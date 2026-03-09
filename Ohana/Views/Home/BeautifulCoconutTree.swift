@@ -75,6 +75,12 @@ struct BeautifulCoconutTree: View {
     var body: some View {
         ZStack(alignment: .bottom) {
 
+            // ── 背景光效（Sunbeams, Lv9+)
+            if level >= 9 {
+                SunbeamsView()
+                    .offset(y: -100)
+            }
+
             // ── 升级冲击波（在树冠中心位置）
             if burstKey > 0 {
                 Circle()
@@ -87,7 +93,15 @@ struct BeautifulCoconutTree: View {
                     .allowsHitTesting(false)
             }
 
-            // ── 底部阴影椭圆
+            // ── 底部光环与阴影（绿洲神池）
+            if level >= 7 {
+                Ellipse()
+                    .fill(Color(hex: "0EA5E9").opacity(0.6))
+                    .frame(width: trunkW * 6, height: trunkW * 2)
+                    .blur(radius: 12)
+                    .animation(.spring(response: 1.5), value: level)
+            }
+
             Ellipse()
                 .fill(isMax ? Color(hex: "0F172A") : Color(hex: "271A14"))
                 .frame(width: trunkW * 5, height: trunkW * 1.6)
@@ -118,6 +132,12 @@ struct BeautifulCoconutTree: View {
                     .shadow(color: Color(hex: "84CC16").opacity(0.6), radius: 4)
                     .opacity(0.8)
                     .animation(.easeOut(duration: 2.0), value: vineProgress)
+            }
+
+            // ── 神圣光环 (Divine Halo, Lv6+)
+            if level >= 6 {
+                DivineHaloView(isSwaying: isSwaying)
+                    .offset(x: bend + trunkW * 0.4, y: -(trunkH))
             }
 
             // ── 树冠（树叶 + 椰子，摇摆）
@@ -161,6 +181,16 @@ struct BeautifulCoconutTree: View {
                             value: cfg.coconutCount
                         )
                     }
+                }
+
+                // ── 符文 (Runes, Lv10)
+                if isMax {
+                    RunesView(isSwaying: isSwaying)
+                }
+
+                // ── 星尘 (Stardust, Lv8+)
+                if level >= 8 {
+                    StardustView()
                 }
             }
             // 树冠对齐树干顶端（对应 React animate.x/y）
@@ -389,6 +419,94 @@ struct CoconutView: View {
                     .offset(x: -4, y: -6)
             }
         }
+    }
+}
+
+// MARK: - Special Visual Effects (AI Studio Features)
+
+struct SunbeamsView: View {
+    @State private var breathe = false
+    var body: some View {
+        Path { path in
+            path.move(to: CGPoint(x: -60, y: -200))
+            path.addLine(to: CGPoint(x: 60, y: -200))
+            path.addLine(to: CGPoint(x: 200, y: 300))
+            path.addLine(to: CGPoint(x: -200, y: 300))
+            path.closeSubpath()
+        }
+        .fill(LinearGradient(colors: [.white.opacity(0.15), .clear], startPoint: .top, endPoint: .bottom))
+        .opacity(breathe ? 0.8 : 0.3)
+        .blendMode(.screen)
+        .allowsHitTesting(false)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) {
+                breathe = true
+            }
+        }
+    }
+}
+
+struct DivineHaloView: View {
+    var isSwaying: Bool
+    var body: some View {
+        Circle()
+            .strokeBorder(
+                AngularGradient(colors: [Color(hex: "00FFD1"), Color(hex: "C8FF00"), Color(hex: "00FFD1")], center: .center),
+                style: StrokeStyle(lineWidth: 1.5, dash: [6, 10])
+            )
+            .frame(width: 240, height: 240)
+            .rotationEffect(.degrees(isSwaying ? 360 : 0))
+            .animation(.linear(duration: 25).repeatForever(autoreverses: false), value: isSwaying)
+            .opacity(0.8)
+            .allowsHitTesting(false)
+    }
+}
+
+struct RunesView: View {
+    var isSwaying: Bool
+    private let runes = ["✧", "✦", "✺", "✵", "❂", "❀"]
+    var body: some View {
+        ZStack {
+            ForEach(0..<runes.count, id: \.self) { i in
+                let angle = Double(i) * (360.0 / Double(runes.count))
+                Text(runes[i])
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color(hex: "C8FF00"))
+                    .shadow(color: Color(hex: "00FFD1"), radius: 4)
+                    .offset(y: -130)
+                    .rotationEffect(.degrees(angle))
+            }
+        }
+        .rotationEffect(.degrees(isSwaying ? -360 : 0))
+        .animation(.linear(duration: 30).repeatForever(autoreverses: false), value: isSwaying)
+        .opacity(0.9)
+        .allowsHitTesting(false)
+    }
+}
+
+struct StardustView: View {
+    @State private var animate = false
+    var body: some View {
+        ZStack {
+            ForEach(0..<12, id: \.self) { i in
+                Capsule()
+                    .fill(Color.white)
+                    .frame(width: 2, height: CGFloat.random(in: 4...12))
+                    .opacity(animate ? 0.1 : 0.8)
+                    .offset(
+                        x: CGFloat.random(in: -100...100),
+                        y: animate ? 150 : -100
+                    )
+                    .animation(
+                        .linear(duration: Double.random(in: 2...4))
+                            .repeatForever(autoreverses: false)
+                            .delay(Double.random(in: 0...2)),
+                        value: animate
+                    )
+            }
+        }
+        .allowsHitTesting(false)
+        .onAppear { animate = true }
     }
 }
 
