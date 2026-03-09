@@ -263,8 +263,11 @@ struct AddPetWizardView: View {
         .sheet(item: $cropImageItem) { item in
             NavigationStack {
                 PetImageCropView(image: item.image) { cropped in
-                    avatarImageData = cropped.jpegData(compressionQuality: 0.92)
+                    if let cropped {
+                        avatarImageData = cropped.jpegData(compressionQuality: 0.92)
+                    }
                     cropImageItem = nil
+                    photosPickerItem = nil
                 }
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
@@ -1093,6 +1096,7 @@ struct AddPetWizardView: View {
                 if !eyeColor.isEmpty { confirmCell(icon: "eye.fill", label: "瞳色", value: eyeColor) }
                 if !microchipID.isEmpty { confirmCell(icon: "cpu", label: "芯片号", value: microchipID) }
                 if !passportNumber.isEmpty { confirmCell(icon: "doc.fill", label: "护照号", value: passportNumber) }
+                confirmCell(icon: "paintpalette.fill", label: "主题色", value: "#\(themeColorHex.uppercased())")
             }
 
             if hasBirthday && !humanAgeText.isEmpty {
@@ -1477,7 +1481,7 @@ struct PetCameraPickerView: UIViewControllerRepresentable {
 // MARK: - Image Crop View（方形取景框，统一坐标空间）
 struct PetImageCropView: View {
     let image: UIImage
-    let onCrop: (UIImage) -> Void
+    let onCrop: (UIImage?) -> Void
 
     // 取景框边长
     private let cropSize: CGFloat = 280
@@ -1535,7 +1539,7 @@ struct PetImageCropView: View {
                 VStack {
                     Spacer()
                     HStack(spacing: 16) {
-                        Button("取消") { onCrop(normalizedImage(image)) }
+                        Button("取消") { onCrop(nil) }
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
                             .foregroundStyle(.white.opacity(0.7))
                             .padding(.horizontal, 32).padding(.vertical, 14)
