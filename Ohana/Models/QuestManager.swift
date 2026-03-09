@@ -100,6 +100,7 @@ final class QuestManager {
         case .walk:              return nil   // GPS 距离门槛控制
         case .health:            return nil
         case .expense:           return nil
+        case .weight:            return nil
         case .milestone:         return nil
         case .general:           return 2 * 3600
         }
@@ -117,6 +118,7 @@ final class QuestManager {
         case .walk:              aKey = "walk"
         case .health:            aKey = "health"
         case .expense:           aKey = "expense"
+        case .weight:            aKey = "weight"
         case .milestone:         aKey = "milestone"
         case .general(_, _, _, let t): aKey = "general_\(t.prefix(10))"
         }
@@ -181,6 +183,7 @@ final class QuestManager {
         case health
         case expense
         case milestone
+        case weight
         case general(humanReward: Int, petReward: Int, emoji: String, title: String)
 
         /// 基础奖励（未暴击时）
@@ -207,6 +210,8 @@ final class QuestManager {
                 return (20, 20)
             case .expense:
                 return (10, 0)
+            case .weight:
+                return (5, 5)
             case .milestone:
                 return (50, 50)
             case .general(let h, let p, _, _):
@@ -230,6 +235,7 @@ final class QuestManager {
                 }
             case .health:  return "💉"
             case .expense: return "💰"
+            case .weight:  return "⚖️"
             case .milestone: return "🏆"
             case .general(_, _, let e, _): return e
             }
@@ -254,6 +260,7 @@ final class QuestManager {
                 return "\(n) \(label)奖励"
             case .health:  return "\(n) 健康打卡奖励"
             case .expense: return "记账奖励"
+            case .weight:  return "\(n) 体重记录奖励"
             case .milestone: return "\(n) 里程碑达成"
             case .general(_, _, _, let t): return t
             }

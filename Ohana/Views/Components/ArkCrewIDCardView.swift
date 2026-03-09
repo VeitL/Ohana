@@ -2044,7 +2044,7 @@ enum QACardType: String, CaseIterable, Codable {
         case "猫":
             return [.litter, .feed, .water, .potty, .play, .care, .health, .expense, .weight]
         case "鱼", "热带鱼", "金鱼", "锦鲤":
-            return [.feed, .waterChange, .filterClean, .health, .expense]
+            return [.feed, .waterChange, .filterClean, .play, .health, .expense]
         case "鸟", "鹦鹉", "文鸟", "鸽子":
             return [.feed, .water, .cageCleaning, .freeFlight, .play, .health, .expense, .weight]
         case "兔子", "仓鼠", "龙猫", "豚鼠":
