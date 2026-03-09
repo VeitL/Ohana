@@ -314,16 +314,25 @@ struct AddQuickActionSheet: View {
         ActionOption(id: "walk",    label: "遛狗",  icon: "figure.walk",    colorHex: "C8FF00", speciesFilter: "狗"),
         ActionOption(id: "feed",    label: "喂食",  icon: "fork.knife",     colorHex: "FFDD44", speciesFilter: nil),
         ActionOption(id: "water",   label: "喂水",  icon: "drop.fill",      colorHex: "00D4AA", speciesFilter: nil),
-        ActionOption(id: "potty",   label: "便便",  icon: "allergens",      colorHex: "FF8C42", speciesFilter: "狗"),
+        ActionOption(id: "potty",   label: "便便",  icon: "allergens",      colorHex: "FF8C42", speciesFilter: nil), // Removed "狗" filter
         ActionOption(id: "litter",  label: "铲屎",  icon: "trash.fill",     colorHex: "5B6AFF", speciesFilter: "猫"),
         ActionOption(id: "groom",   label: "护理",  icon: "scissors",       colorHex: "FF8C42", speciesFilter: nil),
         ActionOption(id: "health",  label: "健康",  icon: "heart.fill",     colorHex: "FF4757", speciesFilter: nil),
         ActionOption(id: "expense", label: "花费",  icon: "yensign.circle", colorHex: "A78BFA", speciesFilter: nil),
         ActionOption(id: "weight",  label: "体重",  icon: "scalemass.fill", colorHex: "80FFEA", speciesFilter: nil),
+        ActionOption(id: "play",    label: "逗玩",  icon: "tennisball.fill", colorHex: "FF6B6B", speciesFilter: nil),
+        ActionOption(id: "waterChange",    label: "换水",  icon: "drop.circle.fill", colorHex: "4ECDC4", speciesFilter: nil),
+        ActionOption(id: "filterClean",    label: "清滤材", icon: "wrench.and.screwdriver.fill", colorHex: "A78BFA", speciesFilter: nil),
+        ActionOption(id: "cageCleaning",   label: "清鸟笼", icon: "basket.fill", colorHex: "FFD166", speciesFilter: nil),
+        ActionOption(id: "freeFlight",     label: "放飞",  icon: "bird.fill", colorHex: "06D6A0", speciesFilter: nil),
+        ActionOption(id: "misting",        label: "喷水",  icon: "cloud.drizzle.fill", colorHex: "118AB2", speciesFilter: nil),
+        ActionOption(id: "substrateChange",label: "换垫材", icon: "leaf.fill", colorHex: "07DB8B", speciesFilter: nil),
     ]
 
     private func availableActions(for pet: Pet) -> [ActionOption] {
-        let petActions = allActions.filter { $0.speciesFilter == nil || $0.speciesFilter == pet.species }
+        // We now rely on QACardType.available(for:) which is the source of truth for allowed cards per species.
+        let allowedCardIds = Set(QACardType.available(for: pet.species).map { $0.rawValue })
+        let petActions = allActions.filter { allowedCardIds.contains($0.id) }
         let existingTypes = Set(existingItems.filter { $0.petId == pet.id }.map { $0.actionType })
         return petActions.filter { !existingTypes.contains($0.id) }
     }
