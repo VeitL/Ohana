@@ -189,6 +189,39 @@ struct SettingsView: View {
                             }
                         }
 
+                        // 开发者工具
+                        settingsSection(title: "开发者工具") {
+                            NavigationLink {
+                                OhanaUIDemoView()
+                                    .navigationBarBackButtonHidden()
+                            } label: {
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .fill(Color.goPrimary.opacity(0.12))
+                                            .frame(width: 32, height: 32)
+                                        Image(systemName: "paintpalette.fill")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundStyle(Color.goPrimary)
+                                    }
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("UI 规范测试")
+                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                            .foregroundStyle(.white)
+                                        Text("查看所有 UI 元素的 Light/Dark 表现")
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(.white.opacity(0.4))
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(.white.opacity(0.2))
+                                }
+                                .padding(.vertical, 2)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
                         // 数据
                         settingsSection(title: "数据") {
                             VStack(spacing: 0) {
