@@ -152,6 +152,7 @@ struct OverviewView: View {
                     case 1: CalendarView()
                     case 2: CrewRosterOverlay(
                         onSelectPet: { pet in
+                            selectedPetTab = .overview
                             selectedPet = pet
                         },
                         onSelectHuman: { human in
