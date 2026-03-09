@@ -26,79 +26,77 @@ struct OhanaUIDemoView: View {
     @State private var barHeights: [CGFloat] = [0.4, 0.7, 0.55, 0.9, 0.3, 0.8, 0.6]
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 28) {
-                    // ─── Mode Toggle ───
-                    modeToggleSection
+        ScrollView {
+            VStack(spacing: 28) {
+                // ─── Mode Toggle ───
+                modeToggleSection
 
-                    // ─── Typography ───
-                    sectionLabel("排版 · Typography")
-                    typographySection
+                // ─── Typography ───
+                sectionLabel("排版 · Typography")
+                typographySection
 
-                    // ─── Color Palette ───
-                    sectionLabel("色板 · Color Palette")
-                    colorPaletteSection
+                // ─── Color Palette ───
+                sectionLabel("色板 · Color Palette")
+                colorPaletteSection
 
-                    // ─── Buttons ───
-                    sectionLabel("按钮 · Buttons")
-                    buttonsSection
+                // ─── Buttons ───
+                sectionLabel("按钮 · Buttons")
+                buttonsSection
 
-                    // ─── Cards ───
-                    sectionLabel("卡片 · Cards (统一风格)")
-                    cardsSection
+                // ─── Cards ───
+                sectionLabel("卡片 · Cards (统一风格)")
+                cardsSection
 
-                    // ─── Inputs ───
-                    sectionLabel("输入 · Inputs")
-                    inputsSection
+                // ─── Inputs ───
+                sectionLabel("输入 · Inputs")
+                inputsSection
 
-                    // ─── Alerts ─── 4 styles side-by-side
-                    sectionLabel("提示横幅 · Alert Banners — 4种风格")
-                    alertsSection
+                // ─── Alerts ─── 4 styles side-by-side
+                sectionLabel("提示横幅 · Alert Banners — 4种风格")
+                alertsSection
 
-                    // ─── Tags & Chips ─── 3 styles
-                    sectionLabel("标签 · Tags & Chips — 3种风格")
-                    tagsSection
+                // ─── Tags & Chips ─── 3 styles
+                sectionLabel("标签 · Tags & Chips — 3种风格")
+                tagsSection
 
-                    // ─── Dividers ───
-                    sectionLabel("分割线 · Dividers")
-                    dividersSection
+                // ─── Dividers ───
+                sectionLabel("分割线 · Dividers")
+                dividersSection
 
-                    // ─── Progress & Metrics ───
-                    sectionLabel("进度 & 大字 · Progress & Metrics")
-                    progressSection
+                // ─── Progress & Metrics ───
+                sectionLabel("进度 & 大字 · Progress & Metrics")
+                progressSection
 
-                    // ─── Charts ───
-                    sectionLabel("图表 · Charts")
-                    chartsSection
+                // ─── Charts ───
+                sectionLabel("图表 · Charts")
+                chartsSection
 
-                    // ─── Animations ───
-                    sectionLabel("动画 · Animations")
-                    animationsSection
+                // ─── Animations ───
+                sectionLabel("动画 · Animations")
+                animationsSection
 
-                    Spacer(minLength: 60)
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
+                Spacer(minLength: 60)
             }
-            .background {
-                if isDarkMode { ArkBackgroundView() }
-                else { Color(hex: "F4F5F9").ignoresSafeArea() }
-            }
-            .navigationTitle("UI 规范")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .preferredColorScheme(isDarkMode ? .dark : .light)
-            .onAppear { startAnimations() }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
         }
+        .background {
+            if isDarkMode { ArkBackgroundView() }
+            else { Color(hex: "F4F5F9").ignoresSafeArea() }
+        }
+        .navigationTitle("UI 规范")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .preferredColorScheme(isDarkMode ? .dark : .light)
+        .onAppear { startAnimations() }
     }
 
     // MARK: - Mode Toggle
