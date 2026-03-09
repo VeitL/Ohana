@@ -1303,6 +1303,13 @@ struct OverviewView: View {
             }
             let bathGot = QuestManager.shared.awardAction(type: .care(type: .bath), pet: pet, context: modelContext)
             showToast(pet, message: "\(pet.name) 洗澡打卡 +\(bathGot.petGot + bathGot.humanGot)🥥", emoji: "🛁")
+        case "play":
+            let eidP = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
+            let playLog = PetCareLog(date: Date(), type: .play, pet: pet, executorId: eidP)
+            modelContext.insert(playLog)
+            let oat = QuestManager.OhanaActionType.general(humanReward: 10, petReward: 12, emoji: "🎾", title: "\(pet.name) 互动奖励")
+            let playGot = QuestManager.shared.awardAction(type: oat, pet: pet, context: modelContext)
+            showToast(pet, message: "\(pet.name) 逗玩打卡 +\(playGot.petGot + playGot.humanGot)🥥", emoji: "🎾")
         default:
             selectedPetTab = .overview
             selectedPet = pet
