@@ -38,6 +38,7 @@ struct OasisRewardView: View {
     @State private var glowBreathing: Bool  = false
     @State private var flyCoconut: Bool     = false
     @State private var flyOpacity: Double   = 0
+    @State private var harvestedCoconutIndices: Set<Int> = []
 
     private let treeMgr = OasisTreeManager.shared
 
@@ -204,7 +205,23 @@ struct OasisRewardView: View {
             // 动态生长椰子树
             BeautifulCoconutTree(
                 level: treeMgr.treeLevel.rawValue,
-                isInjecting: isInjecting
+                isInjecting: isInjecting,
+                harvestedCoconuts: harvestedCoconutIndices,
+                onHarvest: { idx in
+                    // 单椰子点击 → +1 椰子，标记该椰子为已采摘
+                    guard !harvestedCoconutIndices.contains(idx) else { return }
+                    harvestedCoconutIndices.insert(idx)
+                    QuestManager.shared.addCoconuts(1, emoji: "🥥", title: "摘下椰子 +1🥥")
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    flyCoconut = false
+                    flyOpacity = 1
+                    withAnimation(.spring(response: 0.55, dampingFraction: 0.6).delay(0.05)) {
+                        flyCoconut = true
+                    }
+                    withAnimation(.easeOut(duration: 0.3).delay(0.6)) {
+                        flyOpacity = 0
+                    }
+                }
             )
             .shadow(color: Color.goLime.opacity(glowBreathing ? 0.45 : 0.15), radius: glowBreathing ? 24 : 10, x: 0, y: 0)
             .scaleEffect(levelUpPulse ? 1.12 : treeScale)

@@ -19,6 +19,7 @@ struct PetMilestoneListView: View {
     @State private var newDate       = Date()
     @State private var newNotes      = ""
     @State private var newLocation   = ""
+    @State private var showingLocationPicker = false
     @State private var newPhotoItem: PhotosPickerItem? = nil
     @State private var newPhotoData: Data? = nil
     @State private var selectedMilestone: PetMilestone? = nil
@@ -64,6 +65,44 @@ struct PetMilestoneListView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showAddSheet) { addMilestoneSheet }
         .sheet(item: $selectedMilestone) { m in MilestoneDetailSheet(milestone: m, pet: pet) }
+        .onAppear { autoCreateMilestones() }
+    }
+
+    // MARK: - 自动生成里程碑（生日、到家日、最重/最轻体重）
+    private func autoCreateMilestones() {
+        let existingTitles = Set(pet.milestones.map { $0.title })
+
+        // 生日
+        if let bday = pet.birthday {
+            let title = "\(pet.name)的生日 🎂"
+            if !existingTitles.contains(title) {
+                let m = PetMilestone(date: bday, title: title, emoji: "🎂",
+                    notes: "出生啦！", pet: pet)
+                modelContext.insert(m)
+            }
+        }
+
+        // 到家日（领养/购买）
+        if let homeDate = pet.homeDate {
+            let title = "\(pet.name)到家了 🏠"
+            if !existingTitles.contains(title) {
+                let m = PetMilestone(date: homeDate, title: title, emoji: "🏠",
+                    notes: "第一天回家!", pet: pet)
+                modelContext.insert(m)
+            }
+        }
+
+        // 最重体重记录
+        if let heaviest = pet.weightLogs.max(by: { $0.weight < $1.weight }) {
+            let title = "最重记录：\(String(format: "%.1f", heaviest.weight))kg"
+            if !existingTitles.contains(title) {
+                let m = PetMilestone(date: heaviest.date, title: title, emoji: "⚖️",
+                    notes: "历史最高体重记录", pet: pet)
+                modelContext.insert(m)
+            }
+        }
+
+        modelContext.safeSave()
     }
 
     // MARK: - Header
@@ -277,19 +316,34 @@ struct PetMilestoneListView: View {
                         .overlay(RoundedRectangle(cornerRadius: 14)
                             .strokeBorder(.white.opacity(0.12), lineWidth: 1))
 
-                        // 地址
-                        HStack(spacing: 10) {
-                            Image(systemName: "mappin.circle.fill")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.goYellow)
-                            TextField("地址（可选）", text: $newLocation)
-                                .font(.system(size: 14))
-                                .foregroundStyle(.white)
-                                .tint(Color.goYellow)
+                        // 地址选择 (地图搜索)
+                        Button {
+                            showingLocationPicker = true
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "mappin.circle.fill")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(Color.goYellow)
+                                if newLocation.isEmpty {
+                                    Text("地点（点此从地图选择）")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(.white.opacity(0.4))
+                                } else {
+                                    Text(newLocation)
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(.white)
+                                        .lineLimit(1)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(.white.opacity(0.25))
+                            }
+                            .padding(.horizontal, 14).padding(.vertical, 12)
+                            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.white.opacity(0.12), lineWidth: 1))
                         }
-                        .padding(.horizontal, 14).padding(.vertical, 12)
-                        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.white.opacity(0.12), lineWidth: 1))
+                        .buttonStyle(.plain)
 
                         // 备注
                         TextField("备注（可选）", text: $newNotes, axis: .vertical)
@@ -390,6 +444,133 @@ struct PetMilestoneListView: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
         .preferredColorScheme(.dark)
+        .sheet(isPresented: $showingLocationPicker) {
+            MapLocationPickerSheet(selectedLocation: $newLocation)
+        }
+    }
+}
+
+// MARK: - 地图地点搜索选择器
+struct MapLocationPickerSheet: View {
+    @Binding var selectedLocation: String
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var searchText = ""
+    @State private var results: [MKMapItem] = []
+    @State private var isSearching = false
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color(hex: "0D0638").ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    // 搜索框
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                        TextField("搜索地点、医院、公园…", text: $searchText)
+                            .foregroundStyle(.white)
+                            .tint(Color.goYellow)
+                            .submitLabel(.search)
+                            .onSubmit { performSearch() }
+                        if !searchText.isEmpty {
+                            Button { searchText = ""; results = [] } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 12)
+                    .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+                    .padding(.horizontal, 16).padding(.vertical, 12)
+
+                    if isSearching {
+                        ProgressView()
+                            .tint(Color.goYellow)
+                            .padding(.top, 40)
+                        Spacer()
+                    } else if results.isEmpty && !searchText.isEmpty {
+                        VStack(spacing: 10) {
+                            Image(systemName: "mappin.slash").font(.system(size: 36)).foregroundStyle(.white.opacity(0.3))
+                            Text("没有找到匹配地点")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.4))
+                        }.padding(.top, 60)
+                        Spacer()
+                    } else if results.isEmpty {
+                        VStack(spacing: 10) {
+                            Image(systemName: "mappin.and.ellipse").font(.system(size: 36)).foregroundStyle(Color.goYellow.opacity(0.4))
+                            Text("输入地名开始搜索")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.4))
+                        }.padding(.top, 60)
+                        Spacer()
+                    } else {
+                        List(results, id: \.self) { item in
+                            Button {
+                                selectedLocation = item.name ?? item.placemark.title ?? ""
+                                dismiss()
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(item.name ?? "未知地点")
+                                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(.white)
+                                    if let addr = item.placemark.title, addr != item.name {
+                                        Text(addr)
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundStyle(.white.opacity(0.4))
+                                            .lineLimit(1)
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            .buttonStyle(.plain)
+                            .listRowBackground(Color.white.opacity(0.05))
+                            .listRowSeparatorTint(.white.opacity(0.1))
+                        }
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
+                    }
+                }
+            }
+            .navigationTitle("选择地点")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("取消") { dismiss() }
+                        .foregroundStyle(.secondary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    if !searchText.isEmpty {
+                        Button("搜索") { performSearch() }
+                            .foregroundStyle(Color.goYellow)
+                            .fontWeight(.bold)
+                    }
+                }
+            }
+            .onChange(of: searchText) { _, new in
+                if new.count >= 2 { performSearch() }
+                else if new.isEmpty { results = [] }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private func performSearch() {
+        guard !searchText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        isSearching = true
+        let req = MKLocalSearch.Request()
+        req.naturalLanguageQuery = searchText
+        let search = MKLocalSearch(request: req)
+        search.start { resp, _ in
+            DispatchQueue.main.async {
+                isSearching = false
+                results = resp?.mapItems ?? []
+            }
+        }
     }
 }
 

@@ -13,6 +13,7 @@ struct DocumentsListView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var showingAdd = false
     @State private var editingDoc: PetDocument? = nil
+    @State private var detailDoc: PetDocument? = nil
 
     private var sortedDocs: [PetDocument] {
         pet.documents.sorted { ($0.expiryDate ?? .distantFuture) < ($1.expiryDate ?? .distantFuture) }
@@ -27,12 +28,13 @@ struct DocumentsListView: View {
                         emptyState
                     } else {
                         ForEach(sortedDocs) { doc in
-                            DocumentDetailRow(doc: doc, onEdit: {
-                                editingDoc = doc
-                            }, onDelete: {
-                                modelContext.delete(doc)
-                                modelContext.safeSave()
-                            })
+                            DocumentDetailRow(doc: doc,
+                                onDetail: { detailDoc = doc },
+                                onEdit: { editingDoc = doc },
+                                onDelete: {
+                                    modelContext.delete(doc)
+                                    modelContext.safeSave()
+                                })
                         }
                     }
                     Spacer(minLength: 40)
@@ -57,6 +59,9 @@ struct DocumentsListView: View {
         .sheet(item: $editingDoc) { doc in
             EditDocumentSheet(doc: doc, pet: pet)
         }
+        .sheet(item: $detailDoc) { doc in
+            DocumentDetailSheet(doc: doc, pet: pet, onEdit: { editingDoc = doc })
+        }
     }
 
     private var emptyState: some View {
@@ -78,6 +83,7 @@ struct DocumentsListView: View {
 // MARK: - Document Detail Row
 private struct DocumentDetailRow: View {
     let doc: PetDocument
+    let onDetail: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
 
@@ -173,8 +179,11 @@ private struct DocumentDetailRow: View {
         }
         .padding(14)
         .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
-        .onTapGesture { onEdit() }
+        .onTapGesture { onDetail() }
         .contextMenu {
+            Button { onDetail() } label: {
+                Label("查看详情", systemImage: "doc.text.magnifyingglass")
+            }
             Button { onEdit() } label: {
                 Label("编辑证件", systemImage: "pencil")
             }
