@@ -47,6 +47,19 @@ struct GoQuickActionCard: View {
 
     private var isGroom: Bool { item.actionType == "groom" }
 
+    /// 根据 actionType 获取干净的显示名（不含宠物名）
+    private var cleanLabel: String {
+        let map: [String: String] = [
+            "walk": "遛狗", "feed": "喂食", "water": "喂水",
+            "potty": "便便", "litter": "铲屎", "groom": "护理",
+            "health": "健康", "expense": "花费", "weight": "体重",
+            "play": "逗玩", "waterChange": "换水", "filterClean": "清滤材",
+            "cageCleaning": "清鸟笼", "freeFlight": "放飞",
+            "misting": "喷水", "substrateChange": "换垫材"
+        ]
+        return map[item.actionType] ?? item.label
+    }
+
     private var cardBgColor: Color {
         let base = petThemeColorHex.map { Color(hex: $0) } ?? Color(hex: item.colorHex)
         return pendingReminder != nil ? base.opacity(0.22) : base.opacity(0.14)
@@ -55,6 +68,9 @@ struct GoQuickActionCard: View {
         let base = petThemeColorHex.map { Color(hex: $0) } ?? Color(hex: item.colorHex)
         return pendingReminder != nil ? base.opacity(0.7) : base.opacity(0.3)
     }
+
+    @Environment(\.colorScheme) private var colorScheme
+    private var isDarkMode: Bool { colorScheme == .dark }
 
     var body: some View {
         Button(action: {
@@ -66,76 +82,80 @@ struct GoQuickActionCard: View {
             }
         }) {
             ZStack(alignment: .topTrailing) {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(cardBgColor)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .strokeBorder(cardBorderColor, lineWidth: pendingReminder != nil ? 1.5 : 1)
-                    )
-
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .top) {
                         Image(systemName: item.icon)
                             .font(.system(size: 20, weight: .bold))
                             .foregroundStyle(Color(hex: item.colorHex))
-                            .padding(.top, 12)
-                            .padding(.leading, 10)
-                        Spacer()
+                        Spacer(minLength: 0)
                         if let img = petAvatar {
                             Image(uiImage: img)
                                 .resizable()
                                 .scaledToFill()
-                                .frame(width: 22, height: 22)
+                                .frame(width: 16, height: 16)
                                 .clipShape(Circle())
                                 .overlay(Circle().strokeBorder(.white.opacity(0.3), lineWidth: 1))
-                                .padding(.top, 8)
-                                .padding(.trailing, 8)
-                        } else {
+                        } else if pendingReminder == nil {
                             Circle()
                                 .fill(Color(hex: item.colorHex).opacity(0.3))
-                                .frame(width: 10, height: 10)
-                                .padding(.top, 10)
-                                .padding(.trailing, 10)
+                                .frame(width: 6, height: 6)
                         }
                     }
-
-                    Spacer()
-
-                    VStack(alignment: .leading, spacing: 2) {
+                    
+                    Spacer(minLength: 0)
+                    
+                    VStack(alignment: .leading, spacing: 0) {
                         if let reminder = pendingReminder {
-                            Text(reminder.event?.title ?? item.label)
-                                .font(.system(size: 10, weight: .black, design: .rounded))
+                            Text(reminder.event?.title ?? cleanLabel)
+                                .font(.system(size: 13, weight: .black, design: .rounded))
                                 .foregroundStyle(Color(hex: item.colorHex))
                                 .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                             Text("待办")
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(isDarkMode ? .white.opacity(0.5) : Color.arkInk.opacity(0.5))
                         } else {
-                            Text(item.label)
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.8))
-                                .lineLimit(1)
                             if let ct = countText {
-                                Text(ct)
-                                    .font(.system(size: 9, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(Color(hex: item.colorHex).opacity(0.8))
+                                Text(cleanLabel)
+                                    .font(.system(size: 13, weight: .black, design: .rounded))
+                                    .foregroundStyle(isDarkMode ? .white : Color.arkInk)
                                     .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                Text(ct)
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(isDarkMode ? .white.opacity(0.6) : Color.arkInk.opacity(0.6))
+                                    .lineLimit(1)
+                            } else {
+                                Text(cleanLabel)
+                                    .font(.system(size: 13, weight: .black, design: .rounded))
+                                    .foregroundStyle(isDarkMode ? .white : Color.arkInk)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                // 保持和有数据的卡片一致的布局高度
+                                Text(" ")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(.clear)
                             }
                         }
                     }
-                    .padding(.leading, 10)
-                    .padding(.bottom, 10)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .aspectRatio(1, contentMode: .fit)
+                .padding(10)
+                .ohanaStandardCard(cornerRadius: 16)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(pendingReminder != nil ? Color(hex: item.colorHex).opacity(0.5) : .clear, lineWidth: 2)
+                )
 
                 if pendingReminder != nil {
                     Circle()
                         .fill(Color.goRed)
                         .frame(width: 8, height: 8)
-                        .padding(.top, 7)
-                        .padding(.trailing, 7)
+                        .padding(.top, 10)
+                        .padding(.trailing, 10)
                 }
             }
-            .frame(height: 84)
             .scaleEffect(isPressed ? 0.93 : 1.0)
             .animation(.spring(response: 0.25, dampingFraction: 0.6), value: isPressed)
         }
@@ -504,7 +524,7 @@ struct AddQuickActionSheet: View {
                         Button {
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             onAdd(QuickActionItem(
-                                label: "\(pet.name)\(action.label)",
+                                label: action.label,
                                 icon: action.icon, colorHex: action.colorHex,
                                 petId: pet.id, actionType: action.id
                             ))

@@ -158,7 +158,7 @@ struct HumanDetailView: View {
         }
         .padding(.vertical, 24)
         .frame(maxWidth: .infinity)
-        .goTranslucentCard(cornerRadius: 28)
+        .ohanaStandardCard(cornerRadius: 28)
         .padding(.horizontal, 16)
     }
 
@@ -222,7 +222,7 @@ struct HumanDetailView: View {
                     .foregroundStyle(.white.opacity(0.3))
             }
             .padding(.horizontal, 16).padding(.vertical, 14)
-            .goTranslucentCard(cornerRadius: 20)
+            .ohanaStandardCard(cornerRadius: 20)
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
@@ -258,7 +258,7 @@ struct HumanDetailView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16).padding(.vertical, 14)
-        .goTranslucentCard(cornerRadius: 20)
+        .ohanaStandardCard(cornerRadius: 20)
         .padding(.horizontal, 16)
     }
 
@@ -299,7 +299,7 @@ struct HumanDetailView: View {
                 }
                 .padding(.horizontal, 16).padding(.vertical, 14)
             }
-            .goTranslucentCard(cornerRadius: 20)
+            .ohanaStandardCard(cornerRadius: 20)
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
@@ -333,7 +333,7 @@ struct HumanDetailView: View {
             .labelsHidden()
         }
         .padding(.horizontal, 16).padding(.vertical, 14)
-        .goTranslucentCard(cornerRadius: 20)
+        .ohanaStandardCard(cornerRadius: 20)
         .padding(.horizontal, 16)
     }
 
@@ -399,7 +399,7 @@ struct HumanDetailView: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 20)
+        .ohanaStandardCard(cornerRadius: 20)
         .padding(.horizontal, 16)
     }
     
@@ -421,7 +421,7 @@ struct HumanDetailView: View {
                         .foregroundStyle(.white.opacity(0.7))
                 }
                 .padding(16)
-                .goTranslucentCard(cornerRadius: 20)
+                .ohanaStandardCard(cornerRadius: 20)
                 .padding(.horizontal, 16)
             }
         }

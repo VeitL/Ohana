@@ -13,6 +13,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @AppStorage("appLanguage") private var appLanguage = "zh"
+    @AppStorage("appThemePreference") private var appThemePreference: String = "system"
     @AppStorage("userNickname") private var userNickname = ""
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
     @State private var showingNicknameEdit = false
@@ -78,6 +79,24 @@ struct SettingsView: View {
                                 .pickerStyle(.menu)
                             }
                             .foregroundStyle(.primary)
+                            
+                            // 外观主题
+                            HStack {
+                                Image(systemName: "circle.lefthalf.filled")
+                                    .foregroundStyle(.purple)
+                                    .frame(width: 28)
+                                Text("外观主题")
+                                    .font(.system(size: 15, weight: .medium))
+                                Spacer()
+                                Picker("", selection: $appThemePreference) {
+                                    Text("跟随系统").tag("system")
+                                    Text("浅色模式").tag("light")
+                                    Text("深色模式").tag("dark")
+                                }
+                                .pickerStyle(.menu)
+                            }
+                            .foregroundStyle(.primary)
+                            .padding(.top, 8)
                         }
                         
                         // 通知
@@ -96,15 +115,15 @@ struct SettingsView: View {
                         settingsSection(title: "关于") {
                             VStack(spacing: 0) {
                                 settingsRow(icon: "info.circle", title: "版本", subtitle: "v4.5.0") {}
-                                GoDashedDivider().padding(.leading, 44)
+                                OhanaDashedDivider(color: .white.opacity(0.1)).padding(.leading, 44)
                                 settingsRow(icon: "star.fill", title: "评价 App", subtitle: "") {
                                     if let url = URL(string: "https://apps.apple.com/app/id6742117937?action=write-review") {
                                         UIApplication.shared.open(url)
                                     }
                                 }
-                                GoDashedDivider().padding(.leading, 44)
+                                OhanaDashedDivider(color: .white.opacity(0.1)).padding(.leading, 44)
                                 settingsRow(icon: "lock.shield", title: "隐私政策", subtitle: "") {}
-                                GoDashedDivider().padding(.leading, 44)
+                                OhanaDashedDivider(color: .white.opacity(0.1)).padding(.leading, 44)
                                 settingsRow(icon: "envelope", title: "联系开发者", subtitle: "") {}
                             }
                         }
@@ -114,7 +133,7 @@ struct SettingsView: View {
                             settingsSection(title: "宠物管理") {
                                 VStack(spacing: 0) {
                                     ForEach(Array(pets.enumerated()), id: \.element.id) { i, pet in
-                                        if i > 0 { GoDashedDivider().padding(.leading, 44) }
+                                        if i > 0 { OhanaDashedDivider(color: .white.opacity(0.1)).padding(.leading, 44) }
                                         HStack(spacing: 10) {
                                             ZStack {
                                                 RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -226,7 +245,7 @@ struct SettingsView: View {
                         settingsSection(title: "数据") {
                             VStack(spacing: 0) {
                                 settingsRow(icon: "square.and.arrow.up", title: "导出数据", subtitle: "即将推出") {}
-                                GoDashedDivider().padding(.leading, 44)
+                                OhanaDashedDivider(color: .white.opacity(0.1)).padding(.leading, 44)
                                 settingsRow(icon: "exclamationmark.triangle", title: "清除所有数据", subtitle: "") {
                                     showingClearDataAlert = true
                                 }
@@ -392,7 +411,7 @@ struct SettingsView: View {
                 }
                 .padding(.vertical, 6)
 
-                GoDashedDivider().padding(.leading, 44).padding(.vertical, 2)
+                OhanaDashedDivider(color: .white.opacity(0.1)).padding(.leading, 44).padding(.vertical, 2)
 
                 // ── 导入行
                 HStack(spacing: 10) {
@@ -426,7 +445,7 @@ struct SettingsView: View {
                 }
                 .padding(.vertical, 6)
 
-                GoDashedDivider().padding(.leading, 44).padding(.vertical, 2)
+                OhanaDashedDivider(color: .white.opacity(0.1)).padding(.leading, 44).padding(.vertical, 2)
 
                 // ── 说明行
                 HStack(spacing: 8) {
@@ -515,20 +534,20 @@ struct SettingsView: View {
                 .foregroundStyle(.white.opacity(0.2))
         }
         .padding(20)
-        .goTranslucentCard(cornerRadius: 24)
+        .ohanaStandardCard(cornerRadius: 24)
     }
     
     // MARK: - Settings Section
     private func settingsSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title.uppercased())
-                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .font(OhanaFont.caption2(.bold))
                 .foregroundStyle(.white.opacity(0.4))
                 .tracking(1.5)
                 .padding(.leading, 4)
             content()
                 .padding(14)
-                .goTranslucentCard(cornerRadius: 18)
+                .ohanaStandardCard(cornerRadius: 18)
         }
     }
 
@@ -537,26 +556,26 @@ struct SettingsView: View {
             HStack(spacing: 12) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.goLime.opacity(0.12))
+                        .fill(Color.white.opacity(0.08))
                         .frame(width: 32, height: 32)
                     Image(systemName: icon)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Color.goLime)
                 }
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.body(.semibold))
                     .foregroundStyle(.white)
                 Spacer()
                 if !subtitle.isEmpty {
                     Text(subtitle)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.35))
+                        .font(OhanaFont.footnote())
+                        .foregroundStyle(.white.opacity(0.4))
                 }
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.2))
             }
-            .padding(.vertical, 2)
+            .padding(.vertical, 4)
         }
         .buttonStyle(.plain)
     }

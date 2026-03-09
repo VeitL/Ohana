@@ -643,5 +643,166 @@ extension View {
         self.modifier(CoconutBalanceToolbarModifier(onTap: onTap))
     }
 }
+
+// MARK: - Ohana Unified UI Components (Phase 60)
+
+public struct OhanaStandardCardModifier: ViewModifier {
+    var isDarkMode: Bool
+    var cornerRadius: CGFloat
     
+    public func body(content: Content) -> some View {
+        content
+            .background {
+                if isDarkMode {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(LinearGradient(colors: [Color.goDarkBlue.opacity(0.8), Color.goDeepNavy.opacity(0.9)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .overlay(RoundedRectangle(cornerRadius: cornerRadius).strokeBorder(.white.opacity(0.12), lineWidth: 1))
+                } else {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(.white)
+                        .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    }
+}
+
+public extension View {
+    func ohanaStandardCard(isDarkMode: Bool, cornerRadius: CGFloat = 20) -> some View {
+        modifier(OhanaStandardCardModifier(isDarkMode: isDarkMode, cornerRadius: cornerRadius))
+    }
+}
+
+// 自动读取 colorScheme 的版本
+public struct AutoOhanaStandardCardModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+    var cornerRadius: CGFloat
     
+    public func body(content: Content) -> some View {
+        content.modifier(OhanaStandardCardModifier(isDarkMode: colorScheme == .dark, cornerRadius: cornerRadius))
+    }
+}
+
+public extension View {
+    func ohanaStandardCard(cornerRadius: CGFloat = 20) -> some View {
+        modifier(AutoOhanaStandardCardModifier(cornerRadius: cornerRadius))
+    }
+}
+
+/// Icon Button Style B — subtle gradient bg, colored icon, no border
+public struct OhanaIconButton: View {
+    let icon: String
+    let color: Color
+    let action: () -> Void
+    
+    public init(icon: String, color: Color, action: @escaping () -> Void) {
+        self.icon = icon
+        self.color = color
+        self.action = action
+    }
+    
+    public var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(color)
+                .frame(width: 44, height: 44)
+                .background(
+                    LinearGradient(colors: [color.opacity(0.2), color.opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing),
+                    in: RoundedRectangle(cornerRadius: 14)
+                )
+        }
+    }
+}
+
+/// Alert Style D — solid color capsule/toast
+public struct OhanaAlertBanner: View {
+    let icon: String
+    let message: String
+    let bg: Color
+    let fg: Color
+    
+    public init(icon: String, message: String, bg: Color, fg: Color) {
+        self.icon = icon
+        self.message = message
+        self.bg = bg
+        self.fg = fg
+    }
+    
+    public var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon).font(.system(size: 14, weight: .bold)).foregroundStyle(fg)
+            Text(message).font(OhanaFont.callout(.bold)).foregroundStyle(fg)
+            Spacer()
+        }
+        .padding(.horizontal, 16).padding(.vertical, 10)
+        .background(bg, in: Capsule())
+    }
+}
+
+/// Tag Style C — dot + weighted background
+public struct OhanaChip: View {
+    let label: String
+    let color: Color
+    let selected: Bool
+    var isDarkMode: Bool
+    let action: (() -> Void)?
+    
+    public init(label: String, color: Color, selected: Bool, isDarkMode: Bool, action: (() -> Void)? = nil) {
+        self.label = label
+        self.color = color
+        self.selected = selected
+        self.isDarkMode = isDarkMode
+        self.action = action
+    }
+    
+    public var body: some View {
+        let chipContent = HStack(spacing: 6) {
+            Circle().fill(color).frame(width: 6, height: 6)
+            Text(label).font(OhanaFont.callout(.bold))
+                .foregroundStyle(selected ? (isDarkMode ? .white : Color.arkInk) : (isDarkMode ? .white.opacity(0.5) : Color.arkInk.opacity(0.5)))
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(
+            isDarkMode ? (selected ? Color.white.opacity(0.12) : Color.white.opacity(0.05))
+                      : (selected ? color.opacity(0.12) : Color.black.opacity(0.04)),
+            in: RoundedRectangle(cornerRadius: 10)
+        )
+        
+        if let action = action {
+            Button(action: action) { chipContent }
+        } else {
+            chipContent
+        }
+    }
+}
+
+/// QA Card Glass Style
+public struct OhanaQACard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    var isDarkMode: Bool
+    
+    public init(title: String, value: String, icon: String, color: Color, isDarkMode: Bool) {
+        self.title = title
+        self.value = value
+        self.icon = icon
+        self.color = color
+        self.isDarkMode = isDarkMode
+    }
+    
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Image(systemName: icon).font(.system(size: 24, weight: .bold)).foregroundStyle(color)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(value).font(OhanaFont.title2(.black)).foregroundStyle(isDarkMode ? .white : Color.arkInk)
+                Text(title).font(OhanaFont.caption2(.bold)).foregroundStyle(isDarkMode ? .white.opacity(0.5) : Color.arkInk.opacity(0.5))
+            }
+        }
+        .frame(width: 130, alignment: .leading)
+        .padding(16)
+        .ohanaStandardCard(isDarkMode: isDarkMode)
+    }
+}

@@ -1,6 +1,6 @@
 # Ohana (欧哈纳) iOS App 完整技术文档
 
-> 最后更新: 2026-03-09 | Schema: ArkSchemaV19 | Phase 1-76 + TASK A-E + FIX 1-8 + 深度修复 P1-P10 完成 | 编译: iPhone 17 Pro Simulator, iOS 26.2
+> 最后更新: 2026-03-10 | Schema: ArkSchemaV20 | Phase 1-79 + UI 标准化重构 + Inventory & Theme Toggles | 编译: iPhone 17 Pro Simulator, iOS 26.2
 
 ---
 
@@ -11,7 +11,7 @@
 - **核心理念**："Ohana means family. Nobody gets left behind or forgotten."
 - **技术栈**：SwiftUI + SwiftData + Swift Charts, iOS 17+, Swift 6
 - **本地优先**：无需账号，数据存储在设备 SwiftData（SQLite + App Group）
-- **设计风格**：Go UI — 青柠主色调，深蓝渐变背景，毛玻璃卡片，热带岛屿养成氛围
+- **设计风格**：Ohana Design System (基于 Go UI 进化) — 支持 Light/Dark 模式，Bento Box 布局，现代毛玻璃卡片，热带岛屿养成氛围
 - **App Group**：`group.com.guanchen.li.Ark`
 
 ### 项目结构
@@ -86,18 +86,26 @@ Ohana/
 | 标准卡片 | 20pt |
 | 小型卡片/胶囊 | 16pt |
 | 按钮/Badge | 12pt |
-| Chip/Tag | `Capsule()` |
+| Chip/Tag | `Capsule()` (Style C - 带圆点) |
 
-### 2.4 ViewModifier（`OhanaDesignSystem.swift`）
+### 2.4 核心布局与风格规则
+
+*   **卡片容器**：统一使用 `ohanaStandardCard` (自动适配：Dark 模式下为深蓝渐变 + frosted glass, Light 模式下为纯白 + 阴影)
+*   **页面布局**：主要数据流页面（如 Overview, 详情页）采用 **Bento Box (组合方块)** 布局，打破横向堆叠的单调感。
+*   **列表布局**：设置页等重列表页面采用 **Floating Groups**，将分组内容置于单一容器内，使用 `OhanaDashedDivider` 分隔。
+*   **Quick Access (QA)**：采用 **Glass (毛玻璃)** 紧凑小卡片风格，突出核心指标。
+*   **按钮/标签**：统一使用 Style B (无边框 Icon 按钮), Style D (Toast Alert), Style C (圆点标签)。
+
+### 2.5 通用修饰器组件 (`OhanaDesignSystem.swift`)
 
 ```swift
-.goTranslucentCard(cornerRadius: 20)   // 毛玻璃卡片（最常用）
-.goCard(cornerRadius: 20)              // 白色卡片
-.goBlueCard(cornerRadius: 20)          // 蓝色卡片
-.ohanaGlassStyle(cornerRadius: 24)     // 旧版毛玻璃（部分页面保留）
-.neoWhiteCard(cornerRadius: 32)        // 新白色卡
-.coconutRewardOverlay()                // 椰子弹跳动效
+.ohanaStandardCard()                   // 核心：自动适配亮暗模式的卡片背景
+OhanaIconButton(icon:color:action:)    // 核心：Style B 按钮组件
+OhanaAlertBanner(text:icon:style:)     // 核心：Style D 提示横幅
+OhanaQACard(item:...)                  // 核心：Glass 风格 QA 卡片
 ```
+
+*(注意：旧有的 `.goTranslucentCard`, `.goCard`, `.neoWhiteCard` 正在被逐步替换为 `.ohanaStandardCard`)*
 
 ### 2.5 通用组件
 
@@ -126,6 +134,7 @@ CoconutRewardModifier               // 全局椰子弹跳动效
 | V17 | PetMilestone 新增 `photoData: Data?`（lightweight）|
 | **V18** | **PetMilestone 新增 `location: String`**（lightweight，默认 ""）|
 | **V19** | **Pet 新增 `cardStyleRaw: String`**（lightweight，默认 "classic"）|
+| **V20** | **PetDocument 修改：支持 `attachments` (关系) & 多附件迁移**（custom，ArkSchemaV20）|
 
 **迁移链**：V1→…→V14 全部 `lightweight`；V14→V15 `custom`；V15→V19 全部 `lightweight`。
 
@@ -234,7 +243,8 @@ CoconutRewardModifier               // 全局椰子弹跳动效
 | PetHygieneLog | `PetHygieneLog.swift` | date, typeRaw(bath/teeth/nails/grooming/earCleaning) |
 | PetWeightLog | `PetWeightLog.swift` | date, weight(Double) |
 | PetHealthLog | `PetHealthLog.swift` | date, typeRaw(vaccine/deworming/dewormingInternal/dewormingExternal/checkup/medication/surgery/emergency), note, vetName, expirationDate, cost |
-| PetDocument | `PetDocument.swift` | name, documentTypeRaw, expirationDate, cost, attachmentData(`@externalStorage`), attachmentFilename |
+| PetDocument | `PetDocument.swift` | name, documentTypeRaw, expirationDate, cost, attachments(关系), syncToPet(Bool) |
+| PetDocumentAttachment | `PetDocumentAttachment.swift` | id, filename, fileType(image/file), data(@externalStorage) |
 | PetExpenseLog | `PetExpenseLog.swift` | date, amount, category, note, executorId |
 | PetFoodRecord | `PetFoodRecord.swift` | date, amountGrams, mealTypeRaw, executorId |
 | PetMilestone | `PetMilestone.swift` | date, title, notes, photoData(`Data?`) |
@@ -364,7 +374,9 @@ func awardAction(type: OhanaActionType, pet: Pet?, context: ModelContext) -> (hu
 | AchievementWallView | `Details/AchievementWallView.swift` | 成就墙 2 列网格 |
 | SitterCardPreviewSheet | `Details/SitterCardPreviewSheet.swift` | 寄养名片 + ImageRenderer 截图分享 |
 | VaccinePassportView | `Details/VaccinePassportView.swift` | 疫苗本详情 |
-| DocumentsListView | `Details/DocumentsListView.swift` | 证件列表 |
+| DocumentsListView | `Details/DocumentsListView.swift` | 证件列表（点击跳转 `DocumentDetailSheet`） |
+| DocumentDetailSheet | `Details/DocumentDetailSheet.swift` | 证件完整详情（多附件展示/下载/预览） |
+| DogActivityCard | `Home/DogActivityCard.swift` | 狗狗运动卡（遛狗/陪玩记录显示） |
 | PlantDetailView | `Details/PlantDetailView.swift` | 植物详情（浇水/施肥） |
 | CatCareStationCard | `Details/CatCareStationCard.swift` | 猫咪护理站 |
 | CoHealthDashboardView | `Details/CoHealthDashboardView.swift` | 协同健康仪表盘 |
@@ -380,9 +392,26 @@ func awardAction(type: OhanaActionType, pet: Pet?, context: ModelContext) -> (hu
 | IslandExplorationDashboard | `Details/IslandExplorationDashboard.swift` | 全岛探索（总里程 + Bento + 堆叠柱状图 + 贡献榜） |
 | IslandWealthDashboard2 | `Details/IslandWealthDashboard2.swift` | 椰子财富中心（堆叠柱状图 + 贡献排行榜） |
 
-> **Charts 注意**：BarMark 的 `unit` 参数只支持 `.day/.hour/.month` 等静态值，不能动态传 `Calendar.Component`（会 fatal error）。
+### 5.16 Phase 78 & 79 (UI Polish, Inventory & Theme Toggles)
 
-### 5.16 CritterDeckCarousel / HumanIDCardView（Phase 76 更新）
+**UI 标准化与动效**：
+- `IslandStatComponents` 图表增加了载入动画，且使用 `pet.themeColor` 区分各宠物的曲线。
+- 日历 Bug 修复，支持正确的跨天显示和序列删除逻辑。
+- 引入了系统的 `appThemePreference`（系统/浅色/深色），对 `ohanaStandardCard` 等组件做了全适配。
+
+**Inventory & Effects (背包与特效装备)**：
+- `InventoryView`: 从 Oasis 进入，分为 Titles / Effects / Consumables 三页，数据通过 `@AppStorage` 保存。
+- **特效支持**：
+  - `fx_lime_glow`: 装备后在首页 ID Card 签到时会有绿色闪光 (`ArkCrewIDCardView.swift`)
+  - `fx_rainbow`: 装备后 `WalkDetailView` 的轨迹线条呈彩虹渐变
+  - `fx_stars`: 装备后完成 `DailyQuestsCard` 的任务掉落星星粒子
+  - `fx_firework`: 装备后 `MilestoneCelebrationOverlay` 庆典掉落烟花粒子
+- **称号支持**：
+  - `title_guardian` (守护神): 展示在 `ArkCrewIDCardView` 封面名字前
+  - `title_pioneer` (先锋): 在 `IslandExplorationDashboard` 为劳模铲屎官头衔加 Rocket badge
+  - `title_chef` (厨神): 在 `QuestManager.swift` 发生喂食 (`.feed`) 判定时，Human 额外 +1 椰子奖励
+
+### 5.17 CritterDeckCarousel / HumanIDCardView（Phase 76 更新）
 
 **位置**：`Views/Home/CritterDeckCarousel.swift`
 
@@ -770,6 +799,11 @@ final class PetHealthAlertEngine {
 | FIX 6 | `PetDetailView.swift` | `PetHUDVitalSection` 改为独立 struct，内置 `@Query`（按 `pet.id + todayStart/weekStart` 过滤），打卡后顶部 3 个数字实时更新，无需等待 SwiftData relationship 刷新 |
 | FIX 7 | `PetMilestone.swift`, `SharedModelContainer.swift`, `PetMilestoneListView.swift` | 模型新增 `photoData: Data?`（ArkSchemaV17）；列表页添加 `PhotosPicker` 照片选择、160pt 高照片展示、保存时写入 `photoData`；sheet 改为 `.presentationDetents([.large])` |
 | FIX 8 | `CritterDeckCarousel.swift` | 小卡片普通图片（非透明 PNG）底部叠加 `LinearGradient(colors:[.clear,.clear,goDarkBlue.opacity(0.5),goDarkBlue.opacity(0.85)])` overlay，使头像底部自然融入卡片渐变背景 |
+| **P11** | **DocumentsListView.swift / DocumentDetailSheet.swift** | **证件详情重构**：点击证件不再直接进入编辑，而是通过 `DocumentDetailSheet` 展示全字段 + 多附件预览（支持图片/文件）；Edit/Delete 移至详情页 Toolbar； contextMenu 增加查看详情入口 |
+| **P12** | **OasisRewardView.swift** | **椰子点击交互**：`BeautifulCoconutTree` 启用 `onHarvest` 回调；`harvestedCoconutIndices` 追踪当日采摘；点击椰果触发 `QuestManager.shared.addCoconuts(1)` + 飞入动画 |
+| **P13** | **PetMilestoneListView.swift** | **地图选址 + 自动化**：地址 TextField 替换为 `MapLocationPickerSheet`（`MKLocalSearch`）；新增 `autoCreateMilestones()`：进入页面时自动补全生日、到家日、最高体重记录里程碑（存入 `location` 字段） |
+| **P14** | **AddDocumentSheet.swift / Pet.swift** | **信息同步**：添加证件时可勾选「同步到宠物基本信息」；自动读写 `pet.passportNumber` |
+| **P15** | **DogActivityCard.swift** | **狗狗专项**：为物种="狗"的宠物在详情页增加「遛狗与陪玩」专属统计卡片 |
 
 ---
 

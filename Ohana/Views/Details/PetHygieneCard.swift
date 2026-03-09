@@ -18,15 +18,13 @@ struct PetHygieneCard: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 8) {
                 // Header — NavigationLink 进入护理详情页
                 NavigationLink(destination: PetHygieneDetailView(pet: pet)) {
                     HStack {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Color.goCardCyan)
+                        Text("✨").font(.system(size: 14))
                         Text("护理打卡")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .font(.system(size: 14, weight: .black, design: .rounded))
                             .foregroundStyle(.white)
                         Spacer()
                         Image(systemName: "chevron.right")
@@ -35,69 +33,38 @@ struct PetHygieneCard: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 10)
 
-                GoDashedDivider().padding(.horizontal, 14)
+                // Only show items with records
+                let recordedTypes = HygieneType.allCases.filter { type in
+                    pet.hygieneLogs.contains { $0.type == type.rawValue }
+                }
 
-                // C6: 5图标单行等距
-                HStack(spacing: 0) {
-                    ForEach(HygieneType.allCases, id: \.rawValue) { type in
-                        HygieneCheckButton(pet: pet, type: type, households: households, onUndo: { log in
-                            undoLog = log
-                            undoLabel = type.rawValue
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                                if undoLog?.id == log.id {
-                                    withAnimation(.spring(response: 0.3)) { undoLog = nil }
+                if recordedTypes.isEmpty {
+                    Text("暂无记录")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.3))
+                        .padding(.vertical, 4)
+                } else {
+                    let cols = Array(repeating: GridItem(.flexible()), count: min(recordedTypes.count, 5))
+                    LazyVGrid(columns: cols, spacing: 8) {
+                        ForEach(recordedTypes, id: \.rawValue) { type in
+                            HygieneCheckButton(pet: pet, type: type, households: households, onUndo: { log in
+                                undoLog = log
+                                undoLabel = type.rawValue
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                                    if undoLog?.id == log.id {
+                                        withAnimation(.spring(response: 0.3)) { undoLog = nil }
+                                    }
                                 }
+                            }) {
+                                longPressedType = type
                             }
-                        }) {
-                            longPressedType = type
                         }
-                        .frame(maxWidth: .infinity)
                     }
+                    .padding(.vertical, 4)
                 }
-                .padding(.horizontal, 8).padding(.vertical, 10)
-
-                // task5: 铲屎 / 便便快捷打卡（护理卡片底部）
-                let isLitter = ["猫","兔子","仓鼠","龙猫","豚鼠"].contains(pet.species)
-                GoDashedDivider().padding(.horizontal, 14)
-                HStack {
-                    let pottyToday: Int = {
-                        if isLitter {
-                            return pet.careLogs.filter { $0.type == CareType.litter.rawValue && Calendar.current.isDateInToday($0.date) }.count
-                        } else {
-                            return pet.pottyLogs.filter { Calendar.current.isDateInToday($0.date) }.count
-                        }
-                    }()
-                    Text(isLitter ? "🪣" : "💩")
-                        .font(.system(size: 16))
-                    Text(isLitter ? "今日铲屎 \(pottyToday) 次" : "今日便便 \(pottyToday) 次")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.6))
-                    Spacer()
-                    Button {
-                        if isLitter {
-                            let log = PetCareLog(date: Date(), type: .litter, pet: pet)
-                            modelContext.insert(log)
-                        } else {
-                            let log = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet)
-                            modelContext.insert(log)
-                        }
-                        modelContext.safeSave()
-                        QuestManager.shared.awardAction(type: .potty(isLitter: isLitter), pet: pet, context: modelContext)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    } label: {
-                        Text("+ 打卡")
-                            .font(.system(size: 12, weight: .black, design: .rounded))
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 14).padding(.vertical, 6)
-                            .background(Color.goYellow, in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal, 14).padding(.vertical, 10)
             }
-            .goTranslucentCard(cornerRadius: 20)
+            .padding(.horizontal, 4)
 
             // U16: 3秒撤回 toast
             if undoLog != nil {
@@ -512,16 +479,16 @@ private struct HygieneCheckButton: View {
 
     var body: some View {
         Button { checkIn() } label: {
-            VStack(spacing: 5) {
+            VStack(spacing: 4) {
                 ZStack {
                     Circle()
                         .fill(justChecked || isDoneToday ? statusColor : statusColor.opacity(0.12))
-                        .frame(width: 44, height: 44)
+                        .frame(width: 36, height: 36)
                         .overlay(Circle().strokeBorder(statusColor.opacity(0.3), lineWidth: 1))
-                    Text(type.emoji).font(.system(size: 20))
+                    Text(type.emoji).font(.system(size: 16))
                 }
                 Text(type.rawValue)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .font(.system(size: 9, weight: .semibold, design: .rounded))
                     .foregroundStyle(isDoneToday ? statusColor : .white.opacity(0.6))
                     .lineLimit(1)
             }

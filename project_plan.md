@@ -1,6 +1,6 @@
 # Ohana App 开发进度
 
-> 最后更新: 2026-03-09 | Schema: ArkSchemaV19 | Phase 1-76 + TASK 1-7 + FIX 1-8 + UIUX 1-6 + BUG FIX 11项 + 深度修复 P1-P10 全部完成
+> 最后更新: 2026-03-09 | Schema: ArkSchemaV20 | Phase 1-77 + TASK 1-7 + FIX 1-8 + UIUX 1-6 + BUG FIX 11项 + 深度修复 P1-P15 全部完成
 
 ## App 定位
 
@@ -18,7 +18,7 @@
 
 | 模块 | 状态 | 说明 |
 |------|------|------|
-| 核心架构 | ✅ 完成 | ArkSchemaV15（V15新增Human.themeColorHex），21模型，V1→V15完整迁移链 |
+| 核心架构 | ✅ 完成 | ArkSchemaV20（V20新增多附件支持），21模型，V1→V20完整迁移链 |
 | 宠物模块 | ✅ 完成 | 健康/遛狗/饮食/护理/证件/花费/里程碑/成就/关系 |
 | 人类成员模块 | ✅ 完成 | 体重/国籍城市/运动卡/HealthKit/心愿单 |
 | 植物模块 | ✅ 基础 | 浇水/施肥追踪（无高级功能） |
@@ -131,6 +131,9 @@
 | 73 | 03-07 | **UX 重构 9 模块 + 经济系统扩展**（详见下方） |
 | 74 | 03-07 | **终极体验打磨 6 项 + iOS 17 Vision 抜像集成**（详见下方） |
 | 75 | 03-08 | **终极体验打磨 Phase 2 — 9 模块数据+UI+架构全面升级**（详见下方） |
+| 77 | 03-09 | **深度修复与证件/里程碑专修**：多附件证件管理 + 详情页、椰子树采摘交互、地标地图选址、自动里程碑、狗狗运动卡、证件同步宠物信息。 |
+| 78 | 03-09 | **UI 标准化重构 Phase 1 & 2**：制定 Ohana Design System，重构 SettingsView (Floating Groups), OverviewView (Bento Box + Glass QA Cards), PetDetailView (Bento widgets) 适配亮暗模式。修复日历跨天显示/删除无二次确认 Bug，完善全岛统计图表动效与专属宠物主题颜色。 |
+| 79 | 03-09 | **Inventory, Effects & Theme Toggles**：实现 Backpack (InventoryView)，装备特效 (Lime/Rainbow/Star/Firework)，装备头衔 (守护神/先锋/厨师加成)。并在Settings中加入 Light/Dark/System 主题切换，自动适配全局卡片和 ArkBackgroundView。 |
 
 #### Phase 71 详情
 
@@ -197,9 +200,9 @@
 
 ## 编译状态
 
-✅ **最新编译通过** — iPhone 17 Pro Simulator, iOS 26.2（FIX 1-8 + 椰子树升级 + UI优化5项全部完成）
+✅ **最新编译通过** — iPhone 17 Pro Simulator, iOS 26.2（FIX 1-8 + P11-P15 全部完成）
 
-**Schema**: ArkSchemaV17（新增 PetMilestone.photoData）
+**Schema**: ArkSchemaV20（新增 PetDocumentAttachment 关系）
 
 ---
 
@@ -406,8 +409,13 @@ Phase 3 — 深度互动（视用户反馈决定是否推进）
 | P8：喂食超量弱化拦截 | `PetFoodManagementView.swift` | 移除超量拦截逻辑（前一 session 完成）|
 | P9：寄养名片数据同步 | `SitterCardPreviewSheet.swift` | 基本信息区补充体重（最新体重+日期）、年龄（`ageText`）、出生地字段，与宠物详情页数据保持一致 |
 | P10：图鉴卡片一致性 | `CrewRosterOverlay.swift` | 移除 ScreenCompat 依赖，改用 GeometryReader 计算卡片宽度（前一 session 完成）|
+| P11：证件详情页 | `DocumentDetailSheet.swift` | 证件点击不再跳转编辑，而是进入详情展示多附件。|
+| P12：椰子采摘 | `OasisRewardView.swift` | 椰子树上的椰果现可点击采摘并获得椰子。|
+| P13：地图选址 | `PetMilestoneListView.swift` | 里程碑地点支持地图搜索选址。|
+| P14：自动里程碑 | `PetMilestoneListView.swift` | 自动根据生日、到家日、体重记录生成里程碑。|
+| P15：狗狗运动卡 | `DogActivityCard.swift` | 首页详情新增专门针对狗狗的运动与陪玩卡片。|
 
-**Schema 版本**: ArkSchemaV19（V18 新增 `PetMilestone.location`，V19 新增 `Pet.cardStyleRaw`）
+**Schema 版本**: ArkSchemaV20（V20 新增 `PetDocument` 与 `PetDocumentAttachment` 的 1:N 关系）
 **编译状态**: BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.2)
 
 ---

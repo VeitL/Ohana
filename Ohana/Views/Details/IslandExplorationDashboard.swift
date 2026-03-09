@@ -49,6 +49,9 @@ struct IslandExplorationDashboard: View {
     @State private var timeRange: ExploreTimeRange = .month
     @State private var animationProgress: Double = 0.0
 
+    @AppStorage("shop_equipped_title") private var equippedTitle: String = ""
+    @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
+
     // MARK: - Filtered logs
 
     private var filteredLogs: [PetWalkLog] {
@@ -282,6 +285,14 @@ struct IslandExplorationDashboard: View {
                                 .fill(Color.goPrimary.mix(with: .black, by: 0.3))
                                 .frame(width: 44, height: 44)
                             Text(h.human.avatarEmoji).font(.system(size: 24))
+                            
+                            if h.human.id.uuidString == activeHumanId && equippedTitle == "title_pioneer" {
+                                Text("🚀")
+                                    .font(.system(size: 14))
+                                    .padding(4)
+                                    .background(Color.white, in: Circle())
+                                    .offset(x: 16, y: -16)
+                            }
                         }
                         Text(h.human.name)
                             .font(.system(size: 13, weight: .black, design: .rounded))

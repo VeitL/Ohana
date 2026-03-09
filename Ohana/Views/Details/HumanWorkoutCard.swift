@@ -135,7 +135,7 @@ struct HumanWorkoutCard: View {
                 recentLogsSection
             }
         }
-        .goTranslucentCard(cornerRadius: 20)
+        .ohanaStandardCard(cornerRadius: 20)
         .overlay(alignment: .top) {
             if toastVisible {
                 rewardToastBanner
@@ -318,7 +318,7 @@ struct AddWorkoutSheet: View {
                                 }
                             }
                         }
-                        .padding(16).goTranslucentCard(cornerRadius: 20)
+                        .padding(16).ohanaStandardCard(cornerRadius: 20)
 
                         // 时长/距离/卡路里
                         VStack(spacing: 12) {
@@ -326,7 +326,7 @@ struct AddWorkoutSheet: View {
                             workoutField(icon: "map", label: "距离（公里，可选）", placeholder: "0.0", text: $distanceStr, color: .goCardCyan)
                             workoutField(icon: "flame", label: "卡路里（可选）", placeholder: "0", text: $caloriesStr, color: .goOrange)
                         }
-                        .padding(16).goTranslucentCard(cornerRadius: 20)
+                        .padding(16).ohanaStandardCard(cornerRadius: 20)
 
                         // 日期
                         HStack {
@@ -342,7 +342,7 @@ struct AddWorkoutSheet: View {
                                 .tint(Color.goLime)
                                 .labelsHidden()
                         }
-                        .padding(16).goTranslucentCard(cornerRadius: 20)
+                        .padding(16).ohanaStandardCard(cornerRadius: 20)
                     }
                     .padding(.horizontal, 16).padding(.vertical, 8)
                 }
@@ -481,7 +481,7 @@ struct HumanWorkoutHistoryView: View {
             summaryCell(value: String(format: "%.1f", sortedLogs.reduce(0) { $0 + $1.distanceKm }), label: "总公里", color: .goOrange)
         }
         .padding(.vertical, 14)
-        .goTranslucentCard(cornerRadius: 20)
+        .ohanaStandardCard(cornerRadius: 20)
     }
 
     private func summaryCell(value: String, label: String, color: Color) -> some View {
@@ -545,7 +545,7 @@ struct HumanWorkoutHistoryView: View {
                     }
                 }
             }
-            .goTranslucentCard(cornerRadius: 20)
+            .ohanaStandardCard(cornerRadius: 20)
             .padding(.horizontal, 16)
         }
     }

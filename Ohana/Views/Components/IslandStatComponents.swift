@@ -109,9 +109,9 @@ struct IslandStatCard<Chart: View>: View {
                     .lineLimit(2)
             }
         }
-        .padding(16)
-        .frame(width: 220, height: 240)
-        .background(.clear)
+        .padding(.vertical, 16)
+        .padding(.horizontal, 4)
+        .frame(width: 170, height: 212)
         .contentShape(Rectangle())
         .onTapGesture { onTap?() }
     }
@@ -121,6 +121,7 @@ struct IslandStatCard<Chart: View>: View {
 struct MultiPetLineChart: View {
     // [(petName, values, color)]
     let series: [(String, [Double], Color)]
+    @State private var animPhase: CGFloat = 0.0
 
     private var allValues: [Double] { series.flatMap { $0.1 } }
     private var minV: Double { (allValues.min() ?? 0) - 0.1 }
@@ -131,7 +132,8 @@ struct MultiPetLineChart: View {
         count <= 1 ? w / 2 : CGFloat(i) / CGFloat(count - 1) * w
     }
     private func yPos(_ v: Double, h: CGFloat) -> CGFloat {
-        h - CGFloat((v - minV) / range) * h
+        let rawY = h - CGFloat((v - minV) / range) * h
+        return h - (h - rawY) * animPhase
     }
 
     var body: some View {
@@ -183,6 +185,11 @@ struct MultiPetLineChart: View {
                             }
                         }
                     }
+                }
+            }
+            .onAppear {
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1)) {
+                    animPhase = 1.0
                 }
             }
         }
@@ -265,6 +272,7 @@ struct MiniBarChart: View {
     let values: [Double]
     let labels: [String]
     let accentColor: Color
+    @State private var animPhase: CGFloat = 0.0
 
     var body: some View {
         GeometryReader { geo in
@@ -286,7 +294,7 @@ struct MiniBarChart: View {
                             )
                             .frame(
                                 width: barW,
-                                height: max(3, CGFloat(val / maxV) * (h - (labels.isEmpty ? 0 : 14)))
+                                height: max(3, CGFloat(val / maxV) * (h - (labels.isEmpty ? 0 : 14)) * animPhase)
                             )
                         if !labels.isEmpty && i < labels.count {
                             Text(labels[i])
@@ -298,6 +306,11 @@ struct MiniBarChart: View {
                 }
             }
             .frame(width: w, height: h, alignment: .bottom)
+            .onAppear {
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1)) {
+                    animPhase = 1.0
+                }
+            }
         }
     }
 }
@@ -306,6 +319,7 @@ struct MiniBarChart: View {
 struct MultiPetExpenseBar: View {
     // [(petName, amount, color)]
     let series: [(String, Double, Color)]
+    @State private var animPhase: CGFloat = 0.0
 
     private var maxAmount: Double { series.map { $0.1 }.max() ?? 1 }
 
@@ -328,7 +342,7 @@ struct MultiPetExpenseBar: View {
                 HStack(alignment: .bottom, spacing: spacing) {
                     ForEach(Array(series.enumerated()), id: \.offset) { _, item in
                         let (name, amount, color) = item
-                        let barH = max(4, CGFloat(amount / maxAmount) * chartH)
+                        let barH = max(4, CGFloat(amount / maxAmount) * chartH * animPhase)
                         VStack(spacing: 2) {
                             Spacer(minLength: 0)
                             RoundedRectangle(cornerRadius: 4, style: .continuous)
@@ -343,6 +357,11 @@ struct MultiPetExpenseBar: View {
                     }
                 }
                 .frame(width: w, height: h, alignment: .bottom)
+                .onAppear {
+                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1)) {
+                        animPhase = 1.0
+                    }
+                }
             }
         }
     }
@@ -554,9 +573,7 @@ struct SynergyFlashCard: View {
                 }
                 .padding(16)
                 .frame(width: 280, height: 160)
-                .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(brief.accentColor.opacity(0.25), lineWidth: 1))
+                .ohanaStandardCard()
                 .contentShape(Rectangle())
                 .onTapGesture {
                     withAnimation(.spring(response: 0.3)) {
@@ -640,14 +657,14 @@ struct CoconutWealthRankingCard: View {
                 // 大数字
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("\(computedTotal)")
-                        .font(.system(size: 36, weight: .black, design: .rounded))
+                        .font(OhanaFont.metric(size: 36))
                         .foregroundStyle(.white)
                         .contentTransition(.numericText())
                     Text("🥥")
                         .font(.system(size: 18))
                 }
 
-            GoDashedDivider()
+            OhanaDashedDivider(color: .white.opacity(0.1)).padding(.vertical, 4)
 
             // 排行榜
             if leaderboard.isEmpty {
@@ -694,19 +711,20 @@ struct CoconutWealthRankingCard: View {
 struct MiniRingChart: View {
     let progress: Double
     let accentColor: Color
+    @State private var animPhase: CGFloat = 0.0
 
     var body: some View {
         ZStack {
             Circle()
                 .stroke(.white.opacity(0.1), lineWidth: 5)
             Circle()
-                .trim(from: 0, to: CGFloat(progress))
+                .trim(from: 0, to: CGFloat(progress) * animPhase)
                 .stroke(
                     accentColor,
                     style: StrokeStyle(lineWidth: 5, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
-                .animation(.spring(response: 0.6), value: progress)
+                .animation(.spring(response: 0.6), value: progress * Double(animPhase))
 
             Text("\(Int(progress * 100))%")
                 .font(.system(size: 11, weight: .black, design: .rounded))
@@ -714,5 +732,10 @@ struct MiniRingChart: View {
         }
         .frame(width: 44, height: 44)
         .frame(maxWidth: .infinity, alignment: .center)
+        .onAppear {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1)) {
+                animPhase = 1.0
+            }
+        }
     }
 }

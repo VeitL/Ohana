@@ -20,6 +20,7 @@ struct OasisRewardView: View {
     @State private var showCoconutShop      = false
     @State private var showGacha            = false
     @State private var showBountyBoard      = false
+    @State private var showInventory        = false
     @State private var showCoconutRules     = false
     @State private var showCheckInCalendar  = false
     @State private var energyParticles: [EnergyParticle] = []
@@ -99,6 +100,18 @@ struct OasisRewardView: View {
                                 .overlay(Capsule().strokeBorder(Color.goLime.opacity(0.3), lineWidth: 1))
                             }
                             .buttonStyle(.plain)
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                showInventory = true
+                            } label: {
+                                Image(systemName: "shippingbox.fill")
+                                    .font(.system(size: 15))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 32, height: 32)
+                                    .background(Color.goLime.opacity(0.12), in: Circle())
+                                    .overlay(Circle().strokeBorder(Color.goLime.opacity(0.3), lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
                             CoconutBalanceCapsule { showingCoconutLog = true }
                         }
                     }
@@ -138,6 +151,10 @@ struct OasisRewardView: View {
                 NavigationStack { AchievementWallView(pet: pet) }
                     .presentationDetents([.large])
             }
+        }
+        .sheet(isPresented: $showInventory) {
+            InventoryView()
+                .presentationDetents([.large])
         }
         .sheet(isPresented: $showCoconutShop) {
             CoconutShopView()
@@ -401,16 +418,15 @@ struct OasisRewardView: View {
                 }
                 .padding(.horizontal, 10).padding(.vertical, 4)
                 .background(Color.goYellow.opacity(0.12), in: Capsule())
-                // 补签包数量
-                if makeupPackCount > 0 {
-                    HStack(spacing: 4) {
-                        Text("📦")
-                        Text("×\(makeupPackCount)")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.7))
-                    }
-                    .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(.white.opacity(0.08), in: Capsule())
+            }
+
+            // 星期标题行
+            HStack(spacing: 0) {
+                ForEach(["日","一","二","三","四","五","六"], id: \.self) { d in
+                    Text(d)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.3))
+                        .frame(maxWidth: .infinity)
                 }
             }
 
@@ -457,19 +473,39 @@ struct OasisRewardView: View {
                 }
             }
 
-            // 提示文字
-            if makeupPackCount > 0 {
-                Text("点击灰色日期可消耗1个补签包")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.3))
-            } else {
-                Text("在椰子商店购买补签包，可补录漏打卡日期")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.25))
+            OhanaDashedDivider(color: .white.opacity(0.1))
+
+            // 补签入口
+            HStack(spacing: 12) {
+                HStack(spacing: 4) {
+                    Text("📦").font(.system(size: 14))
+                    Text("补签包")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.7))
+                    Text("×\(makeupPackCount)")
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(makeupPackCount > 0 ? Color.goLime : .white.opacity(0.3))
+                }
+                Spacer()
+                if makeupPackCount > 0 {
+                    Text("点击灰色日期补签")
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.goLime.opacity(0.6))
+                } else {
+                    Text("在椰子商店购买补签包")
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.25))
+                }
             }
         }
         .padding(16)
-        .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background {
+            ZStack {
+                Color.goDeepNavy
+                Color.goPrimary.opacity(0.1)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
             .strokeBorder(Color.goLime.opacity(0.15), lineWidth: 1))
     }

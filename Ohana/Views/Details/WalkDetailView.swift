@@ -12,6 +12,7 @@ struct WalkDetailView: View {
     let pet: Pet
 
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("shop_equip_fx_rainbow") private var equipFxRainbow: Bool = false
     @State private var shareImage: UIImage? = nil
     @State private var isSharing = false
     @State private var isRendering = false
@@ -102,8 +103,13 @@ struct WalkDetailView: View {
                 // 交互式地图
                 Map(initialPosition: .region(region)) {
                     // 路径折线
-                    MapPolyline(coordinates: coords)
-                        .stroke(Color.goLime, lineWidth: 4)
+                    if equipFxRainbow {
+                        MapPolyline(coordinates: coords)
+                            .stroke(LinearGradient(colors: [.red, .orange, .yellow, .green, .blue, .purple], startPoint: .leading, endPoint: .trailing), lineWidth: 4)
+                    } else {
+                        MapPolyline(coordinates: coords)
+                            .stroke(Color.goLime, lineWidth: 4)
+                    }
 
                     // 起点标注
                     if let first = coords.first {

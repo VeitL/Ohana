@@ -58,6 +58,9 @@ struct CritterDeckCarousel: View {
     /// 是否正在拖拽
     @State private var isDragging: Bool = false
     @State private var showAllCardsSheet = false
+    
+    @AppStorage("shop_equipped_title") private var equippedTitle: String = ""
+    @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
 
     private var allItems: [DeckItem] {
         let petItems  = pets.map   { DeckItem.pet($0) }
@@ -385,6 +388,8 @@ private struct MiniFlipCard: View {
     var onPromote: (() -> Void)? = nil
 
     @State private var isFlipped = false
+    @AppStorage("shop_equipped_title") private var equippedTitle: String = ""
+    @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
 
     var body: some View {
         ZStack {
@@ -535,7 +540,17 @@ private struct MiniFlipCard: View {
 
                 VStack(alignment: .trailing, spacing: 2) {
                     Spacer()
-                    Text(human.name)
+                    let isMe = (human.id.uuidString == activeHumanId)
+                    let titleDisplay: String = {
+                        guard isMe else { return "" }
+                        switch equippedTitle {
+                        case "title_guardian": return "🛡️"
+                        case "title_pioneer": return "🚀"
+                        case "title_chef": return "👨‍🍳"
+                        default: return ""
+                        }
+                    }()
+                    Text(titleDisplay + human.name)
                         .font(.system(size: 18, weight: .heavy, design: .rounded))
                         .foregroundStyle(.white)
                         .lineLimit(1).minimumScaleFactor(0.5)
@@ -554,34 +569,62 @@ private struct MiniFlipCard: View {
         }
     }
 
-    // ── 卡片背面（操作按钮）
+    // ── 卡片背面（操作按钮 + 今日快速统计）
     private var miniCardBack: some View {
-        ZStack {
+        let name: String = {
+            switch item {
+            case .pet(let p): return p.name
+            case .human(let h): return h.name
+            }
+        }()
+        let accentColor: Color = {
+            switch item {
+            case .pet(let p): return Color(hex: p.themeColorHex.isEmpty ? "4338FF" : p.themeColorHex)
+            case .human(let h): return Color(hex: h.themeColor)
+            }
+        }()
+
+        return ZStack {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(LinearGradient(
                     colors: [Color.goDarkBlue, Color.goDeepNavy],
                     startPoint: .top, endPoint: .bottom))
 
-            VStack(spacing: 10) {
-                // 名字
-                let name: String = {
-                    switch item {
-                    case .pet(let p): return p.name
-                    case .human(let h): return h.name
+            VStack(spacing: 8) {
+                // 名字 + 主题色点
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(accentColor)
+                        .frame(width: 6, height: 6)
+                    Text(name)
+                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                }
+
+                // 小统计（宠物显示今日动态）
+                if case .pet(let p) = item {
+                    let walkToday = p.walkLogs.filter { Calendar.current.isDateInToday($0.startDate) }.count
+                    let feedToday = p.careLogs.filter { $0.type == CareType.feeding.rawValue && Calendar.current.isDateInToday($0.date) }.count
+                    HStack(spacing: 8) {
+                        Label("\(walkToday)", systemImage: "figure.walk")
+                            .font(.system(size: 9, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color.goLime.opacity(walkToday > 0 ? 1 : 0.35))
+                        Label("\(feedToday)", systemImage: "fork.knife")
+                            .font(.system(size: 9, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color.goOrange.opacity(feedToday > 0 ? 1 : 0.35))
                     }
-                }()
-                Text(name)
-                    .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
+                    .padding(.horizontal, 8).padding(.vertical, 3)
+                    .background(.white.opacity(0.06), in: Capsule())
+                }
 
                 // 详情按钮
                 Button(action: onDetail) {
                     Text("进入详情")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity).padding(.vertical, 8)
-                        .background(Color.goLime, in: Capsule())
+                        .frame(maxWidth: .infinity).padding(.vertical, 7)
+                        .background(accentColor, in: Capsule())
                 }
                 .buttonStyle(.plain)
 
@@ -589,21 +632,21 @@ private struct MiniFlipCard: View {
                 if let promote = onPromote {
                     Button(action: promote) {
                         Text("置顶显示")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color.goLime.opacity(0.85))
-                            .frame(maxWidth: .infinity).padding(.vertical, 6)
-                            .background(Color.goLime.opacity(0.12), in: Capsule())
-                            .overlay(Capsule().strokeBorder(Color.goLime.opacity(0.3), lineWidth: 1))
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.7))
+                            .frame(maxWidth: .infinity).padding(.vertical, 5)
+                            .background(Color.white.opacity(0.08), in: Capsule())
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(14)
+            .padding(12)
         }
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
     }
 }
+
 
 // ==========================================================
 // ⚠️ 下方的 HumanIDCardView 保持原样，与之前提供的一致
@@ -616,6 +659,8 @@ struct HumanIDCardView: View {
     var isFlipped: Binding<Bool>? = nil
     
     @State private var _isFlipped = false
+    @AppStorage("shop_equipped_title") private var equippedTitle: String = ""
+    @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
     
     private var flipped: Bool {
         isFlipped?.wrappedValue ?? _isFlipped
@@ -748,7 +793,17 @@ struct HumanIDCardView: View {
                         }
 
                         // 大名字
-                        Text(human.name)
+                        let isMe = (human.id.uuidString == activeHumanId)
+                        let titleDisplay: String = {
+                            guard isMe else { return "" }
+                            switch equippedTitle {
+                            case "title_guardian": return "🛡️ "
+                            case "title_pioneer": return "🚀 "
+                            case "title_chef": return "👨‍🍳 "
+                            default: return ""
+                            }
+                        }()
+                        Text(titleDisplay + human.name)
                             .font(.system(size: 28, weight: .heavy, design: .rounded))
                             .foregroundStyle(.white)
                             .lineLimit(1).minimumScaleFactor(0.45)

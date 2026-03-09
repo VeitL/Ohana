@@ -9,12 +9,13 @@ import SwiftUI
 
 struct ArkBackgroundView: View {
     var level: IslandLevel = .seedling
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         ZStack {
             // 基础渐变（随等级进化）
             LinearGradient(
-                colors: level.backgroundColors,
+                colors: colorScheme == .dark ? level.backgroundColors : level.backgroundColorsLight,
                 startPoint: .top,
                 endPoint: .bottom
             )

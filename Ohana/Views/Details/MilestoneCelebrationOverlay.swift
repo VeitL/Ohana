@@ -51,7 +51,11 @@ struct MilestoneCelebrationOverlay: View {
     @State private var cardOpacity: Double = 0
     @State private var glowPulse: Bool = false
 
-    private let particleEmojis = ["🎉","✨","🌟","🎊","🥥","💫","🎈","🌈","⭐️"]
+    @AppStorage("shop_equip_fx_firework") private var equipFxFirework: Bool = false
+    
+    private var particleEmojis: [String] {
+        equipFxFirework ? ["🎆", "🎇", "✨", "🎊", "🌟"] : ["🎉","✨","🌟","🎊","🥥","💫","🎈","🌈","⭐️"]
+    }
 
     var body: some View {
         ZStack {

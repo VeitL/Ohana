@@ -203,23 +203,23 @@ struct ExpenseHistoryView: View {
     private var recordListLayer: some View {
         ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(Color(hex: "F2F0F5"))
+                .fill(Color.goDeepNavy.opacity(0.95))
                 .ignoresSafeArea(edges: .bottom)
 
             VStack(spacing: 0) {
                 Capsule()
-                    .fill(Color.black.opacity(0.12))
+                    .fill(Color.white.opacity(0.2))
                     .frame(width: 40, height: 4)
                     .padding(.top, 12).padding(.bottom, 8)
 
                 HStack {
                     Text("花费记录")
                         .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(.white)
                     Spacer()
                     Text("\(sortedLogs.count) 条")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.4))
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 12)
@@ -232,7 +232,7 @@ struct ExpenseHistoryView: View {
                         if sortedLogs.isEmpty {
                             Text("还没有花费记录\n点击右上角 + 开始记录")
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.white.opacity(0.35))
                                 .multilineTextAlignment(.center)
                                 .padding(.vertical, 40)
                         }
@@ -255,15 +255,15 @@ struct ExpenseHistoryView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(log.category)
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(.black.opacity(0.85))
+                    .foregroundStyle(.white)
                 HStack(spacing: 8) {
                     Text(log.date, format: .dateTime.year().month().day())
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.4))
                     if !log.note.isEmpty {
                         Text(log.note)
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.white.opacity(0.4))
                             .lineLimit(1)
                     }
                 }
@@ -281,12 +281,13 @@ struct ExpenseHistoryView: View {
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary.opacity(0.5))
+                    .foregroundStyle(.white.opacity(0.3))
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
+        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .strokeBorder(.white.opacity(0.08), lineWidth: 1))
     }
 
     // MARK: - Add Expense Sheet
@@ -294,7 +295,7 @@ struct ExpenseHistoryView: View {
         VStack(spacing: 0) {
             // 把手
             Capsule()
-                .fill(Color.black.opacity(0.12))
+                .fill(Color.white.opacity(0.2))
                 .frame(width: 40, height: 4)
                 .padding(.top, 12)
                 .padding(.bottom, 20)
@@ -303,7 +304,7 @@ struct ExpenseHistoryView: View {
                 VStack(spacing: 20) {
                     Text("记录花费")
                         .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 24)
 
@@ -316,21 +317,22 @@ struct ExpenseHistoryView: View {
                             TextField("0", text: $newAmount)
                                 .keyboardType(.decimalPad)
                                 .font(.system(size: 56, weight: .black, design: .rounded))
-                                .foregroundStyle(.black)
+                                .foregroundStyle(.white)
                         }
                         .padding(.horizontal, 24).padding(.vertical, 20)
-                        .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 20))
+                        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 20))
+                        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(.white.opacity(0.1), lineWidth: 1))
                         .padding(.horizontal, 24)
                         Text("金额 (元)")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.white.opacity(0.4))
                     }
 
                     // 分类选择
                     VStack(alignment: .leading, spacing: 10) {
                         Text("分类")
                             .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(.white)
                             .padding(.horizontal, 24)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 10) {
@@ -340,11 +342,11 @@ struct ExpenseHistoryView: View {
                                             Text(cat.emoji)
                                             Text(cat.rawValue)
                                                 .font(.system(size: 14, weight: .bold, design: .rounded))
-                                                .foregroundStyle(newCategory == cat ? .black : Color(.label))
+                                                .foregroundStyle(newCategory == cat ? .black : .white.opacity(0.7))
                                         }
                                         .padding(.horizontal, 16).padding(.vertical, 10)
                                         .background(
-                                            newCategory == cat ? Color.goYellow : Color(.systemGray5),
+                                            newCategory == cat ? Color.goYellow : Color.white.opacity(0.08),
                                             in: Capsule()
                                         )
                                     }
@@ -358,12 +360,13 @@ struct ExpenseHistoryView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("备注（可选）")
                             .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(.white)
                         TextField("例如：定期疫苗", text: $newNote)
                             .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(Color(.label))
+                            .foregroundStyle(.white)
                             .padding(.horizontal, 16).padding(.vertical, 14)
-                            .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 14))
+                            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.white.opacity(0.1), lineWidth: 1))
                     }
                     .padding(.horizontal, 24)
 
@@ -371,12 +374,13 @@ struct ExpenseHistoryView: View {
                     HStack {
                         Text("日期")
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(.white)
                         Spacer()
                         DatePicker("", selection: $newDate, in: ...Date(), displayedComponents: .date)
                             .datePickerStyle(.compact)
                             .tint(Color.goYellow)
                             .labelsHidden()
+                            .colorScheme(.dark)
                     }
                     .padding(.horizontal, 24)
 
@@ -409,7 +413,7 @@ struct ExpenseHistoryView: View {
                 }
             }
         }
-        .background(Color.white)
+        .background(Color.goDeepNavy)
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
     }

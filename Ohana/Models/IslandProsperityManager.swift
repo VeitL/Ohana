@@ -36,7 +36,7 @@ enum IslandLevel: Int, CaseIterable {
         }
     }
 
-    // 背景渐变色（越高级越丰富）
+    // 背景渐变色（Dark Mode）
     var backgroundColors: [Color] {
         switch self {
         case .seedling:
@@ -45,6 +45,18 @@ enum IslandLevel: Int, CaseIterable {
             return [Color(hex: "3B2FB5"), Color.goPrimary, Color(hex: "0D2A8A")]
         case .paradise:
             return [Color(hex: "4B1FA8"), Color(hex: "2C3AB8"), Color(hex: "081E6B")]
+        }
+    }
+
+    // 背景渐变色（Light Mode）
+    var backgroundColorsLight: [Color] {
+        switch self {
+        case .seedling:
+            return [Color(hex: "E8F0FE"), Color(hex: "D2E3FC"), Color(hex: "AECBFA")]
+        case .blooming:
+            return [Color(hex: "E0F7FA"), Color(hex: "B2EBF2"), Color(hex: "80DEEA")]
+        case .paradise:
+            return [Color(hex: "F3E8FF"), Color(hex: "E9D5FF"), Color(hex: "D8B4FE")]
         }
     }
 

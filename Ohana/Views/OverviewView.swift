@@ -533,7 +533,7 @@ struct OverviewView: View {
             .padding(.horizontal, 20)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 0) {
+                HStack(spacing: 8) {
                     // 1. 体重卡（所有宠物 分系列折线图）
                     // U11: 显示所有宠物的最新体重
                     let weightSeries = weightSeriesData
@@ -560,8 +560,8 @@ struct OverviewView: View {
                     ) {
                         MultiPetLineChart(series: weightSeries)
                     }
-
-                    islandStatDivider
+                    
+                    verticalDashDivider
 
                     // 2. 遛狗卡（7天柱状图）
                     let weekWalkData = last7DayWalkCounts
@@ -578,8 +578,8 @@ struct OverviewView: View {
                     ) {
                         MiniBarChart(values: weekWalkData.map { Double($0.1) }, labels: weekWalkData.map { $0.0 }, accentColor: .goLime)
                     }
-
-                    islandStatDivider
+                    
+                    verticalDashDivider
 
                     // 3. 本月花费（各宠物对比柱）
                     let monthTotal = pets.flatMap { $0.expenseLogs }.filter {
@@ -604,9 +604,6 @@ struct OverviewView: View {
                         .min(by: { $0.remainingFoodDays < $1.remainingFoodDays }) {
                         let progress = min(1.0, Double(urgentPet.remainingFoodDays) / 30.0)
                         let accent: Color = urgentPet.remainingFoodDays <= 7 ? .goRed : .goOrange
-
-                        islandStatDivider
-
                         IslandStatCard(
                             icon: "bag.fill",
                             title: "粮仓",
@@ -622,12 +619,11 @@ struct OverviewView: View {
 
                     // Phase 49: 羁绊简报卡
                     if !pets.isEmpty || !humans.isEmpty {
-                        islandStatDivider
+                        verticalDashDivider
                         SynergyFlashCard(pets: pets, humans: humans)
                     }
 
                     // Phase 49: 椰子财富榜
-                    islandStatDivider
                     CoconutWealthRankingCard(
                         pets: pets,
                         humans: humans
@@ -639,14 +635,22 @@ struct OverviewView: View {
         }
     }
 
-    private var islandStatDivider: some View {
-        Path { p in
-            p.move(to: CGPoint(x: 0, y: 16))
-            p.addLine(to: CGPoint(x: 0, y: 224))
-        }
-        .stroke(Color.white.opacity(0.12), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-        .frame(width: 1, height: 240)
+    private var verticalDashDivider: some View {
+        Rectangle()
+            .fill(Color.clear)
+            .frame(width: 1, height: 160)
+            .overlay(
+                Path { path in
+                    path.move(to: CGPoint(x: 0, y: 0))
+                    path.addLine(to: CGPoint(x: 0, y: 160))
+                }
+                .stroke(style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                .foregroundStyle(.white.opacity(0.15))
+            )
+            .padding(.horizontal, 4)
     }
+
+
 
     private var weekWalkSteps: Int {
         guard let weekStart = Calendar.current.date(byAdding: .day, value: -7, to: Date()) else { return 0 }
@@ -658,22 +662,20 @@ struct OverviewView: View {
     }
 
     private var weightSeriesData: [(String, [Double], Color)] {
-        let colors: [Color] = [.goTeal, .goLime, .goYellow, Color(hex: "FF8C42"), Color(hex: "C084FC"), .goMint, .goRed]
         return pets.enumerated().compactMap { (i, p) in
             let sorted = p.weightLogs.sorted { $0.date < $1.date }
             guard !sorted.isEmpty else { return nil }
-            return (p.name, Array(sorted.suffix(8).map { $0.weight }), colors[i % colors.count])
+            return (p.name, Array(sorted.suffix(8).map { $0.weight }), Color(hex: p.themeColorHex))
         }
     }
 
     private var petExpenseSeriesData: [(String, Double, Color)] {
-        let colors: [Color] = [.goYellow, .goTeal, .goLime, Color(hex: "FF8C42"), Color(hex: "C084FC")]
         return pets.enumerated().compactMap { (i, p) in
             let amt = p.expenseLogs.filter {
                 Calendar.current.isDate($0.date, equalTo: Date(), toGranularity: .month)
             }.reduce(0.0) { $0 + $1.amount }
             guard amt > 0 else { return nil }
-            return (p.name, amt, colors[i % colors.count])
+            return (p.name, amt, Color(hex: p.themeColorHex))
         }
     }
 
@@ -919,10 +921,7 @@ struct OverviewView: View {
             }
             .padding(.horizontal, 20)
 
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4),
-                spacing: 12
-            ) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4), spacing: 10) {
                 // Task2: 按顶牌动态过滤，Spring 动画确保切换丝滑
                 ForEach(activeQuickActionItems, id: \.id) { item in
                     GoQuickActionCard(
@@ -968,27 +967,29 @@ struct OverviewView: View {
                 // + 添加新 item 按钮
                 Button { showingAddQuickAction = true } label: {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .fill(.white.opacity(0.05))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
                                     .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
                                     .foregroundStyle(.white.opacity(0.2))
                             )
-                        VStack(spacing: 6) {
+                        VStack(spacing: 4) {
                             Image(systemName: "plus")
                                 .font(.system(size: 18, weight: .bold))
                                 .foregroundStyle(.white.opacity(0.45))
                             Text("Add")
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .font(.system(size: 10, weight: .bold))
                                 .foregroundStyle(.white.opacity(0.3))
                         }
                     }
-                    .frame(height: 84)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .aspectRatio(1, contentMode: .fit)
                 }
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 16)
+            .padding(.vertical, 8)
         }
         .sheet(isPresented: $showingAddQuickAction) {
             AddQuickActionSheet(

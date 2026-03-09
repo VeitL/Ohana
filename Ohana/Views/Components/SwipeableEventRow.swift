@@ -18,8 +18,10 @@ struct SwipeableEventRow: View {
     @State private var offsetX: CGFloat = 0
     @State private var isTriggerred = false
     @State private var celebrationParticles: [CelebrationParticle] = []
+    @AppStorage("shop_equip_fx_stars") private var equipFxStars: Bool = false
     @State private var coconutFloats: [CoconutFloat] = []
     @State private var showDetail = false
+    @State private var showSkipReason = false
 
     private let triggerThreshold: CGFloat = 100
     private let dampFactor: CGFloat = 0.4
@@ -134,6 +136,17 @@ struct SwipeableEventRow: View {
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
         }
+        .overlay(alignment: .top) {
+            if showSkipReason {
+                Text("今日已打卡，不重复奖励 🥥")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 14).padding(.vertical, 8)
+                    .background(Color.goYellow, in: Capsule())
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .offset(y: -8)
+            }
+        }
     }
 
     // MARK: - Event Card
@@ -208,12 +221,12 @@ struct SwipeableEventRow: View {
         .padding(.horizontal, 14).padding(.vertical, 11)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.white.opacity(rowState == .completed ? 0.04 : 0.07))
+                .fill(Color.goPrimary.mix(with: .black, by: 0.4).opacity(0.55))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(
-                    rowState == .overdue ? Color.goOrange.opacity(0.4) : .white.opacity(0.09),
+                    rowState == .overdue ? Color.goOrange.opacity(0.4) : .white.opacity(0.12),
                     lineWidth: rowState == .overdue ? 1.5 : 1
                 )
         )
@@ -260,6 +273,12 @@ struct SwipeableEventRow: View {
         if !alreadyCheckedIn {
             QuestManager.shared.addCoconuts(5, emoji: "🥥", title: event.title + " 完成奖励")
             spawnCoconutFloat()
+        } else {
+            // 提示用户已打卡
+            withAnimation(.spring(response: 0.3)) { showSkipReason = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                withAnimation { showSkipReason = false }
+            }
         }
         launchCelebrationParticles()
         withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) { offsetX = -800 }
@@ -317,7 +336,7 @@ struct SwipeableEventRow: View {
     }
 
     private func launchCelebrationParticles() {
-        let emojis = ["⭐️", "✨", "💛", "🎉", "🐾"]
+        let emojis = equipFxStars ? ["✨", "⭐️", "🌟", "💫", "💛"] : ["⭐️", "✨", "💛", "🎉", "🐾"]
         celebrationParticles = (0..<6).map { i in
             CelebrationParticle(
                 emoji: emojis[i % emojis.count],
@@ -354,11 +373,12 @@ private struct EventDetailSheet: View {
     let onComplete: () -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @State private var showDeleteConfirm = false
 
     var body: some View {
         VStack(spacing: 0) {
             Capsule()
-                .fill(Color.black.opacity(0.1))
+                .fill(Color.white.opacity(0.2))
                 .frame(width: 40, height: 4)
                 .padding(.top, 12).padding(.bottom, 20)
 
@@ -376,7 +396,7 @@ private struct EventDetailSheet: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(event.title)
                                 .font(.system(size: 18, weight: .black, design: .rounded))
-                                .foregroundStyle(Color.arkInk)
+                                .foregroundStyle(.white)
                                 .lineLimit(2)
                             Text(event.eventType)
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
@@ -389,8 +409,12 @@ private struct EventDetailSheet: View {
                     .padding(.horizontal, 24)
 
                     // 时间信息
-                    infoRow(icon: "clock.fill", label: "时间",
+                    infoRow(icon: "clock.fill", label: "开始",
                             value: event.isAllDay ? "全天" : event.startDate.formatted(date: .abbreviated, time: .shortened))
+                    if let end = event.endDate {
+                        infoRow(icon: "clock.badge.checkmark.fill", label: "截止",
+                                value: end.formatted(date: .abbreviated, time: event.isAllDay ? .omitted : .shortened))
+                    }
                     if event.recurrenceDays > 0 {
                         infoRow(icon: "repeat", label: "重复",
                                 value: recurrenceLabel(event.recurrenceDays))
@@ -417,10 +441,7 @@ private struct EventDetailSheet: View {
                         }
 
                         Button {
-                            modelContext.delete(event)
-                            modelContext.safeSave()
-                            onDelete()
-                            dismiss()
+                            showDeleteConfirm = true
                         } label: {
                             Label("删除", systemImage: "trash.fill")
                                 .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -429,13 +450,29 @@ private struct EventDetailSheet: View {
                                 .background(Color.goRed, in: RoundedRectangle(cornerRadius: 14))
                         }
                         .buttonStyle(.plain)
+                        .confirmationDialog("确认删除", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+                            Button("删除此事项", role: .destructive) {
+                                modelContext.delete(event)
+                                modelContext.safeSave()
+                                onDelete()
+                                dismiss()
+                            }
+                            Button("取消", role: .cancel) {}
+                        } message: {
+                            Text("确定要删除「\(event.title)」吗？此操作不可撤回。")
+                        }
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 30)
                 }
             }
         }
-        .background(Color(hex: "F2F0F5"))
+        .background {
+            ZStack {
+                Color.goDeepNavy
+                Color.goPrimary.opacity(0.15)
+            }
+        }
         .presentationCornerRadius(28)
     }
 
@@ -447,11 +484,11 @@ private struct EventDetailSheet: View {
                 .frame(width: 22)
             Text(label)
                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.arkInk.opacity(0.5))
+                .foregroundStyle(.white.opacity(0.5))
             Spacer()
             Text(value)
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(.white)
         }
         .padding(.horizontal, 24)
     }

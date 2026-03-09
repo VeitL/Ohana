@@ -202,13 +202,13 @@ struct HumanWishlistView: View {
     private var addWishSheet: some View {
         VStack(spacing: 0) {
             Capsule()
-                .fill(Color.black.opacity(0.12))
+                .fill(Color.white.opacity(0.2))
                 .frame(width: 40, height: 4)
                 .padding(.top, 12).padding(.bottom, 20)
 
             Text("许一个愿 🌟")
                 .font(.system(size: 22, weight: .black, design: .rounded))
-                .foregroundStyle(.black)
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 24)
 
@@ -216,15 +216,17 @@ struct HumanWishlistView: View {
                 // 心愿标题
                 TextField("心愿内容（例如：新耳机）", text: $newTitle)
                     .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
                     .padding(.horizontal, 16).padding(.vertical, 14)
-                    .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 14))
+                    .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.white.opacity(0.1), lineWidth: 1))
 
                 // 椰子费用
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("兑换费用")
                             .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(.white)
                         Spacer()
                         HStack(spacing: 4) {
                             Text("🥥 \(newCost)")
@@ -238,13 +240,14 @@ struct HumanWishlistView: View {
                     ), in: 5...500, step: 5)
                     .tint(Color.goYellow)
                     HStack {
-                        Text("5 🥥").font(.caption).foregroundStyle(.secondary)
+                        Text("5 🥥").font(.caption).foregroundStyle(.white.opacity(0.4))
                         Spacer()
-                        Text("500 🥥").font(.caption).foregroundStyle(.secondary)
+                        Text("500 🥥").font(.caption).foregroundStyle(.white.opacity(0.4))
                     }
                 }
                 .padding(.horizontal, 16).padding(.vertical, 14)
-                .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 14))
+                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.white.opacity(0.1), lineWidth: 1))
             }
             .padding(.horizontal, 24).padding(.top, 20)
 
@@ -268,7 +271,7 @@ struct HumanWishlistView: View {
             .disabled(newTitle.isEmpty)
             .padding(.horizontal, 24).padding(.bottom, 32)
         }
-        .background(Color.white)
+        .background(Color.goDeepNavy)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.hidden)
     }

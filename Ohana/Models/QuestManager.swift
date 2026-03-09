@@ -325,8 +325,13 @@ final class QuestManager {
         let base = type.baseRewards
         let crit = rollCrit()
 
-        let finalHuman = base.human * crit.multiplier
-        let finalPet   = base.pet   * crit.multiplier
+        var finalHuman = base.human * crit.multiplier
+        var finalPet   = base.pet   * crit.multiplier
+
+        // title_chef: CEO/Chef bonus
+        if case .feed = type, UserDefaults.standard.string(forKey: "shop_equipped_title") == "title_chef" {
+            finalHuman += 1
+        }
 
         // ── 1. 宠物账户
         if finalPet > 0 { pet?.coconutBalance += finalPet }
@@ -501,8 +506,13 @@ final class QuestManager {
 
         let base = type.baseRewards
         let crit = rollCrit()
-        let finalHuman = base.human * crit.multiplier   // 人只发一次
+        var finalHuman = base.human * crit.multiplier   // 人只发一次
         let finalPetEach = base.pet * crit.multiplier   // 每只宠物各发一次
+
+        // title_chef: CEO/Chef bonus
+        if case .feed = type, UserDefaults.standard.string(forKey: "shop_equipped_title") == "title_chef" {
+            finalHuman += 1
+        }
 
         // ── 1. 写 PetCareLog（每只宠物独立一条）
         let careTypeEnum: CareType?

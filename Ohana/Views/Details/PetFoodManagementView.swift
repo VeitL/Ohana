@@ -50,7 +50,7 @@ private struct FoodReminderSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             Capsule()
-                .fill(Color.black.opacity(0.12))
+                .fill(Color.white.opacity(0.2))
                 .frame(width: 40, height: 4)
                 .padding(.top, 12).padding(.bottom, 20)
 
@@ -62,7 +62,7 @@ private struct FoodReminderSheet: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("添加提醒")
                                 .font(.system(size: 22, weight: .black, design: .rounded))
-                                .foregroundStyle(.black)
+                                .foregroundStyle(.white)
                             Text("\(pet.name) · \(prefillType)")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(.secondary)
@@ -80,7 +80,8 @@ private struct FoodReminderSheet: View {
                         TextField("标题", text: $title)
                             .font(.system(size: 15, weight: .semibold, design: .rounded))
                             .padding(.horizontal, 16).padding(.vertical, 12)
-                            .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 12))
+                            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.white.opacity(0.1), lineWidth: 1))
                             .padding(.horizontal, 24)
                     }
 
@@ -88,14 +89,14 @@ private struct FoodReminderSheet: View {
                     HStack {
                         Label("全天", systemImage: "sun.max.fill")
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(.white)
                         Spacer()
                         Toggle("", isOn: $isAllDay)
                             .tint(Color.goLime)
                             .labelsHidden()
                     }
                     .padding(.horizontal, 24).padding(.vertical, 14)
-                    .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 16))
+                    .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
                     .padding(.horizontal, 24)
 
                     // 开始时间（可选）
@@ -158,10 +159,10 @@ private struct FoodReminderSheet: View {
                                     Button { recurrenceDays = days } label: {
                                         Text(label)
                                             .font(.system(size: 14, weight: .bold, design: .rounded))
-                                            .foregroundStyle(recurrenceDays == days ? .black : Color(.label))
+                                            .foregroundStyle(recurrenceDays == days ? .black : .white.opacity(0.7))
                                             .padding(.horizontal, 16).padding(.vertical, 10)
                                             .background(
-                                                recurrenceDays == days ? Color.goLime : Color(.systemGray5),
+                                                recurrenceDays == days ? Color.goLime : Color.white.opacity(0.08),
                                                 in: Capsule()
                                             )
                                     }
@@ -185,7 +186,7 @@ private struct FoodReminderSheet: View {
                 }
             }
         }
-        .background(Color.white)
+        .background(Color.goDeepNavy)
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
     }

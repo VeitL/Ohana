@@ -13,6 +13,7 @@ import BackgroundTasks
 struct OhanaApp: App {
     let container: ModelContainer
     private static let bgTaskID = "com.guanchen.li.Ark.reminderRefill"
+    @AppStorage("appThemePreference") private var appThemePreference: String = "system"
 
     init() {
         self.container = SharedModelContainer.make()
@@ -31,6 +32,7 @@ struct OhanaApp: App {
             RootView()
                 .modelContainer(container)
                 .tint(Color.arkCoral)
+                .preferredColorScheme(appThemePreference == "light" ? .light : (appThemePreference == "dark" ? .dark : nil))
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
                     OhanaApp.scheduleReminderRefill()
                 }

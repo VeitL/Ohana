@@ -97,47 +97,63 @@ struct PetDetailView: View {
                         modelContext: modelContext
                     )
 
-                    // ── L3.5: 免疫健康中枢卡（快动作 + 疫苗本 + 免疫状态）──
-                    PetHealthHubCard(pet: pet, onRecord: { type in
-                        healthRecordType = type
-                    }, onViewPassport: {
-                        showingVaccinePassport = true
-                    }, onViewDetail: {
-                        showingHealthDetail = true
-                    })
-                    .padding(.horizontal, 16)
+                    // ── L3.5 - L5: Bento Box Grid (2-column) ──────────────
+                    Grid(horizontalSpacing: 12, verticalSpacing: 12) {
+                        // ── L3.5: 免疫健康中枢卡 ──
+                        GridRow {
+                            PetHealthHubCard(pet: pet, onRecord: { type in
+                                healthRecordType = type
+                            }, onViewPassport: {
+                                showingVaccinePassport = true
+                            }, onViewDetail: {
+                                showingHealthDetail = true
+                            })
+                            .padding(14)
+                            .ohanaStandardCard(cornerRadius: 20)
+                            .gridCellColumns(2)
+                        }
 
-                    // ── L4: 护理卡 ──────────────────────────────────────
-                    PetHygieneCard(pet: pet)
-                        .padding(.horizontal, 16)
+                        // ── L4 & L4.5: 护理卡 + 饮食排泄卡 ──
+                        GridRow {
+                            PetHygieneCard(pet: pet)
+                                .padding(14)
+                                .ohanaStandardCard(cornerRadius: 20)
+                            DietCardWithQuickActions(
+                                pet: pet,
+                                onOpenDetail: { showingFoodManagement = true }
+                            )
+                            .padding(14)
+                            .ohanaStandardCard(cornerRadius: 20)
+                        }
 
-                    // ── L4.5: 饮食与排泄卡片（task4: 内联快速打卡）
-                    DietCardWithQuickActions(
-                        pet: pet,
-                        onOpenDetail: { showingFoodManagement = true }
-                    )
-                    .padding(.horizontal, 16)
+                        // ── L4.6: 狗狗专属陪玩遛狗卡片 ──
+                        if pet.species == "狗" {
+                            GridRow {
+                                DogActivityCard(pet: pet)
+                                    .padding(14)
+                                    .ohanaStandardCard(cornerRadius: 20)
+                                    .gridCellColumns(2)
+                            }
+                        }
 
-                    // ── L4.6: 狗狗专属陪玩遛狗卡片
-                    if pet.species == "狗" {
-                        DogActivityCard(pet: pet)
-                            .padding(.horizontal, 16)
-                    }
+                        // ── L5: 证件 + 里程碑 ──
+                        GridRow {
+                            NavigationLink { DocumentsListView(pet: pet) } label: {
+                                compactDocumentsCard
+                            }.buttonStyle(.plain)
 
-                    // ── L5: 证件 + 里程碑 + 成就墙（并列三列 compact）────────────
-                    HStack(alignment: .top, spacing: 10) {
-                        // 证件卡
-                        NavigationLink { DocumentsListView(pet: pet) } label: {
-                            compactDocumentsCard
-                        }.buttonStyle(.plain)
-                        // 里程碑卡
-                        Button { showingMilestones = true } label: {
-                            compactMilestonesCard
-                        }.buttonStyle(.plain)
-                        // 成就墙卡
-                        Button { showingAchievements = true } label: {
-                            compactAchievementsCard
-                        }.buttonStyle(.plain)
+                            Button { showingMilestones = true } label: {
+                                compactMilestonesCard
+                            }.buttonStyle(.plain)
+                        }
+
+                        // ── 成就墙 ──
+                        GridRow {
+                            Button { showingAchievements = true } label: {
+                                compactAchievementsCard
+                            }.buttonStyle(.plain)
+                            .gridCellColumns(2)
+                        }
                     }
                     .padding(.horizontal, 16)
 
@@ -313,7 +329,7 @@ struct PetDetailView: View {
                 .font(.system(size: 12, weight: .semibold)).foregroundStyle(.white.opacity(0.3))
         }
         .padding(.horizontal, 16).padding(.vertical, 14)
-        .goTranslucentCard(cornerRadius: 18)
+        .ohanaStandardCard(cornerRadius: 18)
     }
 
     // MARK: - Compact 三列卡（证件/里程碑/成就）
@@ -351,7 +367,7 @@ struct PetDetailView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .goTranslucentCard(cornerRadius: 18)
+        .ohanaStandardCard(cornerRadius: 18)
     }
 
     private var compactMilestonesCard: some View {
@@ -382,7 +398,7 @@ struct PetDetailView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .goTranslucentCard(cornerRadius: 18)
+        .ohanaStandardCard(cornerRadius: 18)
     }
 
     private var compactAchievementsCard: some View {
@@ -410,7 +426,7 @@ struct PetDetailView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .goTranslucentCard(cornerRadius: 18)
+        .ohanaStandardCard(cornerRadius: 18)
     }
 
     // MARK: - Rainbow Bridge Section
@@ -566,22 +582,77 @@ private struct PetHeroRow: View {
     let pet: Pet
     let onTap: () -> Void
 
+    /// 人类等价年龄
+    private var humanEquivalentAge: String? {
+        guard let bday = pet.birthday else { return nil }
+        let cal = Calendar.current
+        let ageYears = cal.dateComponents([.year], from: bday, to: Date()).year ?? 0
+        let ageMonths = cal.dateComponents([.month], from: bday, to: Date()).month ?? 0
+        let petAge = Double(ageMonths) / 12.0
+        guard petAge > 0 else { return nil }
+        let humanAge: Int
+        switch pet.species {
+        case "狗":
+            if petAge <= 2 { humanAge = Int(petAge * 12) }
+            else { humanAge = 24 + Int((petAge - 2) * 5) }
+        case "猫":
+            if petAge <= 2 { humanAge = Int(petAge * 12.5) }
+            else { humanAge = 25 + Int((petAge - 2) * 4) }
+        case "兔子": humanAge = Int(petAge * 8)
+        case "仓鼠": humanAge = Int(petAge * 26)
+        case "龙猫": humanAge = Int(petAge * 4.5)
+        case "豚鼠": humanAge = Int(petAge * 10)
+        default: humanAge = Int(petAge * 7)
+        }
+        return "≈ \(humanAge)岁人类"
+    }
+
     var body: some View {
+        let themeColor = pet.themeColorHex.isEmpty ? Color.goCardBlue : Color(hex: pet.themeColorHex)
+        let isTransparent = pet.avatarImageData.map { ImageCutoutService.isTransparentPNG($0) } ?? false
+
         Button(action: onTap) {
-            VStack(spacing: 12) {
-                HStack(spacing: 14) {
-                    // 头像
-                    ZStack {
-                        Circle().fill(.white.opacity(0.1)).frame(width: 72, height: 72)
-                        if let data = pet.avatarImageData, let ui = UIImage(data: data) {
-                            Image(uiImage: ui).resizable().scaledToFill()
-                                .frame(width: 72, height: 72).clipShape(Circle())
-                                .overlay(Circle().strokeBorder(.white.opacity(0.2), lineWidth: 2))
-                        } else {
-                            Text(pet.avatarEmoji).font(.system(size: 38))
-                        }
-                    }
-                    VStack(alignment: .leading, spacing: 6) {
+            ZStack(alignment: .bottomLeading) {
+                // 渐变底色（匹配首页卡片风格）
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(LinearGradient(
+                        colors: [themeColor, themeColor.opacity(0.6), Color.goDarkBlue],
+                        startPoint: .topLeading, endPoint: .bottomTrailing))
+
+                // 头像区域（带径向渐变遮罩）
+                if let data = pet.avatarImageData, let img = UIImage(data: data), !isTransparent {
+                    Image(uiImage: img)
+                        .resizable().scaledToFill()
+                        .frame(width: 120, height: 120)
+                        .mask(
+                            RadialGradient(
+                                gradient: Gradient(stops: [
+                                    .init(color: .black, location: 0.35),
+                                    .init(color: .black, location: 0.5),
+                                    .init(color: .clear, location: 0.9)
+                                ]),
+                                center: UnitPoint(x: 0.5, y: 0.5),
+                                startRadius: 10,
+                                endRadius: 70
+                            )
+                        )
+                        .offset(x: 12, y: -10)
+                        .allowsHitTesting(false)
+                } else if isTransparent, let data = pet.avatarImageData, let img = UIImage(data: data) {
+                    Image(uiImage: img)
+                        .resizable().scaledToFit()
+                        .frame(height: 100)
+                        .offset(x: 12, y: -10)
+                        .allowsHitTesting(false)
+                } else {
+                    Text(pet.avatarEmoji).font(.system(size: 52))
+                        .offset(x: 20, y: -10)
+                }
+
+                // 信息覆盖层（右侧）
+                HStack {
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 6) {
                         Text(pet.name)
                             .font(.system(size: 24, weight: .black, design: .rounded))
                             .foregroundStyle(.white)
@@ -594,18 +665,30 @@ private struct PetHeroRow: View {
                             heroTag(pet.genderSymbol)
                             if pet.isNeutered { heroTag("已绝育") }
                         }
+                        Spacer().frame(height: 4)
+                        VStack(alignment: .trailing, spacing: 4) {
+                            heroStat(value: "\(pet.daysTogether)", label: "同行天", accent: .goLime)
+                            HStack(spacing: 8) {
+                                heroStat(value: pet.ageText, label: "年龄", accent: .goTeal)
+                                if let hAge = humanEquivalentAge {
+                                    Text(hAge)
+                                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(.white.opacity(0.4))
+                                }
+                            }
+                        }
                     }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 10) {
-                        heroStat(value: "\(pet.daysTogether)", label: "同行天", accent: .goLime)
-                        heroStat(value: pet.ageText, label: "年龄", accent: .goTeal)
-                    }
+                    .padding(.trailing, 14)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.25))
                 }
+                .padding(.vertical, 14)
+            }
+            .frame(height: 140)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
 
-                // 第二行：出生/到家/体重
+            // 第二行：出生/到家/体重
                 HStack(spacing: 0) {
                     if pet.birthday != nil {
                         heroInfoCell(icon: "birthday.cake.fill", label: "生日",
@@ -626,9 +709,7 @@ private struct PetHeroRow: View {
                     }
                 }
                 .padding(.top, 4)
-            }
-            .padding(.horizontal, 16).padding(.vertical, 16)
-            .goTranslucentCard(cornerRadius: 20)
+
             .padding(.horizontal, 16)
         }
         .buttonStyle(.plain)
@@ -758,7 +839,7 @@ private struct PetHealthActionRow: View {
             }
         }
         .padding(.vertical, 12)
-        .goTranslucentCard(cornerRadius: 20)
+        .ohanaStandardCard(cornerRadius: 20)
     }
 }
 
@@ -771,98 +852,80 @@ private struct PetHealthHubCard: View {
     let onViewPassport: () -> Void
     var onViewDetail: (() -> Void)? = nil
 
-    private let quickActions: [(String, String, Color, HealthLogType)] = [
-        ("💉", "疫苗", .goCardCyan, .vaccine),
-        ("🛡️", "驱虫", .goTeal,    .medication),
-        ("🩺", "体检", .goYellow,  .checkup),
-        ("🏥", "就诊", .goRed,     .surgery),
-    ]
-
-    private var immunityRows: [(String, String, Date?, Date?)] {
+    private var immunityRows: [(emoji: String, label: String, lastDate: Date?, expiryDate: Date?)] {
         let v = pet.healthLogs.filter { $0.type == HealthLogType.vaccine.rawValue }.sorted { $0.date > $1.date }.first
         let d = pet.healthLogs.filter { $0.type == HealthLogType.medication.rawValue }.sorted { $0.date > $1.date }.first
         let c = pet.healthLogs.filter { $0.type == HealthLogType.checkup.rawValue }.sorted { $0.date > $1.date }.first
+        let s = pet.healthLogs.filter { $0.type == HealthLogType.surgery.rawValue }.sorted { $0.date > $1.date }.first
         return [
             ("💉", "疫苗", v?.date, v.flatMap { Calendar.current.date(byAdding: .year, value: 1, to: $0.date) }),
             ("🛡️", "驱虫", d?.date, d.flatMap { Calendar.current.date(byAdding: .month, value: 3, to: $0.date) }),
             ("🩺", "体检", c?.date, c.flatMap { Calendar.current.date(byAdding: .year, value: 1, to: $0.date) }),
-        ]
+            ("🏥", "就诊", s?.date, nil),
+        ].filter { $0.lastDate != nil } // only show items with records
     }
 
     private var vaccineCount: Int { pet.healthLogs.filter { $0.type == HealthLogType.vaccine.rawValue }.count }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // ── 顶栏：标题（可点进详情）+ 疫苗本入口
+        VStack(alignment: .leading, spacing: 10) {
+            // ── 标题行
             Button { onViewDetail?() } label: {
-                HStack(spacing: 10) {
-                    ZStack {
-                        Circle().fill(Color.goCardCyan.opacity(0.15)).frame(width: 34, height: 34)
-                        Text("💉").font(.system(size: 17))
-                    }
+                HStack(spacing: 8) {
+                    Text("💉").font(.system(size: 16))
                     Text("免疫健康")
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(.system(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
-                    Text(vaccineCount == 0 ? "暂无记录" : "\(vaccineCount) 条")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.35))
                     Spacer()
+                    Button(action: onViewPassport) {
+                        HStack(spacing: 3) {
+                            Text("疫苗本")
+                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                            Image(systemName: "chevron.right").font(.system(size: 9, weight: .semibold))
+                        }
+                        .foregroundStyle(Color.goCardCyan.opacity(0.8))
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(Color.goCardCyan.opacity(0.1), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.25))
                 }
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 6)
 
-            // 疫苗本快捷入口（独立行）
-            HStack {
-                Spacer()
-                Button(action: onViewPassport) {
-                    HStack(spacing: 3) {
-                        Text("疫苗本")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                        Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold))
-                    }
-                    .foregroundStyle(Color.goCardCyan.opacity(0.8))
-                    .padding(.horizontal, 10).padding(.vertical, 4)
-                    .background(Color.goCardCyan.opacity(0.1), in: Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 14).padding(.bottom, 8)
-
-            GoDashedDivider().padding(.horizontal, 14)
-
-            // ── 快动作按钮行（点击直接添加记录）
-            HStack(spacing: 0) {
-                ForEach(quickActions, id: \.1) { emoji, label, accent, type in
-                    Button { onRecord(type) } label: {
-                        VStack(spacing: 4) {
-                            ZStack {
-                                Circle().fill(accent.opacity(0.14)).frame(width: 38, height: 38)
-                                Text(emoji).font(.system(size: 18))
-                            }
-                            Text(label)
+            // ── 有记录的项目 + 有效期
+            if immunityRows.isEmpty {
+                Text("暂无记录")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.3))
+                    .padding(.vertical, 4)
+            } else {
+                ForEach(immunityRows, id: \.label) { row in
+                    HStack(spacing: 8) {
+                        Text(row.emoji).font(.system(size: 14))
+                        Text(row.label)
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.8))
+                        Spacer()
+                        if let exp = row.expiryDate {
+                            let isExpired = exp < Date()
+                            let daysLeft = Calendar.current.dateComponents([.day], from: Date(), to: exp).day ?? 0
+                            Text(isExpired ? "已过期" : "有效至 \(exp.formatted(.dateTime.month().day()))")
                                 .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.6))
+                                .foregroundStyle(isExpired ? Color.goRed : (daysLeft < 30 ? Color.goYellow : Color.goTeal))
+                        } else if row.lastDate != nil {
+                            Text(row.lastDate!.formatted(.dateTime.month().day()))
+                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.4))
                         }
-                        .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.plain)
+                    .padding(.vertical, 2)
                 }
             }
-            .padding(.vertical, 10)
         }
-        .goTranslucentCard(cornerRadius: 20)
-    }
-
-    private func statusPill(_ text: String, color: Color) -> some View {
-        Text(text)
-            .font(.system(size: 10, weight: .black, design: .rounded))
-            .foregroundStyle(color)
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(color.opacity(0.15), in: Capsule())
+        .padding(.horizontal, 4)
     }
 }
 
@@ -994,7 +1057,7 @@ private struct PetBentoGrid: View {
             }
         }
         .padding(14)
-        .goTranslucentCard(cornerRadius: 20)
+        .ohanaStandardCard(cornerRadius: 20)
     }
 
     // 花费卡
@@ -1015,7 +1078,7 @@ private struct PetBentoGrid: View {
         }
         .padding(14)
         .frame(minHeight: 130)
-        .goTranslucentCard(cornerRadius: 20)
+        .ohanaStandardCard(cornerRadius: 20)
     }
 
     // 遛狗卡
@@ -1069,7 +1132,7 @@ private struct PetBentoGrid: View {
         }
         .padding(14)
         .frame(minHeight: 130)
-        .goTranslucentCard(cornerRadius: 20)
+        .ohanaStandardCard(cornerRadius: 20)
     }
 
     // 粮仓卡
@@ -1099,7 +1162,7 @@ private struct PetBentoGrid: View {
             }
         }
         .padding(14)
-        .goTranslucentCard(cornerRadius: 20)
+        .ohanaStandardCard(cornerRadius: 20)
     }
 }
 
@@ -1207,7 +1270,7 @@ private struct PetUnifiedTimeline: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 24)
+        .ohanaStandardCard(cornerRadius: 24)
     }
 }
 
@@ -1292,13 +1355,12 @@ private struct DietCardWithQuickActions: View {
     var body: some View {
         VStack(spacing: 0) {
             Button(action: onOpenDetail) {
-                HStack {
-                    Image(systemName: "fork.knife.circle.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.goOrange)
-                    Text("饮食与排泄")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                HStack(spacing: 6) {
+                    Text("🍽️").font(.system(size: 14))
+                    Text("饮食排泄")
+                        .font(.system(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
+                        .lineLimit(1)
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .semibold))
@@ -1306,11 +1368,9 @@ private struct DietCardWithQuickActions: View {
                 }
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 10)
+            .padding(.bottom, 12)
 
-            GoDashedDivider().padding(.horizontal, 14)
-
-            HStack(spacing: 8) {
+            VStack(spacing: 8) {
                 Button {
                     let log = PetCareLog(date: Date(), type: .feeding, pet: pet)
                     modelContext.insert(log)
@@ -1320,7 +1380,7 @@ private struct DietCardWithQuickActions: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 } label: {
                     dietActionCell(
-                        emoji: "🍗", label: "喂食", countLabel: "今日 \(todayFeed) 次",
+                        emoji: "🍗", label: "喂食", countLabel: "\(todayFeed) 次",
                         accent: Color.goOrange
                     )
                 }
@@ -1334,13 +1394,12 @@ private struct DietCardWithQuickActions: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 } label: {
                     dietActionCell(
-                        emoji: "💧", label: "喂水", countLabel: "今日 \(todayWater) 次",
+                        emoji: "💧", label: "喂水", countLabel: "\(todayWater) 次",
                         accent: Color.goCardCyan
                     )
                 }
                 .buttonStyle(.plain)
 
-                // FIX 4: 猫的便便/铲砂快捷打卡
                 Button {
                     let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
                     if isCatLike {
@@ -1358,15 +1417,15 @@ private struct DietCardWithQuickActions: View {
                     dietActionCell(
                         emoji: isCatLike ? "🧹" : "💩",
                         label: isCatLike ? "铲砂" : "便便",
-                        countLabel: "今日 \(todayPotty) 次",
+                        countLabel: "\(todayPotty) 次",
                         accent: isCatLike ? Color(hex: "5B6AFF") : Color(hex: "FF8C42")
                     )
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 10).padding(.vertical, 10)
+            .padding(.horizontal, 4).padding(.vertical, 8)
         }
-        .goTranslucentCard(cornerRadius: 20)
+        .padding(.horizontal, 4)
     }
 
     private func dietActionCell(emoji: String, label: String, countLabel: String, accent: Color) -> some View {

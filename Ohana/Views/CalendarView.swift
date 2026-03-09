@@ -38,9 +38,18 @@ struct CalendarView: View {
     }
     
     private var eventsForSelectedDate: [Event] {
-        filteredEvents.filter {
-            Calendar.current.isDate($0.startDate, inSameDayAs: selectedDate)
-        }
+        filteredEvents.filter { eventOccursOnDate($0, date: selectedDate) }
+    }
+
+    /// 判断事件是否出现在指定日期（支持多日事件）
+    private func eventOccursOnDate(_ event: Event, date: Date) -> Bool {
+        let cal = Calendar.current
+        let dayStart = cal.startOfDay(for: date)
+        guard let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart) else { return false }
+        let eStart = event.startDate
+        let eEnd = event.endDate ?? eStart  // 无 endDate 则等于 startDate
+        // 事件范围与当天范围有交集
+        return eStart < dayEnd && eEnd >= dayStart
     }
     
     // 本周 7 天
@@ -107,7 +116,7 @@ struct CalendarView: View {
                 ForEach(thisWeekDays, id: \.self) { day in
                     let isToday = Calendar.current.isDateInToday(day)
                     let isSelected = Calendar.current.isDate(day, inSameDayAs: selectedDate)
-                    let dayEvents = filteredEvents.filter { Calendar.current.isDate($0.startDate, inSameDayAs: day) }
+                    let dayEvents = filteredEvents.filter { eventOccursOnDate($0, date: day) }
                     let hasEvents = !dayEvents.isEmpty
                     
                     Button {
@@ -261,15 +270,26 @@ struct CalendarView: View {
             }
             .padding(.horizontal, 20)
             
-            // Calendar grid — Go 风格（无星期行）
+            // Weekday header — 日一二三四五六
+            HStack(spacing: 0) {
+                ForEach(["日","一","二","三","四","五","六"], id: \.self) { d in
+                    Text(d)
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.3))
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.horizontal, 12)
+
+            // Calendar grid
             let daysInMonth = calendarDays()
             
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 6) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) {
                 ForEach(Array(daysInMonth.enumerated()), id: \.offset) { offset, date in
                     if let date {
                         let isToday = Calendar.current.isDateInToday(date)
                         let isSelected = Calendar.current.isDate(date, inSameDayAs: selectedDate)
-                        let hasEvents = filteredEvents.contains { Calendar.current.isDate($0.startDate, inSameDayAs: date) }
+                        let hasEvents = filteredEvents.contains { eventOccursOnDate($0, date: date) }
                         
                         Button {
                             withAnimation(.spring(response: 0.25)) {
@@ -285,14 +305,14 @@ struct CalendarView: View {
                                     .fill(hasEvents ? (isSelected ? Color.arkInk.opacity(0.5) : Color.goLime) : .clear)
                                     .frame(width: 5, height: 5)
                             }
-                            .frame(width: 38, height: 44)
+                            .frame(width: 40, height: 48)
                             .background(
                                 isSelected ? Color.goLime : (isToday ? Color.white.opacity(0.08) : .clear),
                                 in: RoundedRectangle(cornerRadius: 12, style: .continuous)
                             )
                         }
                     } else {
-                        Color.clear.frame(width: 38, height: 44)
+                        Color.clear.frame(width: 40, height: 48)
                     }
                 }
             }

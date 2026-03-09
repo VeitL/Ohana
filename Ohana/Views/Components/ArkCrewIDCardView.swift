@@ -21,6 +21,8 @@ struct ArkCrewIDCardView: View {
     var onTapDocStat: (() -> Void)? = nil
     
     @State private var _isFlipped = false
+    @State private var glowFlash = false
+    @State private var cardScale: CGFloat = 1.0
 
     private var flipped: Bool {
         isFlipped?.wrappedValue ?? _isFlipped
@@ -45,7 +47,11 @@ struct ArkCrewIDCardView: View {
         }
         .frame(width: ScreenCompat.width - 48, height: (ScreenCompat.width - 48) / 1.586)
         .rotation3DEffect(.degrees(flipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
-        .animation(.spring(response: 0.6, dampingFraction: 0.78), value: flipped)
+        .shadow(color: glowFlash ? Color.goLime.opacity(0.8) : Color.black.opacity(0.15),
+                radius: glowFlash ? 20 : 24, x: 0, y: glowFlash ? 0 : 12)
+        .scaleEffect(cardScale)
+        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: flipped)
+        .animation(.easeInOut(duration: 0.8), value: glowFlash)
     }
     
     // Card theme color based on pet's themeColorHex
@@ -736,8 +742,18 @@ struct ArkCrewIDCardView: View {
                 .contentShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
                 .onTapGesture { toggleFlip() }
 
+            // 顶部主题色渐变阴影
+            VStack {
+                LinearGradient(
+                    colors: [cardThemeColor.opacity(0.25), .clear],
+                    startPoint: .top, endPoint: .bottom
+                )
+                .frame(height: 60)
+                Spacer()
+            }
+
             VStack(spacing: 0) {
-                // ── 顶栏：宠物名 + 详情按钮
+                // ── 顶栏：宠物名 + 详情按钮（上移）
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("DATA DASHBOARD")
@@ -763,14 +779,18 @@ struct ArkCrewIDCardView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 18).padding(.top, 16).padding(.bottom, 10)
+                .padding(.horizontal, 18).padding(.top, 12).padding(.bottom, 8)
 
-                // ── 区域 1：核心数据摘要（无框悬浮，无单击）
+                Spacer()
+
+                // ── 区域 1：核心数据摘要（居中）
                 backCoreMetrics
                     .padding(.horizontal, 16)
                     .allowsHitTesting(true) // 允许长按
 
-                // ── 区域 2：底部待办 Banner（唯一可点击数据修改区）
+                Spacer()
+
+                // ── 区域 2：底部待办 Banner（下移到底部）
                 backTodoBanner
                     .padding(.horizontal, 12)
                     .padding(.bottom, 14)
@@ -1550,6 +1570,9 @@ private struct BackBentoDashboard: View {
 
     // 椰子浮字特效（仅保留用于完成待办奖励）
     @State private var coconutFloats: [CoconutFloat] = []
+    
+    @State private var glowFlash = false
+    @State private var cardScale: CGFloat = 1.0
 
     private struct CoconutFloat: Identifiable {
         let id = UUID()
@@ -1703,7 +1726,9 @@ private struct BackBentoDashboard: View {
                     SpeciesCheckInGrid(
                         pet: pet,
                         onNavigateToHealth: { onShowHealth?() },
-                        onNavigateToWeight: { onShowWeight?() }
+                        onNavigateToWeight: { onShowWeight?() },
+                        glowFlash: $glowFlash,
+                        cardScale: $cardScale
                     )
                 }
             }
@@ -2150,6 +2175,9 @@ struct SpeciesCheckInGrid: View {
     // 撤回
     @State private var undoItem: UndoCheckIn? = nil
     @State private var feedAnimating = false
+    @Binding var glowFlash: Bool
+    @Binding var cardScale: CGFloat
+    @AppStorage("shop_equip_fx_lime_glow") private var equipFxLimeGlow: Bool = false
 
     private struct UndoCheckIn: Identifiable {
         let id = UUID()
@@ -2311,6 +2339,20 @@ struct SpeciesCheckInGrid: View {
     // MARK: - 点击处理
     private func handleTap(_ card: QACardType) {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        
+        if equipFxLimeGlow {
+            withAnimation(.easeOut(duration: 0.15)) {
+                glowFlash = true
+                cardScale = 1.03
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                withAnimation(.easeIn(duration: 0.5)) {
+                    glowFlash = false
+                    cardScale = 1.0
+                }
+            }
+        }
+        
         switch card {
         case .care:
             showCareMenu = true

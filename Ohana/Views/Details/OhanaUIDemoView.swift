@@ -2,7 +2,7 @@
 //  OhanaUIDemoView.swift
 //  Ohana
 //
-//  UI 规范测试页 — 已确认风格 + 布局探索
+//  UI 规范测试页 — 已确认风格 + 布局示例 (Phase 60)
 //
 
 import SwiftUI
@@ -16,10 +16,11 @@ struct OhanaUIDemoView: View {
     @State private var sampleSlider: Double = 0.65
     @State private var sampleDate = Date()
     @State private var sampleStepper = 3
+    @State private var sampleSegment = 0
+    @State private var samplePicker = 0
     
     // Animation states
     @State private var pulseScale: CGFloat = 1.0
-    @State private var rotationDeg: Double = 0
     @State private var barHeights: [CGFloat] = [0.4, 0.7, 0.55, 0.9, 0.3, 0.8, 0.6]
 
     var body: some View {
@@ -30,76 +31,113 @@ struct OhanaUIDemoView: View {
 
                 // ─── PART 1: CHOSEN PRIMARY STYLES ───
                 Group {
-                    sectionLabel("✅ 已确认的基础风格 · Standard Styles")
+                    sectionLabel("✅ 基础风格 · Standard Elements")
                     
                     VStack(spacing: 16) {
-                        // Chosen Alert Style D (Solid Capsule)
-                        VStack(spacing: 10) {
-                            Text("横幅风格 (选定: D)").font(OhanaFont.footnote(.bold)).foregroundStyle(textTertiary).frame(maxWidth: .infinity, alignment: .leading)
-                            alertStyleD("checkmark.circle.fill", "操作成功完成！", Color.goLime, Color.arkInk)
-                            alertStyleD("exclamationmark.triangle.fill", "证件即将到期。", Color.goYellow, Color.arkInk)
-                        }
+                        // Typography
+                        typographySection
                         
-                        // Chosen Button Style B (Gradient subtle background)
+                        // Colors
+                        colorPaletteSection
+                        
+                        // Inputs
+                        inputsSection
+                        
+                        // Standard Card Showcase
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("统一卡片 (ohanaStandardCard)").font(OhanaFont.footnote(.bold)).foregroundStyle(textTertiary).frame(maxWidth: .infinity, alignment: .leading)
+                            Text("深色模式: 深蓝渐变 + 磨砂描边\n浅色模式: 纯白 + 柔和投影").font(OhanaFont.callout()).foregroundStyle(textSecondary)
+                        }
+                        .padding(16)
+                        .ohanaStandardCard(isDarkMode: isDarkMode)
+                        
+                        // Chosen Alert Style D
                         VStack(spacing: 10) {
-                            Text("图标按钮 (选定: B)").font(OhanaFont.footnote(.bold)).foregroundStyle(textTertiary).frame(maxWidth: .infinity, alignment: .leading)
+                            Text("提示横幅 (OhanaAlertBanner)").font(OhanaFont.footnote(.bold)).foregroundStyle(textTertiary).frame(maxWidth: .infinity, alignment: .leading)
+                            OhanaAlertBanner(icon: "checkmark.circle.fill", message: "操作成功完成！", bg: Color.goLime, fg: Color.arkInk)
+                            OhanaAlertBanner(icon: "exclamationmark.triangle.fill", message: "证件即将到期。", bg: Color.goYellow, fg: Color.arkInk)
+                            OhanaAlertBanner(icon: "xmark.circle.fill", message: "保存失败请重试。", bg: Color.goRed, fg: .white)
+                            OhanaAlertBanner(icon: "info.circle.fill", message: "新版本可用。", bg: Color.goPrimary, fg: .white)
+                        }
+                        .padding(16)
+                        .ohanaStandardCard(isDarkMode: isDarkMode)
+                        
+                        // Chosen Button Style B
+                        VStack(spacing: 10) {
+                            Text("图标按钮 (OhanaIconButton)").font(OhanaFont.footnote(.bold)).foregroundStyle(textTertiary).frame(maxWidth: .infinity, alignment: .leading)
                             HStack(spacing: 12) {
-                                iconBtnStyleB("heart.fill", Color.goRed)
-                                iconBtnStyleB("star.fill", Color.goYellow)
-                                iconBtnStyleB("mappin.circle.fill", Color.goTeal)
-                                iconBtnStyleB("bell.fill", Color.goOrange)
+                                OhanaIconButton(icon: "heart.fill", color: Color.goRed) {}
+                                OhanaIconButton(icon: "star.fill", color: Color.goYellow) {}
+                                OhanaIconButton(icon: "mappin.circle.fill", color: Color.goTeal) {}
+                                OhanaIconButton(icon: "bell.fill", color: Color.goOrange) {}
                                 Spacer()
                             }
+                            
+                            Text("主操作按钮 (Primary)").font(OhanaFont.footnote(.bold)).foregroundStyle(textTertiary).frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8)
+                            Button {} label: {
+                                Text("保存设置")
+                                    .font(OhanaFont.headline(.bold))
+                                    .foregroundStyle(Color.arkInk)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 16)
+                                    .background(LinearGradient(colors: [Color.goLime, Color(hex: "A8E44A")], startPoint: .leading, endPoint: .trailing), in: RoundedRectangle(cornerRadius: 18))
+                            }
                         }
+                        .padding(16)
+                        .ohanaStandardCard(isDarkMode: isDarkMode)
                         
-                        // Chosen Tag Style C (Dot + Weighted bg)
+                        // Chosen Tag Style C
                         VStack(spacing: 10) {
-                            Text("标签风格 (选定: C)").font(OhanaFont.footnote(.bold)).foregroundStyle(textTertiary).frame(maxWidth: .infinity, alignment: .leading)
-                            HStack(spacing: 8) {
-                                chipStyleC("🐕 狗狗", Color.goLime, selected: true)
-                                chipStyleC("🐈 猫咪", Color.goTeal, selected: false)
-                                chipStyleC("🐰 兔子", Color.goYellow, selected: false)
-                                Spacer()
+                            Text("标签 (OhanaChip)").font(OhanaFont.footnote(.bold)).foregroundStyle(textTertiary).frame(maxWidth: .infinity, alignment: .leading)
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    OhanaChip(label: "🐕 狗狗", color: Color.goLime, selected: true, isDarkMode: isDarkMode)
+                                    OhanaChip(label: "🐈 猫咪", color: Color.goTeal, selected: false, isDarkMode: isDarkMode)
+                                    OhanaChip(label: "🐰 兔子", color: Color.goYellow, selected: false, isDarkMode: isDarkMode)
+                                    OhanaChip(label: "⚖️ 体重", color: Color.goOrange, selected: false, isDarkMode: isDarkMode)
+                                }
                             }
                         }
+                        .padding(16)
+                        .ohanaStandardCard(isDarkMode: isDarkMode)
                     }
-                    .padding(16)
-                    .standardCard(dark: isDarkMode)
                 }
 
-                // ─── PART 2: LAYOUT EXPLORATIONS ───
+                // ─── PART 2: LAYOUT EXPLORATIONS (Standardized) ───
                 Group {
-                    sectionLabel("🧩 布局探索 · Layout Variations")
-                    Text("打破单一的横条卡片，尝试更多空间组合").font(OhanaFont.callout()).foregroundStyle(textSecondary).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 4)
+                    sectionLabel("🧩 布局规范 · Layout Conventions")
+                    Text("不要使用单一的横条卡片堆叠，使用这些组合进行布局。").font(OhanaFont.callout()).foregroundStyle(textSecondary).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 4)
                     
-                    // Style A: Bento Box (Mix of large and small squares)
+                    // Style A: Bento Box
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("风格 1: 组合方块 (Bento Box)").font(OhanaFont.headline()).foregroundStyle(textPrimary)
+                        Text("1. 组合方块 (Bento Box)").font(OhanaFont.headline()).foregroundStyle(textPrimary)
+                        Text("用于仪表盘和详情页头部").font(OhanaFont.caption()).foregroundStyle(textSecondary)
                         HStack(spacing: 12) {
-                            // Large Square
                             VStack(alignment: .leading, spacing: 12) {
                                 Image(systemName: "dog.fill").font(.system(size: 32)).foregroundStyle(Color.goLime)
+                                Spacer()
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("萌宠档案").font(OhanaFont.title3(.bold)).foregroundStyle(textPrimary)
-                                    Text("查看基本信息").font(OhanaFont.caption()).foregroundStyle(textSecondary)
+                                    Text("基本概览").font(OhanaFont.caption()).foregroundStyle(textSecondary)
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(16)
-                            .standardCard(dark: isDarkMode)
+                            .ohanaStandardCard(isDarkMode: isDarkMode)
                             
-                            // Right Column (Two small squares)
                             VStack(spacing: 12) {
                                 layoutSmallCard(icon: "calendar", title: "日程", color: Color.goTeal)
                                 layoutSmallCard(icon: "chart.bar.fill", title: "健康", color: Color.goOrange)
                             }
                             .frame(width: 100)
                         }
+                        .frame(height: 140)
                     }
 
-                    // Style B: Split Cards (Visual balance)
+                    // Style B: Split Cards
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("风格 2: 对称切片 (Split Cards)").font(OhanaFont.headline()).foregroundStyle(textPrimary)
+                        Text("2. 对称切片 (Split Cards)").font(OhanaFont.headline()).foregroundStyle(textPrimary)
+                        Text("用于并列两项重要指标").font(OhanaFont.caption()).foregroundStyle(textSecondary)
                         HStack(spacing: 12) {
                             HStack {
                                 Image(systemName: "pawprint.fill").foregroundStyle(Color.goLime)
@@ -107,7 +145,7 @@ struct OhanaUIDemoView: View {
                                 Spacer()
                                 Text("1.2k").font(OhanaFont.footnote(.bold)).foregroundStyle(textSecondary)
                             }
-                            .padding(14).standardCard(dark: isDarkMode)
+                            .padding(14).ohanaStandardCard(isDarkMode: isDarkMode)
                             
                             HStack {
                                 Image(systemName: "drop.fill").foregroundStyle(Color.goTeal)
@@ -115,48 +153,44 @@ struct OhanaUIDemoView: View {
                                 Spacer()
                                 Text("600ml").font(OhanaFont.footnote(.bold)).foregroundStyle(textSecondary)
                             }
-                            .padding(14).standardCard(dark: isDarkMode)
+                            .padding(14).ohanaStandardCard(isDarkMode: isDarkMode)
                         }
                     }
 
-                    // Style C: Floating Section (Minimalist)
+                    // Style C: Floating Section
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("风格 3: 悬浮群组 (Floating Groups)").font(OhanaFont.headline()).foregroundStyle(textPrimary)
-                        VStack(spacing: 1) {
-                            groupItem(icon: "gearshape.fill", title: "系统设置", color: Color.goPrimary, isTop: true)
-                            Divider().padding(.leading, 50).opacity(0.1)
-                            groupItem(icon: "lock.fill", title: "隐私与安全", color: Color.goTeal, isBottom: true)
+                        Text("3. 悬浮群组 (Floating Groups)").font(OhanaFont.headline()).foregroundStyle(textPrimary)
+                        Text("用于设置页和列表，代替各自独立的行卡片").font(OhanaFont.caption()).foregroundStyle(textSecondary)
+                        VStack(spacing: 0) {
+                            groupItem(icon: "gearshape.fill", title: "系统设置", color: Color.goPrimary)
+                            OhanaDashedDivider(color: isDarkMode ? .white.opacity(0.1) : .black.opacity(0.05)).padding(.leading, 50)
+                            groupItem(icon: "lock.fill", title: "隐私与安全", color: Color.goTeal)
+                            OhanaDashedDivider(color: isDarkMode ? .white.opacity(0.1) : .black.opacity(0.05)).padding(.leading, 50)
+                            groupItem(icon: "person.2.fill", title: "家庭管理", color: Color.goOrange)
                         }
-                        .standardCard(dark: isDarkMode)
+                        .ohanaStandardCard(isDarkMode: isDarkMode)
                     }
                 }
 
-                // ─── PART 3: QUICK ACCESS (QA) EXPLORATIONS ───
+                // ─── PART 3: QUICK ACCESS (QA) ───
                 Group {
-                    sectionLabel("⚡️ QA 卡片探索 · Quick Access Styles")
+                    sectionLabel("⚡️ 快捷操作卡片 · Quick Access")
+                    Text("OhanaQACard (玻璃质感，小巧紧凑)").font(OhanaFont.callout()).foregroundStyle(textSecondary).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 4)
                     
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 16) {
-                            // Style 1: Modern Glass (Large Icon + Metric)
-                            qaGlassCard(title: "今日运动", value: "45分", icon: "figure.walk", color: Color.goLime)
-                            
-                            // Style 2: Gradient Minimal (Clean)
-                            qaGradientCard(title: "体重记录", value: "6.2kg", icon: "scalemass.fill", color: Color.goTeal)
-                            
-                            // Style 3: Illustration Style (Colorful bg)
-                            qaIllustrativeCard(title: "椰子收获", value: "28", icon: "leaf.circle.fill", color: Color.goYellow)
-                            
-                            // Style 4: Classic Badge
-                            qaClassicCard(title: "剩余猫粮", value: "1.5kg", icon: "cart.fill", color: Color.goOrange)
+                            OhanaQACard(title: "今日运动", value: "45分", icon: "figure.walk", color: Color.goLime, isDarkMode: isDarkMode)
+                            OhanaQACard(title: "体重", value: "6.2kg", icon: "scalemass.fill", color: Color.goTeal, isDarkMode: isDarkMode)
+                            OhanaQACard(title: "收益余额", value: "248 🥥", icon: "leaf.circle.fill", color: Color.goYellow, isDarkMode: isDarkMode)
                         }
                         .padding(.vertical, 8)
                         .padding(.horizontal, 4)
                     }
                 }
 
-                // ─── PART 4: CHARTS & ANIMATIONS (Retained) ───
+                // ─── PART 4: CHARTS & ANIMATIONS ───
                 Group {
-                    sectionLabel("📊 数据 & 指标 · Metrics")
+                    sectionLabel("📊 数据可视化 · Charts & Metrics")
                     VStack(spacing: 16) {
                         chartsSection
                         progressSection
@@ -173,7 +207,7 @@ struct OhanaUIDemoView: View {
             if isDarkMode { ArkBackgroundView() }
             else { Color(hex: "F4F5F9").ignoresSafeArea() }
         }
-        .navigationTitle("UI 规范探索")
+        .navigationTitle("Ohana UI 规范")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -188,7 +222,7 @@ struct OhanaUIDemoView: View {
         .onAppear { startAnimations() }
     }
 
-    // MARK: - Components & Helpers
+    // MARK: - Components
 
     private var modeToggleSection: some View {
         HStack(spacing: 14) {
@@ -197,12 +231,12 @@ struct OhanaUIDemoView: View {
                 .foregroundStyle(isDarkMode ? Color.goYellow : Color.goOrange)
             VStack(alignment: .leading, spacing: 2) {
                 Text(isDarkMode ? "深色模式 Dark" : "浅色模式 Light").font(OhanaFont.headline()).foregroundStyle(textPrimary)
-                Text("实时预览选定风格与新布局设计").font(OhanaFont.caption()).foregroundStyle(.secondary)
+                Text("实时预览所有标准组件").font(OhanaFont.caption()).foregroundStyle(.secondary)
             }
             Spacer()
             Toggle("", isOn: $isDarkMode).labelsHidden().tint(Color.goLime)
         }
-        .padding(16).standardCard(dark: isDarkMode)
+        .padding(16).ohanaStandardCard(isDarkMode: isDarkMode)
     }
 
     private func sectionLabel(_ text: String) -> some View {
@@ -214,42 +248,81 @@ struct OhanaUIDemoView: View {
         .padding(.leading, 4).padding(.top, 8)
     }
 
-    // Standard Styles Helpers
-    private func alertStyleD(_ icon: String, _ msg: String, _ bg: Color, _ fg: Color) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon).font(.system(size: 14, weight: .bold)).foregroundStyle(fg)
-            Text(msg).font(OhanaFont.callout(.bold)).foregroundStyle(fg)
+    // MARK: Typography
+    private var typographySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("排版 (OhanaFont)").font(OhanaFont.footnote(.bold)).foregroundStyle(textTertiary).frame(maxWidth: .infinity, alignment: .leading)
+            Group {
+                Text("Hero / Metric").font(OhanaFont.metric(size: 40)).foregroundStyle(textPrimary)
+                Text("LargeTitle").font(OhanaFont.largeTitle()).foregroundStyle(textPrimary)
+                Text("Title").font(OhanaFont.title()).foregroundStyle(textPrimary)
+                Text("Title3").font(OhanaFont.title3()).foregroundStyle(textPrimary)
+                Text("Headline").font(OhanaFont.headline()).foregroundStyle(textPrimary)
+                Text("Body 说明正文").font(OhanaFont.body()).foregroundStyle(textSecondary)
+                Text("Caption / Footnote 辅助信息").font(OhanaFont.caption()).foregroundStyle(textTertiary)
+            }
+        }
+        .padding(16)
+        .ohanaStandardCard(isDarkMode: isDarkMode)
+    }
+
+    // MARK: Colors
+    private var colorPaletteSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("品牌色板").font(OhanaFont.footnote(.bold)).foregroundStyle(textTertiary).frame(maxWidth: .infinity, alignment: .leading)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                paletteChip("goLime", Color.goLime)
+                paletteChip("goYellow", Color.goYellow)
+                paletteChip("goOrange", Color.goOrange)
+                paletteChip("goRed", Color.goRed)
+                paletteChip("goTeal", Color.goTeal)
+                paletteChip("goMint", Color.goMint)
+            }
+        }
+        .padding(16)
+        .ohanaStandardCard(isDarkMode: isDarkMode)
+    }
+
+    private func paletteChip(_ name: String, _ color: Color) -> some View {
+        HStack(spacing: 8) {
+            RoundedRectangle(cornerRadius: 6).fill(color).frame(width: 24, height: 24)
+            Text(name).font(OhanaFont.caption2(.bold)).foregroundStyle(textPrimary).lineLimit(1)
             Spacer()
         }
-        .padding(.horizontal, 16).padding(.vertical, 10)
-        .background(bg, in: Capsule())
     }
 
-    private func iconBtnStyleB(_ icon: String, _ color: Color) -> some View {
-        Button {} label: {
-            Image(systemName: icon).font(.system(size: 16, weight: .bold)).foregroundStyle(color)
-                .frame(width: 44, height: 44)
-                .background(
-                    LinearGradient(colors: [color.opacity(0.2), color.opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                    in: RoundedRectangle(cornerRadius: 14)
-                )
+    // MARK: Inputs
+    private var inputsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("表单输入 (Inputs)").font(OhanaFont.footnote(.bold)).foregroundStyle(textTertiary).frame(maxWidth: .infinity, alignment: .leading)
+            
+            // TextField
+            HStack {
+                Image(systemName: "pencil").foregroundStyle(textTertiary)
+                TextField("输入些什么...", text: $sampleText)
+                    .foregroundStyle(textPrimary)
+            }
+            .padding(12)
+            .background(isDarkMode ? .white.opacity(0.05) : .black.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
+            
+            // Segment
+            Picker("", selection: $sampleSegment) {
+                Text("选项 1").tag(0); Text("选项 2").tag(1); Text("选项 3").tag(2)
+            }
+            .pickerStyle(.segmented)
+            
+            HStack {
+                Text("Stepper").font(OhanaFont.body()).foregroundStyle(textPrimary)
+                Spacer()
+                Stepper("\(sampleStepper)", value: $sampleStepper, in: 0...10)
+                    .font(OhanaFont.body(.bold)).fixedSize()
+            }
         }
+        .padding(16)
+        .ohanaStandardCard(isDarkMode: isDarkMode)
     }
 
-    private func chipStyleC(_ label: String, _ color: Color, selected: Bool) -> some View {
-        HStack(spacing: 6) {
-            Circle().fill(color).frame(width: 6, height: 6)
-            Text(label).font(OhanaFont.callout(.bold)).foregroundStyle(selected ? textPrimary : textSecondary)
-        }
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(
-            isDarkMode ? (selected ? Color.white.opacity(0.12) : Color.white.opacity(0.05))
-                      : (selected ? color.opacity(0.12) : Color.black.opacity(0.04)),
-            in: RoundedRectangle(cornerRadius: 10)
-        )
-    }
-
-    // Layout Exploration Helpers
+    // MARK: Layout Explorations Components
     private func layoutSmallCard(icon: String, title: String, color: Color) -> some View {
         VStack(spacing: 6) {
             Image(systemName: icon).font(.system(size: 18, weight: .bold)).foregroundStyle(color)
@@ -257,10 +330,10 @@ struct OhanaUIDemoView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.vertical, 12)
-        .standardCard(dark: isDarkMode)
+        .ohanaStandardCard(isDarkMode: isDarkMode)
     }
 
-    private func groupItem(icon: String, title: String, color: Color, isTop: Bool = false, isBottom: Bool = false) -> some View {
+    private func groupItem(icon: String, title: String, color: Color) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon).font(.system(size: 16)).foregroundStyle(color)
                 .frame(width: 32, height: 32)
@@ -273,77 +346,25 @@ struct OhanaUIDemoView: View {
         .background(isDarkMode ? .white.opacity(0.01) : .clear)
     }
 
-    // Quick Access Card Helpers
-    private func qaGlassCard(title: String, value: String, icon: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Image(systemName: icon).font(.system(size: 24, weight: .bold)).foregroundStyle(color)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(value).font(OhanaFont.title2(.black)).foregroundStyle(textPrimary)
-                Text(title).font(OhanaFont.caption2(.bold)).foregroundStyle(textSecondary)
-            }
-        }
-        .frame(width: 140, alignment: .leading)
-        .padding(16)
-        .standardCard(dark: isDarkMode)
-    }
-
-    private func qaGradientCard(title: String, value: String, icon: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text(title).font(OhanaFont.caption(.bold)).foregroundStyle(.white.opacity(0.7))
-                Spacer()
-                Image(systemName: icon).font(.system(size: 14)).foregroundStyle(.white)
-            }
-            Spacer()
-            Text(value).font(OhanaFont.title2(.black)).foregroundStyle(.white)
-        }
-        .frame(width: 130, height: 80)
-        .padding(14)
-        .background(LinearGradient(colors: [color, color.opacity(0.7)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 18))
-        .shadow(color: color.opacity(0.3), radius: 8, y: 4)
-    }
-
-    private func qaIllustrativeCard(title: String, value: String, icon: String, color: Color) -> some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle().fill(color.opacity(0.2)).frame(width: 44, height: 44)
-                Image(systemName: icon).font(.system(size: 20)).foregroundStyle(color)
-            }
-            VStack(alignment: .leading, spacing: 0) {
-                Text(value).font(OhanaFont.title3(.bold)).foregroundStyle(textPrimary)
-                Text(title).font(OhanaFont.caption2()).foregroundStyle(textSecondary)
-            }
-        }
-        .padding(.horizontal, 14).padding(.vertical, 10)
-        .standardCard(dark: isDarkMode)
-    }
-
-    private func qaClassicCard(title: String, value: String, icon: String, color: Color) -> some View {
-        VStack(alignment: .center, spacing: 4) {
-            Image(systemName: icon).font(.system(size: 18)).foregroundStyle(color)
-            Text(value).font(OhanaFont.callout(.bold)).foregroundStyle(textPrimary)
-            Text(title).font(.system(size: 9, weight: .bold)).foregroundStyle(textSecondary)
-        }
-        .frame(width: 80, height: 80)
-        .standardCard(dark: isDarkMode)
-    }
-
-    // (Existing charts/progress logic retained for reference but cleaned up)
+    // MARK: Charts & Progress
     private var chartsSection: some View {
         VStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 10) {
-                Text("健康趋势折线图").font(OhanaFont.headline()).foregroundStyle(textPrimary)
+                Text("图表 (Charts)").font(OhanaFont.headline()).foregroundStyle(textPrimary)
                 Chart {
                     ForEach(Array(zip(weekDays, weekValues).enumerated()), id: \.offset) { i, pair in
                         LineMark(x: .value("Day", pair.0), y: .value("Val", pair.1))
                             .interpolationMethod(.catmullRom)
                             .foregroundStyle(Color.goLime)
                             .lineStyle(StrokeStyle(lineWidth: 3))
+                        AreaMark(x: .value("Day", pair.0), y: .value("Val", pair.1))
+                            .interpolationMethod(.catmullRom)
+                            .foregroundStyle(LinearGradient(colors: [Color.goLime.opacity(0.3), .clear], startPoint: .top, endPoint: .bottom))
                     }
                 }
                 .frame(height: 100)
             }
-            .padding(16).standardCard(dark: isDarkMode)
+            .padding(16).ohanaStandardCard(isDarkMode: isDarkMode)
         }
     }
 
@@ -352,9 +373,9 @@ struct OhanaUIDemoView: View {
             Text("128").font(OhanaFont.metric(size: 44)).foregroundStyle(Color.goLime)
             Text("天").font(OhanaFont.callout()).foregroundStyle(textSecondary)
             Spacer()
-            Circle().trim(from: 0, to: 0.75).stroke(Color.goLime, lineWidth: 4).frame(width: 30, height: 30)
+            Circle().trim(from: 0, to: 0.75).stroke(Color.goLime, style: StrokeStyle(lineWidth: 4, lineCap: .round)).frame(width: 40, height: 40)
         }
-        .padding(16).standardCard(dark: isDarkMode)
+        .padding(16).ohanaStandardCard(isDarkMode: isDarkMode)
     }
 
     private var animationsSection: some View {
@@ -362,12 +383,13 @@ struct OhanaUIDemoView: View {
             Circle().fill(Color.goLime.opacity(0.15)).frame(width: 40, height: 40)
                 .scaleEffect(pulseScale)
                 .overlay(Image(systemName: "heart.fill").foregroundStyle(Color.goLime))
-            Text("活跃状态脉冲").font(OhanaFont.callout(.bold)).foregroundStyle(textPrimary)
+            Text("活跃状态脉冲 (Animations)").font(OhanaFont.callout(.bold)).foregroundStyle(textPrimary)
             Spacer()
         }
-        .padding(14).standardCard(dark: isDarkMode)
+        .padding(14).ohanaStandardCard(isDarkMode: isDarkMode)
     }
 
+    // MARK: Helpers
     private var textPrimary: Color { isDarkMode ? .white : Color.arkInk }
     private var textSecondary: Color { isDarkMode ? .white.opacity(0.5) : Color.arkInk.opacity(0.5) }
     private var textTertiary: Color { isDarkMode ? .white.opacity(0.3) : Color.arkInk.opacity(0.3) }
@@ -377,23 +399,6 @@ struct OhanaUIDemoView: View {
 
     private func startAnimations() {
         withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) { pulseScale = 1.15 }
-    }
-}
-
-// MARK: - Unified Card Modifier
-private extension View {
-    func standardCard(dark: Bool) -> some View {
-        self.background {
-            if dark {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(LinearGradient(colors: [Color.goDarkBlue.opacity(0.8), Color.goDeepNavy.opacity(0.9)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(.white.opacity(0.12), lineWidth: 1))
-            } else {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(.white)
-                    .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
-            }
-        }
     }
 }
 
