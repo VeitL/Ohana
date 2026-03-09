@@ -2,7 +2,7 @@
 //  QuickWeightSheet.swift
 //  Ohana
 //
-//  Quick Access 快速添加体重弹窗（presentationDetents .height(280)）
+//  Quick Access 快速添加体重弹窗
 //
 
 import SwiftUI
@@ -26,133 +26,91 @@ struct QuickWeightSheet: View {
 
     var body: some View {
         ZStack {
-            // 玻璃风格背景
-            Color.goDarkBlue.ignoresSafeArea()
-            LinearGradient(
-                colors: [Color.goPrimary.opacity(0.25), Color.goDarkBlue],
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            ArkBackgroundView()
 
-            VStack(spacing: 0) {
-                // 标题行
+            VStack(spacing: 20) {
+                // 标题栏
                 HStack {
-                    HStack(spacing: 10) {
-                        if let data = pet.avatarImageData, let ui = UIImage(data: data) {
-                            Image(uiImage: ui)
-                                .resizable().scaledToFill()
-                                .frame(width: 38, height: 38)
-                                .clipShape(Circle())
-                                .overlay(Circle().strokeBorder(.white.opacity(0.15), lineWidth: 1))
-                        } else {
-                            Text(pet.speciesEmoji)
-                                .font(.system(size: 26))
-                                .frame(width: 38, height: 38)
-                        }
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("记录体重")
-                                .font(.system(size: 16, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
-                            Text(pet.name)
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.45))
-                        }
-                    }
+                    Text("记录体重")
+                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
                     Spacer()
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 24))
+                            .font(.system(size: 20))
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.secondary)
                     }
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 28)
-                .padding(.bottom, 20)
+                .padding(.horizontal, 20).padding(.top, 20)
 
-                // 玻璃风格输入大卡片
-                VStack(spacing: 20) {
-                    // 巨大数字 + kg
-                    VStack(spacing: 4) {
-                        HStack(alignment: .lastTextBaseline, spacing: 8) {
-                            TextField("0.0", text: $weightText)
-                                .font(.system(size: 72, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
-                                .keyboardType(.decimalPad)
-                                .multilineTextAlignment(.center)
-                                .focused($focused)
-                                .minimumScaleFactor(0.5)
-                                .frame(maxWidth: .infinity)
-                            Text("kg")
-                                .font(.system(size: 28, weight: .black, design: .rounded))
-                                .foregroundStyle(Color.goLime)
-                                .padding(.bottom, 8)
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.top, 8)
-
-                        // 细分割线
-                        Rectangle()
-                            .fill(.white.opacity(0.08))
-                            .frame(height: 1)
-                            .padding(.horizontal, 16)
-                    }
-
-                    // 日期选择器
-                    HStack {
-                        Label("日期", systemImage: "calendar")
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.5))
-                        Spacer()
-                        DatePicker("", selection: $recordDate, in: ...Date(), displayedComponents: [.date])
-                            .datePickerStyle(.compact)
-                            .labelsHidden()
-                            .tint(Color.goLime)
-                            .colorScheme(.dark)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 8)
+                // 体重输入
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    TextField("0.0", text: $weightText)
+                        .keyboardType(.decimalPad)
+                        .font(.system(size: 52, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .minimumScaleFactor(0.5)
+                        .focused($focused)
+                    Text("kg")
+                        .font(.system(size: 32, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.goLime)
                 }
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .strokeBorder(.white.opacity(0.1), lineWidth: 1)
-                )
                 .padding(.horizontal, 20)
 
-                Spacer(minLength: 20)
+                // 日期选择 row
+                HStack(spacing: 10) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.4))
+                    Text("记录日期")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.4))
+                    Spacer()
+                    DatePicker("", selection: $recordDate, in: ...Date(), displayedComponents: [.date])
+                        .datePickerStyle(.compact)
+                        .labelsHidden()
+                        .tint(Color.goLime)
+                        .colorScheme(.dark)
+                }
+                .padding(.horizontal, 14).padding(.vertical, 10)
+                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 20)
 
                 // 保存按钮
-                Button {
-                    guard let v = Double(safeWeightText), v > 0 else { return }
-                    let log = PetWeightLog(date: recordDate, weight: v, pet: pet)
-                    modelContext.insert(log)
-                    modelContext.safeSave()
-                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                    didSave = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { dismiss() }
-                } label: {
+                Button { saveWeight() } label: {
                     HStack(spacing: 8) {
                         if didSave {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 18, weight: .bold))
                         }
-                        Text(didSave ? "已保存 ✓" : "保存记录")
-                            .font(.system(size: 16, weight: .black, design: .rounded))
+                        Text(didSave ? "已保存" : "保存记录")
+                            .font(.system(size: 15, weight: .black, design: .rounded))
                     }
-                    .foregroundStyle(Color.arkInk)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 17)
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity).padding(.vertical, 14)
                     .background(
-                        didSave ? Color.goTeal : (isValid ? Color.goLime : Color.goLime.opacity(0.25)),
-                        in: Capsule()
+                        didSave ? Color.goTeal : (isValid ? Color.goLime : Color.goLime.opacity(0.4)),
+                        in: RoundedRectangle(cornerRadius: 14)
                     )
                 }
                 .disabled(!isValid || didSave)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 28)
+                .buttonStyle(.plain)
+                .padding(.horizontal, 20)
+
+                Spacer()
             }
         }
         .onAppear { focused = true }
+    }
+
+    private func saveWeight() {
+        guard let v = Double(safeWeightText), v > 0 else { return }
+        let log = PetWeightLog(date: recordDate, weight: v, pet: pet)
+        modelContext.insert(log)
+        modelContext.safeSave()
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        didSave = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { dismiss() }
     }
 }
