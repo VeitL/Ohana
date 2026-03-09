@@ -22,6 +22,7 @@ struct AddDocumentSheet: View {
     let pet: Pet
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Query(sort: \Human.createdAt) private var humans: [Human]
 
     @State private var title: String = ""
     @State private var selectedCategory: DocumentCategory = .other
@@ -31,6 +32,7 @@ struct AddDocumentSheet: View {
     @State private var expiryDate: Date = Calendar.current.date(byAdding: .year, value: 1, to: Date()) ?? Date()
     @State private var issuingAuthority: String = ""
     @State private var notes: String = ""
+    @State private var documentNumber: String = ""
     // B4: 多附件
     @State private var attachments: [DocAttachment] = []
     @State private var showingCamera = false
@@ -43,10 +45,12 @@ struct AddDocumentSheet: View {
     // N3: 所有类型都可记录花费
     @State private var costText: String = ""
     @State private var hasCost: Bool = false
+    @State private var selectedPayerId: String? = nil
     // N2: 保险月付标记
     @State private var isMonthlyInsurance: Bool = false
     // B4: 自动预填名称
     private var autoTitle: String { "\(pet.name)\(selectedCategory.rawValue)" }
+    private var showDocumentNumber: Bool { selectedCategory == .passport || selectedCategory == .registration }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -147,7 +151,6 @@ struct AddDocumentSheet: View {
                         }
                     }
 
-                    // ── 花费
                     docRow(icon: "yensign.circle.fill", iconColor: .goLime, label: "花费记账") {
                         HStack(spacing: 8) {
                             Toggle("", isOn: $hasCost).tint(Color.goLime).labelsHidden()
@@ -160,6 +163,76 @@ struct AddDocumentSheet: View {
                                     .frame(maxWidth: 80)
                             }
                         }
+                    }
+
+                    // Payer picker (when cost is enabled)
+                    if hasCost && !humans.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "creditcard.fill")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(Color.goLime.opacity(0.7))
+                                Text("谁付的款")
+                                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            }
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 10) {
+                                    Button { selectedPayerId = nil } label: {
+                                        VStack(spacing: 4) {
+                                            ZStack {
+                                                Circle()
+                                                    .fill(selectedPayerId == nil ? Color.goLime : Color(.systemGray5))
+                                                    .frame(width: 40, height: 40)
+                                                Image(systemName: "questionmark")
+                                                    .font(.system(size: 16, weight: .bold))
+                                                    .foregroundStyle(selectedPayerId == nil ? Color.arkInk : .primary.opacity(0.5))
+                                            }
+                                            Text("未指定")
+                                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    ForEach(humans) { human in
+                                        let hid = human.id.uuidString
+                                        let isSelected = selectedPayerId == hid
+                                        let themeColor = Color(hex: human.themeColorHex.count == 6 ? human.themeColorHex : "C8FF00")
+                                        Button { selectedPayerId = hid } label: {
+                                            VStack(spacing: 4) {
+                                                ZStack {
+                                                    Circle()
+                                                        .fill(isSelected ? themeColor : themeColor.opacity(0.2))
+                                                        .frame(width: 40, height: 40)
+                                                    if let data = human.avatarImageData, let img = UIImage(data: data) {
+                                                        Image(uiImage: img)
+                                                            .resizable().scaledToFill()
+                                                            .frame(width: 40, height: 40).clipShape(Circle())
+                                                    } else {
+                                                        Text(human.avatarEmoji)
+                                                            .font(.system(size: 20))
+                                                    }
+                                                    if isSelected {
+                                                        Circle()
+                                                            .strokeBorder(.white, lineWidth: 2)
+                                                            .frame(width: 40, height: 40)
+                                                    }
+                                                }
+                                                Text(human.name)
+                                                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                                                    .foregroundStyle(isSelected ? .primary : .secondary)
+                                                    .lineLimit(1)
+                                            }
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 16))
+                        .padding(.horizontal, 20)
                     }
 
                     if hasCost && selectedCategory == .insurance {
@@ -240,6 +313,15 @@ struct AddDocumentSheet: View {
                             .font(.system(size: 14, weight: .medium, design: .rounded))
                             .tint(Color.goPrimary)
                             .lineLimit(2...4)
+                    }
+
+                    // ── 证件号码 (护照/登记证)
+                    if showDocumentNumber {
+                        docRow(icon: "number.circle.fill", iconColor: .goCardCyan, label: selectedCategory == .passport ? "护照号码" : "证件号码") {
+                            TextField("编号", text: $documentNumber)
+                                .font(.system(size: 15, weight: .medium, design: .rounded))
+                                .tint(Color.goCardCyan)
+                        }
                     }
                 }
                 .padding(.bottom, 24)
@@ -392,6 +474,12 @@ struct AddDocumentSheet: View {
         }
         modelContext.insert(doc)
         modelContext.safeSave()
+        // Sync document number to Pet fields
+        if !documentNumber.isEmpty {
+            if selectedCategory == .passport { pet.passportNumber = documentNumber }
+            else if selectedCategory == .registration { /* could sync to microchip if field exists */ }
+            modelContext.safeSave()
+        }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 }

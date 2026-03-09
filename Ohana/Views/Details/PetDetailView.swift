@@ -118,6 +118,12 @@ struct PetDetailView: View {
                     )
                     .padding(.horizontal, 16)
 
+                    // ── L4.6: 狗狗专属陪玩遛狗卡片
+                    if pet.species == "狗" {
+                        DogActivityCard(pet: pet)
+                            .padding(.horizontal, 16)
+                    }
+
                     // ── L5: 证件 + 里程碑 + 成就墙（并列三列 compact）────────────
                     HStack(alignment: .top, spacing: 10) {
                         // 证件卡

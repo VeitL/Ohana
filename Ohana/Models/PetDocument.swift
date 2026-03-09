@@ -28,6 +28,23 @@ enum DocumentCategory: String, Codable, CaseIterable {
     }
 }
 
+// MARK: - PetDocumentAttachment (multi-attachment support)
+
+@Model
+final class PetDocumentAttachment {
+    var id: UUID
+    @Attribute(.externalStorage) var data: Data
+    var filename: String
+    var isImage: Bool
+
+    init(data: Data, filename: String, isImage: Bool) {
+        self.id = UUID()
+        self.data = data
+        self.filename = filename
+        self.isImage = isImage
+    }
+}
+
 @Model
 final class PetDocument {
     var id: UUID
@@ -39,8 +56,12 @@ final class PetDocument {
     var notes: String
     var reminderDate: Date?
     var cost: Double
-    @Attribute(.externalStorage) var attachmentData: Data?
-    var attachmentFilename: String
+    @Attribute(.externalStorage) var attachmentData: Data? // Keeping for backward compatibility temporarily
+    var attachmentFilename: String // Keeping for backward compatibility temporarily
+    
+    @Relationship(deleteRule: .cascade)
+    var attachments: [PetDocumentAttachment] = []
+    
     var pet: Pet?
     
     init(title: String = "", category: DocumentCategory = .other, pet: Pet? = nil) {
@@ -55,6 +76,7 @@ final class PetDocument {
         self.cost = 0
         self.attachmentData = nil
         self.attachmentFilename = ""
+        self.attachments = []
         self.pet = pet
     }
     

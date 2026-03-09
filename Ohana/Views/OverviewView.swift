@@ -1168,6 +1168,12 @@ struct OverviewView: View {
         case "potty":
             let count = pet.pottyLogs.filter { cal.isDateInToday($0.date) }.count
             return count > 0 ? "今日 \(count)次" : nil
+        case "play":
+            let count = pet.careLogs.filter { $0.type == CareType.play.rawValue && cal.isDateInToday($0.date) }.count
+            return count > 0 ? "今日逗玩 \(count)次" : "今日未逗玩"
+        case "groom":
+            let count = pet.hygieneLogs.filter { cal.isDateInToday($0.date) }.count
+            return count > 0 ? "今日 \(count)次" : nil
         default:
             return nil
         }

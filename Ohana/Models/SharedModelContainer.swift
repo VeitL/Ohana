@@ -351,6 +351,22 @@ enum ArkSchemaV19: VersionedSchema {
     }
 }
 
+// MARK: - Schema V20（新增 PetDocumentAttachment — 多附件支持）
+enum ArkSchemaV20: VersionedSchema {
+    static var versionIdentifier = Schema.Version(20, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [
+            Pet.self, Human.self, Plant.self, Household.self, Event.self, Reminder.self,
+            PetPottyLog.self, PetWalkLog.self, PetHygieneLog.self, PetWeightLog.self,
+            PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
+            PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
+            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
+            PetDocumentAttachment.self,
+        ]
+    }
+}
+
 // MARK: - Migration Plan
 enum ArkMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
@@ -358,7 +374,7 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
          ArkSchemaV5.self, ArkSchemaV6.self, ArkSchemaV7.self, ArkSchemaV8.self,
          ArkSchemaV9.self, ArkSchemaV10.self, ArkSchemaV11.self, ArkSchemaV12.self,
          ArkSchemaV13.self, ArkSchemaV14.self, ArkSchemaV15.self, ArkSchemaV16.self,
-         ArkSchemaV17.self, ArkSchemaV18.self, ArkSchemaV19.self]
+         ArkSchemaV17.self, ArkSchemaV18.self, ArkSchemaV19.self, ArkSchemaV20.self]
     }
 
     static var stages: [MigrationStage] {
@@ -410,9 +426,12 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
             MigrationStage.lightweight(fromVersion: ArkSchemaV17.self, toVersion: ArkSchemaV18.self),
             // V18 → V19: Pet 新增 cardStyleRaw ("classic")， lightweight 自动填充
             MigrationStage.lightweight(fromVersion: ArkSchemaV18.self, toVersion: ArkSchemaV19.self),
+            // V19 → V20: 新增 PetDocumentAttachment 多附件表，lightweight 自动创建
+            MigrationStage.lightweight(fromVersion: ArkSchemaV19.self, toVersion: ArkSchemaV20.self),
         ]
     }
 }
+
 
 // MARK: - Shared Container
 struct SharedModelContainer {
@@ -425,7 +444,7 @@ struct SharedModelContainer {
             cloudKitDatabase: .none
         )
 
-        let schema = Schema(ArkSchemaV19.models)
+        let schema = Schema(ArkSchemaV20.models)
         do {
             let container = try ModelContainer(
                 for: schema,
