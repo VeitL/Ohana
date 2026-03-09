@@ -1,0 +1,2408 @@
+{
+  "id": "VariableCollectionId:1334:2316",
+  "name": "React Design System Semantic Tokens",
+  "modes": {
+    "mode:light": "Light",
+    "mode:dark": "Dark"
+  },
+  "variableIds": [
+    "VariableID:2000",
+    "VariableID:2001",
+    "VariableID:2002",
+    "VariableID:2003",
+    "VariableID:2004",
+    "VariableID:2005",
+    "VariableID:2006",
+    "VariableID:2007",
+    "VariableID:2008",
+    "VariableID:2009",
+    "VariableID:2010",
+    "VariableID:2011",
+    "VariableID:2012",
+    "VariableID:2013",
+    "VariableID:2014",
+    "VariableID:2015",
+    "VariableID:2016",
+    "VariableID:2017",
+    "VariableID:2018",
+    "VariableID:2019",
+    "VariableID:2020",
+    "VariableID:2021",
+    "VariableID:2022",
+    "VariableID:2023",
+    "VariableID:2024",
+    "VariableID:2025",
+    "VariableID:2026",
+    "VariableID:2027",
+    "VariableID:2028",
+    "VariableID:2029",
+    "VariableID:2030",
+    "VariableID:2031",
+    "VariableID:2032",
+    "VariableID:2033",
+    "VariableID:2034",
+    "VariableID:2035",
+    "VariableID:2036",
+    "VariableID:2037",
+    "VariableID:2038",
+    "VariableID:2039",
+    "VariableID:2040",
+    "VariableID:2041",
+    "VariableID:2042",
+    "VariableID:2043",
+    "VariableID:2044",
+    "VariableID:2045",
+    "VariableID:2046",
+    "VariableID:2047",
+    "VariableID:2048",
+    "VariableID:2049",
+    "VariableID:2050",
+    "VariableID:2051",
+    "VariableID:2052",
+    "VariableID:2053"
+  ],
+  "variables": [
+    {
+      "id": "VariableID:2000",
+      "name": "Tokens/Button/Primary Background",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.25882352941176473,
+          "g": 0.2196078431372549,
+          "b": 1,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.25882352941176473,
+          "g": 0.2196078431372549,
+          "b": 1,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.25882352941176473,
+            "g": 0.2196078431372549,
+            "b": 1,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.25882352941176473,
+            "g": 0.2196078431372549,
+            "b": 1,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2001",
+      "name": "Tokens/Button/Primary Text",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 1,
+          "g": 1,
+          "b": 1,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 1,
+          "g": 1,
+          "b": 1,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 1,
+            "g": 1,
+            "b": 1,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 1,
+            "g": 1,
+            "b": 1,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2002",
+      "name": "Tokens/Button/Primary Hover",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.1607843137254902,
+          "g": 0.11764705882352941,
+          "b": 0.9019607843137255,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.3607843137254902,
+          "g": 0.3215686274509804,
+          "b": 1,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.1607843137254902,
+            "g": 0.11764705882352941,
+            "b": 0.9019607843137255,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.3607843137254902,
+            "g": 0.3215686274509804,
+            "b": 1,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2003",
+      "name": "Tokens/Button/Secondary Background",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.7843137254901961,
+          "g": 1,
+          "b": 0,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.7843137254901961,
+          "g": 1,
+          "b": 0,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.7843137254901961,
+            "g": 1,
+            "b": 0,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.7843137254901961,
+            "g": 1,
+            "b": 0,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2004",
+      "name": "Tokens/Button/Secondary Text",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0,
+          "g": 0,
+          "b": 0,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0,
+          "g": 0,
+          "b": 0,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2005",
+      "name": "Tokens/Button/Outline Border",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.25882352941176473,
+          "g": 0.2196078431372549,
+          "b": 1,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.25882352941176473,
+          "g": 0.2196078431372549,
+          "b": 1,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.25882352941176473,
+            "g": 0.2196078431372549,
+            "b": 1,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.25882352941176473,
+            "g": 0.2196078431372549,
+            "b": 1,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2006",
+      "name": "Tokens/Button/Disabled Background",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.9607843137254902,
+          "g": 0.9607843137254902,
+          "b": 0.9607843137254902,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.16470588235294117,
+          "g": 0.16470588235294117,
+          "b": 0.16470588235294117,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.9607843137254902,
+            "g": 0.9607843137254902,
+            "b": 0.9607843137254902,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.16470588235294117,
+            "g": 0.16470588235294117,
+            "b": 0.16470588235294117,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2007",
+      "name": "Tokens/Button/Disabled Text",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.6392156862745098,
+          "g": 0.6392156862745098,
+          "b": 0.6392156862745098,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.3215686274509804,
+          "g": 0.3215686274509804,
+          "b": 0.3215686274509804,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.6392156862745098,
+            "g": 0.6392156862745098,
+            "b": 0.6392156862745098,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.3215686274509804,
+            "g": 0.3215686274509804,
+            "b": 0.3215686274509804,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2008",
+      "name": "Tokens/Form/Input Background",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 1,
+          "g": 1,
+          "b": 1,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.0392156862745098,
+          "g": 0.0392156862745098,
+          "b": 0.0392156862745098,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 1,
+            "g": 1,
+            "b": 1,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.0392156862745098,
+            "g": 0.0392156862745098,
+            "b": 0.0392156862745098,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2009",
+      "name": "Tokens/Form/Input Border",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.8980392156862745,
+          "g": 0.8980392156862745,
+          "b": 0.8980392156862745,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.16470588235294117,
+          "g": 0.16470588235294117,
+          "b": 0.16470588235294117,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.8980392156862745,
+            "g": 0.8980392156862745,
+            "b": 0.8980392156862745,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.16470588235294117,
+            "g": 0.16470588235294117,
+            "b": 0.16470588235294117,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2010",
+      "name": "Tokens/Form/Input Border Focus",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.25882352941176473,
+          "g": 0.2196078431372549,
+          "b": 1,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.25882352941176473,
+          "g": 0.2196078431372549,
+          "b": 1,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.25882352941176473,
+            "g": 0.2196078431372549,
+            "b": 1,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.25882352941176473,
+            "g": 0.2196078431372549,
+            "b": 1,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2011",
+      "name": "Tokens/Form/Input Text",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.09019607843137255,
+          "g": 0.09019607843137255,
+          "b": 0.09019607843137255,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.9803921568627451,
+          "g": 0.9803921568627451,
+          "b": 0.9803921568627451,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.09019607843137255,
+            "g": 0.09019607843137255,
+            "b": 0.09019607843137255,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.9803921568627451,
+            "g": 0.9803921568627451,
+            "b": 0.9803921568627451,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2012",
+      "name": "Tokens/Form/Input Placeholder",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.45098039215686275,
+          "g": 0.45098039215686275,
+          "b": 0.45098039215686275,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.6392156862745098,
+          "g": 0.6392156862745098,
+          "b": 0.6392156862745098,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.45098039215686275,
+            "g": 0.45098039215686275,
+            "b": 0.45098039215686275,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.6392156862745098,
+            "g": 0.6392156862745098,
+            "b": 0.6392156862745098,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2013",
+      "name": "Tokens/Form/Label Text",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.25098039215686274,
+          "g": 0.25098039215686274,
+          "b": 0.25098039215686274,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.8313725490196079,
+          "g": 0.8313725490196079,
+          "b": 0.8313725490196079,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.25098039215686274,
+            "g": 0.25098039215686274,
+            "b": 0.25098039215686274,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.8313725490196079,
+            "g": 0.8313725490196079,
+            "b": 0.8313725490196079,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2014",
+      "name": "Tokens/Form/Error Text",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.9372549019607843,
+          "g": 0.26666666666666666,
+          "b": 0.26666666666666666,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.9725490196078431,
+          "g": 0.44313725490196076,
+          "b": 0.44313725490196076,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.9372549019607843,
+            "g": 0.26666666666666666,
+            "b": 0.26666666666666666,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.9725490196078431,
+            "g": 0.44313725490196076,
+            "b": 0.44313725490196076,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2015",
+      "name": "Tokens/Form/Error Border",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.9372549019607843,
+          "g": 0.26666666666666666,
+          "b": 0.26666666666666666,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.9725490196078431,
+          "g": 0.44313725490196076,
+          "b": 0.44313725490196076,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.9372549019607843,
+            "g": 0.26666666666666666,
+            "b": 0.26666666666666666,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.9725490196078431,
+            "g": 0.44313725490196076,
+            "b": 0.44313725490196076,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2016",
+      "name": "Tokens/Card/Background",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 1,
+          "g": 1,
+          "b": 1,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.0392156862745098,
+          "g": 0.0392156862745098,
+          "b": 0.0392156862745098,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 1,
+            "g": 1,
+            "b": 1,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.0392156862745098,
+            "g": 0.0392156862745098,
+            "b": 0.0392156862745098,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2017",
+      "name": "Tokens/Card/Border",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.8980392156862745,
+          "g": 0.8980392156862745,
+          "b": 0.8980392156862745,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.16470588235294117,
+          "g": 0.16470588235294117,
+          "b": 0.16470588235294117,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.8980392156862745,
+            "g": 0.8980392156862745,
+            "b": 0.8980392156862745,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.16470588235294117,
+            "g": 0.16470588235294117,
+            "b": 0.16470588235294117,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2018",
+      "name": "Tokens/Card/Hover Background",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.9803921568627451,
+          "g": 0.9803921568627451,
+          "b": 0.9803921568627451,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.0784313725490196,
+          "g": 0.0784313725490196,
+          "b": 0.0784313725490196,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.9803921568627451,
+            "g": 0.9803921568627451,
+            "b": 0.9803921568627451,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.0784313725490196,
+            "g": 0.0784313725490196,
+            "b": 0.0784313725490196,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2019",
+      "name": "Tokens/Card/Shadow",
+      "description": "Semantic token for React components",
+      "type": "STRING",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+        "mode:dark": "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+        },
+        "mode:dark": {
+          "resolvedValue": "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+        }
+      }
+    },
+    {
+      "id": "VariableID:2020",
+      "name": "Tokens/Card/Shadow Hover",
+      "description": "Semantic token for React components",
+      "type": "STRING",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
+        "mode:dark": "0 10px 15px -3px rgba(0, 0, 0, 0.1)"
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": "0 10px 15px -3px rgba(0, 0, 0, 0.1)"
+        },
+        "mode:dark": {
+          "resolvedValue": "0 10px 15px -3px rgba(0, 0, 0, 0.1)"
+        }
+      }
+    },
+    {
+      "id": "VariableID:2021",
+      "name": "Tokens/Nav/Background",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 1,
+          "g": 1,
+          "b": 1,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0,
+          "g": 0,
+          "b": 0,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 1,
+            "g": 1,
+            "b": 1,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2022",
+      "name": "Tokens/Nav/Border",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.8980392156862745,
+          "g": 0.8980392156862745,
+          "b": 0.8980392156862745,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.16470588235294117,
+          "g": 0.16470588235294117,
+          "b": 0.16470588235294117,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.8980392156862745,
+            "g": 0.8980392156862745,
+            "b": 0.8980392156862745,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.16470588235294117,
+            "g": 0.16470588235294117,
+            "b": 0.16470588235294117,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2023",
+      "name": "Tokens/Nav/Link Text",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.3215686274509804,
+          "g": 0.3215686274509804,
+          "b": 0.3215686274509804,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.8313725490196079,
+          "g": 0.8313725490196079,
+          "b": 0.8313725490196079,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.3215686274509804,
+            "g": 0.3215686274509804,
+            "b": 0.3215686274509804,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.8313725490196079,
+            "g": 0.8313725490196079,
+            "b": 0.8313725490196079,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2024",
+      "name": "Tokens/Nav/Link Active",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.25882352941176473,
+          "g": 0.2196078431372549,
+          "b": 1,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.25882352941176473,
+          "g": 0.2196078431372549,
+          "b": 1,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.25882352941176473,
+            "g": 0.2196078431372549,
+            "b": 1,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.25882352941176473,
+            "g": 0.2196078431372549,
+            "b": 1,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2025",
+      "name": "Tokens/Nav/Link Hover",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.09019607843137255,
+          "g": 0.09019607843137255,
+          "b": 0.09019607843137255,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.9803921568627451,
+          "g": 0.9803921568627451,
+          "b": 0.9803921568627451,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.09019607843137255,
+            "g": 0.09019607843137255,
+            "b": 0.09019607843137255,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.9803921568627451,
+            "g": 0.9803921568627451,
+            "b": 0.9803921568627451,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2026",
+      "name": "Tokens/Modal/Background",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 1,
+          "g": 1,
+          "b": 1,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.0392156862745098,
+          "g": 0.0392156862745098,
+          "b": 0.0392156862745098,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 1,
+            "g": 1,
+            "b": 1,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.0392156862745098,
+            "g": 0.0392156862745098,
+            "b": 0.0392156862745098,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2027",
+      "name": "Tokens/Modal/Overlay",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0,
+          "g": 0,
+          "b": 0,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0,
+          "g": 0,
+          "b": 0,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2028",
+      "name": "Tokens/Modal/Shadow",
+      "description": "Semantic token for React components",
+      "type": "STRING",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+        "mode:dark": "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
+        },
+        "mode:dark": {
+          "resolvedValue": "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
+        }
+      }
+    },
+    {
+      "id": "VariableID:2029",
+      "name": "Tokens/Modal/Border Radius",
+      "description": "Semantic token for React components",
+      "type": "FLOAT",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": 12,
+        "mode:dark": 12
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": 12
+        },
+        "mode:dark": {
+          "resolvedValue": 12
+        }
+      }
+    },
+    {
+      "id": "VariableID:2030",
+      "name": "Tokens/Alert/Primary/Background",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 1,
+          "g": 1,
+          "b": 1,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0,
+          "g": 0,
+          "b": 0.2,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 1,
+            "g": 1,
+            "b": 1,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0,
+            "g": 0,
+            "b": 0.2,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2031",
+      "name": "Tokens/Alert/Primary/Border",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.25882352941176473,
+          "g": 0.2196078431372549,
+          "b": 1,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.25882352941176473,
+          "g": 0.2196078431372549,
+          "b": 1,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.25882352941176473,
+            "g": 0.2196078431372549,
+            "b": 1,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.25882352941176473,
+            "g": 0.2196078431372549,
+            "b": 1,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2032",
+      "name": "Tokens/Alert/Primary/Text",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.25882352941176473,
+          "g": 0.2196078431372549,
+          "b": 1,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.25882352941176473,
+          "g": 0.2196078431372549,
+          "b": 1,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.25882352941176473,
+            "g": 0.2196078431372549,
+            "b": 1,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.25882352941176473,
+            "g": 0.2196078431372549,
+            "b": 1,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2033",
+      "name": "Tokens/Alert/Primary/Icon",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.25882352941176473,
+          "g": 0.2196078431372549,
+          "b": 1,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.25882352941176473,
+          "g": 0.2196078431372549,
+          "b": 1,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.25882352941176473,
+            "g": 0.2196078431372549,
+            "b": 1,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.25882352941176473,
+            "g": 0.2196078431372549,
+            "b": 1,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2034",
+      "name": "Tokens/Alert/Secondary/Background",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 1,
+          "g": 1,
+          "b": 0.8,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0,
+          "g": 0.2,
+          "b": 0,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 1,
+            "g": 1,
+            "b": 0.8,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0,
+            "g": 0.2,
+            "b": 0,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2035",
+      "name": "Tokens/Alert/Secondary/Border",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.7843137254901961,
+          "g": 1,
+          "b": 0,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.7843137254901961,
+          "g": 1,
+          "b": 0,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.7843137254901961,
+            "g": 1,
+            "b": 0,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.7843137254901961,
+            "g": 1,
+            "b": 0,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2036",
+      "name": "Tokens/Alert/Secondary/Text",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.7843137254901961,
+          "g": 1,
+          "b": 0,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.7843137254901961,
+          "g": 1,
+          "b": 0,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.7843137254901961,
+            "g": 1,
+            "b": 0,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.7843137254901961,
+            "g": 1,
+            "b": 0,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2037",
+      "name": "Tokens/Alert/Secondary/Icon",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.7843137254901961,
+          "g": 1,
+          "b": 0,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.7843137254901961,
+          "g": 1,
+          "b": 0,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.7843137254901961,
+            "g": 1,
+            "b": 0,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.7843137254901961,
+            "g": 1,
+            "b": 0,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2038",
+      "name": "Tokens/Alert/Success/Background",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.9411764705882353,
+          "g": 0.9921568627450981,
+          "b": 0.9568627450980393,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.0196078431372549,
+          "g": 0.1803921568627451,
+          "b": 0.08627450980392157,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.9411764705882353,
+            "g": 0.9921568627450981,
+            "b": 0.9568627450980393,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.0196078431372549,
+            "g": 0.1803921568627451,
+            "b": 0.08627450980392157,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2039",
+      "name": "Tokens/Alert/Success/Border",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.06274509803921569,
+          "g": 0.7254901960784313,
+          "b": 0.5058823529411764,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.20392156862745098,
+          "g": 0.8274509803921568,
+          "b": 0.6,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.06274509803921569,
+            "g": 0.7254901960784313,
+            "b": 0.5058823529411764,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.20392156862745098,
+            "g": 0.8274509803921568,
+            "b": 0.6,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2040",
+      "name": "Tokens/Alert/Success/Text",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.023529411764705882,
+          "g": 0.37254901960784315,
+          "b": 0.27450980392156865,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.43137254901960786,
+          "g": 0.9058823529411765,
+          "b": 0.7176470588235294,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.023529411764705882,
+            "g": 0.37254901960784315,
+            "b": 0.27450980392156865,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.43137254901960786,
+            "g": 0.9058823529411765,
+            "b": 0.7176470588235294,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2041",
+      "name": "Tokens/Alert/Success/Icon",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.023529411764705882,
+          "g": 0.37254901960784315,
+          "b": 0.27450980392156865,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.43137254901960786,
+          "g": 0.9058823529411765,
+          "b": 0.7176470588235294,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.023529411764705882,
+            "g": 0.37254901960784315,
+            "b": 0.27450980392156865,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.43137254901960786,
+            "g": 0.9058823529411765,
+            "b": 0.7176470588235294,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2042",
+      "name": "Tokens/Alert/Warning/Background",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 1,
+          "g": 0.984313725490196,
+          "b": 0.9215686274509803,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.47058823529411764,
+          "g": 0.20784313725490197,
+          "b": 0.058823529411764705,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 1,
+            "g": 0.984313725490196,
+            "b": 0.9215686274509803,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.47058823529411764,
+            "g": 0.20784313725490197,
+            "b": 0.058823529411764705,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2043",
+      "name": "Tokens/Alert/Warning/Border",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.9607843137254902,
+          "g": 0.6196078431372549,
+          "b": 0.043137254901960784,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.984313725490196,
+          "g": 0.7490196078431373,
+          "b": 0.1411764705882353,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.9607843137254902,
+            "g": 0.6196078431372549,
+            "b": 0.043137254901960784,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.984313725490196,
+            "g": 0.7490196078431373,
+            "b": 0.1411764705882353,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2044",
+      "name": "Tokens/Alert/Warning/Text",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.5725490196078431,
+          "g": 0.25098039215686274,
+          "b": 0.054901960784313725,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.9882352941176471,
+          "g": 0.8274509803921568,
+          "b": 0.30196078431372547,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.5725490196078431,
+            "g": 0.25098039215686274,
+            "b": 0.054901960784313725,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.9882352941176471,
+            "g": 0.8274509803921568,
+            "b": 0.30196078431372547,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2045",
+      "name": "Tokens/Alert/Warning/Icon",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.5725490196078431,
+          "g": 0.25098039215686274,
+          "b": 0.054901960784313725,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.9882352941176471,
+          "g": 0.8274509803921568,
+          "b": 0.30196078431372547,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.5725490196078431,
+            "g": 0.25098039215686274,
+            "b": 0.054901960784313725,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.9882352941176471,
+            "g": 0.8274509803921568,
+            "b": 0.30196078431372547,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2046",
+      "name": "Tokens/Alert/Error/Background",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.996078431372549,
+          "g": 0.9490196078431372,
+          "b": 0.9490196078431372,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.4980392156862745,
+          "g": 0.11372549019607843,
+          "b": 0.11372549019607843,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.996078431372549,
+            "g": 0.9490196078431372,
+            "b": 0.9490196078431372,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.4980392156862745,
+            "g": 0.11372549019607843,
+            "b": 0.11372549019607843,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2047",
+      "name": "Tokens/Alert/Error/Border",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.9372549019607843,
+          "g": 0.26666666666666666,
+          "b": 0.26666666666666666,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.9725490196078431,
+          "g": 0.44313725490196076,
+          "b": 0.44313725490196076,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.9372549019607843,
+            "g": 0.26666666666666666,
+            "b": 0.26666666666666666,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.9725490196078431,
+            "g": 0.44313725490196076,
+            "b": 0.44313725490196076,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2048",
+      "name": "Tokens/Alert/Error/Text",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.8627450980392157,
+          "g": 0.14901960784313725,
+          "b": 0.14901960784313725,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.9882352941176471,
+          "g": 0.6470588235294118,
+          "b": 0.6470588235294118,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.8627450980392157,
+            "g": 0.14901960784313725,
+            "b": 0.14901960784313725,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.9882352941176471,
+            "g": 0.6470588235294118,
+            "b": 0.6470588235294118,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2049",
+      "name": "Tokens/Alert/Error/Icon",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.8627450980392157,
+          "g": 0.14901960784313725,
+          "b": 0.14901960784313725,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.9882352941176471,
+          "g": 0.6470588235294118,
+          "b": 0.6470588235294118,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.8627450980392157,
+            "g": 0.14901960784313725,
+            "b": 0.14901960784313725,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.9882352941176471,
+            "g": 0.6470588235294118,
+            "b": 0.6470588235294118,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2050",
+      "name": "Tokens/Alert/Info/Background",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.9372549019607843,
+          "g": 0.9647058823529412,
+          "b": 1,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.11764705882352941,
+          "g": 0.22745098039215686,
+          "b": 0.5411764705882353,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.9372549019607843,
+            "g": 0.9647058823529412,
+            "b": 1,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.11764705882352941,
+            "g": 0.22745098039215686,
+            "b": 0.5411764705882353,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2051",
+      "name": "Tokens/Alert/Info/Border",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.23137254901960785,
+          "g": 0.5098039215686274,
+          "b": 0.9647058823529412,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.3764705882352941,
+          "g": 0.6470588235294118,
+          "b": 0.9803921568627451,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.23137254901960785,
+            "g": 0.5098039215686274,
+            "b": 0.9647058823529412,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.3764705882352941,
+            "g": 0.6470588235294118,
+            "b": 0.9803921568627451,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2052",
+      "name": "Tokens/Alert/Info/Text",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.11372549019607843,
+          "g": 0.3058823529411765,
+          "b": 0.8470588235294118,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.5764705882352941,
+          "g": 0.7725490196078432,
+          "b": 0.9921568627450981,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.11372549019607843,
+            "g": 0.3058823529411765,
+            "b": 0.8470588235294118,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.5764705882352941,
+            "g": 0.7725490196078432,
+            "b": 0.9921568627450981,
+            "a": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "VariableID:2053",
+      "name": "Tokens/Alert/Info/Icon",
+      "description": "Semantic token for React components",
+      "type": "COLOR",
+      "scopes": [
+        "ALL_SCOPES"
+      ],
+      "hiddenFromPublishing": false,
+      "codeSyntax": {},
+      "valuesByMode": {
+        "mode:light": {
+          "type": "SOLID",
+          "r": 0.11372549019607843,
+          "g": 0.3058823529411765,
+          "b": 0.8470588235294118,
+          "a": 1
+        },
+        "mode:dark": {
+          "type": "SOLID",
+          "r": 0.5764705882352941,
+          "g": 0.7725490196078432,
+          "b": 0.9921568627450981,
+          "a": 1
+        }
+      },
+      "resolvedValuesByMode": {
+        "mode:light": {
+          "resolvedValue": {
+            "r": 0.11372549019607843,
+            "g": 0.3058823529411765,
+            "b": 0.8470588235294118,
+            "a": 1
+          }
+        },
+        "mode:dark": {
+          "resolvedValue": {
+            "r": 0.5764705882352941,
+            "g": 0.7725490196078432,
+            "b": 0.9921568627450981,
+            "a": 1
+          }
+        }
+      }
+    }
+  ]
+}

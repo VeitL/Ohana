@@ -29,9 +29,22 @@
 		4FDA02482F54E0D6004B725F /* OhanaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OhanaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		4FDA07102F5C3A14004B725F /* Exceptions for "Ohana" folder in "Ohana" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 4FDA02302F54E0D4004B725F /* Ohana */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4FDA02332F54E0D4004B725F /* Ohana */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4FDA07102F5C3A14004B725F /* Exceptions for "Ohana" folder in "Ohana" target */,
+			);
 			path = Ohana;
 			sourceTree = "<group>";
 		};
@@ -395,13 +408,22 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Ohana/Ohana.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 567SK733UN;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Ohana/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Ohana 需要访问相机来拍摄宠物头像";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Ohana 需要读取您的步数、消耗和运动记录，以便在您的岛民档案中展示并参与全岛探索里程统计。";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Ohana 需要此权限来帮您将手动记录的运动数据同步至苹果健康。";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Ohana 在遛狗时需要持续追踪位置以记录完整路线，即使 App 在后台运行";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Ohana 在遛狗时需要使用位置来记录路线";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Ohana 需要访问相册来选择宠物头像";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIBackgroundModes = "(location)";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -427,13 +449,22 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Ohana/Ohana.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 567SK733UN;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Ohana/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Ohana 需要访问相机来拍摄宠物头像";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Ohana 需要读取您的步数、消耗和运动记录，以便在您的岛民档案中展示并参与全岛探索里程统计。";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Ohana 需要此权限来帮您将手动记录的运动数据同步至苹果健康。";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Ohana 在遛狗时需要持续追踪位置以记录完整路线，即使 App 在后台运行";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Ohana 在遛狗时需要使用位置来记录路线";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Ohana 需要访问相册来选择宠物头像";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIBackgroundModes = "(location)";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";

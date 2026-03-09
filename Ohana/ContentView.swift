@@ -6,19 +6,52 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct ContentView: View {
+    @State private var selectedPet: Pet?
+    @State private var selectedHuman: Human?
+    @State private var selectedPlant: Plant?
+    @State private var selectedPetTab: PetDetailTab = .overview
+    @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
+    
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        ZStack {
+            if !hasOnboarded {
+                OnboardingView()
+                    .transition(.opacity)
+                    .zIndex(100)
+            }
+            NavigationStack {
+                OverviewView(
+                    selectedPet: $selectedPet,
+                    selectedHuman: $selectedHuman,
+                    selectedPlant: $selectedPlant,
+                    selectedPetTab: $selectedPetTab
+                )
+                .navigationDestination(item: $selectedPet) { pet in
+                    PetDetailView(
+                        pet: pet,
+                        initialTab: selectedPetTab,
+                        openHealthOnAppear: selectedPetTab == .health
+                    )
+                }
+                .navigationDestination(item: $selectedHuman) { human in
+                    HumanDetailView(human: human)
+                }
+                .navigationDestination(item: $selectedPlant) { plant in
+                    PlantDetailView(plant: plant)
+                }
+            }
+
+            // 全局遛狗悬浮卡（底部，任何页面均可见）
+            GlobalWalkBanner()
+                .ignoresSafeArea(edges: .bottom)
         }
-        .padding()
     }
 }
 
 #Preview {
     ContentView()
+        .modelContainer(SharedModelContainer.make())
 }
