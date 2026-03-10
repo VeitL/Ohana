@@ -69,10 +69,10 @@ struct DocumentsListView: View {
             Text("📄").font(.system(size: 48))
             Text("还没有证件记录")
                 .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(.primary.opacity(0.6))
             Text("点击右上角 + 添加第一份证件")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(.primary.opacity(0.3))
         }
         .frame(maxWidth: .infinity)
         .padding(40)
@@ -107,10 +107,10 @@ private struct DocumentDetailRow: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(doc.title.isEmpty ? doc.category : doc.title)
                         .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Text(doc.category)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                 }
 
                 Spacer()
@@ -148,7 +148,7 @@ private struct DocumentDetailRow: View {
             if !doc.notes.isEmpty {
                 Text(doc.notes)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .foregroundStyle(.primary.opacity(0.35))
                     .lineLimit(2)
             }
 
@@ -170,7 +170,7 @@ private struct DocumentDetailRow: View {
                     Image(systemName: "doc.fill").foregroundStyle(Color.goPrimary)
                     Text(doc.attachmentFilename)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.primary.opacity(0.5))
                         .lineLimit(1)
                 }
                 .padding(10)
@@ -201,7 +201,7 @@ private struct DocumentDetailRow: View {
                             Spacer()
                             Button { showingPreview = false } label: {
                                 Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 28)).foregroundStyle(.white).shadow(radius: 4)
+                                    .font(.system(size: 28)).foregroundStyle(.primary).shadow(radius: 4)
                             }.padding(16)
                         }
                         Spacer()

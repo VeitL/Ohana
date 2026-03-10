@@ -245,7 +245,7 @@ struct CalendarView: View {
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(.primary.opacity(0.6))
                         .frame(width: 36, height: 36)
                         .background(.white.opacity(0.1), in: Circle())
                 }
@@ -254,7 +254,7 @@ struct CalendarView: View {
                 
                 Text(selectedDate, format: .dateTime.year().month(.wide))
                     .font(.system(size: 20, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 
                 Spacer()
                 
@@ -263,7 +263,7 @@ struct CalendarView: View {
                 } label: {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(.primary.opacity(0.6))
                         .frame(width: 36, height: 36)
                         .background(.white.opacity(0.1), in: Circle())
                 }
@@ -275,7 +275,7 @@ struct CalendarView: View {
                 ForEach(["日","一","二","三","四","五","六"], id: \.self) { d in
                     Text(d)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(.primary.opacity(0.3))
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -331,7 +331,7 @@ struct CalendarView: View {
                                 .font(.system(size: 32))
                             Text("No events")
                                 .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.4))
+                                .foregroundStyle(.primary.opacity(0.4))
                         }
                         .padding(.top, 20)
                     } else {
@@ -361,7 +361,7 @@ struct CalendarView: View {
                         Text("📭").font(.system(size: 40))
                         Text("暂无记录")
                             .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.top, 60)
@@ -445,7 +445,7 @@ struct CalendarView: View {
 
                 Text("·  \(events.count)")
                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.25))
+                    .foregroundStyle(.primary.opacity(0.25))
 
                 Spacer()
             }

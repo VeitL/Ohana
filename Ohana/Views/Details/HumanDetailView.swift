@@ -78,7 +78,7 @@ struct HumanDetailView: View {
                     
                     Button { showingEditSheet = true } label: {
                         Image(systemName: "pencil.circle")
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                     }
                 }
             }
@@ -142,7 +142,7 @@ struct HumanDetailView: View {
             VStack(spacing: 8) {
                 Text(human.name)
                     .font(OhanaFont.largeTitle(.heavy))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -170,7 +170,7 @@ struct HumanDetailView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("动态称号")
                         .font(.system(size: 11, weight: .black, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                         .textCase(.uppercase)
                         .padding(.horizontal, 20)
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -206,20 +206,20 @@ struct HumanDetailView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("椰子心愿单")
                         .font(.system(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     HStack(spacing: 4) {
                         Text("🥥 \(human.coconutBalance) 个椰子")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(Color.goYellow)
                         Text("· 点击许愿")
                             .font(.system(size: 11))
-                            .foregroundStyle(.white.opacity(0.35))
+                            .foregroundStyle(.primary.opacity(0.35))
                     }
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
             }
             .padding(.horizontal, 16).padding(.vertical, 14)
             .ohanaStandardCard(cornerRadius: 20)
@@ -240,7 +240,7 @@ struct HumanDetailView: View {
     private func humanChip(_ text: String) -> some View {
         Text(text)
             .font(OhanaFont.caption(.semibold))
-            .foregroundStyle(.white.opacity(0.9))
+            .foregroundStyle(.primary.opacity(0.9))
             .padding(.horizontal, 12).padding(.vertical, 5)
             .background(.white.opacity(0.12), in: Capsule())
             .overlay(Capsule().strokeBorder(.white.opacity(0.15), lineWidth: 1))
@@ -251,10 +251,10 @@ struct HumanDetailView: View {
         HStack(spacing: 12) {
             Image(systemName: "lock.fill")
                 .font(.system(size: 18))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(.primary.opacity(0.3))
             Text("🔒 \(label)·仅本人可见")
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(.primary.opacity(0.3))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16).padding(.vertical, 14)
@@ -277,7 +277,7 @@ struct HumanDetailView: View {
                     }
                     Text("体重记录")
                         .font(OhanaFont.headline())
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Spacer()
                     if let latest = human.weightLogs.sorted(by: { $0.date > $1.date }).first {
                         HStack(alignment: .firstTextBaseline, spacing: 3) {
@@ -291,11 +291,11 @@ struct HumanDetailView: View {
                     } else {
                         Text("暂无记录")
                             .font(OhanaFont.caption())
-                            .foregroundStyle(.white.opacity(0.35))
+                            .foregroundStyle(.primary.opacity(0.35))
                     }
                     Image(systemName: "chevron.right")
                         .font(OhanaFont.caption(.semibold))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                 }
                 .padding(.horizontal, 16).padding(.vertical, 14)
             }
@@ -319,10 +319,10 @@ struct HumanDetailView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("在首页卡堆显示")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text(human.shouldShowOnHome ? "已加入首页宠物卡堆" : "仅在家庭成员列表显示")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
             }
             Spacer()
             Toggle("", isOn: Binding(
@@ -354,7 +354,7 @@ struct HumanDetailView: View {
             if humanReminders.isEmpty {
                 Text("暂无待办提醒")
                     .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .foregroundStyle(.primary.opacity(0.35))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 12)
             } else {
@@ -366,10 +366,10 @@ struct HumanDetailView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(reminder.event?.title ?? "提醒")
                                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                                 Text(reminder.scheduledAt, style: .date)
                                     .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.4))
+                                    .foregroundStyle(.primary.opacity(0.4))
                             }
                             Spacer()
                             // 模块4：催办 NudgeButton
@@ -413,12 +413,12 @@ struct HumanDetailView: View {
                             .foregroundStyle(Color.goLime)
                         Text("备注")
                             .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Spacer()
                     }
                     Text(human.notes)
                         .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(.primary.opacity(0.7))
                 }
                 .padding(16)
                 .ohanaStandardCard(cornerRadius: 20)

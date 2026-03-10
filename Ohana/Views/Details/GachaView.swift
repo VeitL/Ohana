@@ -209,7 +209,7 @@ struct GachaView: View {
 
             Text("每次消耗 \(cost)🥥")
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.35))
+                .foregroundStyle(.primary.opacity(0.35))
         }
     }
 
@@ -295,7 +295,7 @@ struct GachaView: View {
             if questManager.coconutCount < cost {
                 Text("椰子不足，快去打卡赚取吧 🥥")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
             }
         }
     }
@@ -305,7 +305,7 @@ struct GachaView: View {
         VStack(spacing: 14) {
             Text("✨ 恭喜获得 ✨")
                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.primary.opacity(0.5))
                 .tracking(2)
 
             Text(prize.emoji)
@@ -315,7 +315,7 @@ struct GachaView: View {
 
             Text(prize.name)
                 .font(.system(size: 22, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
 
             Text(prize.rarity.rawValue)
                 .font(.system(size: 12, weight: .bold, design: .rounded))
@@ -326,7 +326,7 @@ struct GachaView: View {
 
             Text(prize.description)
                 .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.primary.opacity(0.5))
                 .multilineTextAlignment(.center)
 
             // 补打卡券：立即使用 按钮
@@ -371,7 +371,7 @@ struct GachaView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("最近记录")
                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(.primary.opacity(0.4))
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 10) {
                 ForEach(recentHistory) { prize in

@@ -85,10 +85,10 @@ struct WalkSummarySheet: View {
                 .font(.system(size: 20))
             Text(value)
                 .font(.system(size: 22, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
             Text(label)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.primary.opacity(0.5))
         }
         .frame(maxWidth: .infinity)
     }
@@ -99,7 +99,7 @@ struct WalkSummarySheet: View {
             HStack {
                 Text("历史记录")
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(.primary.opacity(0.6))
                 Spacer()
             }
             
@@ -113,7 +113,7 @@ struct WalkSummarySheet: View {
             if sortedWalks.isEmpty {
                 Text("还没有巡岛记录")
                     .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 20)
             }
@@ -140,23 +140,23 @@ struct WalkSummarySheet: View {
                         .fill(.white.opacity(0.06))
                         .frame(width: 56, height: 56)
                     Image(systemName: "map")
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(.primary.opacity(0.3))
                 }
             }
             // 右侧箭头提示
             Image(systemName: "chevron.right")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.25))
+                .foregroundStyle(.primary.opacity(0.25))
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(walk.startDate, format: .dateTime.month().day().weekday(.abbreviated))
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 
                 HStack(spacing: 8) {
                     Label(walk.distanceText, systemImage: "arrow.triangle.swap")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.primary.opacity(0.5))
                     
                     if walk.coconutsEarned > 0 {
                         Text("+\(walk.coconutsEarned)🥥")
@@ -166,7 +166,7 @@ struct WalkSummarySheet: View {
 
                     Label(walk.durationText, systemImage: "clock")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.primary.opacity(0.5))
                 }
             }
             
@@ -174,7 +174,7 @@ struct WalkSummarySheet: View {
             
             Text(walk.startDate, format: .dateTime.hour().minute())
                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(.primary.opacity(0.4))
         }
         .padding(.vertical, 4)
     }

@@ -54,12 +54,12 @@ struct ExpenseSplitterCard: View {
                     .font(.system(size: 18))
                 Text("财务结算室")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Spacer()
                 if totalExpense > 0 {
                     Text("人均 ¥\(Int(totalExpense / max(1, Double(humans.count))))")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                         .padding(.horizontal, 10).padding(.vertical, 5)
                         .background(.white.opacity(0.08), in: Capsule())
                 }
@@ -69,13 +69,13 @@ struct ExpenseSplitterCard: View {
             if results.isEmpty {
                 Text("添加花费记录并指定支付人后，这里会自动计算谁欠谁多少钱。")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .foregroundStyle(.primary.opacity(0.35))
                     .padding(.horizontal, 20).padding(.bottom, 18)
             } else {
                 // 结算文案（大字报）
                 Text(settlementText)
                     .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 16)
 
@@ -104,10 +104,10 @@ struct ExpenseSplitterCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(r.name)
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text("实付 ¥\(Int(r.paid))")
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .foregroundStyle(.primary.opacity(0.35))
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
@@ -116,7 +116,7 @@ struct ExpenseSplitterCard: View {
                     .foregroundStyle(isPositive ? Color.goLime : Color.goRed)
                 Text(isPositive ? "垫付较多" : "少付了")
                     .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
             }
         }
         .padding(12)

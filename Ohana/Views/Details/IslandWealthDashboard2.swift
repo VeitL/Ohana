@@ -62,14 +62,14 @@ struct IslandWealthDashboardView: View {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .frame(width: 38, height: 38)
                     .background(.white.opacity(0.12), in: Circle())
             }
             Spacer()
             Text("欧哈纳财富")
                 .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
             Spacer()
             CoconutBalanceCapsule { showingCoconutLog = true }
         }
@@ -127,16 +127,16 @@ struct IslandWealthDashboardView: View {
         .chartXAxis {
             AxisMarks(preset: .aligned, values: .stride(by: stridedUnit)) { _ in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
-                    .foregroundStyle(.white.opacity(0.1))
+                    .foregroundStyle(.primary.opacity(0.1))
                 AxisValueLabel(format: format)
-                    .foregroundStyle(.white.opacity(0.55))
+                    .foregroundStyle(.primary.opacity(0.55))
                     .font(.system(size: 10))
             }
         }
         .chartYAxis {
             AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { _ in
-                AxisGridLine().foregroundStyle(.white.opacity(0.07))
-                AxisValueLabel().foregroundStyle(.white.opacity(0.5))
+                AxisGridLine().foregroundStyle(.primary.opacity(0.07))
+                AxisValueLabel().foregroundStyle(.primary.opacity(0.5))
                     .font(.system(size: 10))
             }
         }
@@ -153,7 +153,7 @@ struct IslandWealthDashboardView: View {
                     Circle().fill(vm.color(for: row.entityId)).frame(width: 7, height: 7)
                     Text(row.name)
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(.primary.opacity(0.6))
                         .lineLimit(1)
                 }
             }
@@ -167,7 +167,7 @@ struct IslandWealthDashboardView: View {
                 .font(.system(size: 52))
             Text("立刻去打卡赚取第一桶金吧！")
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.primary.opacity(0.5))
         }
         .frame(maxWidth: .infinity)
     }
@@ -201,7 +201,7 @@ struct IslandWealthDashboardView: View {
                     .foregroundStyle(Color.goLime.opacity(0.7))
                 Text("\(vm.totalAssets)")
                     .font(.system(size: 52, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .contentTransition(.numericText())
                     .animation(.spring(response: 0.4), value: vm.totalAssets)
                 Text("🥥")
@@ -218,10 +218,10 @@ struct IslandWealthDashboardView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "trophy")
                         .font(.system(size: 36))
-                        .foregroundStyle(.white.opacity(0.25))
+                        .foregroundStyle(.primary.opacity(0.25))
                     Text("完成打卡即可解锁财富榜 ✨")
                         .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.primary.opacity(0.5))
                 }
                 .padding(.vertical, 32)
             } else {
@@ -286,7 +286,7 @@ struct IslandWealthDashboardView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(row.name)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
@@ -304,7 +304,7 @@ struct IslandWealthDashboardView: View {
             // Amount
             Text("\(row.amount)🥥")
                 .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .padding(.horizontal, 9).padding(.vertical, 4)
                 .background(accent.opacity(0.14), in: Capsule())
         }

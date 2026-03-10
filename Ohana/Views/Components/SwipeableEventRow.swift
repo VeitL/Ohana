@@ -74,7 +74,7 @@ struct SwipeableEventRow: View {
                             .font(.system(size: 20, weight: .bold))
                         Text("完成").font(.system(size: 12, weight: .bold, design: .rounded))
                     }
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .opacity(min(1, leftProgress * 1.5))
                     .scaleEffect(0.8 + leftProgress * 0.2)
                     .padding(.trailing, 20)
@@ -92,7 +92,7 @@ struct SwipeableEventRow: View {
                             .font(.system(size: 20, weight: .bold))
                         Text("删除").font(.system(size: 12, weight: .bold, design: .rounded))
                     }
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .opacity(min(1, rightProgress * 1.5))
                     .scaleEffect(0.8 + rightProgress * 0.2)
                     .padding(.leading, 20)
@@ -186,7 +186,7 @@ struct SwipeableEventRow: View {
                     if event.recurrenceDays > 0 {
                         Image(systemName: "repeat")
                             .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.3))
+                            .foregroundStyle(.primary.opacity(0.3))
                     }
                     if rowState == .overdue {
                         Text("逾期")
@@ -209,7 +209,7 @@ struct SwipeableEventRow: View {
                 } else if event.isAllDay {
                     Text("全天")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.25))
+                        .foregroundStyle(.primary.opacity(0.25))
                 } else {
                     Text(event.startDate, style: .time)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
@@ -396,7 +396,7 @@ private struct EventDetailSheet: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(event.title)
                                 .font(.system(size: 18, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                                 .lineLimit(2)
                             Text(event.eventType)
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
@@ -433,7 +433,7 @@ private struct EventDetailSheet: View {
                                 Label(event.isCompleted ? "标记未完成" : "标记完成",
                                       systemImage: event.isCompleted ? "xmark.circle" : "checkmark.circle.fill")
                                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                                     .frame(maxWidth: .infinity).padding(.vertical, 14)
                                     .background(Color.goTeal, in: RoundedRectangle(cornerRadius: 14))
                             }
@@ -445,7 +445,7 @@ private struct EventDetailSheet: View {
                         } label: {
                             Label("删除", systemImage: "trash.fill")
                                 .font(.system(size: 15, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                                 .frame(maxWidth: .infinity).padding(.vertical, 14)
                                 .background(Color.goRed, in: RoundedRectangle(cornerRadius: 14))
                         }
@@ -484,11 +484,11 @@ private struct EventDetailSheet: View {
                 .frame(width: 22)
             Text(label)
                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.primary.opacity(0.5))
             Spacer()
             Text(value)
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
         }
         .padding(.horizontal, 24)
     }

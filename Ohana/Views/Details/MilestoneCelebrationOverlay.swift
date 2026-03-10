@@ -122,18 +122,18 @@ struct MilestoneCelebrationOverlay: View {
                                 .foregroundStyle(milestone.accentColor)
                             Text("天")
                                 .font(.system(size: 28, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(.primary.opacity(0.7))
                         }
 
                         // 标题
                         Text(milestone.title)
                             .font(.system(size: 26, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
 
                         // 副标题
                         Text(milestone.subtitle)
                             .font(.system(size: 15, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(.primary.opacity(0.6))
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
 

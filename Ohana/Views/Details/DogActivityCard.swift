@@ -27,11 +27,11 @@ struct DogActivityCard: View {
                 Text("🐾").font(.system(size: 14))
                 Text("遛狗 & 陪玩")
                     .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.25))
+                    .foregroundStyle(.primary.opacity(0.25))
             }
 
             // ── 遛狗快捷行
@@ -41,10 +41,10 @@ struct DogActivityCard: View {
                     .foregroundStyle(Color.goLime)
                 Text("遛狗")
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text("今日 \(walkCountToday) 次")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
                 Spacer()
             }
 
@@ -55,10 +55,10 @@ struct DogActivityCard: View {
                     .foregroundStyle(Color(hex: "FF6B6B"))
                 Text("陪玩")
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text("今日 \(playCountToday) 次")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
                 Spacer()
                 Button {
                     let log = PetCareLog(date: Date(), type: .play, pet: pet)

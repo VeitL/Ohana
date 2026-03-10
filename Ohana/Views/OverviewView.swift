@@ -205,10 +205,10 @@ struct OverviewView: View {
                             VStack(spacing: 6) {
                                 Text("每日登录奖励 +1🥥")
                                     .font(.system(size: 20, weight: .black, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                                 Text("坚持照顾家人，收获更多椰子")
                                     .font(.system(size: 14, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.5))
+                                    .foregroundStyle(.primary.opacity(0.5))
                             }
                             .transition(.opacity)
 
@@ -433,7 +433,7 @@ struct OverviewView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("\(greetingText) 👋")
                     .font(.system(size: 24, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 if let firstPet = pets.first {
                     let hour = Calendar.current.component(.hour, from: Date())
                     let hint = hour >= 6 && hour < 10 ? "趁早晨凉爽，带 \(firstPet.name) 出去走走吧" :
@@ -441,7 +441,7 @@ struct OverviewView: View {
                                "\(firstPet.name) 在等你呢"
                     Text(hint)
                         .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.55))
+                        .foregroundStyle(.primary.opacity(0.55))
                 }
             }
             Spacer()
@@ -485,7 +485,7 @@ struct OverviewView: View {
             } else {
                 Image(systemName: "person.fill")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(.primary.opacity(0.7))
             }
         }
         .overlay(Circle().strokeBorder(Color.white.opacity(0.2), lineWidth: 1))
@@ -518,16 +518,16 @@ struct OverviewView: View {
             HStack {
                 Text("ISLAND STATS")
                     .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
                     .tracking(3)
                 Spacer()
                 HStack(spacing: 4) {
                     Text("左滑查看更多")
                         .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.25))
+                        .foregroundStyle(.primary.opacity(0.25))
                     Image(systemName: "chevron.left.2")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.2))
+                        .foregroundStyle(.primary.opacity(0.2))
                 }
             }
             .padding(.horizontal, 20)
@@ -645,7 +645,7 @@ struct OverviewView: View {
                     path.addLine(to: CGPoint(x: 0, y: 160))
                 }
                 .stroke(style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                .foregroundStyle(.white.opacity(0.15))
+                .foregroundStyle(.primary.opacity(0.15))
             )
             .padding(.horizontal, 4)
     }
@@ -700,16 +700,16 @@ struct OverviewView: View {
                 HStack(spacing: 6) {
                     Text("Today's Tasks")
                         .font(.system(size: 18, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Text("\(completedToday)/\(max(allTodayCount, 1))")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.primary.opacity(0.5))
                 }
                 Spacer()
                 Button { showingCalendar = true } label: {
                     Text("View Plan →")
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                 }
             }
             .padding(.horizontal, 20)
@@ -732,7 +732,7 @@ struct OverviewView: View {
                     Text("🎉").font(.system(size: 22))
                     Text("All tasks done! Enjoy your day.")
                         .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(.primary.opacity(0.7))
                 }
                 .padding(14)
                 .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
@@ -763,7 +763,7 @@ struct OverviewView: View {
                     .foregroundStyle(Color.goLime)
                 Text("全家")
                     .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(.primary.opacity(0.7))
             }
             .padding(.leading, 12)
 
@@ -785,7 +785,7 @@ struct OverviewView: View {
             Button { showingBatchCheckInSheet = true } label: {
                 Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
                     .padding(.horizontal, 10)
             }
             .buttonStyle(.plain)
@@ -875,7 +875,7 @@ struct OverviewView: View {
                 }
                 Text(action.label)
                     .font(.system(size: 10, weight: .black, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.85))
+                    .foregroundStyle(.primary.opacity(0.85))
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
@@ -915,7 +915,7 @@ struct OverviewView: View {
             HStack {
                 Text("QUICK ACCESS")
                     .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
                     .tracking(3)
                 Spacer()
             }
@@ -972,15 +972,15 @@ struct OverviewView: View {
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                                     .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-                                    .foregroundStyle(.white.opacity(0.2))
+                                    .foregroundStyle(.primary.opacity(0.2))
                             )
                         VStack(spacing: 4) {
                             Image(systemName: "plus")
                                 .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.45))
+                                .foregroundStyle(.primary.opacity(0.45))
                             Text("Add")
                                 .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.3))
+                                .foregroundStyle(.primary.opacity(0.3))
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1345,13 +1345,13 @@ struct OverviewView: View {
 
             Text("欢迎来到 Ohana 岛")
                 .font(.system(size: 30, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
                 .padding(.bottom, 8)
 
             Text("这里是你和家人的专属小岛\n还没有居民，快把第一个家人带来吧 🐾")
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.primary.opacity(0.5))
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
                 .padding(.bottom, 32)
@@ -1398,15 +1398,15 @@ struct OverviewView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text(subtitle)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
             }
             Spacer()
             Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.15))
+                .foregroundStyle(.primary.opacity(0.15))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -1421,10 +1421,10 @@ struct OverviewView: View {
                     .font(.system(size: 56))
                 Text("带你的毛孩子来！")
                     .font(.system(size: 24, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text("添加第一只宠物，开启椰子奖励之旅")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.primary.opacity(0.5))
                     .multilineTextAlignment(.center)
             }
 
@@ -1437,7 +1437,7 @@ struct OverviewView: View {
                         .foregroundStyle(Color.goLime)
                     Text("添加宠物")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
@@ -1451,7 +1451,7 @@ struct OverviewView: View {
                         .foregroundStyle(Color.goLime)
                     Text("每次打卡")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
@@ -1465,7 +1465,7 @@ struct OverviewView: View {
                         .foregroundStyle(Color.goLime)
                     Text("遛狗奖励")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
@@ -1501,7 +1501,7 @@ struct OverviewView: View {
                 if !filteredPets.isEmpty {
                     Text("PETS")
                         .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.primary.opacity(0.5))
                         .tracking(2)
                         .padding(.horizontal, 16)
                     
@@ -1518,15 +1518,15 @@ struct OverviewView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(pet.name)
                                         .font(.system(size: 16, weight: .bold, design: .rounded))
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(.primary)
                                     Text("\(pet.species) · \(pet.breed)")
                                         .font(.system(size: 12, weight: .medium))
-                                        .foregroundStyle(.white.opacity(0.5))
+                                        .foregroundStyle(.primary.opacity(0.5))
                                 }
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(.white.opacity(0.3))
+                                    .foregroundStyle(.primary.opacity(0.3))
                             }
                             .padding(12)
                             .goTranslucentCard(cornerRadius: 16)
@@ -1538,7 +1538,7 @@ struct OverviewView: View {
                 if !filteredHumans.isEmpty {
                     Text("FAMILY")
                         .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.primary.opacity(0.5))
                         .tracking(2)
                         .padding(.horizontal, 16)
                     
@@ -1555,15 +1555,15 @@ struct OverviewView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(human.name)
                                         .font(.system(size: 16, weight: .bold, design: .rounded))
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(.primary)
                                     Text(human.roleText)
                                         .font(.system(size: 12, weight: .medium))
-                                        .foregroundStyle(.white.opacity(0.5))
+                                        .foregroundStyle(.primary.opacity(0.5))
                                 }
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(.white.opacity(0.3))
+                                    .foregroundStyle(.primary.opacity(0.3))
                             }
                             .padding(12)
                             .goTranslucentCard(cornerRadius: 16)

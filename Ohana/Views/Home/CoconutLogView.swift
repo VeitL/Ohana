@@ -49,7 +49,7 @@ struct CoconutLogView: View {
                     Button { dismiss() } label: {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 17, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(.primary.opacity(0.7))
                             .frame(width: 36, height: 36)
                             .background(.white.opacity(0.08), in: Circle())
                     }
@@ -57,10 +57,10 @@ struct CoconutLogView: View {
                     VStack(spacing: 2) {
                         Text("椰子记录")
                             .font(.system(size: 18, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Text("每次照顾家人都能获得椰子 🥥")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                     }
                     Spacer()
                     Color.clear.frame(width: 36, height: 36)
@@ -78,7 +78,7 @@ struct CoconutLogView: View {
                             .animation(.spring(response: 0.4), value: manager.coconutCount)
                         Text("当前椰子余额")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.35))
+                            .foregroundStyle(.primary.opacity(0.35))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -107,10 +107,10 @@ struct CoconutLogView: View {
                         Text("🥥").font(.system(size: 48))
                         Text(selectedActorId == nil ? "还没有椰子记录" : "该成员暂无椰子记录")
                             .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                         Text("完成打卡、照顾家人后椰子会出现在这里")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.25))
+                            .foregroundStyle(.primary.opacity(0.25))
                             .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -172,13 +172,13 @@ struct CoconutLogView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(log.title)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 HStack(spacing: 6) {
                     if isSystem {
                         // 全局系统奖励
                         Text("🏕️ 岛屿奖励")
                             .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.45))
+                            .foregroundStyle(.primary.opacity(0.45))
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(.white.opacity(0.07), in: Capsule())
                     } else if isPet {
@@ -202,7 +202,7 @@ struct CoconutLogView: View {
                     }
                     Text(log.timeAgoString)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.35))
+                        .foregroundStyle(.primary.opacity(0.35))
                 }
             }
             Spacer()

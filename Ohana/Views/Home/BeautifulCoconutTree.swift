@@ -532,7 +532,7 @@ struct StardustView: View {
 
                     Text("Lv.\(level) · 点击椰子采摘")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(.primary.opacity(0.6))
 
                     HStack(spacing: 16) {
                         Button("升级") {
@@ -550,12 +550,12 @@ struct StardustView: View {
                         }
                         .padding(.horizontal, 20).padding(.vertical, 10)
                         .background(.white.opacity(0.15), in: Capsule())
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
 
                         Button("重置椰子") { harvested = [] }
                         .padding(.horizontal, 20).padding(.vertical, 10)
                         .background(.white.opacity(0.15), in: Capsule())
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     }
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                 }

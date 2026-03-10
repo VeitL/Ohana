@@ -194,12 +194,12 @@ struct PetDetailView: View {
                     Button { showingSitterCard = true } label: {
                         Image(systemName: "rectangle.portrait.on.rectangle.portrait")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(.primary.opacity(0.7))
                     }
                     Button { showingCalendar = true } label: {
                         Image(systemName: "calendar")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                     }
                 }
             }
@@ -287,16 +287,16 @@ struct PetDetailView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("疫苗本")
                     .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 let count = pet.healthLogs.filter { $0.type == "疫苗" }.count
                 Text(count == 0 ? "点击添加第一条疫苗记录" : "共 \(count) 条记录")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(.primary.opacity(0.45))
             }
             Spacer()
             Image(systemName: "chevron.right")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(.primary.opacity(0.3))
         }
         .padding(14)
         .background(Color.goCardCyan.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
@@ -315,9 +315,9 @@ struct PetDetailView: View {
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text("成就墙")
-                    .font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                    .font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(.primary)
                 Text("\(unlocked) / \(total) 已解锁")
-                    .font(.system(size: 12, weight: .medium)).foregroundStyle(.white.opacity(0.5))
+                    .font(.system(size: 12, weight: .medium)).foregroundStyle(.primary.opacity(0.5))
             }
             Spacer()
             Text("\(total > 0 ? Int(Double(unlocked)/Double(total)*100) : 0)%")
@@ -326,7 +326,7 @@ struct PetDetailView: View {
                 .padding(.horizontal, 10).padding(.vertical, 5)
                 .background(Color.goYellow.opacity(0.15), in: Capsule())
             Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold)).foregroundStyle(.white.opacity(0.3))
+                .font(.system(size: 12, weight: .semibold)).foregroundStyle(.primary.opacity(0.3))
         }
         .padding(.horizontal, 16).padding(.vertical, 14)
         .ohanaStandardCard(cornerRadius: 18)
@@ -342,15 +342,15 @@ struct PetDetailView: View {
                     .foregroundStyle(Color.goCardCyan)
                 Text("证件")
                     .font(.system(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.25))
+                    .foregroundStyle(.primary.opacity(0.25))
             }
             Text("\(pet.documents.count) 份")
                 .font(.system(size: 26, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
             if !expiring.isEmpty {
                 Text("\(expiring.count) 即将到期")
                     .font(.system(size: 10, weight: .bold))
@@ -379,21 +379,21 @@ struct PetDetailView: View {
                     .foregroundStyle(Color.goYellow)
                 Text("里程碑")
                     .font(.system(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Spacer()
             }
             Text("\(pet.milestones.count)")
                 .font(.system(size: 26, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
             if let m = latest {
                 Text(m.emoji + " " + m.title)
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(.primary.opacity(0.6))
                     .lineLimit(1)
             } else {
                 Text("暂无记录")
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
             }
         }
         .padding(12)
@@ -411,18 +411,18 @@ struct PetDetailView: View {
                 Text("🏆").font(.system(size: 11))
                 Text("成就")
                     .font(.system(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.25))
+                    .foregroundStyle(.primary.opacity(0.25))
             }
             Text("\(pct)%")
                 .font(.system(size: 26, weight: .black, design: .rounded))
                 .foregroundStyle(Color.goYellow)
             Text("\(unlocked)/\(total) 解锁")
                 .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.primary.opacity(0.5))
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -439,7 +439,7 @@ struct PetDetailView: View {
                     Text("🌈").font(.system(size: 14))
                     Text("岁月史书 · 彩虹桥彼端")
                         .font(.system(size: 11, weight: .black, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.primary.opacity(0.5))
                         .tracking(1)
                     Spacer()
                 }
@@ -448,11 +448,11 @@ struct PetDetailView: View {
                         if let d = pet.passedAwayDate {
                             Text("离世日期：\(d.formatted(.dateTime.year().month().day()))")
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(.primary.opacity(0.7))
                         }
                         Text("相伴 \(pet.daysTogetherAtPassing) 天 · \(pet.ageAtPassingText)")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.45))
+                            .foregroundStyle(.primary.opacity(0.45))
                     }
                     Spacer()
                     Button {
@@ -791,7 +791,7 @@ private struct PetAlertScrollSection: View {
                             Text(alert.0).font(.system(size: 20))
                             Text(alert.1)
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                                 .lineLimit(1)
                         }
                         .padding(.horizontal, 16).padding(.vertical, 12)
@@ -831,7 +831,7 @@ private struct PetHealthActionRow: View {
                         }
                         Text(label)
                             .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.65))
+                            .foregroundStyle(.primary.opacity(0.65))
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -875,7 +875,7 @@ private struct PetHealthHubCard: View {
                     Text("💉").font(.system(size: 16))
                     Text("免疫健康")
                         .font(.system(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Spacer()
                     Button(action: onViewPassport) {
                         HStack(spacing: 3) {
@@ -890,7 +890,7 @@ private struct PetHealthHubCard: View {
                     .buttonStyle(.plain)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.25))
+                        .foregroundStyle(.primary.opacity(0.25))
                 }
             }
             .buttonStyle(.plain)
@@ -899,7 +899,7 @@ private struct PetHealthHubCard: View {
             if immunityRows.isEmpty {
                 Text("暂无记录")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
                     .padding(.vertical, 4)
             } else {
                 ForEach(immunityRows, id: \.label) { row in
@@ -907,7 +907,7 @@ private struct PetHealthHubCard: View {
                         Text(row.emoji).font(.system(size: 14))
                         Text(row.label)
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.8))
+                            .foregroundStyle(.primary.opacity(0.8))
                         Spacer()
                         if let exp = row.expiryDate {
                             let isExpired = exp < Date()
@@ -918,7 +918,7 @@ private struct PetHealthHubCard: View {
                         } else if row.lastDate != nil {
                             Text(row.lastDate!.formatted(.dateTime.month().day()))
                                 .font(.system(size: 10, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.4))
+                                .foregroundStyle(.primary.opacity(0.4))
                         }
                     }
                     .padding(.vertical, 2)
@@ -1020,18 +1020,18 @@ private struct PetBentoGrid: View {
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
                     Text(String(format: "%.1f", w.weight))
                         .font(.system(size: 32, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Text("kg").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.goTeal)
                 }
             } else {
-                Text("--").font(.system(size: 32, weight: .black, design: .rounded)).foregroundStyle(.white.opacity(0.3))
+                Text("--").font(.system(size: 32, weight: .black, design: .rounded)).foregroundStyle(.primary.opacity(0.3))
             }
             if showingAddWeight {
                 HStack(spacing: 8) {
                     TextField("0.0", text: $quickWeightInput)
                         .keyboardType(.decimalPad)
                         .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .padding(.horizontal, 10).padding(.vertical, 6)
                         .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
                     Button {
@@ -1068,12 +1068,12 @@ private struct PetBentoGrid: View {
                 .foregroundStyle(Color.goYellow)
             Text("¥\(Int(monthTotal))")
                 .font(.system(size: 26, weight: .black, design: .rounded))
-                .foregroundStyle(.white).minimumScaleFactor(0.6).lineLimit(1)
+                .foregroundStyle(.primary).minimumScaleFactor(0.6).lineLimit(1)
             Text("本月")
-                .font(.system(size: 10, weight: .medium)).foregroundStyle(.white.opacity(0.35))
+                .font(.system(size: 10, weight: .medium)).foregroundStyle(.primary.opacity(0.35))
             Spacer()
             Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold)).foregroundStyle(.white.opacity(0.2))
+                .font(.system(size: 11, weight: .semibold)).foregroundStyle(.primary.opacity(0.2))
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(14)
@@ -1094,19 +1094,19 @@ private struct PetBentoGrid: View {
             if let w = lastWalk {
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("距离").font(.system(size: 9, weight: .semibold)).foregroundStyle(.white.opacity(0.4))
-                        Text(w.distanceText).font(.system(size: 18, weight: .black, design: .rounded)).foregroundStyle(.white)
+                        Text("距离").font(.system(size: 9, weight: .semibold)).foregroundStyle(.primary.opacity(0.4))
+                        Text(w.distanceText).font(.system(size: 18, weight: .black, design: .rounded)).foregroundStyle(.primary)
                     }
                     Rectangle().fill(.white.opacity(0.1)).frame(width: 1, height: 28)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("时长").font(.system(size: 9, weight: .semibold)).foregroundStyle(.white.opacity(0.4))
-                        Text(w.durationText).font(.system(size: 18, weight: .black, design: .rounded)).foregroundStyle(.white)
+                        Text("时长").font(.system(size: 9, weight: .semibold)).foregroundStyle(.primary.opacity(0.4))
+                        Text(w.durationText).font(.system(size: 18, weight: .black, design: .rounded)).foregroundStyle(.primary)
                     }
                 }
             } else {
-                Text("暂无记录").font(.system(size: 13, weight: .medium)).foregroundStyle(.white.opacity(0.3))
+                Text("暂无记录").font(.system(size: 13, weight: .medium)).foregroundStyle(.primary.opacity(0.3))
             }
-            Text("\(pet.walkLogs.count) 次巡岛").font(.system(size: 10, weight: .medium)).foregroundStyle(.white.opacity(0.3))
+            Text("\(pet.walkLogs.count) 次巡岛").font(.system(size: 10, weight: .medium)).foregroundStyle(.primary.opacity(0.3))
         }
         .padding(14)
         .background(LinearGradient(colors: [Color.goLime.opacity(0.1), .clear], startPoint: .topLeading, endPoint: .bottomTrailing),
@@ -1121,13 +1121,13 @@ private struct PetBentoGrid: View {
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.goOrange)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text("\(todayPotty)").font(.system(size: 28, weight: .black, design: .rounded)).foregroundStyle(.white)
+                Text("\(todayPotty)").font(.system(size: 28, weight: .black, design: .rounded)).foregroundStyle(.primary)
                 Text("次").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.goOrange)
             }
-            Text("今日").font(.system(size: 10, weight: .medium)).foregroundStyle(.white.opacity(0.35))
+            Text("今日").font(.system(size: 10, weight: .medium)).foregroundStyle(.primary.opacity(0.35))
             Spacer()
             Image(systemName: "chevron.right")
-                .font(.system(size: 11)).foregroundStyle(.white.opacity(0.2))
+                .font(.system(size: 11)).foregroundStyle(.primary.opacity(0.2))
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(14)
@@ -1156,9 +1156,9 @@ private struct PetBentoGrid: View {
                     Spacer()
                     Text("\(pet.remainingFoodDays) 天")
                 }
-                .font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.4))
+                .font(.system(size: 11, weight: .medium)).foregroundStyle(.primary.opacity(0.4))
             } else {
-                Text("未设置粮食库存").font(.system(size: 12, weight: .medium)).foregroundStyle(.white.opacity(0.3))
+                Text("未设置粮食库存").font(.system(size: 12, weight: .medium)).foregroundStyle(.primary.opacity(0.3))
             }
         }
         .padding(14)
@@ -1212,19 +1212,19 @@ private struct PetUnifiedTimeline: View {
             HStack {
                 Text("岁月史书")
                     .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
                     .tracking(2)
                 Spacer()
                 Text("\(items.count) 条")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.25))
+                    .foregroundStyle(.primary.opacity(0.25))
             }
             .padding(.bottom, 16)
 
             if items.isEmpty {
                 Text("还没有任何记录")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 24)
             } else {
@@ -1250,16 +1250,16 @@ private struct PetUnifiedTimeline: View {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(item.title)
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                             if !item.subtitle.isEmpty {
                                 Text(item.subtitle)
                                     .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.4))
+                                    .foregroundStyle(.primary.opacity(0.4))
                                     .lineLimit(1)
                             }
                             Text(item.date, format: .dateTime.year().month().day().hour().minute())
                                 .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.25))
+                                .foregroundStyle(.primary.opacity(0.25))
                         }
                         .padding(.top, 6)
                         .padding(.bottom, idx < items.count - 1 ? 16 : 0)
@@ -1359,12 +1359,12 @@ private struct DietCardWithQuickActions: View {
                     Text("🍽️").font(.system(size: 14))
                     Text("饮食排泄")
                         .font(.system(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .lineLimit(1)
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(.primary.opacity(0.3))
                 }
             }
             .buttonStyle(.plain)
@@ -1434,7 +1434,7 @@ private struct DietCardWithQuickActions: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(label)
                     .font(.system(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text(countLabel)
                     .font(.system(size: 10))
                     .foregroundStyle(accent)

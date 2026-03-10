@@ -148,11 +148,11 @@ struct CoconutDropSheet: View {
                 VStack(spacing: 12) {
                     Text(revealed ? "今日盲盒已开启！" : "敲开你的椰子")
                         .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
 
                     Text(revealed ? reward.text : "完成所有委托换取的神秘礼物")
                         .font(.system(size: 15, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(.primary.opacity(0.6))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 40)
                 }
@@ -252,7 +252,7 @@ struct DailyQuestsCard: View {
                 .font(.system(size: 22))
             Text("今日岛屿委托已全部完成")
                 .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(.primary.opacity(0.6))
             Spacer()
             Image(systemName: "checkmark.seal.fill")
                 .font(.system(size: 18))
@@ -274,7 +274,7 @@ struct DailyQuestsCard: View {
                         .font(.system(size: 14, weight: .bold))
                     Text("今日岛屿委托")
                         .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                 }
                 Spacer()
                 // 进度 pill
@@ -365,7 +365,7 @@ struct DailyQuestsCard: View {
                     .strikethrough(quest.isCompleted, color: .white.opacity(0.3))
                 Text(quest.subtitle)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
             }
             Spacer()
             if quest.isCompleted {

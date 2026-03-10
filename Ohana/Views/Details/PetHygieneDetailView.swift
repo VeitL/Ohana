@@ -123,14 +123,14 @@ struct PetHygieneDetailView: View {
                     }
                     Text(type.rawValue)
                         .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(.primary.opacity(0.7))
                     if let d = days {
                         Text(d == 0 ? "今天" : "\(d)天前")
                             .font(.system(size: 8, weight: .semibold))
                             .foregroundStyle(color)
                     } else {
                         Text("未记录")
-                            .font(.system(size: 8)).foregroundStyle(.white.opacity(0.3))
+                            .font(.system(size: 8)).foregroundStyle(.primary.opacity(0.3))
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -163,7 +163,7 @@ struct PetHygieneDetailView: View {
                 Text(type.emoji).font(.system(size: 16))
                 Text(type.rawValue)
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Spacer()
                 // 状态胶囊
                 if let d = days {
@@ -175,7 +175,7 @@ struct PetHygieneDetailView: View {
                 } else {
                     Text("未记录")
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(.primary.opacity(0.3))
                         .padding(.horizontal, 7).padding(.vertical, 3)
                         .background(.white.opacity(0.05), in: Capsule())
                 }
@@ -190,7 +190,7 @@ struct PetHygieneDetailView: View {
                     if doneToday {
                         Image(systemName: "checkmark")
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.45))
+                            .foregroundStyle(.primary.opacity(0.45))
                             .padding(.horizontal, 10).padding(.vertical, 5)
                             .background(.white.opacity(0.07), in: Capsule())
                     } else {
@@ -218,7 +218,7 @@ struct PetHygieneDetailView: View {
                     AxisMarks(values: .stride(by: .day)) { _ in
                         AxisValueLabel(format: .dateTime.weekday(.narrow))
                             .font(.system(size: 9))
-                            .foregroundStyle(.white.opacity(0.35))
+                            .foregroundStyle(.primary.opacity(0.35))
                     }
                 }
                 .chartYAxis(.hidden)
@@ -232,11 +232,11 @@ struct PetHygieneDetailView: View {
                         HStack {
                             Text(log.date, format: .dateTime.month().day().hour().minute())
                                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.45))
+                                .foregroundStyle(.primary.opacity(0.45))
                             Spacer()
                             Button { modelContext.delete(log); modelContext.safeSave() } label: {
                                 Image(systemName: "trash").font(.system(size: 10))
-                                    .foregroundStyle(.white.opacity(0.2))
+                                    .foregroundStyle(.primary.opacity(0.2))
                             }
                         }
                         .padding(.vertical, 4)
@@ -311,7 +311,7 @@ struct PetHygieneDetailView: View {
                 .chartXAxis {
                     AxisMarks(values: .stride(by: .day)) { _ in
                         AxisValueLabel(format: .dateTime.weekday(.narrow))
-                            .font(.system(size: 9)).foregroundStyle(.white.opacity(0.4))
+                            .font(.system(size: 9)).foregroundStyle(.primary.opacity(0.4))
                     }
                 }
                 .chartYAxis(.hidden)
@@ -349,7 +349,7 @@ struct PetHygieneDetailView: View {
                             Text("镐屎打卡")
                                 .font(.system(size: 12, weight: .black, design: .rounded))
                         }
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .padding(.horizontal, 14).padding(.vertical, 8)
                         .background(Color(hex: "AA96DA"), in: Capsule())
                     }
@@ -363,10 +363,10 @@ struct PetHygieneDetailView: View {
                 HStack {
                     Text("💩").font(.system(size: 13))
                     Text(log.date, format: .dateTime.month().day().hour().minute())
-                        .font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+                        .font(.system(size: 12, weight: .semibold)).foregroundStyle(.primary)
                     Spacer()
                     Button { modelContext.delete(log); modelContext.safeSave() } label: {
-                        Image(systemName: "trash").font(.system(size: 11)).foregroundStyle(.white.opacity(0.3))
+                        Image(systemName: "trash").font(.system(size: 11)).foregroundStyle(.primary.opacity(0.3))
                     }
                 }
                 .padding(.vertical, 2)
@@ -380,8 +380,8 @@ struct PetHygieneDetailView: View {
     private func statCell(emoji: String, value: String, label: String, color: Color) -> some View {
         VStack(spacing: 4) {
             Text(emoji).font(.system(size: 20))
-            Text(value).font(.system(size: 22, weight: .black, design: .rounded)).foregroundStyle(.white)
-            Text(label).font(.system(size: 10, weight: .medium)).foregroundStyle(.white.opacity(0.4))
+            Text(value).font(.system(size: 22, weight: .black, design: .rounded)).foregroundStyle(.primary)
+            Text(label).font(.system(size: 10, weight: .medium)).foregroundStyle(.primary.opacity(0.4))
         }
         .frame(maxWidth: .infinity).padding(.vertical, 12)
         .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))

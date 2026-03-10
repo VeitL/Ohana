@@ -38,7 +38,7 @@ struct WalkTrackingCard: View {
                         .foregroundStyle(Color.goYellow)
                     Text("开启「始终允许」定位，后台路线追踪更完整")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.85))
+                        .foregroundStyle(.primary.opacity(0.85))
                     Spacer()
                     Button {
                         locationMgr.upgradeToAlways()
@@ -55,7 +55,7 @@ struct WalkTrackingCard: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                     }
                     .buttonStyle(.plain)
                 }
@@ -231,7 +231,7 @@ struct WalkTrackingCard: View {
                 } label: {
                     Image(systemName: "stop.fill")
                         .font(.system(size: 12))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .frame(width: 32, height: 32)
                         .background(Color.goRed, in: Circle())
                 }
@@ -254,7 +254,7 @@ struct WalkTrackingCard: View {
                 } label: {
                     Image(systemName: "stop.fill")
                         .font(.system(size: 12))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .frame(width: 32, height: 32)
                         .background(Color.goRed, in: Circle())
                 }
@@ -300,7 +300,7 @@ struct WalkTrackingCard: View {
             if mgr.poopCount > 0 {
                 Text("\(mgr.poopCount)")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .frame(width: 16, height: 16)
                     .background(.orange, in: Circle())
                     .offset(x: 4, y: -4)
@@ -327,10 +327,10 @@ struct WalkTrackingCard: View {
                         VStack(spacing: 6) {
                             Image(systemName: "map")
                                 .font(.system(size: 26))
-                                .foregroundStyle(.white.opacity(0.25))
+                                .foregroundStyle(.primary.opacity(0.25))
                             Text("无记录")
                                 .font(.system(size: 10, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.2))
+                                .foregroundStyle(.primary.opacity(0.2))
                         }
                     }
                     if lastWalk != nil {
@@ -360,7 +360,7 @@ struct WalkTrackingCard: View {
                          ? String(format: "%.1f km", LocationManager.shared.totalDistance / 1000)
                          : String(format: "%.0f m", LocationManager.shared.totalDistance))
                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                 }
             }
         }

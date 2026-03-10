@@ -54,7 +54,7 @@ struct GenericWeightEntrySheet: View {
                 HStack {
                     Text("记录体重")
                         .font(.system(size: 18, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Spacer()
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
@@ -71,7 +71,7 @@ struct GenericWeightEntrySheet: View {
                         .keyboardType(.decimalPad)
                         .focused($inputFocused)
                         .font(.system(size: 42, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .minimumScaleFactor(0.5)
                     Text("kg")
                         .font(.system(size: 24, weight: .black, design: .rounded))
@@ -85,10 +85,10 @@ struct GenericWeightEntrySheet: View {
                         HStack(spacing: 6) {
                             Image(systemName: "person.fill")
                                 .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.4))
+                                .foregroundStyle(.primary.opacity(0.4))
                             Text("谁记录的")
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.4))
+                                .foregroundStyle(.primary.opacity(0.4))
                         }
                         .padding(.horizontal, 20)
                         
@@ -154,10 +154,10 @@ struct GenericWeightEntrySheet: View {
                 HStack(spacing: 10) {
                     Image(systemName: "calendar")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                     Text("日期")
                         .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Spacer()
                     DatePicker("", selection: $selectedDate, in: ...Date(), displayedComponents: .date)
                         .datePickerStyle(.compact)
@@ -173,10 +173,10 @@ struct GenericWeightEntrySheet: View {
                 HStack(spacing: 10) {
                     Image(systemName: "scalemass.fill")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                     Text(entityName)
                         .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Spacer()
                     avatarView
                 }

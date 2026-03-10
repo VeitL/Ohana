@@ -37,17 +37,17 @@ struct ImageCutoutPreviewSheet: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("选择头像样式")
                             .font(.system(size: 18, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Text("点击任意一张完成选择")
                             .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.45))
+                            .foregroundStyle(.primary.opacity(0.45))
                     }
                     Spacer()
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 24))
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                     }
                 }
                 .padding(.horizontal, 24)
@@ -93,14 +93,14 @@ struct ImageCutoutPreviewSheet: View {
                 if !isProcessing && cutoutImage == nil {
                     Label("无法识别主体，仅提供原图", systemImage: "exclamationmark.triangle")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                         .padding(.bottom, 8)
                 }
 
                 // ── 说明文字
                 Text("选择「去除背景」后，卡片正面将显示带白色描边的贴纸效果。")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
                     .padding(.bottom, 24)
@@ -159,7 +159,7 @@ struct ImageCutoutPreviewSheet: View {
             }
             Text(sublabel)
                 .font(.system(size: 10, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(.primary.opacity(0.4))
         }
     }
 
@@ -176,7 +176,7 @@ struct ImageCutoutPreviewSheet: View {
                         .scaleEffect(1.2)
                     Text("AI 智能抠图中…")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.primary.opacity(0.5))
                 }
             }
             .frame(maxWidth: .infinity)
@@ -189,10 +189,10 @@ struct ImageCutoutPreviewSheet: View {
 
             Text("去除背景")
                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.primary.opacity(0.5))
             Text("处理中…")
                 .font(.system(size: 10, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(.primary.opacity(0.3))
         }
     }
 
@@ -204,10 +204,10 @@ struct ImageCutoutPreviewSheet: View {
                 VStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.system(size: 28))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(.primary.opacity(0.3))
                     Text("无法抠图")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                 }
             }
             .frame(maxWidth: .infinity)
@@ -220,10 +220,10 @@ struct ImageCutoutPreviewSheet: View {
 
             Text("去除背景")
                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(.primary.opacity(0.3))
             Text("识别失败")
                 .font(.system(size: 10, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.25))
+                .foregroundStyle(.primary.opacity(0.25))
         }
     }
 

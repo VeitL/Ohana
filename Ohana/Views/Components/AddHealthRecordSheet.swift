@@ -70,7 +70,7 @@ struct AddHealthRecordSheet: View {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(pet.name)
                                     .font(.system(size: 17, weight: .black, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                                 Text(typeLabel)
                                     .font(.system(size: 13, weight: .medium))
                                     .foregroundStyle(Color.goTeal)
@@ -91,7 +91,7 @@ struct AddHealthRecordSheet: View {
                                         .frame(width: 22)
                                     TextField("名称（如：狂犬疫苗三联苗）", text: $name)
                                         .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(.primary)
                                 }
                             }
                         }
@@ -102,7 +102,7 @@ struct AddHealthRecordSheet: View {
                                 .datePickerStyle(.compact)
                                 .tint(Color.goLime)
                                 .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                         }
 
                         // 有效期（疫苗/驱虫才显示）
@@ -112,7 +112,7 @@ struct AddHealthRecordSheet: View {
                                     HStack {
                                         Text("设置有效期")
                                             .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                            .foregroundStyle(.white)
+                                            .foregroundStyle(.primary)
                                         Spacer()
                                         Toggle("", isOn: $hasExpiration)
                                             .tint(Color.goLime)
@@ -123,7 +123,7 @@ struct AddHealthRecordSheet: View {
                                             .datePickerStyle(.compact)
                                             .tint(Color.goYellow)
                                             .font(.system(size: 14, weight: .medium, design: .rounded))
-                                            .foregroundStyle(.white.opacity(0.8))
+                                            .foregroundStyle(.primary.opacity(0.8))
                                     }
                                 }
                             }
@@ -136,7 +136,7 @@ struct AddHealthRecordSheet: View {
                                     HStack {
                                         Text("下次体检提醒")
                                             .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                            .foregroundStyle(.white)
+                                            .foregroundStyle(.primary)
                                         Spacer()
                                         Toggle("", isOn: $hasNextCheckup)
                                             .tint(Color.goTeal)
@@ -147,7 +147,7 @@ struct AddHealthRecordSheet: View {
                                             .datePickerStyle(.compact)
                                             .tint(Color.goTeal)
                                             .font(.system(size: 14, weight: .medium, design: .rounded))
-                                            .foregroundStyle(.white.opacity(0.8))
+                                            .foregroundStyle(.primary.opacity(0.8))
                                     }
                                 }
                             }
@@ -162,7 +162,7 @@ struct AddHealthRecordSheet: View {
                                     .frame(width: 22)
                                 TextField("医生 / 诊所（可选）", text: $vetName)
                                     .font(.system(size: 15, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                             }
                         }
 
@@ -176,7 +176,7 @@ struct AddHealthRecordSheet: View {
                                 TextField("费用（可选）", text: $cost)
                                     .keyboardType(.decimalPad)
                                     .font(.system(size: 15, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                             }
                         }
 
@@ -185,12 +185,12 @@ struct AddHealthRecordSheet: View {
                             HStack(alignment: .top) {
                                 Image(systemName: "note.text")
                                     .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(.white.opacity(0.4))
+                                    .foregroundStyle(.primary.opacity(0.4))
                                     .frame(width: 22)
                                     .padding(.top, 2)
                                 TextField("备注 / 笔记（可选）", text: $note, axis: .vertical)
                                     .font(.system(size: 15, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                                     .lineLimit(3...6)
                             }
                         }
@@ -216,7 +216,7 @@ struct AddHealthRecordSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(.primary.opacity(0.6))
                 }
             }
             .onAppear {

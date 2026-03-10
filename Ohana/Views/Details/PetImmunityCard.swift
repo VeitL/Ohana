@@ -18,7 +18,7 @@ struct PetImmunityCard: View {
                     .foregroundStyle(Color.goCardCyan)
                 Text("免疫健康")
                     .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Spacer()
                 let urgentCount = upcomingCount
                 if urgentCount > 0 {
@@ -101,15 +101,15 @@ struct PetImmunityCard: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(row.title)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 if let last = row.lastDate {
                     Text("上次: \(last, style: .date)")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                 } else {
                     Text("尚未记录")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(.primary.opacity(0.3))
                 }
             }
             Spacer()
@@ -129,7 +129,7 @@ struct PetImmunityCard: View {
                 } else if let due = row.nextDueDate {
                     Text(due, style: .date)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(.primary.opacity(0.3))
                 }
             }
         }

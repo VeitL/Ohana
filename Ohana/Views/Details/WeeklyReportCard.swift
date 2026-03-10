@@ -51,11 +51,11 @@ struct WeeklyReportCard: View {
                     .foregroundStyle(Color.goPrimary)
                 Text("本周小报")
                     .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Spacer()
                 Text("\(weekStart, format: .dateTime.month().day()) - \(weekEnd, format: .dateTime.month().day())")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
                 Button {
                     Task { await renderAndShare() }
                 } label: {
@@ -204,7 +204,7 @@ struct WeeklyReportCard: View {
                 Spacer()
                 Text("\(weekStart, format: .dateTime.month().day()) — \(weekEnd, format: .dateTime.month().day())")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
@@ -226,10 +226,10 @@ struct WeeklyReportCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(pet.name)
                         .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Text("本周战绩")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                 }
                 Spacer()
                 // 活跃天数大字
@@ -243,7 +243,7 @@ struct WeeklyReportCard: View {
                         .foregroundStyle(Color.goLime)
                     Text("活跃天")
                         .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                 }
             }
             .padding(.horizontal, 20)
@@ -271,7 +271,7 @@ struct WeeklyReportCard: View {
                             .frame(height: 20)
                         Text(d, format: .dateTime.weekday(.narrow))
                             .font(.system(size: 8, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.3))
+                            .foregroundStyle(.primary.opacity(0.3))
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -284,7 +284,7 @@ struct WeeklyReportCard: View {
                 Spacer()
                 Text("Made with Ohana 🏝️")
                     .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.18))
+                    .foregroundStyle(.primary.opacity(0.18))
             }
             .padding(.horizontal, 20)
             .padding(.top, 12)
@@ -308,11 +308,11 @@ struct WeeklyReportCard: View {
             Text(emoji).font(.system(size: 18))
             Text(value)
                 .font(.system(size: 15, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .lineLimit(1).minimumScaleFactor(0.7)
             Text(label)
                 .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(.primary.opacity(0.4))
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)

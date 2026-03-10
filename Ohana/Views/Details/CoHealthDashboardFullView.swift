@@ -97,10 +97,10 @@ struct CoHealthDashboardFullView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(human.name + " × 毛孩子")
                         .font(.system(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Text("人宠共健报告")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                 }
                 Spacer()
                 Text("🏃").font(.system(size: 36))
@@ -138,7 +138,7 @@ struct CoHealthDashboardFullView: View {
                             if let s = val.as(String.self) {
                                 Text(s)
                                     .font(.system(size: 9, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.4))
+                                    .foregroundStyle(.primary.opacity(0.4))
                             }
                         }
                     }
@@ -149,7 +149,7 @@ struct CoHealthDashboardFullView: View {
                             if let v = val.as(Double.self) {
                                 Text(String(format: "%.1f", v))
                                     .font(.system(size: 8, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.3))
+                                    .foregroundStyle(.primary.opacity(0.3))
                             }
                         }
                     }
@@ -208,11 +208,11 @@ struct CoHealthDashboardFullView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(pet.name)
                             .font(.system(size: 14, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         if let w = pet.weightLogs.sorted(by: { $0.date > $1.date }).first?.weight {
                             Text("最新体重 \(String(format: "%.1f", w)) kg")
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(.primary.opacity(0.5))
                         }
                     }
                     Spacer()
@@ -224,7 +224,7 @@ struct CoHealthDashboardFullView: View {
                         Text(String(format: "%.1f km", monthWalk))
                             .font(.system(size: 16, weight: .black, design: .rounded))
                             .foregroundStyle(Color.goLime)
-                        Text("本月同行").font(.system(size: 9)).foregroundStyle(.white.opacity(0.3))
+                        Text("本月同行").font(.system(size: 9)).foregroundStyle(.primary.opacity(0.3))
                     }
                 }
             }
@@ -237,13 +237,13 @@ struct CoHealthDashboardFullView: View {
     private func sectionTitle(_ t: String) -> some View {
         Text(t)
             .font(.system(size: 14, weight: .black, design: .rounded))
-            .foregroundStyle(.white)
+            .foregroundStyle(.primary)
     }
 
     private func emptyLabel(_ t: String) -> some View {
         Text(t)
             .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(.white.opacity(0.3))
+            .foregroundStyle(.primary.opacity(0.3))
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 24)
     }

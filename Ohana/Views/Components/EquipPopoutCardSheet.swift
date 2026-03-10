@@ -38,10 +38,10 @@ struct EquipPopoutCardSheet: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("激活 3D 破框卡片")
                             .font(.system(size: 20, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Text(pet.name)
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.45))
+                            .foregroundStyle(.primary.opacity(0.45))
                     }
                     Spacer()
                     Button { dismiss() } label: {
@@ -69,7 +69,7 @@ struct EquipPopoutCardSheet: View {
                                     .foregroundStyle(Color.goLime)
                                 Text("当前已激活破框风格")
                                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.7))
+                                    .foregroundStyle(.primary.opacity(0.7))
                             }
                             .padding(.horizontal, 14).padding(.vertical, 10)
                             .background(Color.goLime.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
@@ -86,7 +86,7 @@ struct EquipPopoutCardSheet: View {
                             } label: {
                                 Text("恢复默认风格")
                                     .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.35))
+                                    .foregroundStyle(.primary.opacity(0.35))
                             }
                             .padding(.top, 4)
                         }
@@ -105,7 +105,7 @@ struct EquipPopoutCardSheet: View {
                             .foregroundStyle(Color.goOrange)
                         Text("剪贴板没有图片，请先在相册长按宠物并拷贝")
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                     }
                     .padding(.horizontal, 16).padding(.vertical, 12)
                     .background(Color.goDarkBlue, in: RoundedRectangle(cornerRadius: 14))
@@ -164,7 +164,7 @@ struct EquipPopoutCardSheet: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("✨ 3D 破框悬浮效果")
                     .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 VStack(alignment: .leading, spacing: 4) {
                     guideStep("1", "打开系统相册，找到宠物照片")
                     guideStep("2", "长按宠物主体，点击「拷贝」（iOS 自动抠图）")
@@ -258,7 +258,7 @@ struct EquipPopoutCardSheet: View {
                 .background(Color.goLime, in: Circle())
             Text(text)
                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.65))
+                .foregroundStyle(.primary.opacity(0.65))
             Spacer()
         }
     }

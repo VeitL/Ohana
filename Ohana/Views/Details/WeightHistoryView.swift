@@ -64,12 +64,12 @@ struct WeightHistoryView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("体重趋势")
                         .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     if let latest = sortedLogs.first {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             Text(String(format: "%.1f", latest.weight))
                                 .font(.system(size: 44, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                             Text("kg")
                                 .font(.system(size: 18, weight: .bold))
                                 .foregroundStyle(Color.goTeal)
@@ -127,13 +127,13 @@ struct WeightHistoryView: View {
                         Text(l.date, format: .dateTime.month(.abbreviated).day())
                     }
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
                     .padding(.horizontal, 24)
                 }
             } else {
                 Text("记录 2 条以上体重后可显示趋势图")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 40)
             }

@@ -55,17 +55,17 @@ struct AddPlantView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("浇水周期")
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(.primary.opacity(0.6))
                         Stepper("每 \(wateringInterval) 天", value: $wateringInterval, in: 1...90)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                     }
                     
                     VStack(alignment: .leading, spacing: 8) {
                         Text("施肥周期")
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(.primary.opacity(0.6))
                         Stepper("每 \(fertilizingInterval) 天", value: $fertilizingInterval, in: 1...365)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                     }
                 }
                 .padding(.horizontal, 24)
@@ -88,10 +88,10 @@ struct AddPlantView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(.primary.opacity(0.6))
             TextField(placeholder, text: text)
                 .textFieldStyle(.plain)
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .padding(12)
                 .ohanaGlassStyle(cornerRadius: 12)
         }

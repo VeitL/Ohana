@@ -84,7 +84,7 @@ struct GlobalWalkBanner: View {
                 }
                 Image(systemName: "figure.walk")
                     .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
             }
         }
         .frame(width: 64, height: 64)
@@ -134,14 +134,14 @@ struct GlobalWalkBanner: View {
                         }
                         Text(pet.name)
                             .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                     }
                 }
                 Spacer()
                 Button { withAnimation { isMinimized = true } } label: {
                     Image(systemName: "minus.circle.fill")
                         .font(.system(size: 22))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                 }
             }
             .padding(.horizontal, 20).padding(.top, 18)
@@ -154,7 +154,7 @@ struct GlobalWalkBanner: View {
                     TimelineView(.periodic(from: .now, by: 1)) { _ in
                         Text(formatElapsed(mgr.elapsedTime))
                             .font(.system(size: 26, weight: .black, design: .monospaced))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                     }
                 }
                 Rectangle().fill(.white.opacity(0.1)).frame(width: 1, height: 40)
@@ -162,7 +162,7 @@ struct GlobalWalkBanner: View {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text(String(format: "%.2f", LocationManager.shared.totalDistance / 1000))
                             .font(.system(size: 26, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Text("km").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.goTeal)
                     }
                 }
@@ -171,7 +171,7 @@ struct GlobalWalkBanner: View {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text("\(mgr.poopCount)")
                             .font(.system(size: 26, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Text("💩").font(.system(size: 14))
                     }
                 }
@@ -218,7 +218,7 @@ struct GlobalWalkBanner: View {
                 } label: {
                     Label("结束", systemImage: "stop.fill")
                         .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .frame(maxWidth: .infinity).padding(.vertical, 13)
                         .background(Color.goRed, in: RoundedRectangle(cornerRadius: 14))
                 }
@@ -255,7 +255,7 @@ struct GlobalWalkBanner: View {
                             .foregroundStyle(Color.goLime)
                         Text(pet.name)
                             .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                     }
                 }
                 Spacer()
@@ -270,7 +270,7 @@ struct GlobalWalkBanner: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 28))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(.primary.opacity(0.7))
                 }
                 .frame(width: 52, height: 52)
                 .contentShape(Rectangle())
@@ -297,7 +297,7 @@ struct GlobalWalkBanner: View {
                                     Text("在地图中查看")
                                         .font(.system(size: 11, weight: .bold, design: .rounded))
                                 }
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                                 .padding(.horizontal, 10).padding(.vertical, 5)
                                 .background(.black.opacity(0.45), in: Capsule())
                                 .padding(8),
@@ -311,8 +311,8 @@ struct GlobalWalkBanner: View {
                         .frame(maxWidth: .infinity).frame(height: 80)
                         .overlay(
                             HStack(spacing: 6) {
-                                Image(systemName: "map").font(.system(size: 20)).foregroundStyle(.white.opacity(0.2))
-                                Text("地图生成中…").font(.system(size: 12)).foregroundStyle(.white.opacity(0.3))
+                                Image(systemName: "map").font(.system(size: 20)).foregroundStyle(.primary.opacity(0.2))
+                                Text("地图生成中…").font(.system(size: 12)).foregroundStyle(.primary.opacity(0.3))
                             }
                         )
                 }
@@ -362,7 +362,7 @@ struct GlobalWalkBanner: View {
             value()
             Text(label)
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(.primary.opacity(0.4))
         }
         .frame(maxWidth: .infinity)
     }
@@ -372,12 +372,12 @@ struct GlobalWalkBanner: View {
         VStack(spacing: 3) {
             Text(value)
                 .font(.system(size: 18, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Text(label)
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(.primary.opacity(0.4))
         }
         .frame(maxWidth: .infinity)
     }

@@ -32,11 +32,11 @@ struct StreakBadgeView: View {
                         .contentTransition(.numericText())
                     Text("天")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.primary.opacity(0.5))
                 }
                 Text(streakSubtitle)
                     .font(.system(size: 9, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .foregroundStyle(.primary.opacity(0.35))
             }
         }
         .padding(.horizontal, 10).padding(.vertical, 6)

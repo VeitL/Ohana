@@ -39,7 +39,7 @@ struct PlantDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showingEditSheet = true } label: {
                     Image(systemName: "pencil.circle")
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                 }
             }
         }
@@ -79,20 +79,20 @@ struct PlantDetailView: View {
             VStack(spacing: 8) {
                 Text(plant.name)
                     .font(.system(size: 32, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 
                 HStack(spacing: 8) {
                     if !plant.species.isEmpty {
                         Text(plant.species)
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                             .padding(.horizontal, 12).padding(.vertical, 5)
                             .background(.white.opacity(0.18), in: Capsule())
                     }
                     if !plant.location.isEmpty {
                         Text("📍 \(plant.location)")
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                             .padding(.horizontal, 12).padding(.vertical, 5)
                             .background(.white.opacity(0.18), in: Capsule())
                     }
@@ -212,7 +212,7 @@ struct PlantDetailView: View {
                     Text("浇水")
                 }
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .background(Color.blue.opacity(0.6), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -230,7 +230,7 @@ struct PlantDetailView: View {
                     Text("施肥")
                 }
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .background(Color.green.opacity(0.6), in: RoundedRectangle(cornerRadius: 16, style: .continuous))

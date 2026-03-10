@@ -302,10 +302,10 @@ struct PetVetPDFShareSheet: View {
                                 .foregroundStyle(pet.themeColor.color.opacity(0.8))
                             Text("\(pet.name)_兽医档案.pdf")
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(.primary.opacity(0.7))
                             Text("A4 · 兽医健康档案")
                                 .font(.system(size: 11))
-                                .foregroundStyle(.white.opacity(0.35))
+                                .foregroundStyle(.primary.opacity(0.35))
                         }
                     }
                     .padding(.horizontal, 20)

@@ -87,10 +87,10 @@ struct VaccinePassportView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(pet.name)
                     .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text("共 \(vaccineLogs.count) 条疫苗记录")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(.primary.opacity(0.45))
             }
             Spacer()
             Text("💉").font(.system(size: 36))
@@ -105,10 +105,10 @@ struct VaccinePassportView: View {
             Text("💉").font(.system(size: 48))
             Text("还没有疫苗记录")
                 .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(.primary.opacity(0.6))
             Text("点击右上角 + 开始记录第一针疫苗")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(.primary.opacity(0.3))
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -155,7 +155,7 @@ private struct VaccineRow: View {
                     .foregroundStyle(Color.goLime)
                 Text(log.date.formatted(.dateTime.year()))
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .foregroundStyle(.primary.opacity(0.35))
             }
             .frame(width: 42)
 
@@ -169,18 +169,18 @@ private struct VaccineRow: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text(log.note.isEmpty ? "疫苗接种" : log.note)
                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
 
                 HStack(spacing: 10) {
                     if !log.vetName.isEmpty {
                         Label(log.vetName, systemImage: "stethoscope")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                     }
                     if log.cost > 0 {
                         Label(String(format: "¥%.0f", log.cost), systemImage: "yensign.circle")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                     }
                 }
 
@@ -246,7 +246,7 @@ struct AddVaccineSheet: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(pet.name)
                                     .font(.system(size: 16, weight: .black, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                                 Text("添加疫苗记录")
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundStyle(Color.goTeal)
@@ -264,7 +264,7 @@ struct AddVaccineSheet: View {
                                     .foregroundStyle(Color.goCardCyan).frame(width: 22)
                                 TextField("疫苗名称（如：狂犬病疫苗）", text: $vaccineName)
                                     .font(.system(size: 15, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                             }
                         }
 
@@ -274,7 +274,7 @@ struct AddVaccineSheet: View {
                                 .datePickerStyle(.compact)
                                 .tint(Color.goLime)
                                 .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                         }
 
                         // 有效期
@@ -283,7 +283,7 @@ struct AddVaccineSheet: View {
                                 HStack {
                                     Text("设置有效期")
                                         .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(.primary)
                                     Spacer()
                                     Toggle("", isOn: $hasExpiry)
                                         .tint(Color.goLime).labelsHidden()
@@ -294,7 +294,7 @@ struct AddVaccineSheet: View {
                                         .datePickerStyle(.compact)
                                         .tint(Color.goYellow)
                                         .font(.system(size: 14, weight: .medium, design: .rounded))
-                                        .foregroundStyle(.white.opacity(0.8))
+                                        .foregroundStyle(.primary.opacity(0.8))
                                 }
                             }
                         }
@@ -308,7 +308,7 @@ struct AddVaccineSheet: View {
                                             .foregroundStyle(Color.goYellow).frame(width: 22)
                                         Text("到期提醒")
                                             .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                            .foregroundStyle(.white)
+                                            .foregroundStyle(.primary)
                                         Spacer()
                                         Toggle("", isOn: $enableReminder)
                                             .tint(Color.goYellow).labelsHidden()
@@ -317,7 +317,7 @@ struct AddVaccineSheet: View {
                                         HStack(spacing: 8) {
                                             Text("提前")
                                                 .font(.system(size: 13, weight: .medium))
-                                                .foregroundStyle(.white.opacity(0.5))
+                                                .foregroundStyle(.primary.opacity(0.5))
                                             ForEach(reminderOptions, id: \.self) { days in
                                                 Button {
                                                     reminderDaysBefore = days
@@ -347,7 +347,7 @@ struct AddVaccineSheet: View {
                                     .foregroundStyle(Color.goTeal).frame(width: 22)
                                 TextField("医生 / 诊所（可选）", text: $vetName)
                                     .font(.system(size: 15, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                             }
                         }
 
@@ -359,7 +359,7 @@ struct AddVaccineSheet: View {
                                 TextField("费用（可选）", text: $costText)
                                     .keyboardType(.decimalPad)
                                     .font(.system(size: 15, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                             }
                         }
 
@@ -384,7 +384,7 @@ struct AddVaccineSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(.primary.opacity(0.6))
                 }
             }
         }

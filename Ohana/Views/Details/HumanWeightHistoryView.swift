@@ -55,12 +55,12 @@ struct HumanWeightHistoryView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("体重趋势")
                         .font(OhanaFont.title2(.black))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     if let latest = sortedLogs.first {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             Text(String(format: "%.1f", latest.weight))
                                 .font(OhanaFont.metric(size: 44))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                             Text("kg")
                                 .font(OhanaFont.title3(.bold))
                                 .foregroundStyle(Color.goTeal)
@@ -105,13 +105,13 @@ struct HumanWeightHistoryView: View {
                         Text(l.date, format: .dateTime.month(.abbreviated).day())
                     }
                     .font(OhanaFont.caption2())
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
                     .padding(.horizontal, 24)
                 }
             } else {
                 Text("记录 2 条以上体重后可显示趋势图")
                     .font(OhanaFont.subheadline())
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 40)
             }

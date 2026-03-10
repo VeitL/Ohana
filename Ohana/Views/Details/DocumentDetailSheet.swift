@@ -58,11 +58,11 @@ struct DocumentDetailSheet: View {
                             }
                             Text(doc.title.isEmpty ? doc.category : doc.title)
                                 .font(.system(size: 22, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                                 .multilineTextAlignment(.center)
                             Text(doc.category)
                                 .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.4))
+                                .foregroundStyle(.primary.opacity(0.4))
                                 .padding(.horizontal, 12).padding(.vertical, 4)
                                 .background(.white.opacity(0.08), in: Capsule())
                         }
@@ -143,7 +143,7 @@ struct DocumentDetailSheet: View {
                                             .foregroundStyle(Color.goCardCyan)
                                         Text(att.name)
                                             .font(.system(size: 14, weight: .medium))
-                                            .foregroundStyle(.white.opacity(0.7))
+                                            .foregroundStyle(.primary.opacity(0.7))
                                             .lineLimit(1)
                                         Spacer()
                                     }
@@ -173,7 +173,7 @@ struct DocumentDetailSheet: View {
                                     Image(systemName: "xmark.circle.fill")
                                         .font(.system(size: 30))
                                         .symbolRenderingMode(.hierarchical)
-                                        .foregroundStyle(.white).padding(16)
+                                        .foregroundStyle(.primary).padding(16)
                                 }
                             }
                             Spacer()
@@ -189,7 +189,7 @@ struct DocumentDetailSheet: View {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(.primary.opacity(0.6))
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -235,7 +235,7 @@ struct DocumentDetailSheet: View {
                 .frame(width: 22)
             Text(label)
                 .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(.primary.opacity(0.4))
             Spacer()
             Text(value)
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
@@ -253,7 +253,7 @@ struct DocumentDetailSheet: View {
                 .foregroundStyle(Color.goCardCyan)
             Text(title)
                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.primary.opacity(0.5))
         }
     }
 }

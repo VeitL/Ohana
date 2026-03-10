@@ -29,7 +29,7 @@ struct AssigneeChip: View {
                 }
                 Text(h.name)
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(.primary.opacity(0.7))
                     .lineLimit(1)
             }
             .padding(.horizontal, 8).padding(.vertical, 4)

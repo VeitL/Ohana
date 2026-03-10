@@ -36,7 +36,7 @@ struct OverlappingAvatarsView: View {
                         .frame(width: 24, height: 24)
                     Text("+\(emojis.count - maxCount)")
                         .font(.system(size: 8, weight: .black, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(.primary.opacity(0.7))
                 }
                 .offset(x: CGFloat(-maxCount) * 8)
             }
@@ -65,14 +65,14 @@ struct IslandStatCard<Chart: View>: View {
                     .foregroundStyle(accentColor)
                 Text(title)
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.55))
+                    .foregroundStyle(.primary.opacity(0.55))
             }
 
             // 大数字
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(value)
                     .font(.system(size: 34, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .contentTransition(.numericText())
                 if !unit.isEmpty {
                     Text(unit)
@@ -92,7 +92,7 @@ struct IslandStatCard<Chart: View>: View {
                     if !subtitle.isEmpty {
                         Text(subtitle)
                             .font(.system(size: 10, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.3))
+                            .foregroundStyle(.primary.opacity(0.3))
                             .lineLimit(1)
                     }
                     Spacer()
@@ -105,7 +105,7 @@ struct IslandStatCard<Chart: View>: View {
             } else if !subtitle.isEmpty {
                 Text(subtitle)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .foregroundStyle(.primary.opacity(0.35))
                     .lineLimit(2)
             }
         }
@@ -143,7 +143,7 @@ struct MultiPetLineChart: View {
                 if allValues.isEmpty {
                     Text("暂无数据")
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.25))
+                        .foregroundStyle(.primary.opacity(0.25))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ForEach(Array(series.enumerated()), id: \.offset) { _, s in
@@ -259,7 +259,7 @@ struct MiniLineChart: View {
                 } else {
                     Text("暂无数据")
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.25))
+                        .foregroundStyle(.primary.opacity(0.25))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
@@ -299,7 +299,7 @@ struct MiniBarChart: View {
                         if !labels.isEmpty && i < labels.count {
                             Text(labels[i])
                                 .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.3))
+                                .foregroundStyle(.primary.opacity(0.3))
                                 .frame(width: barW)
                         }
                     }
@@ -330,7 +330,7 @@ struct MultiPetExpenseBar: View {
             if series.isEmpty {
                 Text("暂无花费")
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.25))
+                    .foregroundStyle(.primary.opacity(0.25))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 let barCount = series.count
@@ -350,7 +350,7 @@ struct MultiPetExpenseBar: View {
                                 .frame(width: barW, height: barH)
                             Text(name)
                                 .font(.system(size: 7, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.4))
+                                .foregroundStyle(.primary.opacity(0.4))
                                 .frame(width: barW)
                                 .lineLimit(1)
                         }
@@ -534,7 +534,7 @@ struct SynergyFlashCard: View {
                             .foregroundStyle(brief.accentColor)
                         Text("家庭简报")
                             .font(.system(size: 11, weight: .black, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.45))
+                            .foregroundStyle(.primary.opacity(0.45))
                             .tracking(2)
                         Spacer()
                         // 分页点
@@ -556,11 +556,11 @@ struct SynergyFlashCard: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(brief.headline)
                                 .font(.system(size: 16, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                                 .lineLimit(2)
                             Text(brief.subtext)
                                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.45))
+                                .foregroundStyle(.primary.opacity(0.45))
                                 .lineLimit(2)
                         }
                         Spacer(minLength: 0)
@@ -646,19 +646,19 @@ struct CoconutWealthRankingCard: View {
                         .font(.system(size: 14))
                     Text("全岛总资产")
                         .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.primary.opacity(0.5))
                         .tracking(1)
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(.primary.opacity(0.3))
                 }
 
                 // 大数字
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("\(computedTotal)")
                         .font(OhanaFont.metric(size: 36))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .contentTransition(.numericText())
                     Text("🥥")
                         .font(.system(size: 18))
@@ -670,7 +670,7 @@ struct CoconutWealthRankingCard: View {
             if leaderboard.isEmpty {
                 Text("完成打卡即可解锁财富榜 ✨")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
             } else {
                 VStack(spacing: 8) {
                     ForEach(Array(leaderboard.enumerated()), id: \.element.id) { i, entry in
@@ -687,7 +687,7 @@ struct CoconutWealthRankingCard: View {
                             }
                             Text(entry.name)
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                                 .lineLimit(1)
                             Spacer()
                             Text("\(entry.balance) 🥥")

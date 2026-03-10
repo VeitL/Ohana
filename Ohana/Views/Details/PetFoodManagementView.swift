@@ -62,7 +62,7 @@ private struct FoodReminderSheet: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("添加提醒")
                                 .font(.system(size: 22, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                             Text("\(pet.name) · \(prefillType)")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(.secondary)
@@ -89,7 +89,7 @@ private struct FoodReminderSheet: View {
                     HStack {
                         Label("全天", systemImage: "sun.max.fill")
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Spacer()
                         Toggle("", isOn: $isAllDay)
                             .tint(Color.goLime)
@@ -398,7 +398,7 @@ struct PetFoodManagementView: View {
                  ? "只记录大概吃多久，喂食打卡不扣克数 🐾"
                  : "精确追踪库存克数，动态计算剩余天数 📊")
                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.45))
+                .foregroundStyle(.primary.opacity(0.45))
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(14)
@@ -421,7 +421,7 @@ struct PetFoodManagementView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("开包日期")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.primary.opacity(0.5))
                 DatePicker("", selection: $casualOpenDate, displayedComponents: .date)
                     .datePickerStyle(.compact)
                     .labelsHidden()
@@ -436,7 +436,7 @@ struct PetFoodManagementView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("预估能吃多久")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.primary.opacity(0.5))
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(durationOptions, id: \.1) { label, days in
@@ -474,7 +474,7 @@ struct PetFoodManagementView: View {
                             .foregroundStyle(accent)
                         Text(remaining > 0 ? "约剩 \(remaining) 天" : "请尽快补充粮食 🚨")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                     }
                     Spacer()
                 }
@@ -486,7 +486,7 @@ struct PetFoodManagementView: View {
             } else {
                 Text("设置开包日期和预估时长，即可查看耗尽提醒 ✨")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
             }
         }
         .padding(16)
@@ -518,7 +518,7 @@ struct PetFoodManagementView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("粮食品牌")
                             .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(.primary.opacity(0.5))
                         Picker("品牌", selection: $selectedBrand) {
                             ForEach(knownFoodBrands, id: \.self) { brand in
                                 Text(brand).tag(brand)
@@ -535,7 +535,7 @@ struct PetFoodManagementView: View {
                         if selectedBrand == "自定义品牌" {
                             TextField("输入自定义品牌名", text: $customBrandInput)
                                 .font(.system(size: 14, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                                 .padding(.horizontal, 12).padding(.vertical, 8)
                                 .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
                         }
@@ -562,7 +562,7 @@ struct PetFoodManagementView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("支付人")
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(.primary.opacity(0.5))
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 8) {
                                     ForEach(allHumans) { human in
@@ -615,7 +615,7 @@ struct PetFoodManagementView: View {
                     VStack(spacing: 4) {
                         HStack {
                             Text("剩余 \(Int(pet.remainingFoodGrams))g")
-                                .font(.system(size: 12, weight: .medium)).foregroundStyle(.white.opacity(0.5))
+                                .font(.system(size: 12, weight: .medium)).foregroundStyle(.primary.opacity(0.5))
                             Spacer()
                             if let runOut = pet.estimatedRunOutDate {
                                 Text("预计 \(runOut, format: .dateTime.month().day()) 断粮")
@@ -698,10 +698,10 @@ struct PetFoodManagementView: View {
                         TextField("克数", text: $feedGramsInput)
                             .keyboardType(.decimalPad)
                             .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                             .padding(.horizontal, 10).padding(.vertical, 8)
                             .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
-                        Text("g").font(.system(size: 13, weight: .bold)).foregroundStyle(.white.opacity(0.4))
+                        Text("g").font(.system(size: 13, weight: .bold)).foregroundStyle(.primary.opacity(0.4))
                         Button {
                             let g = Double(feedGramsInput.replacingOccurrences(of: ",", with: ".")) ?? 0
                             if g > 0 { quickFeed(grams: g) }
@@ -722,7 +722,7 @@ struct PetFoodManagementView: View {
                                 .font(.system(size: 14)).foregroundStyle(setAsDefault ? Color.goLime : .white.opacity(0.3))
                             Text("设为默认单次喂食量")
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(.primary.opacity(0.5))
                         }
                     }
                     .buttonStyle(.plain)
@@ -736,10 +736,10 @@ struct PetFoodManagementView: View {
                     HStack {
                         Text("🍽️").font(.system(size: 13))
                         Text(log.amountGrams > 0 ? "\(Int(log.amountGrams))g" : "快速打卡")
-                            .font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                            .font(.system(size: 13, weight: .semibold)).foregroundStyle(.primary)
                         Spacer()
                         Text(log.date, style: .time)
-                            .font(.system(size: 11)).foregroundStyle(.white.opacity(0.4))
+                            .font(.system(size: 11)).foregroundStyle(.primary.opacity(0.4))
                     }
                     .padding(.vertical, 2)
                 }
@@ -806,10 +806,10 @@ struct PetFoodManagementView: View {
                         TextField("毫升数", text: $waterMlInput)
                             .keyboardType(.numberPad)
                             .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                             .padding(.horizontal, 10).padding(.vertical, 8)
                             .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
-                        Text("ml").font(.system(size: 13, weight: .bold)).foregroundStyle(.white.opacity(0.4))
+                        Text("ml").font(.system(size: 13, weight: .bold)).foregroundStyle(.primary.opacity(0.4))
                         Button {
                             let ml = Double(waterMlInput) ?? 0
                             if ml > 0 { quickWater(ml: ml) }
@@ -829,7 +829,7 @@ struct PetFoodManagementView: View {
                                 .font(.system(size: 14)).foregroundStyle(setWaterAsDefault ? Color.goLime : .white.opacity(0.3))
                             Text("设为默认加水量")
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(.primary.opacity(0.5))
                         }
                     }
                     .buttonStyle(.plain)
@@ -842,10 +842,10 @@ struct PetFoodManagementView: View {
                     HStack {
                         Text("💧").font(.system(size: 13))
                         Text(log.amountMl > 0 ? "\(Int(log.amountMl)) ml" : "加水")
-                            .font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                            .font(.system(size: 13, weight: .semibold)).foregroundStyle(.primary)
                         Spacer()
                         Text(log.date, style: .time)
-                            .font(.system(size: 11)).foregroundStyle(.white.opacity(0.4))
+                            .font(.system(size: 11)).foregroundStyle(.primary.opacity(0.4))
                     }
                     .padding(.vertical, 2)
                 }
@@ -867,15 +867,15 @@ struct PetFoodManagementView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("喂食历史")
                     .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4)).tracking(2)
+                    .foregroundStyle(.primary.opacity(0.4)).tracking(2)
                 ForEach(feedLogs) { log in
                     HStack {
                         Text("🍽️").font(.system(size: 13))
                         Text(log.amountGrams > 0 ? "\(Int(log.amountGrams))g" : "快速打卡")
-                            .font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                            .font(.system(size: 13, weight: .semibold)).foregroundStyle(.primary)
                         Spacer()
                         Text(log.date, format: .dateTime.month().day().hour().minute())
-                            .font(.system(size: 11)).foregroundStyle(.white.opacity(0.4))
+                            .font(.system(size: 11)).foregroundStyle(.primary.opacity(0.4))
                     }
                     .padding(.vertical, 2)
                 }
@@ -892,7 +892,7 @@ struct PetFoodManagementView: View {
             Text(value)
                 .font(.system(size: 16, weight: .black, design: .rounded))
                 .foregroundStyle(accent).lineLimit(1).minimumScaleFactor(0.6)
-            Text(label).font(.system(size: 10, weight: .medium)).foregroundStyle(.white.opacity(0.35))
+            Text(label).font(.system(size: 10, weight: .medium)).foregroundStyle(.primary.opacity(0.35))
         }
         .frame(maxWidth: .infinity)
     }
@@ -902,9 +902,9 @@ struct PetFoodManagementView: View {
             Image(systemName: icon)
                 .font(.system(size: 13, weight: .semibold)).foregroundStyle(color).frame(width: 20)
             Text(label)
-                .font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(.white.opacity(0.7))
+                .font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(.primary.opacity(0.7))
                 .frame(width: 90, alignment: .leading)
-            field().foregroundStyle(.white)
+            field().foregroundStyle(.primary)
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
         .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))

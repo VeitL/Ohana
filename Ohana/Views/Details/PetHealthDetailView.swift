@@ -131,7 +131,7 @@ struct PetHealthDetailView: View {
                 Button { dismiss() } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 20))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.primary.opacity(0.5))
                 }
             }
         }
@@ -218,13 +218,13 @@ struct PetHealthDetailView: View {
                     }
                     Text(label)
                         .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(.primary.opacity(0.7))
                     if let d = days {
                         Text(d < 0 ? "逾期" : "\(d)天")
                             .font(.system(size: 8, weight: .semibold)).foregroundStyle(color)
                     } else {
                         Text("未记录")
-                            .font(.system(size: 8)).foregroundStyle(.white.opacity(0.3))
+                            .font(.system(size: 8)).foregroundStyle(.primary.opacity(0.3))
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -243,7 +243,7 @@ struct PetHealthDetailView: View {
             ForEach(HealthLogType.allCases, id: \.rawValue) { type in
                 RuleMark(y: .value("类型", type.rawValue))
                     .lineStyle(StrokeStyle(lineWidth: 0.5, dash: [3, 4]))
-                    .foregroundStyle(.white.opacity(0.08))
+                    .foregroundStyle(.primary.opacity(0.08))
             }
             // 每条记录一个散点，直接映射颜色
             ForEach(scatterPoints) { pt in
@@ -260,14 +260,14 @@ struct PetHealthDetailView: View {
             AxisMarks(values: .stride(by: .month, count: 2)) { _ in
                 AxisValueLabel(format: .dateTime.month())
                     .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
             }
         }
         .chartYAxis {
             AxisMarks { _ in
                 AxisValueLabel()
                     .font(.system(size: 9, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.55))
+                    .foregroundStyle(.primary.opacity(0.55))
             }
         }
         .frame(height: 160)
@@ -284,7 +284,7 @@ struct PetHealthDetailView: View {
                             .frame(width: 7, height: 7)
                         Text(type.rawValue)
                             .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(.primary.opacity(0.6))
                     }
                 }
             }
@@ -301,7 +301,7 @@ struct PetHealthDetailView: View {
                 Spacer()
                 Text("最近 12 个月")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
             }
             scatterChart
             trendLegend
@@ -321,7 +321,7 @@ struct PetHealthDetailView: View {
                 Spacer()
                 Text("\(sortedLogs.count) 条")
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(.white.opacity(0.06), in: Capsule())
             }
@@ -331,7 +331,7 @@ struct PetHealthDetailView: View {
                     Text("💉").font(.system(size: 36))
                     Text("暂无健康记录\n点击右上角 + 开始记录")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                         .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity)
@@ -346,15 +346,15 @@ struct PetHealthDetailView: View {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(log.type)
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                             HStack(spacing: 6) {
                                 Text(log.date, format: .dateTime.year().month().day())
                                     .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.4))
+                                    .foregroundStyle(.primary.opacity(0.4))
                                 if !log.note.isEmpty {
                                     Text(log.note)
                                         .font(.system(size: 11))
-                                        .foregroundStyle(.white.opacity(0.4))
+                                        .foregroundStyle(.primary.opacity(0.4))
                                         .lineLimit(1)
                                 }
                             }
@@ -364,13 +364,13 @@ struct PetHealthDetailView: View {
                             if log.cost > 0 {
                                 Text("¥\(Int(log.cost))")
                                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.7))
+                                    .foregroundStyle(.primary.opacity(0.7))
                             }
                             Button {
                                 modelContext.delete(log); modelContext.safeSave()
                             } label: {
                                 Image(systemName: "trash").font(.system(size: 11))
-                                    .foregroundStyle(.white.opacity(0.3))
+                                    .foregroundStyle(.primary.opacity(0.3))
                             }
                         }
                     }
@@ -395,11 +395,11 @@ struct PetHealthDetailView: View {
                     .foregroundStyle(Color.goOrange)
                 Text("健康预警")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.8))
+                    .foregroundStyle(.primary.opacity(0.8))
                 Spacer()
                 Text("\(healthAlerts.count) 条")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .foregroundStyle(.primary.opacity(0.35))
             }
 
             ForEach(healthAlerts.prefix(5)) { alert in
@@ -414,10 +414,10 @@ struct PetHealthDetailView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(alert.title)
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Text(alert.detail)
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.45))
+                            .foregroundStyle(.primary.opacity(0.45))
                             .lineLimit(2)
                     }
                     Spacer()

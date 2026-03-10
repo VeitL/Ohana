@@ -166,7 +166,7 @@ struct IslandExpenseDashboard: View {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .frame(width: 36, height: 36)
                     .background(.white.opacity(0.12), in: Circle())
             }
@@ -174,7 +174,7 @@ struct IslandExpenseDashboard: View {
             Spacer()
             Text("全岛花费")
                 .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
             Spacer()
             Color.clear.frame(width: 36, height: 36)
         }
@@ -195,16 +195,16 @@ struct IslandExpenseDashboard: View {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("¥ ")
                         .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(.primary.opacity(0.6))
                     Text(totalAmount.formatted(.number.precision(.fractionLength(2))))
                         .font(.system(size: 44, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .contentTransition(.numericText())
                         .animation(.spring(response: 0.4), value: totalAmount)
                 }
                 Text("\(timeRange.rawValue == "全部" ? "累计" : "本\(timeRange.rawValue)")花费")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
             }
         }
         .padding(.horizontal, 4)
@@ -236,20 +236,20 @@ struct IslandExpenseDashboard: View {
                     Text("💰")
                     Text("本期吞金兽")
                         .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(.primary.opacity(0.8))
                 }
                 Spacer(minLength: 0)
                 if let top = topPet {
                     Text(top.emoji).font(.system(size: 48))
                     Text(top.name)
                         .font(.system(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .lineLimit(1)
                     Text("¥\(top.total.formatted(.number.precision(.fractionLength(0))))")
                         .font(.title2.bold())
                         .foregroundStyle(Color.goRed)
                 } else {
-                    Text("暂无数据").font(.system(size: 12)).foregroundStyle(.white.opacity(0.3))
+                    Text("暂无数据").font(.system(size: 12)).foregroundStyle(.primary.opacity(0.3))
                 }
             }
             .padding(14)
@@ -273,19 +273,19 @@ struct IslandExpenseDashboard: View {
                     Text("🛍️")
                     Text("消费大头")
                         .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(.primary.opacity(0.8))
                 }
                 Spacer(minLength: 0)
                 if let top = topCategory {
                     Text(top.category.emoji).font(.system(size: 48))
                     Text(top.category.rawValue)
                         .font(.system(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Text("\(Int(top.pct * 100))%")
                         .font(.title2.bold())
                         .foregroundStyle(Color.goCardCyan)
                 } else {
-                    Text("暂无数据").font(.system(size: 12)).foregroundStyle(.white.opacity(0.3))
+                    Text("暂无数据").font(.system(size: 12)).foregroundStyle(.primary.opacity(0.3))
                 }
             }
             .padding(14)
@@ -303,7 +303,7 @@ struct IslandExpenseDashboard: View {
                 Text("🐾").font(.system(size: 14))
                 Text("成员花费对比")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
             }
 
             if petSummaries.isEmpty {
@@ -325,7 +325,7 @@ struct IslandExpenseDashboard: View {
                     Text(summary.emoji).font(.system(size: 16))
                     Text(summary.name)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .frame(width: 50, alignment: .leading)
                         .lineLimit(1)
                     GeometryReader { geo in
@@ -358,7 +358,7 @@ struct IslandExpenseDashboard: View {
                 Text("💳").font(.system(size: 14))
                 Text("谁在买单")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
             }
 
             if humanSummaries.isEmpty {
@@ -371,7 +371,7 @@ struct IslandExpenseDashboard: View {
                             Text(summary.emoji).font(.system(size: 16))
                             Text(summary.name)
                                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                                 .frame(width: 50, alignment: .leading)
                                 .lineLimit(1)
                             GeometryReader { geo in
@@ -409,7 +409,7 @@ struct IslandExpenseDashboard: View {
                 Text("🍩").font(.system(size: 14))
                 Text("消费类目分布")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
             }
 
             if categorySummaries.isEmpty {
@@ -459,11 +459,11 @@ struct IslandExpenseDashboard: View {
                         .frame(width: 8, height: 8)
                     Text(item.category.rawValue)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.75))
+                        .foregroundStyle(.primary.opacity(0.75))
                     Spacer()
                     Text("\(Int(item.pct * 100))%")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.primary.opacity(0.5))
                 }
             }
         }
@@ -485,7 +485,7 @@ struct IslandExpenseDashboard: View {
     private func emptyState(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 13, weight: .medium, design: .rounded))
-            .foregroundStyle(.white.opacity(0.3))
+            .foregroundStyle(.primary.opacity(0.3))
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 28)

@@ -43,11 +43,11 @@ struct PetCareTrackingCard: View {
                             .foregroundStyle(Color.goOrange)
                         Text("日常照料")
                             .font(.system(size: 16, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.3))
+                            .foregroundStyle(.primary.opacity(0.3))
                     }
                 }
                 .buttonStyle(.plain)
@@ -83,7 +83,7 @@ struct PetCareTrackingCard: View {
                 HStack(spacing: 8) {
                     Text("🍚 \(undoLabel) 已记录")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Spacer()
                     Button {
                         if let log = undoLog {
@@ -144,7 +144,7 @@ struct CareTrackingDetailSheet: View {
                     Button { dismiss() } label: {
                         Image(systemName: "chevron.down")
                             .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(.primary.opacity(0.6))
                             .frame(width: 34, height: 34)
                             .background(.white.opacity(0.08), in: Circle())
                     }
@@ -152,10 +152,10 @@ struct CareTrackingDetailSheet: View {
                     VStack(spacing: 2) {
                         Text("日常照料")
                             .font(.system(size: 17, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Text(pet.name)
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                     }
                     Spacer()
                     CoconutBalanceCapsule { showingCoconutLog = true }
@@ -174,10 +174,10 @@ struct CareTrackingDetailSheet: View {
                             Text(type.emoji).font(.system(size: 26))
                             Text("\(todayCount(type))")
                                 .font(.system(size: 28, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                             Text(type.rawValue)
                                 .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.45))
+                                .foregroundStyle(.primary.opacity(0.45))
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
@@ -348,7 +348,7 @@ private struct CareTypeRow: View {
                 HStack(spacing: 6) {
                     Text(type.rawValue)
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Text("今日 \(todayCount) 次")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(Color(hex: type.accentColorHex).opacity(0.8))

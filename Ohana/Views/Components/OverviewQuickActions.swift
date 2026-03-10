@@ -628,10 +628,10 @@ struct QuickFeedSheet: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(pet.name)
                     .font(.system(size: 17, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text(isWater ? "喂水打卡" : (isCasual ? "佛系喂食 🐾" : "精准喂食 📊"))
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(.primary.opacity(0.45))
             }
             Spacer()
             Text(isWater ? "💧" : "🍗").font(.system(size: 30))
@@ -644,11 +644,11 @@ struct QuickFeedSheet: View {
             VStack(spacing: 6) {
                 Text(casualCopyText)
                     .font(.system(size: 22, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .multilineTextAlignment(.center)
                 Text("打卡后获得 +1🥥 椰子奖励")
                     .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 8)
@@ -675,25 +675,25 @@ struct QuickFeedSheet: View {
             VStack(spacing: 8) {
                 Text("输入\(isWater ? "饮水量" : "喂食量")")
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(.primary.opacity(0.6))
                 HStack(spacing: 8) {
                     TextField("默认 \(Int(defaultAmount))", text: $amountText)
                         .keyboardType(.decimalPad)
                         .font(.system(size: 32, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                         .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
                     Text(unit)
                         .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.primary.opacity(0.5))
                         .frame(width: 36)
                 }
                 Toggle(isOn: $setAsDefault) {
                     Text("设为默认\(isWater ? "饮水量" : "每日份量")")
                         .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(.primary.opacity(0.7))
                 }
                 .tint(Color.goLime)
             }

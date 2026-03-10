@@ -25,11 +25,11 @@ struct PetHygieneCard: View {
                         Text("✨").font(.system(size: 14))
                         Text("护理打卡")
                             .font(.system(size: 14, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.3))
+                            .foregroundStyle(.primary.opacity(0.3))
                     }
                 }
                 .buttonStyle(.plain)
@@ -42,7 +42,7 @@ struct PetHygieneCard: View {
                 if recordedTypes.isEmpty {
                     Text("暂无记录")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(.primary.opacity(0.3))
                         .padding(.vertical, 4)
                 } else {
                     let cols = Array(repeating: GridItem(.flexible()), count: min(recordedTypes.count, 5))
@@ -71,7 +71,7 @@ struct PetHygieneCard: View {
                 HStack(spacing: 8) {
                     Text("✨ \(undoLabel) 已打卡")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Spacer()
                     Button {
                         if let log = undoLog {
@@ -142,7 +142,7 @@ private struct HygieneDetailSheet: View {
                     Button { dismiss() } label: {
                         Image(systemName: "chevron.down")
                             .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(.primary.opacity(0.6))
                             .frame(width: 34, height: 34)
                             .background(.white.opacity(0.08), in: Circle())
                     }
@@ -150,10 +150,10 @@ private struct HygieneDetailSheet: View {
                     VStack(spacing: 2) {
                         Text("护理打卡")
                             .font(.system(size: 17, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Text(pet.name)
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                     }
                     Spacer()
                     // 占位保持居中
@@ -183,7 +183,7 @@ private struct HygieneDetailSheet: View {
                             }
                             Text(type.rawValue)
                                 .font(.system(size: 10, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.8))
+                                .foregroundStyle(.primary.opacity(0.8))
                             if let d = days {
                                 Text(d == 0 ? "今天" : "\(d)天前")
                                     .font(.system(size: 9, weight: .semibold))
@@ -191,7 +191,7 @@ private struct HygieneDetailSheet: View {
                             } else {
                                 Text("未记录")
                                     .font(.system(size: 9, weight: .semibold))
-                                    .foregroundStyle(.white.opacity(0.3))
+                                    .foregroundStyle(.primary.opacity(0.3))
                             }
                         }
                         .frame(maxWidth: .infinity)

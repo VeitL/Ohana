@@ -28,7 +28,7 @@ struct AddExpenseSheet: View {
                 HStack {
                     Text("快速记账")
                         .font(.system(size: 18, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Spacer()
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
@@ -47,7 +47,7 @@ struct AddExpenseSheet: View {
                     TextField("0.00", text: $amountInput)
                         .keyboardType(.decimalPad)
                         .font(.system(size: 42, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .minimumScaleFactor(0.5)
                 }
                 .padding(.horizontal, 20)
@@ -58,10 +58,10 @@ struct AddExpenseSheet: View {
                         HStack(spacing: 6) {
                             Image(systemName: "creditcard.fill")
                                 .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.4))
+                                .foregroundStyle(.primary.opacity(0.4))
                             Text("谁付的款")
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.4))
+                                .foregroundStyle(.primary.opacity(0.4))
                         }
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 10) {
@@ -145,10 +145,10 @@ struct AddExpenseSheet: View {
                 HStack(spacing: 10) {
                     Image(systemName: "note.text")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                     TextField("备注（可选）", text: $noteInput)
                         .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                 }
                 .padding(.horizontal, 14).padding(.vertical, 10)
                 .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))

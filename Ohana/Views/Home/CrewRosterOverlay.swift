@@ -90,15 +90,15 @@ struct CrewRosterOverlay: View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(.primary.opacity(0.4))
             TextField("搜索岛民...", text: $searchText)
                 .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .tint(Color.goLime)
             if !searchText.isEmpty {
                 Button { searchText = "" } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.white.opacity(0.35))
+                        .foregroundStyle(.primary.opacity(0.35))
                 }
             }
         }
@@ -161,7 +161,7 @@ struct CrewRosterOverlay: View {
             Text(emoji).font(.system(size: 12))
             Text(title)
                 .font(.system(size: 11, weight: .black, design: .rounded))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(.primary.opacity(0.4))
                 .tracking(2)
             Text("· \(count)")
                 .font(.system(size: 11, weight: .bold, design: .rounded))
@@ -189,7 +189,7 @@ struct CrewRosterOverlay: View {
                         .foregroundStyle(Color.goLime)
                     Text("宠物 · 家人 · 植物")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                 }
                 Spacer()
                 Image(systemName: "arrow.right")
@@ -219,10 +219,10 @@ struct CrewRosterOverlay: View {
             Text("🔍").font(.system(size: 48))
             Text("没有找到岛民")
                 .font(.system(size: 17, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.primary.opacity(0.5))
             Text("试试其他关键词")
                 .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(.primary.opacity(0.3))
         }
         .padding(.top, 80)
     }
@@ -521,7 +521,7 @@ private struct HumanWideCard: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(human.name)
                         .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     HStack(spacing: 6) {
                         Text(human.roleText)
                             .font(.system(size: 12, weight: .bold, design: .rounded))
@@ -531,7 +531,7 @@ private struct HumanWideCard: View {
                         if human.birthday != nil {
                             Text(human.ageText)
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.45))
+                                .foregroundStyle(.primary.opacity(0.45))
                         }
                     }
                 }
@@ -540,7 +540,7 @@ private struct HumanWideCard: View {
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.25))
+                    .foregroundStyle(.primary.opacity(0.25))
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
@@ -586,7 +586,7 @@ private struct PlantTallCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(plant.name)
                     .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
                 if plant.needsWatering {
                     Label("需要浇水", systemImage: "drop.fill")
@@ -595,7 +595,7 @@ private struct PlantTallCard: View {
                 } else {
                     Text(plant.species.isEmpty ? "植物" : plant.species)
                         .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.45))
+                        .foregroundStyle(.primary.opacity(0.45))
                         .lineLimit(1)
                 }
             }

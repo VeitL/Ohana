@@ -87,7 +87,7 @@ struct CoHealthDashboardView: View {
                     .font(.system(size: 18))
                 Text("人宠共健仪表盘")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Spacer()
             }
             .padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 6)
@@ -149,12 +149,12 @@ struct CoHealthDashboardView: View {
         VStack(spacing: 3) {
             Text(label)
                 .font(.system(size: 9, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(.primary.opacity(0.3))
                 .textCase(.uppercase)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value)
                     .font(.system(size: 22, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .minimumScaleFactor(0.6).lineLimit(1)
                 Text(unit)
                     .font(.system(size: 10, weight: .bold))
@@ -177,13 +177,13 @@ struct CoHealthDashboardView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("体重对比趋势")
                 .font(.system(size: 10, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(.primary.opacity(0.3))
                 .textCase(.uppercase)
 
             if !hasData {
                 Text("体重记录 2 条以上后可查看趋势对比")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.25))
+                    .foregroundStyle(.primary.opacity(0.25))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .frame(height: 80)
             } else {
@@ -244,7 +244,7 @@ struct CoHealthDashboardView: View {
                             if let v = val.as(Double.self) {
                                 Text(String(format: "%.0f", v))
                                     .font(.system(size: 7, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.3))
+                                    .foregroundStyle(.primary.opacity(0.3))
                             }
                         }
                     }
@@ -268,7 +268,7 @@ struct CoHealthDashboardView: View {
             Circle().fill(color).frame(width: 7, height: 7)
             Text(label)
                 .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.primary.opacity(0.5))
         }
     }
 }

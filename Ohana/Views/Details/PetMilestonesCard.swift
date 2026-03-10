@@ -17,11 +17,11 @@ struct PetMilestonesCard: View {
                     .foregroundStyle(Color.goYellow)
                 Text("里程碑")
                     .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Spacer()
                 Text("\(pet.milestones.count) 个")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
             }
 
             let sorted = pet.milestones.sorted { $0.date > $1.date }
@@ -37,7 +37,7 @@ struct PetMilestonesCard: View {
             if pet.milestones.isEmpty {
                 Text("暂无里程碑")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 8)
             }
@@ -68,11 +68,11 @@ struct PetMilestonesCard: View {
                     .foregroundStyle(index == 0 ? .white : .white.opacity(0.7))
                 Text(milestone.date, style: .date)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .foregroundStyle(.primary.opacity(0.35))
                 if !milestone.notes.isEmpty {
                     Text(milestone.notes)
                         .font(.system(size: 11))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(.primary.opacity(0.3))
                         .lineLimit(2)
                 }
             }

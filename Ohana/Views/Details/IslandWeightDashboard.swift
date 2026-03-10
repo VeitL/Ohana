@@ -85,7 +85,7 @@ struct IslandWeightDashboard: View {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .frame(width: 36, height: 36)
                     .background(.white.opacity(0.12), in: Circle())
             }
@@ -93,7 +93,7 @@ struct IslandWeightDashboard: View {
             Spacer()
             Text("全岛体重")
                 .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
             Spacer()
             Color.clear.frame(width: 36, height: 36)
         }
@@ -107,11 +107,11 @@ struct IslandWeightDashboard: View {
                 Text("⚖️").font(.system(size: 14))
                 Text("全岛体重变动趋势")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Spacer()
                 Text("相对初始记录")
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .foregroundStyle(.primary.opacity(0.35))
             }
 
             if vm.weightDeltas.isEmpty {
@@ -132,7 +132,7 @@ struct IslandWeightDashboard: View {
             // 零线基准
             RuleMark(y: .value("基准", 0))
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 5]))
-                .foregroundStyle(.white.opacity(0.18))
+                .foregroundStyle(.primary.opacity(0.18))
 
             ForEach(vm.weightDeltasBySeries, id: \.0) { name, points, isHuman in
                 let c = color(for: name, isHuman: isHuman)
@@ -172,8 +172,8 @@ struct IslandWeightDashboard: View {
             AxisMarks(values: .automatic(desiredCount: 4)) { _ in
                 AxisValueLabel(format: .dateTime.month(.abbreviated).day())
                     .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.4))
-                AxisGridLine().foregroundStyle(.white.opacity(0.05))
+                    .foregroundStyle(.primary.opacity(0.4))
+                AxisGridLine().foregroundStyle(.primary.opacity(0.05))
             }
         }
         .chartYAxis {
@@ -182,10 +182,10 @@ struct IslandWeightDashboard: View {
                     AxisValueLabel {
                         Text("\(d >= 0 ? "+" : "")\(String(format: "%.1f", d))%")
                             .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                     }
                 }
-                AxisGridLine().foregroundStyle(.white.opacity(0.05))
+                AxisGridLine().foregroundStyle(.primary.opacity(0.05))
             }
         }
         .chartForegroundStyleScale(
@@ -206,7 +206,7 @@ struct IslandWeightDashboard: View {
                             .frame(width: 16, height: 3)
                         Text(name)
                             .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(.primary.opacity(0.6))
                     }
                 }
             }
@@ -225,7 +225,7 @@ struct IslandWeightDashboard: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("🏆 本月排行")
                 .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
 
             if let gain = vm.gainChampion {
                 HStack(spacing: 6) {
@@ -236,7 +236,7 @@ struct IslandWeightDashboard: View {
                             .foregroundStyle(Color.goYellow.opacity(0.8))
                         Text(gain.entityName)
                             .font(.system(size: 12, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                             .lineLimit(1)
                         Text("+\(String(format: "%.1f", gain.deltaPercent))%")
                             .font(.system(size: 10, weight: .bold))
@@ -244,7 +244,7 @@ struct IslandWeightDashboard: View {
                     }
                 }
             } else {
-                Text("暂无数据").font(.system(size: 11)).foregroundStyle(.white.opacity(0.3))
+                Text("暂无数据").font(.system(size: 11)).foregroundStyle(.primary.opacity(0.3))
             }
 
             if let loss = vm.lossChampion {
@@ -256,7 +256,7 @@ struct IslandWeightDashboard: View {
                             .foregroundStyle(Color.goLime.opacity(0.8))
                         Text(loss.entityName)
                             .font(.system(size: 12, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                             .lineLimit(1)
                         Text("\(String(format: "%.1f", loss.deltaPercent))%")
                             .font(.system(size: 10, weight: .bold))
@@ -278,7 +278,7 @@ struct IslandWeightDashboard: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("🌐 全岛总质量")
                 .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
 
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(String(format: "%.1f", totalIslandWeightKg))
@@ -288,12 +288,12 @@ struct IslandWeightDashboard: View {
                     .lineLimit(1)
                 Text("kg")
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.primary.opacity(0.5))
             }
 
             Text(weightComparison)
                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.55))
+                .foregroundStyle(.primary.opacity(0.55))
                 .lineLimit(2)
 
             Spacer(minLength: 0)
@@ -312,7 +312,7 @@ struct IslandWeightDashboard: View {
                 Text("📊").font(.system(size: 14))
                 Text("个体体重清单")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
             }
 
             let allEntries = buildSparklineEntries()
@@ -383,14 +383,14 @@ struct IslandWeightDashboard: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.name)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
                     Text(String(format: "%.1f", entry.current))
                         .font(.system(size: 18, weight: .black, design: .rounded))
                         .foregroundStyle(entry.accentColor)
                     Text("kg")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                 }
             }
 
@@ -415,7 +415,7 @@ struct IslandWeightDashboard: View {
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.25))
+                .foregroundStyle(.primary.opacity(0.25))
         }
         .padding(.vertical, 10)
         .contentShape(Rectangle())
@@ -441,7 +441,7 @@ struct IslandWeightDashboard: View {
     private func emptyState(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 13, weight: .medium, design: .rounded))
-            .foregroundStyle(.white.opacity(0.3))
+            .foregroundStyle(.primary.opacity(0.3))
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 28)

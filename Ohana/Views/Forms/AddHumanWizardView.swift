@@ -73,7 +73,7 @@ struct AddHumanWizardView: View {
             
             Text("步骤 \(currentStep + 1)/\(totalSteps)")
                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.primary.opacity(0.5))
                 .padding(.top, 4)
             
             TabView(selection: $currentStep) {
@@ -84,7 +84,7 @@ struct AddHumanWizardView: View {
                             .font(.system(size: 24, weight: .bold, design: .rounded))
                             .multilineTextAlignment(.center)
                             .textFieldStyle(.plain)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                             .padding()
                             .ohanaGlassStyle(cornerRadius: 16)
 
@@ -138,7 +138,7 @@ struct AddHumanWizardView: View {
                         }
                         Text("相册长按人物 → 拷贝主体 → 回来粘贴")
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.25))
+                            .foregroundStyle(.primary.opacity(0.25))
                             .multilineTextAlignment(.center)
 
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 12) {
@@ -166,12 +166,12 @@ struct AddHumanWizardView: View {
                     VStack(spacing: 20) {
                         Toggle("设置生日", isOn: $hasBirthday)
                             .tint(Color(hex: "667eea"))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         
                         if hasBirthday {
                             DatePicker("生日", selection: $birthday, displayedComponents: .date)
                                 .datePickerStyle(.wheel)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                         }
                     }
                 }
@@ -226,7 +226,7 @@ struct AddHumanWizardView: View {
                     Button { gender = "" } label: {
                         Text("跳过")
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.35))
+                            .foregroundStyle(.primary.opacity(0.35))
                     }
                     .padding(.top, 4)
                 }
@@ -255,7 +255,7 @@ struct AddHumanWizardView: View {
                     if familyRole == "自定义" {
                         TextField("输入自定义关系", text: $familyRole)
                             .font(.system(size: 15, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                             .padding(12)
                             .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
                             .padding(.top, 4)
@@ -271,7 +271,7 @@ struct AddHumanWizardView: View {
                                 .foregroundStyle(Color(hex: "667eea")).frame(width: 24)
                             TextField("国籍 / 城市（可选）", text: $nationality)
                                 .font(.system(size: 15, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                         }
                         .padding(14)
                         .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
@@ -281,7 +281,7 @@ struct AddHumanWizardView: View {
                                 .foregroundStyle(.secondary).frame(width: 24).padding(.top, 2)
                             TextField("备注（可选）", text: $notes, axis: .vertical)
                                 .font(.system(size: 15, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                                 .lineLimit(3...5)
                         }
                         .padding(14)
@@ -301,15 +301,15 @@ struct AddHumanWizardView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("身高")
                                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.4))
+                                    .foregroundStyle(.primary.opacity(0.4))
                                 TextField("如 170", text: $heightText)
                                     .keyboardType(.decimalPad)
                                     .font(.system(size: 22, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                             }
                             Text("cm")
                                 .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.4))
+                                .foregroundStyle(.primary.opacity(0.4))
                         }
                         .padding(16)
                         .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
@@ -322,22 +322,22 @@ struct AddHumanWizardView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("体重")
                                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.4))
+                                    .foregroundStyle(.primary.opacity(0.4))
                                 TextField("如 65.0", text: $weightText)
                                     .keyboardType(.decimalPad)
                                     .font(.system(size: 22, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                             }
                             Text("kg")
                                 .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.4))
+                                .foregroundStyle(.primary.opacity(0.4))
                         }
                         .padding(16)
                         .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
 
                         Text("填写体重将自动创建一条初始体重记录")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.3))
+                            .foregroundStyle(.primary.opacity(0.3))
                     }
                 }
                 .tag(6)
@@ -347,7 +347,7 @@ struct AddHumanWizardView: View {
                     VStack(spacing: 12) {
                         Text("同一设备上的其他家庭成员无法查看被隐藏的内容")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.35))
+                            .foregroundStyle(.primary.opacity(0.35))
                             .multilineTextAlignment(.center)
 
                         privacyToggleRow("体重记录与图表", emoji: "⚖️", binding: $privateWeight)
@@ -374,13 +374,13 @@ struct AddHumanWizardView: View {
 
                         Text(name.isEmpty ? "未命名" : name)
                             .font(.system(size: 28, weight: .heavy, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
 
                         // 主题色选择器
                         VStack(alignment: .leading, spacing: 8) {
                             Text("主题颜色")
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.4))
+                                .foregroundStyle(.primary.opacity(0.4))
                                 .padding(.horizontal, 4)
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 10) {
@@ -398,7 +398,7 @@ struct AddHumanWizardView: View {
                                                     .animation(.spring(response: 0.2), value: themeColorHex)
                                                 Text(label)
                                                     .font(.system(size: 9, weight: .medium, design: .rounded))
-                                                    .foregroundStyle(.white.opacity(themeColorHex == hex ? 1 : 0.4))
+                                                    .foregroundStyle(.primary.opacity(themeColorHex == hex ? 1 : 0.4))
                                             }
                                         }
                                         .buttonStyle(.plain)
@@ -436,7 +436,7 @@ struct AddHumanWizardView: View {
                     } label: {
                         Text("上一步")
                             .font(.system(size: 16, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(.primary.opacity(0.7))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                     }
@@ -522,10 +522,10 @@ struct AddHumanWizardView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Text(description)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.primary.opacity(0.5))
                 }
                 Spacer()
             }
@@ -540,11 +540,11 @@ struct AddHumanWizardView: View {
             Spacer()
             Text(title)
                 .font(.system(size: 24, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
             if !subtitle.isEmpty {
                 Text(subtitle)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(.primary.opacity(0.6))
             }
             content()
                 .padding(.horizontal, 24)
@@ -623,7 +623,7 @@ struct AddHumanWizardView: View {
             Text(emoji).font(.system(size: 22)).frame(width: 32)
             Text(title)
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
             Spacer()
             Toggle("", isOn: binding)
                 .tint(Color.goPrimary)
@@ -646,7 +646,7 @@ private struct FlowTagRow: View {
                     ForEach(tags, id: \.self) { tag in
                         Text(tag)
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                             .padding(.horizontal, 12).padding(.vertical, 5)
                             .background(Color(hex: "667eea").opacity(0.3), in: Capsule())
                     }

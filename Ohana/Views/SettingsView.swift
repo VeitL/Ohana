@@ -144,7 +144,7 @@ struct SettingsView: View {
                                             }
                                             Text(pet.name)
                                                 .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                                .foregroundStyle(.white)
+                                                .foregroundStyle(.primary)
                                             Spacer()
                                             // 重置数据（保留基础信息）
                                             Button {
@@ -226,15 +226,15 @@ struct SettingsView: View {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("UI 规范测试")
                                             .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                            .foregroundStyle(.white)
+                                            .foregroundStyle(.primary)
                                         Text("查看所有 UI 元素的 Light/Dark 表现")
                                             .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(.white.opacity(0.4))
+                                            .foregroundStyle(.primary.opacity(0.4))
                                     }
                                     Spacer()
                                     Image(systemName: "chevron.right")
                                         .font(.system(size: 11, weight: .semibold))
-                                        .foregroundStyle(.white.opacity(0.2))
+                                        .foregroundStyle(.primary.opacity(0.2))
                                 }
                                 .padding(.vertical, 2)
                             }
@@ -287,7 +287,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("这台手机的主人是谁？")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.55))
+                    .foregroundStyle(.primary.opacity(0.55))
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
                         // "未绑定" 选项
@@ -348,7 +348,7 @@ struct SettingsView: View {
                             .font(.system(size: 12))
                         Text("打卡记录将关联到 \(selected.name)")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(.primary.opacity(0.5))
                     }
                 }
             }
@@ -373,10 +373,10 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("导出备份")
                             .font(.system(size: 15, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Text("全量 JSON · 含所有宠物、日志、状态")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                     }
                     Spacer()
                     if isExporting {
@@ -426,10 +426,10 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("从备份恢复")
                             .font(.system(size: 15, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Text("选择 .json 备份文件导入")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                     }
                     Spacer()
                     if isImporting {
@@ -454,7 +454,7 @@ struct SettingsView: View {
                         .foregroundStyle(Color.goYellow.opacity(0.6))
                     Text("备份含全部宠物、家庭成员、日志、健康档案及应用状态。恢复时以 UUID 去重，不会清除现有数据。")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(.primary.opacity(0.3))
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.vertical, 4)
@@ -523,15 +523,15 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(userNickname.isEmpty ? "Ohana 岛民" : userNickname)
                     .font(.system(size: 20, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text("本地模式")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
             }
             Spacer()
             Image(systemName: "chevron.right")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.2))
+                .foregroundStyle(.primary.opacity(0.2))
         }
         .padding(20)
         .ohanaStandardCard(cornerRadius: 24)
@@ -542,7 +542,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title.uppercased())
                 .font(OhanaFont.caption2(.bold))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(.primary.opacity(0.4))
                 .tracking(1.5)
                 .padding(.leading, 4)
             content()
@@ -564,16 +564,16 @@ struct SettingsView: View {
                 }
                 Text(title)
                     .font(OhanaFont.body(.semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Spacer()
                 if !subtitle.isEmpty {
                     Text(subtitle)
                         .font(OhanaFont.footnote())
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                 }
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.2))
+                    .foregroundStyle(.primary.opacity(0.2))
             }
             .padding(.vertical, 4)
         }

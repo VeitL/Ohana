@@ -23,7 +23,7 @@ struct SitterCardPreviewSheet: View {
                             .padding(.horizontal, 16)
                         Text("点击右上角分享按钮，将名片发给宠物保姆")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.35))
+                            .foregroundStyle(.primary.opacity(0.35))
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
                         Spacer(minLength: 40)
@@ -38,7 +38,7 @@ struct SitterCardPreviewSheet: View {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(.primary.opacity(0.6))
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -86,7 +86,7 @@ struct SitterCardPreviewSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(pet.name)
                         .font(.system(size: 24, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     HStack(spacing: 6) {
                         capsuleTag(pet.species)
                         if !pet.breed.isEmpty { capsuleTag(pet.breed) }
@@ -161,10 +161,10 @@ struct SitterCardPreviewSheet: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Label("特别说明", systemImage: "note.text")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.45))
+                        .foregroundStyle(.primary.opacity(0.45))
                     Text(pet.notes)
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(.primary.opacity(0.7))
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, 20)
@@ -176,7 +176,7 @@ struct SitterCardPreviewSheet: View {
                 Spacer()
                 Text("Made with Ohana 🏝️")
                     .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.2))
+                    .foregroundStyle(.primary.opacity(0.2))
                     .padding(.bottom, 16)
                     .padding(.trailing, 20)
             }
@@ -208,11 +208,11 @@ struct SitterCardPreviewSheet: View {
             }
             Text(label)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(.primary.opacity(0.4))
                 .frame(width: 56, alignment: .leading)
             Text(value)
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.85))
+                .foregroundStyle(.primary.opacity(0.85))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer()
         }
@@ -222,7 +222,7 @@ struct SitterCardPreviewSheet: View {
     private func capsuleTag(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 10, weight: .bold, design: .rounded))
-            .foregroundStyle(.white.opacity(0.6))
+            .foregroundStyle(.primary.opacity(0.6))
             .padding(.horizontal, 8).padding(.vertical, 3)
             .background(.white.opacity(0.1), in: Capsule())
     }

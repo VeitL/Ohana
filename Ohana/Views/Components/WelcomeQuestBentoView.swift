@@ -55,7 +55,7 @@ struct WelcomeQuestBentoView: View {
             HStack {
                 Text("🌱 建设欧哈纳岛屿")
                     .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Spacer()
                 // 椰子总数
                 HStack(spacing: 4) {
@@ -73,7 +73,7 @@ struct WelcomeQuestBentoView: View {
                 // 进度
                 Text("\(manager.completedCount)/\(manager.totalQuestCount)")
                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .foregroundStyle(.primary.opacity(0.35))
                     .padding(.leading, 4)
             }
             .padding(.horizontal, 16)

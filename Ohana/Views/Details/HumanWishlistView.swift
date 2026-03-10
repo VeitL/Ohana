@@ -86,7 +86,7 @@ struct HumanWishlistView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("我的椰子余额")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.primary.opacity(0.5))
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("🥥")
                         .font(.system(size: 28))
@@ -97,16 +97,16 @@ struct HumanWishlistView: View {
                 }
                 Text("许愿消耗椰子，需攒够才能兑换")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .foregroundStyle(.primary.opacity(0.35))
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 6) {
                 Text("\(pendingItems.count)")
                     .font(.system(size: 32, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text("个待兑换")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
             }
         }
         .padding(20)
@@ -133,7 +133,7 @@ struct HumanWishlistView: View {
                     .strikethrough(redeemed)
                 Text(item.createdAt, format: .dateTime.month().day())
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
             }
             Spacer()
 
@@ -161,13 +161,13 @@ struct HumanWishlistView: View {
                 } label: {
                     Image(systemName: "trash")
                         .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.2))
+                        .foregroundStyle(.primary.opacity(0.2))
                 }
                 .buttonStyle(.plain)
             } else {
                 Text("已兑换 ✓")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.25))
+                    .foregroundStyle(.primary.opacity(0.25))
                     .padding(.horizontal, 10).padding(.vertical, 6)
                     .background(.white.opacity(0.05), in: Capsule())
             }
@@ -180,7 +180,7 @@ struct HumanWishlistView: View {
     private func sectionHeader(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 13, weight: .black, design: .rounded))
-            .foregroundStyle(.white.opacity(0.5))
+            .foregroundStyle(.primary.opacity(0.5))
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -190,10 +190,10 @@ struct HumanWishlistView: View {
             Text("🌟").font(.system(size: 56))
             Text("还没有心愿")
                 .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
             Text("许下你想要的礼物\n让家人帮你兑换！")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(.primary.opacity(0.4))
                 .multilineTextAlignment(.center)
         }
     }
@@ -208,7 +208,7 @@ struct HumanWishlistView: View {
 
             Text("许一个愿 🌟")
                 .font(.system(size: 22, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 24)
 
@@ -216,7 +216,7 @@ struct HumanWishlistView: View {
                 // 心愿标题
                 TextField("心愿内容（例如：新耳机）", text: $newTitle)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .padding(.horizontal, 16).padding(.vertical, 14)
                     .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
                     .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.white.opacity(0.1), lineWidth: 1))
@@ -226,7 +226,7 @@ struct HumanWishlistView: View {
                     HStack {
                         Text("兑换费用")
                             .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Spacer()
                         HStack(spacing: 4) {
                             Text("🥥 \(newCost)")
@@ -240,9 +240,9 @@ struct HumanWishlistView: View {
                     ), in: 5...500, step: 5)
                     .tint(Color.goYellow)
                     HStack {
-                        Text("5 🥥").font(.caption).foregroundStyle(.white.opacity(0.4))
+                        Text("5 🥥").font(.caption).foregroundStyle(.primary.opacity(0.4))
                         Spacer()
-                        Text("500 🥥").font(.caption).foregroundStyle(.white.opacity(0.4))
+                        Text("500 🥥").font(.caption).foregroundStyle(.primary.opacity(0.4))
                     }
                 }
                 .padding(.horizontal, 16).padding(.vertical, 14)

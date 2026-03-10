@@ -33,7 +33,7 @@ struct QuickWeightSheet: View {
                 HStack {
                     Text("记录体重")
                         .font(.system(size: 18, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Spacer()
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
@@ -49,7 +49,7 @@ struct QuickWeightSheet: View {
                     TextField("0.0", text: $weightText)
                         .keyboardType(.decimalPad)
                         .font(.system(size: 52, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .minimumScaleFactor(0.5)
                         .focused($focused)
                     Text("kg")
@@ -62,10 +62,10 @@ struct QuickWeightSheet: View {
                 HStack(spacing: 10) {
                     Image(systemName: "calendar")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                     Text("记录日期")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                     Spacer()
                     DatePicker("", selection: $recordDate, in: ...Date(), displayedComponents: [.date])
                         .datePickerStyle(.compact)

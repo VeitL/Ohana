@@ -91,7 +91,7 @@ struct PetBasicInfoDetailView: View {
             if isEditing {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { withAnimation { isEditing = false } } label: {
-                        Text("取消").foregroundStyle(.white.opacity(0.5))
+                        Text("取消").foregroundStyle(.primary.opacity(0.5))
                     }
                 }
             }
@@ -152,14 +152,14 @@ struct PetBasicInfoDetailView: View {
                     RoundedRectangle(cornerRadius: 8).fill(Color(hex: pet.themeColorHex)).frame(width: 32, height: 32)
                     Text("#\(pet.themeColorHex.uppercased())")
                         .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(.primary.opacity(0.8))
                 }
             }
             if !pet.notes.isEmpty {
                 infoSection(title: "备注", icon: "note.text", iconColor: Color.goOrange) {
                     Text(pet.notes)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(.primary.opacity(0.7))
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
@@ -260,7 +260,7 @@ struct PetBasicInfoDetailView: View {
                                 Circle().fill(Color(hex: hex)).frame(width: 38, height: 38)
                                 if eThemeColorHex.uppercased() == hex.uppercased() {
                                     Circle().strokeBorder(.white, lineWidth: 2.5)
-                                    Image(systemName: "checkmark").font(.system(size: 11, weight: .black)).foregroundStyle(.white)
+                                    Image(systemName: "checkmark").font(.system(size: 11, weight: .black)).foregroundStyle(.primary)
                                 }
                             }
                         }.buttonStyle(.plain)
@@ -277,7 +277,7 @@ struct PetBasicInfoDetailView: View {
             editSection(title: "备注", icon: "note.text", iconColor: Color.goOrange) {
                 TextField("备注（可选）", text: $eNotes, axis: .vertical)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .tint(Color.goOrange)
                     .lineLimit(3...6)
             }
@@ -297,9 +297,9 @@ struct PetBasicInfoDetailView: View {
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text(isEditing ? (eName.isEmpty ? pet.name : eName) : pet.name)
-                    .font(.system(size: 22, weight: .black, design: .rounded)).foregroundStyle(.white)
+                    .font(.system(size: 22, weight: .black, design: .rounded)).foregroundStyle(.primary)
                 Text("\(isEditing ? eSpecies : pet.species) · \(isEditing ? (eBreed.isEmpty ? "未填写品种" : eBreed) : (pet.breed.isEmpty ? "未填写品种" : pet.breed))")
-                    .font(.system(size: 13, weight: .medium)).foregroundStyle(.white.opacity(0.5))
+                    .font(.system(size: 13, weight: .medium)).foregroundStyle(.primary.opacity(0.5))
             }
             Spacer()
             if isEditing {
@@ -316,7 +316,7 @@ struct PetBasicInfoDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: icon).font(.system(size: 13, weight: .bold)).foregroundStyle(iconColor)
-                Text(title).font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                Text(title).font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(.primary)
             }
             content()
         }
@@ -327,7 +327,7 @@ struct PetBasicInfoDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: icon).font(.system(size: 13, weight: .bold)).foregroundStyle(iconColor)
-                Text(title).font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                Text(title).font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(.primary)
             }
             content()
         }
@@ -336,14 +336,14 @@ struct PetBasicInfoDetailView: View {
 
     private func infoRow(label: String, value: String) -> some View {
         HStack {
-            Text(label).font(.system(size: 13, weight: .medium)).foregroundStyle(.white.opacity(0.45)).frame(width: 80, alignment: .leading)
-            Text(value).font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(.white.opacity(0.9))
+            Text(label).font(.system(size: 13, weight: .medium)).foregroundStyle(.primary.opacity(0.45)).frame(width: 80, alignment: .leading)
+            Text(value).font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(.primary.opacity(0.9))
             Spacer()
         }
     }
 
     private func editLabel(_ label: String) -> some View {
-        Text(label).font(.system(size: 13, weight: .medium)).foregroundStyle(.white.opacity(0.55))
+        Text(label).font(.system(size: 13, weight: .medium)).foregroundStyle(.primary.opacity(0.55))
     }
 
     private func editField(_ label: String, text: Binding<String>) -> some View {
@@ -351,7 +351,7 @@ struct PetBasicInfoDetailView: View {
             editLabel(label).frame(width: 70, alignment: .leading)
             TextField(label, text: text)
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .tint(Color.goLime)
                 .multilineTextAlignment(.trailing)
         }

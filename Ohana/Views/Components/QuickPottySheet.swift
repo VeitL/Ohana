@@ -24,7 +24,7 @@ struct QuickPottySheet: View {
                 HStack {
                     Text("噗噗打卡")
                         .font(.system(size: 18, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Spacer()
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
@@ -60,7 +60,7 @@ struct QuickPottySheet: View {
                 HStack {
                     Text("时间")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.primary.opacity(0.5))
                     Spacer()
                     DatePicker("", selection: $date, displayedComponents: [.hourAndMinute])
                         .labelsHidden()

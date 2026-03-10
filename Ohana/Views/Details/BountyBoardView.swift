@@ -177,7 +177,7 @@ struct BountyBoardView: View {
                 .foregroundStyle(accent)
             Text(label)
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.35))
+                .foregroundStyle(.primary.opacity(0.35))
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
@@ -219,12 +219,12 @@ struct BountyBoardView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(task.title)
                         .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .lineLimit(1)
                     if !task.description.isEmpty {
                         Text(task.description)
                             .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.45))
+                            .foregroundStyle(.primary.opacity(0.45))
                             .lineLimit(2)
                     }
                 }
@@ -247,10 +247,10 @@ struct BountyBoardView: View {
                     .font(.system(size: 14))
                 Text(task.creatorName)
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
                 Text("发布")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.25))
+                    .foregroundStyle(.primary.opacity(0.25))
 
                 Spacer()
 
@@ -305,7 +305,7 @@ struct BountyBoardView: View {
             if !isActive, let completedAt = task.completedAt {
                 Text("完成于 \(completedAt.formatted(date: .abbreviated, time: .omitted))")
                     .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.2))
+                    .foregroundStyle(.primary.opacity(0.2))
             }
         }
         .padding(16)
@@ -330,7 +330,7 @@ struct BountyBoardView: View {
                 .opacity(0.5)
             Text(message)
                 .font(.system(size: 14, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(.primary.opacity(0.3))
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -398,7 +398,7 @@ struct AddBountyTaskSheet: View {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("任务图标")
                                 .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(.primary.opacity(0.5))
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 10) {
                                     ForEach(emojiOptions, id: \.self) { emoji in
@@ -434,11 +434,11 @@ struct AddBountyTaskSheet: View {
                         formField(title: "任务标题") {
                             TextField("", text: $title)
                                 .font(.system(size: 16, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                                 .tint(Color.goLime)
                                 .placeholder(when: title.isEmpty) {
                                     Text("例如：帮我给猫铲屎")
-                                        .foregroundStyle(.white.opacity(0.25))
+                                        .foregroundStyle(.primary.opacity(0.25))
                                 }
                         }
 
@@ -446,12 +446,12 @@ struct AddBountyTaskSheet: View {
                         formField(title: "任务说明（可选）") {
                             TextField("", text: $description, axis: .vertical)
                                 .font(.system(size: 14, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                                 .tint(Color.goLime)
                                 .lineLimit(3)
                                 .placeholder(when: description.isEmpty) {
                                     Text("描述任务内容...")
-                                        .foregroundStyle(.white.opacity(0.25))
+                                        .foregroundStyle(.primary.opacity(0.25))
                                 }
                         }
 
@@ -459,7 +459,7 @@ struct AddBountyTaskSheet: View {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("椰子奖励")
                                 .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(.primary.opacity(0.5))
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 8) {
                                     ForEach(rewardOptions, id: \.self) { val in
@@ -501,10 +501,10 @@ struct AddBountyTaskSheet: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("发布人")
                                         .font(.system(size: 10, weight: .medium, design: .rounded))
-                                        .foregroundStyle(.white.opacity(0.3))
+                                        .foregroundStyle(.primary.opacity(0.3))
                                     Text(human.name)
                                         .font(.system(size: 14, weight: .bold, design: .rounded))
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(.primary)
                                 }
                                 Spacer()
                                 Text("奖励 \(reward)🥥")
@@ -528,7 +528,7 @@ struct AddBountyTaskSheet: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("取消") { dismiss() }
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(.primary.opacity(0.6))
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("发布") {
@@ -557,7 +557,7 @@ struct AddBountyTaskSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.primary.opacity(0.5))
             content()
                 .padding(.horizontal, 16).padding(.vertical, 14)
                 .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))

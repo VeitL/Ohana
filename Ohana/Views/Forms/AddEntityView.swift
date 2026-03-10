@@ -76,7 +76,7 @@ struct AddEntityView: View {
                             withAnimation { selectedType = nil }
                         } label: {
                             Image(systemName: "chevron.left")
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                         }
                     }
                 }
@@ -97,7 +97,7 @@ struct AddEntityView: View {
             
             Text("选择要添加的类型")
                 .font(.system(size: 20, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
             
             ForEach(EntityType.allCases, id: \.rawValue) { type in
                 Button {
@@ -131,13 +131,13 @@ struct AddEntityView: View {
                             }
                             Text(typeDescription(type))
                                 .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(.white.opacity(type.isAvailable ? 0.6 : 0.25))
+                                .foregroundStyle(.primary.opacity(type.isAvailable ? 0.6 : 0.25))
                         }
                         
                         Spacer()
                         
                         Image(systemName: type.isAvailable ? "chevron.right" : "lock.fill")
-                            .foregroundStyle(.white.opacity(type.isAvailable ? 0.3 : 0.2))
+                            .foregroundStyle(.primary.opacity(type.isAvailable ? 0.3 : 0.2))
                     }
                     .padding(16)
                     .ohanaGlassStyle(cornerRadius: 20)

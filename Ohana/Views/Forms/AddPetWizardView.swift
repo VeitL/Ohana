@@ -168,7 +168,7 @@ struct AddPetWizardView: View {
                             .foregroundStyle(Color.goYellow)
                         Text("岛屿欢迎新家人！")
                             .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.8))
+                            .foregroundStyle(.primary.opacity(0.8))
                     }
                     .scaleEffect(coconutBurstScale)
                     .opacity(coconutBurstOpacity)
@@ -186,18 +186,18 @@ struct AddPetWizardView: View {
                         .padding(.top, 12)
                     Text("步骤 \(currentStep.rawValue + 1) / \(totalSteps)")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                 }
 
                 // Title
                 VStack(spacing: 5) {
                     Text(currentStep.title)
                         .font(.system(size: 26, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .multilineTextAlignment(.center)
                     Text(currentStep.subtitle)
                         .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.45))
+                        .foregroundStyle(.primary.opacity(0.45))
                 }
                 .padding(.top, 20)
                 .padding(.horizontal, 24)
@@ -272,7 +272,7 @@ struct AddPetWizardView: View {
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("取消") { cropImageItem = nil }
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(.primary.opacity(0.6))
                     }
                 }
                 .navigationBarTitleDisplayMode(.inline)
@@ -297,7 +297,7 @@ struct AddPetWizardView: View {
                 } label: {
                     Text("上一步")
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(.primary.opacity(0.7))
                         .frame(maxWidth: .infinity).padding(.vertical, 16)
                         .background(.white.opacity(0.08), in: Capsule())
                 }
@@ -342,12 +342,12 @@ struct AddPetWizardView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Label("名字（必填）", systemImage: "pencil")
                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(.primary.opacity(0.45))
                 TextField("给你的小怪兽起个名字", text: $name)
                     .font(.system(size: 22, weight: .bold, design: .rounded))
                     .multilineTextAlignment(.center)
                     .textFieldStyle(.plain)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .padding(.vertical, 14).padding(.horizontal, 16)
                     .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
                     .overlay(RoundedRectangle(cornerRadius: 16)
@@ -356,7 +356,7 @@ struct AddPetWizardView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Label("物种", systemImage: "pawprint.fill")
                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(.primary.opacity(0.45))
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
                     ForEach(speciesOptions, id: \.self) { sp in
                         Button {
@@ -382,13 +382,13 @@ struct AddPetWizardView: View {
     private var stepBreed: some View {
         VStack(spacing: 12) {
             HStack {
-                Image(systemName: "magnifyingglass").foregroundStyle(.white.opacity(0.4))
+                Image(systemName: "magnifyingglass").foregroundStyle(.primary.opacity(0.4))
                 TextField("搜索品种", text: $breedSearch)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .font(.system(size: 15, weight: .medium, design: .rounded))
                 if !breedSearch.isEmpty {
                     Button { breedSearch = "" } label: {
-                        Image(systemName: "xmark.circle.fill").foregroundStyle(.white.opacity(0.4))
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(.primary.opacity(0.4))
                     }
                 }
             }
@@ -415,7 +415,7 @@ struct AddPetWizardView: View {
                             HStack {
                                 Text(b.name)
                                     .font(.system(size: 15, weight: isSelected ? .bold : .medium, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                                 Spacer()
                                 if isSelected { Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.goLime) }
                             }
@@ -427,7 +427,7 @@ struct AddPetWizardView: View {
                     if isCustomBreed {
                         TextField("请输入品种名称", text: $customBreedText)
                             .font(.system(size: 15, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                             .padding(12)
                             .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
                             .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.goLime.opacity(0.5), lineWidth: 1))
@@ -458,7 +458,7 @@ struct AddPetWizardView: View {
                 Button { avatarImageData = nil } label: {
                     Text("使用默认首字母头像")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(.primary.opacity(0.3))
                 }
                 .padding(.top, 2)
             }
@@ -527,7 +527,7 @@ struct AddPetWizardView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("✨ 解锁 3D 悬浮卡片效果")
                     .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
 
                 Group {
                     Text("强烈建议在系统相册中 ")
@@ -535,7 +535,7 @@ struct AddPetWizardView: View {
                     + Text("，然后点击下方粘贴，即可获得最佳的杂志封面悬浮体验！")
                 }
                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.60))
+                .foregroundStyle(.primary.opacity(0.60))
                 .lineSpacing(2)
             }
         }
@@ -648,7 +648,7 @@ struct AddPetWizardView: View {
                     Text("从相册选择")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
                 }
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(.primary.opacity(0.75))
                 .frame(maxWidth: .infinity).padding(.vertical, 13)
                 .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay(
@@ -663,7 +663,7 @@ struct AddPetWizardView: View {
                     Text("拍照")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
                 }
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(.primary.opacity(0.75))
                 .frame(maxWidth: .infinity).padding(.vertical, 13)
                 .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay(
@@ -684,7 +684,7 @@ struct AddPetWizardView: View {
                 .background(Color.goLime, in: Circle())
             Text(text)
                 .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(.primary.opacity(0.7))
             Spacer()
         }
     }
@@ -721,7 +721,7 @@ struct AddPetWizardView: View {
                 Toggle(isOn: $hasBirthday) {
                     Label("设置生日", systemImage: "birthday.cake")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                 }
                 .tint(Color.goLime)
                 if hasBirthday {
@@ -730,7 +730,7 @@ struct AddPetWizardView: View {
                     if !humanAgeText.isEmpty {
                         Label(humanAgeText, systemImage: "person.fill")
                             .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.85))
+                            .foregroundStyle(.primary.opacity(0.85))
                             .padding(10)
                             .background(accentColor.opacity(0.12), in: Capsule())
                     }
@@ -743,7 +743,7 @@ struct AddPetWizardView: View {
                 Toggle(isOn: $hasHomeDate) {
                     Label("设置到家日", systemImage: "house.fill")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                 }
                 .tint(Color.goLime)
                 if hasHomeDate {
@@ -756,7 +756,7 @@ struct AddPetWizardView: View {
                     if !daysTogetherText.isEmpty {
                         Label(daysTogetherText, systemImage: "heart.fill")
                             .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.85))
+                            .foregroundStyle(.primary.opacity(0.85))
                             .padding(10)
                             .background(Color.goLime.opacity(0.12), in: Capsule())
                     }
@@ -773,7 +773,7 @@ struct AddPetWizardView: View {
             ForEach([("male","♂ 男孩"), ("female","♀ 女孩"), ("unknown","未知")], id: \.0) { val, label in
                 Button { gender = val } label: {
                     HStack {
-                        Text(label).font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                        Text(label).font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(.primary)
                         Spacer()
                         if gender == val { Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.goLime) }
                     }
@@ -784,8 +784,8 @@ struct AddPetWizardView: View {
             }
             Toggle(isOn: $isNeutered) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("已绝育 / 已结扎").font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(.white)
-                    Text("对长期健康有益").font(.system(size: 12)).foregroundStyle(.white.opacity(0.4))
+                    Text("已绝育 / 已结扎").font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(.primary)
+                    Text("对长期健康有益").font(.system(size: 12)).foregroundStyle(.primary.opacity(0.4))
                 }
             }
             .tint(Color.goLime)
@@ -798,7 +798,7 @@ struct AddPetWizardView: View {
     private var stepBirthplace: some View {
         VStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("出生国家").font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(.white.opacity(0.45))
+                Text("出生国家").font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(.primary.opacity(0.45))
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(PetBreedDatabase.countries, id: \.self) { country in
@@ -815,7 +815,7 @@ struct AddPetWizardView: View {
             }
             if !birthCountry.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("出生城市").font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(.white.opacity(0.45))
+                    Text("出生城市").font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(.primary.opacity(0.45))
                     let cities = PetBreedDatabase.cities(for: birthCountry)
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                         ForEach(cities, id: \.self) { city in
@@ -835,7 +835,7 @@ struct AddPetWizardView: View {
                     if isCustomCity {
                         TextField("输入城市名称", text: $birthCity)
                             .font(.system(size: 15, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white).padding(12)
+                            .foregroundStyle(.primary).padding(12)
                             .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
                     }
                 }
@@ -862,20 +862,20 @@ struct AddPetWizardView: View {
                 VStack(spacing: 12) {
                     Image(systemName: "pawprint.fill")
                         .font(.system(size: 36))
-                        .foregroundStyle(.white.opacity(0.2))
+                        .foregroundStyle(.primary.opacity(0.2))
                     Text(species.isEmpty ? "请先选择宠物品种" : "岛上暂时没有同品种宠物")
                         .font(.system(size: 15, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                     Text("不同品种间没有亲属关系，直接跳过")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.25))
+                        .foregroundStyle(.primary.opacity(0.25))
                 }
                 .frame(maxWidth: .infinity).padding(.vertical, 40)
                 .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
             } else {
                 Text("选择与每只宠物的关系（可多选，选填）")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .foregroundStyle(.primary.opacity(0.35))
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 ForEach(sameSpeciesPets) { existPet in
@@ -897,10 +897,10 @@ struct AddPetWizardView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(existPet.name)
                                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                                 Text("\(existPet.species) · \(existPet.ageText)")
                                     .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.4))
+                                    .foregroundStyle(.primary.opacity(0.4))
                             }
                             Spacer()
                             if currentRelation != nil {
@@ -908,7 +908,7 @@ struct AddPetWizardView: View {
                                     selectedRelations.removeAll { $0.petId == existPet.id }
                                 } label: {
                                     Image(systemName: "xmark.circle.fill")
-                                        .foregroundStyle(.white.opacity(0.4))
+                                        .foregroundStyle(.primary.opacity(0.4))
                                         .font(.system(size: 18))
                                 }
                             }
@@ -981,9 +981,9 @@ struct AddPetWizardView: View {
             GoDashedDivider()
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text("主题色").font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(.white.opacity(0.6))
+                    Text("主题色").font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(.primary.opacity(0.6))
                     Spacer()
-                    Text("卡片背景色").font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.3))
+                    Text("卡片背景色").font(.system(size: 11, weight: .medium)).foregroundStyle(.primary.opacity(0.3))
                 }
                 // preset grid
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6), spacing: 12) {
@@ -995,10 +995,10 @@ struct AddPetWizardView: View {
                                 Circle().fill(tc.color.opacity(isUsed ? 0.3 : 1.0)).frame(width: 40, height: 40)
                                 if themeColorHex.uppercased() == tcHex.uppercased() {
                                     Circle().strokeBorder(.white, lineWidth: 2.5)
-                                    Image(systemName: "checkmark").font(.system(size: 12, weight: .black)).foregroundStyle(.white)
+                                    Image(systemName: "checkmark").font(.system(size: 12, weight: .black)).foregroundStyle(.primary)
                                 }
                                 if isUsed {
-                                    Image(systemName: "xmark").font(.system(size: 10, weight: .bold)).foregroundStyle(.white.opacity(0.5))
+                                    Image(systemName: "xmark").font(.system(size: 10, weight: .bold)).foregroundStyle(.primary.opacity(0.5))
                                 }
                             }
                         }
@@ -1026,7 +1026,7 @@ struct AddPetWizardView: View {
                         .frame(width: 28, height: 28)
                     Text("卡片预览色 #\(themeColorHex.uppercased())")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.45))
+                        .foregroundStyle(.primary.opacity(0.45))
                 }
             }
         }
@@ -1076,7 +1076,7 @@ struct AddPetWizardView: View {
                 }
             }
             Text(name.isEmpty ? "未命名" : name)
-                .font(.system(size: 28, weight: .black, design: .rounded)).foregroundStyle(.white)
+                .font(.system(size: 28, weight: .black, design: .rounded)).foregroundStyle(.primary)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 confirmCell(icon: "pawprint.fill", label: "物种", value: species)
@@ -1101,12 +1101,12 @@ struct AddPetWizardView: View {
 
             if hasBirthday && !humanAgeText.isEmpty {
                 Label(humanAgeText, systemImage: "person.fill")
-                    .font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(.white.opacity(0.8))
+                    .font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(.primary.opacity(0.8))
                     .padding(10).background(accentColor.opacity(0.12), in: Capsule())
             }
             if hasHomeDate && !daysTogetherText.isEmpty {
                 Label(daysTogetherText, systemImage: "heart.fill")
-                    .font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(.white.opacity(0.8))
+                    .font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(.primary.opacity(0.8))
                     .padding(10).background(Color.goLime.opacity(0.12), in: Capsule())
             }
         }
@@ -1117,9 +1117,9 @@ struct AddPetWizardView: View {
     private func wizardField(label: String, placeholder: String, text: Binding<String>, icon: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Label(label, systemImage: icon)
-                .font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(.white.opacity(0.45))
+                .font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(.primary.opacity(0.45))
             TextField(placeholder, text: text)
-                .font(.system(size: 15, weight: .medium, design: .rounded)).foregroundStyle(.white)
+                .font(.system(size: 15, weight: .medium, design: .rounded)).foregroundStyle(.primary)
                 .padding(12).background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
         }
     }
@@ -1135,7 +1135,7 @@ struct AddPetWizardView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(.primary.opacity(0.6))
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     // Preset solid swatches
@@ -1147,7 +1147,7 @@ struct AddPetWizardView: View {
                                     if selected.wrappedValue == colorName {
                                         Circle().strokeBorder(.white, lineWidth: 2.5)
                                         Image(systemName: "checkmark")
-                                            .font(.system(size: 11, weight: .black)).foregroundStyle(.white)
+                                            .font(.system(size: 11, weight: .black)).foregroundStyle(.primary)
                                     }
                                 }
                                 Text(colorName)
@@ -1168,7 +1168,7 @@ struct AddPetWizardView: View {
                                     if selected.wrappedValue == pattern.displayName {
                                         Circle().strokeBorder(.white, lineWidth: 2.5)
                                         Image(systemName: "checkmark")
-                                            .font(.system(size: 11, weight: .black)).foregroundStyle(.white)
+                                            .font(.system(size: 11, weight: .black)).foregroundStyle(.primary)
                                     }
                                 }
                                 Text(pattern.displayName)
@@ -1188,13 +1188,13 @@ struct AddPetWizardView: View {
                                     Circle().fill(customColor.wrappedValue).frame(width: 38, height: 38)
                                     Circle().strokeBorder(.white, lineWidth: 2.5).frame(width: 38, height: 38)
                                     Image(systemName: "checkmark")
-                                        .font(.system(size: 11, weight: .black)).foregroundStyle(.white)
+                                        .font(.system(size: 11, weight: .black)).foregroundStyle(.primary)
                                 } else {
                                     Circle()
                                         .fill(LinearGradient(colors: [.red,.orange,.yellow,.green,.blue,.purple], startPoint: .topLeading, endPoint: .bottomTrailing))
                                         .frame(width: 38, height: 38)
                                     Image(systemName: "plus")
-                                        .font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
+                                        .font(.system(size: 13, weight: .bold)).foregroundStyle(.primary)
                                 }
                             }
                         }
@@ -1220,8 +1220,8 @@ struct AddPetWizardView: View {
         HStack(spacing: 8) {
             Image(systemName: icon).font(.system(size: 13, weight: .semibold)).foregroundStyle(accentColor).frame(width: 20)
             VStack(alignment: .leading, spacing: 1) {
-                Text(label).font(.system(size: 10, weight: .medium)).foregroundStyle(.white.opacity(0.4))
-                Text(value).font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(.white).lineLimit(1)
+                Text(label).font(.system(size: 10, weight: .medium)).foregroundStyle(.primary.opacity(0.4))
+                Text(value).font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(.primary).lineLimit(1)
             }
             Spacer()
         }
@@ -1541,7 +1541,7 @@ struct PetImageCropView: View {
                     HStack(spacing: 16) {
                         Button("取消") { onCrop(nil) }
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(.primary.opacity(0.7))
                             .padding(.horizontal, 32).padding(.vertical, 14)
                             .background(.white.opacity(0.12), in: Capsule())
                         Button("确认裁剪") { performCrop(in: geo.size) }
@@ -1729,7 +1729,7 @@ struct GoColorPickerSheet: View {
 
                 Text("自定义颜色")
                     .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
 
                 // 预览色块
                 RoundedRectangle(cornerRadius: 20, style: .continuous)

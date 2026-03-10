@@ -113,7 +113,7 @@ struct EditPetSheet: View {
                                         Circle().strokeBorder(.white, lineWidth: 2.5).frame(width: 38, height: 38)
                                         Image(systemName: "checkmark")
                                             .font(.system(size: 11, weight: .black))
-                                            .foregroundStyle(.white)
+                                            .foregroundStyle(.primary)
                                     }
                                 }
                             }

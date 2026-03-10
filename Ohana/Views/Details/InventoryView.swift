@@ -92,13 +92,13 @@ struct InventoryView: View {
                             VStack(spacing: 12) {
                                 Image(systemName: "shippingbox")
                                     .font(.system(size: 40))
-                                    .foregroundStyle(.white.opacity(0.2))
+                                    .foregroundStyle(.primary.opacity(0.2))
                                 Text("百宝箱空空如也")
                                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.4))
+                                    .foregroundStyle(.primary.opacity(0.4))
                                 Text("前往椰子商店兑换更多有趣的道具吧！")
                                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.3))
+                                    .foregroundStyle(.primary.opacity(0.3))
                             }
                             .padding(.top, 60)
                         }
@@ -125,7 +125,7 @@ struct InventoryView: View {
                     .foregroundStyle(Color.goLime)
                 Text(title)
                     .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
             }
             .padding(.horizontal, 4)
             
@@ -147,10 +147,10 @@ struct InventoryView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.name)
                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text(item.description)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
             }
             Spacer()
             
@@ -208,17 +208,17 @@ struct InventoryView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.name)
                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text(item.description)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
             }
             Spacer()
             
             if item.id == "fx_popout_card" {
                 Text("已绑定")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
             } else {
                 Toggle("", isOn: isActive)
                     .tint(Color.goLime)
@@ -238,7 +238,7 @@ struct InventoryView: View {
                 .font(.system(size: 28))
             Text(name)
                 .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
             Spacer()
             if let suf = suffix {
                 Text(suf)
@@ -247,7 +247,7 @@ struct InventoryView: View {
             } else {
                 Text("x\(count)")
                     .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
             }
         }
         .padding(16)

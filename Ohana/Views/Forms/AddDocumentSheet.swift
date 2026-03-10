@@ -372,7 +372,7 @@ struct AddDocumentSheet: View {
                             Button { previewAttachment = nil } label: {
                                 Image(systemName: "xmark.circle.fill")
                                     .font(.system(size: 28))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                                     .shadow(radius: 4)
                             }
                             .padding(16)
@@ -409,7 +409,7 @@ struct AddDocumentSheet: View {
                 .background(color.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
             Text(label)
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.55))
+                .foregroundStyle(.primary.opacity(0.55))
         }
         .frame(maxWidth: .infinity)
     }
@@ -635,7 +635,7 @@ struct EditDocumentSheet: View {
                                     .overlay(alignment: .topTrailing) {
                                         Button { attachmentImage = nil } label: {
                                             Image(systemName: "xmark.circle.fill")
-                                                .font(.system(size: 20)).foregroundStyle(.white).padding(6)
+                                                .font(.system(size: 20)).foregroundStyle(.primary).padding(6)
                                         }
                                     }
                             }.buttonStyle(.plain)
@@ -703,7 +703,7 @@ struct EditDocumentSheet: View {
                     Color.black.ignoresSafeArea()
                     Image(uiImage: img).resizable().scaledToFit().ignoresSafeArea()
                     VStack { HStack { Spacer(); Button { showingPreview = false } label: {
-                        Image(systemName: "xmark.circle.fill").font(.system(size: 28)).foregroundStyle(.white).padding(16)
+                        Image(systemName: "xmark.circle.fill").font(.system(size: 28)).foregroundStyle(.primary).padding(16)
                     }}; Spacer() }
                 }
             }

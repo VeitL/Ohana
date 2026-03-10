@@ -89,11 +89,11 @@ struct HumanWorkoutCard: View {
                     }
                     Text("运动记录")
                         .font(OhanaFont.headline())
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(OhanaFont.caption(.semibold))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                 }
                 .padding(.horizontal, 16).padding(.vertical, 12)
             }
@@ -106,10 +106,10 @@ struct HumanWorkoutCard: View {
                 HStack(spacing: 8) {
                     Image(systemName: "hammer.fill")
                         .font(OhanaFont.callout())
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                     Text("🚧 Apple Health 接入中")
                         .font(OhanaFont.subheadline(.medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.primary.opacity(0.5))
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
@@ -121,7 +121,7 @@ struct HumanWorkoutCard: View {
                 
                 Text("手动记录功能正常使用")
                     .font(OhanaFont.caption())
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
                     .padding(.horizontal, 16)
             }
             .padding(.vertical, 8)
@@ -225,12 +225,12 @@ struct HumanWorkoutCard: View {
                 HStack(spacing: 6) {
                     Text(name)
                         .font(OhanaFont.subheadline(.bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     // Mock: 不显示 HealthKit 标记
                 }
                 Text(date, format: .dateTime.month().day().hour().minute())
                     .font(OhanaFont.caption())
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(.primary.opacity(0.45))
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
@@ -240,11 +240,11 @@ struct HumanWorkoutCard: View {
                 if distance > 0.01 {
                     Text(String(format: "%.1f km", distance))
                         .font(OhanaFont.caption())
-                        .foregroundStyle(.white.opacity(0.45))
+                        .foregroundStyle(.primary.opacity(0.45))
                 } else if calories > 0 {
                     Text("\(calories) kcal")
                         .font(OhanaFont.caption())
-                        .foregroundStyle(.white.opacity(0.45))
+                        .foregroundStyle(.primary.opacity(0.45))
                 }
             }
         }
@@ -255,10 +255,10 @@ struct HumanWorkoutCard: View {
         VStack(spacing: 8) {
             Image(systemName: "figure.run.circle")
                 .font(OhanaFont.metric(size: 36))
-                .foregroundStyle(.white.opacity(0.2))
+                .foregroundStyle(.primary.opacity(0.2))
             Text("暂无运动记录")
                 .font(OhanaFont.subheadline())
-                .foregroundStyle(.white.opacity(0.35))
+                .foregroundStyle(.primary.opacity(0.35))
             Button { showAddSheet = true } label: {
                 Text("+ 添加运动")
                     .font(OhanaFont.caption(.bold))
@@ -294,7 +294,7 @@ struct AddWorkoutSheet: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("运动类型")
                                 .font(OhanaFont.subheadline(.bold))
-                                .foregroundStyle(.white.opacity(0.6))
+                                .foregroundStyle(.primary.opacity(0.6))
                             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 10) {
                                 ForEach(WorkoutType.allCases, id: \.self) { type in
                                     Button { selectedType = type } label: {
@@ -335,7 +335,7 @@ struct AddWorkoutSheet: View {
                                 .foregroundStyle(Color.goPrimary)
                             Text("日期")
                                 .font(OhanaFont.callout(.semibold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                             Spacer()
                             DatePicker("", selection: $date, displayedComponents: .date)
                                 .datePickerStyle(.compact)
@@ -352,7 +352,7 @@ struct AddWorkoutSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("取消") { dismiss() }
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(.primary.opacity(0.7))
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("保存") { save() }
@@ -372,12 +372,12 @@ struct AddWorkoutSheet: View {
                 .frame(width: 24)
             Text(label)
                 .font(OhanaFont.callout(.medium))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(.primary.opacity(0.7))
             Spacer()
             TextField(placeholder, text: text)
                 .keyboardType(.decimalPad)
                 .font(OhanaFont.callout(.bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .multilineTextAlignment(.trailing)
                 .frame(width: 80)
         }
@@ -435,17 +435,17 @@ struct HumanWorkoutHistoryView: View {
                             VStack(spacing: 12) {
                                 Text("还没有运动记录")
                                     .font(OhanaFont.body())
-                                    .foregroundStyle(.white.opacity(0.35))
+                                    .foregroundStyle(.primary.opacity(0.35))
                                     .padding(.top, 60)
                                 
                                 // 🚧 占位提示
                                 HStack(spacing: 8) {
                                     Image(systemName: "hammer.fill")
                                         .font(OhanaFont.callout())
-                                        .foregroundStyle(.white.opacity(0.4))
+                                        .foregroundStyle(.primary.opacity(0.4))
                                     Text("Apple Health 同步功能开发中")
                                         .font(OhanaFont.subheadline(.medium))
-                                        .foregroundStyle(.white.opacity(0.5))
+                                        .foregroundStyle(.primary.opacity(0.5))
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
@@ -491,7 +491,7 @@ struct HumanWorkoutHistoryView: View {
                 .foregroundStyle(color)
             Text(label)
                 .font(OhanaFont.caption())
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.primary.opacity(0.5))
         }
         .frame(maxWidth: .infinity)
     }
@@ -501,7 +501,7 @@ struct HumanWorkoutHistoryView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("手动记录")
                 .font(OhanaFont.subheadline(.bold))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(.primary.opacity(0.7))
                 .padding(.horizontal, 16)
 
             VStack(spacing: 0) {
@@ -514,10 +514,10 @@ struct HumanWorkoutHistoryView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(log.workoutType.rawValue)
                                 .font(OhanaFont.subheadline(.bold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                             Text(log.date, format: .dateTime.year().month().day())
                                 .font(OhanaFont.caption())
-                                .foregroundStyle(.white.opacity(0.4))
+                                .foregroundStyle(.primary.opacity(0.4))
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 2) {
@@ -527,7 +527,7 @@ struct HumanWorkoutHistoryView: View {
                             if log.distanceKm > 0.01 {
                                 Text(String(format: "%.1f km", log.distanceKm))
                                     .font(OhanaFont.caption())
-                                    .foregroundStyle(.white.opacity(0.4))
+                                    .foregroundStyle(.primary.opacity(0.4))
                             }
                         }
                         Button {

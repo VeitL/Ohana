@@ -26,15 +26,15 @@ struct PetDocumentsCard: View {
                         .foregroundStyle(Color.goCardCyan)
                     Text("证件管理")
                         .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Spacer()
                     HStack(spacing: 6) {
                         Text("\(pet.documents.count) 份")
                             .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                         Image(systemName: "chevron.right")
                             .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.25))
+                            .foregroundStyle(.primary.opacity(0.25))
                     }
                 }
 
@@ -46,7 +46,7 @@ struct PetDocumentsCard: View {
                                 Text(doc.documentCategory.emoji)
                                 Text(doc.title.isEmpty ? doc.category : doc.title)
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                                 Spacer()
                                 Text(doc.isExpired ? "已过期" : "即将到期")
                                     .font(.system(size: 10, weight: .bold))
@@ -59,7 +59,7 @@ struct PetDocumentsCard: View {
                 } else if pet.documents.isEmpty {
                     Text("暂无证件，点击添加")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(.primary.opacity(0.3))
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 4)
                 } else {
@@ -74,7 +74,7 @@ struct PetDocumentsCard: View {
                         if pet.documents.count > 5 {
                             Text("+\(pet.documents.count - 5)")
                                 .font(.system(size: 11, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.4))
+                                .foregroundStyle(.primary.opacity(0.4))
                         }
                     }
                 }

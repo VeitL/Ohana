@@ -19,11 +19,11 @@ struct PetHealthLogCard: View {
                     .foregroundStyle(Color.goRed)
                 Text("健康日志")
                     .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Spacer()
                 Text("\(pet.healthLogs.count) 条")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
             }
 
             let recentLogs = pet.healthLogs.sorted { $0.date > $1.date }.prefix(5)
@@ -33,11 +33,11 @@ struct PetHealthLogCard: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(log.type)
                             .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         if !log.note.isEmpty {
                             Text(log.note)
                                 .font(.system(size: 12))
-                                .foregroundStyle(.white.opacity(0.4))
+                                .foregroundStyle(.primary.opacity(0.4))
                                 .lineLimit(1)
                         }
                         // 显示有效期
@@ -78,7 +78,7 @@ struct PetHealthLogCard: View {
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(log.date, style: .date)
                             .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                         if log.cost > 0 {
                             Text("¥\(Int(log.cost))")
                                 .font(.system(size: 11, weight: .bold))
@@ -91,7 +91,7 @@ struct PetHealthLogCard: View {
             if pet.healthLogs.isEmpty {
                 Text("暂无健康日志")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 8)
             }
@@ -145,7 +145,7 @@ struct HealthLogListView: View {
                     if filteredLogs.isEmpty {
                         Text("暂无记录")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                             .padding(.top, 40)
                     }
                     Spacer(minLength: 40)
@@ -197,11 +197,11 @@ struct HealthLogListView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(log.type)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 if !log.note.isEmpty {
                     Text(log.note)
                         .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.primary.opacity(0.5))
                         .lineLimit(2)
                 }
             }
@@ -209,7 +209,7 @@ struct HealthLogListView: View {
             VStack(alignment: .trailing, spacing: 3) {
                 Text(log.date, style: .date)
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.primary.opacity(0.5))
                 if log.cost > 0 {
                     Text("¥\(Int(log.cost))")
                         .font(.system(size: 12, weight: .bold, design: .rounded))

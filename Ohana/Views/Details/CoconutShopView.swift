@@ -167,7 +167,7 @@ struct CoconutShopView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("我的余额")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("🥥")
                         .font(.system(size: 24))
@@ -182,7 +182,7 @@ struct CoconutShopView: View {
             VStack(alignment: .trailing, spacing: 3) {
                 Text("已兑换")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
                 Text("\(purchasedSet.count) 件")
                     .font(.system(size: 18, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goTeal)
@@ -249,12 +249,12 @@ struct CoconutShopView: View {
 
                 Text(item.name)
                     .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
 
                 Text(item.description)
                     .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(.primary.opacity(0.45))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -278,7 +278,7 @@ struct CoconutShopView: View {
                     if !purchased && !canAfford {
                         Text("不足")
                             .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.25))
+                            .foregroundStyle(.primary.opacity(0.25))
                     }
                 }
             }

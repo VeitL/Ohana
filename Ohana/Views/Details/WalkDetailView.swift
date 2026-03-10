@@ -82,7 +82,7 @@ struct WalkDetailView: View {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(.primary.opacity(0.6))
                     }
                 }
             }
@@ -169,10 +169,10 @@ struct WalkDetailView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "map")
                         .font(.system(size: 32))
-                        .foregroundStyle(.white.opacity(0.25))
+                        .foregroundStyle(.primary.opacity(0.25))
                     Text("没有路径数据")
                         .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(.primary.opacity(0.3))
                 }
             }
         }
@@ -206,11 +206,11 @@ struct WalkDetailView: View {
                 .foregroundStyle(color)
             Text(value)
                 .font(.system(size: 15, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .lineLimit(1).minimumScaleFactor(0.7)
             Text(label)
                 .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(.primary.opacity(0.4))
         }
         .frame(maxWidth: .infinity)
     }

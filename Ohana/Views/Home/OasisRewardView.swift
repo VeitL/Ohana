@@ -71,18 +71,18 @@ struct OasisRewardView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("欧哈纳")
                                 .font(.system(size: 12, weight: .black, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.4))
+                                .foregroundStyle(.primary.opacity(0.4))
                                 .tracking(3)
                             Text("绿洲")
                                 .font(.system(size: 38, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                         }
                         Spacer()
                         HStack(spacing: 8) {
                             Button { showCoconutRules = true } label: {
                                 Image(systemName: "info.circle")
                                     .font(.system(size: 18, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.45))
+                                    .foregroundStyle(.primary.opacity(0.45))
                             }
                             .buttonStyle(.plain)
                             // 模块六入口：打卡日历
@@ -106,7 +106,7 @@ struct OasisRewardView: View {
                             } label: {
                                 Image(systemName: "shippingbox.fill")
                                     .font(.system(size: 15))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                                     .frame(width: 32, height: 32)
                                     .background(Color.goLime.opacity(0.12), in: Circle())
                                     .overlay(Circle().strokeBorder(Color.goLime.opacity(0.3), lineWidth: 1))
@@ -318,10 +318,10 @@ struct OasisRewardView: View {
             HStack(spacing: 6) {
                 Text(treeMgr.treeLevel.displayName)
                     .font(.system(size: 20, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text("·  生命之树")
                     .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
             }
 
             // 进度条
@@ -344,7 +344,7 @@ struct OasisRewardView: View {
 
             Text("能量 \(treeMgr.totalEnergy) · 下一级需 \(treeMgr.nextLevelThreshold)")
                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(.primary.opacity(0.3))
         }
     }
 
@@ -406,7 +406,7 @@ struct OasisRewardView: View {
                         .foregroundStyle(Color.goLime)
                     Text("打卡日历")
                         .font(.system(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                 }
                 Spacer()
                 // 连胜天数
@@ -425,7 +425,7 @@ struct OasisRewardView: View {
                 ForEach(["日","一","二","三","四","五","六"], id: \.self) { d in
                     Text(d)
                         .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(.primary.opacity(0.3))
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -481,7 +481,7 @@ struct OasisRewardView: View {
                     Text("📦").font(.system(size: 14))
                     Text("补签包")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(.primary.opacity(0.7))
                     Text("×\(makeupPackCount)")
                         .font(.system(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(makeupPackCount > 0 ? Color.goLime : .white.opacity(0.3))
@@ -494,7 +494,7 @@ struct OasisRewardView: View {
                 } else {
                     Text("在椰子商店购买补签包")
                         .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.25))
+                        .foregroundStyle(.primary.opacity(0.25))
                 }
             }
         }
@@ -605,7 +605,7 @@ struct OasisRewardView: View {
                 Text(emoji).font(.system(size: 30))
                 Text(title)
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Spacer()
                 Text(subtitle)
                     .font(.system(size: 11, weight: .medium))
@@ -628,7 +628,7 @@ struct OasisRewardView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text(locked ? "即将上线" : subtitle)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(locked ? .white.opacity(0.25) : accent.opacity(0.8))
@@ -650,7 +650,7 @@ struct OasisRewardView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Text(subtitle)
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(accent.opacity(0.75))
@@ -659,7 +659,7 @@ struct OasisRewardView: View {
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.2))
+                    .foregroundStyle(.primary.opacity(0.2))
             }
             .padding(.horizontal, 14).padding(.vertical, 11)
             .frame(maxWidth: .infinity)
@@ -774,7 +774,7 @@ private struct CoconutRulesSheet: View {
                                     .font(.system(size: 28))
                                 Text("打卡次数越多，椰子越多，生命之树越旺！")
                                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.35))
+                                    .foregroundStyle(.primary.opacity(0.35))
                                     .multilineTextAlignment(.center)
                             }
                             Spacer()
@@ -814,11 +814,11 @@ private struct CoconutRulesSheet: View {
                 Text(emoji).font(.system(size: 18))
                 Text(title)
                     .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
             }
             Text(subtitle)
                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(.primary.opacity(0.4))
         }
     }
 
@@ -829,12 +829,12 @@ private struct CoconutRulesSheet: View {
                 .font(.system(size: 28))
             Text(card.title)
                 .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Text(card.desc)
                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.45))
+                .foregroundStyle(.primary.opacity(0.45))
                 .lineLimit(2)
             Spacer(minLength: 0)
             Text(card.reward)
@@ -875,10 +875,10 @@ private struct CoconutRulesSheet: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text(desc)
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.primary.opacity(0.4))
             }
             Spacer()
         }

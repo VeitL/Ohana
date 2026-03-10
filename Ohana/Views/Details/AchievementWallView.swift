@@ -43,7 +43,7 @@ struct AchievementWallView: View {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(.primary.opacity(0.6))
                     }
                 }
             }
@@ -64,7 +64,7 @@ struct AchievementWallView: View {
                     .foregroundStyle(Color.goLime)
                 Text("已解锁")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.primary.opacity(0.5))
             }
             .frame(maxWidth: .infinity)
 
@@ -73,10 +73,10 @@ struct AchievementWallView: View {
             VStack(spacing: 6) {
                 Text("\(total)")
                     .font(.system(size: 36, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text("共计")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.primary.opacity(0.5))
             }
             .frame(maxWidth: .infinity)
 
@@ -88,7 +88,7 @@ struct AchievementWallView: View {
                     .foregroundStyle(Color.goTeal)
                 Text("完成度")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.primary.opacity(0.5))
             }
             .frame(maxWidth: .infinity)
         }
@@ -142,7 +142,7 @@ struct AchievementWallView: View {
             } else {
                 Text(badge.description)
                     .font(.system(size: 9))
-                    .foregroundStyle(.white.opacity(0.25))
+                    .foregroundStyle(.primary.opacity(0.25))
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
             }

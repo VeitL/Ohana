@@ -54,7 +54,7 @@ struct PottyOverviewView: View {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(.primary.opacity(0.7))
                     }
                 }
             }
@@ -69,17 +69,17 @@ struct PottyOverviewView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("便便追踪")
                         .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text("\(todayCount)")
                             .font(.system(size: 44, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Text("次")
                             .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(Color.brown.opacity(0.9))
                         Text("· 今日")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                     }
                 }
                 Spacer()
@@ -103,7 +103,7 @@ struct PottyOverviewView: View {
                         if item.count > 0 {
                             Text("\(item.count)")
                                 .font(.system(size: 10, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(.primary.opacity(0.7))
                         }
                         RoundedRectangle(cornerRadius: 5)
                             .fill(
@@ -116,7 +116,7 @@ struct PottyOverviewView: View {
                             .frame(height: max(6, CGFloat(item.count) * 18))
                         Text(item.date, format: .dateTime.weekday(.abbreviated))
                             .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -133,7 +133,7 @@ struct PottyOverviewView: View {
                             Text(type.emoji).font(.system(size: 22))
                             Text(type.rawValue)
                                 .font(.system(size: 10, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(.primary.opacity(0.7))
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)

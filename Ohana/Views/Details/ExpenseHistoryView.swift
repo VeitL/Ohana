@@ -103,11 +103,11 @@ struct ExpenseHistoryView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(selectedRange.rawValue + "花费")
                         .font(.system(size: 16, weight: .black, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(.primary.opacity(0.6))
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text("¥\(Int(rangeTotal))")
                             .font(.system(size: 44, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                             .contentTransition(.numericText())
                             .animation(.spring(response: 0.4), value: rangeTotal)
                     }
@@ -147,7 +147,7 @@ struct ExpenseHistoryView: View {
             if categoryBreakdown.isEmpty {
                 Text("暂无花费记录")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 30)
             } else {
@@ -178,11 +178,11 @@ struct ExpenseHistoryView: View {
                                 Text(cat.emoji).font(.system(size: 13))
                                 Text(cat.rawValue)
                                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.8))
+                                    .foregroundStyle(.primary.opacity(0.8))
                                 Spacer()
                                 Text("\(pct)%")
                                     .font(.system(size: 10, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.4))
+                                    .foregroundStyle(.primary.opacity(0.4))
                                 Text("¥\(Int(amount))")
                                     .font(.system(size: 11, weight: .black, design: .rounded))
                                     .foregroundStyle(Color.goYellow)
@@ -215,11 +215,11 @@ struct ExpenseHistoryView: View {
                 HStack {
                     Text("花费记录")
                         .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Spacer()
                     Text("\(sortedLogs.count) 条")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 12)
@@ -232,7 +232,7 @@ struct ExpenseHistoryView: View {
                         if sortedLogs.isEmpty {
                             Text("还没有花费记录\n点击右上角 + 开始记录")
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.35))
+                                .foregroundStyle(.primary.opacity(0.35))
                                 .multilineTextAlignment(.center)
                                 .padding(.vertical, 40)
                         }
@@ -255,15 +255,15 @@ struct ExpenseHistoryView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(log.category)
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 HStack(spacing: 8) {
                     Text(log.date, format: .dateTime.year().month().day())
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.primary.opacity(0.4))
                     if !log.note.isEmpty {
                         Text(log.note)
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                             .lineLimit(1)
                     }
                 }
@@ -281,7 +281,7 @@ struct ExpenseHistoryView: View {
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.3))
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
@@ -304,7 +304,7 @@ struct ExpenseHistoryView: View {
                 VStack(spacing: 20) {
                     Text("记录花费")
                         .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 24)
 
@@ -317,7 +317,7 @@ struct ExpenseHistoryView: View {
                             TextField("0", text: $newAmount)
                                 .keyboardType(.decimalPad)
                                 .font(.system(size: 56, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.primary)
                         }
                         .padding(.horizontal, 24).padding(.vertical, 20)
                         .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 20))
@@ -325,14 +325,14 @@ struct ExpenseHistoryView: View {
                         .padding(.horizontal, 24)
                         Text("金额 (元)")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.4))
                     }
 
                     // 分类选择
                     VStack(alignment: .leading, spacing: 10) {
                         Text("分类")
                             .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                             .padding(.horizontal, 24)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 10) {
@@ -360,10 +360,10 @@ struct ExpenseHistoryView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("备注（可选）")
                             .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         TextField("例如：定期疫苗", text: $newNote)
                             .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                             .padding(.horizontal, 16).padding(.vertical, 14)
                             .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
                             .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.white.opacity(0.1), lineWidth: 1))
@@ -374,7 +374,7 @@ struct ExpenseHistoryView: View {
                     HStack {
                         Text("日期")
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Spacer()
                         DatePicker("", selection: $newDate, in: ...Date(), displayedComponents: .date)
                             .datePickerStyle(.compact)
