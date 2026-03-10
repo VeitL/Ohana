@@ -9,51 +9,55 @@ import SwiftUI
 
 struct ArkBackgroundView: View {
     var level: IslandLevel = .seedling
-    @Environment(\.colorScheme) private var colorScheme
+
+    @State private var animate1 = false
+    @State private var animate2 = false
+    @State private var animate3 = false
 
     var body: some View {
         ZStack {
-            // 基础渐变（随等级进化）
-            LinearGradient(
-                colors: colorScheme == .dark ? level.backgroundColors : level.backgroundColorsLight,
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            // 基础深蓝底色
+            Color.goDeepNavy
+                .ignoresSafeArea()
 
-            // Level 2+：繁花光晕
-            if level.showBlossoms {
-                RadialGradient(
-                    colors: [Color.goMint.opacity(0.08), .clear],
-                    center: .topLeading,
-                    startRadius: 0,
-                    endRadius: 320
-                )
-                .ignoresSafeArea()
-                RadialGradient(
-                    colors: [Color.goTeal.opacity(0.06), .clear],
-                    center: .bottomTrailing,
-                    startRadius: 0,
-                    endRadius: 280
-                )
-                .ignoresSafeArea()
-            }
+            // 光晕 1
+            Circle()
+                .fill(Color.goLime)
+                .frame(width: 300, height: 300)
+                .blur(radius: 60)
+                .opacity(0.06)
+                .offset(x: animate1 ? 150 : -120, y: animate1 ? 250 : -200)
+                .onAppear {
+                    withAnimation(.easeInOut(duration: 12).repeatForever(autoreverses: true)) {
+                        animate1.toggle()
+                    }
+                }
 
-            // Level 3：极光层
-            if level.showAurora {
-                LinearGradient(
-                    colors: [
-                        Color(hex: "7B4FFF").opacity(0.15),
-                        Color(hex: "00D4AA").opacity(0.10),
-                        .clear,
-                        Color(hex: "4338FF").opacity(0.12)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-                .blendMode(.screen)
-            }
+            // 光晕 2
+            Circle()
+                .fill(Color.goPrimary)
+                .frame(width: 250, height: 250)
+                .blur(radius: 50)
+                .opacity(0.08)
+                .offset(x: animate2 ? -200 : 150, y: animate2 ? 100 : -150)
+                .onAppear {
+                    withAnimation(.easeInOut(duration: 15).repeatForever(autoreverses: true)) {
+                        animate2.toggle()
+                    }
+                }
+
+            // 光晕 3
+            Circle()
+                .fill(Color.goMint)
+                .frame(width: 200, height: 200)
+                .blur(radius: 40)
+                .opacity(0.05)
+                .offset(x: animate3 ? 100 : -150, y: animate3 ? -250 : 300)
+                .onAppear {
+                    withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) {
+                        animate3.toggle()
+                    }
+                }
 
             // 微妙噪点纹理保留
             NoiseTextureView()
@@ -61,6 +65,7 @@ struct ArkBackgroundView: View {
                 .blendMode(.overlay)
                 .ignoresSafeArea()
         }
+        .ignoresSafeArea()
     }
 }
 
