@@ -27,11 +27,7 @@ struct ArkBackgroundView: View {
                 .blur(radius: 60)
                 .opacity(0.06)
                 .offset(x: animate1 ? 150 : -120, y: animate1 ? 250 : -200)
-                .onAppear {
-                    withAnimation(.easeInOut(duration: 12).repeatForever(autoreverses: true)) {
-                        animate1.toggle()
-                    }
-                }
+                .animation(.easeInOut(duration: 12).repeatForever(autoreverses: true), value: animate1)
 
             // 光晕 2
             Circle()
@@ -40,11 +36,7 @@ struct ArkBackgroundView: View {
                 .blur(radius: 50)
                 .opacity(0.08)
                 .offset(x: animate2 ? -200 : 150, y: animate2 ? 100 : -150)
-                .onAppear {
-                    withAnimation(.easeInOut(duration: 15).repeatForever(autoreverses: true)) {
-                        animate2.toggle()
-                    }
-                }
+                .animation(.easeInOut(duration: 15).repeatForever(autoreverses: true), value: animate2)
 
             // 光晕 3
             Circle()
@@ -53,11 +45,7 @@ struct ArkBackgroundView: View {
                 .blur(radius: 40)
                 .opacity(0.05)
                 .offset(x: animate3 ? 100 : -150, y: animate3 ? -250 : 300)
-                .onAppear {
-                    withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) {
-                        animate3.toggle()
-                    }
-                }
+                .animation(.easeInOut(duration: 10).repeatForever(autoreverses: true), value: animate3)
 
             // 微妙噪点纹理保留
             NoiseTextureView()
@@ -66,6 +54,11 @@ struct ArkBackgroundView: View {
                 .ignoresSafeArea()
         }
         .ignoresSafeArea()
+        .onAppear {
+            animate1 = true
+            animate2 = true
+            animate3 = true
+        }
     }
 }
 
