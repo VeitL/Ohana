@@ -168,16 +168,6 @@ struct GoQuickActionCard: View {
                 )
             )
         }
-        .simultaneousGesture(
-            LongPressGesture(minimumDuration: 0.5).onEnded { _ in
-                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                if let lp = onLongPress {
-                    lp()
-                } else {
-                    showDeleteConfirm = true
-                }
-            }
-        )
         .contextMenu {
             if let reminder = pendingReminder {
                 Button {
@@ -187,6 +177,14 @@ struct GoQuickActionCard: View {
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                 } label: {
                     Label("完成待办", systemImage: "checkmark.circle.fill")
+                }
+            }
+            
+            if let lp = onLongPress {
+                Button {
+                    lp()
+                } label: {
+                    Label("查看详情", systemImage: "doc.text.magnifyingglass")
                 }
             }
             if isGroom, let onAdd = onAddReminder {
