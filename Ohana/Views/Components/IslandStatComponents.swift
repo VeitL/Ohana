@@ -64,19 +64,19 @@ struct IslandStatCard<Chart: View>: View {
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(accentColor)
                 Text(title)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.footnote(.bold))
                     .foregroundStyle(.primary.opacity(0.55))
             }
 
             // 大数字
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(value)
-                    .font(.system(size: 34, weight: .black, design: .rounded))
+                    .font(OhanaFont.metric(size: 34))
                     .foregroundStyle(.primary)
                     .contentTransition(.numericText())
                 if !unit.isEmpty {
                     Text(unit)
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .font(OhanaFont.callout(.bold))
                         .foregroundStyle(accentColor)
                 }
             }
@@ -91,7 +91,7 @@ struct IslandStatCard<Chart: View>: View {
                     OverlappingAvatarsView(emojis: avatarEmojis)
                     if !subtitle.isEmpty {
                         Text(subtitle)
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .font(OhanaFont.caption2(.medium))
                             .foregroundStyle(.primary.opacity(0.3))
                             .lineLimit(1)
                     }
@@ -104,14 +104,13 @@ struct IslandStatCard<Chart: View>: View {
                 }
             } else if !subtitle.isEmpty {
                 Text(subtitle)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.caption(.medium))
                     .foregroundStyle(.primary.opacity(0.35))
                     .lineLimit(2)
             }
         }
-        .padding(.vertical, 16)
-        .padding(.horizontal, 4)
-        .frame(width: 170, height: 212)
+        .padding(16)
+        .frame(width: 260, height: 212)
         .contentShape(Rectangle())
         .onTapGesture { onTap?() }
     }
@@ -121,7 +120,7 @@ struct IslandStatCard<Chart: View>: View {
 struct MultiPetLineChart: View {
     // [(petName, values, color)]
     let series: [(String, [Double], Color)]
-    @State private var animPhase: CGFloat = 0.0
+    @State private var revealProgress: CGFloat = 0.0
 
     private var allValues: [Double] { series.flatMap { $0.1 } }
     private var minV: Double { (allValues.min() ?? 0) - 0.1 }
@@ -132,14 +131,29 @@ struct MultiPetLineChart: View {
         count <= 1 ? w / 2 : CGFloat(i) / CGFloat(count - 1) * w
     }
     private func yPos(_ v: Double, h: CGFloat) -> CGFloat {
-        let rawY = h - CGFloat((v - minV) / range) * h
-        return h - (h - rawY) * animPhase
+        h - CGFloat((v - minV) / range) * h
+    }
+
+    private var animationKey: String {
+        series
+            .map { name, values, _ in
+                let joined = values.map { String(format: "%.3f", $0) }.joined(separator: ",")
+                return "\(name):\(joined)"
+            }
+            .joined(separator: "|")
+    }
+
+    private func playAnimation() {
+        revealProgress = 0
+        withAnimation(.linear(duration: 0.5)) {
+            revealProgress = 1.0
+        }
     }
 
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width, h = geo.size.height
-            ZStack {
+            let chartContent = ZStack {
                 if allValues.isEmpty {
                     Text("暂无数据")
                         .font(.system(size: 10, weight: .medium))
@@ -182,16 +196,19 @@ struct MultiPetLineChart: View {
                             if let last = values.last {
                                 Circle().fill(color).frame(width: 5, height: 5)
                                     .position(x: xPos(values.count-1, count: values.count, w: w), y: yPos(last, h: h))
+                                    .opacity(revealProgress > 0.98 ? 1 : 0)
                             }
                         }
                     }
                 }
             }
-            .onAppear {
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1)) {
-                    animPhase = 1.0
+            chartContent
+                .mask(alignment: .leading) {
+                    Rectangle()
+                        .frame(width: max(1, w * revealProgress))
                 }
-            }
+            .onAppear { playAnimation() }
+            .onChange(of: animationKey) { _, _ in playAnimation() }
         }
     }
 }
@@ -200,6 +217,7 @@ struct MultiPetLineChart: View {
 struct MiniLineChart: View {
     let values: [Double]
     let accentColor: Color
+    @State private var revealProgress: CGFloat = 0.0
 
     private var minV: Double { (values.min() ?? 0) - 0.1 }
     private var maxV: Double { (values.max() ?? 1) + 0.1 }
@@ -212,10 +230,21 @@ struct MiniLineChart: View {
         h - CGFloat((v - minV) / range) * h
     }
 
+    private var animationKey: String {
+        values.map { String(format: "%.3f", $0) }.joined(separator: ",")
+    }
+
+    private func playAnimation() {
+        revealProgress = 0
+        withAnimation(.linear(duration: 0.45)) {
+            revealProgress = 1.0
+        }
+    }
+
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width, h = geo.size.height
-            ZStack {
+            let chartContent = ZStack {
                 if values.count >= 2 {
                     // 填充渐变
                     Path { path in
@@ -255,6 +284,7 @@ struct MiniLineChart: View {
                             .fill(accentColor)
                             .frame(width: 5, height: 5)
                             .position(x: xPos(values.count - 1, w: w), y: yPos(last, h: h))
+                            .opacity(revealProgress > 0.98 ? 1 : 0)
                     }
                 } else {
                     Text("暂无数据")
@@ -263,6 +293,13 @@ struct MiniLineChart: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
+            chartContent
+                .mask(alignment: .leading) {
+                    Rectangle()
+                        .frame(width: max(1, w * revealProgress))
+                }
+            .onAppear { playAnimation() }
+            .onChange(of: animationKey) { _, _ in playAnimation() }
         }
     }
 }
@@ -273,6 +310,17 @@ struct MiniBarChart: View {
     let labels: [String]
     let accentColor: Color
     @State private var animPhase: CGFloat = 0.0
+
+    private var animationKey: String {
+        values.map { String(format: "%.3f", $0) }.joined(separator: ",")
+    }
+
+    private func playAnimation() {
+        animPhase = 0
+        withAnimation(.linear(duration: 0.35)) {
+            animPhase = 1.0
+        }
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -306,11 +354,8 @@ struct MiniBarChart: View {
                 }
             }
             .frame(width: w, height: h, alignment: .bottom)
-            .onAppear {
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1)) {
-                    animPhase = 1.0
-                }
-            }
+            .onAppear { playAnimation() }
+            .onChange(of: animationKey) { _, _ in playAnimation() }
         }
     }
 }
@@ -322,6 +367,19 @@ struct MultiPetExpenseBar: View {
     @State private var animPhase: CGFloat = 0.0
 
     private var maxAmount: Double { series.map { $0.1 }.max() ?? 1 }
+
+    private var animationKey: String {
+        series
+            .map { name, value, _ in "\(name):\(String(format: "%.3f", value))" }
+            .joined(separator: "|")
+    }
+
+    private func playAnimation() {
+        animPhase = 0
+        withAnimation(.linear(duration: 0.4)) {
+            animPhase = 1.0
+        }
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -346,7 +404,7 @@ struct MultiPetExpenseBar: View {
                         VStack(spacing: 2) {
                             Spacer(minLength: 0)
                             RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                .fill(LinearGradient(colors: [color, color.opacity(0.55)], startPoint: .top, endPoint: .bottom))
+                                .fill(color)
                                 .frame(width: barW, height: barH)
                             Text(name)
                                 .font(.system(size: 7, weight: .bold, design: .rounded))
@@ -357,11 +415,8 @@ struct MultiPetExpenseBar: View {
                     }
                 }
                 .frame(width: w, height: h, alignment: .bottom)
-                .onAppear {
-                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1)) {
-                        animPhase = 1.0
-                    }
-                }
+                .onAppear { playAnimation() }
+                .onChange(of: animationKey) { _, _ in playAnimation() }
             }
         }
     }
@@ -573,7 +628,6 @@ struct SynergyFlashCard: View {
                 }
                 .padding(16)
                 .frame(width: 280, height: 160)
-                .ohanaStandardCard()
                 .contentShape(Rectangle())
                 .onTapGesture {
                     withAnimation(.spring(response: 0.3)) {
@@ -615,6 +669,7 @@ struct SynergyFlashCard: View {
 struct CoconutWealthRankingCard: View {
     let pets: [Pet]
     let humans: [Human]
+    var onTap: (() -> Void)? = nil
     // 全岛总资产：直接使用 QuestManager.coconutCount（全局唯一数据源）
     private var computedTotal: Int {
         return QuestManager.shared.coconutCount
@@ -631,20 +686,20 @@ struct CoconutWealthRankingCard: View {
         var all: [RankEntry] = []
         all += pets.map   { RankEntry(emoji: $0.avatarEmoji, name: $0.name,  balance: $0.coconutBalance) }
         all += humans.map { RankEntry(emoji: $0.avatarEmoji, name: $0.name,  balance: $0.coconutBalance) }
-        // Bug11: 即使 balance=0 也展示所有成员，按余额降序，最多显示前4名
-        return all.sorted { $0.balance > $1.balance }.prefix(4).map { $0 }
+        // Bug11: 即使 balance=0 也展示所有成员，按余额降序，最多显示前3名
+        return all.sorted { $0.balance > $1.balance }.prefix(3).map { $0 }
     }
 
     private let rankEmojis = ["🥇", "🥈", "🥉", "4️⃣"]
 
     var body: some View {
-        NavigationLink(destination: IslandWealthDashboardView()) {
+        Button { onTap?() } label: {
             VStack(alignment: .leading, spacing: 12) {
                 // 标题行
                 HStack(spacing: 6) {
                     Text("🌴")
                         .font(.system(size: 14))
-                    Text("全岛总资产")
+                    Text("Ohana财富")
                         .font(.system(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(.primary.opacity(0.5))
                         .tracking(1)
@@ -713,6 +768,13 @@ struct MiniRingChart: View {
     let accentColor: Color
     @State private var animPhase: CGFloat = 0.0
 
+    private func playAnimation() {
+        animPhase = 0
+        withAnimation(.easeOut(duration: 0.28)) {
+            animPhase = 1.0
+        }
+    }
+
     var body: some View {
         ZStack {
             Circle()
@@ -724,7 +786,7 @@ struct MiniRingChart: View {
                     style: StrokeStyle(lineWidth: 5, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
-                .animation(.spring(response: 0.6), value: progress * Double(animPhase))
+                .animation(.easeOut(duration: 0.28), value: progress * Double(animPhase))
 
             Text("\(Int(progress * 100))%")
                 .font(.system(size: 11, weight: .black, design: .rounded))
@@ -732,10 +794,7 @@ struct MiniRingChart: View {
         }
         .frame(width: 44, height: 44)
         .frame(maxWidth: .infinity, alignment: .center)
-        .onAppear {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1)) {
-                animPhase = 1.0
-            }
-        }
+        .onAppear { playAnimation() }
+        .onChange(of: progress) { _, _ in playAnimation() }
     }
 }

@@ -949,43 +949,90 @@ struct AddPetWizardView: View {
         }
     }
 
-    // MARK: - Step 8: Appearance
-    private var stepAppearance: some View {
-        VStack(spacing: 20) {
-            let bi = selectedBreedInfo
-            let coatItems = (bi?.coatColors.map { ($0.name, $0.hex) }) ?? PetBreedDatabase.genericCoatColors.map { ($0.name, $0.hex) }
-            let eyeItems = (bi?.eyeColors.map { ($0.name, $0.hex) }) ?? PetBreedDatabase.genericEyeColors.map { ($0.name, $0.hex) }
+    // MARK: - Resolved colors for silhouette preview
+    private var resolvedCoatColor: Color {
+        if coatColor == "自定义" { return customCoatUIColor }
+        let bi = selectedBreedInfo
+        let coatItems = bi?.coatColors ?? PetBreedDatabase.genericCoatColors
+        if let found = coatItems.first(where: { $0.name == coatColor }) { return found.color }
+        // 检查图案
+        if let pattern = PetCoatPattern.allCases.first(where: { $0.displayName == coatColor }) {
+            // 图案没法直接变成 Color，用默认暖色
+            switch pattern {
+            case .calico: return Color(hex: "D4B896")
+            case .silverChinchilla: return Color(hex: "C8C8C8")
+            case .tortoiseshell: return Color(hex: "6E2C00")
+            case .cowPattern: return .white
+            case .bicolor: return Color(hex: "95ADBE")
+            }
+        }
+        return Color(hex: "E8C49A") // fallback 杏色
+    }
+    private var resolvedEyeColor: Color {
+        if eyeColor == "自定义" { return customEyeUIColor }
+        let bi = selectedBreedInfo
+        let eyeItems = bi?.eyeColors ?? PetBreedDatabase.genericEyeColors
+        if let found = eyeItems.first(where: { $0.name == eyeColor }) { return found.color }
+        return Color(hex: "6B3A2A") // fallback 棕色
+    }
 
-            colorSection(
-                title: "毛色",
-                items: coatItems,
-                patternItems: PetCoatPattern.allCases,
-                selected: $coatColor,
-                showCustomPicker: $showCoatColorPicker,
-                customColor: $customCoatUIColor
-            )
-            .onChange(of: coatColor) { _, newColor in
-                autoMapThemeFromCoat(newColor, items: coatItems)
+    // MARK: - Step 8: Appearance
+    @State private var showCoatSheet = false
+    @State private var showEyeSheet = false
+
+    private var stepAppearance: some View {
+        let bi = selectedBreedInfo
+        let coatItems = (bi?.coatColors.map { ($0.name, $0.hex) }) ?? PetBreedDatabase.genericCoatColors.map { ($0.name, $0.hex) }
+        let eyeItems  = (bi?.eyeColors.map  { ($0.name, $0.hex) }) ?? PetBreedDatabase.genericEyeColors.map  { ($0.name, $0.hex) }
+
+        return VStack(spacing: 24) {
+
+            // ── 互动宠物剪影（点击不同部位触发选色）
+            VStack(spacing: 6) {
+                PetSilhouetteView(
+                    species: species,
+                    coatColor: resolvedCoatColor,
+                    eyeColor: resolvedEyeColor,
+                    patternName: PetCoatPattern.allCases.first(where: { $0.displayName == coatColor })?.displayName,
+                    onTapCoat: { showCoatSheet = true },
+                    onTapEye:  { showEyeSheet  = true }
+                )
+                .animation(.easeInOut(duration: 0.3), value: resolvedCoatColor.description)
+                .animation(.easeInOut(duration: 0.3), value: resolvedEyeColor.description)
+
+                // 操作提示
+                HStack(spacing: 16) {
+                    Label {
+                        Text("点击身体 → 毛色")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    } icon: {
+                        Circle()
+                            .fill(resolvedCoatColor)
+                            .frame(width: 10, height: 10)
+                    }
+                    Label {
+                        Text("点击眼睛 → 瞳色")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    } icon: {
+                        Circle()
+                            .fill(resolvedEyeColor)
+                            .frame(width: 10, height: 10)
+                    }
+                }
+                .padding(.top, 4)
             }
 
             GoDashedDivider()
-            colorSection(
-                title: "瞳色",
-                items: eyeItems,
-                patternItems: [],
-                selected: $eyeColor,
-                showCustomPicker: $showEyeColorPicker,
-                customColor: $customEyeUIColor
-            )
 
-            GoDashedDivider()
+            // ── 主题色选择
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text("主题色").font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(.primary.opacity(0.6))
                     Spacer()
                     Text("卡片背景色").font(.system(size: 11, weight: .medium)).foregroundStyle(.primary.opacity(0.3))
                 }
-                // preset grid
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6), spacing: 12) {
                     ForEach(PetThemeColor.allCases, id: \.rawValue) { tc in
                         let tcHex = tc.hexValue
@@ -1004,22 +1051,16 @@ struct AddPetWizardView: View {
                         }
                         .disabled(isUsed)
                     }
-                    // Custom color swatch
                     ColorPicker("", selection: Binding(
                         get: { Color(hex: themeColorHex) },
-                        set: { newColor in
-                            if let hex = newColor.toHex() { themeColorHex = hex }
-                        }
+                        set: { newColor in if let hex = newColor.toHex() { themeColorHex = hex } }
                     ), supportsOpacity: false)
                     .labelsHidden()
                     .frame(width: 40, height: 40)
                     .scaleEffect(1.3)
                     .clipShape(Circle())
-                    .overlay(
-                        Circle().strokeBorder(.white.opacity(0.3), lineWidth: 1)
-                    )
+                    .overlay(Circle().strokeBorder(.white.opacity(0.3), lineWidth: 1))
                 }
-                // Preview
                 HStack(spacing: 8) {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(Color(hex: themeColorHex))
@@ -1028,6 +1069,175 @@ struct AddPetWizardView: View {
                         .font(.system(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(.primary.opacity(0.45))
                 }
+            }
+        }
+        // ── 毛色选择 Sheet
+        .sheet(isPresented: $showCoatSheet) {
+            ColorPickerSheet(
+                title: "选择毛色",
+                subtitle: breed.isEmpty ? species : breed,
+                items: coatItems,
+                patternItems: PetCoatPattern.allCases,
+                selected: $coatColor,
+                customColor: $customCoatUIColor,
+                showCustomPicker: $showCoatColorPicker
+            )
+            .onChange(of: coatColor) { _, newColor in
+                autoMapThemeFromCoat(newColor, items: coatItems)
+            }
+        }
+        // ── 瞳色选择 Sheet
+        .sheet(isPresented: $showEyeSheet) {
+            ColorPickerSheet(
+                title: "选择瞳色",
+                subtitle: breed.isEmpty ? species : breed,
+                items: eyeItems,
+                patternItems: [],
+                selected: $eyeColor,
+                customColor: $customEyeUIColor,
+                showCustomPicker: $showEyeColorPicker
+            )
+        }
+    }
+
+    // MARK: - Color Picker Sheet（弹出选色面板）
+    private struct ColorPickerSheet: View {
+        let title: String
+        let subtitle: String
+        let items: [(String, String)]
+        let patternItems: [PetCoatPattern]
+        @Binding var selected: String
+        @Binding var customColor: Color
+        @Binding var showCustomPicker: Bool
+        @Environment(\.dismiss) private var dismiss
+
+        var body: some View {
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        // 颜色网格
+                        LazyVGrid(
+                            columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5),
+                            spacing: 12
+                        ) {
+                            ForEach(items, id: \.0) { name, hex in
+                                colorCell(name: name, hex: hex, isPattern: false)
+                            }
+                            ForEach(patternItems, id: \.rawValue) { pattern in
+                                colorCell(name: pattern.displayName, hex: patternPreviewHex(pattern), isPattern: true)
+                            }
+                            // 自定义
+                            customCell
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                    }
+                    .padding(.bottom, 40)
+                }
+                .navigationTitle(title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("完成") { dismiss() }
+                            .fontWeight(.bold)
+                            .foregroundStyle(Color.goLime)
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .sheet(isPresented: $showCustomPicker) {
+                ColorPicker("自定义颜色", selection: $customColor, supportsOpacity: false)
+                    .padding(32)
+                    .presentationDetents([.height(320)])
+            }
+        }
+
+        @ViewBuilder
+        private func colorCell(name: String, hex: String, isPattern: Bool) -> some View {
+            let isSelected = selected == name
+            Button {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                    selected = name
+                }
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            } label: {
+                VStack(spacing: 6) {
+                    ZStack {
+                        Circle()
+                            .fill(Color(hex: hex))
+                            .frame(width: 44, height: 44)
+                            .shadow(color: Color(hex: hex).opacity(0.4), radius: 6, x: 0, y: 3)
+                        if isSelected {
+                            Circle().strokeBorder(.white, lineWidth: 2.5)
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 13, weight: .black))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                    Text(name)
+                        .font(.system(size: 10, weight: isSelected ? .bold : .medium, design: .rounded))
+                        .foregroundStyle(isSelected ? .primary : .secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(
+                    isSelected
+                        ? Color(hex: hex).opacity(0.12)
+                        : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+            }
+            .buttonStyle(.plain)
+        }
+
+        private var customCell: some View {
+            let isSelected = selected == "自定义"
+            return Button {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) { selected = "自定义" }
+                showCustomPicker = true
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            } label: {
+                VStack(spacing: 6) {
+                    ZStack {
+                        Circle()
+                            .fill(isSelected ? customColor : Color.secondary.opacity(0.2))
+                            .frame(width: 44, height: 44)
+                        if !isSelected {
+                            Image(systemName: "paintpalette.fill")
+                                .font(.system(size: 18))
+                                .foregroundStyle(.secondary)
+                        }
+                        if isSelected {
+                            Circle().strokeBorder(.white, lineWidth: 2.5)
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 13, weight: .black))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                    Text("自定义")
+                        .font(.system(size: 10, weight: isSelected ? .bold : .medium, design: .rounded))
+                        .foregroundStyle(isSelected ? .primary : .secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(
+                    isSelected ? customColor.opacity(0.12) : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+            }
+            .buttonStyle(.plain)
+        }
+
+        private func patternPreviewHex(_ pattern: PetCoatPattern) -> String {
+            switch pattern {
+            case .calico: return "D4B896"
+            case .silverChinchilla: return "C8C8C8"
+            case .tortoiseshell: return "6E2C00"
+            case .cowPattern: return "F5F5F0"
+            case .bicolor: return "95ADBE"
             }
         }
     }

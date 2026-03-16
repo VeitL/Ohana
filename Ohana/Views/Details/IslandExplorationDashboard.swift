@@ -207,42 +207,76 @@ struct IslandExplorationDashboard: View {
     // MARK: - 模块A：核心总数据 Hero Display
 
     private var heroDisplay: some View {
-        VStack(spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
+            // 时间 filter
             Picker("", selection: $timeRange) {
                 ForEach(ExploreTimeRange.allCases) { r in
                     Text(r.rawValue).tag(r)
                 }
             }
             .pickerStyle(.segmented)
+            .padding(.horizontal, 4)
 
-            VStack(spacing: 6) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(
-                        (totalMeters / 1000)
-                            .formatted(.number.precision(.fractionLength(totalMeters >= 1000 ? 1 : 0)))
-                    )
-                    .font(.system(size: 54, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
-                    .contentTransition(.numericText())
-                    .animation(.spring(response: 0.4), value: totalMeters)
+            // 大数字
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(
+                    (totalMeters / 1000)
+                        .formatted(.number.precision(.fractionLength(totalMeters >= 1000 ? 1 : 0)))
+                )
+                .font(.system(size: 46, weight: .black, design: .rounded))
+                .foregroundStyle(.primary)
+                .contentTransition(.numericText())
+                .animation(.spring(response: 0.4), value: totalMeters)
 
-                    Text("km")
-                        .font(.system(size: 20, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.goLime)
-                        .padding(.bottom, 4)
-                }
+                Text("km")
+                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.goLime)
+                    .padding(.bottom, 3)
+
+                Spacer()
 
                 Text(funSubtitle)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.4))
-                    .multilineTextAlignment(.center)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(.primary.opacity(0.35))
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: 140)
+                    .lineLimit(2)
+            }
+            .padding(.horizontal, 4)
+
+            // 悬浮堆叠柱状图（无背景卡片）
+            let data = stackedPoints
+            if !data.isEmpty {
+                let uniqueDays = Set(data.map { Calendar.current.startOfDay(for: $0.date) }).count
+                let barWidth: MarkDimension = uniqueDays <= 1 ? .fixed(16) : .automatic
+                Chart(data) { pt in
+                    BarMark(
+                        x: .value("日期", pt.date, unit: .day),
+                        y: .value("km", pt.km),
+                        width: barWidth
+                    )
+                    .foregroundStyle(pt.petColor)
+                    .cornerRadius(3)
+                }
+                .chartXAxis {
+                    AxisMarks(values: .stride(by: .day, count: uniqueDays > 14 ? 7 : 1)) { _ in
+                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                            .foregroundStyle(.primary.opacity(0.06))
+                        AxisValueLabel(format: .dateTime.day())
+                            .font(.system(size: 9))
+                            .foregroundStyle(.primary.opacity(0.4))
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks(values: .automatic(desiredCount: 3)) { _ in
+                        AxisGridLine().foregroundStyle(.primary.opacity(0.05))
+                        AxisValueLabel().font(.system(size: 8)).foregroundStyle(.primary.opacity(0.3))
+                    }
+                }
+                .frame(height: 120)
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 20)
-        .frame(maxWidth: .infinity)
-        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(.white.opacity(0.09), lineWidth: 1))
+        .padding(.horizontal, 4)
     }
 
     // MARK: - 模块B：荣誉看板 Fun Bento

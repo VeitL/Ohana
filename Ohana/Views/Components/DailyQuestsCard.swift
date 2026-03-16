@@ -265,42 +265,30 @@ struct DailyQuestsCard: View {
 
     // 展开状态 — 正常显示任务列表
     private var expandedCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             // Header
             HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "scroll.fill")
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
                         .foregroundStyle(Color.goYellow)
-                        .font(.system(size: 14, weight: .bold))
-                    Text("今日岛屿委托")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .font(.system(size: 16, weight: .bold))
+                    Text("今日任务")
+                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .foregroundStyle(.primary.opacity(0.9))
+                        .tracking(1)
                 }
                 Spacer()
                 // 进度 pill
                 Text("\(completedCount)/\(quests.count)")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(allDone ? Color.arkInk : .white.opacity(0.5))
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 10).padding(.vertical, 4)
-                    .background(allDone ? Color.goLime : Color.white.opacity(0.1), in: Capsule())
+                    .background(Color.goLime.opacity(0.15), in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(Color.goLime.opacity(0.3), lineWidth: 1)
+                    )
             }
-
-            // 进度条
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.08))
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.goLime, Color.goTeal],
-                                startPoint: .leading, endPoint: .trailing
-                            )
-                        )
-                        .frame(width: quests.isEmpty ? 0 : geo.size.width * CGFloat(completedCount) / CGFloat(quests.count))
-                        .animation(.spring(response: 0.5), value: completedCount)
-                }
-            }
-            .frame(height: 5)
 
             // 任务列表
             ForEach(quests) { quest in
@@ -345,34 +333,54 @@ struct DailyQuestsCard: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .padding(16)
-        .goTranslucentCard(cornerRadius: 20)
+        .padding(20)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     private func questRow(_ quest: IslandQuest) -> some View {
         HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(quest.isCompleted ? Color.goLime.opacity(0.15) : Color.white.opacity(0.06))
-                    .frame(width: 36, height: 36)
-                Text(quest.emoji)
-                    .font(.system(size: 16))
-            }
-            VStack(alignment: .leading, spacing: 2) {
+            // 左侧：复选框与任务名称
+            HStack(spacing: 12) {
+                // Checkbox
+                ZStack {
+                    Circle()
+                        .fill(quest.isCompleted ? Color.goLime : .clear)
+                        .frame(width: 20, height: 20)
+                        .overlay(
+                            Circle()
+                                .strokeBorder(quest.isCompleted ? .clear : .white.opacity(0.2), lineWidth: 2)
+                        )
+                    if quest.isCompleted {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Color.arkInk)
+                    }
+                }
+                
                 Text(quest.title)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(quest.isCompleted ? .white.opacity(0.4) : .white)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(quest.isCompleted ? .white.opacity(0.3) : .white.opacity(0.9))
                     .strikethrough(quest.isCompleted, color: .white.opacity(0.3))
-                Text(quest.subtitle)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.primary.opacity(0.3))
             }
+            
             Spacer()
-            if quest.isCompleted {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(Color.goLime)
-                    .font(.system(size: 18))
+            
+            // 右侧：奖励显示
+            HStack(spacing: 4) {
+                Text("🥥")
+                    .font(.system(size: 12))
+                Text("+15") // 暂定固定奖励
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(quest.isCompleted ? .white.opacity(0.3) : Color.goYellow)
             }
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(Color.black.opacity(0.2), in: RoundedRectangle(cornerRadius: 8))
         }
+        .padding(14)
+        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(Color.white.opacity(0.05), lineWidth: 1)
+        )
     }
 }

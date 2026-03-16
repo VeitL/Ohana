@@ -8,11 +8,14 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - 欧哈纳图鉴主视图
+// MARK: - Ohana 图鉴主视图
 
 struct CrewRosterOverlay: View {
     let onSelectPet: (Pet) -> Void
     let onSelectHuman: (Human) -> Void
+    var hideToolbar: Bool = false
+    var searchTrigger: Bool = false
+    var addMemberTrigger: Bool = false
 
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
@@ -20,6 +23,7 @@ struct CrewRosterOverlay: View {
     @Query(sort: \Plant.createdAt) private var plants: [Plant]
 
     @State private var searchText = ""
+    @State private var isSearchActive = false
     @State private var showingAddEntity = false
     @State private var showingCoconutLog = false
 
@@ -43,11 +47,43 @@ struct CrewRosterOverlay: View {
                     .allowsHitTesting(false)
 
                 VStack(spacing: 0) {
-                    // 顶部搜索栏
-                    dexSearchBar
+                    // R6: 全局 header 占位
+                    Spacer().frame(height: 70)
+
+                    if !hideToolbar {
+                        // 顶部搜索栏 + 添加按钮（独立使用时显示）
+                        HStack(spacing: 10) {
+                            dexSearchBar
+                            Button { showingAddEntity = true } label: {
+                                Image(systemName: "plus.circle.fill")
+                                    .symbolRenderingMode(.hierarchical)
+                                    .foregroundStyle(Color.goLime)
+                                    .font(.system(size: 24))
+                            }
+                        }
                         .padding(.horizontal, 16)
                         .padding(.top, 4)
                         .padding(.bottom, 10)
+                    } else if isSearchActive {
+                        // 嵌入 tab 时，仅当搜索激活时显示搜索栏
+                        HStack(spacing: 10) {
+                            dexSearchBar
+                            Button {
+                                withAnimation(.spring(response: 0.25)) {
+                                    isSearchActive = false
+                                    searchText = ""
+                                }
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(.primary.opacity(0.4))
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 4)
+                        .padding(.bottom, 10)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
 
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(spacing: 20) {
@@ -62,26 +98,14 @@ struct CrewRosterOverlay: View {
                     }
                 }
             }
-            .navigationTitle("欧哈纳图鉴")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 16) {
-                        // 1. 添加实体按钮（独立，自带图标背景）
-                        Button { showingAddEntity = true } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .symbolRenderingMode(.hierarchical)
-                                .foregroundStyle(Color.goLime)
-                                .font(.system(size: 20))
-                        }
-
-                        // 2. 椰子余额（完全独立的视觉个体）
-                        CoconutBalanceCapsule { showingCoconutLog = true }
-                    }
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingAddEntity) { AddEntityView() }
             .sheet(isPresented: $showingCoconutLog) { CoconutLogView() }
+            .onChange(of: searchTrigger) { _, _ in
+                withAnimation(.spring(response: 0.25)) { isSearchActive.toggle() }
+                if !isSearchActive { searchText = "" }
+            }
+            .onChange(of: addMemberTrigger) { _, _ in showingAddEntity = true }
         }
     }
 
@@ -123,16 +147,12 @@ struct CrewRosterOverlay: View {
                 .padding(.horizontal, 16)
             }
 
-            // ── 人类区（横向宽卡片）
+            // ── 人类区（正方形卡片 2列 Bento）
             if !filteredHumans.isEmpty {
                 dexSectionLabel("HUMANS", count: filteredHumans.count, emoji: "👥")
-                VStack(spacing: 10) {
-                    ForEach(filteredHumans) { human in
-                        HumanWideCard(human: human) {
-                            onSelectHuman(human)
-                        }
-                    }
-                }
+                BentoHumanGrid(humans: filteredHumans, onSelect: { human in
+                    onSelectHuman(human)
+                })
                 .padding(.horizontal, 16)
             }
 
@@ -228,32 +248,32 @@ struct CrewRosterOverlay: View {
     }
 }
 
-// MARK: - 宠物 Bento 网格（不对称混排）
+// MARK: - 宠物两列网格
 
 private struct BentoPetGrid: View {
     let pets: [Pet]
     let onSelect: (Pet) -> Void
 
+    private let columns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
+
     var body: some View {
-        // 每行 2 个正方形，奇数最后一个占满整行
-        let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
         LazyVGrid(columns: columns, spacing: 12) {
-            ForEach(Array(pets.enumerated()), id: \.element.id) { idx, pet in
-                PetSquareCard(pet: pet, isWide: pets.count % 2 == 1 && idx == pets.count - 1) {
+            ForEach(pets) { pet in
+                PetSquareCard(pet: pet) {
                     onSelect(pet)
                 }
-                // 奇数末尾卡片占满剩余列
-                .gridCellColumns(pets.count % 2 == 1 && idx == pets.count - 1 ? 2 : 1)
             }
         }
     }
 }
 
-// MARK: - 宠物正方形卡片（P10：与首页 ArkCrewIDCardView 正面完全一致）
+// MARK: - 宠物小卡片（两列网格用，单击进详情，只显示名字）
 
 private struct PetSquareCard: View {
     let pet: Pet
-    var isWide: Bool = false
     let onTap: () -> Void
 
     @Environment(\.modelContext) private var modelContext
@@ -263,30 +283,62 @@ private struct PetSquareCard: View {
     @State private var showNameMismatch = false
 
     private var themeColor: Color { Color(hex: pet.themeColorHex.isEmpty ? "4338FF" : pet.themeColorHex) }
-    private var cardHeight: CGFloat { isWide ? 140 : 160 }
+
+    private var posterHeadline: String {
+        let trimmed = pet.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return "OHANA" }
+        return String(trimmed.prefix(6)).uppercased()
+    }
 
     var body: some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            onTap()
-        } label: {
+        Button(action: onTap) {
             GeometryReader { geo in
                 let w = geo.size.width
                 let h = geo.size.height
                 let avatarImage: UIImage? = pet.avatarImageData.flatMap { UIImage(data: $0) }
                 let isTransparent: Bool = pet.avatarImageData.map { ImageCutoutService.isTransparentPNG($0) } ?? false
+                let isPopout = isTransparent && avatarImage != nil
 
                 ZStack {
-                    if isTransparent, let img = avatarImage {
-                        petCutoutCard(geo: geo, img: img, w: w, h: h)
-                    } else if let img = avatarImage {
-                        petBlurCard(geo: geo, img: img, w: w, h: h)
-                    } else {
-                        petEmojiCard(geo: geo, w: w, h: h)
-                    }
+                    // 蓝色渐变背景（与首页 posterFront 一致）
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color(hex: "233BFF"), Color(hex: "141FAE")],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [.clear, .black.opacity(0.22)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+
+                    // 背景大字（橙红色，与首页一致）
+                    Text(posterHeadline)
+                        .font(.system(size: w * 0.28, weight: .black, design: .rounded))
+                        .foregroundStyle(Color(hex: "FF5A3D").opacity(0.85))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.25)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .offset(y: -h * 0.22)
+                        .allowsHitTesting(false)
+
+                    // 左半：头像主体层（与首页布局一致）
+                    miniSubjectLayer(avatarImage: avatarImage, isPopout: isPopout, w: w, h: h)
+                        .frame(width: w * 0.52, height: h)
+                        .clipped()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                        .allowsHitTesting(false)
                 }
             }
-            .frame(height: cardHeight)
+            .aspectRatio(1.586, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .shadow(color: Color(hex: "233BFF").opacity(0.35), radius: 12, x: 0, y: 4)
         }
         .buttonStyle(.plain)
         .scaleEffect(isPressed ? 0.95 : 1.0)
@@ -326,94 +378,174 @@ private struct PetSquareCard: View {
         }
     }
 
-    // ── 方案1：透明抠图 破框悬浮
-    private func petCutoutCard(geo: GeometryProxy, img: UIImage, w: CGFloat, h: CGFloat) -> some View {
-        ZStack(alignment: .bottomLeading) {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(themeColor.mix(with: .black, by: 0.30))
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(LinearGradient(
-                    colors: [themeColor.opacity(0.85),
-                             themeColor.mix(with: Color(hex: "000000"), by: 0.45).opacity(0.95)],
-                    startPoint: .topTrailing, endPoint: .bottomLeading))
-            // 右侧名字
-            HStack(alignment: .bottom, spacing: 0) {
-                Spacer().frame(width: w * 0.48)
-                miniInfoColumn(w: w, h: h)
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        // 破框层
-        .overlay(alignment: .bottomLeading) {
-            ZStack(alignment: .bottom) {
-                Ellipse()
-                    .fill(RadialGradient(colors: [themeColor.opacity(0.55), .clear],
-                                        center: .center, startRadius: 0, endRadius: 50))
-                    .frame(width: 100, height: 28).blur(radius: 8).offset(y: 6)
-                ZStack {
-                    Image(uiImage: img).resizable().scaledToFit()
-                        .scaleEffect(1.06).colorMultiply(.white)
+    @ViewBuilder
+    private func miniSubjectLayer(avatarImage: UIImage?, isPopout: Bool, w: CGFloat, h: CGFloat) -> some View {
+        if let avatarImage {
+            if isPopout {
+                // 透明抠图：居左贴边
+                ZStack(alignment: .bottom) {
+                    Image(uiImage: avatarImage)
+                        .resizable()
+                        .scaledToFit()
+                        .scaleEffect(0.88)
+                        .colorMultiply(.white)
                         .shadow(color: .white, radius: 0, x: 2, y: 0)
                         .shadow(color: .white, radius: 0, x: -2, y: 0)
                         .shadow(color: .white, radius: 0, x: 0, y: -2)
-                    Image(uiImage: img).resizable().scaledToFit()
+                    Image(uiImage: avatarImage)
+                        .resizable()
+                        .scaledToFit()
                 }
-                .frame(width: w * 0.50, height: h * 1.12)
-                .offset(y: -12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .shadow(color: .black.opacity(0.28), radius: 10, x: 0, y: 6)
+            } else {
+                // 普通照片：填满左半区域，右侧羽化
+                Image(uiImage: avatarImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: w * 0.52, height: h)
+                    .clipped()
+                    .saturation(1.02)
+                    .contrast(1.03)
+                    .mask(
+                        LinearGradient(
+                            stops: [
+                                .init(color: .black, location: 0.0),
+                                .init(color: .black, location: 0.65),
+                                .init(color: .clear, location: 1.0)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .overlay {
+                        LinearGradient(
+                            colors: [
+                                .white.opacity(0.08),
+                                .clear,
+                                themeColor.opacity(0.18)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .blendMode(.screen)
+                    }
             }
-            .frame(width: w * 0.50, alignment: .bottom)
-            .allowsHitTesting(false)
+        } else {
+            // 无头像：剪影
+            let silhouetteSpecies: String = {
+                let value = pet.species.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if value == "dog" || pet.species == "狗" { return "狗" }
+                if value == "cat" || pet.species == "猫" { return "猫" }
+                return pet.species
+            }()
+            ZStack {
+                Ellipse()
+                    .fill(Color.black.opacity(0.16))
+                    .frame(width: w * 0.28, height: 12)
+                    .blur(radius: 6)
+                    .offset(y: h * 0.14)
+                PetSilhouetteView(
+                    species: silhouetteSpecies,
+                    coatColor: pet.coatColor.isEmpty ? Color(hex: "E8C49A") : Color(hex: pet.coatColor),
+                    eyeColor: pet.eyeColor.isEmpty ? Color(hex: "6B3A2A") : Color(hex: pet.eyeColor)
+                )
+                .scaleEffect(0.42)
+                .frame(width: w * 0.38, height: h * 0.68)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .shadow(color: themeColor.opacity(0.45), radius: 10, x: 0, y: 4)
+    }
+
+    // ── 方案1：透明抠图 破框悬浮
+    private func petCutoutCard(geo: GeometryProxy, img: UIImage, w: CGFloat, h: CGFloat) -> some View {
+        UltimateGlassCard {
+            ZStack(alignment: .bottomLeading) {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(LinearGradient(
+                        colors: [themeColor.opacity(0.85),
+                                 themeColor.mix(with: Color(hex: "000000"), by: 0.45).opacity(0.95)],
+                        startPoint: .topTrailing, endPoint: .bottomLeading))
+                // 右侧名字
+                HStack(alignment: .bottom, spacing: 0) {
+                    Spacer().frame(width: w * 0.48)
+                    miniInfoColumn(w: w, h: h)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            // 破框层
+            .overlay(alignment: .bottomLeading) {
+                ZStack(alignment: .bottom) {
+                    Ellipse()
+                        .fill(RadialGradient(colors: [themeColor.opacity(0.55), .clear],
+                                            center: .center, startRadius: 0, endRadius: 50))
+                        .frame(width: 100, height: 28).blur(radius: 8).offset(y: 6)
+                    ZStack {
+                        Image(uiImage: img).resizable().scaledToFit()
+                            .scaleEffect(1.06).colorMultiply(.white)
+                            .shadow(color: .white, radius: 0, x: 2, y: 0)
+                            .shadow(color: .white, radius: 0, x: -2, y: 0)
+                            .shadow(color: .white, radius: 0, x: 0, y: -2)
+                        Image(uiImage: img).resizable().scaledToFit()
+                    }
+                    .frame(width: w * 0.50, height: h * 1.12)
+                    .offset(y: -12)
+                }
+                .frame(width: w * 0.50, alignment: .bottom)
+                .allowsHitTesting(false)
+            }
+        }
     }
 
     // ── 方案2：普通照片 高斯模糊背景
     private func petBlurCard(geo: GeometryProxy, img: UIImage, w: CGFloat, h: CGFloat) -> some View {
-        ZStack(alignment: .bottomLeading) {
-            Image(uiImage: img).resizable().scaledToFill()
-                .frame(width: w, height: h).blur(radius: 30)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(LinearGradient(
-                    colors: [Color.black.opacity(0.25), Color.black.opacity(0.52)],
-                    startPoint: .topLeading, endPoint: .bottomTrailing))
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(.ultraThinMaterial.opacity(0.30))
-            Image(uiImage: img).resizable().scaledToFill()
-                .frame(width: w * 0.60, height: h).clipped()
-                .mask(LinearGradient(
-                    stops: [.init(color: .black, location: 0),
-                            .init(color: .black, location: 0.45),
-                            .init(color: .clear, location: 1.0)],
-                    startPoint: .leading, endPoint: .trailing))
-                .allowsHitTesting(false)
-            HStack(alignment: .bottom, spacing: 0) {
-                Spacer().frame(width: w * 0.44)
-                miniInfoColumn(w: w, h: h, textColor: .white)
+        UltimateGlassCard {
+            ZStack(alignment: .bottomLeading) {
+                Image(uiImage: img).resizable().scaledToFill()
+                    .frame(width: w, height: h).blur(radius: 30)
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(LinearGradient(
+                        colors: [Color.black.opacity(0.25), Color.black.opacity(0.52)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing))
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(.ultraThinMaterial.opacity(0.30))
+                Image(uiImage: img).resizable().scaledToFill()
+                    .frame(width: w * 0.60, height: h).clipped()
+                    .mask(LinearGradient(
+                        stops: [.init(color: .black, location: 0),
+                                .init(color: .black, location: 0.45),
+                                .init(color: .clear, location: 1.0)],
+                        startPoint: .leading, endPoint: .trailing))
+                    .allowsHitTesting(false)
+                HStack(alignment: .bottom, spacing: 0) {
+                    Spacer().frame(width: w * 0.44)
+                    miniInfoColumn(w: w, h: h, textColor: .white)
+                }
             }
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: themeColor.opacity(0.35), radius: 10, x: 0, y: 4)
     }
 
     // ── 方案3：纯色渐变 + Emoji
     private func petEmojiCard(geo: GeometryProxy, w: CGFloat, h: CGFloat) -> some View {
-        ZStack(alignment: .bottomLeading) {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(LinearGradient(
-                    colors: [themeColor, themeColor.mix(with: .black, by: 0.45)],
-                    startPoint: .topLeading, endPoint: .bottomTrailing))
-            Text(pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji)
-                .font(.system(size: 56)).minimumScaleFactor(0.5)
-                .frame(width: w * 0.50, height: h * 0.90, alignment: .center)
-                .allowsHitTesting(false)
-            HStack(alignment: .bottom, spacing: 0) {
-                Spacer().frame(width: w * 0.50)
-                miniInfoColumn(w: w, h: h)
+        UltimateGlassCard {
+            ZStack(alignment: .bottomLeading) {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(LinearGradient(
+                        colors: [themeColor, themeColor.mix(with: .black, by: 0.45)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing))
+                Text(pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji)
+                    .font(.system(size: 56)).minimumScaleFactor(0.5)
+                    .frame(width: w * 0.50, height: h * 0.90, alignment: .center)
+                    .allowsHitTesting(false)
+                HStack(alignment: .bottom, spacing: 0) {
+                    Spacer().frame(width: w * 0.50)
+                    miniInfoColumn(w: w, h: h)
+                }
             }
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: themeColor.opacity(0.35), radius: 10, x: 0, y: 4)
     }
 
     // ── 右侧信息列（名字 + 相伴天数）
@@ -425,22 +557,22 @@ private struct PetSquareCard: View {
             if pet.daysTogether > 0 {
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                     Text("\(pet.daysTogether)")
-                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .font(OhanaFont.metric(size: 20))
                         .foregroundStyle(tc)
                     Text("天")
-                        .font(.system(size: 9, weight: .black, design: .rounded))
+                        .font(OhanaFont.caption2(.black))
                         .foregroundStyle(tc.opacity(0.6))
                 }
                 .padding(.bottom, 3)
             }
             Text(pet.name)
-                .font(.system(size: 16, weight: .heavy, design: .rounded))
+                .font(OhanaFont.subheadline(.heavy))
                 .foregroundStyle(tc)
                 .lineLimit(1).minimumScaleFactor(0.45)
                 .padding(.bottom, 4)
             if !pet.ageText.isEmpty {
                 Text(pet.ageText)
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .font(OhanaFont.caption2(.bold))
                     .foregroundStyle(tc.opacity(0.65))
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(tc.opacity(0.15), in: Capsule())
@@ -487,73 +619,221 @@ private struct PetSquareCard: View {
     }
 }
 
-// MARK: - 人类横向宽卡片
+// MARK: - 人类两列网格
 
-private struct HumanWideCard: View {
-    let human: Human
-    let onTap: () -> Void
-    @State private var isPressed = false
+private struct BentoHumanGrid: View {
+    let humans: [Human]
+    let onSelect: (Human) -> Void
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
 
     var body: some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            onTap()
-        } label: {
-            HStack(spacing: 14) {
-                // 头像
-                ZStack {
-                    Circle()
-                        .fill(Color(hex: "667eea").opacity(0.25))
-                        .frame(width: 56, height: 56)
-                    if let data = human.avatarImageData, let ui = UIImage(data: data) {
-                        Image(uiImage: ui)
-                            .resizable().scaledToFill()
-                            .frame(width: 56, height: 56)
-                            .clipShape(Circle())
-                            .overlay(Circle().strokeBorder(.white.opacity(0.15), lineWidth: 2))
-                    } else {
-                        Text(human.avatarEmoji)
-                            .font(.system(size: 28))
-                    }
+        LazyVGrid(columns: columns, spacing: 12) {
+            ForEach(humans) { human in
+                HumanSquareCard(human: human) {
+                    onSelect(human)
                 }
-
-                // 名字 + 角色
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(human.name)
-                        .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
-                    HStack(spacing: 6) {
-                        Text(human.roleText)
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.arkInk)
-                            .padding(.horizontal, 10).padding(.vertical, 3)
-                            .background(Color.goLime, in: Capsule())
-                        if human.birthday != nil {
-                            Text(human.ageText)
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.45))
-                        }
-                    }
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.primary.opacity(0.25))
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .goTranslucentCard(cornerRadius: 20)
+        }
+    }
+}
+
+// MARK: - 人类小卡片（两列网格用，单击进详情，只显示名字）
+
+private struct HumanSquareCard: View {
+    let human: Human
+    let onTap: () -> Void
+
+    @Environment(\.modelContext) private var modelContext
+    @State private var isPressed = false
+    @State private var showDeleteAlert = false
+
+    private var themeColor: Color { Color(hex: human.themeColor) }
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 0) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [themeColor, themeColor.mix(with: .black, by: 0.35)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    humanAvatarContent
+                }
+                .frame(height: 120)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                Text(human.name)
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .padding(.top, 8)
+                    .padding(.horizontal, 4)
+            }
         }
         .buttonStyle(.plain)
-        .scaleEffect(isPressed ? 0.97 : 1.0)
+        .scaleEffect(isPressed ? 0.95 : 1.0)
         .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isPressed)
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { _ in isPressed = true }
                 .onEnded { _ in isPressed = false }
         )
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.7).onEnded { _ in
+                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                showDeleteAlert = true
+            }
+        )
+        .alert("删除 \(human.name)？", isPresented: $showDeleteAlert) {
+            Button("取消", role: .cancel) { }
+            Button("删除", role: .destructive) {
+                modelContext.delete(human)
+                modelContext.safeSave()
+            }
+        } message: {
+            Text("确定要删除 \(human.name) 吗？此操作不可撤销。")
+        }
+    }
+
+    @ViewBuilder
+    private var humanAvatarContent: some View {
+        if let data = human.avatarImageData, let img = UIImage(data: data) {
+            Image(uiImage: img)
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+        } else if !human.avatarEmoji.isEmpty {
+            Text(human.avatarEmoji)
+                .font(.system(size: 44))
+        } else {
+            Text(String(human.name.prefix(1)))
+                .font(.system(size: 36, weight: .black, design: .rounded))
+                .foregroundStyle(.white.opacity(0.6))
+        }
+    }
+
+    // ── 方案1：透明抠图 破框悬浮
+    private func humanCutoutCard(geo: GeometryProxy, img: UIImage, w: CGFloat, h: CGFloat) -> some View {
+        UltimateGlassCard {
+            ZStack(alignment: .bottomLeading) {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(LinearGradient(
+                        colors: [themeColor.opacity(0.85),
+                                 themeColor.mix(with: Color(hex: "000000"), by: 0.45).opacity(0.95)],
+                        startPoint: .topTrailing, endPoint: .bottomLeading))
+                HStack(alignment: .bottom, spacing: 0) {
+                    Spacer().frame(width: w * 0.48)
+                    miniInfoColumn(w: w, h: h)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(alignment: .bottomLeading) {
+                ZStack(alignment: .bottom) {
+                    Ellipse()
+                        .fill(RadialGradient(colors: [themeColor.opacity(0.55), .clear],
+                                            center: .center, startRadius: 0, endRadius: 50))
+                        .frame(width: 100, height: 28).blur(radius: 8).offset(y: 6)
+                    ZStack {
+                        Image(uiImage: img).resizable().scaledToFit()
+                            .scaleEffect(1.06).colorMultiply(.white)
+                            .shadow(color: .white, radius: 0, x: 2, y: 0)
+                            .shadow(color: .white, radius: 0, x: -2, y: 0)
+                            .shadow(color: .white, radius: 0, x: 0, y: -2)
+                        Image(uiImage: img).resizable().scaledToFit()
+                            .clipShape(Circle()) // Apply circular clipping for humans if preferring normal avatar look
+                    }
+                    .frame(width: w * 0.50, height: h * 1.12)
+                    .offset(y: -12)
+                }
+                .frame(width: w * 0.50, alignment: .bottom)
+                .allowsHitTesting(false)
+            }
+        }
+    }
+
+    // ── 方案2：普通照片 高斯模糊背景
+    private func humanBlurCard(geo: GeometryProxy, img: UIImage, w: CGFloat, h: CGFloat) -> some View {
+        UltimateGlassCard {
+            ZStack(alignment: .bottomLeading) {
+                Image(uiImage: img).resizable().scaledToFill()
+                    .frame(width: w, height: h).blur(radius: 30)
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(LinearGradient(
+                        colors: [Color.black.opacity(0.25), Color.black.opacity(0.52)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing))
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(.ultraThinMaterial.opacity(0.30))
+                Image(uiImage: img).resizable().scaledToFill()
+                    .frame(width: w * 0.60, height: h).clipped()
+                    .mask(LinearGradient(
+                        stops: [.init(color: .black, location: 0),
+                                .init(color: .black, location: 0.45),
+                                .init(color: .clear, location: 1.0)],
+                        startPoint: .leading, endPoint: .trailing))
+                    .allowsHitTesting(false)
+                HStack(alignment: .bottom, spacing: 0) {
+                    Spacer().frame(width: w * 0.44)
+                    miniInfoColumn(w: w, h: h, textColor: .white)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+    }
+
+    // ── 方案3：纯色渐变 + Emoji
+    private func humanEmojiCard(geo: GeometryProxy, w: CGFloat, h: CGFloat) -> some View {
+        UltimateGlassCard {
+            ZStack(alignment: .bottomLeading) {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(LinearGradient(
+                        colors: [themeColor, themeColor.mix(with: .black, by: 0.45)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing))
+                Text(human.avatarEmoji.isEmpty ? String(human.name.prefix(1)) : human.avatarEmoji)
+                    .font(.system(size: 56)).minimumScaleFactor(0.5)
+                    .frame(width: w * 0.50, height: h * 0.90, alignment: .center)
+                    .allowsHitTesting(false)
+                HStack(alignment: .bottom, spacing: 0) {
+                    Spacer().frame(width: w * 0.50)
+                    miniInfoColumn(w: w, h: h)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+    }
+
+    // ── 右侧信息列（名字 + 角色）
+    private func miniInfoColumn(w: CGFloat, h: CGFloat, textColor: Color? = nil) -> some View {
+        let bright = ["C8FF00","E8FFB0","B8FFD0","FFF44F","FFEB3B","FFFFFF"]
+        let tc: Color = textColor ?? (bright.contains(human.themeColor.uppercased()) ? Color.arkInk : .white)
+        return VStack(alignment: .trailing, spacing: 0) {
+            Spacer(minLength: 0)
+            
+            Text(human.name)
+                .font(OhanaFont.subheadline(.heavy))
+                .foregroundStyle(tc)
+                .lineLimit(1).minimumScaleFactor(0.45)
+                .padding(.bottom, 4)
+                
+            Text(human.roleText)
+                .font(OhanaFont.caption2(.bold))
+                .foregroundStyle(tc.opacity(0.65))
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(tc.opacity(0.15), in: Capsule())
+                .padding(.bottom, 10)
+        }
+        .padding(.trailing, 10)
+        .frame(width: w * 0.50, alignment: .trailing)
     }
 }
 

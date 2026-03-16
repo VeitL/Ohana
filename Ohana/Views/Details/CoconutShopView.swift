@@ -393,10 +393,10 @@ struct CoconutShopView: View {
             UserDefaults.standard.set(Date().addingTimeInterval(86400), forKey: "shop_streakShieldExpiry")
 
         case "boost_backdate_pack":
-            // 补打卡包：增加 3 张昨日补打卡券库存
+            // 补打卡包：增加 1 张补签券库存
             let key = "inventory_backdate_1day_count"
             let cur = UserDefaults.standard.integer(forKey: key)
-            UserDefaults.standard.set(cur + 3, forKey: key)
+            UserDefaults.standard.set(cur + 1, forKey: key)
 
         case "boost_cooldown_reset":
             // 冷却重置券：清空所有宠物的冷却记录

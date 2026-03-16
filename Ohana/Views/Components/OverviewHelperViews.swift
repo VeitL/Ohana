@@ -8,7 +8,7 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Floating Dock Nav
+// MARK: - Floating Dock Nav（iOS 26 Liquid Glass + GlassEffectContainer morphing）
 struct FloatingDockNav: View {
     @Binding var selectedTab: Int
     let onHome: () -> Void
@@ -16,18 +16,29 @@ struct FloatingDockNav: View {
     let onCrew: () -> Void
     let onOasis: () -> Void
 
-    private let items: [(String, String)] = [
-        ("figure.walk.circle.fill", "Home"),
-        ("chart.bar.fill", "日历"),
-        ("pawprint.fill", "Ohana图鉴"),
-        ("leaf.fill", "绿洲"),
-    ]
+    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Namespace private var dockNamespace
+
+    private var items: [(String, String, Int)] {
+        let l = L10n(appLanguage)
+        return [
+            ("house.fill", l.tabHome, 0),
+            ("calendar", l.tabCalendar, 1),
+            ("pawprint.fill", l.tabCrew, 2),
+            ("leaf.fill", l.tabOasis, 3),
+        ]
+    }
 
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(Array(items.enumerated()), id: \.offset) { idx, item in
+            ForEach(items, id: \.2) { item in
+                let idx = item.2
+                let isSelected = selectedTab == idx
                 Button {
-                    selectedTab = idx
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                        selectedTab = idx
+                    }
                     switch idx {
                     case 0: onHome()
                     case 1: onStats()
@@ -37,26 +48,25 @@ struct FloatingDockNav: View {
                 } label: {
                     VStack(spacing: 3) {
                         Image(systemName: item.0)
-                            .font(.system(size: selectedTab == idx ? 22 : 20, weight: .bold))
-                            .foregroundStyle(selectedTab == idx ? Color.goLime : .white.opacity(0.4))
-                            .scaleEffect(selectedTab == idx ? 1.1 : 1.0)
-                        if selectedTab == idx {
-                            Circle()
-                                .fill(Color.goLime)
-                                .frame(width: 4, height: 4)
-                        }
+                            .font(.system(size: isSelected ? 22 : 20, weight: .bold))
+                            .foregroundStyle(isSelected ? Color.goLime : .primary.opacity(0.4))
+                            .scaleEffect(isSelected ? 1.1 : 1.0)
+                            .animation(.spring(response: 0.35, dampingFraction: 0.75), value: selectedTab)
+                        Circle()
+                            .fill(isSelected ? Color.goLime : Color.clear)
+                            .frame(width: 4, height: 4)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
+                    .contentShape(Rectangle())
                 }
-                .animation(.spring(response: 0.3), value: selectedTab)
+                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 8)
-        .background(Color.goDeepNavy, in: Capsule())
-        .overlay(Capsule().strokeBorder(.white.opacity(0.1), lineWidth: 1))
-        .shadow(color: .black.opacity(0.35), radius: 16, x: 0, y: 6)
-        .padding(.horizontal, 40)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .shadow(color: .black.opacity(0.25), radius: 16, x: 0, y: 6)
+        .padding(.horizontal, 32)
     }
 }
 
@@ -435,7 +445,8 @@ struct HomeSectionEntry: Identifiable {
 
     static let defaults: [HomeSectionEntry] = [
         HomeSectionEntry(id: "batchCheckIn",  title: "一键全家",   subtitle: "极简胶囊条，多宠快捷打卡", icon: "bolt.circle.fill",    colorHex: "FFD60A"),
-        HomeSectionEntry(id: "quickAccess",   title: "快速动作",   subtitle: "毛玻璃正方形快捷入口",    icon: "bolt.fill",           colorHex: "FF8C42"),
+        HomeSectionEntry(id: "homeModule",    title: "岛屿总览",   subtitle: "绿洲等级与打卡统计",      icon: "square.grid.2x2.fill", colorHex: "A78BFA"),
+        HomeSectionEntry(id: "quickAccess",   title: "快速动作",   subtitle: "高级极简快捷入口",        icon: "bolt.fill",           colorHex: "FF8C42"),
         HomeSectionEntry(id: "islandStats",   title: "岛屿统计",   subtitle: "体重/步数/花费/粮仓",     icon: "chart.bar.fill",      colorHex: "00D4AA"),
         HomeSectionEntry(id: "todayTasks",    title: "今日任务",   subtitle: "紧凑任务行 + 进度条",     icon: "checklist",           colorHex: "80FFEA"),
     ]
@@ -460,19 +471,19 @@ struct BentoStatCard: View {
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(accentColor)
                 Text(title)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.55))
+                    .font(OhanaFont.footnote(.bold))
+                    .foregroundStyle(.primary.opacity(0.55))
                     .lineLimit(1)
             }
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(value)
-                    .font(.system(size: 32, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .font(OhanaFont.metric(size: 32))
+                    .foregroundStyle(.primary)
                     .contentTransition(.numericText())
                 if !unit.isEmpty {
                     Text(unit)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(.primary.opacity(0.4))
                 }
             }
             if showMiniBar > 0 || barMax > 0 && showMiniBar >= 0 {
@@ -489,16 +500,15 @@ struct BentoStatCard: View {
                     Image(systemName: (trendUp ?? true) ? "arrow.up.right" : "arrow.down.right")
                         .font(.system(size: 9, weight: .bold))
                     Text(t)
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(OhanaFont.caption2(.bold))
                 }
                 .foregroundStyle((trendUp ?? true) ? Color.goTeal : Color.goOrange)
             }
         }
         .padding(16)
-        .frame(width: 130, height: 130, alignment: .topLeading)
-        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
-            .strokeBorder(.white.opacity(0.1), lineWidth: 1))
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(height: 130)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 }
 

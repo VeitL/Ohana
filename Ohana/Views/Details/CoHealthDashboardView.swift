@@ -11,6 +11,7 @@ import Charts
 struct CoHealthDashboardView: View {
     let human: Human
     @Query(sort: \Pet.name) private var allPets: [Pet]
+    @State private var chartRevealProgress: CGFloat = 0.0
 
     // 取过去30天数据
     private var past30Days: Date {
@@ -21,7 +22,7 @@ struct CoHealthDashboardView: View {
     private var humanWeightPoints: [WeightPoint] {
         Array(
             human.weightLogs
-                .filter { $0.date >= past30Days }
+                .filter { $0.date >= past30Days && $0.weight.isFinite }
                 .sorted { $0.date < $1.date }
                 .suffix(10)
         ).enumerated().map { i, log in
@@ -41,7 +42,7 @@ struct CoHealthDashboardView: View {
     private func petWeightPoints(_ pet: Pet) -> [WeightPoint] {
         Array(
             pet.weightLogs
-                .filter { $0.date >= past30Days }
+                .filter { $0.date >= past30Days && $0.weight.isFinite }
                 .sorted { $0.date < $1.date }
                 .suffix(10)
         ).enumerated().map { i, log in
@@ -77,6 +78,13 @@ struct CoHealthDashboardView: View {
             return "本月你带 \(petName) 走了 \(km)km，\(petName)\(dir) \(String(format: "%.1f", abs(delta)))kg 🎉"
         }
         return "本月你带 \(petName) 走了 \(km)km，继续加油！💪"
+    }
+
+    private func playWeightChartReveal() {
+        chartRevealProgress = 0
+        withAnimation(.easeOut(duration: 0.42)) {
+            chartRevealProgress = 1.0
+        }
     }
 
     var body: some View {
@@ -126,8 +134,8 @@ struct CoHealthDashboardView: View {
                 color: Color.goLime
             )
             miniStat(
-                value: human.weightLogs.sorted { $0.date > $1.date }.first.map {
-                    String(format: "%.1f", $0.weight)
+                value: human.weightLogs.sorted { $0.date > $1.date }.first.flatMap {
+                    $0.weight.isFinite ? String(format: "%.1f", $0.weight) : nil
                 } ?? "--",
                 unit: "kg",
                 label: "当前体重",
@@ -258,7 +266,14 @@ struct CoHealthDashboardView: View {
                     }
                 }
                 .chartPlotStyle { $0.background(.clear) }
+                .mask(alignment: .leading) {
+                    GeometryReader { geo in
+                        Rectangle()
+                            .frame(width: max(1, geo.size.width * chartRevealProgress))
+                    }
+                }
                 .frame(height: 110)
+                .onAppear { playWeightChartReveal() }
             }
         }
     }

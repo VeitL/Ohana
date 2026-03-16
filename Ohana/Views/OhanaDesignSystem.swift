@@ -19,17 +19,17 @@ struct CoconutBalanceCapsule: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 5) {
-                Text("🥥").font(.system(size: 14))
+                Text("🥥").font(.system(size: 13))
                 Text("\(questManager.coconutCount)")
-                    .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.goYellow)
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(.black)
                     .contentTransition(.numericText())
                     .animation(.spring(response: 0.4), value: questManager.coconutCount)
             }
-            .padding(.horizontal, 10).padding(.vertical, 6)
-            .frame(height: 32)
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().strokeBorder(Color.goYellow.opacity(0.3), lineWidth: 1))
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .frame(height: 30)
+            .fixedSize(horizontal: true, vertical: false)
+            .background(Color.goLime, in: Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -651,19 +651,9 @@ public struct OhanaStandardCardModifier: ViewModifier {
     var cornerRadius: CGFloat
     
     public func body(content: Content) -> some View {
-        content
-            .background {
-                if isDarkMode {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(LinearGradient(colors: [Color.goDarkBlue.opacity(0.8), Color.goDeepNavy.opacity(0.9)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .overlay(RoundedRectangle(cornerRadius: cornerRadius).strokeBorder(.white.opacity(0.12), lineWidth: 1))
-                } else {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(.white)
-                        .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        UltimateGlassCard(isDarkMode: isDarkMode) {
+            content
+        }
     }
 }
 

@@ -14,6 +14,7 @@ struct OverviewView: View {
     @Binding var selectedPlant: Plant?
     @Binding var selectedPetTab: PetDetailTab
     
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
@@ -35,14 +36,18 @@ struct OverviewView: View {
     @State private var pendingActionId: String? = nil
     @State private var showingPetPicker = false
     @State private var showingAddQuickAction = false
+    @State private var showingQAManageSheet = false
     @State private var showIslandWeight = false
     @State private var showIslandExpense = false
     @State private var showIslandExplore = false
+    @State private var showIslandWealth = false
     @State private var showingAllFoodManagement = false
     @AppStorage("quickActionItems_v2") private var quickActionItemsJSON: String = ""
     // 首页 section 可见性
-    @AppStorage("home_section_order") private var sectionOrderRaw: String = "batchCheckIn,quickAccess,islandStats,todayTasks"
+    @AppStorage("home_section_order") private var sectionOrderRaw: String = "batchCheckIn,homeModule,quickAccess,islandStats,todayTasks"
     @AppStorage("home_section_hidden") private var hiddenSectionsRaw: String = ""
+    @AppStorage("appLanguage") private var appLanguage = "zh"
+    private var l: L10n { L10n(appLanguage) }
     private var hiddenSections: Set<String> { Set(hiddenSectionsRaw.split(separator: ",").map(String.init)) }
     private var sectionOrder: [String] { sectionOrderRaw.split(separator: ",").map(String.init) }
     // Quick action 额外弹窗
@@ -53,6 +58,12 @@ struct OverviewView: View {
     // Task31: Quick Access 长按导航
     @State private var quickAccessFoodPet: Pet? = nil
     @State private var quickAccessCarePet: Pet? = nil
+    // B7: 长按查看详情 — 对应 sheet
+    @State private var quickWeightDetailPet: Pet? = nil
+    @State private var quickExpenseDetailPet: Pet? = nil
+    @State private var quickWalkDetailPet: Pet? = nil
+    @State private var quickHealthDetailPet: Pet? = nil
+    @State private var quickGroomDetailPet: Pet? = nil
     // task46: 喂食/喂水长按弹窗
     @State private var feedSheetItem: (pet: Pet, actionType: String)? = nil
     // 花费快速记录
@@ -83,12 +94,24 @@ struct OverviewView: View {
     @State private var showDailyCoconut = false
     @State private var coconutFlyOut = false
     // H27fix: 里程碑投喂椰子动效
-    @State private var showMilestoneCoconut = false
+    @State private var showRewardCoconut = false
+    @State private var rewardCoconutAmount: Int = 20
+    @State private var rewardCoconutLabel: String? = nil
     // U9: 记忆碎片滑动消失
     @State private var memoryDismissed = false
     @State private var memoryDragOffset: CGFloat = 0
     // 全局椰子日志显示
     @State private var showingCoconutLog = false
+    // HomeBentoBoxes 跳转
+    @State private var showOasisReward = false
+    @State private var showStreakDetail = false
+    // Header 触发器（tab 1-3 按钮通过 toggle 触发子视图动作）
+    @AppStorage("calendar_viewMode") private var calendarViewModeRaw: String = CalendarViewMode.list.rawValue
+    @State private var calendarAddEventTrigger = false
+    @State private var crewSearchTrigger = false
+    @State private var crewAddMemberTrigger = false
+    @State private var oasisRulesTrigger = false
+    @State private var oasisInventoryTrigger = false
     // Task2 / Bug10: 当前顶牌对应的 Pet ID（AppStorage 保证 NavigationStack 返回后不丢失）
     @AppStorage("overview_activeCritterId") private var activeCritterIdStr: String = ""
     private var activeCritterId: UUID? {
@@ -125,10 +148,10 @@ struct OverviewView: View {
     private var greetingText: String {
         let hour = Calendar.current.component(.hour, from: Date())
         switch hour {
-        case 5..<12: return "Good morning"
-        case 12..<17: return "Good afternoon"
-        case 17..<22: return "Good evening"
-        default: return "Good night"
+        case 5..<12: return l.goodMorning
+        case 12..<17: return l.goodAfternoon
+        case 17..<22: return l.goodEvening
+        default: return l.goodNight
         }
     }
     
@@ -149,7 +172,7 @@ struct OverviewView: View {
                 // F2: tab 内容区切换
                 Group {
                     switch selectedDockTab {
-                    case 1: CalendarView()
+                    case 1: CalendarView(hideToolbar: true, addEventTrigger: calendarAddEventTrigger)
                     case 2: CrewRosterOverlay(
                         onSelectPet: { pet in
                             selectedPetTab = .overview
@@ -157,9 +180,12 @@ struct OverviewView: View {
                         },
                         onSelectHuman: { human in
                             selectedHuman = human
-                        }
+                        },
+                        hideToolbar: true,
+                        searchTrigger: crewSearchTrigger,
+                        addMemberTrigger: crewAddMemberTrigger
                     )
-                    case 3: OasisRewardView()
+                    case 3: OasisRewardView(hideToolbar: true, rulesTrigger: oasisRulesTrigger, inventoryTrigger: oasisInventoryTrigger)
                     default: mainScrollView
                     }
                 }
@@ -229,6 +255,13 @@ struct OverviewView: View {
                 .transition(.opacity)
             }
 
+            // R6: 全局固定前置层 — glass header，4 个 tab 保持不动
+            VStack(spacing: 0) {
+                globalFixedHeader
+                    .padding(.top, 4)
+                Spacer()
+            }
+
             // Floating Dock Nav
             VStack {
                 Spacer()
@@ -243,7 +276,7 @@ struct OverviewView: View {
             }
         }
         // H27fix: 椰子爆出动效挂在页面层（SmartTodayCard本身可能已消失）
-        .coconutRewardOverlay(trigger: $showMilestoneCoconut, amount: 20)
+        .coconutRewardOverlay(trigger: $showRewardCoconut, amount: rewardCoconutAmount, label: rewardCoconutLabel)
         .onAppear {
             for pet in pets {
                 StreakManager.refreshStreak(for: pet, context: modelContext)
@@ -269,7 +302,7 @@ struct OverviewView: View {
             // F1: 迁移旧 sectionOrder，确保所有 section 都存在
             var order = sectionOrderRaw.split(separator: ",").map(String.init)
             order.removeAll { $0 == "petCards" }  // 宠物卡片不再参与排序管理
-            let managedIds = ["batchCheckIn", "quickAccess", "islandStats", "todayTasks"]
+            let managedIds = ["batchCheckIn", "homeModule", "quickAccess", "islandStats", "todayTasks"]
             for id in managedIds where !order.contains(id) { order.append(id) }
             sectionOrderRaw = order.joined(separator: ",")
         }
@@ -287,7 +320,7 @@ struct OverviewView: View {
         }
         .sheet(item: $quickWeightPet) { pet in
             QuickWeightSheet(pet: pet)
-                .presentationDetents([.height(280)])
+                .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
         .fullScreenCover(isPresented: $showIslandWeight) {
@@ -299,11 +332,22 @@ struct OverviewView: View {
         .fullScreenCover(isPresented: $showIslandExplore) {
             IslandExplorationDashboard()
         }
+        .fullScreenCover(isPresented: $showIslandWealth) {
+            IslandWealthDashboardView()
+        }
         .sheet(isPresented: $showingAllFoodManagement) {
             AllPetsFoodOverviewSheet()
         }
         .sheet(isPresented: $showingCoconutLog) {
             CoconutLogView()
+        }
+        .fullScreenCover(isPresented: $showOasisReward) {
+            OasisRewardView()
+        }
+        .sheet(isPresented: $showStreakDetail) {
+            DailyStreakDetailView(pets: pets)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
     }
     
@@ -311,12 +355,11 @@ struct OverviewView: View {
     // Task3: 固定布局顺序（人体工学动线）：
     //   Greeting → MemoryDrop → Carousel → QuickAccess（拇指舒适区）→ IslandStats → SmartToday
     private var mainScrollView: some View {
-        ScrollView(.vertical, showsIndicators: false) {
+        VStack(spacing: 0) {
+            ScrollView(.vertical, showsIndicators: false) {
+            // R6: 全局 header 占位
+            Spacer().frame(height: 70)
             VStack(spacing: 24) {
-                // ── 层1：问候 Header
-                goGreetingHeader
-                    .padding(.top, 8)
-
                 // ── 层2：记忆碎片卡（可侧滑移出）
                 if !memoryDismissed, let memory = MemoryEngine.pickFragment(pets: pets, plants: plants) {
                     MemoryDropCard(fragment: memory)
@@ -359,7 +402,7 @@ struct OverviewView: View {
                     CritterDeckCarousel(
                         pets: pets,
                         humans: humans,
-                        onSelectPet: { selectedPet = $0 },
+                        onSelectPet: { selectedPetTab = .overview; selectedPet = $0 },
                         onSelectHuman: { selectedHuman = $0 },
                         onTopCardChanged: { item in
                             if case .pet(let p) = item { activeCritterIdStr = p.id.uuidString }
@@ -385,6 +428,16 @@ struct OverviewView: View {
                            pets.filter({ !$0.hasPassedAway }).count > 1 {
                             batchCheckInBar
                                 .padding(.horizontal, 16)
+                        }
+                    case "homeModule":
+                        if !hiddenSections.contains("homeModule") {
+                            HomeBentoBoxes(
+                                islandLevel: islandLevel,
+                                pets: pets,
+                                onOasisTap: { selectedDockTab = 3 },
+                                onStreakTap: { showStreakDetail = true }
+                            )
+                            .padding(.horizontal, 16)
                         }
                     case "quickAccess":
                         if !hiddenSections.contains("quickAccess") {
@@ -416,42 +469,164 @@ struct OverviewView: View {
 
                 Spacer(minLength: 120)
             }
-        }
+            } // end ScrollView
+        } // end VStack
     }
 
     private var orderedSections: [String] {
         let order = sectionOrder
-        let allIds = ["batchCheckIn", "quickAccess", "islandStats", "todayTasks"]
+        let allIds = ["batchCheckIn", "homeModule", "quickAccess", "islandStats", "todayTasks"]
         var result = order.filter { allIds.contains($0) }
         for id in allIds where !result.contains(id) { result.append(id) }
         return result
     }
     
-    // MARK: - Greeting Header
-    private var goGreetingHeader: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("\(greetingText) 👋")
-                    .font(.system(size: 24, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
-                if let firstPet = pets.first {
-                    let hour = Calendar.current.component(.hour, from: Date())
-                    let hint = hour >= 6 && hour < 10 ? "趁早晨凉爽，带 \(firstPet.name) 出去走走吧" :
-                               hour >= 17 && hour < 20 ? "黄金时段，带 \(firstPet.name) 散个步吧 🌇" :
-                               "\(firstPet.name) 在等你呢"
-                    Text(hint)
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.55))
+    // MARK: - R6: Global Fixed Header（全局固定前置层）
+    private var globalFixedHeader: some View {
+        HStack(alignment: .center) {
+            // 左侧：标题区
+            VStack(alignment: .leading, spacing: 2) {
+                switch selectedDockTab {
+                case 0:
+                    Text("\(greetingText) 👋")
+                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .foregroundStyle(.primary)
+                    if let firstPet = pets.first {
+                        let hour = Calendar.current.component(.hour, from: Date())
+                        let hint = hour >= 6 && hour < 10 ? l.morningHint(firstPet.name) :
+                                   hour >= 17 && hour < 20 ? l.eveningHint(firstPet.name) :
+                                   l.defaultHint(firstPet.name)
+                        Text(hint)
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(.primary.opacity(0.5))
+                    }
+                case 1:
+                    Text(l.tabCalendar)
+                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .foregroundStyle(.primary)
+                case 2:
+                    Text(l.ohanaCrew)
+                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .foregroundStyle(.primary)
+                case 3:
+                    Text(l.tabOasis)
+                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .foregroundStyle(.primary)
+                default:
+                    EmptyView()
                 }
             }
             Spacer()
-            HStack(spacing: 10) {
-                // 全局椰子余额胶囊
+            // 右侧：按 tab 显示不同按钮
+            HStack(spacing: 8) {
+                switch selectedDockTab {
+                case 0:
+                    // 首页：椰子 + 头像菜单
+                    CoconutBalanceCapsule { showingCoconutLog = true }
+                    Menu {
+                        Button { showingAddEntity = true } label: {
+                            Label(l.addMember, systemImage: "person.badge.plus")
+                        }
+                        Button { showingManageSheet = true } label: {
+                            Label(l.manageHome, systemImage: "slider.horizontal.3")
+                        }
+                        Button { showingSettings = true } label: {
+                            Label(l.settings, systemImage: "gearshape")
+                        }
+                    } label: {
+                        avatarMenuLabel
+                    }
+                case 1:
+                    // 日历：视图切换 + 添加日程 + 椰子
+                    headerCalendarViewToggle
+                    headerIconButton(systemName: "plus.circle.fill", color: Color.goLime) {
+                        calendarAddEventTrigger.toggle()
+                    }
+                    CoconutBalanceCapsule { showingCoconutLog = true }
+                case 2:
+                    // 图鉴：搜索 + 添加岛民 + 椰子
+                    headerIconButton(systemName: "magnifyingglass", color: .primary) {
+                        crewSearchTrigger.toggle()
+                    }
+                    headerIconButton(systemName: "person.badge.plus", color: Color.goLime) {
+                        crewAddMemberTrigger.toggle()
+                    }
+                    CoconutBalanceCapsule { showingCoconutLog = true }
+                case 3:
+                    // 绿洲：椰子指南 + 百宝箱 + 椰子
+                    headerIconButton(systemName: "info.circle", color: .primary.opacity(0.7)) {
+                        oasisRulesTrigger.toggle()
+                    }
+                    headerIconButton(systemName: "shippingbox.fill", color: .primary) {
+                        oasisInventoryTrigger.toggle()
+                    }
+                    CoconutBalanceCapsule { showingCoconutLog = true }
+                default:
+                    EmptyView()
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Header 通用图标按钮
+    private func headerIconButton(systemName: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(color)
+                .frame(width: 32, height: 32)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Header 日历视图切换
+    private var headerCalendarViewToggle: some View {
+        let current = CalendarViewMode(rawValue: calendarViewModeRaw) ?? .list
+        return HStack(spacing: 2) {
+            headerViewModeBtn(systemName: "calendar", mode: .month, current: current)
+            headerViewModeBtn(systemName: "list.bullet", mode: .list, current: current)
+        }
+        .padding(3)
+        .background(.white.opacity(0.1), in: Capsule())
+    }
+
+    private func headerViewModeBtn(systemName: String, mode: CalendarViewMode, current: CalendarViewMode) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.28)) { calendarViewModeRaw = mode.rawValue }
+        } label: {
+            Image(systemName: systemName)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(current == mode ? Color.arkInk : .white.opacity(0.45))
+                .frame(width: 30, height: 26)
+                .background { if current == mode { Capsule().fill(Color.goLime) } }
+        }
+    }
+
+    // MARK: - Greeting Header (legacy, replaced by globalFixedHeader)
+    private var goGreetingHeader: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(greetingText) 👋")
+                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                if let firstPet = pets.first {
+                    let hour = Calendar.current.component(.hour, from: Date())
+                    let hint = hour >= 6 && hour < 10 ? "带 \(firstPet.name) 早晨出去走走吧" :
+                               hour >= 17 && hour < 20 ? "黄金时段，带 \(firstPet.name) 散个步 🌇" :
+                               "\(firstPet.name) 在等你呢"
+                    Text(hint)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(.primary.opacity(0.5))
+                }
+            }
+            Spacer()
+            HStack(spacing: 8) {
                 CoconutBalanceCapsule {
                     showingCoconutLog = true
                 }
-                
-                // N8: 用户头像 → 点击展开二级菜单
                 Menu {
                     Button { showingAddEntity = true } label: {
                         Label("添加成员", systemImage: "person.badge.plus")
@@ -467,7 +642,10 @@ struct OverviewView: View {
                 }
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial.opacity(0.7), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(.horizontal, 16)
     }
 
     // N8: 用户头像标签（读取当前绑定 Human）
@@ -505,37 +683,37 @@ struct OverviewView: View {
             onMilestoneRewardCompleted: {
                 // H27fix: 卡片在自身层触发后立即从列表移除，所以椰子动画要在页面层触发
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    showMilestoneCoconut = true
+                    triggerCoconutReward(amount: 20)
                 }
             }
         )
         .padding(.horizontal, 16)
     }
 
-    // MARK: - Island Stats (横向滚动卡片，每张带专属图表)
+    // MARK: - Island Stats（iOS 26 规范：图表直接浮在背景上，无卡片容器）
     private var islandStatsBento: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("ISLAND STATS")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.4))
-                    .tracking(3)
-                Spacer()
-                HStack(spacing: 4) {
-                    Text("左滑查看更多")
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.25))
-                    Image(systemName: "chevron.left.2")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.primary.opacity(0.2))
+        VStack(alignment: .leading, spacing: 8) {
+                // Section Header — 浮动标题，无背景
+                HStack {
+                    Text("ISLAND STATS")
+                        .font(OhanaFont.caption2(.bold))
+                        .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.45) : Color.black.opacity(0.4))
+                        .tracking(3)
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Text("左滑查看更多")
+                            .font(OhanaFont.caption2())
+                            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.25) : Color.black.opacity(0.3))
+                        Image(systemName: "chevron.left.2")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.20) : Color.black.opacity(0.25))
+                    }
                 }
-            }
-            .padding(.horizontal, 20)
+                .padding(.horizontal, 20)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
                     // 1. 体重卡（所有宠物 分系列折线图）
-                    // U11: 显示所有宠物的最新体重
                     let weightSeries = weightSeriesData
                     let totalWithWeight = weightSeries.count
                     let allLatestWeights: [(String, Double)] = pets.compactMap { p in
@@ -546,21 +724,22 @@ struct OverviewView: View {
                         ? "--"
                         : allLatestWeights.map { "\($0.0) \(String(format: "%.1f", $0.1))" }.joined(separator: " · ")
                     let weightSubtitle = totalWithWeight == 0 ? "暂无数据" : weightSeries.map { $0.0 }.joined(separator: " · ")
+                    let totalWeight = allLatestWeights.reduce(0.0) { $0 + $1.1 }
                     IslandStatCard(
                         icon: "scalemass.fill",
                         title: "体重",
-                        value: allLatestWeights.count == 1
-                            ? String(format: "%.1f", allLatestWeights[0].1)
-                            : (allLatestWeights.isEmpty ? "--" : "\(allLatestWeights.count)只"),
-                        unit: allLatestWeights.count == 1 ? "kg" : "",
+                        value: allLatestWeights.isEmpty
+                            ? "--"
+                            : String(format: "%.1f", totalWeight),
+                        unit: allLatestWeights.isEmpty ? "" : "kg",
                         subtitle: allLatestWeights.count > 1 ? weightValueStr : weightSubtitle,
                         accentColor: .goTeal,
-                        avatarEmojis: (pets.map { $0.avatarEmoji } + humans.map { $0.avatarEmoji }),
+                        avatarEmojis: (pets.map { $0.avatarEmoji } + humans.filter { $0.shouldShowOnHome }.map { $0.avatarEmoji }),
                         onTap: { showIslandWeight = true }
                     ) {
                         MultiPetLineChart(series: weightSeries)
                     }
-                    
+
                     verticalDashDivider
 
                     // 2. 遛狗卡（7天柱状图）
@@ -578,7 +757,7 @@ struct OverviewView: View {
                     ) {
                         MiniBarChart(values: weekWalkData.map { Double($0.1) }, labels: weekWalkData.map { $0.0 }, accentColor: .goLime)
                     }
-                    
+
                     verticalDashDivider
 
                     // 3. 本月花费（各宠物对比柱）
@@ -604,6 +783,7 @@ struct OverviewView: View {
                         .min(by: { $0.remainingFoodDays < $1.remainingFoodDays }) {
                         let progress = min(1.0, Double(urgentPet.remainingFoodDays) / 30.0)
                         let accent: Color = urgentPet.remainingFoodDays <= 7 ? .goRed : .goOrange
+                        verticalDashDivider
                         IslandStatCard(
                             icon: "bag.fill",
                             title: "粮仓",
@@ -626,11 +806,14 @@ struct OverviewView: View {
                     // Phase 49: 椰子财富榜
                     CoconutWealthRankingCard(
                         pets: pets,
-                        humans: humans
+                        humans: humans,
+                        onTap: { showIslandWealth = true }
                     )
+                    .padding(16)
+                    .frame(width: 260, height: 212)
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 4)
+                .padding(.bottom, 4)
             }
         }
     }
@@ -748,55 +931,41 @@ struct OverviewView: View {
         }
     }
 
-    // MARK: - Batch Check-In Bar（Minimalist 极简胶囊条）
+    // MARK: - Batch Check-In Grid（与快捷操作一致的网格布局）
     @State private var batchPressedId: String? = nil
 
     private var batchCheckInBar: some View {
         let livePets = pets.filter { !$0.hasPassedAway }
         let actions = customBatchActions.filter { !$0.targetPets(from: livePets).isEmpty }
 
-        return HStack(spacing: 0) {
-            // 左侧标题（固定）
-            HStack(spacing: 5) {
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: 10, weight: .black))
-                    .foregroundStyle(Color.goLime)
-                Text("全家")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.7))
-            }
-            .padding(.leading, 12)
-
-            // 分隔线
-            Rectangle().fill(.white.opacity(0.12)).frame(width: 1, height: 20).padding(.horizontal, 8)
-
-            // 动作按钮协（水平滚动）
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(actions, id: \.id) { action in
-                        batchPillButton(action: action, livePets: livePets)
-                    }
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("一键全家")
+                    .font(OhanaFont.title3(.black))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showingBatchCheckInSheet = true
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.primary.opacity(0.7))
+                        .frame(width: 30, height: 30)
+                        .glassEffect(.regular, in: Circle())
                 }
-                .padding(.vertical, 7)
-                .padding(.horizontal, 4)
+                .buttonStyle(.plain)
             }
+            .padding(.horizontal, 4)
 
-            // 右侧编辑按钮
-            Button { showingBatchCheckInSheet = true } label: {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.primary.opacity(0.4))
-                    .padding(.horizontal, 10)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4), spacing: 10) {
+                ForEach(actions, id: \.id) { action in
+                    batchGridCell(action: action, livePets: livePets)
+                }
             }
-            .buttonStyle(.plain)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 4)
         }
-        .frame(height: 44)
-        .background(
-            Capsule()
-                .fill(.ultraThinMaterial)
-                .overlay(Capsule().strokeBorder(.white.opacity(0.12), lineWidth: 1))
-        )
-        .shadow(color: Color.goPrimary.opacity(0.12), radius: 8, x: 0, y: 3)
         .sheet(isPresented: $showingBatchCheckInSheet) {
             BatchActionEditSheet(selected: Binding(
                 get: { customBatchActions },
@@ -807,122 +976,159 @@ struct OverviewView: View {
         }
     }
 
-    // 极简胶囊按钮（Minimalist 风格）
-    private func batchPillButton(action: BatchAction, livePets: [Pet]) -> some View {
+    // 与 GoQuickActionCard 一致的网格单元：无背景 icon，打卡后 goLime
+    private func batchGridCell(action: BatchAction, livePets: [Pet]) -> some View {
         let isPressed = batchPressedId == action.id
+        let isDone = isBatchDoneToday(action: action, livePets: livePets)
         return Button {
             let targets = action.targetPets(from: livePets)
             guard !targets.isEmpty else { return }
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) { batchPressedId = action.id }
-            action.perform(pets: targets, context: modelContext)
-            showBatchToast(action.toastMessage)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                withAnimation { batchPressedId = nil }
+            withAnimation(.easeOut(duration: 0.12)) { batchPressedId = action.id }
+            DispatchQueue.main.async {
+                performBatchAction(action, targets: targets)
             }
-        } label: {
-            HStack(spacing: 4) {
-                Text(action.label)
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(isPressed ? .black : .white.opacity(0.85))
-            }
-            .padding(.horizontal, 10).padding(.vertical, 5)
-            .background(
-                isPressed
-                    ? action.color
-                    : action.color.opacity(0.22),
-                in: Capsule()
-            )
-            .scaleEffect(isPressed ? 0.93 : 1.0)
-        }
-        .buttonStyle(.plain)
-        .animation(.spring(response: 0.22, dampingFraction: 0.65), value: isPressed)
-    }
-
-    private func batchBentoCell(action: BatchAction, livePets: [Pet]) -> some View {
-        let isPressed = batchPressedId == action.id
-        return Button {
-            let targets = action.targetPets(from: livePets)
-            guard !targets.isEmpty else { return }
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
-                batchPressedId = action.id
-            }
-            action.perform(pets: targets, context: modelContext)
-            showBatchToast(action.toastMessage)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                withAnimation { batchPressedId = nil }
-            }
-        } label: {
-            VStack(spacing: 5) {
-                // 多巴胺渐变图标背景
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [action.color.opacity(isPressed ? 0.9 : 0.75),
-                                         action.color.mix(with: .black, by: 0.25).opacity(isPressed ? 0.95 : 0.85)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 48, height: 48)
-                        .shadow(color: action.color.opacity(isPressed ? 0.7 : 0.35),
-                                radius: isPressed ? 12 : 6, x: 0, y: 3)
-                    Text(action.type.emoji)
-                        .font(.system(size: 26))
-                        .scaleEffect(isPressed ? 1.15 : 1.0)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
+                withAnimation(.easeOut(duration: 0.22)) {
+                    if batchPressedId == action.id { batchPressedId = nil }
                 }
-                Text(action.label)
-                    .font(.system(size: 10, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.85))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isPressed ? action.color.opacity(0.14) : Color.white.opacity(0.04))
-            )
-            .scaleEffect(isPressed ? 0.93 : 1.0)
+        } label: {
+            VStack(spacing: 6) {
+                Image(systemName: action.type.sfIcon)
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundStyle(isDone ? Color.goLime : .primary.opacity(0.75))
+                    .scaleEffect(isPressed ? 0.90 : 1.0)
+                    .frame(width: 44, height: 44)
+
+                VStack(spacing: 1) {
+                    Text(action.type.label)
+                        .font(OhanaFont.caption2(.semibold))
+                        .foregroundStyle(.primary.opacity(0.75))
+                        .lineLimit(1)
+                    Text(isDone ? "已完成" : "全家")
+                        .font(OhanaFont.caption2(.medium))
+                        .foregroundStyle(.primary.opacity(0.35))
+                        .lineLimit(1)
+                }
+            }
+            .scaleEffect(isPressed ? 0.88 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isPressed)
         }
         .buttonStyle(.plain)
-        .animation(.spring(response: 0.22, dampingFraction: 0.65), value: isPressed)
     }
 
-    private func batchPill(_ label: String, color: Color) -> some View {
-        Text(label)
-            .font(.system(size: 12, weight: .bold, design: .rounded))
-            .foregroundStyle(.black)
-            .padding(.horizontal, 12).padding(.vertical, 6)
-            .background(color, in: Capsule())
+    private func isBatchDoneToday(action: BatchAction, livePets: [Pet]) -> Bool {
+        let targets = action.targetPets(from: livePets)
+        guard !targets.isEmpty else { return false }
+        let cal = Calendar.current
+        return targets.allSatisfy { pet in
+            switch action.type {
+            case .feed:
+                return pet.careLogs.contains { $0.type == CareType.feeding.rawValue && cal.isDateInToday($0.date) }
+            case .water:
+                return pet.careLogs.contains { $0.type == CareType.watering.rawValue && cal.isDateInToday($0.date) }
+            case .potty:
+                return pet.pottyLogs.contains { cal.isDateInToday($0.date) }
+            case .litter:
+                return pet.careLogs.contains { $0.type == CareType.litter.rawValue && cal.isDateInToday($0.date) }
+            case .play:
+                return pet.careLogs.contains { $0.type == CareType.play.rawValue && cal.isDateInToday($0.date) }
+            }
+        }
     }
 
-    private func showBatchToast(_ msg: String) {
+
+    private func showBatchToast(_ msg: String, emoji: String = "✅") {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        guard let anyPet = pets.first else { return }
         withAnimation(.spring(response: 0.35)) {
-            actionToast = (pet: pets.first!, message: msg, emoji: "🥥")
+            actionToast = (pet: anyPet, message: msg, emoji: emoji)
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
-            withAnimation { actionToast = nil }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+            withAnimation {
+                if actionToast?.message == msg {
+                    actionToast = nil
+                }
+            }
         }
     }
 
-    // MARK: - Quick Actions (Go UI 毛玻璃正方形网格)
+    private func performBatchAction(_ action: BatchAction, targets: [Pet]) {
+        let coconutBefore = QuestManager.shared.coconutCount
+        let energyBefore = OasisTreeManager.shared.totalEnergy
+        let levelBefore = OasisTreeManager.shared.treeLevel
+
+        action.perform(pets: targets, context: modelContext)
+        OasisTreeManager.shared.refreshEnergy(modelContext: modelContext, pets: pets, humans: humans)
+
+        let coconutDelta = max(QuestManager.shared.coconutCount - coconutBefore, 0)
+        let energyDelta = max(OasisTreeManager.shared.totalEnergy - energyBefore, 0)
+        let levelAfter = OasisTreeManager.shared.treeLevel
+
+        if coconutDelta > 0 {
+            triggerCoconutReward(amount: coconutDelta, label: "全家\(action.type.label)")
+            showBatchToast("全家\(action.type.label) +\(coconutDelta)🥥", emoji: "🥥")
+        } else {
+            showBatchToast(action.toastMessage)
+        }
+
+        if levelAfter > levelBefore {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
+                showBatchTreeToast("生命之树升级到 \(levelAfter.displayName) · Lv.\(levelAfter.rawValue)")
+            }
+        } else if energyDelta > 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
+                showBatchTreeToast("生命之树吸收了 +\(energyDelta) 能量")
+            }
+        }
+    }
+
+    private func triggerCoconutReward(amount: Int, label: String? = nil) {
+        rewardCoconutAmount = amount
+        rewardCoconutLabel = label
+        showRewardCoconut = true
+    }
+
+    private func showBatchTreeToast(_ message: String) {
+        guard let anyPet = pets.first else { return }
+        withAnimation(.spring(response: 0.35)) {
+            actionToast = (pet: anyPet, message: message, emoji: "🌴")
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+            withAnimation {
+                if actionToast?.message == message {
+                    actionToast = nil
+                }
+            }
+        }
+    }
+
+    // MARK: - Quick Actions (iOS 26 Liquid Glass)
     private var quickActionsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // E2: 标题行 + 右上角 + 按钮
             HStack {
-                Text("QUICK ACCESS")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.4))
-                    .tracking(3)
+                Text("快捷操作")
+                    .font(OhanaFont.title3(.black))
+                    .foregroundStyle(.primary)
                 Spacer()
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showingAddQuickAction = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.primary.opacity(0.7))
+                        .frame(width: 30, height: 30)
+                        .glassEffect(.regular, in: Circle())
+                }
+                .buttonStyle(.plain)
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 4)
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4), spacing: 10) {
-                // Task2: 按顶牌动态过滤，Spring 动画确保切换丝滑
+                // 现有卡片
                 ForEach(activeQuickActionItems, id: \.id) { item in
                     GoQuickActionCard(
                         item: item,
@@ -931,6 +1137,7 @@ struct OverviewView: View {
                         petThemeColorHex: themeColorForAction(item),
                         pendingReminder: reminderForAction(item),
                         countText: countTextForAction(item),
+                        isCompletedToday: isCompletedToday(for: item),
                         onTap: {
                             pressedActionId = item.id
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -945,7 +1152,6 @@ struct OverviewView: View {
                         },
                         onDoubleTap: item.actionType == "litter" || item.actionType == "potty" ? {
                             if let pid = item.petId, let pet = pets.first(where: { $0.id == pid }) {
-                                // 任务5：猫咪铲屎长按→护理详情；狗便便长按→食物管理
                                 if item.actionType == "litter" {
                                     quickAccessCarePet = pet
                                 } else {
@@ -964,73 +1170,105 @@ struct OverviewView: View {
                         } : nil
                     )
                 }
-                // + 添加新 item 按钮
-                Button { showingAddQuickAction = true } label: {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(.white.opacity(0.05))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-                                    .foregroundStyle(.primary.opacity(0.2))
-                            )
-                        VStack(spacing: 4) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(.primary.opacity(0.45))
-                            Text("Add")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(.primary.opacity(0.3))
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .aspectRatio(1, contentMode: .fit)
-                }
-                .buttonStyle(.plain)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 4)
         }
         .sheet(isPresented: $showingAddQuickAction) {
-            AddQuickActionSheet(
-                pets: pets,
-                defaultPetId: activeCritterId,
-                existingItems: savedQuickActionItems
-            ) { newItem in
-                addQuickAction(newItem)
-            }
-        }
-        .sheet(item: $quickAccessFoodPet) { pet in
-            PetFoodManagementView(pet: pet)
-        }
-        .sheet(item: $quickAccessCarePet) { pet in
-            PetHygieneCard(pet: pet)
-        }
-        .sheet(item: $quickExpensePet) { pet in
-            AddExpenseSheet(pet: pet)
-                .presentationDetents([.height(460), .medium])
-                .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: Binding(
-            get: { feedSheetItem != nil },
-            set: { if !$0 { feedSheetItem = nil } }
-        )) {
-            if let fi = feedSheetItem {
-                QuickFeedSheet(pet: fi.pet, actionType: fi.actionType) {
-                    feedSheetItem = nil
-                    if let found = savedQuickActionItems.first(where: { $0.petId == fi.pet.id && $0.actionType == fi.actionType }) {
-                        removeQuickAction(found)
+                AddQuickActionSheet(
+                    pets: pets,
+                    defaultPetId: activeCritterId,
+                    existingItems: savedQuickActionItems
+                ) { newItem in
+                    var items = savedQuickActionItems
+                    items.append(newItem)
+                    if let data = try? JSONEncoder().encode(items),
+                       let str = String(data: data, encoding: .utf8) {
+                        quickActionItemsJSON = str
                     }
                 }
-                .presentationDetents([.height(320)])
+        }
+        .sheet(isPresented: $showingQAManageSheet) {
+                QAManageSheet(
+                    pets: pets,
+                    defaultPetId: activeCritterId,
+                    savedItems: Binding(get: { savedQuickActionItems }, set: { newItems in
+                        if let data = try? JSONEncoder().encode(newItems),
+                           let str = String(data: data, encoding: .utf8) {
+                            quickActionItemsJSON = str
+                        }
+                    })
+                )
+            }
+            .sheet(item: $quickAccessFoodPet) { pet in
+                PetFoodManagementView(pet: pet)
+            }
+            .sheet(item: $quickAccessCarePet) { pet in
+                PetHygieneCard(pet: pet)
+            }
+            .sheet(item: $quickExpensePet) { pet in
+                AddExpenseSheet(pet: pet)
+                    .presentationDetents([.height(460), .medium])
+                    .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: Binding(
+                get: { feedSheetItem != nil },
+                set: { if !$0 { feedSheetItem = nil } }
+            )) {
+                if let fi = feedSheetItem {
+                    QuickFeedSheet(pet: fi.pet, actionType: fi.actionType) {
+                        feedSheetItem = nil
+                        if let found = savedQuickActionItems.first(where: { $0.petId == fi.pet.id && $0.actionType == fi.actionType }) {
+                            removeQuickAction(found)
+                        }
+                    }
+                    .presentationDetents([.height(320)])
+                    .presentationDragIndicator(.visible)
+                }
+            }
+            // B7: 长按详情页 sheets
+            .sheet(item: $quickWeightDetailPet) { pet in
+                NavigationStack {
+                    WeightHistoryView(pet: pet)
+                }
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
             }
-        }
+            .sheet(item: $quickExpenseDetailPet) { pet in
+                NavigationStack {
+                    ExpenseHistoryView(pet: pet)
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
+            .sheet(item: $quickWalkDetailPet) { pet in
+                NavigationStack {
+                    DogActivityCard(pet: pet)
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
+            .sheet(item: $quickHealthDetailPet) { pet in
+                NavigationStack {
+                    PetHealthDetailView(pet: pet, isModal: true)
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
+            .sheet(item: $quickGroomDetailPet) { pet in
+                PetHygieneCard(pet: pet)
+            }
     }
+
 
     // Task2: 根据顶牌过滤 Quick Access items（顶牌是宠物时，过滤出该宠物 + 无宠物 items；顶牌是人时显示全部）
     private var activeQuickActionItems: [QuickActionItem] {
-        let all = savedQuickActionItems
+        let all = savedQuickActionItems.map { item -> QuickActionItem in
+            // C2: 旧版存储的 actionType="care" 规范化为 "groom"
+            var normalized = item
+            if item.actionType == "care" { normalized.actionType = "groom" }
+            return normalized
+        }
         guard let activeId = activeCritterId else { return all }
         return all.filter { item in
             item.petId == nil || item.petId == activeId
@@ -1097,20 +1335,25 @@ struct OverviewView: View {
         guard let p = pet else { return }
         switch item.actionType {
         case "feed", "water":
-            // task46: 长按弹出喂食量 sheet
+            // 长按弹出喂食量 sheet
             feedSheetItem = (pet: p, actionType: item.actionType)
         case "potty", "litter":
-            // task47: 长按→排泄护理页
             quickAccessFoodPet = p
         case "health":
-            // task47: 长按→健康页（单击也直达，保持一致）
-            selectedPet = p
-            selectedPetTab = .health
+            // B7/B8: 长按→健康详情 modal sheet（避免 NavigationStack 重复 push 死锁）
+            quickHealthDetailPet = p
         case "hygiene", "groom", "bath":
-            quickAccessCarePet = p
+            // B7: 长按→护理历史
+            quickGroomDetailPet = p
         case "walk":
-            selectedPet = p
-            selectedPetTab = .overview
+            // B7: 长按→遛狗历史
+            quickWalkDetailPet = p
+        case "weight":
+            // B7: 长按→体重历史
+            quickWeightDetailPet = p
+        case "expense":
+            // B7: 长按→花费历史
+            quickExpenseDetailPet = p
         default:
             selectedPet = p
             selectedPetTab = .overview
@@ -1143,6 +1386,32 @@ struct OverviewView: View {
         if let data = try? JSONEncoder().encode(current),
            let str = String(data: data, encoding: .utf8) {
             quickActionItemsJSON = str
+        }
+    }
+
+    // Task 2: 检查今日是否已打卡（改变 icon 为 goLime 主色）
+    private func isCompletedToday(for item: QuickActionItem) -> Bool {
+        guard let pid = item.petId, let pet = pets.first(where: { $0.id == pid }) else { return false }
+        let cal = Calendar.current
+        switch item.actionType {
+        case "walk":
+            return pet.walkLogs.contains { cal.isDateInToday($0.startDate) }
+        case "feed":
+            return pet.careLogs.contains { $0.type == CareType.feeding.rawValue && cal.isDateInToday($0.date) }
+        case "water":
+            return pet.careLogs.contains { $0.type == CareType.watering.rawValue && cal.isDateInToday($0.date) }
+        case "litter":
+            return pet.careLogs.contains { $0.type == CareType.litter.rawValue && cal.isDateInToday($0.date) }
+        case "potty":
+            return pet.pottyLogs.contains { cal.isDateInToday($0.date) }
+        case "play":
+            return pet.careLogs.contains { $0.type == CareType.play.rawValue && cal.isDateInToday($0.date) }
+        case "groom":
+            return pet.hygieneLogs.contains { cal.isDateInToday($0.date) }
+        case "bath":
+            return pet.hygieneLogs.contains { $0.type == HygieneType.bath.rawValue && cal.isDateInToday($0.date) }
+        default:
+            return false
         }
     }
 
@@ -1265,12 +1534,11 @@ struct OverviewView: View {
             quickWeightValue = ""
             quickWeightPet = pet
         case "health":
-            // task47: 单击直接进入健康页
-            selectedPetTab = .health
-            selectedPet = pet
+            // B8: 单击弹出健康详情 modal，避免 NavigationStack 重复 push 死锁
+            quickHealthDetailPet = pet
         case "hygiene", "groom":
-            selectedPetTab = .health
-            selectedPet = pet
+            // groom 单击由 GoQuickActionCard.isGroom 内部弹 GroomMenuSheet 处理；此处兜底
+            quickAccessCarePet = pet
         case "potty":
             let eid0 = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
             let log = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet, executorId: eid0)
@@ -1441,7 +1709,8 @@ struct OverviewView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .goTranslucentCard(cornerRadius: 16)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.15), lineWidth: 1))
 
                 VStack(spacing: 4) {
                     Text("💩")
@@ -1455,7 +1724,8 @@ struct OverviewView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .goTranslucentCard(cornerRadius: 16)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.15), lineWidth: 1))
 
                 VStack(spacing: 4) {
                     Text("🦮")
@@ -1469,7 +1739,8 @@ struct OverviewView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .goTranslucentCard(cornerRadius: 16)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.15), lineWidth: 1))
             }
 
             Button { showingAddEntity = true } label: {

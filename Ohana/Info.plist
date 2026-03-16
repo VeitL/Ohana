@@ -6,25 +6,19 @@
 	<array>
 		<string>com.guanchen.li.Ark.reminderRefill</string>
 	</array>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Ohana 在遛狗时需要获取您的位置，以记录步行路线和距离。</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>开启始终允许定位，Ohana 可在后台持续追踪遛狗路线，确保数据完整。</string>
-	<key>NSLocationAlwaysUsageDescription</key>
-	<string>开启始终允许定位，Ohana 可在后台持续追踪遛狗路线，确保数据完整。</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-peripheral</string>
 		<string>audio</string>
 		<string>fetch</string>
 		<string>processing</string>
-		<string>external-accessory</string>
 		<string>location</string>
 		<string>push-to-talk</string>
 		<string>bluetooth-central</string>
 		<string>remote-notification</string>
 		<string>nearby-interaction</string>
 		<string>voip</string>
+		<string>external-accessory</string>
 	</array>
 </dict>
 </plist>

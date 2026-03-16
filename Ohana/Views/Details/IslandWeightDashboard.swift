@@ -17,14 +17,68 @@ private struct SparkPoint: Identifiable {
     let weight: Double
 }
 
+private struct AnimatedWeightSparkline: View {
+    let history: [SparkPoint]
+    let accentColor: Color
+    @State private var revealProgress: CGFloat = 0
+
+    private var animationKey: String {
+        history
+            .map { "\($0.date.timeIntervalSince1970):\(String(format: "%.3f", $0.weight))" }
+            .joined(separator: "|")
+    }
+
+    private func playAnimation() {
+        revealProgress = 0
+        withAnimation(.easeOut(duration: 0.7)) {
+            revealProgress = 1
+        }
+    }
+
+    var body: some View {
+        Chart(history) { point in
+            LineMark(
+                x: .value("date", point.date),
+                y: .value("kg", point.weight)
+            )
+            .foregroundStyle(accentColor)
+            .interpolationMethod(.catmullRom)
+            .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+        }
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .chartLegend(.hidden)
+        .mask(alignment: .leading) {
+            GeometryReader { geo in
+                Rectangle()
+                    .frame(width: max(8, geo.size.width * revealProgress))
+            }
+        }
+        .onAppear { playAnimation() }
+        .onChange(of: animationKey) { _, _ in playAnimation() }
+    }
+}
+
 // MARK: - Main View
 struct IslandWeightDashboard: View {
     @Environment(\.dismiss)       private var dismiss
     @Environment(\.modelContext)  private var modelContext
+    @Environment(\.colorScheme)   private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Query(sort: \Pet.name)       private var pets:   [Pet]
     @Query(sort: \Human.name)     private var humans: [Human]
 
     @State private var vm = IslandUnifiedStatsViewModel()
+    @State private var weightTimeRange: WeightTimeFilter = .all
+    @State private var chartRevealProgress: CGFloat = 0
+
+    enum WeightTimeFilter: String, CaseIterable, Identifiable {
+        case week  = "周"
+        case month = "月"
+        case year  = "年"
+        case all   = "全部"
+        var id: String { rawValue }
+    }
 
     // 颜色映射
     private let humanColor   = Color.goLime
@@ -39,10 +93,28 @@ struct IslandWeightDashboard: View {
         return petPalette[idx % petPalette.count]
     }
 
+    // 只显示 shouldShowOnHome 的人类
+    private var visibleHumans: [Human] {
+        humans.filter { $0.shouldShowOnHome }
+    }
+
+    // 自适应文字颜色
+    private var primaryText: Color {
+        colorScheme == .dark ? .white : .black
+    }
+    
+    private var secondaryText: Color {
+        colorScheme == .dark ? .white.opacity(0.7) : .black.opacity(0.6)
+    }
+    
+    private var tertiaryText: Color {
+        colorScheme == .dark ? .white.opacity(0.45) : .black.opacity(0.4)
+    }
+
     // 全岛总质量
     private var totalIslandWeightKg: Double {
         let petWeight  = pets.compactMap   { $0.weightLogs.sorted { $0.date > $1.date }.first?.weight }.reduce(0, +)
-        let humanWeight = humans.compactMap { $0.weightLogs.sorted { $0.date > $1.date }.first?.weight }.reduce(0, +)
+        let humanWeight = visibleHumans.compactMap { $0.weightLogs.sorted { $0.date > $1.date }.first?.weight }.reduce(0, +)
         return petWeight + humanWeight
     }
 
@@ -63,7 +135,7 @@ struct IslandWeightDashboard: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
                         navBar
-                        weightTrendCard
+                        weightFloatingChart
                         funBentoRow
                         individualSparklineCard
                         Color.clear.frame(height: 40)
@@ -74,9 +146,9 @@ struct IslandWeightDashboard: View {
             .ignoresSafeArea(edges: .top)
             .navigationBarHidden(true)
         }
-        .onAppear { vm.load(modelContext: modelContext, pets: pets, humans: humans) }
-        .onChange(of: pets.count)   { vm.load(modelContext: modelContext, pets: pets, humans: humans) }
-        .onChange(of: humans.count) { vm.load(modelContext: modelContext, pets: pets, humans: humans) }
+        .onAppear { vm.load(modelContext: modelContext, pets: pets, humans: visibleHumans) }
+        .onChange(of: pets.count)   { vm.load(modelContext: modelContext, pets: pets, humans: visibleHumans) }
+        .onChange(of: humans.count) { vm.load(modelContext: modelContext, pets: pets, humans: visibleHumans) }
     }
 
     // MARK: - Nav Bar
@@ -85,62 +157,107 @@ struct IslandWeightDashboard: View {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(primaryText)
                     .frame(width: 36, height: 36)
-                    .background(.white.opacity(0.12), in: Circle())
+                    .glassEffect(.regular, in: Circle())
             }
             .buttonStyle(.plain)
             Spacer()
             Text("全岛体重")
                 .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(primaryText)
             Spacer()
             Color.clear.frame(width: 36, height: 36)
         }
         .padding(.top, 64)
     }
 
-    // MARK: - 模块 1: 全岛体重变动趋势（百分比折线图）
-    private var weightTrendCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 6) {
-                Text("⚖️").font(.system(size: 14))
-                Text("全岛体重变动趋势")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
-                Spacer()
-                Text("相对初始记录")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.primary.opacity(0.35))
+    // MARK: - 模块 1: 全岛体重变动趋势（悬浮无卡片）
+    private var weightFloatingChart: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // 时间 filter
+            HStack {
+                Picker("", selection: $weightTimeRange) {
+                    ForEach(WeightTimeFilter.allCases) { r in
+                        Text(r.rawValue).tag(r)
+                    }
+                }
+                .pickerStyle(.segmented)
             }
+            .padding(.horizontal, 4)
 
-            if vm.weightDeltas.isEmpty {
+            HStack(spacing: 6) {
+                Text("⚖️").font(.system(size: 13))
+                Text("体重趋势")
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(secondaryText)
+                Spacer()
+                Text("kg")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(tertiaryText)
+            }
+            .padding(.horizontal, 4)
+
+            if filteredWeightAbsolutes.isEmpty {
                 emptyState("暂无体重数据\n记录后即可看到趋势曲线")
             } else {
-                weightLineChart
-                weightLegend
+                weightAbsoluteLineChart
+                weightAbsoluteLegend
             }
         }
-        .padding(16)
-        .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .strokeBorder(.white.opacity(0.1), lineWidth: 1))
+        .padding(.horizontal, 4)
     }
 
-    private var weightLineChart: some View {
-        Chart {
-            // 零线基准
-            RuleMark(y: .value("基准", 0))
-                .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 5]))
-                .foregroundStyle(.primary.opacity(0.18))
+    private var filteredWeightAbsolutes: [WeightAbsolutePoint] {
+        let now = Date()
+        let cal = Calendar.current
+        let cutoff: Date? = {
+            switch weightTimeRange {
+            case .week:  return cal.date(byAdding: .day, value: -6, to: cal.startOfDay(for: now))
+            case .month: return cal.dateInterval(of: .month, for: now)?.start
+            case .year:  return cal.dateInterval(of: .year,  for: now)?.start
+            case .all:   return nil
+            }
+        }()
+        guard let c = cutoff else { return vm.weightAbsolutes }
+        return vm.weightAbsolutes.filter { $0.date >= c }
+    }
 
-            ForEach(vm.weightDeltasBySeries, id: \.0) { name, points, isHuman in
+    private var filteredAbsoluteSeriesByName: [(String, [WeightAbsolutePoint], Bool)] {
+        let names = Array(Set(filteredWeightAbsolutes.map { $0.entityName })).sorted()
+        return names.map { name in
+            let pts = filteredWeightAbsolutes
+                .filter { $0.entityName == name }
+                .sorted { $0.date < $1.date }
+            return (name, pts, pts.first?.isHuman ?? false)
+        }
+    }
+
+    private var chartAnimationKey: String {
+        filteredAbsoluteSeriesByName
+            .map { name, points, _ in
+                let joined = points.map { "\($0.date.timeIntervalSince1970):\(String(format: "%.3f", $0.weight))" }
+                    .joined(separator: ",")
+                return "\(name):\(joined)"
+            }
+            .joined(separator: "|")
+    }
+
+    private func playChartReveal() {
+        chartRevealProgress = 0
+        withAnimation(.easeOut(duration: 0.85)) {
+            chartRevealProgress = 1
+        }
+    }
+
+    private var weightAbsoluteLineChart: some View {
+        Chart {
+            ForEach(filteredAbsoluteSeriesByName, id: \.0) { name, points, isHuman in
                 let c = color(for: name, isHuman: isHuman)
-                // 面积填充（极淡）
                 ForEach(points) { pt in
                     AreaMark(
                         x: .value("日期", pt.date),
-                        y: .value("变动%", pt.percentChange)
+                        y: .value("kg", pt.weight)
                     )
                     .foregroundStyle(
                         LinearGradient(
@@ -152,61 +269,74 @@ struct IslandWeightDashboard: View {
                 }
                 .foregroundStyle(by: .value("成员", name))
 
-                // 折线主体
                 ForEach(points) { pt in
                     LineMark(
                         x: .value("日期", pt.date),
-                        y: .value("变动%", pt.percentChange)
+                        y: .value("kg", pt.weight)
                     )
                     .foregroundStyle(c)
                     .interpolationMethod(.catmullRom)
-                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .symbol {
-                        Circle().fill(c).frame(width: 5, height: 5)
-                    }
+                    .lineStyle(StrokeStyle(lineWidth: 2.6, lineCap: .round, lineJoin: .round))
                 }
                 .foregroundStyle(by: .value("成员", name))
+
+                if let last = points.last {
+                    PointMark(
+                        x: .value("日期", last.date),
+                        y: .value("kg", last.weight)
+                    )
+                    .foregroundStyle(c)
+                    .symbolSize(36)
+                }
             }
         }
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) { _ in
                 AxisValueLabel(format: .dateTime.month(.abbreviated).day())
                     .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.primary.opacity(0.4))
-                AxisGridLine().foregroundStyle(.primary.opacity(0.05))
+                    .foregroundStyle(tertiaryText)
+                AxisGridLine().foregroundStyle(tertiaryText.opacity(0.12))
             }
         }
         .chartYAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) { val in
                 if let d = val.as(Double.self) {
                     AxisValueLabel {
-                        Text("\(d >= 0 ? "+" : "")\(String(format: "%.1f", d))%")
+                        Text(String(format: "%.1f", d))
                             .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.primary.opacity(0.4))
+                            .foregroundStyle(tertiaryText)
                     }
                 }
-                AxisGridLine().foregroundStyle(.primary.opacity(0.05))
+                AxisGridLine().foregroundStyle(tertiaryText.opacity(0.12))
             }
         }
         .chartForegroundStyleScale(
-            domain: vm.weightDeltasBySeries.map { $0.0 },
-            range:  vm.weightDeltasBySeries.map { color(for: $0.0, isHuman: $0.2) }
+            domain: filteredAbsoluteSeriesByName.map { $0.0 },
+            range:  filteredAbsoluteSeriesByName.map { color(for: $0.0, isHuman: $0.2) }
         )
         .chartLegend(.hidden)
+        .mask(alignment: .leading) {
+            GeometryReader { geo in
+                Rectangle()
+                    .frame(width: max(12, geo.size.width * chartRevealProgress))
+            }
+        }
         .frame(height: 200)
+        .onAppear { playChartReveal() }
+        .onChange(of: chartAnimationKey) { _, _ in playChartReveal() }
     }
 
-    private var weightLegend: some View {
+    private var weightAbsoluteLegend: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                ForEach(vm.weightDeltasBySeries, id: \.0) { name, _, isHuman in
+                ForEach(filteredAbsoluteSeriesByName, id: \.0) { name, _, isHuman in
                     HStack(spacing: 4) {
                         RoundedRectangle(cornerRadius: 2)
                             .fill(color(for: name, isHuman: isHuman))
                             .frame(width: 16, height: 3)
                         Text(name)
                             .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.6))
+                            .foregroundStyle(secondaryText)
                     }
                 }
             }
@@ -222,117 +352,116 @@ struct IslandWeightDashboard: View {
     }
 
     private var championsCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("🏆 本月排行")
-                .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+        glassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("🏆 本月排行")
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(primaryText)
 
-            if let gain = vm.gainChampion {
-                HStack(spacing: 6) {
-                    Text(gain.emoji).font(.system(size: 18))
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("干饭王")
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.goYellow.opacity(0.8))
-                        Text(gain.entityName)
-                            .font(.system(size: 12, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                        Text("+\(String(format: "%.1f", gain.deltaPercent))%")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(Color.goYellow)
+                if let gain = vm.gainChampion {
+                    HStack(spacing: 6) {
+                        Text(gain.emoji).font(.system(size: 18))
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("干饭王")
+                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                                .foregroundStyle(colorScheme == .dark ? Color.goYellow.opacity(0.8) : Color.goOrange)
+                            Text(gain.entityName)
+                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .foregroundStyle(primaryText)
+                                .lineLimit(1)
+                            Text("+\(String(format: "%.1f", gain.deltaPercent))%")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(colorScheme == .dark ? Color.goYellow : Color.goOrange)
+                        }
                     }
+                } else {
+                    Text("暂无数据").font(.system(size: 11)).foregroundStyle(tertiaryText)
                 }
-            } else {
-                Text("暂无数据").font(.system(size: 11)).foregroundStyle(.primary.opacity(0.3))
-            }
 
-            if let loss = vm.lossChampion {
-                HStack(spacing: 6) {
-                    Text(loss.emoji).font(.system(size: 18))
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("自律王")
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.goLime.opacity(0.8))
-                        Text(loss.entityName)
-                            .font(.system(size: 12, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                        Text("\(String(format: "%.1f", loss.deltaPercent))%")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(Color.goLime)
+                if let loss = vm.lossChampion {
+                    HStack(spacing: 6) {
+                        Text(loss.emoji).font(.system(size: 18))
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("自律王")
+                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                                .foregroundStyle(colorScheme == .dark ? Color.goTeal.opacity(0.8) : Color.goBlue)
+                            Text(loss.entityName)
+                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .foregroundStyle(primaryText)
+                                .lineLimit(1)
+                            Text("\(String(format: "%.1f", loss.deltaPercent))%")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(colorScheme == .dark ? Color.goTeal : Color.goBlue)
+                        }
                     }
+                } else {
+                    Text("暂无数据").font(.system(size: 11)).foregroundStyle(tertiaryText)
                 }
-            }
 
-            Spacer(minLength: 0)
+                Spacer(minLength: 0)
+            }
+            .padding(14)
+            .frame(height: 160)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(.white.opacity(0.1), lineWidth: 1))
-        .frame(height: 160)
     }
 
     private var islandMassCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("🌐 全岛总质量")
-                .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+        glassCard {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("🌐 全岛总质量")
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(primaryText)
 
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text(String(format: "%.1f", totalIslandWeightKg))
-                    .font(.system(size: 36, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.goYellow)
-                    .minimumScaleFactor(0.6)
-                    .lineLimit(1)
-                Text("kg")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.5))
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    Text(String(format: "%.1f", totalIslandWeightKg))
+                        .font(.system(size: 36, weight: .black, design: .rounded))
+                        .foregroundStyle(colorScheme == .dark ? Color.goYellow : Color.goOrange)
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                    Text("kg")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(secondaryText)
+                }
+
+                Text(weightComparison)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(tertiaryText)
+                    .lineLimit(2)
+
+                Spacer(minLength: 0)
             }
-
-            Text(weightComparison)
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.55))
-                .lineLimit(2)
-
-            Spacer(minLength: 0)
+            .padding(14)
+            .frame(height: 160)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color.goYellow.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.goYellow.opacity(0.2), lineWidth: 1))
-        .frame(height: 160)
     }
 
     // MARK: - 模块 3: 个体 Sparkline 清单
     private var individualSparklineCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 6) {
-                Text("📊").font(.system(size: 14))
-                Text("个体体重清单")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
-            }
+        glassCard {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 6) {
+                    Text("📊").font(.system(size: 14))
+                    Text("个体体重清单")
+                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .foregroundStyle(primaryText)
+                }
 
-            let allEntries = buildSparklineEntries()
-            if allEntries.isEmpty {
-                emptyState("暂无个体体重数据")
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(allEntries.enumerated()), id: \.offset) { idx, entry in
-                        sparklineRow(entry: entry)
-                        if idx < allEntries.count - 1 {
-                            Divider().background(.white.opacity(0.06))
+                let allEntries = buildSparklineEntries()
+                if allEntries.isEmpty {
+                    emptyState("暂无个体体重数据")
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(Array(allEntries.enumerated()), id: \.offset) { idx, entry in
+                            sparklineRow(entry: entry)
+                            if idx < allEntries.count - 1 {
+                                Divider().background(colorScheme == .dark ? .white.opacity(0.06) : .black.opacity(0.06))
+                            }
                         }
                     }
                 }
             }
+            .padding(16)
         }
-        .padding(16)
-        .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .strokeBorder(.white.opacity(0.1), lineWidth: 1))
     }
 
     private struct SparkEntry: Identifiable {
@@ -361,7 +490,7 @@ struct IslandWeightDashboard: View {
                 petRef: pet, humanRef: nil
             ))
         }
-        for human in humans {
+        for human in visibleHumans {
             let sorted = human.weightLogs.sorted { $0.date < $1.date }
             guard !sorted.isEmpty else { continue }
             let pts = sorted.map { SparkPoint(date: $0.date, weight: $0.weight) }
@@ -383,14 +512,14 @@ struct IslandWeightDashboard: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.name)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(primaryText)
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
                     Text(String(format: "%.1f", entry.current))
                         .font(.system(size: 18, weight: .black, design: .rounded))
                         .foregroundStyle(entry.accentColor)
                     Text("kg")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.primary.opacity(0.4))
+                        .foregroundStyle(tertiaryText)
                 }
             }
 
@@ -398,24 +527,13 @@ struct IslandWeightDashboard: View {
 
             // 极简无轴 Sparkline
             if entry.history.count > 1 {
-                Chart(entry.history) { pt in
-                    LineMark(
-                        x: .value("date", pt.date),
-                        y: .value("kg", pt.weight)
-                    )
-                    .foregroundStyle(entry.accentColor)
-                    .interpolationMethod(.catmullRom)
-                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-                }
-                .chartXAxis(.hidden)
-                .chartYAxis(.hidden)
-                .chartLegend(.hidden)
+                AnimatedWeightSparkline(history: entry.history, accentColor: entry.accentColor)
                 .frame(width: 80, height: 36)
             }
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.primary.opacity(0.25))
+                .foregroundStyle(tertiaryText.opacity(0.6))
         }
         .padding(.vertical, 10)
         .contentShape(Rectangle())
@@ -441,10 +559,28 @@ struct IslandWeightDashboard: View {
     private func emptyState(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 13, weight: .medium, design: .rounded))
-            .foregroundStyle(.primary.opacity(0.3))
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 28)
+            .foregroundStyle(tertiaryText)
+            .frame(maxWidth: .infinity, alignment: .center)
+    }
+    
+    // MARK: - Glass Card Helper
+    @ViewBuilder
+    private func glassCard<C: View>(@ViewBuilder content: () -> C) -> some View {
+        if reduceTransparency {
+            // 无障碍降级：纯色不透明背景
+            content()
+                .background(Color(.systemBackground).opacity(0.95))
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        } else {
+            // 浅色模式下更透明
+            if colorScheme == .light {
+                content()
+                    .background(.ultraThinMaterial.opacity(0.3), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            } else {
+                content()
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            }
+        }
     }
 }
 

@@ -12,8 +12,11 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @AppStorage("appLanguage") private var appLanguage = "zh"
     @AppStorage("appThemePreference") private var appThemePreference: String = "system"
+    @AppStorage("appBackgroundStyle") private var appBackgroundStyle: String = AppBackgroundStyle.goDefault.rawValue
     @AppStorage("userNickname") private var userNickname = ""
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
     @State private var showingNicknameEdit = false
@@ -35,6 +38,31 @@ struct SettingsView: View {
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
     
+    private var preferredScheme: ColorScheme? {
+        switch appThemePreference {
+        case "light": return .light
+        case "dark":  return .dark
+        default:      return nil
+        }
+    }
+    
+    // 自适应文字颜色
+    private var primaryText: Color {
+        colorScheme == .dark ? .white : .black
+    }
+    
+    private var secondaryText: Color {
+        colorScheme == .dark ? .white.opacity(0.7) : .black.opacity(0.6)
+    }
+    
+    private var tertiaryText: Color {
+        colorScheme == .dark ? .white.opacity(0.45) : .black.opacity(0.4)
+    }
+    
+    private var accentColor: Color {
+        colorScheme == .dark ? Color.goTeal : Color.goBlue
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -67,7 +95,7 @@ struct SettingsView: View {
                         settingsSection(title: "偏好设置") {
                             HStack {
                                 Image(systemName: "globe")
-                                    .foregroundStyle(.blue)
+                                    .foregroundStyle(colorScheme == .dark ? Color.goBlue : Color.goTeal)
                                     .frame(width: 28)
                                 Text("语言")
                                     .font(.system(size: 15, weight: .medium))
@@ -78,12 +106,12 @@ struct SettingsView: View {
                                 }
                                 .pickerStyle(.menu)
                             }
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(primaryText)
                             
                             // 外观主题
                             HStack {
                                 Image(systemName: "circle.lefthalf.filled")
-                                    .foregroundStyle(.purple)
+                                    .foregroundStyle(accentColor)
                                     .frame(width: 28)
                                 Text("外观主题")
                                     .font(.system(size: 15, weight: .medium))
@@ -95,7 +123,34 @@ struct SettingsView: View {
                                 }
                                 .pickerStyle(.menu)
                             }
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(primaryText)
+                            .padding(.top, 8)
+
+                            // 背景风格
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Image(systemName: "sparkles")
+                                        .foregroundStyle(colorScheme == .dark ? Color.goTeal : Color.goBlue)
+                                        .frame(width: 28)
+                                    Text("背景风格")
+                                        .font(.system(size: 15, weight: .medium))
+                                    Spacer()
+                                }
+                                .foregroundStyle(primaryText)
+
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 10) {
+                                        ForEach(AppBackgroundStyle.allCases) { style in
+                                            BackgroundStyleCard(
+                                                style: style,
+                                                isSelected: appBackgroundStyle == style.rawValue,
+                                                onTap: { appBackgroundStyle = style.rawValue }
+                                            )
+                                        }
+                                    }
+                                    .padding(.horizontal, 2)
+                                }
+                            }
                             .padding(.top, 8)
                         }
                         
@@ -144,7 +199,7 @@ struct SettingsView: View {
                                             }
                                             Text(pet.name)
                                                 .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                                .foregroundStyle(.primary)
+                                                .foregroundStyle(primaryText)
                                             Spacer()
                                             // 重置数据（保留基础信息）
                                             Button {
@@ -211,32 +266,32 @@ struct SettingsView: View {
                         // 开发者工具
                         settingsSection(title: "开发者工具") {
                             NavigationLink {
-                                OhanaUIDemoView()
+                                iOS26UITestView()
                                     .navigationBarBackButtonHidden()
                             } label: {
                                 HStack(spacing: 12) {
                                     ZStack {
                                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .fill(Color.goPrimary.opacity(0.12))
+                                            .fill(Color.goLime.opacity(0.12))
                                             .frame(width: 32, height: 32)
-                                        Image(systemName: "paintpalette.fill")
+                                        Image(systemName: "wand.and.sparkles")
                                             .font(.system(size: 14, weight: .semibold))
-                                            .foregroundStyle(Color.goPrimary)
+                                            .foregroundStyle(Color.goLime)
                                     }
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text("UI 规范测试")
+                                        Text("iOS 26 UI 测试页")
                                             .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                            .foregroundStyle(.primary)
-                                        Text("查看所有 UI 元素的 Light/Dark 表现")
+                                            .foregroundStyle(primaryText)
+                                        Text("Liquid Glass 原生 .glassEffect() API 展示")
                                             .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(.primary.opacity(0.4))
+                                            .foregroundStyle(tertiaryText)
                                     }
                                     Spacer()
                                     Image(systemName: "chevron.right")
                                         .font(.system(size: 11, weight: .semibold))
-                                        .foregroundStyle(.primary.opacity(0.2))
+                                        .foregroundStyle(tertiaryText.opacity(0.6))
                                 }
-                                .padding(.vertical, 2)
+                                .padding(.vertical, 8)
                             }
                             .buttonStyle(.plain)
                         }
@@ -279,6 +334,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .preferredColorScheme(preferredScheme)
     }
     
     // MARK: - 设备身份绑定卡
@@ -287,7 +343,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("这台手机的主人是谁？")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.55))
+                    .foregroundStyle(secondaryText)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
                         // "未绑定" 选项
@@ -348,7 +404,7 @@ struct SettingsView: View {
                             .font(.system(size: 12))
                         Text("打卡记录将关联到 \(selected.name)")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.5))
+                            .foregroundStyle(tertiaryText)
                     }
                 }
             }
@@ -373,10 +429,10 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("导出备份")
                             .font(.system(size: 15, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(primaryText)
                         Text("全量 JSON · 含所有宠物、日志、状态")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.primary.opacity(0.4))
+                            .foregroundStyle(tertiaryText)
                     }
                     Spacer()
                     if isExporting {
@@ -426,10 +482,10 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("从备份恢复")
                             .font(.system(size: 15, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(primaryText)
                         Text("选择 .json 备份文件导入")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.primary.opacity(0.4))
+                            .foregroundStyle(tertiaryText)
                     }
                     Spacer()
                     if isImporting {
@@ -454,7 +510,7 @@ struct SettingsView: View {
                         .foregroundStyle(Color.goYellow.opacity(0.6))
                     Text("备份含全部宠物、家庭成员、日志、健康档案及应用状态。恢复时以 UUID 去重，不会清除现有数据。")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.primary.opacity(0.3))
+                        .foregroundStyle(tertiaryText.opacity(0.7))
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.vertical, 4)
@@ -510,44 +566,49 @@ struct SettingsView: View {
 
     // MARK: - Profile Card
     private var profileCard: some View {
-        HStack(spacing: 16) {
-            ZStack {
-                Circle()
-                    .fill(Color.goLime.opacity(0.15))
-                    .frame(width: 64, height: 64)
-                    .overlay(Circle().strokeBorder(Color.goLime.opacity(0.3), lineWidth: 1.5))
-                Image(systemName: "person.fill")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(Color.goLime)
+        glassCard {
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(Color.goLime.opacity(0.15))
+                        .frame(width: 64, height: 64)
+                        .overlay(Circle().strokeBorder(Color.goLime.opacity(0.3), lineWidth: 1.5))
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(Color.goLime)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(userNickname.isEmpty ? "Ohana 岛民" : userNickname)
+                        .font(OhanaFont.title3(.black))
+                        .foregroundStyle(primaryText)
+                    Text("本地模式")
+                        .font(OhanaFont.caption(.medium))
+                        .foregroundStyle(tertiaryText)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(tertiaryText.opacity(0.6))
             }
-            VStack(alignment: .leading, spacing: 4) {
-                Text(userNickname.isEmpty ? "Ohana 岛民" : userNickname)
-                    .font(.system(size: 20, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
-                Text("本地模式")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.primary.opacity(0.4))
-            }
-            Spacer()
-            Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.primary.opacity(0.2))
+            .padding(20)
         }
-        .padding(20)
-        .ohanaStandardCard(cornerRadius: 24)
     }
     
     // MARK: - Settings Section
-    private func settingsSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private func settingsSection<Content: View>(title: String, @ViewBuilder content: @escaping () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
             Text(title.uppercased())
                 .font(OhanaFont.caption2(.bold))
-                .foregroundStyle(.primary.opacity(0.4))
+                .foregroundStyle(tertiaryText)
                 .tracking(1.5)
                 .padding(.leading, 4)
-            content()
-                .padding(14)
-                .ohanaStandardCard(cornerRadius: 18)
+            
+            glassCard {
+                VStack(spacing: 0) {
+                    content()
+                }
+                .padding(16)
+            }
         }
     }
 
@@ -556,24 +617,24 @@ struct SettingsView: View {
             HStack(spacing: 12) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.white.opacity(0.08))
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.08))
                         .frame(width: 32, height: 32)
                     Image(systemName: icon)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.goLime)
+                        .foregroundStyle(accentColor)
                 }
                 Text(title)
                     .font(OhanaFont.body(.semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(primaryText)
                 Spacer()
                 if !subtitle.isEmpty {
                     Text(subtitle)
                         .font(OhanaFont.footnote())
-                        .foregroundStyle(.primary.opacity(0.4))
+                        .foregroundStyle(tertiaryText)
                 }
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.primary.opacity(0.2))
+                    .foregroundStyle(tertiaryText.opacity(0.6))
             }
             .padding(.vertical, 4)
         }
@@ -621,6 +682,66 @@ struct SettingsView: View {
         } catch {
             print("Clear data error: \(error)")
         }
+    }
+    
+    // MARK: - Glass Card Helper
+    @ViewBuilder
+    private func glassCard<C: View>(@ViewBuilder content: () -> C) -> some View {
+        if reduceTransparency {
+            // 无障碍降级：纯色不透明背景
+            content()
+                .background(Color(.systemBackground).opacity(0.95))
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        } else {
+            // 浅色模式下更透明
+            if colorScheme == .light {
+                content()
+                    .background(.ultraThinMaterial.opacity(0.3), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            } else {
+                content()
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            }
+        }
+    }
+}
+
+// MARK: - Background Style Card（背景风格预览卡）
+private struct BackgroundStyleCard: View {
+    let style: AppBackgroundStyle
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 6) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(style.previewColors[0])
+                        .frame(width: 64, height: 48)
+                    // 两个小光球预览
+                    Circle()
+                        .fill(style.previewColors.count > 1 ? style.previewColors[1] : .clear)
+                        .frame(width: 20)
+                        .blur(radius: 6)
+                        .offset(x: -10, y: -6)
+                    Circle()
+                        .fill(style.previewColors.count > 2 ? style.previewColors[2] : .clear)
+                        .frame(width: 16)
+                        .blur(radius: 5)
+                        .offset(x: 10, y: 8)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(isSelected ? Color.goLime : .white.opacity(0.15), lineWidth: isSelected ? 2 : 1)
+                )
+
+                Text(style.displayName)
+                    .font(.system(size: 10, weight: isSelected ? .bold : .medium, design: .rounded))
+                    .foregroundStyle(isSelected ? Color.goLime : .primary.opacity(0.6))
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 

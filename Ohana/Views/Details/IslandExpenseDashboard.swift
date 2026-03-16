@@ -80,7 +80,7 @@ struct IslandExpenseDashboard: View {
             guard total > 0 else { return nil }
             return PetExpenseSummary(id: pet.id, name: pet.name,
                                      emoji: pet.avatarEmoji, total: total,
-                                     color: pet.themeColor.color)
+                                     color: Color(hex: pet.themeColorHex))
         }.sorted { $0.total > $1.total }
     }
 
@@ -133,11 +133,10 @@ struct IslandExpenseDashboard: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 20) {
                     navBar
-                    totalHeader
+                    expenseFloatingHeader
                     funBentoRow
                     petBarChartCard
                     payerBreakdownCard
-                    categoryDonutCard
                     ExpenseSplitterCard(filteredLogs: filteredLogs, humans: humans)
                     Color.clear.frame(height: 40)
                 }
@@ -181,37 +180,100 @@ struct IslandExpenseDashboard: View {
         .padding(.top, 64)
     }
 
-    // MARK: - 总支出 + 时间选择器
-    private var totalHeader: some View {
-        VStack(spacing: 14) {
+    // MARK: - E7: 悬浮首部（时间filter + 大数字 + pie chart）
+    private var expenseFloatingHeader: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // 时间 filter
             Picker("", selection: $timeRange) {
                 ForEach(ExpenseTimeRange.allCases) { r in
                     Text(r.rawValue).tag(r)
                 }
             }
             .pickerStyle(.segmented)
+            .padding(.horizontal, 4)
 
-            VStack(spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("¥ ")
-                        .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.6))
-                    Text(totalAmount.formatted(.number.precision(.fractionLength(2))))
-                        .font(.system(size: 44, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
-                        .contentTransition(.numericText())
-                        .animation(.spring(response: 0.4), value: totalAmount)
+            // 悬浮 Pie Chart（独立色系，无卡片背景）
+            HStack(alignment: .center, spacing: 20) {
+                ZStack {
+                    if categorySummaries.isEmpty {
+                        // 无数据：灰色空心环
+                        Circle()
+                            .strokeBorder(.primary.opacity(0.1), lineWidth: 18)
+                            .frame(width: 150, height: 150)
+                    } else {
+                        Chart(categorySummaries) { item in
+                            SectorMark(
+                                angle: .value("金额", item.total * chartAnimationProgress),
+                                innerRadius: .ratio(0.5),
+                                angularInset: 2
+                            )
+                            .foregroundStyle(expensePieColor(item.category))
+                            .cornerRadius(4)
+                        }
+                        .frame(width: 150, height: 150)
+                    }
+
+                    VStack(spacing: 2) {
+                        if categorySummaries.isEmpty {
+                            Text("暂无数据")
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundStyle(.primary.opacity(0.3))
+                        } else {
+                            Text("¥\(Int(totalAmount))")
+                                .font(.system(size: 16, weight: .black, design: .rounded))
+                                .foregroundStyle(.primary)
+                            Text(timeRange.rawValue == "全部" ? "累计" : "本\(timeRange.rawValue)")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
-                Text("\(timeRange.rawValue == "全部" ? "累计" : "本\(timeRange.rawValue)")花费")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.4))
+
+                if !categorySummaries.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(categorySummaries.prefix(5)) { item in
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(expensePieColor(item.category))
+                                    .frame(width: 7, height: 7)
+                                Text(item.category.rawValue)
+                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(.primary.opacity(0.75))
+                                Spacer()
+                                Text("\(Int(item.pct * 100))%")
+                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.primary.opacity(0.45))
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("记录第一笔花费")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(.primary.opacity(0.4))
+                        Text("在宠物详情页添加花费记录后，这里会显示消费分布")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(.primary.opacity(0.25))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
+            .padding(.horizontal, 4)
         }
         .padding(.horizontal, 4)
-        .padding(.vertical, 16)
-        .frame(maxWidth: .infinity)
-        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(.white.opacity(0.09), lineWidth: 1))
+    }
+
+    /// E7: 独立色系，和宠物主题色区分
+    private func expensePieColor(_ cat: ExpenseCategory) -> Color {
+        switch cat {
+        case .food:     return Color(hex: "3B82F6")  // 蓝
+        case .treats:   return Color(hex: "10B981")  // 緑
+        case .medical:  return Color(hex: "F59E0B")  // 橙黄
+        case .grooming: return Color(hex: "8B5CF6")  // 紫
+        case .toys:     return Color(hex: "EC4899")  // 粉
+        case .other:    return Color(hex: "6B7280")  // 灰
+        }
     }
 
     // MARK: - 趣味 Bento（吞金兽 + 消费大头）
@@ -223,77 +285,58 @@ struct IslandExpenseDashboard: View {
     }
 
     private var topPetCard: some View {
-        ZStack {
-            // 微光背景
-            RadialGradient(
-                colors: [Color.goRed.opacity(0.18), .clear],
-                center: .center, startRadius: 10, endRadius: 100
-            )
-        }
-        .overlay {
-            VStack(alignment: .center, spacing: 6) {
-                HStack(spacing: 5) {
-                    Text("💰")
-                    Text("本期吞金兽")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.8))
-                }
-                Spacer(minLength: 0)
-                if let top = topPet {
-                    Text(top.emoji).font(.system(size: 48))
-                    Text(top.name)
-                        .font(.system(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    Text("¥\(top.total.formatted(.number.precision(.fractionLength(0))))")
-                        .font(.title2.bold())
-                        .foregroundStyle(Color.goRed)
-                } else {
-                    Text("暂无数据").font(.system(size: 12)).foregroundStyle(.primary.opacity(0.3))
-                }
+        VStack(alignment: .center, spacing: 6) {
+            HStack(spacing: 5) {
+                Text("💰")
+                Text("吞金兽")
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary.opacity(0.6))
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, minHeight: 150)
+            Spacer(minLength: 0)
+            if let top = topPet {
+                Text(top.emoji).font(.system(size: 34))
+                Text(top.name)
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Text("¥\(top.total.formatted(.number.precision(.fractionLength(0))))")
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary.opacity(0.85))
+            } else {
+                Text("暂无数据").font(.system(size: 12)).foregroundStyle(.primary.opacity(0.3))
+            }
         }
-        .frame(maxWidth: .infinity, minHeight: 150)
-        .background(Color.goRed.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.goRed.opacity(0.2), lineWidth: 1))
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 110)
+        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.white.opacity(0.1), lineWidth: 1))
     }
 
     private var topCategoryCard: some View {
-        ZStack {
-            RadialGradient(
-                colors: [Color.goCardCyan.opacity(0.18), .clear],
-                center: .center, startRadius: 10, endRadius: 100
-            )
-        }
-        .overlay {
-            VStack(alignment: .center, spacing: 6) {
-                HStack(spacing: 5) {
-                    Text("🛍️")
-                    Text("消费大头")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.8))
-                }
-                Spacer(minLength: 0)
-                if let top = topCategory {
-                    Text(top.category.emoji).font(.system(size: 48))
-                    Text(top.category.rawValue)
-                        .font(.system(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
-                    Text("\(Int(top.pct * 100))%")
-                        .font(.title2.bold())
-                        .foregroundStyle(Color.goCardCyan)
-                } else {
-                    Text("暂无数据").font(.system(size: 12)).foregroundStyle(.primary.opacity(0.3))
-                }
+        VStack(alignment: .center, spacing: 6) {
+            HStack(spacing: 5) {
+                Text("🏷️")
+                Text("消费大头")
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary.opacity(0.6))
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, minHeight: 150)
+            Spacer(minLength: 0)
+            if let top = topCategory {
+                Text(top.category.emoji).font(.system(size: 34))
+                Text(top.category.rawValue)
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                Text("\(Int(top.pct * 100))%")
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary.opacity(0.85))
+            } else {
+                Text("暂无数据").font(.system(size: 12)).foregroundStyle(.primary.opacity(0.3))
+            }
         }
-        .frame(maxWidth: .infinity, minHeight: 150)
-        .background(Color.goCardCyan.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.goCardCyan.opacity(0.2), lineWidth: 1))
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 110)
+        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.white.opacity(0.1), lineWidth: 1))
     }
 
     // MARK: - 成员花费横向条形图

@@ -10,6 +10,7 @@ import SwiftData
 /// 三种视觉状态：Pending / Completed / Overdue
 struct SwipeableEventRow: View {
     let event: Event
+    var occurrenceDate: Date = Date()
     let onComplete: () -> Void
     let onDelete: () -> Void
 
@@ -17,6 +18,7 @@ struct SwipeableEventRow: View {
 
     @State private var offsetX: CGFloat = 0
     @State private var isTriggerred = false
+    @State private var showDeleteConfirmAlert = false
     @State private var celebrationParticles: [CelebrationParticle] = []
     @AppStorage("shop_equip_fx_stars") private var equipFxStars: Bool = false
     @State private var coconutFloats: [CoconutFloat] = []
@@ -123,7 +125,7 @@ struct SwipeableEventRow: View {
                         // 信息性事件不可左滑完成
                         if dx < -triggerThreshold && event.isActionableTask { triggerComplete() }
                         else if dx < -triggerThreshold { withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) { offsetX = 0 } }
-                        else if dx > triggerThreshold { triggerDelete() }
+                        else if dx > triggerThreshold { pendingDelete() }
                         else {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) { offsetX = 0 }
                         }
@@ -135,6 +137,24 @@ struct SwipeableEventRow: View {
             EventDetailSheet(event: event, onDelete: onDelete, onComplete: onComplete)
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
+        }
+        // F1+F2: 唯一删除确认弹窗，所有逻辑在此处理
+        .confirmationDialog(
+            event.recurrenceDays > 0 ? "删除重复事件" : "删除「\(event.title)」",
+            isPresented: $showDeleteConfirmAlert,
+            titleVisibility: .visible
+        ) {
+            if event.recurrenceDays > 0 {
+                Button("仅删除此条", role: .destructive) { deleteSingleOccurrence() }
+                Button("删除此条及之后所有重复", role: .destructive) { deleteThisAndAfter() }
+            } else {
+                Button("删除", role: .destructive) { triggerDelete() }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text(event.recurrenceDays > 0
+                 ? "这是一个重复事件，请选择删除方式"
+                 : "确定要删除「\(event.title)」吗？此操作不可撤回。")
         }
         .overlay(alignment: .top) {
             if showSkipReason {
@@ -219,18 +239,15 @@ struct SwipeableEventRow: View {
             }
         }
         .padding(.horizontal, 14).padding(.vertical, 11)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.goPrimary.mix(with: .black, by: 0.4).opacity(0.55))
-        )
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(
-                    rowState == .overdue ? Color.goOrange.opacity(0.4) : .white.opacity(0.12),
-                    lineWidth: rowState == .overdue ? 1.5 : 1
+                    rowState == .overdue ? Color.goOrange.opacity(0.5) : Color.clear,
+                    lineWidth: rowState == .overdue ? 1.5 : 0
                 )
         )
-        .opacity(rowState == .completed ? 0.55 : 1.0)
+        .opacity(rowState == .completed ? 0.5 : 1.0)
     }
 
     // MARK: - Dynamic Emoji（根据标题关键词）
@@ -321,18 +338,95 @@ struct SwipeableEventRow: View {
         return logs.contains { $0.pet?.id.uuidString == petIdStr && $0.type == careType }
     }
 
+    // E1: 右滑只弹确认 alert，回弹到原位
+    private func pendingDelete() {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) { offsetX = 0 }
+        showDeleteConfirmAlert = true
+    }
+
     private func triggerDelete() {
         isTriggerred = true
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) { offsetX = 800 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
-            // 真删除：写入 modelContext
             modelContext.delete(event)
             modelContext.safeSave()
             onDelete()
             isTriggerred = false
             withAnimation(.spring(response: 0.35)) { offsetX = 0 }
         }
+    }
+
+    /// F1: 仅删除单条重复出现（修改 recurrenceEndDate 或 startDate 或拆分）
+    private func deleteSingleOccurrence() {
+        let cal = Calendar.current
+        let occStart = cal.startOfDay(for: occurrenceDate)
+        let eventStart = cal.startOfDay(for: event.startDate)
+
+        if occStart == eventStart {
+            // 第一条：将 startDate 推进到下一次
+            if let next = cal.date(byAdding: .day, value: event.recurrenceDays, to: eventStart) {
+                let hasMore: Bool
+                if let end = event.recurrenceEndDate {
+                    hasMore = next <= cal.startOfDay(for: end)
+                } else {
+                    hasMore = true
+                }
+                if hasMore {
+                    event.startDate = next
+                } else {
+                    modelContext.delete(event)
+                }
+            } else {
+                modelContext.delete(event)
+            }
+        } else {
+            // 中间或末尾：截断当前事件到前一天，如果后面还有则创建新事件
+            let dayBefore = cal.date(byAdding: .day, value: -1, to: occStart)!
+            let nextOcc = cal.date(byAdding: .day, value: event.recurrenceDays, to: occStart)!
+            let hasAfter: Bool
+            if let endDate = event.recurrenceEndDate {
+                hasAfter = nextOcc <= cal.startOfDay(for: endDate)
+            } else {
+                hasAfter = true
+            }
+            if hasAfter {
+                let newEvent = Event(
+                    title: event.title,
+                    startDate: nextOcc,
+                    endDate: event.endDate,
+                    isAllDay: event.isAllDay,
+                    eventType: event.eventType,
+                    relatedEntityType: event.relatedEntityType,
+                    relatedEntityId: event.relatedEntityId
+                )
+                newEvent.recurrenceDays = event.recurrenceDays
+                newEvent.recurrenceEndDate = event.recurrenceEndDate
+                newEvent.assigneeId = event.assigneeId
+                modelContext.insert(newEvent)
+            }
+            event.recurrenceEndDate = dayBefore
+        }
+        modelContext.safeSave()
+        onDelete()
+    }
+
+    /// F1: 删除此条及之后所有重复
+    private func deleteThisAndAfter() {
+        let cal = Calendar.current
+        let occStart = cal.startOfDay(for: occurrenceDate)
+        let eventStart = cal.startOfDay(for: event.startDate)
+
+        if occStart <= eventStart {
+            // 选中的是第一条或之前 → 删除整个事件
+            modelContext.delete(event)
+        } else {
+            // 截断到选中日期的前一天
+            let dayBefore = cal.date(byAdding: .day, value: -1, to: occStart)!
+            event.recurrenceEndDate = dayBefore
+        }
+        modelContext.safeSave()
+        onDelete()
     }
 
     private func launchCelebrationParticles() {

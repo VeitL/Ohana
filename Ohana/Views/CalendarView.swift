@@ -8,8 +8,15 @@
 import SwiftUI
 import SwiftData
 
+enum CalendarViewMode: String, CaseIterable {
+    case month = "月"
+    case list = "列表"
+}
+
 struct CalendarView: View {
     var preselectedPetId: String? = nil
+    var hideToolbar: Bool = false
+    var addEventTrigger: Bool = false
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -20,14 +27,10 @@ struct CalendarView: View {
     @State private var selectedPetFilter: String? = nil
     @State private var showingAddEvent = false
     @State private var showingCoconutLog = false
-    @State private var viewMode: CalendarViewMode = .list
+    @AppStorage("calendar_viewMode") private var viewModeRaw: String = CalendarViewMode.list.rawValue
+    private var viewMode: CalendarViewMode { CalendarViewMode(rawValue: viewModeRaw) ?? .list }
     @State private var deletingEvent: Event? = nil
     @State private var showDeleteSeriesAlert = false
-    
-    enum CalendarViewMode: String, CaseIterable {
-        case month = "月"
-        case list = "列表"
-    }
     
     private var filteredEvents: [Event] {
         var result = events
@@ -36,19 +39,84 @@ struct CalendarView: View {
         }
         return result
     }
+
+    // D1: 展开重复事件 → 生成虚拟 (Event, occurrenceDate) 对，用于列表视图分组
+    private struct EventOccurrence: Identifiable {
+        let id: String          // event.id + date
+        let event: Event
+        let occurrenceDate: Date
+    }
+
+    private var expandedOccurrences: [EventOccurrence] {
+        let cal = Calendar.current
+        let cutoff = cal.date(byAdding: .month, value: -3, to: Date()) ?? Date() // 只展开近3个月
+        let future = cal.date(byAdding: .month, value: 3, to: Date()) ?? Date()  // 及未来3个月
+        var result: [EventOccurrence] = []
+        for event in filteredEvents {
+            let eStart = cal.startOfDay(for: event.startDate)
+            if event.recurrenceDays > 0 {
+                let hardCap: Date
+                if let recEnd = event.recurrenceEndDate {
+                    hardCap = min(recEnd, future)
+                } else {
+                    hardCap = future
+                }
+                var cursor = max(eStart, cutoff)
+                // 对齐到第一个重复发生日
+                if cursor > eStart {
+                    let diff = cal.dateComponents([.day], from: eStart, to: cursor).day ?? 0
+                    let steps = Int(ceil(Double(diff) / Double(event.recurrenceDays)))
+                    cursor = cal.date(byAdding: .day, value: steps * event.recurrenceDays, to: eStart) ?? eStart
+                }
+                var safety = 0
+                while cursor <= hardCap && safety < 200 {
+                    result.append(EventOccurrence(
+                        id: "\(event.id.uuidString)-\(cursor.timeIntervalSince1970)",
+                        event: event,
+                        occurrenceDate: cursor
+                    ))
+                    cursor = cal.date(byAdding: .day, value: event.recurrenceDays, to: cursor) ?? cursor
+                    safety += 1
+                }
+            } else {
+                if eStart >= cutoff && eStart <= future {
+                    result.append(EventOccurrence(
+                        id: event.id.uuidString,
+                        event: event,
+                        occurrenceDate: eStart
+                    ))
+                }
+            }
+        }
+        return result.sorted { $0.occurrenceDate > $1.occurrenceDate }
+    }
     
     private var eventsForSelectedDate: [Event] {
         filteredEvents.filter { eventOccursOnDate($0, date: selectedDate) }
     }
 
-    /// 判断事件是否出现在指定日期（支持多日事件）
+    /// 判断事件是否出现在指定日期（支持多日事件 + 重复事件展开）
     private func eventOccursOnDate(_ event: Event, date: Date) -> Bool {
         let cal = Calendar.current
         let dayStart = cal.startOfDay(for: date)
         guard let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart) else { return false }
-        let eStart = event.startDate
-        let eEnd = event.endDate ?? eStart  // 无 endDate 则等于 startDate
-        // 事件范围与当天范围有交集
+        let eStart = cal.startOfDay(for: event.startDate)
+
+        // 重复事件：检查 date 是否是某个重复发生日
+        if event.recurrenceDays > 0 {
+            // date 不能早于事件开始日
+            guard dayStart >= eStart else { return false }
+            // 不能超过重复结束日（如果设置了）
+            if let recEnd = event.recurrenceEndDate {
+                guard dayStart <= cal.startOfDay(for: recEnd) else { return false }
+            }
+            // date 距 startDate 的天数必须是 recurrenceDays 的整数倍
+            let diff = cal.dateComponents([.day], from: eStart, to: dayStart).day ?? 0
+            return diff % event.recurrenceDays == 0
+        }
+
+        // 单次事件：事件范围与当天范围有交集
+        let eEnd = event.endDate.map { cal.startOfDay(for: $0) } ?? eStart
         return eStart < dayEnd && eEnd >= dayStart
     }
     
@@ -68,6 +136,29 @@ struct CalendarView: View {
                 ArkBackgroundView()
                 
                 VStack(spacing: 0) {
+                    // R6: 全局 header 占位
+                    Spacer().frame(height: 70)
+
+                    if !hideToolbar {
+                        // 日历工具栏（独立使用时显示，嵌入 tab 时由全局 header 提供）
+                        HStack(spacing: 12) {
+                            Spacer()
+                            HStack(spacing: 2) {
+                                iconModeBtn(systemName: "calendar", mode: .month)
+                                iconModeBtn(systemName: "list.bullet", mode: .list)
+                            }
+                            .padding(3)
+                            .background(.white.opacity(0.1), in: Capsule())
+                            Button { showingAddEvent = true } label: {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(Color.goLime)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 6)
+                    }
+
                     // Go 风格 Pet Chip 筛选器
                     goPetChipFilter
                     
@@ -79,33 +170,10 @@ struct CalendarView: View {
                     }
                 }
             }
-            .navigationTitle("Calendar")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 16) {
-                        // 1. 日历模式切换（独立胶囊背景）
-                        HStack(spacing: 2) {
-                            iconModeBtn(systemName: "calendar", mode: .month)
-                            iconModeBtn(systemName: "list.bullet", mode: .list)
-                        }
-                        .padding(3)
-                        .background(.white.opacity(0.1), in: Capsule())
-
-                        // 2. 添加事件按钮（独立，无联合背景）
-                        Button { showingAddEvent = true } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 20))
-                                .foregroundStyle(Color.goLime)
-                        }
-
-                        // 3. 椰子余额（完全独立的视觉个体）
-                        CoconutBalanceCapsule { showingCoconutLog = true }
-                    }
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingAddEvent) { AddEventView() }
             .sheet(isPresented: $showingCoconutLog) { CoconutLogView() }
+            .onChange(of: addEventTrigger) { _, _ in showingAddEvent = true }
         }
     }
     
@@ -170,7 +238,7 @@ struct CalendarView: View {
     private var goPetChipFilter: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                goChipButton(label: "All", emoji: "🏝️", isSelected: selectedPetFilter == nil) {
+                goChipButton(label: "全部", emoji: "🏝️", isSelected: selectedPetFilter == nil) {
                     selectedPetFilter = nil
                 }
                 
@@ -221,7 +289,7 @@ struct CalendarView: View {
 
     private func iconModeBtn(systemName: String, mode: CalendarViewMode) -> some View {
         Button {
-            withAnimation(.spring(response: 0.28)) { viewMode = mode }
+            withAnimation(.spring(response: 0.28)) { viewModeRaw = mode.rawValue }
         } label: {
             Image(systemName: systemName)
                 .font(.system(size: 14, weight: .bold))
@@ -329,14 +397,14 @@ struct CalendarView: View {
                         VStack(spacing: 8) {
                             Text("📭")
                                 .font(.system(size: 32))
-                            Text("No events")
+                            Text("暂无事件")
                                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                                 .foregroundStyle(.primary.opacity(0.4))
                         }
                         .padding(.top, 20)
                     } else {
                         ForEach(eventsForSelectedDate) { event in
-                            goEventRow(event)
+                            goEventRow(event, occurrenceDate: selectedDate)
                         }
                     }
                 }
@@ -352,8 +420,9 @@ struct CalendarView: View {
             ambientLightBlobs
 
             ScrollView {
-                let grouped = Dictionary(grouping: filteredEvents) { event in
-                    Calendar.current.startOfDay(for: event.startDate)
+                // D1: 用展开后的重复事件按 occurrenceDate 分组
+                let grouped = Dictionary(grouping: expandedOccurrences) { occ in
+                    Calendar.current.startOfDay(for: occ.occurrenceDate)
                 }.sorted { $0.key > $1.key }
 
                 if grouped.isEmpty {
@@ -367,31 +436,15 @@ struct CalendarView: View {
                     .padding(.top, 60)
                 } else {
                     LazyVStack(spacing: 0, pinnedViews: []) {
-                        ForEach(grouped, id: \.key) { date, dayEvents in
-                            timelineSection(date: date, events: dayEvents)
+                        ForEach(grouped, id: \.key) { date, occurrences in
+                            timelineSection(date: date, occurrences: occurrences)
                         }
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 20)
                 }
             }
-            // ✅ alert 挂在列表级别，唯一实例，消除 ForEach 多行竞争
-            .alert("删除事件", isPresented: $showDeleteSeriesAlert, presenting: deletingEvent) { ev in
-                Button("删除此条", role: .destructive) {
-                    modelContext.delete(ev)
-                    modelContext.safeSave()
-                    deletingEvent = nil
-                }
-                if ev.recurrenceDays > 0 {
-                    Button("删除此条及之后所有重复", role: .destructive) {
-                        deleteSeriesFrom(ev)
-                        deletingEvent = nil
-                    }
-                }
-                Button("取消", role: .cancel) { deletingEvent = nil }
-            } message: { ev in
-                Text(ev.recurrenceDays > 0 ? "这是一个重复事件，请选择删除方式" : "确认删除「\(ev.title)」吗？")
-            }
+            // F2: 删除 alert 已移至 SwipeableEventRow’s confirmationDialog
         }
     }
 
@@ -422,11 +475,10 @@ struct CalendarView: View {
     }
 
     // 单日时间轴组
-    private func timelineSection(date: Date, events: [Event]) -> some View {
+    private func timelineSection(date: Date, occurrences: [EventOccurrence]) -> some View {
         VStack(spacing: 0) {
             // 日期组头
             HStack(spacing: 10) {
-                // 日期节点圆点
                 ZStack {
                     Circle()
                         .fill(Calendar.current.isDateInToday(date) ? Color.goLime : .white.opacity(0.12))
@@ -443,7 +495,7 @@ struct CalendarView: View {
                     .foregroundStyle(Calendar.current.isDateInToday(date) ? Color.goLime : .white.opacity(0.4))
                     .tracking(0.5)
 
-                Text("·  \(events.count)")
+                Text("·  \(occurrences.count)")
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(.primary.opacity(0.25))
 
@@ -454,7 +506,6 @@ struct CalendarView: View {
 
             // 事件行列（左侧纵线贯穿）
             HStack(alignment: .top, spacing: 0) {
-                // 纵向时间线（LinearGradient 发光光纤效果）
                 VStack(spacing: 0) {
                     Rectangle()
                         .fill(
@@ -468,10 +519,9 @@ struct CalendarView: View {
                 }
                 .frame(width: 40)
 
-                // 事件卡片列
                 VStack(spacing: 8) {
-                    ForEach(events) { event in
-                        goEventRow(event)
+                    ForEach(occurrences) { occ in
+                        goEventRow(occ.event, occurrenceDate: occ.occurrenceDate)
                     }
                 }
                 .padding(.bottom, 8)
@@ -490,13 +540,13 @@ struct CalendarView: View {
     }
     
     // MARK: - Go Event Row
-    private func goEventRow(_ event: Event) -> some View {
+    private func goEventRow(_ event: Event, occurrenceDate: Date) -> some View {
         SwipeableEventRow(
             event: event,
+            occurrenceDate: occurrenceDate,
             onComplete: {
                 withAnimation(.spring(response: 0.3)) {
                     event.isCompleted.toggle()
-                    // N6: 同步所有关联的今日 Reminder 状态
                     let now = Date()
                     let today = Calendar.current.startOfDay(for: now)
                     let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: today)!
@@ -509,17 +559,8 @@ struct CalendarView: View {
                     modelContext.safeSave()
                 }
             },
-            onDelete: {
-                deletingEvent = event
-                showDeleteSeriesAlert = true
-            }
+            onDelete: { /* F2: 删除逻辑已在 SwipeableEventRow 内处理 */ }
         )
-    }
-
-    private func deleteSeriesFrom(_ event: Event) {
-        let sameTitle = events.filter { $0.title == event.title && $0.startDate >= event.startDate }
-        for ev in sameTitle { modelContext.delete(ev) }
-        modelContext.safeSave()
     }
     
     // MARK: - Calendar Helpers

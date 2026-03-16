@@ -32,6 +32,7 @@ struct GoQuickActionCard: View {
     var petThemeColorHex: String? = nil
     var pendingReminder: Reminder? = nil
     var countText: String? = nil
+    var isCompletedToday: Bool = false
     let onTap: () -> Void
     var onLongPress: (() -> Void)? = nil
     var onDoubleTap: (() -> Void)? = nil
@@ -59,6 +60,9 @@ struct GoQuickActionCard: View {
         ]
         return map[item.actionType] ?? item.label
     }
+    
+    // 高级极简的规则圆角，取代不规则圆角
+    private let premiumShape = RoundedRectangle(cornerRadius: 20, style: .continuous)
 
     private var cardBgColor: Color {
         let base = petThemeColorHex.map { Color(hex: $0) } ?? Color(hex: item.colorHex)
@@ -71,6 +75,8 @@ struct GoQuickActionCard: View {
 
     @Environment(\.colorScheme) private var colorScheme
     private var isDarkMode: Bool { colorScheme == .dark }
+    
+    @State private var animateGlow = false
 
     var body: some View {
         Button(action: {
@@ -81,83 +87,44 @@ struct GoQuickActionCard: View {
                 onTap()
             }
         }) {
-            ZStack(alignment: .topTrailing) {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .top) {
-                        Image(systemName: item.icon)
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundStyle(Color(hex: item.colorHex))
-                        Spacer(minLength: 0)
-                        if let img = petAvatar {
-                            Image(uiImage: img)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 16, height: 16)
-                                .clipShape(Circle())
-                                .overlay(Circle().strokeBorder(.white.opacity(0.3), lineWidth: 1))
-                        } else if pendingReminder == nil {
-                            Circle()
-                                .fill(Color(hex: item.colorHex).opacity(0.3))
-                                .frame(width: 6, height: 6)
-                        }
-                    }
-                    
-                    Spacer(minLength: 0)
-                    
-                    VStack(alignment: .leading, spacing: 0) {
-                        if let reminder = pendingReminder {
-                            Text(reminder.event?.title ?? cleanLabel)
-                                .font(.system(size: 13, weight: .black, design: .rounded))
-                                .foregroundStyle(Color(hex: item.colorHex))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                            Text("待办")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(isDarkMode ? .white.opacity(0.5) : Color.arkInk.opacity(0.5))
-                        } else {
-                            if let ct = countText {
-                                Text(cleanLabel)
-                                    .font(.system(size: 13, weight: .black, design: .rounded))
-                                    .foregroundStyle(isDarkMode ? .white : Color.arkInk)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
-                                Text(ct)
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(isDarkMode ? .white.opacity(0.6) : Color.arkInk.opacity(0.6))
-                                    .lineLimit(1)
-                            } else {
-                                Text(cleanLabel)
-                                    .font(.system(size: 13, weight: .black, design: .rounded))
-                                    .foregroundStyle(isDarkMode ? .white : Color.arkInk)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
-                                // 保持和有数据的卡片一致的布局高度
-                                Text(" ")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(.clear)
-                            }
-                        }
+            VStack(spacing: 6) {
+                // Icon — 无背景，直接显示
+                ZStack {
+                    Image(systemName: item.icon)
+                        .font(.system(size: 26, weight: .semibold))
+                        .foregroundStyle(isCompletedToday ? Color.goLime : .primary.opacity(0.75))
+                        .scaleEffect(isPressed ? 0.90 : 1.0)
+
+                    if pendingReminder != nil {
+                        Circle()
+                            .fill(Color.goRed)
+                            .frame(width: 7, height: 7)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                            .offset(x: 2, y: -2)
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                .aspectRatio(1, contentMode: .fit)
-                .padding(10)
-                .ohanaStandardCard(cornerRadius: 16)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(pendingReminder != nil ? Color(hex: item.colorHex).opacity(0.5) : .clear, lineWidth: 2)
-                )
+                .frame(width: 44, height: 44)
 
-                if pendingReminder != nil {
-                    Circle()
-                        .fill(Color.goRed)
-                        .frame(width: 8, height: 8)
-                        .padding(.top, 10)
-                        .padding(.trailing, 10)
+                // 文字
+                VStack(spacing: 1) {
+                    Text(cleanLabel)
+                        .font(OhanaFont.caption2(.semibold))
+                        .foregroundStyle(.primary.opacity(0.75))
+                        .lineLimit(1)
+
+                    if let subtitle = countText ?? pendingReminder?.event?.title {
+                        Text(subtitle)
+                            .font(OhanaFont.caption2(.medium))
+                            .foregroundStyle(.primary.opacity(0.35))
+                            .lineLimit(1)
+                    } else {
+                        Text(" ")
+                            .font(.system(size: 9))
+                    }
                 }
             }
-            .scaleEffect(isPressed ? 0.93 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.6), value: isPressed)
+            .scaleEffect(isPressed ? 0.88 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isPressed)
         }
         .buttonStyle(.plain)
         .if(onDoubleTap != nil) { v in
@@ -240,12 +207,17 @@ struct GroomMenuSheet: View {
 
     var body: some View {
         VStack(spacing: 20) {
+            // 拖拽把手
+            Capsule()
+                .fill(.secondary.opacity(0.35))
+                .frame(width: 36, height: 4)
+                .padding(.top, 10)
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("护理打卡")
-                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .font(OhanaFont.title3(.black))
                     Text("选择护理项目")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(OhanaFont.caption(.medium))
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -258,7 +230,7 @@ struct GroomMenuSheet: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 24)
-            .padding(.top, 20)
+            .padding(.top, 4)
 
             LazyVGrid(
                 columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 3),
@@ -285,7 +257,7 @@ struct GroomMenuSheet: View {
                                     .font(.system(size: 28))
                             }
                             Text(opt.label)
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .font(OhanaFont.caption(.bold))
                                 .foregroundStyle(.primary)
                         }
                         .frame(maxWidth: .infinity)
@@ -306,6 +278,80 @@ struct GroomMenuSheet: View {
 
             Spacer(minLength: 8)
         }
+        .presentationBackground(.ultraThinMaterial)
+    }
+}
+
+// MARK: - QA Manage Sheet
+struct QAManageSheet: View {
+    let pets: [Pet]
+    let defaultPetId: UUID?
+    @Binding var savedItems: [QuickActionItem]
+    
+    @Environment(\.dismiss) private var dismiss
+    @State private var showingAddSheet = false
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(savedItems, id: \.id) { item in
+                    HStack(spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color(hex: item.colorHex).opacity(0.15))
+                                .frame(width: 36, height: 36)
+                            Image(systemName: item.icon)
+                                .foregroundStyle(Color(hex: item.colorHex))
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.label)
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                            if let pid = item.petId, let pet = pets.first(where: { $0.id == pid }) {
+                                Text(pet.name)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text("通用")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                .onDelete { indices in
+                    savedItems.remove(atOffsets: indices)
+                }
+                .onMove { indices, newOffset in
+                    savedItems.move(fromOffsets: indices, toOffset: newOffset)
+                }
+            }
+            .navigationTitle("管理快捷入口")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    EditButton()
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    HStack {
+                        Button { showingAddSheet = true } label: {
+                            Image(systemName: "plus")
+                        }
+                        Button("完成") { dismiss() }
+                            .fontWeight(.bold)
+                    }
+                }
+            }
+            .sheet(isPresented: $showingAddSheet) {
+                AddQuickActionSheet(
+                    pets: pets,
+                    defaultPetId: defaultPetId,
+                    existingItems: savedItems
+                ) { newItem in
+                    savedItems.append(newItem)
+                }
+            }
+        }
     }
 }
 
@@ -317,8 +363,18 @@ struct AddQuickActionSheet: View {
     let onAdd: (QuickActionItem) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("quickActionItems_v2") private var quickActionItemsJSON: String = ""
     @State private var step: Int = 1
     @State private var selectedPet: Pet? = nil
+
+    /// F3: 实时读取 AppStorage 中的 item 数量（而非快照）
+    private var liveItems: [QuickActionItem] {
+        (try? JSONDecoder().decode([QuickActionItem].self, from: Data(quickActionItemsJSON.utf8))) ?? []
+    }
+    private var selectedPetItemCount: Int {
+        guard let pet = selectedPet else { return 0 }
+        return liveItems.filter { $0.petId == pet.id }.count
+    }
 
     private struct ActionOption: Identifiable {
         let id: String
@@ -348,10 +404,11 @@ struct AddQuickActionSheet: View {
     ]
 
     private func availableActions(for pet: Pet) -> [ActionOption] {
-        // We now rely on QACardType.available(for:) which is the source of truth for allowed cards per species.
-        let allowedCardIds = Set(QACardType.available(for: pet.species).map { $0.rawValue })
+        // QACardType.care = "care" but AddQuickActionSheet uses "groom" id; map care -> groom
+        var allowedCardIds = Set(QACardType.available(for: pet.species).map { $0.rawValue })
+        if allowedCardIds.contains("care") { allowedCardIds.insert("groom") }
         let petActions = allActions.filter { allowedCardIds.contains($0.id) }
-        let existingTypes = Set(existingItems.filter { $0.petId == pet.id }.map { $0.actionType })
+        let existingTypes = Set(liveItems.filter { $0.petId == pet.id }.map { $0.actionType })
         return petActions.filter { !existingTypes.contains($0.id) }
     }
 
@@ -376,8 +433,8 @@ struct AddQuickActionSheet: View {
                 Spacer(minLength: 32)
             }
         }
-        .presentationBackground(.regularMaterial)
-        .presentationDetents([.medium, .large])
+        .presentationBackground(.ultraThinMaterial)
+        .presentationDetents([.height(380), .medium])
         .presentationDragIndicator(.hidden)
         .onAppear {
             if let pid = defaultPetId, let pet = pets.first(where: { $0.id == pid }) {
@@ -412,7 +469,7 @@ struct AddQuickActionSheet: View {
             .padding(.top, 12)
 
             // 宠物列表
-            VStack(spacing: 8) {
+            VStack(spacing: 10) {
                 ForEach(pets) { pet in
                     Button {
                         selectedPet = pet
@@ -421,7 +478,7 @@ struct AddQuickActionSheet: View {
                         HStack(spacing: 14) {
                             ZStack {
                                 Circle()
-                                    .fill(Color(hex: pet.themeColorHex).opacity(0.18))
+                                    .fill(Color(hex: pet.themeColorHex).opacity(0.22))
                                     .frame(width: 48, height: 48)
                                 if let data = pet.avatarImageData, let img = UIImage(data: data) {
                                     Image(uiImage: img)
@@ -432,9 +489,10 @@ struct AddQuickActionSheet: View {
                                     Text(pet.avatarEmoji).font(.system(size: 26))
                                 }
                             }
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: 3) {
                                 Text(pet.name)
                                     .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.primary)
                                 Text("\(pet.species) · \(pet.breed)")
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundStyle(.secondary)
@@ -443,10 +501,10 @@ struct AddQuickActionSheet: View {
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(Color(hex: pet.themeColorHex))
                         }
-                        .padding(.horizontal, 16).padding(.vertical, 11)
-                        .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .padding(.horizontal, 16).padding(.vertical, 12)
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     }
                     .buttonStyle(.plain)
                 }
@@ -502,63 +560,88 @@ struct AddQuickActionSheet: View {
             .padding(.horizontal, 20)
             .padding(.top, 12)
 
-            // iOS 控制中心风格图标网格
-            if let pet = selectedPet {
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 3),
-                    spacing: 14
-                ) {
-                    let available = availableActions(for: pet)
-                    if available.isEmpty {
-                        Text("所有快捷入口已添加")
-                            .font(.system(size: 14, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 40)
-                    }
-                    ForEach(available) { action in
-                        let accentColor = Color(hex: action.colorHex)
-                        let isPressed = pressedActionId == action.id
-                        Button {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            onAdd(QuickActionItem(
-                                label: action.label,
-                                icon: action.icon, colorHex: action.colorHex,
-                                petId: pet.id, actionType: action.id
-                            ))
-                            dismiss()
-                        } label: {
-                            VStack(spacing: 10) {
-                                // 大图标区域（果冻圆角矩形背景）
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                        .fill(accentColor.opacity(0.15))
-                                        .frame(width: 64, height: 64)
-                                    Image(systemName: action.icon)
-                                        .font(.system(size: 26, weight: .semibold))
-                                        .foregroundStyle(accentColor)
-                                }
-                                // 底部小字
-                                Text(action.label)
-                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(1)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                            .scaleEffect(isPressed ? 0.90 : 1.0)
-                            .animation(.spring(response: 0.22, dampingFraction: 0.6), value: isPressed)
-                        }
+            // E2: 满8个时提示
+            if selectedPetItemCount >= 8 {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.system(size: 44))
+                        .foregroundStyle(Color.goYellow)
+                    Text("\(selectedPet?.name ?? "当前宠物")的快捷操作已满 8 个")
+                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .foregroundStyle(.primary)
+                    Text("请先长按卡片删除一个，再添加新的快捷操作。")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("知道了") { dismiss() }
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 28).padding(.vertical, 10)
+                        .background(Color.goLime, in: Capsule())
                         .buttonStyle(.plain)
-                        .simultaneousGesture(
-                            DragGesture(minimumDistance: 0)
-                                .onChanged { _ in pressedActionId = action.id }
-                                .onEnded   { _ in pressedActionId = nil }
-                        )
-                    }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 32)
+                .padding(.vertical, 24)
+                .frame(maxWidth: .infinity)
+            }
+
+            // iOS 控制中心风格图标网格
+            if let pet = selectedPet, selectedPetItemCount < 8 {
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVGrid(
+                        columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3),
+                        spacing: 12
+                    ) {
+                        let available = availableActions(for: pet)
+                        if available.isEmpty {
+                            Text("所有快捷入口已添加")
+                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 40)
+                        }
+                        ForEach(available) { action in
+                            let accentColor = Color(hex: action.colorHex)
+                            let isPressed = pressedActionId == action.id
+                            Button {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                onAdd(QuickActionItem(
+                                    label: action.label,
+                                    icon: action.icon, colorHex: action.colorHex,
+                                    petId: pet.id, actionType: action.id
+                                ))
+                                dismiss()
+                            } label: {
+                                VStack(spacing: 8) {
+                                    Image(systemName: action.icon)
+                                        .font(.system(size: 28, weight: .semibold))
+                                        .foregroundStyle(accentColor)
+                                        .frame(width: 44, height: 44)
+                                    Text(action.label)
+                                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(1)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(
+                                    isPressed ? accentColor.opacity(0.1) : Color.clear,
+                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                )
+                                .scaleEffect(isPressed ? 0.90 : 1.0)
+                                .animation(.spring(response: 0.22, dampingFraction: 0.6), value: isPressed)
+                            }
+                            .buttonStyle(.plain)
+                            .simultaneousGesture(
+                                DragGesture(minimumDistance: 0)
+                                    .onChanged { _ in pressedActionId = action.id }
+                                    .onEnded   { _ in pressedActionId = nil }
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 32)
+                }
             }
         }
     }
@@ -625,10 +708,10 @@ struct QuickFeedSheet: View {
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(pet.name)
-                    .font(.system(size: 17, weight: .black, design: .rounded))
+                    .font(OhanaFont.body(.black))
                     .foregroundStyle(.primary)
                 Text(isWater ? "喂水打卡" : (isCasual ? "佛系喂食 🐾" : "精准喂食 📊"))
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(OhanaFont.caption(.medium))
                     .foregroundStyle(.primary.opacity(0.45))
             }
             Spacer()
@@ -639,27 +722,29 @@ struct QuickFeedSheet: View {
 
     private var casualBody: some View {
         VStack(spacing: 20) {
-            VStack(spacing: 6) {
-                Text(casualCopyText)
-                    .font(.system(size: 22, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.center)
-                Text("打卡后获得 +1🥥 椰子奖励")
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.4))
+            UltimateGlassCard {
+                VStack(spacing: 12) {
+                    Text(casualCopyText)
+                        .font(OhanaFont.title3(.black))
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.center)
+                    Text("打卡后获得 +1🥥 椰子奖励")
+                        .font(OhanaFont.footnote(.medium))
+                        .foregroundStyle(.primary.opacity(0.4))
+                }
+                .padding(24)
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 20)
 
             Button { commitFeed(amount: 0) } label: {
                 HStack(spacing: 8) {
                     Text("✅")
                     Text("确认喂食  +1🥥")
-                        .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(.black)
+                        .font(OhanaFont.headline(.black))
+                        .foregroundStyle(Color.arkInk)
                 }
                 .frame(maxWidth: .infinity).padding(.vertical, 16)
-                .background(Color.goLime, in: RoundedRectangle(cornerRadius: 16))
+                .background(Color.goLime, in: Capsule())
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 20)
@@ -670,30 +755,33 @@ struct QuickFeedSheet: View {
 
     private var preciseBody: some View {
         VStack(spacing: 16) {
-            VStack(spacing: 8) {
-                Text("输入\(isWater ? "饮水量" : "喂食量")")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.6))
-                HStack(spacing: 8) {
-                    TextField("默认 \(Int(defaultAmount))", text: $amountText)
-                        .keyboardType(.decimalPad)
-                        .font(.system(size: 32, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
-                    Text(unit)
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.5))
-                        .frame(width: 36)
+            UltimateGlassCard {
+                VStack(spacing: 12) {
+                    Text("输入\(isWater ? "饮水量" : "喂食量")")
+                        .font(OhanaFont.footnote(.semibold))
+                        .foregroundStyle(.primary.opacity(0.6))
+                    HStack(spacing: 8) {
+                        TextField("默认 \(Int(defaultAmount))", text: $amountText)
+                            .keyboardType(.decimalPad)
+                            .font(OhanaFont.metric(size: 32))
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
+                        Text(unit)
+                            .font(OhanaFont.title3(.bold))
+                            .foregroundStyle(.primary.opacity(0.5))
+                            .frame(width: 36)
+                    }
+                    Toggle(isOn: $setAsDefault) {
+                        Text("设为默认\(isWater ? "饮水量" : "每日份量")")
+                            .font(OhanaFont.footnote(.medium))
+                            .foregroundStyle(.primary.opacity(0.7))
+                    }
+                    .tint(Color.goLime)
                 }
-                Toggle(isOn: $setAsDefault) {
-                    Text("设为默认\(isWater ? "饮水量" : "每日份量")")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.7))
-                }
-                .tint(Color.goLime)
+                .padding(20)
             }
             .padding(.horizontal, 20)
 
@@ -702,10 +790,10 @@ struct QuickFeedSheet: View {
                 commitFeed(amount: amount)
             } label: {
                 Text("打卡 +1🥥")
-                    .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(.black)
+                    .font(OhanaFont.headline(.black))
+                    .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity).padding(.vertical, 14)
-                    .background(Color.goLime, in: RoundedRectangle(cornerRadius: 14))
+                    .background(Color.goLime, in: Capsule())
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 20)

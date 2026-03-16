@@ -46,88 +46,109 @@ struct EditPetSheet: View {
 
     var body: some View {
         OhanaSheetWrapper(title: "编辑 \(pet.name)", onDismiss: { dismiss() }) {
-            VStack(spacing: 20) {
-                Group {
-                    sectionHeader("基本信息")
-                    formField("名字", text: $name)
-                    formField("物种", text: $species)
-                    formField("品种", text: $breed)
-                    formField("头像 Emoji", text: $avatarEmoji)
-                    
-                    Picker("性别", selection: $gender) {
-                        Text("♂ 男孩").tag("male")
-                        Text("♀ 女孩").tag("female")
-                        Text("未知").tag("unknown")
+            VStack(spacing: 24) {
+                UltimateGlassCard {
+                    VStack(spacing: 16) {
+                        sectionHeader("基本信息")
+                        formField("名字", text: $name)
+                        formField("物种", text: $species)
+                        formField("品种", text: $breed)
+                        formField("头像 Emoji", text: $avatarEmoji)
+                        
+                        Picker("性别", selection: $gender) {
+                            Text("♂ 男孩").tag("male")
+                            Text("♀ 女孩").tag("female")
+                            Text("未知").tag("unknown")
+                        }
+                        .pickerStyle(.segmented)
+                        
+                        Toggle("已绝育", isOn: $isNeutered)
+                            .tint(.arkCoral)
                     }
-                    .pickerStyle(.segmented)
-                    
-                    Toggle("已绝育", isOn: $isNeutered)
-                        .tint(.arkCoral)
+                    .padding(16)
                 }
                 
-                Group {
-                    sectionHeader("日期")
-                    Toggle("设置生日", isOn: $hasBirthday)
-                        .tint(.arkCoral)
-                    if hasBirthday {
-                        DatePicker("生日", selection: $birthday, displayedComponents: .date)
-                    }
-                }
-                
-                Group {
-                    sectionHeader("出生地")
-                    formField("国家", text: $birthCountry)
-                    formField("城市", text: $birthCity)
-                }
-                
-                Group {
-                    sectionHeader("健康信息")
-                    formField("芯片号", text: $microchipID)
-                    formField("兽医联系方式", text: $vetContact)
-                    formField("过敏原", text: $allergies)
-                }
-                
-                Group {
-                    sectionHeader("饮食")
-                    formField("粮食品牌", text: $foodBrand)
-                    HStack {
-                        Text("每日喂食量 (g)")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        TextField("0", value: $dailyPortionGrams, format: .number)
-                            .keyboardType(.decimalPad)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 100)
-                    }
-                }
-                
-                Group {
-                    sectionHeader("主题色")
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6), spacing: 10) {
-                        ForEach(PetThemeColor.allCases, id: \.rawValue) { tc in
-                            Button { themeColorHex = tc.hexValue } label: {
-                                ZStack {
-                                    Circle().fill(tc.color).frame(width: 38, height: 38)
-                                    if themeColorHex.uppercased() == tc.hexValue.uppercased() {
-                                        Circle().strokeBorder(.white, lineWidth: 2.5).frame(width: 38, height: 38)
-                                        Image(systemName: "checkmark")
-                                            .font(.system(size: 11, weight: .black))
-                                            .foregroundStyle(.primary)
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
+                UltimateGlassCard {
+                    VStack(spacing: 16) {
+                        sectionHeader("日期")
+                        Toggle("设置生日", isOn: $hasBirthday)
+                            .tint(.arkCoral)
+                        if hasBirthday {
+                            DatePicker("生日", selection: $birthday, displayedComponents: .date)
                         }
                     }
-                    .padding(.vertical, 4)
+                    .padding(16)
+                }
+                
+                UltimateGlassCard {
+                    VStack(spacing: 16) {
+                        sectionHeader("出生地")
+                        formField("国家", text: $birthCountry)
+                        formField("城市", text: $birthCity)
+                    }
+                    .padding(16)
+                }
+                
+                UltimateGlassCard {
+                    VStack(spacing: 16) {
+                        sectionHeader("健康信息")
+                        formField("芯片号", text: $microchipID)
+                        formField("兽医联系方式", text: $vetContact)
+                        formField("过敏原", text: $allergies)
+                    }
+                    .padding(16)
+                }
+                
+                UltimateGlassCard {
+                    VStack(spacing: 16) {
+                        sectionHeader("饮食")
+                        formField("粮食品牌", text: $foodBrand)
+                        HStack {
+                            Text("每日喂食量 (g)")
+                                .font(OhanaFont.footnote(.medium))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            TextField("0", value: $dailyPortionGrams, format: .number)
+                                .keyboardType(.decimalPad)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 100)
+                        }
+                    }
+                    .padding(16)
+                }
+                
+                UltimateGlassCard {
+                    VStack(spacing: 16) {
+                        sectionHeader("主题色")
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6), spacing: 10) {
+                            ForEach(PetThemeColor.allCases, id: \.rawValue) { tc in
+                                Button { themeColorHex = tc.hexValue } label: {
+                                    ZStack {
+                                        Circle().fill(tc.color).frame(width: 38, height: 38)
+                                        if themeColorHex.uppercased() == tc.hexValue.uppercased() {
+                                            Circle().strokeBorder(.white, lineWidth: 2.5).frame(width: 38, height: 38)
+                                            Image(systemName: "checkmark")
+                                                .font(.system(size: 11, weight: .black))
+                                                .foregroundStyle(.primary)
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .padding(16)
                 }
 
-                Group {
-                    sectionHeader("备注")
-                    TextEditor(text: $notes)
-                        .frame(height: 80)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                UltimateGlassCard {
+                    VStack(spacing: 16) {
+                        sectionHeader("备注")
+                        TextEditor(text: $notes)
+                            .frame(height: 80)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .background(Color.primary.opacity(0.05))
+                    }
+                    .padding(16)
                 }
                 
                 Button {
@@ -135,7 +156,11 @@ struct EditPetSheet: View {
                     save()
                 } label: {
                     Text("保存")
-                        .capsuleButton()
+                        .font(OhanaFont.headline(.black))
+                        .foregroundStyle(Color.arkInk)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.goLime, in: Capsule())
                 }
                 .padding(.top, 8)
             }
@@ -152,20 +177,23 @@ struct EditPetSheet: View {
     private func sectionHeader(_ title: String) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
+                .font(OhanaFont.caption2(.bold))
+                .foregroundStyle(.primary.opacity(0.4))
+                .tracking(1.2)
                 .textCase(.uppercase)
             Spacer()
         }
     }
     
     private func formField(_ title: String, text: Binding<String>) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
+                .font(OhanaFont.caption(.medium))
+                .foregroundStyle(.primary.opacity(0.4))
             TextField(title, text: text)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .padding(12)
+                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
         }
     }
     

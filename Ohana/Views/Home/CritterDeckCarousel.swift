@@ -58,6 +58,8 @@ struct CritterDeckCarousel: View {
     /// 是否正在拖拽
     @State private var isDragging: Bool = false
     @State private var showAllCardsSheet = false
+    // C3: 宠物背面健康格 modal sheet
+    @State private var quickHealthPet: Pet? = nil
     
     @AppStorage("shop_equipped_title") private var equippedTitle: String = ""
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
@@ -78,64 +80,22 @@ struct CritterDeckCarousel: View {
 
     // MARK: - Body
     var body: some View {
-        VStack(spacing: 12) {
-            // 滚轮视图区域（居中对齐，上下各有卡片）
-            ZStack {
-                ForEach(Array(cards.enumerated().reversed()), id: \.element.id) { index, item in
-                    let diff = CGFloat(wheelDiff(index: index))
-                    let isCenter = (index == activeIndex)
-
-                    cardContent(for: item, isTop: isCenter)
-                        .offset(y: diff * wheelSpacing + dragOffsetY * (isCenter ? 1.0 : 0.15))
-                        .scaleEffect(wheelScale(diff: diff), anchor: .center)
-                        .opacity(wheelOpacity(diff: diff))
-                        .brightness(wheelBrightness(diff: diff))
-                        .zIndex(Double(100 - Int(abs(diff))))
-                        .allowsHitTesting(!isBusy && abs(diff) <= 1)
-                        .onTapGesture {
-                            guard !isDragging else { return }
-                            if isCenter {
-                                guard !isBusy else { return }
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                isTopFlipped.toggle()
-                            } else {
-                                jumpToCard(at: index)
-                            }
-                        }
+        VStack(spacing: 14) {
+            TabView(selection: $activeIndex) {
+                ForEach(Array(cards.enumerated()), id: \.element.id) { index, item in
+                    cardContent(for: item, isTop: index == activeIndex)
+                        .scaleEffect(index == activeIndex ? 1.0 : 0.985)
+                        .opacity(index == activeIndex ? 1.0 : 0.92)
+                        .padding(.horizontal, 6)
+                        .tag(index)
                 }
             }
-            .frame(height: wheelFrameHeight)
-            .clipped()
-            // 垂直拖拽手势
-            .gesture(
-                DragGesture(minimumDistance: 8)
-                    .onChanged { value in
-                        guard !isBusy, !isTopFlipped else { return }
-                        isDragging = true
-                        let dampen: CGFloat = 0.40
-                        dragOffsetY = value.translation.height * dampen
-                    }
-                    .onEnded { value in
-                        guard !isBusy, !isTopFlipped else {
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { dragOffsetY = 0 }
-                            isDragging = false
-                            return
-                        }
-                        let dy = value.translation.height
-                        let threshold: CGFloat = cardH * 0.22
-                        if dy < -threshold {
-                            advanceToNext()
-                        } else if dy > threshold {
-                            retreatToPrev()
-                        } else {
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { dragOffsetY = 0 }
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { isDragging = false }
-                    }
-            )
+            .frame(height: cardH + 16)
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .animation(.spring(response: 0.42, dampingFraction: 0.82), value: activeIndex)
 
-            // 底部控制栏（分页指示器 + 全部按钮）
             HStack(spacing: 0) {
+                Spacer()
                 if cards.count > 1 {
                     HStack(spacing: 6) {
                         ForEach(0..<min(cards.count, 5), id: \.self) { idx in
@@ -166,19 +126,35 @@ struct CritterDeckCarousel: View {
                     .buttonStyle(.plain)
                 }
             }
-            .frame(height: 20)
+            .frame(height: 24)
         }
-        .padding(.horizontal, 24)
-        .onAppear { setupCards() }
+        .padding(.horizontal, 16)
+        .onAppear {
+            setupCards()
+            if cards.indices.contains(activeIndex) {
+                onTopCardChanged?(cards[activeIndex])
+            }
+        }
         .onChange(of: allItems.map(\.id)) { _, _ in
             cards = allItems
-            activeIndex = 0
+            activeIndex = min(activeIndex, max(cards.count - 1, 0))
             isTopFlipped = false
             isBusy = false
             dragOffsetY = 0
+            if cards.indices.contains(activeIndex) {
+                onTopCardChanged?(cards[activeIndex])
+            }
         }
         .onChange(of: resetFlip) { _, _ in
             isTopFlipped = false
+        }
+        .onChange(of: activeIndex) { oldValue, newValue in
+            guard cards.indices.contains(newValue) else { return }
+            isTopFlipped = false
+            if oldValue != newValue {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }
+            onTopCardChanged?(cards[newValue])
         }
         .sheet(isPresented: $showAllCardsSheet) {
             AllCardsSheet(
@@ -194,6 +170,12 @@ struct CritterDeckCarousel: View {
             )
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
+        }
+        // C3: 宠物背面健康格 → modal sheet（避免 NavigationStack push 死锁）
+        .sheet(item: $quickHealthPet) { pet in
+            NavigationStack { PetHealthDetailView(pet: pet, isModal: true) }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
     }
 
@@ -287,7 +269,7 @@ struct CritterDeckCarousel: View {
 
     // MARK: - Setup
     private func setupCards() {
-        var base = allItems
+        let base = allItems
         var startIndex = 0
         if let target = initialTopId,
            let idx = base.firstIndex(where: {
@@ -304,11 +286,13 @@ struct CritterDeckCarousel: View {
     @ViewBuilder
     private func cardContent(for item: DeckItem, isTop: Bool) -> some View {
         switch item {
+        // C3 sheet 挂在 cardContent 外的 body ZStack 上
         case .pet(let pet):
             ArkCrewIDCardView(
                 pet: pet,
                 onDetail: { onSelectPet(pet) },
-                isFlipped: isTop ? $isTopFlipped : nil
+                isFlipped: isTop ? $isTopFlipped : nil,
+                onShowHealth: { quickHealthPet = pet }
             )
         case .human(let human):
             HumanIDCardView(
@@ -388,21 +372,27 @@ private struct MiniFlipCard: View {
     var onPromote: (() -> Void)? = nil
 
     @State private var isFlipped = false
+    @State private var showFront = true
     @AppStorage("shop_equipped_title") private var equippedTitle: String = ""
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
 
     var body: some View {
         ZStack {
-            if !isFlipped {
-                miniCardFront
-            } else {
-                miniCardBack
-                    .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-            }
+            miniCardFront
+                .opacity(showFront ? 1 : 0)
+            miniCardBack
+                .scaleEffect(x: -1, y: 1)
+                .opacity(showFront ? 0 : 1)
         }
         .frame(width: cardWidth, height: cardHeight)
         .rotation3DEffect(.degrees(isFlipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
         .animation(.spring(response: 0.5, dampingFraction: 0.78), value: isFlipped)
+        .onChange(of: isFlipped) { _, newFlipped in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+                var t = Transaction(); t.disablesAnimations = true
+                withTransaction(t) { showFront = !newFlipped }
+            }
+        }
         .onTapGesture {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             isFlipped.toggle()
@@ -659,6 +649,7 @@ struct HumanIDCardView: View {
     var isFlipped: Binding<Bool>? = nil
     
     @State private var _isFlipped = false
+    @State private var showFront = true
     @AppStorage("shop_equipped_title") private var equippedTitle: String = ""
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
     
@@ -676,16 +667,24 @@ struct HumanIDCardView: View {
     
     var body: some View {
         ZStack {
-            if !flipped {
-                humanFrontView
-            } else {
-                humanBackView
-                    .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-            }
+            humanFrontView
+                .opacity(showFront ? 1 : 0)
+            humanBackView
+                .scaleEffect(x: -1, y: 1)
+                .opacity(showFront ? 0 : 1)
         }
         .frame(width: ScreenCompat.width - 48, height: (ScreenCompat.width - 48) / 1.586)
-        .rotation3DEffect(.degrees(flipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
+        .compositingGroup()
+        .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+        .rotation3DEffect(.degrees(flipped ? 180 : 0), axis: (x: 0, y: 1, z: 0), perspective: 0.4)
         .animation(.spring(response: 0.6, dampingFraction: 0.78), value: flipped)
+        .onChange(of: flipped) { _, newFlipped in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                var t = Transaction(); t.disablesAnimations = true
+                withTransaction(t) { showFront = !newFlipped }
+            }
+        }
+        .onAppear { showFront = !flipped }
         .onTapGesture { toggleFlip() }
     }
     

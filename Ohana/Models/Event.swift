@@ -30,6 +30,8 @@ enum EventType: String, Codable, CaseIterable, Identifiable {
     // 植物
     case watering = "浇水"
     case fertilizing = "施肥"
+    // 人类专用
+    case medication = "吃药"
     
     var id: String { rawValue }
     
@@ -51,6 +53,7 @@ enum EventType: String, Codable, CaseIterable, Identifiable {
         case .litterBox: return "🧹"
         case .watering: return "💧"
         case .fertilizing: return "🌿"
+        case .medication: return "💊"
         }
     }
 }

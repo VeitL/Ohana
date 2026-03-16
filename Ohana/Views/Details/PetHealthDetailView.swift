@@ -21,6 +21,8 @@ private struct HealthScatterPoint: Identifiable {
 struct PetHealthDetailView: View {
     let pet: Pet
     var isModal: Bool = false
+    /// D4: 关闭时额外回调（如需一并关闭父级）
+    var onFullDismiss: (() -> Void)? = nil
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @State private var healthRecordType: HealthLogType? = nil
@@ -28,6 +30,14 @@ struct PetHealthDetailView: View {
     @State private var pdfURL: URL? = nil
     @State private var isRenderingPDF = false
     @State private var healthAlerts: [HealthAlert] = []
+    @State private var scatterRevealProgress: CGFloat = 0.0
+
+    private func playScatterReveal() {
+        scatterRevealProgress = 0
+        withAnimation(.easeOut(duration: 0.38)) {
+            scatterRevealProgress = 1.0
+        }
+    }
 
     private var themeColor: Color { pet.themeColor.color }
 
@@ -99,7 +109,11 @@ struct PetHealthDetailView: View {
 
     var body: some View {
         ZStack {
-            ArkBackgroundView().ignoresSafeArea()
+            if isModal {
+                Rectangle().fill(.regularMaterial).ignoresSafeArea()
+            } else {
+                ArkBackgroundView().ignoresSafeArea()
+            }
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
                     // ── 健康预警
@@ -128,7 +142,11 @@ struct PetHealthDetailView: View {
         .toolbar {
             if isModal {
             ToolbarItem(placement: .topBarLeading) {
-                Button { dismiss() } label: {
+                Button {
+                    dismiss()
+                    // D4: 如果有外部回调（来自 PetDetailView），同时关闭父级
+                    onFullDismiss?()
+                } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 20))
                         .foregroundStyle(.primary.opacity(0.5))
@@ -270,7 +288,14 @@ struct PetHealthDetailView: View {
                     .foregroundStyle(.primary.opacity(0.55))
             }
         }
+        .mask(alignment: .leading) {
+            GeometryReader { geo in
+                Rectangle()
+                    .frame(width: max(1, geo.size.width * scatterRevealProgress))
+            }
+        }
         .frame(height: 160)
+        .onAppear { playScatterReveal() }
     }
 
     // MARK: - 图例视图

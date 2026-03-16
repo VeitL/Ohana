@@ -22,46 +22,79 @@ struct HumanDetailView: View {
     @State private var showingCoconutLog = false
     @State private var showingWishlist = false
     @State private var showingCoHealth = false
+    @State private var showingExpenses = false
+    @State private var showingMedication = false
+    @State private var showingHealthReport = false
 
     @Query private var allPets: [Pet]
     @Query private var allHumans: [Human]
     @Query(filter: #Predicate<Reminder> { $0.status == "pending" },
            sort: \Reminder.scheduledAt) private var allPendingReminders: [Reminder]
-    
+    @Query private var allMeds: [HumanMedication]
+    @Query private var allReports: [HumanHealthReport]
+
     private var humanReminders: [Reminder] {
         allPendingReminders.filter {
             $0.event?.relatedEntityType == "Human" &&
             $0.event?.relatedEntityId == human.id.uuidString
         }
     }
-    
+
+    private var myMeds: [HumanMedication] {
+        allMeds.filter { $0.humanId == human.id.uuidString && $0.isActive && $0.isActiveToday }
+    }
+
+    private var myReports: [HumanHealthReport] {
+        allReports.filter { $0.humanId == human.id.uuidString }
+    }
+
+    private var themeColor: Color { Color(hex: human.themeColorHex) }
+
     var body: some View {
         ZStack {
             ArkBackgroundView()
-            
+
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 16) {
                     heroCard
                     badgesCard
-                    // FIX 1: 隐私判断
+                    statsBento
+                    showOnHomeCard
+
+                    sectionHeader("健康 & 身体")
+
                     if human.isPrivate("weight", viewedBy: activeHumanId) {
                         privacyPlaceholderCard(label: "体重记录")
                     } else {
                         weightCard
                     }
-                    showOnHomeCard
+                    medicationCard
+                    healthReportCard
+
+                    sectionHeader("活动 & 记录")
+
                     if human.isPrivate("workout", viewedBy: activeHumanId) {
                         privacyPlaceholderCard(label: "运动记录")
                     } else {
                         HumanWorkoutCard(human: human, pets: allPets)
                             .padding(.horizontal, 16)
                     }
-                    // 模块1：心愿单卡
-                    if !human.isPrivate("wishlist", viewedBy: activeHumanId) {
-                        wishlistBentoCard
-                    }
-                    // 模块5：人宠共健
                     coHealthCard
+
+                    sectionHeader("财务")
+
+                    if human.isPrivate("expense", viewedBy: activeHumanId) {
+                        privacyPlaceholderCard(label: "花费记录")
+                    } else {
+                        humanExpenseCard
+                    }
+                    if human.isPrivate("wishlist", viewedBy: activeHumanId) {
+                        privacyPlaceholderCard(label: "椰子资产")
+                    } else {
+                        humanAssetCard
+                    }
+
+                    sectionHeader("提醒 & 备注")
                     remindersSection
                     notesSection
                     deleteSection
@@ -75,31 +108,29 @@ struct HumanDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 12) {
                     CoconutBalanceCapsule { showingCoconutLog = true }
-                    
                     Button { showingEditSheet = true } label: {
                         Image(systemName: "pencil.circle")
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(.white.opacity(0.7))
                     }
                 }
             }
         }
-        .sheet(isPresented: $showingEditSheet) {
-            EditHumanSheet(human: human)
-        }
-        .sheet(isPresented: $showingCoconutLog) {
-            CoconutLogView()
-        }
+        .sheet(isPresented: $showingEditSheet) { EditHumanSheet(human: human) }
+        .sheet(isPresented: $showingCoconutLog) { CoconutLogView() }
         .sheet(isPresented: $showWeightHistory) {
             NavigationStack { HumanWeightHistoryView(human: human) }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
-        .navigationDestination(isPresented: $showingWishlist) {
-            HumanWishlistView(human: human)
+        .navigationDestination(isPresented: $showingWishlist) { HumanWishlistView(human: human) }
+        .navigationDestination(isPresented: $showingCoHealth) { CoHealthDashboardFullView(human: human) }
+        .navigationDestination(isPresented: $showingExpenses) { HumanExpenseDetailView(human: human) }
+        .sheet(isPresented: $showingMedication) {
+            NavigationStack { HumanMedicationView(human: human) }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
-        .navigationDestination(isPresented: $showingCoHealth) {
-            CoHealthDashboardFullView(human: human)
-        }
+        .navigationDestination(isPresented: $showingHealthReport) { HumanHealthReportView(human: human) }
         .alert("确认删除", isPresented: $showingDeleteConfirm) {
             Button("取消", role: .cancel) {}
             Button("删除", role: .destructive) {
@@ -111,218 +142,348 @@ struct HumanDetailView: View {
             Text("确定要删除 \(human.name) 吗？此操作不可撤销。")
         }
     }
-    
-    // MARK: - Hero Card
+
+    // MARK: - Hero Card (iOS 26 Liquid Glass)
     private var heroCard: some View {
-        VStack(spacing: 16) {
-            if let imageData = human.avatarImageData,
-               let uiImage = UIImage(data: imageData) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 100, height: 100)
-                    .clipShape(Circle())
-                    .overlay(Circle().strokeBorder(.white.opacity(0.4), lineWidth: 2))
-            } else {
+        ZStack(alignment: .bottom) {
+            // 渐变背景
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(LinearGradient(
+                    colors: [themeColor, themeColor.mix(with: .black, by: 0.25), Color.goDarkBlue],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                ))
+
+            // 装饰光球 — 模拟 Liquid Glass 折射感
+            Circle()
+                .fill(themeColor.opacity(0.35))
+                .frame(width: 200)
+                .blur(radius: 70)
+                .offset(x: -80, y: -60)
+            Circle()
+                .fill(.white.opacity(0.08))
+                .frame(width: 140)
+                .blur(radius: 50)
+                .offset(x: 90, y: 20)
+
+            VStack(spacing: 20) {
+                // Avatar
                 ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(hex: "667eea"), Color(hex: "764ba2")],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 100, height: 100)
-                    Text(human.avatarEmoji)
-                        .font(.system(size: 52))
-                }
-            }
-            
-            VStack(spacing: 8) {
-                Text(human.name)
-                    .font(OhanaFont.largeTitle(.heavy))
-                    .foregroundStyle(.primary)
-                
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        humanChip(human.roleText)
-                        if human.birthday != nil { humanChip(human.ageText) }
-                        if !human.bloodType.isEmpty { humanChip("血型 \(human.bloodType)") }
-                        if !human.nationality.isEmpty { humanChip("🌍 \(human.nationality)") }
-                        if !human.city.isEmpty { humanChip("📍 \(human.city)") }
+                    if let imageData = human.avatarImageData, let uiImage = UIImage(data: imageData) {
+                        Image(uiImage: uiImage)
+                            .resizable().scaledToFill()
+                            .frame(width: 100, height: 100)
+                            .clipShape(Circle())
+                            .overlay(Circle().strokeBorder(.white.opacity(0.3), lineWidth: 2.5))
+                            .shadow(color: .black.opacity(0.35), radius: 20, y: 10)
+                    } else {
+                        ZStack {
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                                .frame(width: 100, height: 100)
+                                .overlay(Circle().strokeBorder(.white.opacity(0.2), lineWidth: 1.5))
+                                .shadow(color: .black.opacity(0.2), radius: 16, y: 8)
+                            Text(human.avatarEmoji).font(.system(size: 50))
+                        }
                     }
-                    .padding(.horizontal, 4)
+                }
+
+                VStack(spacing: 10) {
+                    Text(human.name)
+                        .font(.system(size: 34, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            humanChip(human.roleText, color: themeColor)
+                            if human.birthday != nil { humanChip(human.ageText, color: .white.opacity(0.7)) }
+                            if !human.bloodType.isEmpty { humanChip("血型 \(human.bloodType)", color: Color.goRed.opacity(0.9)) }
+                            if !human.nationality.isEmpty { humanChip("🌍 \(human.nationality)", color: .white.opacity(0.7)) }
+                            if !human.city.isEmpty { humanChip("📍 \(human.city)", color: .white.opacity(0.7)) }
+                            if human.heightCm > 0 && human.heightCm.isFinite { humanChip(String(format: "%.0f cm", human.heightCm), color: Color.goTeal.opacity(0.9)) }
+                        }
+                        .padding(.horizontal, 4)
+                    }
                 }
             }
+            .padding(.vertical, 28)
+            .frame(maxWidth: .infinity)
         }
-        .padding(.vertical, 24)
-        .frame(maxWidth: .infinity)
-        .ohanaStandardCard(cornerRadius: 28)
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .shadow(color: themeColor.opacity(0.2), radius: 16, y: 8)
         .padding(.horizontal, 16)
     }
 
-    // MARK: - 模块3：动态称号卡
+    // MARK: - Stats Bento (iOS 26 Glass Capsules)
+    private var statsBento: some View {
+        HStack(spacing: 8) {
+            bentoStatMini(
+                icon: "scalemass.fill",
+                value: {
+                    guard let latest = human.weightLogs.sorted(by: { $0.date > $1.date }).first,
+                          latest.weight.isFinite else { return "—" }
+                    return String(format: "%.1f", latest.weight)
+                }(),
+                unit: human.weightLogs.isEmpty ? "" : "kg",
+                label: "体重",
+                color: Color.goLime
+            )
+            bentoStatMini(
+                icon: "pills.fill",
+                value: "\(myMeds.count)",
+                unit: "种",
+                label: "用药",
+                color: Color.goRed
+            )
+            bentoStatMini(
+                icon: "bell.badge.fill",
+                value: "\(humanReminders.count)",
+                unit: "条",
+                label: "待办",
+                color: Color.goOrange
+            )
+            bentoStatMini(
+                icon: "leaf.fill",
+                value: "\(human.coconutBalance)",
+                unit: "🥥",
+                label: "椰子",
+                color: Color.goYellow
+            )
+        }
+        .padding(.horizontal, 16)
+    }
+
+    private func bentoStatMini(icon: String, value: String, unit: String, label: String, color: Color) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(color)
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(value).font(OhanaFont.metric(size: 18)).foregroundStyle(.white)
+                if !unit.isEmpty {
+                    Text(unit).font(OhanaFont.caption2(.bold)).foregroundStyle(color.opacity(0.7))
+                }
+            }
+            Text(label).font(OhanaFont.caption2(.medium)).foregroundStyle(.white.opacity(0.5))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: - Badges Card
     private var badgesCard: some View {
         let badges = human.dynamicBadges(allPets: allPets, allHumans: allHumans)
         return Group {
             if !badges.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("动态称号")
-                        .font(.system(size: 11, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.4))
-                        .textCase(.uppercase)
-                        .padding(.horizontal, 20)
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "trophy.fill")
+                            .font(OhanaFont.callout(.bold))
+                            .foregroundStyle(Color.goYellow)
+                        Text("动态称号")
+                            .font(OhanaFont.headline(.bold))
+                            .foregroundStyle(.white)
+                    }
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
                             ForEach(badges) { badge in
                                 HStack(spacing: 6) {
-                                    Text(badge.emoji).font(.system(size: 14))
+                                    Text(badge.emoji).font(OhanaFont.callout())
                                     Text(badge.title)
-                                        .font(.system(size: 13, weight: .black, design: .rounded))
+                                        .font(OhanaFont.caption(.bold))
                                         .foregroundStyle(Color(hex: badge.color))
                                 }
                                 .padding(.horizontal, 14).padding(.vertical, 8)
                                 .background(Color(hex: badge.color).opacity(0.12), in: Capsule())
                                 .overlay(Capsule().strokeBorder(Color(hex: badge.color).opacity(0.35), lineWidth: 1))
-                                .shadow(color: Color(hex: badge.color).opacity(0.25), radius: 6, y: 2)
                             }
                         }
-                        .padding(.horizontal, 20)
                     }
                 }
+                .padding(16)
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .padding(.horizontal, 16)
             }
         }
     }
 
-    // MARK: - 模块1：心愿单 Bento 卡
-    private var wishlistBentoCard: some View {
-        Button { showingWishlist = true } label: {
+    // MARK: - Medication Card (NEW)
+    private var medicationCard: some View {
+        Button { showingMedication = true } label: {
             HStack(spacing: 14) {
                 ZStack {
-                    Circle().fill(Color.goYellow.opacity(0.18)).frame(width: 44, height: 44)
-                    Text("🎁").font(.system(size: 24))
+                    Circle().fill(Color.goRed.opacity(0.18)).frame(width: 48, height: 48)
+                    Image(systemName: "pills.fill")
+                        .font(OhanaFont.title3(.bold))
+                        .foregroundStyle(Color.goRed)
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("椰子心愿单")
-                        .font(.system(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
-                    HStack(spacing: 4) {
-                        Text("🥥 \(human.coconutBalance) 个椰子")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color.goYellow)
-                        Text("· 点击许愿")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.primary.opacity(0.35))
+                    Text("吃药提醒")
+                        .font(OhanaFont.callout(.bold))
+                        .foregroundStyle(.white)
+                    if myMeds.isEmpty {
+                        Text("暂无用药计划")
+                            .font(OhanaFont.caption())
+                            .foregroundStyle(.white.opacity(0.4))
+                    } else {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(myMeds.prefix(3)) { med in
+                                    HStack(spacing: 4) {
+                                        Circle()
+                                            .fill(Color(hex: med.colorHex))
+                                            .frame(width: 6, height: 6)
+                                        Text(med.name)
+                                            .font(OhanaFont.caption(.semibold))
+                                            .foregroundStyle(.white.opacity(0.7))
+                                    }
+                                    .padding(.horizontal, 8).padding(.vertical, 3)
+                                    .background(Color(hex: med.colorHex).opacity(0.15), in: Capsule())
+                                }
+                                if myMeds.count > 3 {
+                                    Text("+\(myMeds.count - 3)")
+                                        .font(OhanaFont.caption2(.bold))
+                                        .foregroundStyle(.white.opacity(0.4))
+                                }
+                            }
+                        }
                     }
                 }
                 Spacer()
+                if !myMeds.isEmpty {
+                    ZStack {
+                        Circle().fill(Color.goRed).frame(width: 24, height: 24)
+                        Text("\(myMeds.count)")
+                            .font(OhanaFont.caption2(.bold))
+                            .foregroundStyle(.white)
+                    }
+                }
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.primary.opacity(0.3))
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(.white.opacity(0.3))
             }
             .padding(.horizontal, 16).padding(.vertical, 14)
-            .ohanaStandardCard(cornerRadius: 20)
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
     }
 
-    // MARK: - 模块5：人宠共健卡
-    private var coHealthCard: some View {
-        Button { showingCoHealth = true } label: {
-            CoHealthDashboardView(human: human)
-                .padding(.horizontal, 16)
+    // MARK: - Health Report Card
+    private var healthReportCard: some View {
+        Button { showingHealthReport = true } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle().fill(Color.goTeal.opacity(0.18)).frame(width: 48, height: 48)
+                    Image(systemName: "stethoscope")
+                        .font(OhanaFont.title3(.bold))
+                        .foregroundStyle(Color.goTeal)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("身体检测报告")
+                        .font(OhanaFont.callout(.bold))
+                        .foregroundStyle(.white)
+                    if myReports.isEmpty {
+                        Text("暂无检测报告")
+                            .font(OhanaFont.caption())
+                            .foregroundStyle(.white.opacity(0.4))
+                    } else {
+                        let abnormal = myReports.filter { $0.conclusion == .abnormal || $0.conclusion == .critical }.count
+                        HStack(spacing: 6) {
+                            Text("\(myReports.count) 份报告")
+                                .font(OhanaFont.caption(.semibold))
+                                .foregroundStyle(.white.opacity(0.6))
+                            if abnormal > 0 {
+                                Text("· \(abnormal) 项异常")
+                                    .font(OhanaFont.caption(.semibold))
+                                    .foregroundStyle(Color.goOrange)
+                            }
+                        }
+                    }
+                }
+                Spacer()
+                if !myReports.isEmpty {
+                    ZStack {
+                        Circle().fill(Color.goTeal).frame(width: 24, height: 24)
+                        Text("\(myReports.count)")
+                            .font(OhanaFont.caption2(.bold))
+                            .foregroundStyle(.white)
+                    }
+                }
+                Image(systemName: "chevron.right")
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(.white.opacity(0.3))
+            }
+            .padding(.horizontal, 16).padding(.vertical, 14)
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
         .buttonStyle(.plain)
-    }
-
-    private func humanChip(_ text: String) -> some View {
-        Text(text)
-            .font(OhanaFont.caption(.semibold))
-            .foregroundStyle(.primary.opacity(0.9))
-            .padding(.horizontal, 12).padding(.vertical, 5)
-            .background(.white.opacity(0.12), in: Capsule())
-            .overlay(Capsule().strokeBorder(.white.opacity(0.15), lineWidth: 1))
-    }
-
-    // MARK: - FIX 1: 隐私占位卡
-    private func privacyPlaceholderCard(label: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: "lock.fill")
-                .font(.system(size: 18))
-                .foregroundStyle(.primary.opacity(0.3))
-            Text("🔒 \(label)·仅本人可见")
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.3))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16).padding(.vertical, 14)
-        .ohanaStandardCard(cornerRadius: 20)
         .padding(.horizontal, 16)
     }
 
     // MARK: - Weight Card
     private var weightCard: some View {
         Button { showWeightHistory = true } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 10) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.goLime.opacity(0.18))
-                            .frame(width: 36, height: 36)
-                        Image(systemName: "scalemass.fill")
-                            .font(OhanaFont.callout(.bold))
-                            .foregroundStyle(Color.goLime)
-                    }
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle().fill(Color.goLime.opacity(0.18)).frame(width: 48, height: 48)
+                    Image(systemName: "scalemass.fill")
+                        .font(OhanaFont.title3(.bold))
+                        .foregroundStyle(Color.goLime)
+                }
+                VStack(alignment: .leading, spacing: 4) {
                     Text("体重记录")
-                        .font(OhanaFont.headline())
-                        .foregroundStyle(.primary)
-                    Spacer()
+                        .font(OhanaFont.callout(.bold))
+                        .foregroundStyle(.white)
                     if let latest = human.weightLogs.sorted(by: { $0.date > $1.date }).first {
-                        HStack(alignment: .firstTextBaseline, spacing: 3) {
-                            Text(String(format: "%.1f", latest.weight))
-                                .font(OhanaFont.title2(.black))
-                                .foregroundStyle(Color.goLime)
-                            Text("kg")
-                                .font(OhanaFont.footnote(.bold))
-                                .foregroundStyle(Color.goLime.opacity(0.7))
-                        }
+                        Text(latest.date, style: .date)
+                            .font(OhanaFont.caption())
+                            .foregroundStyle(.white.opacity(0.4))
                     } else {
                         Text("暂无记录")
                             .font(OhanaFont.caption())
-                            .foregroundStyle(.primary.opacity(0.35))
+                            .foregroundStyle(.white.opacity(0.4))
                     }
-                    Image(systemName: "chevron.right")
-                        .font(OhanaFont.caption(.semibold))
-                        .foregroundStyle(.primary.opacity(0.4))
                 }
-                .padding(.horizontal, 16).padding(.vertical, 14)
+                Spacer()
+                if let latest = human.weightLogs.sorted(by: { $0.date > $1.date }).first {
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                        Text(String(format: "%.1f", latest.weight))
+                            .font(OhanaFont.metric(size: 24))
+                            .foregroundStyle(Color.goLime)
+                        Text("kg")
+                            .font(OhanaFont.footnote(.bold))
+                            .foregroundStyle(Color.goLime.opacity(0.7))
+                    }
+                }
+                Image(systemName: "chevron.right")
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(.white.opacity(0.3))
             }
-            .ohanaStandardCard(cornerRadius: 20)
+            .padding(.horizontal, 16).padding(.vertical, 14)
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
     }
-    
-    // MARK: - 模块5b：首页卡堆显示开关
+
+    // MARK: - Show On Home Card
     private var showOnHomeCard: some View {
         HStack(spacing: 14) {
             ZStack {
-                Circle()
-                    .fill(Color.goPrimary.opacity(0.2))
-                    .frame(width: 44, height: 44)
+                Circle().fill(Color.goPrimary.opacity(0.2)).frame(width: 48, height: 48)
                 Image(systemName: "rectangle.stack.fill")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(OhanaFont.title3(.bold))
                     .foregroundStyle(Color.goPrimary)
             }
             VStack(alignment: .leading, spacing: 3) {
-                Text("在首页卡堆显示")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
-                Text(human.shouldShowOnHome ? "已加入首页宠物卡堆" : "仅在家庭成员列表显示")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.4))
+                Text("在首页显示")
+                    .font(OhanaFont.callout(.bold))
+                    .foregroundStyle(.white)
+                Text(human.shouldShowOnHome ? "已加入首页卡堆与岛屿统计" : "不在首页卡堆与岛屿体重中显示")
+                    .font(OhanaFont.caption())
+                    .foregroundStyle(.white.opacity(0.4))
             }
             Spacer()
             Toggle("", isOn: Binding(
@@ -333,134 +494,249 @@ struct HumanDetailView: View {
             .labelsHidden()
         }
         .padding(.horizontal, 16).padding(.vertical, 14)
-        .ohanaStandardCard(cornerRadius: 20)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Asset Card
+    private var humanAssetCard: some View {
+        Button { showingWishlist = true } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle().fill(Color.goYellow.opacity(0.18)).frame(width: 48, height: 48)
+                    Text("🥥").font(.system(size: 26))
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("椰子资产")
+                        .font(OhanaFont.callout(.bold))
+                        .foregroundStyle(.white)
+                    HStack(spacing: 4) {
+                        Text("\(human.coconutBalance) 个")
+                            .font(OhanaFont.caption(.semibold))
+                            .foregroundStyle(Color.goYellow)
+                        Text("· 兑换心愿")
+                            .font(OhanaFont.caption())
+                            .foregroundStyle(.white.opacity(0.35))
+                    }
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(.white.opacity(0.3))
+            }
+            .padding(.horizontal, 16).padding(.vertical, 14)
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Expense Card
+    private var humanExpenseCard: some View {
+        Button { showingExpenses = true } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle().fill(Color.goCardCyan.opacity(0.18)).frame(width: 48, height: 48)
+                    Image(systemName: "yensign")
+                        .font(OhanaFont.title3(.bold))
+                        .foregroundStyle(Color.goCardCyan)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("账单花费")
+                        .font(OhanaFont.callout(.bold))
+                        .foregroundStyle(.white)
+                    Text("查看经手支出明细")
+                        .font(OhanaFont.caption())
+                        .foregroundStyle(.white.opacity(0.4))
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(.white.opacity(0.3))
+            }
+            .padding(.horizontal, 16).padding(.vertical, 14)
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Co-Health Card
+    private var coHealthCard: some View {
+        Button { showingCoHealth = true } label: {
+            CoHealthDashboardView(human: human)
+                .padding(.horizontal, 16)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Privacy Placeholder
+    private func privacyPlaceholderCard(label: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "lock.fill")
+                .font(OhanaFont.headline())
+                .foregroundStyle(.white.opacity(0.25))
+            Text("🔒 \(label) · 仅本人可见")
+                .font(OhanaFont.callout(.semibold))
+                .foregroundStyle(.white.opacity(0.3))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16).padding(.vertical, 14)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .padding(.horizontal, 16)
     }
 
     // MARK: - Reminders Section
     private var remindersSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "bell.badge")
-                    .foregroundStyle(.orange)
-                Text("待办提醒")
-                    .font(OhanaFont.headline())
-                Spacer()
-                Text("\(humanReminders.count)")
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Image(systemName: "bell.badge.fill")
                     .font(OhanaFont.callout(.bold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.goOrange)
+                Text("待办提醒")
+                    .font(OhanaFont.headline(.bold))
+                    .foregroundStyle(.white)
+                Spacer()
+                if !humanReminders.isEmpty {
+                    Text("\(humanReminders.count)")
+                        .font(OhanaFont.caption2(.bold))
+                        .foregroundStyle(Color.goOrange)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(Color.goOrange.opacity(0.15), in: Capsule())
+                }
             }
-            
+
             if humanReminders.isEmpty {
-                Text("暂无待办提醒")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.primary.opacity(0.35))
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 12)
-            } else {
-                ForEach(humanReminders) { reminder in
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 10) {
-                            Text(reminder.event?.emoji ?? "📌")
-                                .font(.system(size: 18))
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(reminder.event?.title ?? "提醒")
-                                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.primary)
-                                Text(reminder.scheduledAt, style: .date)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(.primary.opacity(0.4))
-                            }
-                            Spacer()
-                            // 模块4：催办 NudgeButton
-                            if let assigneeId = reminder.event?.assigneeId,
-                               let assignee = allHumans.first(where: { $0.id.uuidString == assigneeId }),
-                               assignee.id != human.id {
-                                NudgeButton(targetHuman: assignee)
-                            }
-                            Button { completeReminder(reminder) } label: {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 22))
-                                    .foregroundStyle(Color.goLime)
-                            }
-                            Button { skipReminder(reminder) } label: {
-                                Image(systemName: "forward.circle")
-                                    .font(.system(size: 22))
-                                    .foregroundStyle(Color.goYellow)
-                            }
-                        }
-                        // 模块4：指派人头像 chip
-                        if let assigneeId = reminder.event?.assigneeId {
-                            AssigneeChip(assigneeId: assigneeId, allHumans: allHumans)
-                        }
+                HStack {
+                    Spacer()
+                    VStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle").font(.system(size: 28)).foregroundStyle(.white.opacity(0.15))
+                        Text("暂无待办提醒").font(OhanaFont.callout()).foregroundStyle(.white.opacity(0.3))
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 12)
+                    Spacer()
+                }
+            } else {
+                ForEach(Array(humanReminders.enumerated()), id: \.element.id) { idx, reminder in
+                    if idx > 0 {
+                        Rectangle().fill(Color.white.opacity(0.07)).frame(height: 1)
+                    }
+                    reminderRow(reminder)
                 }
             }
         }
         .padding(16)
-        .ohanaStandardCard(cornerRadius: 20)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .padding(.horizontal, 16)
     }
-    
+
+    private func reminderRow(_ reminder: Reminder) -> some View {
+        HStack(spacing: 12) {
+            Text(reminder.event?.emoji ?? "📌").font(.system(size: 20))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(reminder.event?.title ?? "提醒")
+                    .font(OhanaFont.callout(.bold))
+                    .foregroundStyle(.white)
+                Text(reminder.scheduledAt, style: .date)
+                    .font(OhanaFont.caption())
+                    .foregroundStyle(.white.opacity(0.4))
+            }
+            Spacer()
+            if let assigneeId = reminder.event?.assigneeId,
+               let assignee = allHumans.first(where: { $0.id.uuidString == assigneeId }),
+               assignee.id != human.id {
+                NudgeButton(targetHuman: assignee)
+            }
+            Button { completeReminder(reminder) } label: {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(OhanaFont.title3(.bold))
+                    .foregroundStyle(Color.goLime)
+            }
+            Button { skipReminder(reminder) } label: {
+                Image(systemName: "forward.circle.fill")
+                    .font(OhanaFont.title3(.bold))
+                    .foregroundStyle(Color.goYellow)
+            }
+        }
+    }
+
     // MARK: - Notes Section
     private var notesSection: some View {
         Group {
             if !human.notes.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
                         Image(systemName: "note.text")
+                            .font(OhanaFont.callout(.bold))
                             .foregroundStyle(Color.goLime)
                         Text("备注")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(.primary)
-                        Spacer()
+                            .font(OhanaFont.headline(.bold))
+                            .foregroundStyle(.white)
                     }
                     Text(human.notes)
-                        .font(.system(size: 14))
-                        .foregroundStyle(.primary.opacity(0.7))
+                        .font(OhanaFont.body())
+                        .foregroundStyle(.white.opacity(0.7))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(16)
-                .ohanaStandardCard(cornerRadius: 20)
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .padding(.horizontal, 16)
             }
         }
     }
-    
+
     // MARK: - Delete Section
     private var deleteSection: some View {
-        Button(role: .destructive) {
-            showingDeleteConfirm = true
-        } label: {
-            HStack {
-                Image(systemName: "trash")
-                Text("删除成员")
-            }
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(.red)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(.red.opacity(0.2), lineWidth: 1)
-            }
+        Button(role: .destructive) { showingDeleteConfirm = true } label: {
+            Label("删除成员", systemImage: "trash")
+                .font(OhanaFont.callout(.semibold))
+                .foregroundStyle(Color.goRed)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color.goRed.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.goRed.opacity(0.2), lineWidth: 1))
         }
         .padding(.horizontal, 16)
     }
-    
+
+    // MARK: - Helpers
+
+    private func humanChip(_ text: String, color: Color) -> some View {
+        Text(text)
+            .font(OhanaFont.caption(.semibold))
+            .foregroundStyle(color)
+            .padding(.horizontal, 12).padding(.vertical, 5)
+            .background(color.opacity(0.12), in: Capsule())
+            .overlay(Capsule().strokeBorder(color.opacity(0.25), lineWidth: 1))
+    }
+
+    private func sectionHeader(_ text: String) -> some View {
+        HStack(spacing: 8) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(Color.goLime)
+                .frame(width: 3, height: 16)
+            Text(text)
+                .font(.system(size: 13, weight: .black, design: .rounded))
+                .foregroundStyle(.white.opacity(0.5))
+                .textCase(.uppercase)
+                .tracking(1.2)
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 2)
+    }
+
     // MARK: - Actions
     private func completeReminder(_ reminder: Reminder) {
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         reminder.statusEnum = .completed
         reminder.completedAt = Date()
         modelContext.safeSave()
     }
-    
+
     private func skipReminder(_ reminder: Reminder) {
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         reminder.statusEnum = .skipped
         modelContext.safeSave()
     }

@@ -83,6 +83,8 @@ extension Color {
     static let goTeal = Color(hex: "00D4AA")
     static let goOrange = Color(hex: "FF8C42")
     static let goRed = Color(hex: "FF4757")
+    static let goBlue = Color(hex: "3B82F6")
+    static let goPurple = Color(hex: "A855F7")
     static let goDarkBlue = Color(hex: "1A0E4B")
     static let goDeepNavy = Color(hex: "0D0638")
 

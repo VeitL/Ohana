@@ -14,6 +14,8 @@ struct ArkCrewIDCardView: View {
     let onDetail: () -> Void
     /// 可选的外部翻转状态绑定；不传则内部自管理
     var isFlipped: Binding<Bool>? = nil
+    /// 外部健康页跳转回调（C3：避免 NavigationStack push 死锁）
+    var onShowHealth: (() -> Void)? = nil
     /// 背面各区域点击回调 (可选)
     var onTapWeightStat: (() -> Void)? = nil
     var onTapWalkStat: (() -> Void)? = nil
@@ -23,6 +25,7 @@ struct ArkCrewIDCardView: View {
     @State private var _isFlipped = false
     @State private var glowFlash = false
     @State private var cardScale: CGFloat = 1.0
+    @State private var showFront = true
 
     private var flipped: Bool {
         isFlipped?.wrappedValue ?? _isFlipped
@@ -38,20 +41,28 @@ struct ArkCrewIDCardView: View {
     
     var body: some View {
         ZStack {
-            if !flipped {
-                cardFrontView
-            } else {
-                cardBackView
-                    .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-            }
+            cardFrontView
+                .opacity(showFront ? 1 : 0)
+            cardBackView
+                .scaleEffect(x: -1, y: 1)
+                .opacity(showFront ? 0 : 1)
         }
         .frame(width: ScreenCompat.width - 48, height: (ScreenCompat.width - 48) / 1.586)
-        .rotation3DEffect(.degrees(flipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
+        .compositingGroup()
+        .rotation3DEffect(.degrees(flipped ? 180 : 0), axis: (x: 0, y: 1, z: 0), perspective: 0.5)
         .shadow(color: glowFlash ? Color.goLime.opacity(0.8) : Color.black.opacity(0.15),
                 radius: glowFlash ? 20 : 24, x: 0, y: glowFlash ? 0 : 12)
         .scaleEffect(cardScale)
-        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: flipped)
+        .animation(.spring(response: 0.5, dampingFraction: 0.82), value: flipped)
         .animation(.easeInOut(duration: 0.8), value: glowFlash)
+        .onChange(of: flipped) { _, newFlipped in
+            // 在旋转到 90° 时切换正反面内容（spring 动画 ~0.22s 到达中点）
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+                var t = Transaction(); t.disablesAnimations = true
+                withTransaction(t) { showFront = !newFlipped }
+            }
+        }
+        .onAppear { showFront = !flipped }
     }
     
     // Card theme color based on pet's themeColorHex
@@ -74,31 +85,247 @@ struct ArkCrewIDCardView: View {
 
             ZStack {
                 if isMinimal {
-                    // ══════════════════════════════════════
-                    // 简约风格：纯色底 + 居中头像 + 底部信息条
-                    // ══════════════════════════════════════
                     minimalFront(geo: geo, avatarImage: avatarImage)
-                } else if isPopout {
-                    // ══════════════════════════════════════
-                    // 破框悬浮（popout 特权 + 透明抠图）
-                    // ══════════════════════════════════════
-                    cutoutFloatFront(geo: geo, uiImage: avatarImage!)
-                } else if let img = avatarImage {
-                    // ══════════════════════════════════════
-                    // 默认：动态高斯模糊背景（普通照片）
-                    // ══════════════════════════════════════
-                    blurBackgroundFront(geo: geo, uiImage: img)
                 } else {
-                    // fallback：纯色渐变 + emoji
-                    emojiFallbackFront(geo: geo)
+                    posterFront(
+                        geo: geo,
+                        avatarImage: avatarImage,
+                        isTransparent: isPopout
+                    )
                 }
             }
+            .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
         }
-        // 整张卡点击翻转
+        .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
         .simultaneousGesture(TapGesture().onEnded { toggleFlip() })
-        .shadow(color: pet.hasPassedAway ? Color.purple.opacity(0.3) : cardThemeColor.opacity(0.5),
-                radius: 24, x: 0, y: 10)
+        .shadow(color: pet.hasPassedAway ? Color.purple.opacity(0.35) : cardThemeColor.opacity(0.45),
+                radius: 24, x: 0, y: 8)
+        .shadow(color: .black.opacity(0.28), radius: 40, x: 0, y: 16)
+        .shadow(color: .black.opacity(0.10), radius: 80, x: 0, y: 32)
+    }
+
+    private func posterFront(geo: GeometryProxy, avatarImage: UIImage?, isTransparent: Bool) -> some View {
+        let baseBlue = Color(hex: "233BFF")
+        let deepBlue = Color(hex: "141FAE")
+        let accent = Color(hex: "FF5A3D")
+        let w = geo.size.width
+        let h = geo.size.height
+        return ZStack {
+            // 背景渐变
+            RoundedRectangle(cornerRadius: 32, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [baseBlue, deepBlue],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            RoundedRectangle(cornerRadius: 32, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.22)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+
+            // 背景大字 — 卡片上半部分居中
+            Text(posterHeadline)
+                .font(.system(size: w * 0.28, weight: .black, design: .rounded))
+                .foregroundStyle(accent.opacity(0.85))
+                .lineLimit(1)
+                .minimumScaleFactor(0.25)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .offset(y: -h * 0.22)
+                .allowsHitTesting(false)
+
+            // 左半：头像主体层，贴左/上/下边缘
+            posterSubjectLayer(geo: geo, avatarImage: avatarImage, isTransparent: isTransparent)
+                .frame(width: w * 0.52, height: h)
+                .clipped()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .allowsHitTesting(false)
+
+            // 右半：文字信息列
+            VStack(alignment: .trailing, spacing: 5) {
+                if pet.currentStreak > 1 {
+                    Text("🔥 \(pet.currentStreak)天连续")
+                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background(Color.goLime, in: Capsule())
+                }
+
+                Spacer()
+
+                Text("\(pet.daysTogether)")
+                    .font(.system(size: 34, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+
+                Text("Days Together")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.92))
+
+                Text(posterFootnote)
+                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+
+                posterBarcode
+                    .padding(.top, 8)
+            }
+            .padding(.trailing, 16)
+            .padding(.top, 18)
+            .padding(.bottom, 16)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+
+            // 翻转提示 & 彩虹桥
+            flipHint
+            if pet.hasPassedAway { rainbowBridgeFrontOverlay(geo: geo) }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+        .overlay(alignment: .topTrailing) { posterDetailButton }
+    }
+
+    @ViewBuilder
+    private func posterSubjectLayer(geo: GeometryProxy, avatarImage: UIImage?, isTransparent: Bool) -> some View {
+        let w = geo.size.width
+        let h = geo.size.height
+        if let avatarImage {
+            if isTransparent {
+                // 透明抠图：居左贴边
+                ZStack(alignment: .bottom) {
+                    Image(uiImage: avatarImage)
+                        .resizable()
+                        .scaledToFit()
+                        .scaleEffect(0.88)
+                        .colorMultiply(.white)
+                        .shadow(color: .white, radius: 0, x: 2, y: 0)
+                        .shadow(color: .white, radius: 0, x: -2, y: 0)
+                        .shadow(color: .white, radius: 0, x: 0, y: -2)
+                    Image(uiImage: avatarImage)
+                        .resizable()
+                        .scaledToFit()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .shadow(color: .black.opacity(0.28), radius: 18, x: 0, y: 12)
+            } else {
+                // 普通照片：填满左半区域，右侧羽化
+                Image(uiImage: avatarImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: w * 0.52, height: h)
+                    .clipped()
+                    .saturation(1.02)
+                    .contrast(1.03)
+                    .mask(
+                        LinearGradient(
+                            stops: [
+                                .init(color: .black, location: 0.0),
+                                .init(color: .black, location: 0.65),
+                                .init(color: .clear, location: 1.0)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .overlay {
+                        LinearGradient(
+                            colors: [
+                                .white.opacity(0.08),
+                                .clear,
+                                cardThemeColor.opacity(0.18)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .blendMode(.screen)
+                    }
+            }
+        } else {
+            // 无头像：剪影居中
+            ZStack {
+                Ellipse()
+                    .fill(Color.black.opacity(0.16))
+                    .frame(width: w * 0.28, height: 24)
+                    .blur(radius: 10)
+                    .offset(y: h * 0.14)
+
+                PetSilhouetteView(
+                    species: silhouetteSpecies,
+                    coatColor: pet.coatColor.isEmpty ? Color(hex: "E8C49A") : Color(hex: pet.coatColor),
+                    eyeColor: pet.eyeColor.isEmpty ? Color(hex: "6B3A2A") : Color(hex: pet.eyeColor)
+                )
+                .scaleEffect(0.92)
+                .frame(width: w * 0.38, height: h * 0.68)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private var posterHeadline: String {
+        let trimmed = pet.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return "OHANA" }
+        return String(trimmed.prefix(6)).uppercased()
+    }
+
+    private var posterFootnote: String {
+        var parts: [String] = []
+        if !pet.ageText.isEmpty { parts.append(pet.ageText) }
+        if !pet.breed.isEmpty { parts.append(pet.breed) }
+        else if !pet.species.isEmpty { parts.append(pet.species) }
+        if parts.isEmpty { parts.append("Ohana PET ID") }
+        return parts.joined(separator: " · ")
+    }
+
+    private var silhouetteSpecies: String {
+        let value = pet.species.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if value == "dog" || pet.species == "狗" { return "狗" }
+        if value == "cat" || pet.species == "猫" { return "猫" }
+        return pet.species
+    }
+
+    private var posterDetailButton: some View {
+        Button(action: onDetail) {
+            HStack(spacing: 4) {
+                Text("详情")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 9, weight: .bold))
+            }
+            .foregroundStyle(.white.opacity(0.95))
+            .padding(.horizontal, 11)
+            .padding(.vertical, 6)
+            .background(.white.opacity(0.12), in: Capsule())
+            .overlay(
+                Capsule()
+                    .strokeBorder(.white.opacity(0.2), lineWidth: 0.8)
+            )
+        }
+        .padding(.top, 18)
+        .padding(.trailing, 16)
+    }
+
+    private var posterBarcode: some View {
+        let pattern: [CGFloat] = [18, 6, 10, 14, 5, 12, 8, 16, 7, 10, 13, 6]
+        return VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .bottom, spacing: 2) {
+                ForEach(Array(pattern.enumerated()), id: \.offset) { _, height in
+                    RoundedRectangle(cornerRadius: 1.2, style: .continuous)
+                        .fill(.white.opacity(0.95))
+                        .frame(width: 2, height: height)
+                }
+            }
+            Text("O H A N A   P E T")
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.82))
+                .tracking(1.2)
+        }
     }
 
     // MARK: - 简约风格正面
@@ -157,15 +384,7 @@ struct ArkCrewIDCardView: View {
                             .font(.system(size: 22, weight: .heavy, design: .rounded))
                             .foregroundStyle(tc)
                             .lineLimit(1).minimumScaleFactor(0.6)
-                        HStack(spacing: 6) {
-                            if !pet.breed.isEmpty {
-                                minimalPill(pet.breed, tc: tc)
-                            } else {
-                                minimalPill(pet.species, tc: tc)
-                            }
-                            minimalPill(pet.genderSymbol, tc: tc)
-                            if pet.isNeutered { minimalPill("已绝育", tc: tc) }
-                        }
+                        // 物种性别已隐藏（数据内存在，但正面不展示）
                     }
                     Spacer()
                     if pet.daysTogether > 0 {
@@ -370,23 +589,75 @@ struct ArkCrewIDCardView: View {
         .overlay(alignment: .topTrailing) { detailButton }
     }
 
-    // MARK: - fallback：纯色 + emoji
+    // MARK: - fallback：纯色 + emoji（大幅升级）
     private func emojiFallbackFront(geo: GeometryProxy) -> some View {
         ZStack(alignment: .bottomLeading) {
+            // 层 1: 主色深底
+            RoundedRectangle(cornerRadius: 32, style: .continuous)
+                .fill(cardThemeColor.mix(with: .black, by: 0.30))
+
+            // 层 2: 对角渐变 - 左上亮、右下深
             RoundedRectangle(cornerRadius: 32, style: .continuous)
                 .fill(LinearGradient(
-                    colors: [cardThemeColor, cardThemeColor.mix(with: .black, by: 0.45)],
+                    colors: [
+                        cardThemeColor.opacity(0.9),
+                        cardThemeColor.mix(with: .black, by: 0.55).opacity(0.95)
+                    ],
                     startPoint: .topLeading, endPoint: .bottomTrailing))
 
-            Text(pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji)
-                .font(.system(size: 120)).minimumScaleFactor(0.4)
-                .frame(width: geo.size.width * 0.50, height: geo.size.height * 0.90, alignment: .center)
+            // 层 3: 右上角高光光斑
+            Ellipse()
+                .fill(RadialGradient(
+                    colors: [cardTextColor.opacity(0.22), .clear],
+                    center: .center, startRadius: 0, endRadius: 130))
+                .frame(width: 260, height: 180)
+                .offset(x: geo.size.width * 0.22, y: -geo.size.height * 0.28)
                 .allowsHitTesting(false)
 
+            // 层 4: 左下角暗角光斑
+            Ellipse()
+                .fill(RadialGradient(
+                    colors: [.black.opacity(0.35), .clear],
+                    center: .center, startRadius: 0, endRadius: 100))
+                .frame(width: 200, height: 150)
+                .offset(x: -geo.size.width * 0.20, y: geo.size.height * 0.25)
+                .allowsHitTesting(false)
+
+            // 层 5: 旋转装饰圆 (类似苹果卡片马赛克圈面)
+            Circle()
+                .strokeBorder(cardTextColor.opacity(0.06), lineWidth: 44)
+                .frame(width: 220)
+                .offset(x: -geo.size.width * 0.28, y: geo.size.height * 0.15)
+                .allowsHitTesting(false)
+
+            Circle()
+                .strokeBorder(cardTextColor.opacity(0.04), lineWidth: 28)
+                .frame(width: 160)
+                .offset(x: geo.size.width * 0.30, y: -geo.size.height * 0.1)
+                .allowsHitTesting(false)
+
+            // 层 6: 品牌水印
+            Text("OHANA")
+                .font(.system(size: 72, weight: .black, design: .rounded))
+                .foregroundStyle(cardTextColor.opacity(0.04))
+                .rotationEffect(.degrees(-12))
+                .offset(x: geo.size.width * 0.05, y: -geo.size.height * 0.06)
+                .allowsHitTesting(false)
+
+            // 层 7: 左侧 emoji 主角 - 加大、加轻微阴影让它“浮”起来
+            Text(pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji)
+                .font(.system(size: geo.size.height * 0.60))
+                .minimumScaleFactor(0.4)
+                .shadow(color: .black.opacity(0.25), radius: 16, x: 4, y: 8)
+                .frame(width: geo.size.width * 0.52, height: geo.size.height * 0.92, alignment: .center)
+                .allowsHitTesting(false)
+
+            // 层 8: 右侧信息列
             HStack(alignment: .bottom, spacing: 0) {
                 Spacer().frame(width: geo.size.width * 0.50)
                 infoColumn(geo: geo)
             }
+
 
             flipHint
             if pet.hasPassedAway { rainbowBridgeFrontOverlay(geo: geo) }
@@ -395,50 +666,60 @@ struct ArkCrewIDCardView: View {
         .overlay(alignment: .topTrailing) { detailButton }
     }
 
-    // MARK: - 共享右侧信息列（删除品种/性别，只保留名字+相伴天数+年龄换算）
+    // MARK: - 共享右侧信息列
     private func infoColumn(geo: GeometryProxy, textColor: Color? = nil) -> some View {
         let tc = textColor ?? cardTextColor
         return VStack(alignment: .trailing, spacing: 0) {
             Spacer(minLength: 0)
 
-            // 相伴天数
+            // 相伴天数 — "一起度过了xx天"
             if pet.daysTogether > 0 {
-                HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Text("✨ 已相伴")
-                        .font(.system(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(tc.opacity(0.65))
-                    Text("\(pet.daysTogether)")
-                        .font(.system(size: 28, weight: .black, design: .rounded))
-                        .foregroundStyle(tc)
-                        .lineLimit(1).minimumScaleFactor(0.5)
-                    Text("天")
-                        .font(.system(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(tc.opacity(0.65))
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text("一起度过了")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(tc.opacity(0.55))
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text("\(pet.daysTogether)")
+                            .font(.system(size: 38, weight: .black, design: .rounded))
+                            .foregroundStyle(tc)
+                            .lineLimit(1).minimumScaleFactor(0.5)
+                        Text("天")
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundStyle(tc.opacity(0.6))
+                    }
                 }
-                .padding(.bottom, 6)
+                .padding(.bottom, 8)
             }
 
             // 大名字
             Text(pet.name)
-                .font(.system(size: 28, weight: .heavy, design: .rounded))
+                .font(.system(size: 24, weight: .heavy, design: .rounded))
                 .foregroundStyle(tc)
                 .lineLimit(1).minimumScaleFactor(0.45)
-                .padding(.bottom, 6)
+                .padding(.bottom, 7)
 
-            // 年龄换算（删除品种和性别）
+            // 年龄 / streak
             let humanAge = pet.humanEquivalentAge
             if humanAge > 0 {
                 frontPillScalable(humanAgeLabel(pet: pet, humanAge: humanAge), textColor: tc)
-                    .padding(.bottom, 10)
+                    .padding(.bottom, pet.currentStreak > 1 ? 5 : 10)
             } else if !pet.ageText.isEmpty {
                 frontPillScalable(pet.ageText, textColor: tc)
+                    .padding(.bottom, pet.currentStreak > 1 ? 5 : 10)
+            }
+
+            // 连续打卡 streak
+            if pet.currentStreak > 1 {
+                Text("🔥 \(pet.currentStreak)天连续")
+                    .font(.system(size: 9, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.goLime)
+                    .padding(.horizontal, 8).padding(.vertical, 3)
+                    .background(Color.goLime.opacity(0.15), in: Capsule())
                     .padding(.bottom, 10)
-            } else {
-                Spacer().frame(height: 10)
             }
         }
         .padding(.trailing, 16)
-        .padding(.bottom, 28)
+        .padding(.bottom, 24)
         .frame(width: geo.size.width * 0.48, alignment: .trailing)
     }
 
@@ -446,15 +727,15 @@ struct ArkCrewIDCardView: View {
     private var detailButton: some View {
         Button(action: onDetail) {
             HStack(spacing: 4) {
-                Text("详情").font(.system(size: 12, weight: .semibold, design: .rounded))
-                Image(systemName: "arrow.up.right").font(.system(size: 10, weight: .semibold))
+                Text("详情").font(.system(size: 11, weight: .bold, design: .rounded))
+                Image(systemName: "arrow.up.right").font(.system(size: 9, weight: .bold))
             }
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 12).padding(.vertical, 7)
-            .background(.ultraThinMaterial)
-            .clipShape(Capsule())
+            .foregroundStyle(cardTextColor.opacity(0.85))
+            .padding(.horizontal, 11).padding(.vertical, 6)
+            .background(cardTextColor.opacity(0.15), in: Capsule())
+            .overlay(Capsule().strokeBorder(cardTextColor.opacity(0.2), lineWidth: 0.5))
         }
-        .padding(.top, 20).padding(.trailing, 18)
+        .padding(.top, 18).padding(.trailing, 16)
     }
 
     private var flipHint: some View {
@@ -733,69 +1014,73 @@ struct ArkCrewIDCardView: View {
 
     private var cardBackView: some View {
         ZStack {
-            // 背面底层：深色渐变，空白处点击翻回正面
+            // 背面底层：点击翻回正面（透明 hitTest 层）
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(LinearGradient(
-                    colors: [Color.goDarkBlue, Color.goDeepNavy],
-                    startPoint: .top, endPoint: .bottom
-                ))
+                .fill(Color.clear)
                 .contentShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
                 .onTapGesture { toggleFlip() }
 
-            // 顶部主题色渐变阴影
-            VStack {
-                LinearGradient(
-                    colors: [cardThemeColor.opacity(0.25), .clear],
-                    startPoint: .top, endPoint: .bottom
-                )
-                .frame(height: 60)
-                Spacer()
-            }
-
-            VStack(spacing: 0) {
-                // ── 顶栏：宠物名 + 详情按钮（上移）
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("DATA DASHBOARD")
-                            .font(.system(size: 8, weight: .black, design: .rounded))
-                            .tracking(3)
-                            .foregroundStyle(.white.opacity(0.25))
-                        Text(pet.name)
-                            .font(.system(size: 18, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
-                    }
+            if isActiveWalk {
+                // ── 遛狗活动中：使用 walkLivePanel 替换普通仪表盘
+                walkLivePanel
+            } else {
+                // 顶部主题色渐变光晕
+                VStack {
+                    LinearGradient(
+                        colors: [cardThemeColor.opacity(0.30), .clear],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                    .frame(height: 80)
                     Spacer()
-                    Button(action: onDetail) {
-                        HStack(spacing: 4) {
-                            Text("详情")
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.75))
-                            Image(systemName: "arrow.up.right")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.5))
-                        }
-                        .padding(.horizontal, 12).padding(.vertical, 6)
-                        .background(.white.opacity(0.08), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 18).padding(.top, 12).padding(.bottom, 8)
+                .allowsHitTesting(false)
 
-                Spacer()
+                VStack(spacing: 0) {
+                    // ── 顶栏：宠物名 + 详情按钮
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("DATA DASHBOARD")
+                                .font(.system(size: 8, weight: .black, design: .rounded))
+                                .tracking(3)
+                                .foregroundStyle(.primary.opacity(0.25))
+                            Text(pet.name)
+                                .font(.system(size: 18, weight: .black, design: .rounded))
+                                .foregroundStyle(.primary)
+                        }
+                        Spacer()
+                        Button(action: onDetail) {
+                            HStack(spacing: 4) {
+                                Text("详情")
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.primary.opacity(0.75))
+                                Image(systemName: "arrow.up.right")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(.primary.opacity(0.5))
+                            }
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .glassEffect(.regular, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 18).padding(.top, 12).padding(.bottom, 8)
 
-                // ── 区域 1：核心数据摘要（居中）
-                backCoreMetrics
-                    .padding(.horizontal, 16)
-                    .allowsHitTesting(true) // 允许长按
+                    Spacer()
 
-                Spacer()
+                    // ── 区域 1：核心数据摘要（居中）
+                    backCoreMetrics
+                        .padding(.horizontal, 16)
+                        .allowsHitTesting(true)
 
-                // ── 区域 2：底部待办 Banner（下移到底部）
-                backTodoBanner
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 14)
+                    Spacer()
+
+                    // ── 区域 2：底部待办 Banner
+                    backTodoBanner
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 14)
+                }
             }
         }
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
         // sheet 路由（由长按手势触发，非单击）
         .sheet(isPresented: $showWeightSheet) {
@@ -812,6 +1097,13 @@ struct ArkCrewIDCardView: View {
             NavigationStack { PetHealthDetailView(pet: pet, isModal: true) }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+        }
+        .onChange(of: showHealthSheet) { _, newVal in
+            // C3: 若有外部回调，优先使用外部 modal（关闭内部 sheet 再调用）
+            if newVal, let ext = onShowHealth {
+                showHealthSheet = false
+                ext()
+            }
         }
         .sheet(isPresented: $showCareSheet) {
             CareTrackingDetailSheet(pet: pet)
@@ -911,12 +1203,12 @@ struct ArkCrewIDCardView: View {
         VStack(spacing: 3) {
             Text(label)
                 .font(.system(size: 8, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(.primary.opacity(0.35))
                 .textCase(.uppercase)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value)
                     .font(.system(size: 26, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .minimumScaleFactor(0.55)
                     .lineLimit(1)
                 if !unit.isEmpty {
@@ -932,7 +1224,7 @@ struct ArkCrewIDCardView: View {
 
     private var metricDivider: some View {
         Rectangle()
-            .fill(.white.opacity(0.08))
+            .fill(.primary.opacity(0.1))
             .frame(width: 1, height: 44)
     }
 
@@ -1065,16 +1357,16 @@ struct ArkCrewIDCardView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(event.title)
                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.9))
+                        .foregroundStyle(.primary.opacity(0.9))
                         .lineLimit(1)
                     if !event.isAllDay, Calendar.current.isDateInToday(event.startDate) {
                         Text(event.startDate, format: .dateTime.hour().minute())
                             .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.primary.opacity(0.45))
                     } else {
                         Text("今日待办")
                             .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.35))
+                            .foregroundStyle(.primary.opacity(0.4))
                     }
                 }
                 Spacer()
@@ -1096,10 +1388,10 @@ struct ArkCrewIDCardView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(Color.goLime.opacity(0.2), lineWidth: 1)
+                    .strokeBorder(Color.goLime.opacity(0.3), lineWidth: 1)
             )
         } else {
             HStack(spacing: 8) {
@@ -1107,7 +1399,7 @@ struct ArkCrewIDCardView: View {
                     .font(.system(size: 14))
                 Text("\(pet.name) 今天没有待完成的事项")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.primary.opacity(0.35))
                 Spacer()
             }
             .padding(.horizontal, 14)

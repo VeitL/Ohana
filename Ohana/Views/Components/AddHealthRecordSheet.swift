@@ -51,7 +51,7 @@ struct AddHealthRecordSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(hex: "0D0638").ignoresSafeArea()
+                ArkBackgroundView()
 
                 ScrollView {
                     VStack(spacing: 20) {
@@ -69,17 +69,17 @@ struct AddHealthRecordSheet: View {
                             }
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(pet.name)
-                                    .font(.system(size: 17, weight: .black, design: .rounded))
+                                    .font(OhanaFont.body(.black))
                                     .foregroundStyle(.primary)
                                 Text(typeLabel)
-                                    .font(.system(size: 13, weight: .medium))
+                                    .font(OhanaFont.caption(.medium))
                                     .foregroundStyle(Color.goTeal)
                             }
                             Spacer()
                             Text(type.emoji).font(.system(size: 32))
                         }
                         .padding(16)
-                        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+                        .ohanaStandardCard(cornerRadius: 16)
 
                         // N9: 疫苗/驱虫名称字段（面板最顶部）
                         if showsNameField {
@@ -198,8 +198,8 @@ struct AddHealthRecordSheet: View {
                         // 保存按钮
                         Button(action: save) {
                             Text("保存记录")
-                                .font(.system(size: 17, weight: .black, design: .rounded))
-                                .foregroundStyle(.black)
+                                .font(OhanaFont.headline(.black))
+                                .foregroundStyle(Color.arkInk)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
                                 .background(Color.goLime, in: RoundedRectangle(cornerRadius: 16))
@@ -232,11 +232,12 @@ struct AddHealthRecordSheet: View {
         }
     }
 
-    private func fieldCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        content()
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
+    private func fieldCard<Content: View>(@ViewBuilder content: @escaping () -> Content) -> some View {
+        UltimateGlassCard {
+            content()
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private func save() {

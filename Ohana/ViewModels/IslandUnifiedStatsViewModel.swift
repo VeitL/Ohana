@@ -19,6 +19,14 @@ struct WeightDeltaPoint: Identifiable {
     let isHuman: Bool
 }
 
+struct WeightAbsolutePoint: Identifiable {
+    let id = UUID()
+    let date: Date
+    let entityName: String
+    let weight: Double          // 实际体重（kg）
+    let isHuman: Bool
+}
+
 struct ExplorationPoint: Identifiable {
     let id = UUID()
     let date: Date
@@ -40,6 +48,7 @@ struct FameRanking {
 final class IslandUnifiedStatsViewModel {
 
     var weightDeltas: [WeightDeltaPoint] = []
+    var weightAbsolutes: [WeightAbsolutePoint] = []
     var explorations: [ExplorationPoint] = []
     var totalWeeklyExplorationKm: Double = 0
     var totalMonthlyExplorationKm: Double = 0
@@ -96,8 +105,35 @@ final class IslandUnifiedStatsViewModel {
 
         weightDeltas = points.sorted { $0.date < $1.date }
 
+        // F4: 加载实际体重绝对值
+        loadWeightAbsolutes(pets: pets, humans: humans)
+
         // 计算排行榜（本月）
         computeRankings(pets: pets, humans: humans)
+    }
+
+    private func loadWeightAbsolutes(pets: [Pet], humans: [Human]) {
+        var pts: [WeightAbsolutePoint] = []
+        for pet in pets {
+            for log in pet.weightLogs {
+                pts.append(WeightAbsolutePoint(date: log.date, entityName: pet.name, weight: log.weight, isHuman: false))
+            }
+        }
+        for human in humans {
+            for log in human.weightLogs {
+                pts.append(WeightAbsolutePoint(date: log.date, entityName: human.name, weight: log.weight, isHuman: true))
+            }
+        }
+        weightAbsolutes = pts.sorted { $0.date < $1.date }
+    }
+
+    // 按实体名分组
+    var weightAbsolutesBySeries: [(String, [WeightAbsolutePoint], Bool)] {
+        let names = Array(Set(weightAbsolutes.map { $0.entityName })).sorted()
+        return names.map { name in
+            let pts = weightAbsolutes.filter { $0.entityName == name }
+            return (name, pts, pts.first?.isHuman ?? false)
+        }
     }
 
     private func computeRankings(pets: [Pet], humans: [Human]) {

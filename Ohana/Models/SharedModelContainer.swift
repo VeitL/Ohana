@@ -367,69 +367,55 @@ enum ArkSchemaV20: VersionedSchema {
     }
 }
 
+// MARK: - Schema V21（新增 HumanMedication — 人类吃药提醒）
+enum ArkSchemaV21: VersionedSchema {
+    static var versionIdentifier = Schema.Version(21, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [
+            Pet.self, Human.self, Plant.self, Household.self, Event.self, Reminder.self,
+            PetPottyLog.self, PetWalkLog.self, PetHygieneLog.self, PetWeightLog.self,
+            PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
+            PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
+            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
+            PetDocumentAttachment.self, HumanMedication.self,
+        ]
+    }
+}
+
+// MARK: - Schema V22（新增 HumanHealthReport — 身体检测报告）
+enum ArkSchemaV22: VersionedSchema {
+    static var versionIdentifier = Schema.Version(22, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [
+            Pet.self, Human.self, Plant.self, Household.self, Event.self, Reminder.self,
+            PetPottyLog.self, PetWalkLog.self, PetHygieneLog.self, PetWeightLog.self,
+            PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
+            PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
+            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
+            PetDocumentAttachment.self, HumanMedication.self, HumanHealthReport.self,
+        ]
+    }
+}
+
 // MARK: - Migration Plan
+// NOTE: 只保留有真实 custom logic 的 stage。
+// SwiftData 的 lightweight migration 对于"只新增字段/模型"完全不需要显式 stage——
+// 当 store 版本落后于当前 schema 时，SwiftData 会自动完成字段填充。
+// 明确列出 stages 反而会导致 iOS 26 抛出 "model reference cannot be equal" 异常
+// （当两个相邻 schema 的 Core Data hash 相同时）。
 enum ArkMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
         [ArkSchemaV1.self, ArkSchemaV2.self, ArkSchemaV3.self, ArkSchemaV4.self,
          ArkSchemaV5.self, ArkSchemaV6.self, ArkSchemaV7.self, ArkSchemaV8.self,
          ArkSchemaV9.self, ArkSchemaV10.self, ArkSchemaV11.self, ArkSchemaV12.self,
          ArkSchemaV13.self, ArkSchemaV14.self, ArkSchemaV15.self, ArkSchemaV16.self,
-         ArkSchemaV17.self, ArkSchemaV18.self, ArkSchemaV19.self, ArkSchemaV20.self]
+         ArkSchemaV17.self, ArkSchemaV18.self, ArkSchemaV19.self, ArkSchemaV20.self,
+         ArkSchemaV21.self, ArkSchemaV22.self]
     }
 
-    static var stages: [MigrationStage] {
-        [
-            MigrationStage.lightweight(fromVersion: ArkSchemaV1.self,  toVersion: ArkSchemaV2.self),
-            MigrationStage.lightweight(fromVersion: ArkSchemaV2.self,  toVersion: ArkSchemaV3.self),
-            MigrationStage.lightweight(fromVersion: ArkSchemaV3.self,  toVersion: ArkSchemaV4.self),
-            MigrationStage.lightweight(fromVersion: ArkSchemaV4.self,  toVersion: ArkSchemaV5.self),
-            MigrationStage.lightweight(fromVersion: ArkSchemaV5.self,  toVersion: ArkSchemaV6.self),
-            MigrationStage.lightweight(fromVersion: ArkSchemaV6.self,  toVersion: ArkSchemaV7.self),
-            MigrationStage.lightweight(fromVersion: ArkSchemaV7.self,  toVersion: ArkSchemaV8.self),
-            MigrationStage.lightweight(fromVersion: ArkSchemaV8.self,  toVersion: ArkSchemaV9.self),
-            MigrationStage.lightweight(fromVersion: ArkSchemaV9.self,  toVersion: ArkSchemaV10.self),
-            MigrationStage.lightweight(fromVersion: ArkSchemaV10.self, toVersion: ArkSchemaV11.self),
-            MigrationStage.lightweight(fromVersion: ArkSchemaV11.self, toVersion: ArkSchemaV12.self),
-            MigrationStage.lightweight(fromVersion: ArkSchemaV12.self, toVersion: ArkSchemaV13.self),
-            // V13 → V14: Pet 新增 passedAwayDate(nil)，lightweight 自动填充 nil
-            MigrationStage.lightweight(fromVersion: ArkSchemaV13.self, toVersion: ArkSchemaV14.self),
-            // V14 → V15: Human 新增 themeColorHex，自定义迁移从 notes 字段提取颜色
-            MigrationStage.custom(
-                fromVersion: ArkSchemaV14.self,
-                toVersion: ArkSchemaV15.self,
-                willMigrate: nil,
-                didMigrate: { context in
-                    let desc = FetchDescriptor<Human>()
-                    let humans = (try? context.fetch(desc)) ?? []
-                    for human in humans {
-                        // 从 notes 提取 "themeColor:XXXXXX" 并写入新字段
-                        if let range = human.notes.range(of: "themeColor:") {
-                            let hex = String(human.notes[range.upperBound...].prefix(6))
-                            if hex.count == 6 {
-                                human.themeColorHex = hex
-                                // 从 notes 中移除该段
-                                let fullTag = "themeColor:" + hex
-                                human.notes = human.notes
-                                    .replacingOccurrences(of: fullTag, with: "")
-                                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                            }
-                        }
-                    }
-                    try? context.save()
-                }
-            ),
-            // V15 → V16: Human 新增 privateFieldsRaw ("") + heightCm (0.0)， lightweight 自动填充默认値
-            MigrationStage.lightweight(fromVersion: ArkSchemaV15.self, toVersion: ArkSchemaV16.self),
-            // V16 → V17: PetMilestone 新增 photoData (nil)， lightweight 自动填充 nil
-            MigrationStage.lightweight(fromVersion: ArkSchemaV16.self, toVersion: ArkSchemaV17.self),
-            // V17 → V18: PetMilestone 新增 location ("")， lightweight 自动填充空字符串
-            MigrationStage.lightweight(fromVersion: ArkSchemaV17.self, toVersion: ArkSchemaV18.self),
-            // V18 → V19: Pet 新增 cardStyleRaw ("classic")， lightweight 自动填充
-            MigrationStage.lightweight(fromVersion: ArkSchemaV18.self, toVersion: ArkSchemaV19.self),
-            // V19 → V20: 新增 PetDocumentAttachment 多附件表，lightweight 自动创建
-            MigrationStage.lightweight(fromVersion: ArkSchemaV19.self, toVersion: ArkSchemaV20.self),
-        ]
-    }
+    static var stages: [MigrationStage] { [] }
 }
 
 
@@ -444,37 +430,43 @@ struct SharedModelContainer {
             cloudKitDatabase: .none
         )
 
-        let schema = Schema(ArkSchemaV20.models)
-        do {
-            let container = try ModelContainer(
-                for: schema,
-                migrationPlan: ArkMigrationPlan.self,
-                configurations: [config]
-            )
-            // F3: 清除之前的数据库错误标记（如果有）
+        let schema = Schema(ArkSchemaV22.models)
+
+        // 先尝试带 migrationPlan（升级老用户数据库）
+        if let container = try? ModelContainer(
+            for: schema,
+            migrationPlan: ArkMigrationPlan.self,
+            configurations: [config]
+        ) {
             UserDefaults.standard.removeObject(forKey: "ohana_db_fallback_active")
             return container
+        }
+
+        // migrationPlan 失败（如全新安装或 iOS 26 迁移链冲突）→ 不带 migrationPlan 直接创建
+        #if DEBUG
+        print("⚠️ SwiftData migrationPlan failed, retrying without migration plan...")
+        #endif
+        if let container = try? ModelContainer(
+            for: schema,
+            configurations: [config]
+        ) {
+            UserDefaults.standard.removeObject(forKey: "ohana_db_fallback_active")
+            return container
+        }
+
+        // 最终降级：内存模式
+        UserDefaults.standard.set(true, forKey: "ohana_db_fallback_active")
+        #if DEBUG
+        print("🚨 SwiftData container creation FAILED — falling back to in-memory store")
+        #endif
+        let fallbackConfig = ModelConfiguration(
+            isStoredInMemoryOnly: true,
+            cloudKitDatabase: .none
+        )
+        do {
+            return try ModelContainer(for: schema, configurations: [fallbackConfig])
         } catch {
-            // F3: 标记数据库降级为内存模式，App 层可据此弹出警告
-            UserDefaults.standard.set(true, forKey: "ohana_db_fallback_active")
-            UserDefaults.standard.set(error.localizedDescription, forKey: "ohana_db_fallback_error")
-            #if DEBUG
-            print("🚨 SwiftData container creation FAILED: \(error)")
-            print("🚨 Falling back to in-memory store — ALL DATA WILL BE LOST on next launch!")
-            #endif
-            let fallbackConfig = ModelConfiguration(
-                isStoredInMemoryOnly: true,
-                cloudKitDatabase: .none
-            )
-            do {
-                return try ModelContainer(
-                    for: schema,
-                    migrationPlan: ArkMigrationPlan.self,
-                    configurations: [fallbackConfig]
-                )
-            } catch {
-                fatalError("Could not create ModelContainer: \(error)")
-            }
+            fatalError("Could not create ModelContainer even in-memory: \(error)")
         }
     }
 }

@@ -22,52 +22,52 @@ enum FoodTrackingMode: String, Codable, CaseIterable {
     }
 }
 
-// MARK: - Pet Theme Color
+// MARK: - Pet Theme Color (Go UI palette — used to distinguish pets in charts, calendar, etc.)
 enum PetThemeColor: String, Codable, CaseIterable {
-    case coral, ocean, lavender, mint, sunset, berry, sky, sage, peach, slate
+    case lime, orange, primary, teal, yellow, red, purple, blue, mint, pink
     
     var color: Color {
         switch self {
-        case .coral:    return Color(hex: "FF6B6B")
-        case .ocean:    return Color(hex: "4ECDC4")
-        case .lavender: return Color(hex: "B8A9C9")
-        case .mint:     return Color(hex: "95E1D3")
-        case .sunset:   return Color(hex: "F38181")
-        case .berry:    return Color(hex: "AA96DA")
-        case .sky:      return Color(hex: "8EC5FC")
-        case .sage:     return Color(hex: "A8E6CF")
-        case .peach:    return Color(hex: "FFD3B6")
-        case .slate:    return Color(hex: "95ADBE")
+        case .lime:    return Color(hex: "C8FF00")  // goLime
+        case .orange:  return Color(hex: "FF8C42")  // goOrange
+        case .primary: return Color(hex: "4338FF")  // goPrimary
+        case .teal:    return Color(hex: "00D4AA")  // goTeal
+        case .yellow:  return Color(hex: "FFF44F")  // goYellow
+        case .red:     return Color(hex: "FF4757")  // goRed
+        case .purple:  return Color(hex: "A78BFA")  // goPurple
+        case .blue:    return Color(hex: "5B6AFF")  // goBlue
+        case .mint:    return Color(hex: "80FFEA")  // goMint
+        case .pink:    return Color(hex: "FF6B9D")  // goPink
         }
     }
     
     var hexValue: String {
         switch self {
-        case .coral:    return "FF6B6B"
-        case .ocean:    return "4ECDC4"
-        case .lavender: return "B8A9C9"
-        case .mint:     return "95E1D3"
-        case .sunset:   return "F38181"
-        case .berry:    return "AA96DA"
-        case .sky:      return "8EC5FC"
-        case .sage:     return "A8E6CF"
-        case .peach:    return "FFD3B6"
-        case .slate:    return "95ADBE"
+        case .lime:    return "C8FF00"
+        case .orange:  return "FF8C42"
+        case .primary: return "4338FF"
+        case .teal:    return "00D4AA"
+        case .yellow:  return "FFF44F"
+        case .red:     return "FF4757"
+        case .purple:  return "A78BFA"
+        case .blue:    return "5B6AFF"
+        case .mint:    return "80FFEA"
+        case .pink:    return "FF6B9D"
         }
     }
 
     var deepColor: Color {
         switch self {
-        case .coral:    return Color(hex: "C0392B")
-        case .ocean:    return Color(hex: "1ABC9C")
-        case .lavender: return Color(hex: "8E44AD")
-        case .mint:     return Color(hex: "27AE60")
-        case .sunset:   return Color(hex: "E74C3C")
-        case .berry:    return Color(hex: "6C3483")
-        case .sky:      return Color(hex: "2980B9")
-        case .sage:     return Color(hex: "229954")
-        case .peach:    return Color(hex: "E67E22")
-        case .slate:    return Color(hex: "5D6D7E")
+        case .lime:    return Color(hex: "8FB800")
+        case .orange:  return Color(hex: "CC5500")
+        case .primary: return Color(hex: "2218CC")
+        case .teal:    return Color(hex: "008870")
+        case .yellow:  return Color(hex: "CCB800")
+        case .red:     return Color(hex: "CC1A2A")
+        case .purple:  return Color(hex: "7C3AED")
+        case .blue:    return Color(hex: "3344CC")
+        case .mint:    return Color(hex: "44CCAA")
+        case .pink:    return Color(hex: "CC3366")
         }
     }
 }
@@ -198,7 +198,7 @@ final class Pet {
     // MARK: - Computed Properties
     
     var themeColor: PetThemeColor {
-        PetThemeColor.allCases.first { $0.rawValue == themeColorHex.lowercased() } ?? .coral
+        PetThemeColor.allCases.first { $0.rawValue == themeColorHex.lowercased() } ?? .orange
     }
     
     var daysTogether: Int {

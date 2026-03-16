@@ -9,6 +9,11 @@ import SwiftUI
 import SwiftData
 
 struct OasisRewardView: View {
+    var hideToolbar: Bool = false
+    var rulesTrigger: Bool = false
+    var inventoryTrigger: Bool = false
+
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Pet.createdAt)   private var pets:   [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
@@ -29,7 +34,10 @@ struct OasisRewardView: View {
     @State private var makeupPackCount: Int = 0            // 补签包数量
     @State private var showMakeupConfirm: String? = nil    // 待确认补签的日期
     private let checkedInKey = "oasis_checkedIn_dates"
-    private let makeupPackKey = "oasis_makeup_pack_count"
+    private let makeupDatesKey = "oasis_makeup_dates"      // 补签日期独立记录
+    private let makeupPackKey = "inventory_backdate_1day_count" // 与椰子商店统一 key
+    @State private var makeupDates: Set<String> = []       // 补签过的日期集合
+    @AppStorage("checkIn_lastClaimedMilestone") private var lastClaimedMilestone: Int = 0
     @State private var lastLevel: TreeLevel = .lv1
     @State private var isInjecting: Bool = false
     @State private var levelUpPulse         = false
@@ -66,38 +74,17 @@ struct OasisRewardView: View {
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 0) {
-                    // ── 顶部 Header（safeAreaInset 由外层 TabView 处理）
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("欧哈纳")
-                                .font(.system(size: 12, weight: .black, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.4))
-                                .tracking(3)
-                            Text("绿洲")
-                                .font(.system(size: 38, weight: .black, design: .rounded))
-                                .foregroundStyle(.primary)
-                        }
-                        Spacer()
+                    // R6: 全局 header 占位
+                    Spacer().frame(height: 70)
+
+                    if !hideToolbar {
+                        // 绿洲工具栏（独立使用时显示，嵌入 tab 时由全局 header 提供）
                         HStack(spacing: 8) {
+                            Spacer()
                             Button { showCoconutRules = true } label: {
                                 Image(systemName: "info.circle")
                                     .font(.system(size: 18, weight: .medium))
                                     .foregroundStyle(.primary.opacity(0.45))
-                            }
-                            .buttonStyle(.plain)
-                            // 模块六入口：打卡日历
-                            Button { showCheckInCalendar = true } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "calendar.badge.checkmark")
-                                        .font(.system(size: 13, weight: .bold))
-                                        .foregroundStyle(Color.goLime)
-                                    Text("\(currentStreak)")
-                                        .font(.system(size: 12, weight: .black, design: .rounded))
-                                        .foregroundStyle(Color.goLime)
-                                }
-                                .padding(.horizontal, 10).padding(.vertical, 6)
-                                .background(Color.goLime.opacity(0.12), in: Capsule())
-                                .overlay(Capsule().strokeBorder(Color.goLime.opacity(0.3), lineWidth: 1))
                             }
                             .buttonStyle(.plain)
                             Button {
@@ -112,10 +99,9 @@ struct OasisRewardView: View {
                                     .overlay(Circle().strokeBorder(Color.goLime.opacity(0.3), lineWidth: 1))
                             }
                             .buttonStyle(.plain)
-                            CoconutBalanceCapsule { showingCoconutLog = true }
                         }
+                        .padding(.horizontal, 24).padding(.top, 4)
                     }
-                    .padding(.horizontal, 24).padding(.top, 16)
 
                     // 新手任务面板
                     if !QuestManager.shared.isAllWelcomeQuestsCompleted {
@@ -168,13 +154,6 @@ struct OasisRewardView: View {
             BountyBoardView()
                 .presentationDetents([.large])
         }
-        .sheet(isPresented: $showCheckInCalendar) {
-            checkInCalendarCard
-                .padding(.top, 12)
-                .padding(.horizontal, 20)
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
-        }
         .onAppear {
             treeMgr.refreshEnergy(modelContext: modelContext, pets: pets, humans: humans)
             lastLevel = treeMgr.treeLevel
@@ -196,6 +175,8 @@ struct OasisRewardView: View {
         }
         .onChange(of: pets.count)   { treeMgr.refreshEnergy(modelContext: modelContext, pets: pets, humans: humans) }
         .onChange(of: humans.count) { treeMgr.refreshEnergy(modelContext: modelContext, pets: pets, humans: humans) }
+        .onChange(of: rulesTrigger) { _, _ in showCoconutRules = true }
+        .onChange(of: inventoryTrigger) { _, _ in showInventory = true }
     }
 
     // MARK: - Tree Section
@@ -316,6 +297,9 @@ struct OasisRewardView: View {
     private var treeLevelLabel: some View {
         VStack(spacing: 6) {
             HStack(spacing: 6) {
+                Text("Lv.\(treeMgr.treeLevel.rawValue)")
+                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .foregroundStyle(treeMgr.treeLevel.glowColor)
                 Text(treeMgr.treeLevel.displayName)
                     .font(.system(size: 20, weight: .black, design: .rounded))
                     .foregroundStyle(.primary)
@@ -394,33 +378,72 @@ struct OasisRewardView: View {
         .opacity(QuestManager.shared.coconutCount >= 10 ? 1 : 0.45)
     }
 
-    // MARK: - 模块六：打卡日历
+    // MARK: - 模块六：打卡日历（完整月视图）
+
+    @State private var calendarDisplayMonth: Date = Date()
 
     private var checkInCalendarCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            // 标题行
+        VStack(alignment: .leading, spacing: 12) {
+            // ── 标题 + 连胜
             HStack {
                 HStack(spacing: 6) {
                     Image(systemName: "calendar.badge.checkmark")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(Color.goLime)
                     Text("打卡日历")
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(.system(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(.primary)
                 }
                 Spacer()
-                // 连胜天数
                 HStack(spacing: 4) {
                     Text("🔥")
                     Text("\(currentStreak) 天连胜")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.goYellow)
                 }
-                .padding(.horizontal, 10).padding(.vertical, 4)
+                .padding(.horizontal, 10).padding(.vertical, 5)
                 .background(Color.goYellow.opacity(0.12), in: Capsule())
             }
 
-            // 星期标题行
+            // ── 统计面板
+            checkInStatsRow
+
+            OhanaDashedDivider(color: .white.opacity(0.1))
+
+            // ── 月份导航
+            HStack {
+                Button {
+                    withAnimation(.spring(response: 0.3)) {
+                        calendarDisplayMonth = Calendar.current.date(byAdding: .month, value: -1, to: calendarDisplayMonth) ?? calendarDisplayMonth
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.primary.opacity(0.5))
+                }
+                Spacer()
+                Text(monthYearString(calendarDisplayMonth))
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Button {
+                    let next = Calendar.current.date(byAdding: .month, value: 1, to: calendarDisplayMonth) ?? calendarDisplayMonth
+                    if next <= Date() {
+                        withAnimation(.spring(response: 0.3)) { calendarDisplayMonth = next }
+                    }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(
+                            Calendar.current.isDate(calendarDisplayMonth, equalTo: Date(), toGranularity: .month)
+                                ? Color.primary.opacity(0.15) : Color.primary.opacity(0.5)
+                        )
+                }
+                .disabled(Calendar.current.isDate(calendarDisplayMonth, equalTo: Date(), toGranularity: .month))
+            }
+            .padding(.horizontal, 4)
+
+            // ── 星期标题行
             HStack(spacing: 0) {
                 ForEach(["日","一","二","三","四","五","六"], id: \.self) { d in
                     Text(d)
@@ -430,52 +453,17 @@ struct OasisRewardView: View {
                 }
             }
 
-            // 30天日历网格（每行7天）
-            let days = last30Days()
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 6) {
-                ForEach(days, id: \.self) { dateStr in
-                    let isToday = dateStr == todayStr()
-                    let isChecked = checkedInDates.contains(dateStr)
-                    let dayNum = dayNumber(from: dateStr)
-                    Button {
-                        if !isChecked && !isToday && makeupPackCount > 0 {
-                            showMakeupConfirm = dateStr
-                        }
-                    } label: {
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    isChecked
-                                        ? Color.goLime
-                                        : (isToday ? Color.goLime.opacity(0.22) : Color.white.opacity(0.05))
-                                )
-                                .frame(width: 34, height: 34)
-                                .overlay(
-                                    Circle().strokeBorder(
-                                        isToday ? Color.goLime : .clear, lineWidth: 1.5
-                                    )
-                                )
-                            if isChecked {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 10, weight: .black))
-                                    .foregroundStyle(.black)
-                            } else {
-                                Text(dayNum)
-                                    .font(.system(size: 11, weight: isToday ? .black : .medium, design: .rounded))
-                                    .foregroundStyle(
-                                        isToday ? Color.goLime : .white.opacity(0.4)
-                                    )
-                            }
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isChecked || isToday || makeupPackCount == 0)
+            // ── 月视图网格（按星期正确对齐）
+            let cells = monthCalendarCells(for: calendarDisplayMonth)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 4) {
+                ForEach(Array(cells.enumerated()), id: \.offset) { _, cell in
+                    calendarDayCell(cell)
                 }
             }
 
             OhanaDashedDivider(color: .white.opacity(0.1))
 
-            // 补签入口
+            // ── 补签包区域
             HStack(spacing: 12) {
                 HStack(spacing: 4) {
                     Text("📦").font(.system(size: 14))
@@ -492,10 +480,17 @@ struct OasisRewardView: View {
                         .font(.system(size: 10, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.goLime.opacity(0.6))
                 } else {
-                    Text("在椰子商店购买补签包")
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.25))
+                    Button { showCoconutShop = true } label: {
+                        Text("去商店购买 →")
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.goYellow.opacity(0.8))
+                    }
                 }
+            }
+
+            // ── 里程碑奖励提示
+            if currentStreak > 0 {
+                checkInMilestoneRow
             }
         }
         .padding(16)
@@ -510,24 +505,187 @@ struct OasisRewardView: View {
             .strokeBorder(Color.goLime.opacity(0.15), lineWidth: 1))
     }
 
+    // MARK: - 统计面板
+    private var checkInStatsRow: some View {
+        HStack(spacing: 0) {
+            checkInStatCell(value: "\(checkedInDates.count)", label: "总打卡", icon: "checkmark.circle.fill", color: Color.goLime)
+            checkInStatCell(value: "\(currentStreak)", label: "当前连胜", icon: "flame.fill", color: Color.goYellow)
+            checkInStatCell(value: "\(longestStreak)", label: "最长连胜", icon: "trophy.fill", color: Color.goOrange)
+            checkInStatCell(value: "\(monthCheckInRate)%", label: "本月", icon: "chart.bar.fill", color: Color.goCardCyan)
+        }
+    }
+
+    private func checkInStatCell(value: String, label: String, icon: String, color: Color) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(color)
+            Text(value)
+                .font(.system(size: 16, weight: .black, design: .rounded))
+                .foregroundStyle(.primary)
+            Text(label)
+                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .foregroundStyle(.primary.opacity(0.35))
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - 里程碑奖励行
+    private var checkInMilestoneRow: some View {
+        let milestones: [(days: Int, reward: Int, emoji: String)] = [
+            (7, 10, "⭐️"), (14, 25, "🌟"), (30, 60, "💎"), (60, 150, "👑"), (100, 300, "🏆")
+        ]
+        let nextMilestone = milestones.first(where: { $0.days > currentStreak })
+        let lastClaimed = lastClaimedMilestone
+
+        return VStack(spacing: 6) {
+            OhanaDashedDivider(color: .white.opacity(0.1))
+            if let next = nextMilestone {
+                HStack(spacing: 6) {
+                    Text(next.emoji)
+                    Text("再连续 \(next.days - currentStreak) 天即可领取 +\(next.reward)🥥")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.goLime.opacity(0.7))
+                    Spacer()
+                }
+            }
+
+            // 可领取的里程碑
+            let claimable = milestones.filter { $0.days <= currentStreak && $0.days > lastClaimed }
+            if !claimable.isEmpty {
+                ForEach(claimable, id: \.days) { m in
+                    Button {
+                        claimMilestone(m.days, reward: m.reward, emoji: m.emoji)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text(m.emoji).font(.system(size: 16))
+                            Text("\(m.days) 天连胜达成！")
+                                .font(.system(size: 13, weight: .black, design: .rounded))
+                                .foregroundStyle(.black)
+                            Spacer()
+                            Text("+\(m.reward)🥥 领取")
+                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .foregroundStyle(.black.opacity(0.7))
+                        }
+                        .padding(.horizontal, 14).padding(.vertical, 10)
+                        .background(Color.goLime, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    // MARK: - 月历单元格模型
+    private struct CalendarCell {
+        let dateStr: String  // "" = 占位空格
+        let day: Int
+        let isToday: Bool
+        let isChecked: Bool
+        let isMakeup: Bool   // 补签的日期
+        let isFuture: Bool
+    }
+
+    private func monthCalendarCells(for month: Date) -> [CalendarCell] {
+        let cal = Calendar.current
+        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+        let todayString = fmt.string(from: Date())
+
+        let comps = cal.dateComponents([.year, .month], from: month)
+        guard let firstOfMonth = cal.date(from: comps) else { return [] }
+        let weekdayOfFirst = cal.component(.weekday, from: firstOfMonth) - 1 // 0=Sun
+        let daysInMonth = cal.range(of: .day, in: .month, for: firstOfMonth)?.count ?? 30
+
+        var cells: [CalendarCell] = []
+
+        // 前置空位
+        for _ in 0..<weekdayOfFirst {
+            cells.append(CalendarCell(dateStr: "", day: 0, isToday: false, isChecked: false, isMakeup: false, isFuture: false))
+        }
+
+        // 每天
+        for d in 1...daysInMonth {
+            var dc = DateComponents(); dc.year = comps.year; dc.month = comps.month; dc.day = d
+            let date = cal.date(from: dc) ?? firstOfMonth
+            let dateStr = fmt.string(from: date)
+            let isToday = dateStr == todayString
+            let isChecked = checkedInDates.contains(dateStr)
+            let isMakeup = makeupDates.contains(dateStr)
+            let isFuture = date > Date() && !isToday
+            cells.append(CalendarCell(dateStr: dateStr, day: d, isToday: isToday, isChecked: isChecked, isMakeup: isMakeup, isFuture: isFuture))
+        }
+
+        return cells
+    }
+
+    @ViewBuilder
+    private func calendarDayCell(_ cell: CalendarCell) -> some View {
+        if cell.dateStr.isEmpty {
+            Color.clear.frame(width: 34, height: 34)
+        } else {
+            Button {
+                if !cell.isChecked && !cell.isToday && !cell.isFuture && makeupPackCount > 0 {
+                    showMakeupConfirm = cell.dateStr
+                }
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(cellFillColor(cell))
+                        .frame(width: 34, height: 34)
+                        .overlay(
+                            Circle().strokeBorder(
+                                cell.isToday ? Color.goLime : .clear, lineWidth: 1.5
+                            )
+                        )
+                    if cell.isChecked {
+                        if cell.isMakeup {
+                            // 补签：用不同图标区分
+                            Image(systemName: "arrow.uturn.backward")
+                                .font(.system(size: 9, weight: .black))
+                                .foregroundStyle(.black.opacity(0.7))
+                        } else {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 10, weight: .black))
+                                .foregroundStyle(.black)
+                        }
+                    } else {
+                        Text("\(cell.day)")
+                            .font(.system(size: 11, weight: cell.isToday ? .black : .medium, design: .rounded))
+                            .foregroundStyle(
+                                cell.isFuture ? .white.opacity(0.15) :
+                                cell.isToday ? Color.goLime : .white.opacity(0.4)
+                            )
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(cell.isChecked || cell.isToday || cell.isFuture || makeupPackCount == 0)
+        }
+    }
+
+    private func cellFillColor(_ cell: CalendarCell) -> Color {
+        if cell.isChecked && cell.isMakeup {
+            return Color.goYellow.opacity(0.85) // 补签用黄色
+        } else if cell.isChecked {
+            return Color.goLime // 正常打卡用青柠
+        } else if cell.isToday {
+            return Color.goLime.opacity(0.22)
+        } else {
+            return Color.white.opacity(0.05)
+        }
+    }
+
+    private func monthYearString(_ date: Date) -> String {
+        let cal = Calendar.current
+        let y = cal.component(.year, from: date)
+        let m = cal.component(.month, from: date)
+        return "\(y) 年 \(m) 月"
+    }
+
     // MARK: - 打卡工具函数
 
     private func todayStr() -> String {
         let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"; return fmt.string(from: Date())
-    }
-
-    private func last30Days() -> [String] {
-        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
-        let cal = Calendar.current
-        return (0..<30).reversed().compactMap { offset in
-            cal.date(byAdding: .day, value: -offset, to: Date()).map { fmt.string(from: $0) }
-        }
-    }
-
-    private func dayNumber(from dateStr: String) -> String {
-        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
-        guard let d = fmt.date(from: dateStr) else { return "" }
-        return "\(Calendar.current.component(.day, from: d))"
     }
 
     private var currentStreak: Int {
@@ -545,9 +703,47 @@ struct OasisRewardView: View {
         return streak
     }
 
+    private var longestStreak: Int {
+        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+        let cal = Calendar.current
+        let sorted = checkedInDates.compactMap { fmt.date(from: $0) }.sorted()
+        guard !sorted.isEmpty else { return 0 }
+        var longest = 1, current = 1
+        for i in 1..<sorted.count {
+            if let expected = cal.date(byAdding: .day, value: 1, to: sorted[i-1]),
+               cal.isDate(expected, inSameDayAs: sorted[i]) {
+                current += 1
+                longest = max(longest, current)
+            } else {
+                current = 1
+            }
+        }
+        return longest
+    }
+
+    private var monthCheckInRate: Int {
+        let cal = Calendar.current
+        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+        let today = Date()
+        let comps = cal.dateComponents([.year, .month], from: today)
+        guard let firstOfMonth = cal.date(from: comps) else { return 0 }
+        let dayOfMonth = cal.component(.day, from: today)
+        var count = 0
+        for d in 0..<dayOfMonth {
+            if let date = cal.date(byAdding: .day, value: d, to: firstOfMonth) {
+                let s = fmt.string(from: date)
+                if checkedInDates.contains(s) { count += 1 }
+            }
+        }
+        return dayOfMonth > 0 ? Int(Double(count) / Double(dayOfMonth) * 100) : 0
+    }
+
     private func loadCheckInData() {
         if let arr = UserDefaults.standard.stringArray(forKey: checkedInKey) {
             checkedInDates = Set(arr)
+        }
+        if let arr = UserDefaults.standard.stringArray(forKey: makeupDatesKey) {
+            makeupDates = Set(arr)
         }
         makeupPackCount = UserDefaults.standard.integer(forKey: makeupPackKey)
     }
@@ -566,8 +762,16 @@ struct OasisRewardView: View {
         makeupPackCount -= 1
         UserDefaults.standard.set(makeupPackCount, forKey: makeupPackKey)
         checkedInDates.insert(date)
+        makeupDates.insert(date)
         UserDefaults.standard.set(Array(checkedInDates), forKey: checkedInKey)
+        UserDefaults.standard.set(Array(makeupDates), forKey: makeupDatesKey)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    private func claimMilestone(_ days: Int, reward: Int, emoji: String) {
+        QuestManager.shared.addCoconuts(reward, emoji: emoji, title: "\(days)天连胜奖励")
+        lastClaimedMilestone = days
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     // MARK: - Bento Grid

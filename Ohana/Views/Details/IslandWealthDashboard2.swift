@@ -19,7 +19,7 @@ struct IslandWealthDashboardView: View {
 
     // 宠物 id → 主题色 映射（传给 ViewModel）
     private var petColorMap: [String: Color] {
-        Dictionary(uniqueKeysWithValues: pets.map { ($0.id.uuidString, $0.themeColor.color) })
+        Dictionary(uniqueKeysWithValues: pets.map { ($0.id.uuidString, Color(hex: $0.themeColorHex)) })
     }
 
     var body: some View {
@@ -31,7 +31,7 @@ struct IslandWealthDashboardView: View {
             // ── L1: 图表区（上半屏） ──────────────────────────────────
             VStack(spacing: 0) {
                 chartArea
-                    .padding(.top, 80)
+                    .padding(.top, 120)
                 Spacer()
             }
 
@@ -58,28 +58,54 @@ struct IslandWealthDashboardView: View {
 
     // MARK: - Floating Nav Bar
     private var navBar: some View {
-        HStack {
-            Button { dismiss() } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 16, weight: .bold))
+        VStack(spacing: 0) {
+            HStack {
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 36, height: 36)
+                        .background(.white.opacity(0.12), in: Circle())
+                }
+                Spacer()
+                Text("Ohana财富")
+                    .font(.system(size: 17, weight: .black, design: .rounded))
                     .foregroundStyle(.primary)
-                    .frame(width: 38, height: 38)
-                    .background(.white.opacity(0.12), in: Circle())
+                Spacer()
+                // 系统椰子过滤开关
+                Button {
+                    withAnimation(.spring(response: 0.3)) {
+                        vm.showSystemCoconuts.toggle()
+                    }
+                } label: {
+                    Image(systemName: vm.showSystemCoconuts ? "gearshape.fill" : "gearshape")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(vm.showSystemCoconuts ? Color.goLime : .primary.opacity(0.4))
+                        .frame(width: 36, height: 36)
+                        .background(.white.opacity(0.12), in: Circle())
+                }
+                .buttonStyle(.plain)
+                CoconutBalanceCapsule { showingCoconutLog = true }
             }
-            Spacer()
-            Text("欧哈纳财富")
-                .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
-            Spacer()
-            CoconutBalanceCapsule { showingCoconutLog = true }
+            .padding(.horizontal, 20)
+            .padding(.top, 56)
+            .padding(.bottom, 12)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 60)
+        .background(.ultraThinMaterial.opacity(0.01))
     }
 
     // MARK: - Chart Area
     private var chartArea: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // 时间 filter
+            Picker("", selection: $vm.timeRange) {
+                ForEach(WealthTimeRange.allCases) { r in
+                    Text(r.rawValue).tag(r)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 4)
+
             if vm.chartBars.isEmpty {
                 emptyChart
             } else {
@@ -180,19 +206,6 @@ struct IslandWealthDashboardView: View {
                 .fill(Color.black.opacity(0.15))
                 .frame(width: 36, height: 4)
                 .padding(.top, 12)
-
-            // 时间范围选择器（直接开头，无冗余标题）
-            HStack {
-                Picker("", selection: $vm.timeRange) {
-                    ForEach(WealthTimeRange.allCases) { r in
-                        Text(r.rawValue).tag(r)
-                    }
-                }
-                .pickerStyle(.segmented)
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 16)
-            .padding(.bottom, 12)
 
             // 全岛总资产（大数字）
             HStack(alignment: .firstTextBaseline, spacing: 6) {

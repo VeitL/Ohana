@@ -23,7 +23,7 @@ struct QuickPottySheet: View {
                 // 标题
                 HStack {
                     Text("噗噗打卡")
-                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .font(OhanaFont.title3(.black))
                         .foregroundStyle(.primary)
                     Spacer()
                     Button { dismiss() } label: {
@@ -36,19 +36,19 @@ struct QuickPottySheet: View {
                 .padding(.horizontal, 20).padding(.top, 20)
 
                 // 类型选择
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     ForEach(PottyType.allCases, id: \.rawValue) { type in
                         Button { selectedType = type } label: {
-                            VStack(spacing: 6) {
-                                Text(type.emoji).font(.system(size: 28))
+                            VStack(spacing: 8) {
+                                Text(type.emoji).font(.system(size: 32))
                                 Text(type.rawValue)
-                                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                                    .foregroundStyle(selectedType == type ? Color.arkInk : .white.opacity(0.5))
+                                    .font(OhanaFont.caption(.bold))
+                                    .foregroundStyle(selectedType == type ? Color.arkInk : .primary.opacity(0.4))
                             }
-                            .frame(maxWidth: .infinity).padding(.vertical, 12)
+                            .frame(maxWidth: .infinity).padding(.vertical, 16)
                             .background(selectedType == type ? Color.goYellow : .white.opacity(0.07),
-                                        in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 .strokeBorder(selectedType == type ? Color.goYellow.opacity(0.6) : .white.opacity(0.1), lineWidth: 1))
                         }
                         .buttonStyle(.plain)
@@ -57,15 +57,17 @@ struct QuickPottySheet: View {
                 .padding(.horizontal, 20)
 
                 // 时间选择
-                HStack {
-                    Text("时间")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.5))
-                    Spacer()
-                    DatePicker("", selection: $date, displayedComponents: [.hourAndMinute])
-                        .labelsHidden()
-                        .colorScheme(.dark)
-                        .tint(Color.goYellow)
+                UltimateGlassCard {
+                    HStack {
+                        Text("记录时间")
+                            .font(OhanaFont.footnote(.bold))
+                            .foregroundStyle(.primary.opacity(0.4))
+                        Spacer()
+                        DatePicker("", selection: $date, displayedComponents: [.hourAndMinute])
+                            .labelsHidden()
+                            .tint(Color.goYellow)
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 10)
                 }
                 .padding(.horizontal, 20)
 
@@ -74,11 +76,11 @@ struct QuickPottySheet: View {
                     HStack(spacing: 8) {
                         Text(selectedType.emoji).font(.system(size: 16))
                         Text("记录 \(selectedType.rawValue)")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(.black)
+                            .font(OhanaFont.headline(.black))
                     }
+                    .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity).padding(.vertical, 14)
-                    .background(Color.goYellow, in: RoundedRectangle(cornerRadius: 14))
+                    .background(Color.goYellow, in: Capsule())
                 }
                 .buttonStyle(.plain)
                 .padding(.horizontal, 20)

@@ -1,6 +1,192 @@
 # Ohana App 开发进度
 
-> 最后更新: 2026-03-09 | Schema: ArkSchemaV20 | Phase 1-77 + TASK 1-7 + FIX 1-8 + UIUX 1-6 + BUG FIX 11项 + 深度修复 P1-P15 全部完成
+> 最后更新: 2026-03-15 | Schema: ArkSchemaV22 | Phase 1-77 + 第二十章～第三十二章完成
+
+## 第三十三章 UI 规范化系统 & 全岛体重过滤修复（2026-03-15）
+
+| ID | 内容 | 修复文件 | 说明 |
+|----|------|----------|------|
+| UI-SHORTHAND | iOS 26 设计口号系统 | `iOS26_Design_Guide.md` | 新增第十四章「Ohana 背景口号系统」，定义四种标准背景：卡片标准背景（UltimateGlassCard 8层折射）、玻璃背景（.glassEffect 原生API）、内嵌背景（.white.opacity(0.08)）、纯色背景（实色CTA），附详细参数和使用决策树 |
+| UI-TEST-DEMO | iOS 26 UI 测试页背景对比 | `iOS26UITestView.swift` | 新增 `cardBackgroundComparison` 卡片，展示四种背景口号的实际效果：生命之树卡片、Dock栏+胶囊+圆形按钮、内嵌 Bento 格、主要按钮+危险操作 |
+| BATCH-GRID-UI | 一键全家改为网格布局 | `OverviewView.swift` | 将 `batchCheckInBar` 从玻璃胶囊条重构为与快捷操作一致的网格布局：标题+管理按钮+LazyVGrid(4列)；`batchGridCell` 匹配 `GoQuickActionCard` 视觉（无背景icon、打卡后goLime、subtitle显示"已完成"/"全家"）；删除死代码 `batchBentoCell` |
+| WEIGHT-HUMAN-FILTER | 全岛体重过滤已关闭人类 | `IslandWeightDashboard.swift` | 新增 `visibleHumans` 计算属性过滤 `shouldShowOnHome==false` 的人类；`totalIslandWeightKg`、`buildSparklineEntries()`、`vm.load()` 三处均使用 `visibleHumans` 替代 `humans`，确保隐藏人类不出现在体重统计中 |
+
+## 第三十二章 UI/UX 精修 & Bug 修复（2026-03-15）
+
+| ID | 内容 | 修复文件 | 说明 |
+|----|------|----------|------|
+| BATCH-GLOW | 一键全家按钮打卡后保持荧光 | `OverviewView.swift` | `batchPillButton` / `batchBentoCell` 新增 `isBatchDoneToday` 判断，打卡完成后 isHighlighted 保持高亮（goLime 背景/黑色文字），不再只在动画期间高亮 |
+| FLIP-MIRROR | 修复卡片翻转镜像 bug | `ArkCrewIDCardView.swift`, `CritterDeckCarousel.swift` | 背面卡使用 `scaleEffect(x: -1, y: 1)` 替代 `rotation3DEffect(.degrees(180))`，避免镜像闪烁；延迟 0.18s 切换正反面 opacity |
+| COCONUT-BTN | 日历页椰子按钮完整显示 | `OhanaDesignSystem.swift` | `CoconutBalanceCapsule` 添加 `.fixedSize(horizontal: true, vertical: false)` 防止父容器压缩截断 |
+| MED-FREEZE | 修复人类详情页吃药提醒卡死 | `HumanMedicationView.swift` | 移除整个视图级别的 `.animation()` 修饰符，toast 动画改由显式 `withAnimation` 控制 |
+| HUMAN-UI-GLASS | 人类详情页卡片改为 glassEffect | `HumanDetailView.swift` | 所有 `UltimateGlassCard` 替换为 `.glassEffect(.regular, in: RoundedRectangle(...))` 与首页 BentoStatCard 风格一致；statsBento mini 卡片同步迁移 |
+| CREW-CARD-MINI | Ohana Crew 卡片等比缩小 | `CrewRosterOverlay.swift` | `PetSquareCard` 改为首页 `posterFront` 等比缩小版：蓝色渐变底 + 橙红大字 + 左侧头像（透明抠图/普通照片羽化/剪影三种方案）；去掉所有文字；宽高比从 1:1 改为 1.586:1 |
+| EXPENSE-EMPTY-PIE | 全岛花费页无数据显示 pie chart | `IslandExpenseDashboard.swift` | `expenseFloatingHeader` 无论有无数据都显示 pie chart 区域；无数据时显示灰色空心环 + "暂无数据" 文字 + 右侧引导文案 |
+| BATCH-ICON-ONLY | 批量打卡仅图标变色 | `OverviewView.swift` | `batchBentoCell` 修改为打卡后仅图标和文字变色（goLime），卡片背景保持不变，避免视觉干扰 |
+| WALK-LIVE-PANEL | 遛狗中显示实时面板 | `ArkCrewIDCardView.swift` | 卡片背面在 `isActiveWalk` 时显示 `walkLivePanel` 替代普通仪表盘，已应用 `.glassEffect` |
+| CARD-FLIP-SPRING | 卡片翻转动画优化 | `ArkCrewIDCardView.swift` | 使用 `spring(response:0.5,dampingFraction:0.82)` 替代 `easeInOut`，延迟 0.22s 切换正反面，提升物理感 |
+| ISLAND-STATS-CLEAN | 岛屿统计布局清理 | `OverviewView.swift`, `IslandStatComponents.swift` | 移除财富榜前多余分隔线；财富榜显示从 Top 4 改为 Top 3 |
+| PET-SILHOUETTE-HALF | 宠物剪影缩小一半 | `CrewRosterOverlay.swift` | `PetSilhouetteView` 缩放从 0.82 改为 0.42，避免视觉过重 |
+| HUMAN-SHOW-RENAME | 人类显示开关重命名 | `HumanDetailView.swift`, `OverviewView.swift` | "在首页卡堆显示" 改为 "在首页显示"；隐藏时从岛屿体重统计头像中排除 |
+| WEALTH-SYSTEM-TOGGLE | 财富页系统椰子开关 | `IslandWealthViewModel2.swift`, `IslandWealthDashboard2.swift` | 添加 `showSystemCoconuts` 开关，过滤图表中系统生成的椰子记录 |
+| NAN-COREGRAPHICS | NaN 渲染错误修复 | `HumanDetailView.swift`, `CoHealthDashboardView.swift` | 所有权重显示添加 `.isFinite` 检查，防止 NaN 导致 CoreGraphics 崩溃 |
+| MEDICATION-CRASH | 吃药提醒导航崩溃修复 | `HumanDetailView.swift` | 将 `navigationDestination` 改为 `.sheet`，避免多导航目标冲突 |
+
+## 第三十一章 Header 重构 & 打卡连击修复 & 身体检测报告（2026-03-15）
+
+| ID | 内容 | 修复文件 | 说明 |
+|----|------|----------|------|
+| HDR-REFACTOR | 全局 Header 去背景 + 按 tab 定制按钮 | `OverviewView.swift`, `CalendarView.swift`, `CrewRosterOverlay.swift`, `OasisRewardView.swift` | 移除 header 半透背景；首页保留椰子+头像菜单；日历：视图切换+添加日程+椰子；图鉴：搜索+添加岛民+椰子；绿洲：规则+百宝箱+椰子。子视图新增 `hideToolbar`+trigger 参数，@AppStorage 共享 viewMode |
+| MAKEUP-COUNT | 补签卡包购买数量 bug | `CoconutShopView.swift` | 购买1个补签包从 +3 改为 +1 |
+| MAKEUP-REFRESH | 购买补签卡后立即刷新 | `DailyStreakDetailView.swift` | `.onChange(of: showCoconutShop)` 关闭商店时重载打卡数据 |
+| MAKEUP-STATS | 补签后顶部卡片统计不更新 | `DailyStreakDetailView.swift` | 顶部卡片从 `loginStreak` 改为 `currentStreak`（含补签），里程碑进度条同步 |
+| MAKEUP-POS | 补签确认框位置太高 | `DailyStreakDetailView.swift` | 从 `.confirmationDialog` 改为 `.alert`，居中显示 |
+| STREAK-REWARD | 连胜奖励不消失+金额太少 | `DailyStreakDetailView.swift`, `OasisRewardView.swift` | `@AppStorage("checkIn_lastClaimedMilestone")` 替代 UserDefaults 直接读写，领取后 UI 即时刷新；奖励从 3/5/10/20/50 提升至 10/25/60/150/300 |
+| STREAK-COCONUT | 打卡连击页显示椰子按钮 | `DailyStreakDetailView.swift` | toolbar 加入 `CoconutBalanceCapsule` + 椰子日志 sheet |
+| HEALTH-REPORT | 身体检测报告功能 | `HumanHealthReport.swift`(新), `HumanHealthReportView.swift`(新), `HumanDetailView.swift`, `SharedModelContainer.swift` | 新增 `HumanHealthReport` SwiftData 模型（9种报告类型 + 4级结论）；`HumanHealthReportView` 列表+添加/编辑；Schema 升级至 ArkSchemaV22 |
+
+### 待做
+
+| ID | 内容 | 优先级 |
+|----|------|--------|
+| i18n-full | 多语言支持全量接入 | 高 |
+
+## 第三十章 UI/动画优化 & 批量打卡修复 & 卡片布局重构（2026-03-15）
+
+| ID | 内容 | 修复文件 | 说明 |
+|----|------|----------|------|
+| CHART-PERF | 图表动画去卡顿 | `IslandStatComponents.swift` | MiniBarChart / MultiPetExpenseBar / MiniRingChart 的 `playAnimation()` 从 `spring(response:0.6)` 改为轻量 `easeOut(duration:0.28~0.3)`，减少 GPU 弹性计算开销 |
+| CHART-REVEAL | 补完剩余图表 reveal 动画 | `CoHealthDashboardView.swift`, `PetHealthDetailView.swift` | 体重对比 Chart 和健康散点 Chart 新增 `chartRevealProgress` / `scatterRevealProgress` 状态 + 从左到右 mask reveal 动画（easeOut 0.38~0.42s） |
+| BATCH-TOAST | 批量打卡 toast 椰子数一致 | `OverviewView.swift` | `performBatchAction` 计算真实 `coconutDelta` 后调 `showBatchToast("全家X +N🥥", emoji:"🥥")`，不再使用静态 `action.toastMessage`；`showBatchToast` 新增 `emoji` 参数 + 防覆盖逻辑 |
+| BATCH-ICON | 批量打卡 icon 变色 | `OverviewView.swift` | `batchPillButton` / `batchBentoCell` 高亮时间从 0.35~0.6s 延长到 1.1s，先设 `batchPressedId` 再异步执行 `performBatchAction`，确保用户看到 goLime 变色反馈 |
+| CARD-LAYOUT | 首页卡片布局重构 | `ArkCrewIDCardView.swift` | `posterFront` 重写：背景大字移到上半居中，头像 `posterSubjectLayer` 贴左半边缘（透明抠图/普通照片/剪影三种方案均居左），文字信息列右对齐 |
+| CARD-FLIP | 翻转动画物理化 | `ArkCrewIDCardView.swift` | `rotation3DEffect` 加 `perspective: 0.4` 透视感，动画从 `spring(response:0.6)` 改为 `easeInOut(duration:0.4)`，模拟真实翻卡 |
+| CREW-GRID | Ohana Crew 两列小卡 | `CrewRosterOverlay.swift` | `BentoPetGrid` / `BentoHumanGrid` 改为 `LazyVGrid` 两列；`PetSquareCard` / `HumanSquareCard` 改为紧凑小卡（120pt 头像区 + 名字），单击直接触发 `onSelect` 进详情，长按删除保留 |
+
+## 第二十九章 首页海报卡精修 & Crew 卡片统一（2026-03-15）
+
+| ID | 内容 | 修复文件 | 说明 |
+|----|------|----------|------|
+| CARD-POSTER-REFINE | 首页海报卡背景字/锚点精修 | `ArkCrewIDCardView.swift` | `posterFront` 的背景大字改为仅显示宠物名，不再叠第二行物种/品种字；底部信息锚点保留条码区，移除右下圆形 seal，使版面更干净 |
+| CARD-PHOTO-BLEND | 普通照片与海报卡背景融合优化 | `ArkCrewIDCardView.swift` | 普通照片主体由“独立圆角照片块”改为“模糊氛围底 + 羽化主体图层”双层方案，通过横向渐隐 mask、轻微 screen 高光和主题色混合，让图片更自然融入蓝色海报底 |
+| CREW-CARD-UNIFY | Ohana Crew 卡片与首页统一 | `CrewRosterOverlay.swift`, `CritterDeckCarousel.swift`, `ArkCrewIDCardView.swift` | `CrewRosterOverlay` 的宠物/人类区不再维护旧的 square card 视觉分支，直接复用 `ArkCrewIDCardView` / `HumanIDCardView`，从而与首页保持一致的海报卡 UI 和后续演进链路 |
+
+## 第二十八章 宠物卡片 GO 海报化重设计（2026-03-15）
+
+| ID | 内容 | 修复文件 | 说明 |
+|----|------|----------|------|
+| CARD-POSTER | 宠物卡正面改版为 GO 海报卡 | `ArkCrewIDCardView.swift` | `cardFrontView` 非 minimal 分支统一切到 `posterFront(geo:avatarImage:isTransparent:)`；采用蓝底 + 橙红超大背景字（宠物名/物种）+ 中右主视觉主体 + 左下信息锚点布局；大数字主信息固定为 `daysTogether`，副文案为年龄/品种；底部加入条码区与圆形 seal，整体风格参考 GO 运动卡片 |
+| CARD-SUBJECT | 无头像/有头像主视觉统一 | `ArkCrewIDCardView.swift`, `PetSilhouetteView.swift` | 透明 PNG 头像使用贴纸白边主体；普通照片使用右侧倾斜圆角图卡；无头像时改用 `PetSilhouetteView` 作为主角色，不再退化为简单 emoji |
+| CARD-PAGE | 首页卡片切换方式重构 | `CritterDeckCarousel.swift` | 从纵向轮盘式卡组改为横向分页 `TabView(.page)` 焦点卡；保留底部分页指示器和“全部成员”入口；`activeIndex` 切换时自动重置翻面状态，并同步 `onTopCardChanged` |
+| CARD-UX | 卡片排列策略升级 | `CritterDeckCarousel.swift`, `OverviewView.swift` | 首页采用“单卡聚焦 + 分页点 + 次级全部入口”的层级，不再让上下叠卡分散注意力；更适合宠物大图、海报字和强主视觉展示 |
+
+## 第二十七章 打卡日历完善 & 全局固定前置层 & i18n 基础设施（2026-03-11）
+
+| ID | 内容 | 修复文件 | 说明 |
+|----|------|----------|------|
+| R6 | 全局固定前置层 | `OverviewView.swift`, `CalendarView.swift`, `CrewRosterOverlay.swift`, `OasisRewardView.swift` | 新增 `globalFixedHeader` glass overlay 覆盖 4 个 tab，动态标题/菜单；子视图隐藏原生 navigationBar，添加顶部占位间距；CalendarView 工具栏移入 body；CrewRosterOverlay 添加按钮移入搜索栏旁；OasisRewardView 去掉冗余 header |
+| i18n-base | 多语言基础设施 | `Localization.swift`(新), `OverviewView.swift`, `OverviewHelperViews.swift` | 新建 `L10n` struct，100+ 翻译 key（tab/greeting/settings/pet/human/calendar/common）；OverviewView globalFixedHeader 接入 L10n；FloatingDockNav tab 标签本地化 |
+| CK-FIX | 补签包 key 不匹配 bug | `OasisRewardView.swift` | `makeupPackKey` 从 `oasis_makeup_pack_count` 改为 `inventory_backdate_1day_count`（与椰子商店 `CoconutShopView.activateBoost` 统一） |
+| CK-CAL | 打卡日历月视图重写 | `OasisRewardView.swift` | 新增 `CalendarCell` 模型 + `monthCalendarCells(for:)` 按星期正确对齐；月份导航（上/下月切换，禁止翻到未来月）；`calendarDayCell` 支持补签视觉区分（黄色 + 回退图标 vs 青柠 + 勾） |
+| CK-STATS | 打卡统计面板 | `OasisRewardView.swift` | 新增 `checkInStatsRow`（总打卡/当前连胜/最长连胜/本月打卡率 4 格），各配独立 SF Symbol + 彩色 |
+| CK-MILE | 连续打卡里程碑奖励 | `OasisRewardView.swift` | 新增 `checkInMilestoneRow`，5 档里程碑（7天+3🥥 / 14天+5🥥 / 30天+10🥥 / 60天+20🥥 / 100天+50🥥）；可领取时显示 goLime 按钮；`claimMilestone` 发放椰子 |
+| CK-MAKEUP | 补签日期独立记录 | `OasisRewardView.swift` | 新增 `makeupDates: Set<String>` + `makeupDatesKey`；`applyMakeup` 同时写入 checkedInDates 和 makeupDates；补签包不足时显示"去商店购买 →"按钮跳转椰子商店 |
+| CK-BENTO | 绿洲 Bento 打卡入口 | `OasisRewardView.swift` | `oasisBentoGrid` 新增第三行全宽打卡日历卡（显示连胜/总天数），点击打开打卡日历 sheet |
+
+### 待做
+
+| ID | 内容 | 优先级 |
+|----|------|--------|
+| i18n-full | 多语言支持全量接入（PetDetailView/HumanDetailView/SettingsView/CalendarView 等） | 高 |
+
+## 第二十六章 详情页 UI 优化 & 背景系统 & ArkBackgroundView 重构（2026-03-11）
+
+| ID | 内容 | 修复文件 | 说明 |
+|----|------|----------|------|
+| BG | 背景系统重构 | `ArkBackgroundView.swift`, `SettingsView.swift` | 新增 `AppBackgroundStyle` 枚举（goDefault/deepAmbient/aurora/midnight 四种风格）；每种风格独立 View 组件（GoDefaultBackground/DeepAmbientBackground/AuroraBackground/MidnightBackground）；通过 `@AppStorage("appBackgroundStyle")` 持久化切换；设置页新增横滚背景风格预览卡（`BackgroundStyleCard`），goLime 选中高亮 |
+| PD-UI | 宠物详情页 Hero 增强 | `PetDetailView.swift` | PetHeroRow 无头像时使用 `PetSilhouetteView` 作为 fallback（根据 pet.coatColor/eyeColor 着色）；头像遮罩优化（130px、0.85渐变边界）；hero 高度 140→152，圆角 20→24；工具栏按钮增加彩色图标区分（编辑 goLime / 日历 goCardCyan / 寄养卡 goYellow） |
+| HD-UI | 人类详情页 UI 现代化 | `HumanDetailView.swift` | heroCard 从 UltimateGlassCard 改为渐变卡片（themeColor→goDarkBlue）+ 装饰光球；头像区域改为白色半透明底 + emoji；Stats Bento 从横排单行改为 4 个独立 UltimateGlassCard 迷你卡（带 SF Symbol 图标）；Section Header 增加 goLime 竖线装饰 + 加大 tracking |
+| AUR-FIX | AuroraBackground 类型修复 | `ArkBackgroundView.swift` | 修复 CGFloat/Double 歧义：`.degrees()` 参数包裹 `Double()` 显式转换 |
+
+### 待做
+
+| ID | 内容 | 优先级 |
+|----|------|--------|
+| R6 | 全局固定前置层（透明玻璃背景，4个页面保持不动） | 高 |
+| i18n | 多语言支持(中英)：设置切换全局语言，'ohana'不翻译 | 高 |
+
+## 第二十五章 Pet Silhouette 精修 & UI 全面优化（2026-03-11）
+
+| ID | 内容 | 修复文件 | 说明 |
+|----|------|----------|------|
+| R1 | 交互式颜色选择（点击剪影选色） | `AddPetWizardView.swift` | `stepAppearance` 完全重写：新增 `showCoatSheet`/`showEyeSheet` 状态；`PetSilhouetteView` 新增 `onTapCoat`/`onTapEye` 闭包；点击身体→毛色选择 sheet，点击眼睛→瞳色选择 sheet；新增 `ColorPickerSheet` 内嵌结构体（5列圆形色格 + 颜色名 + 自定义）|
+| R2 | PetSilhouetteView 视觉修复 | `PetSilhouetteView.swift` | 猫耳嵌入头部不再分离；五官下移；狗眼间距缩小；添加眨眼/耳朵摇摆/狗舌头动画 |
+| R3 | PetBreedDatabase 颜色数据补全 | `PetBreedDatabase.swift` | 全面替换 dogBreeds/catBreeds 颜色数据为精确 hex；genericCoatColors 新增深灰/浅灰/红棕等；genericEyeColors 新增冰蓝/翠绿/红色等；所有品种使用品种专属 `CoatColor`/`EyeColor` 实例（不再用字符串 coats()/eyes() helper） |
+| R4 | 快捷操作添加页 icon 去背景 + 页面缩小 | `OverviewQuickActions.swift` | icon 去掉彩色圆角背景，改为纯彩色 icon（28pt）+ 标签；按下时仅有 0.1 透明度背景反馈；`presentationDetents` 改为 `.height(380)` 优先 |
+| R5 | 一键打卡 UI 无背景+goLime高亮 | `OverviewView.swift` | `batchPillButton` 重写为 emoji + 文字纵排，默认文字灰色无背景，点击瞬间 goLime 高亮 + 圆角矩形背景，0.6s 后淡出 |
+| R6 | 首页 header Liquid Glass | `OverviewView.swift` | `goGreetingHeader` 添加 `.background(.ultraThinMaterial.opacity(0.7))` 圆角毛玻璃背景，与 docker 视觉一致 |
+| R7 | 全局椰子数卡片 goLime 背景 | `OhanaDesignSystem.swift` | `CoconutBalanceCapsule` 背景从 `.ultraThinMaterial` + goYellow 边框改为纯 `Color.goLime`，文字黑色 |
+| R8 | QA体重卡片/图表确认 | `ArkCrewIDCardView.swift` | 确认体重 sparkline 已使用 `pt.weight` 实际体重曲线；`glanceSubtitle` 已显示最新体重值（`"%.1f kg"`）；无需修改 |
+| R9 | 财富页 navBar 与 filter 不重叠 | `IslandWealthDashboard2.swift` | `navBar` 统一使用 VStack + `padding(.top, 56)`；`chartArea` padding(.top) 改为 120 确保 filter 不被遮挡 |
+| R10 | 花费页 Bento 卡片去彩色背景 | `IslandExpenseDashboard.swift` | `topPetCard`/`topCategoryCard` 去掉 RadialGradient 彩色背景和彩色边框，改为 `.white.opacity(0.06)` 半透明深色统一风格 |
+
+### 待做
+
+| ID | 内容 | 优先级 |
+|----|------|--------|
+| R11 | 全局顶部 header（固定位置+切换动效）| 低（复杂架构改动，评估中）|
+| F8 | 宠物卡背面信息去掉从上到下动画，直接显示 | 中 |
+| F9 | 宠物详情页 UI 按 iOS26_Design_Guide.md 更新 | 中 |
+
+## 第二十四章 Bug Fix & 新功能（2026-03-11）
+
+| ID | 问题 | 修复文件 | 说明 |
+|----|------|----------|------|
+| F6 | 财富页更名+导航改 fullScreenCover | `IslandWealthDashboard2.swift`, `IslandStatComponents.swift`, `OverviewView.swift` | navBar 标题改为"Ohana财富"；`CoconutWealthRankingCard` 从 `NavigationLink` 改为 `Button + onTap` 回调；OverviewView 新增 `showIslandWealth` 状态 + fullScreenCover 展示；宠物主题色已在之前 session 中通过 `Color(hex:)` 修正 |
+| F7 | 快捷操作体重弹窗卡片太小 | `OverviewView.swift` | `QuickWeightSheet` 的 `.presentationDetents` 从 `.height(280)` 改为 `[.medium, .large]`，标题和内容完整显示 |
+| F11 | 毛色/瞳色选择页互动宠物剪影 | `PetSilhouetteView.swift`(新), `AddPetWizardView.swift` | 新建 `PetSilhouetteView` 组件，用 SwiftUI Path 绘制猫/狗/通用剪影（身体+耳朵+眼睛+面部细节），支持眨眼/耳朵摇摆/狗舌头伸缩动画；`stepAppearance` 顶部加入实时预览，选毛色/瞳色即时变化颜色；新增 `resolvedCoatColor`/`resolvedEyeColor` 计算属性将颜色名映射为 Color |
+
+### 待做
+
+| ID | 内容 | 优先级 |
+|----|------|--------|
+| F8 | 一键打卡无椰子动画+UI改为无背景icon+打卡变色+显示已打卡次数 | 中 |
+| F9 | 宠物卡背面信息去掉从上到下动画，直接显示 | 中 |
+| F10 | 宠物详情页UI按iOS26_Design_Guide.md更新 | 中 |
+
+## 第二十三章 Bug Fix & UX 优化（2026-03-11）
+
+| ID | 问题 | 修复文件 | 说明 |
+|----|------|----------|------|
+| E1 | 日历左滑即删（未确认就删除） | `SwipeableEventRow.swift` | 右滑改为调 `pendingDelete()`：回弹到原位 + 弹 `confirmationDialog`；确认后才调 `triggerDelete()` 真正删除；重复事件显示"删除此条 / 删除此条及之后" |
+| E2 | 快捷操作无法便捷添加 | `OverviewView.swift`, `OverviewQuickActions.swift` | 标题行右上角新增 `+` 圆角按钮（glassEffect），点击弹 `AddQuickActionSheet`；已满8个时 sheet 内显示提示卡（暂无法添加，先移除再添加）；删除旧的 Grid 内"添加/管理"占位按钮 |
+| E3 | 体重弹窗标题无宠物名 | — | 确认 `QuickWeightSheet` 顶部已包含 `pet.name`，无需修改 |
+| E4 | 宠物卡片详情进健康页 | `OverviewView.swift` | `CritterDeckCarousel` 的 `onSelectPet` 回调改为先重置 `selectedPetTab = .overview` 再设 `selectedPet`，避免残留 `.health` 状态 |
+| E5 | Island Stats 体重页无悬浮 chart | `IslandWeightDashboard.swift` | 去掉旧 `weightTrendCard` 卡片容器，新增 `weightFloatingChart`（时间 filter + 悬浮折线图）；新增 `filteredWeightDeltas` / `filteredSeriesByName` 计算属性支持时间筛选 |
+| E6 | Island Stats 探索页无悬浮 chart | `IslandExplorationDashboard.swift` | `heroDisplay` 去掉背景卡片改为悬浮样式，在大数字下方内嵌 Chart 堆叠柱状图（和首页一致），时间 filter 在最上方 |
+| E7 | Island Stats 花费页 chart 渐变色/有冗余饼图 | `IslandExpenseDashboard.swift`, `IslandStatComponents.swift` | 首页 `MultiPetExpenseBar` 改为纯色填充（去渐变）；花费页新增 `expenseFloatingHeader`（时间filter + 大数字 + 悬浮 pie chart，独立蓝绿橙紫粉灰色系）；删除底部 `categoryDonutCard` |
+| E8 | Island Stats 财富页 filter 在底部卡 | `IslandWealthDashboard2.swift` | 时间 filter 从 `bottomCard` 移到 `chartArea` 上方（filter → chart 顺序），chart 颜色已使用宠物主题色（`petColorMap`） |
+
+## 第二十二章 Bug Fix & UX 优化（2026-03-11）
+
+| ID | 问题 | 修复文件 | 说明 |
+|----|------|----------|------|
+| D1 | 日历列表视图不展开重复事件 | `CalendarView.swift` | 新增 `expandedOccurrences` 计算属性，按 `recurrenceDays` 展开为虚拟出现；列表视图改用此数据源按 `occurrenceDate` 分组，范围：前后各3个月 |
+| D2 | 快捷操作已满8个时无法添加/管理 | `OverviewView.swift` | 未满8个显示"添加"按钮，已满8个改为青柠色"管理"按钮（`slider.horizontal.3` 图标）点击弹出 `QAManageSheet` |
+| D3 | 体重弹窗背景不够透明 | `QuickWeightSheet.swift` | 改用 `.ultraThinMaterial` + `.presentationBackground(.clear)`，可透过看到后面图表（标题已含宠物名） |
+| D4 | 快捷操作健康页关闭后停留在宠物详情页 | `PetHealthDetailView.swift`, `PetDetailView.swift` | 添加 `onFullDismiss` 回调参数；`PetDetailView` 传入 `{ dismiss() }` 使关闭健康页时同时退出详情页 |
+| D5 | 宠物详情页 UI/UX 优化 | `PetDetailView.swift` | 1) spacing 32→20，内容更紧凑；2) 新增 `petToolbar`（编辑/日历/寄养卡胶囊按钮横排）内嵌页面而非挤 NavigationBar；3) 证件/里程碑/成就改三列横排；4) NavigationBar 精简为仅显示椰子余额 |
+
+## 第二十一章 Bug Fix（2026-03-11）
+
+| ID | 问题 | 修复文件 | 说明 |
+|----|------|----------|------|
+| C1 | 护理计划日历重复事件只显示第一天 | `CalendarView.swift` | `eventOccursOnDate` 增加 `recurrenceDays` 展开逻辑，按步长检查 diff % recurrenceDays == 0 |
+| C2 | 快速打卡看不到护理卡片 | `OverviewView.swift` | `activeQuickActionItems` 中将旧版 `actionType="care"` 规范化为 `"groom"`，兼容历史存储 |
+| C3 | 宠物卡点击详情进健康页需多次返回 | `PetDetailView.swift`, `ArkCrewIDCardView.swift`, `CritterDeckCarousel.swift` | `showingHealthDetail` 从 `navigationDestination`(push) 改为 `.sheet`；carousel 传入 `onShowHealth` 回调弹 modal |
+| C4 | 快速打卡进健康页需多次返回 | `PetDetailView.swift` | 同 C3，健康页统一改为 modal sheet 展示 |
+| C5（生命之树） | 点击生命之树卡片跳转绿洲页 | `OverviewView.swift` | `onOasisTap` 改为 `selectedDockTab = 3`，等同点击导航栏第四个图标 |
+| C5（背景） | 弹出页面背景不够不透明 | `QuickWeightSheet.swift`, `PetHealthDetailView.swift` | 改为 `.background(.regularMaterial)` + `.presentationBackground(.clear)`，与 Dock 风格一致 |
 
 ## App 定位
 
@@ -18,9 +204,9 @@
 
 | 模块 | 状态 | 说明 |
 |------|------|------|
-| 核心架构 | ✅ 完成 | ArkSchemaV20（V20新增多附件支持），21模型，V1→V20完整迁移链 |
+| 核心架构 | ✅ 完成 | ArkSchemaV22（V22新增身体检测报告），23模型，V1→V22完整迁移链 |
 | 宠物模块 | ✅ 完成 | 健康/遛狗/饮食/护理/证件/花费/里程碑/成就/关系 |
-| 人类成员模块 | ✅ 完成 | 体重/国籍城市/运动卡/HealthKit/心愿单 |
+| 人类成员模块 | ✅ 完成 | 体重/国籍城市/运动卡/HealthKit/心愿单/用药记录/身体检测报告 |
 | 植物模块 | ✅ 基础 | 浇水/施肥追踪（无高级功能） |
 | 首页系统 | ✅ 完成 | Wallet 堆叠卡牌/Quick Access/Island Stats/天气粒子/记忆碎片 |
 | 日历/提醒 | ✅ 完成 | 月视图+列表/滑动操作/循环事件/本地通知 |
@@ -443,3 +629,255 @@ Phase 3 — 深度互动（视用户反馈决定是否推进）
 | T4：卡片破框改为 popout 特权 + 精简向导 + 商店联动 | `ArkCrewIDCardView.swift`, `AddPetWizardView.swift`, `CoconutShopView.swift`, `EquipPopoutCardSheet.swift`（新建） | ① `cardFrontView` 将破框触发条件改为 `cardStyleRaw == "popout" && isTransparent`，默认始终 blur；② `stepAvatar` 移除 `proTipBanner` 和 `pastePrimaryButton`，只保留相册/拍照；③ `stepConfirm` 移除 cardStyle 选择器；④ `CoconutShopView` 新增 `fx_popout_card`（150🥥，永久特效），购买后触发宠物选择 → `EquipPopoutCardSheet`；⑤ 新建 `EquipPopoutCardSheet`：抠图引导 Banner + 粘贴激活按钮（读取剪贴板图片 → 调 `ImageCutoutService.removeBackground` → 写入 `pet.avatarImageData` + `pet.cardStyleRaw = "popout"`） |
 
 **编译状态**: BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.2)
+
+---
+
+## 第二十四章：3D 堆叠玻璃卡片演示 + SwiftData 崩溃修复（2026-03-10）
+
+| 任务 | 文件 | 变更说明 |
+|------|------|----------|
+| 3D卡片演示 | `PetDetailStackedDemoView.swift`（新建）, `SettingsView.swift` | ① 创建 `PetDetailStackedDemoView`：3D 层叠磨砂玻璃卡片效果，支持垂直拖拽切换，4 张卡片（Overview/Health/Diet & Care/Records）；② 背景动态 Blob 粒子 + Dark/Light 模式切换；③ 卡片 3D 旋转 + 缩放 + 透明度渐变；④ 在 `SettingsView` 开发者工具区添加入口 |
+| SwiftData 崩溃修复 | `SharedModelContainer.swift` | 根因：iOS 26 在解析 `ArkMigrationPlan.stages` 时，若相邻两个 schema 版本的 Core Data hash 完全相同（如 V9 和 V10 的 models 列表一致），直接在 `try?` 捕获范围之前抛出 `NSInvalidArgumentException: model reference cannot be equal`。修复：将 `stages` 清空为 `[]`，依靠 SwiftData 原生自动 lightweight migration（仅新增字段/模型的迁移 SwiftData 完全自动处理，无需显式 stage）；`SharedModelContainer.make()` 改为三级降级策略，防止任何情况下 fatalError |
+
+**编译状态**: BUILD SUCCEEDED (iPhone 17 Pro Max, iOS 26.2)
+
+---
+
+## 第二十五章：终极玻璃卡片 UI 测试页升级（2026-03-10）
+
+| 任务 | 文件 | 变更说明 |
+|------|------|----------|
+| Light Mode 黑卡修复 + 全量 UI 覆盖 | `OhanaGlassUIV2DemoView.swift` | ① **修复根因**：原背景始终为 `Color(hex: "0A0A0C")` 黑色，light mode 切换后 `.thinMaterial` 磨砂出来仍是黑色；改为 `bgBase` 计算属性，dark=`#0A0A0C`，light=`#F0F4FF`，blob 透明度随模式调整；② **整页重构**：抽取 16 个独立 card computed property，每张卡覆盖一类 UI 元素；③ **新增卡片**：Buttons（主/次/危险/圆形）、Chips & Tags、Alert Banners（success/warning/error/info）、Pet Card 宠物档案、Bento Stats 统计格、List Rows 列表行、Progress Ring 进度环、Charts 折线+柱状、Timeline 时间轴、Empty State、Toast/Undo 触发、Avatars & Badges；④ 所有文字颜色随 isDarkMode 切换；⑤ 整体动画 `.spring(response:0.4,dampingFraction:0.82)` 驱动背景过渡 |
+
+**编译状态**: BUILD SUCCEEDED (iPhone 17 Pro Max, iOS 26.2)
+
+---
+
+## 第二十六章：UltimateGlassCard Light Mode 根本修复（2026-03-10）
+
+| 任务 | 文件 | 变更说明 |
+|------|------|----------|
+| Material 渲染 Bug 根本修复 | `UltimateGlassCard.swift` | **根因**：`.environment(\.colorScheme)` 对 `Material.fill` 无效，material 始终跟随系统 colorScheme，导致 Demo 页（系统深色）里 light mode 切换时卡片依然深色。**修复**：使用 `UIViewRepresentable` 封装 `UIVisualEffectView`，强制注入 `overrideUserInterfaceStyle` 和 `.light` style，确保 Light Mode 卡片在任何系统设定下都是极其透亮发白的玻璃效果。 |
+
+**编译状态**: BUILD SUCCEEDED (iPhone 17 Pro Max, iOS 26.2)
+
+---
+
+## 第二十六·二章：终极玻璃卡片 UI 精修与开发者入口清理（2026-03-10）
+
+| 任务 | 文件 | 变更说明 |
+|------|------|----------|
+| 开发者测试页入口清理 | `SettingsView.swift` | 移除已废弃的“动态玻璃 UI 测试 (V1 旧版)” 和 “3D 堆叠卡片详情页”入口，避免视觉混淆，只保留最新的 UI 规范测试入口。 |
+| Alert Banners 荧光实色恢复 | `OhanaGlassUIV2DemoView.swift` | 移除多余的玻璃框与竖条，恢复为与图3完全一致的全实色荧光背景（`goLime`, `goYellow`, `goRed`, `goPrimary`）+ 黑色粗体字的纯色胶囊样式。 |
+| Avatars 彻底移除背景 | `OhanaGlassUIV2DemoView.swift` | 删除所有 `Background` 与 `Overlay` 圆环，仅保留纯 Emoji 叠加与极其轻微的防粘连阴影。 |
+
+**编译状态**: BUILD SUCCEEDED (iPhone 17 Pro Max, iOS 26.2)
+
+## 第二十六·三章：Ohana Stats (Island Stats) 布局重构 (2026-03-10)
+
+| 任务 | 文件 | 变更说明 |
+|------|------|----------|
+| UI 规范文档更新 | `OHANA_UI_GUIDELINES.md` | 更新了 Light Mode 的终极玻璃卡片参数，强调完全抛弃 Material 改用纯白渐变；明确规定了 Alert Banners 必须为实色荧光背景无边框胶囊；明确规定 Avatars 必须为纯 Emoji 重叠无背景圆环。 |
+| IslandStats 卡片透明化 | `IslandStatComponents.swift` | 移除了 `IslandStatCard` 和 `SynergyFlashCard` 内部的 `UltimateGlassCard` 包装，将其转换为纯透明的 VStack 布局，以便能作为一个大型外层容器的子元素呈现。 |
+| 首页数据卡片大一统布局 | `OverviewView.swift` | 将原本各自独立的水平滚动 `IslandStatCard` 统一包裹进了一个全局宽度的 `UltimateGlassCard` 中，使 "Island Stats" 区域成为一张巨大、宽阔的卡片背景，卡片内部的图表则完全透明，并在图表之间使用 `verticalDashDivider`（虚线）作为视觉分隔，彻底符合设计要求的 "charts要无背景（背景透明），chart之间用虚线分割"。 |
+
+**编译状态**: BUILD SUCCEEDED (iPhone 17 Pro Max, iOS 26.2)
+
+---
+
+## 第二十七章：OHANA_UI_GUIDELINES 全面更新 + 首页 UI 规范化（2026-03-10）
+
+| 任务 | 文件 | 变更说明 |
+|------|------|----------|
+| UI 规范文档全面重写 | `OHANA_UI_GUIDELINES.md` | 按 `OhanaGlassUIV2DemoView` 最终实现全量补充：① Dark/Light Mode 参数精确值（CSS equivalent + Swift 代码）；② Island Stats Bento 布局规范（单一 UltimateGlassCard + 透明图表 + verticalDashDivider）；③ 两种规范 Divider 的完整代码（水平实线 + 垂直虚线）；④ Section Header 规范；⑤ Alert Banners 完整示例代码；⑥ Avatars/Badges 完整示例代码；⑦ Status Badges / Chips / Inner Pills 规范；⑧ 全套 Button 变体代码；⑨ Typography 表格；⑩ Backgrounds & Blobs 规范；⑪ Charts 规范（透明背景、Y轴隐藏、X轴颜色）。重组为 9 个章节，总长度约 2.5x |
+| quickActionsSection 规范化 | `OverviewView.swift` | 用 `UltimateGlassCard` 包裹整个 Quick Access 区块（标题 + 4列网格），标题字体改为 `OhanaFont.title3(.black)` |
+| addFirstPetBanner 规范化 | `OverviewView.swift` | 将内部 3 个奖励 bento cell 从 `.goTranslucentCard()` 改为 `.ultraThinMaterial` + `RoundedRectangle(cornerRadius: 16)` + 白色 stroke，符合 UltimateGlassCard inner pill 规范 |
+
+**编译状态**: BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.2)
+
+---
+
+## 第二十八章：暗色卡片 macOS Widget 风格 + Island Stats 浮动图表（2026-03-10）
+
+| 任务 | 文件 | 变更说明 |
+|------|------|----------|
+| Dark Mode 卡片参数升级 | `UltimateGlassCard.swift` | 去掉 `black/40` 纯黑叠色，改为 `#1A2A6C/35% → #0D1B4B/25%` 蓝紫渐变叠在 `systemUltraThinMaterialDark` 上，边框从 `white/10` 升至 `white/18`，阴影从 `black/50 r24 y16` 降至 `black/35 r20 y8`，对齐 macOS widget 极薄透明蓝紫玻璃效果 |
+| Demo 页背景动效加强 | `OhanaGlassUIV2DemoView.swift` | 5 blob 双层结构：Layer1（goLime/goPrimary/goPurple，更大 320-360pt，0.65-0.75 opacity）+ Layer2（goTeal/goOrange，慢速漂移 11s），幅度提升，便于验证卡片透视效果 |
+| Island Stats 彻底去卡片 | `OverviewView.swift` | 去掉 `islandStatsBento` 外层 `UltimateGlassCard`，图表直接浮于页面动态背景上。Section header 独立为半透明白字浮标（`.white.opacity(0.45)`），无背景框 |
+| UI Guidelines 更新 | `OHANA_UI_GUIDELINES.md` | 暗色模式参数更新为 macOS widget 蓝紫叠色规范；Island Stats Bento 规范更新为无卡片浮动图表 |
+
+**编译状态**: BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.2)
+
+---
+
+## 第三十三章：iOS 26 UI 规范全面升级（2026-03-11）
+
+**目标**：根据 `iOS26_Design_Guide.md` 更新首页 UI，遵循原生 Liquid Glass 规范。
+
+| 任务 | 文件 | 变更说明 |
+|------|------|----------|
+| Island Stats 去卡片 | `OverviewView.swift` | 去掉 `UltimateGlassCard` 包裹，图表直接浮在背景上（无容器）；Section Header 改为 `.padding(.horizontal, 20)` 与页面对齐；指南明确：**大面积内容用 `.ultraThinMaterial`，图表/数据区无需卡片** |
+| QuickAccess 升级 | `OverviewView.swift` | `UltimateGlassCard` 替换为 `.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24))` 原生 Liquid Glass |
+| BatchCheckIn 条升级 | `OverviewView.swift` | `.regularMaterial + strokeBorder` 替换为 `.glassEffect(.regular, in: Capsule())` |
+| FloatingDockNav 升级 | `OverviewHelperViews.swift` | `HStack + .regularMaterial` 全面升级为 `GlassEffectContainer + .glassEffectID(idx, in: namespace)` morphing；选中态用 `.regular.tint(Color.goLime.opacity(0.18))`；加入 `UIImpactFeedbackGenerator(.light)` 触觉反馈 |
+
+**iOS 26 设计准则对应**：
+- 大面积数据区（Island Stats）→ 无卡片，直接浮在背景
+- 中型容器（QuickAccess）→ `.glassEffect(.regular, in: RoundedRectangle)`
+- 胶囊控件（BatchCheckIn、Dock）→ `.glassEffect(.regular, in: Capsule())`
+- 多 Glass 元素 → `GlassEffectContainer` 统一渲染
+
+**编译状态**: BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.2)
+
+---
+
+## 第三十二章：iOS 26 UI 测试页（2026-03-11）
+
+**目标**：根据 `iOS26_Design_Guide.md` 新建 "iOS 26 UI 测试页"，内容与 `OhanaGlassUIV2DemoView` 完全对应（同 16 个展示卡片），但全部改用 iOS 26 原生 Liquid Glass API。
+
+| 任务 | 文件 | 变更说明 |
+|------|------|----------|
+| 新建测试页 | `iOS26UITestView.swift` | 用 `.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24))` 替代 `UltimateGlassCard`；多 Glass 元素用 `GlassEffectContainer` 统一渲染；按钮用 `.buttonStyle(.glass)` / `.buttonStyle(.glassProminent)`；Chip 用 `.glassEffect(.regular.tint(color))` 着色；`accessibilityReduceTransparency` 降级为纯色背景；`accessibilityReduceMotion` 适配脉冲动画 |
+| 添加设置入口 | `SettingsView.swift` | 在"终极玻璃卡片 UI 测试"下方追加"iOS 26 UI 测试页"导航行（goLime 图标，wand.and.sparkles SF Symbol） |
+
+**16 个展示卡片（与 OhanaGlassUIV2DemoView 一一对应）：**
+1. Liquid Glass Info（原生 API 说明）
+2. Typography System
+3. Brand Color Palette
+4. Buttons（含 .glass / .glassProminent / GlassEffectContainer 圆形快捷按钮）
+5. Form Inputs
+6. Chips & Tags（GlassEffectContainer + .tint）
+7. Alert Banners（实色，不用 Glass）
+8. Pet Card
+9. Bento Stats
+10. List Rows
+11. Progress & Rings
+12. Charts
+13. Timeline
+14. Empty State
+15. Toast / Undo
+16. Avatars & Badges
+
+**编译状态**: BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.2)
+
+---
+
+## 第三十一章：Glass Card UI V2 + 设计系统规范升级（2026-03-12）
+
+**目标**：根据 `Ohana_Design_System__2_.md` 更新"终极玻璃卡片UI测试"页和 app 首页（`OverviewView`），实现完整 8 层 Liquid Glass 折射系统。
+
+| 任务 | 文件 | 变更说明 |
+|------|------|----------|
+| 8 层折射升级 | `UltimateGlassCard.swift` | Dark Mode：8 层（ultraThinMaterial + L2白色叠层/L3 Lens Rim渐变/L4 Edge Darkening径向暗晕/L5主边框white/12@0.5pt/L6 Chromatic Aberration蓝红双色散/L7顶部聚光线/L8 Specular椭圆 + Caustics阴影）；Light Mode：ZStack(VisualEffectBlur.light + white/68→28渐变) + L3 RadialGradient screen混合/L4/L5对角渐变边框/L6 Chromatic/L7聚光线/L8 Specular（更强）；将 `cardBackground` 拆分为独立子方法避免编译器类型推导超时 |
+| 背景规范化 | `ArkBackgroundView.swift` | 重写为设计系统 2.2 标准三球 Blob：底色 `#0A0A0C`/`#F0F4FF`；goLime/goBlue/goPurple 三球；8s/10s/9s easeInOut 漂移动画；移除旧的 5 球实现 |
+| Demo 页背景升级 | `OhanaGlassUIV2DemoView.swift` | 背景底色改为 `#0A0A0C`/`#F0F4FF`，移除独立 `bgBase` 计算属性；Blob opacity 对齐设计系统双层规范（Layer1 快速7s/Layer2 慢漂11s） |
+| Island Stats 卡片化 | `OverviewView.swift` | `islandStatsBento` 整体包裹进 `UltimateGlassCard`（设计系统 7.3）；Section Header 改用 `OhanaFont.caption2(.bold)` + 正确颜色规范（dark: white/0.45, light: black/0.4） |
+
+**编译状态**: BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.2)
+
+---
+
+## 第三十章：浅色/深色模式切换修复（2026-03-11）
+
+**根本原因**：`OhanaApp.swift` 原先写死了 `.preferredColorScheme(.dark)`，同时 `ArkBackgroundView` 底色硬编码为 `Color.goDeepNavy`，导致切换无效。
+
+| 任务 | 文件 | 变更说明 |
+|------|------|----------|
+| 解除深色模式锁定 | `OhanaApp.swift` | 将 `.preferredColorScheme(.dark)` 改为 `.preferredColorScheme(preferredScheme)`，`preferredScheme` 读取 `@AppStorage("appThemePreference")` 动态返回 `.light` / `.dark` / `nil`（跟随系统） |
+| 背景自适应 | `ArkBackgroundView.swift` | 添加 `@Environment(\.colorScheme)`；底色从写死 `Color.goDeepNavy` 改为 `isDark ? Color.goDeepNavy : Color(hex: "F0F4FF")`；5个 Blob 的 opacity 也按深/浅分别设值 |
+| 浮标题自适应 | `OverviewView.swift` | Island Stats section header 的写死 `.white.opacity()` 改为 `colorScheme == .dark ? .white.opacity(0.45) : Color.primary.opacity(0.5)` |
+
+**编译状态**: BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.2)
+
+---
+
+## 第二十九章：macOS Widget 卡片精准对齐 + 宠物卡片正面大升级（2026-03-11）
+
+| 任务 | 文件 | 变更说明 |
+|------|------|----------|
+| Dark Mode 卡片精准对齐 | `UltimateGlassCard.swift` | 彻底对齐苹果官方 macOS widget 实现：暗色背景改为直接 `.ultraThinMaterial`（系统原生深色环境渲染，内置蓝紫 vibrancy），去掉手动蓝紫渐变叠色；边框 `white/15` lineWidth `0.5pt`；阴影 `black/20 r15 y8` |
+| 宠物卡片 emoji fallback 正面大升级 | `ArkCrewIDCardView.swift` | `emojiFallbackFront` 升级为 9 层：主色深底+对角渐变+右上高光椭圆+左下暗角+装饰大圆环×2+OHANA水印+emoji主角浮起阴影+右侧信息列+底部品种胶囊标签行 |
+| 右侧信息列重构 | `ArkCrewIDCardView.swift` | `infoColumn` 新增：顶部品种+性别 chip 行；相伴天数升级为 36pt 黑体巨字+"天·一起度过"副标记；底部新增 🔥 连续打卡 streak 胶囊（goLime色，streak>1时显示） |
+| 详情按钮重设计 | `ArkCrewIDCardView.swift` | `detailButton` 改为跟随卡片主题色的半透明胶囊（`cardTextColor/15` 背景 + `cardTextColor/20` stroke） |
+
+**编译状态**: BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.2)
+
+---
+
+| 任务 | 文件 | 变更说明 |
+|------|------|----------|
+| HumanMedication 模型 | `HumanMedication.swift`（新建）| SwiftData @Model：name/dosage/frequencyRaw/firstDoseTime/startDate/endDate/colorHex/notes/isActive；MedicationFrequency enum（6种）；isActiveToday/daysRemaining 计算属性 |
+| EventType 扩展 | `Event.swift` | 新增 `.medication = "吃药"` case + 💊 emoji |
+| Schema V21 | `SharedModelContainer.swift` | ArkSchemaV21 新增 HumanMedication.self；ArkMigrationPlan.schemas 追加 V21 |
+| 吃药提醒页面 | `HumanMedicationView.swift`（新建）| ① 汇总 Bento（当前用药/今日到期/长期用药）；② 药物列表行（颜色圆+频率+剩余天数）；③ 激活/停药 Toggle + Toast；④ AddMedicationSheet：药物信息/服药时间/颜色&备注三张 UltimateGlassCard；频率 Chip 横选；编辑/删除 |
+| HumanDetailView 全面重构 | `HumanDetailView.swift` | ① 全部文字 OhanaFont + `.white`；② heroCard 主题色光晕头像；③ statsBento 4格（体重/用药/提醒/椰子）；④ medicationCard 新入口（彩色药丸预览+Badge）；⑤ sectionHeader 区块分组；⑥ remindersSection 统一 UltimateGlassCard；⑦ 导航统一 `.navigationDestination` |
+
+**编译状态**: BUILD SUCCEEDED (iPhone 17 Pro Max, iOS 26.2)
+
+---
+
+## 第二十章：Overview UI & Features 全面更新（2026-03-11）
+
+**目标**：对首页 Bento 卡片、宠物卡、Quick Access、日历、设置页进行全面 UI 升级。
+
+| 任务 | 文件 | 变更说明 |
+|------|------|----------|
+| T1: Bento 卡片中文化 + 跳转 | `HomeBentoBoxes.swift` | "Oasis Tree"→"生命之树"，"Daily Strike"→"打卡连击"；添加 `onOasisTap`/`onStreakTap` 闭包回调；触发轻触觉反馈 |
+| T1: 绿洲/打卡跳转连接 | `OverviewView.swift` | 新增 `showOasisReward`/`showStreakDetail` State；fullScreenCover → `OasisRewardView`；sheet → `DailyStreakDetailView` |
+| T1: 打卡连击详情页 | `DailyStreakDetailView.swift`（新建）| 排行榜（宠物头像/streak大字/上次打卡日期）+ 月历视图（打卡日橙色高亮/今日goLime/月份左右切换）|
+| T2: Quick Access EDIT 按钮移除 | `OverviewView.swift` | 去掉 EDIT 胶囊按钮；标题改"快捷操作"；LazyVGrid 末尾保留虚线"添加"占位按钮（未满8个时显示） |
+| T2: 卡片去背景 | `OverviewQuickActions.swift` | `GoQuickActionCard` 去掉 premiumShape fill/strokeBorder；仅保留 icon + 文字，无卡片容器背景 |
+| T3: 宠物卡正面文案 | `ArkCrewIDCardView.swift` | `infoColumn` 去掉品种/性别 chip 行；daysTogether 改为"一起度过了 XX 天"（小字+大字+小字组合） |
+| T3: 去掉左下角品种标签 | `ArkCrewIDCardView.swift` | `emojiFallbackFront` 底部品种/绝育标签层删除；`minimalFront` 底部品种性别 chip 行注释隐藏 |
+| T4: 卡片眩光柔化 | `ArkCrewIDCardView.swift` | shadow 从单层 `opacity(0.5) r24` 拆为双层：`opacity(0.28) r40 y12` + `opacity(0.10) r80 y20` |
+| T5: Header 固定 | `OverviewView.swift` | `goGreetingHeader` 移出 ScrollView，固定在 VStack 顶部（上版本已完成，本次验证） |
+| T6: 日历 UI 中文化 | `CalendarView.swift` | 导航标题 "Calendar"→"日历"；筛选 chip "All"→"全部"；空状态 "No events"→"暂无事件" |
+| T6: 事件卡片 glassEffect | `SwipeableEventRow.swift` | `eventCard` 背景从手动深蓝 background 改为 `.glassEffect(.regular)` |
+| T7: 设置页主题实时切换 | `SettingsView.swift` | 添加 `preferredScheme` 计算属性；NavigationStack 末尾加 `.preferredColorScheme(preferredScheme)` |
+
+**新建文件**:
+- `Ohana/Views/Home/DailyStreakDetailView.swift`
+
+**编译状态**: BUILD SUCCEEDED (iPhone 17 Pro Simulator, iOS 26.2)
+
+---
+
+## 第二十一章：UI/UX 全面修订 Round 2（2026-03-11）
+
+**目标**：实现 11 项新 UI/UX 改进，涵盖绿洲页返回、Quick Access、宠物卡、Dock、打卡逻辑、卡片背景一致化、图鉴名称、宠物卡背面。
+
+| 任务 | 文件 | 变更说明 |
+|------|------|----------|
+| F1: 绿洲页返回按钮 | `OasisRewardView.swift` | 添加 `@Environment(\.dismiss)`；顶部右侧添加 `xmark.circle.fill` 关闭按钮；标题子标改 "Ohana" |
+| F2: Quick Access + 直接弹 sheet | `OverviewView.swift` | + 按钮点击触发 `showingQAManageSheet`（已有逻辑，确认生效） |
+| F3: 宠物卡浮感增强 | `ArkCrewIDCardView.swift` | 三层 shadow：主题色 r24 y8 + 黑 r40 y16 + 黑淡 r80 y32 |
+| F4: Header 背景柔化 | `OverviewView.swift` | `.background` 叠加 `.ultraThinMaterial.opacity(0.6)` + mask 底部 LinearGradient fade |
+| F5: Dock 合并单卡 | `OverviewHelperViews.swift` | `GlassEffectContainer` → 单张 `.glassEffect(.regular, in: RoundedRectangle(28))`；`chart.bar.fill` → `calendar`；`figure.walk.circle.fill` → `house.fill` |
+| F6: 打卡改为人类每日登录打卡 | `HomeBentoBoxes.swift` | `@AppStorage("user_login_streak")` + `@AppStorage("user_last_login_date")`；`onAppear` 调用 `refreshLoginStreak()`；不再使用 `Pet.currentStreak` |
+| F7: BentoStatCard 背景一致 | `OverviewHelperViews.swift` | `UltimateGlassCard` 替换为 `.glassEffect(.regular, in: RoundedRectangle(24))`；文字改 `.primary` |
+| F8: DailyQuestsCard 背景+中文 | `DailyQuestsCard.swift` | `expandedCard` 背景改 `.glassEffect`；标题 "DAILY QUESTS" → "今日任务" |
+| F9: Ohana 图鉴 | `CrewRosterOverlay.swift` | `navigationTitle` "欧哈纳图鉴" → "Ohana 图鉴"；注释同步更新 |
+| F10: 移除绿洲日历入口 | `OasisRewardView.swift` | 删除 `calendar.badge.checkmark` 按钮及连带胶囊视图 |
+| F11: 宠物卡背面 iOS26 规范 | `ArkCrewIDCardView.swift` | 背景改 `.glassEffect`；文字 `.white` → `.primary`；详情按钮背景改 `.glassEffect`；待办 Banner 背景改 `.glassEffect`；`metricDivider` 改 `.primary.opacity(0.1)` |
+
+**编译状态**: BUILD SUCCEEDED (iPhone 17 Pro Simulator, iOS 26.2)
+
+
+---
+
+## 第二十二章：UI/UX 优化 Round 2 续（2026-03-11）
+
+| ID | 任务 | 文件 | 关键实现 |
+|----|------|------|---------|
+| G1 | 宠物卡方形阴影去除 | `ArkCrewIDCardView.swift` | `cardFrontView` 内 ZStack 加 `.clipShape(RoundedRectangle(32))`，GeometryReader 外层再加一次 `.clipShape` |
+| G2 | 打卡连击页改为人类登录 | `DailyStreakDetailView.swift` + `HomeBentoBoxes.swift` | 删除宠物排行榜；改为「我的连击」卡片（头像+名字+streak大字+里程碑进度条）；日历格读 `user_login_history` JSON；`refreshLoginStreak` 同步写入登录历史 |
+| G3 | Header 去掉 material 背景 | `OverviewView.swift` | 删除 `goGreetingHeader` 底部 `LinearGradient + .ultraThinMaterial.opacity(0.6)` 背景块 |
+| G4 | QA + 按钮直接弹出选择半卡 | `OverviewView.swift` + `OverviewQuickActions.swift` | `+` 按钮改触发 `showingAddQuickAction`；直接弹出 `AddQuickActionSh
+---
+
+## 第二十二章：UI/UX 优化 Round 2 续（2026-03-11）
+
+|??#???| ID | 任务 | 文件 | 关键实现 |
+|----|------|------| `|----|------|------|---------|
+| G1 | ?? G1 | 宠物卡方形阴影?y| G2 | 打卡连击页改为人类登录 | `DailyStreakDetailView.swift` + `HomeBentoBoxes.swift` | 删除宠物排行榜；改为「我的连击」卡片（头像+名字+streak大??| G3 | Header 去掉 material 背景 | `OverviewView.swift` | 删除 `goGreetingHeader` 底部 `LinearGradient + .ultraThinMaterial.opacity(0.6)` 背景块 |
+| G4 | QA + 按钮直接弹出选择半卡 | `OverviewView.swift` + `OverviewQuickActions.swift` | `+` 按钮改触发 `showingAddQuickAc`u| G4 | QA + 按钮直接弹出选择半卡 | `OverviewView.swift` + `OverviewQuickActions.swift` | `+` 按钮改触发 `s17 Pro Simulator, iOS 26.2)

@@ -27,12 +27,20 @@ struct OhanaApp: App {
         }
     }
     
+    private var preferredScheme: ColorScheme? {
+        switch appThemePreference {
+        case "light": return .light
+        case "dark":  return .dark
+        default:      return nil  // system
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()
                 .modelContainer(container)
                 .tint(Color.arkCoral)
-                .preferredColorScheme(appThemePreference == "light" ? .light : (appThemePreference == "dark" ? .dark : nil))
+                .preferredColorScheme(preferredScheme)
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
                     OhanaApp.scheduleReminderRefill()
                 }

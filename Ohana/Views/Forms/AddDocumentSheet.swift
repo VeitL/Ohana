@@ -80,39 +80,40 @@ struct AddDocumentSheet: View {
                 VStack(spacing: 14) {
 
                     // ── 证件类型（Chip 横滚）
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "tag.fill")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Color.goTeal)
-                            Text("证件类型")
-                                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        }
-                        .padding(.horizontal, 4)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(DocumentCategory.allCases, id: \.rawValue) { cat in
-                                    Button { selectedCategory = cat } label: {
-                                        HStack(spacing: 5) {
-                                            Text(cat.emoji)
-                                            Text(cat.rawValue)
-                                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                    UltimateGlassCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "tag.fill")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(Color.goTeal)
+                                Text("证件类型")
+                                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            }
+                            .padding(.horizontal, 4)
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(DocumentCategory.allCases, id: \.rawValue) { cat in
+                                        Button { selectedCategory = cat } label: {
+                                            HStack(spacing: 5) {
+                                                Text(cat.emoji)
+                                                Text(cat.rawValue)
+                                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                            }
+                                            .foregroundStyle(selectedCategory == cat ? Color.arkInk : .primary)
+                                            .padding(.horizontal, 14).padding(.vertical, 8)
+                                            .background(
+                                                selectedCategory == cat ? Color.goLime : Color(.systemGray6),
+                                                in: Capsule()
+                                            )
                                         }
-                                        .foregroundStyle(selectedCategory == cat ? Color.arkInk : .primary)
-                                        .padding(.horizontal, 14).padding(.vertical, 8)
-                                        .background(
-                                            selectedCategory == cat ? Color.goLime : Color(.systemGray6),
-                                            in: Capsule()
-                                        )
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
                                 }
                             }
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                    .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 16))
                     .padding(.horizontal, 20)
 
                     // ── 证件名称
@@ -167,71 +168,72 @@ struct AddDocumentSheet: View {
 
                     // Payer picker (when cost is enabled)
                     if hasCost && !humans.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "creditcard.fill")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(Color.goLime.opacity(0.7))
-                                Text("谁付的款")
-                                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                            }
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 10) {
-                                    Button { selectedPayerId = nil } label: {
-                                        VStack(spacing: 4) {
-                                            ZStack {
-                                                Circle()
-                                                    .fill(selectedPayerId == nil ? Color.goLime : Color(.systemGray5))
-                                                    .frame(width: 40, height: 40)
-                                                Image(systemName: "questionmark")
-                                                    .font(.system(size: 16, weight: .bold))
-                                                    .foregroundStyle(selectedPayerId == nil ? Color.arkInk : .primary.opacity(0.5))
-                                            }
-                                            Text("未指定")
-                                                .font(.system(size: 10, weight: .medium, design: .rounded))
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    }
-                                    .buttonStyle(.plain)
-
-                                    ForEach(humans) { human in
-                                        let hid = human.id.uuidString
-                                        let isSelected = selectedPayerId == hid
-                                        let themeColor = Color(hex: human.themeColorHex.count == 6 ? human.themeColorHex : "C8FF00")
-                                        Button { selectedPayerId = hid } label: {
+                        UltimateGlassCard {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "creditcard.fill")
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(Color.goLime.opacity(0.7))
+                                    Text("谁付的款")
+                                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                }
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 10) {
+                                        Button { selectedPayerId = nil } label: {
                                             VStack(spacing: 4) {
                                                 ZStack {
                                                     Circle()
-                                                        .fill(isSelected ? themeColor : themeColor.opacity(0.2))
+                                                        .fill(selectedPayerId == nil ? Color.goLime : Color.primary.opacity(0.05))
                                                         .frame(width: 40, height: 40)
-                                                    if let data = human.avatarImageData, let img = UIImage(data: data) {
-                                                        Image(uiImage: img)
-                                                            .resizable().scaledToFill()
-                                                            .frame(width: 40, height: 40).clipShape(Circle())
-                                                    } else {
-                                                        Text(human.avatarEmoji)
-                                                            .font(.system(size: 20))
-                                                    }
-                                                    if isSelected {
-                                                        Circle()
-                                                            .strokeBorder(.white, lineWidth: 2)
-                                                            .frame(width: 40, height: 40)
-                                                    }
+                                                    Image(systemName: "questionmark")
+                                                        .font(.system(size: 16, weight: .bold))
+                                                        .foregroundStyle(selectedPayerId == nil ? Color.arkInk : .primary.opacity(0.5))
                                                 }
-                                                Text(human.name)
+                                                Text("未指定")
                                                     .font(.system(size: 10, weight: .medium, design: .rounded))
-                                                    .foregroundStyle(isSelected ? .primary : .secondary)
-                                                    .lineLimit(1)
+                                                    .foregroundStyle(.secondary)
                                             }
                                         }
                                         .buttonStyle(.plain)
+
+                                        ForEach(humans) { human in
+                                            let hid = human.id.uuidString
+                                            let isSelected = selectedPayerId == hid
+                                            let themeColor = Color(hex: human.themeColorHex.count == 6 ? human.themeColorHex : "C8FF00")
+                                            Button { selectedPayerId = hid } label: {
+                                                VStack(spacing: 4) {
+                                                    ZStack {
+                                                        Circle()
+                                                            .fill(isSelected ? themeColor : themeColor.opacity(0.2))
+                                                            .frame(width: 40, height: 40)
+                                                        if let data = human.avatarImageData, let img = UIImage(data: data) {
+                                                            Image(uiImage: img)
+                                                                .resizable().scaledToFill()
+                                                                .frame(width: 40, height: 40).clipShape(Circle())
+                                                        } else {
+                                                            Text(human.avatarEmoji)
+                                                                .font(.system(size: 20))
+                                                        }
+                                                        if isSelected {
+                                                            Circle()
+                                                                .strokeBorder(.white, lineWidth: 2)
+                                                                .frame(width: 40, height: 40)
+                                                        }
+                                                    }
+                                                    Text(human.name)
+                                                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                                                        .foregroundStyle(isSelected ? .primary : .secondary)
+                                                        .lineLimit(1)
+                                                }
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
                                     }
                                 }
                             }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-                        .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 16))
                         .padding(.horizontal, 20)
                     }
 
@@ -242,69 +244,70 @@ struct AddDocumentSheet: View {
                     }
 
                     // ── 附件区域
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "paperclip")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                            Text("附件" + (attachments.isEmpty ? "" : " (\(attachments.count))"))
-                                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        }
-                        .padding(.horizontal, 4)
+                    UltimateGlassCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "paperclip")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                Text("附件" + (attachments.isEmpty ? "" : " (\(attachments.count))"))
+                                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            }
+                            .padding(.horizontal, 4)
 
-                        if !attachments.isEmpty {
-                            VStack(spacing: 6) {
-                                ForEach(attachments) { att in
-                                    HStack(spacing: 10) {
-                                        if att.isImage, let ui = UIImage(data: att.data) {
-                                            Button { previewAttachment = att } label: {
-                                                Image(uiImage: ui).resizable().scaledToFill()
+                            if !attachments.isEmpty {
+                                VStack(spacing: 6) {
+                                    ForEach(attachments) { att in
+                                        HStack(spacing: 10) {
+                                            if att.isImage, let ui = UIImage(data: att.data) {
+                                                Button { previewAttachment = att } label: {
+                                                    Image(uiImage: ui).resizable().scaledToFill()
+                                                        .frame(width: 40, height: 40)
+                                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                                }.buttonStyle(.plain)
+                                            } else {
+                                                Image(systemName: "doc.fill")
+                                                    .font(.system(size: 18))
+                                                    .foregroundStyle(Color.goTeal)
                                                     .frame(width: 40, height: 40)
-                                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                                            }.buttonStyle(.plain)
-                                        } else {
-                                            Image(systemName: "doc.fill")
-                                                .font(.system(size: 18))
-                                                .foregroundStyle(Color.goTeal)
-                                                .frame(width: 40, height: 40)
-                                                .background(Color.goTeal.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                                                    .background(Color.goTeal.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                                            }
+                                            Text(att.filename.isEmpty ? (att.isImage ? "图片" : "文件") : att.filename)
+                                                .font(.system(size: 14, weight: .medium)).lineLimit(1)
+                                            Spacer()
+                                            Button { attachments.removeAll { $0.id == att.id } } label: {
+                                                Image(systemName: "xmark.circle.fill")
+                                                    .foregroundStyle(.secondary.opacity(0.6))
+                                            }
                                         }
-                                        Text(att.filename.isEmpty ? (att.isImage ? "图片" : "文件") : att.filename)
-                                            .font(.system(size: 14, weight: .medium)).lineLimit(1)
-                                        Spacer()
-                                        Button { attachments.removeAll { $0.id == att.id } } label: {
-                                            Image(systemName: "xmark.circle.fill")
-                                                .foregroundStyle(.secondary.opacity(0.6))
-                                        }
+                                        .padding(10)
+                                        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
                                     }
-                                    .padding(10)
-                                    .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 12))
                                 }
                             }
-                        }
 
-                        HStack(spacing: 10) {
-                            attachmentBtn(icon: "camera.fill", label: "拍照", color: Color.goTeal) { showingCamera = true }
-                            PhotosPicker(selection: $photoPickerItems, maxSelectionCount: 10, matching: .images) {
-                                attachmentBtnLabel(icon: "photo.fill", label: "相册", color: Color.goPrimary)
-                            }
-                            .onChange(of: photoPickerItems) { _, items in
-                                Task {
-                                    for item in items {
-                                        if let data = try? await item.loadTransferable(type: Data.self) {
-                                            let att = DocAttachment(data: data, filename: "", isImage: true)
-                                            await MainActor.run { attachments.append(att) }
-                                        }
-                                    }
-                                    await MainActor.run { photoPickerItems = [] }
+                            HStack(spacing: 10) {
+                                attachmentBtn(icon: "camera.fill", label: "拍照", color: Color.goTeal) { showingCamera = true }
+                                PhotosPicker(selection: $photoPickerItems, maxSelectionCount: 10, matching: .images) {
+                                    attachmentBtnLabel(icon: "photo.fill", label: "相册", color: Color.goPrimary)
                                 }
+                                .onChange(of: photoPickerItems) { _, items in
+                                    Task {
+                                        for item in items {
+                                            if let data = try? await item.loadTransferable(type: Data.self) {
+                                                let att = DocAttachment(data: data, filename: "", isImage: true)
+                                                await MainActor.run { attachments.append(att) }
+                                            }
+                                        }
+                                        await MainActor.run { photoPickerItems = [] }
+                                    }
+                                }
+                                attachmentBtn(icon: "doc.fill", label: "文件", color: Color.goOrange) { showingFilePicker = true }
                             }
-                            attachmentBtn(icon: "doc.fill", label: "文件", color: Color.goOrange) { showingFilePicker = true }
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                    .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 16))
                     .padding(.horizontal, 20)
 
                     // ── 备注
@@ -415,20 +418,21 @@ struct AddDocumentSheet: View {
     }
 
     // 护理计划风格行：icon + 标签左，内容右
-    private func docRow<Content: View>(icon: String, iconColor: Color, label: String, @ViewBuilder content: () -> Content) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(iconColor)
-                .frame(width: 22)
-            Text(label)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-            Spacer()
-            content()
+    private func docRow<Content: View>(icon: String, iconColor: Color, label: String, @ViewBuilder content: @escaping () -> Content) -> some View {
+        UltimateGlassCard {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(iconColor)
+                    .frame(width: 22)
+                Text(label)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                Spacer()
+                content()
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 13)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 13)
-        .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 16))
         .padding(.horizontal, 20)
     }
 
@@ -557,29 +561,30 @@ struct EditDocumentSheet: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 14) {
                     // 证件类型
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "tag.fill").font(.system(size: 13, weight: .semibold)).foregroundStyle(Color.goTeal)
-                            Text("证件类型").font(.system(size: 14, weight: .semibold, design: .rounded))
-                        }.padding(.horizontal, 4)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(DocumentCategory.allCases, id: \.rawValue) { cat in
-                                    Button { selectedCategory = cat } label: {
-                                        HStack(spacing: 5) {
-                                            Text(cat.emoji)
-                                            Text(cat.rawValue).font(.system(size: 13, weight: .bold, design: .rounded))
-                                        }
-                                        .foregroundStyle(selectedCategory == cat ? Color.arkInk : .primary)
-                                        .padding(.horizontal, 14).padding(.vertical, 8)
-                                        .background(selectedCategory == cat ? Color.goLime : Color(.systemGray6), in: Capsule())
-                                    }.buttonStyle(.plain)
+                    UltimateGlassCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "tag.fill").font(.system(size: 13, weight: .semibold)).foregroundStyle(Color.goTeal)
+                                Text("证件类型").font(.system(size: 14, weight: .semibold, design: .rounded))
+                            }.padding(.horizontal, 4)
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(DocumentCategory.allCases, id: \.rawValue) { cat in
+                                        Button { selectedCategory = cat } label: {
+                                            HStack(spacing: 5) {
+                                                Text(cat.emoji)
+                                                Text(cat.rawValue).font(.system(size: 13, weight: .bold, design: .rounded))
+                                            }
+                                            .foregroundStyle(selectedCategory == cat ? Color.arkInk : .primary)
+                                            .padding(.horizontal, 14).padding(.vertical, 8)
+                                            .background(selectedCategory == cat ? Color.goLime : Color.primary.opacity(0.05), in: Capsule())
+                                        }.buttonStyle(.plain)
+                                    }
                                 }
                             }
                         }
+                        .padding(.horizontal, 20).padding(.vertical, 12)
                     }
-                    .padding(.horizontal, 20).padding(.vertical, 12)
-                    .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 16))
                     .padding(.horizontal, 20)
 
                     editRow(icon: "doc.text.fill", iconColor: .goTeal, label: "证件名称") {
@@ -622,56 +627,57 @@ struct EditDocumentSheet: View {
                     }
 
                     // 附件预览/更换
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "paperclip").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
-                            Text("附件").font(.system(size: 14, weight: .semibold, design: .rounded))
-                        }.padding(.horizontal, 4)
-                        if let img = attachmentImage {
-                            Button { showingPreview = true } label: {
-                                Image(uiImage: img).resizable().scaledToFill()
-                                    .frame(maxWidth: .infinity).frame(height: 120)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    .overlay(alignment: .topTrailing) {
-                                        Button { attachmentImage = nil } label: {
-                                            Image(systemName: "xmark.circle.fill")
-                                                .font(.system(size: 20)).foregroundStyle(.primary).padding(6)
+                    UltimateGlassCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "paperclip").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
+                                Text("附件").font(.system(size: 14, weight: .semibold, design: .rounded))
+                            }.padding(.horizontal, 4)
+                            if let img = attachmentImage {
+                                Button { showingPreview = true } label: {
+                                    Image(uiImage: img).resizable().scaledToFill()
+                                        .frame(maxWidth: .infinity).frame(height: 120)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .overlay(alignment: .topTrailing) {
+                                            Button { attachmentImage = nil } label: {
+                                                Image(systemName: "xmark.circle.fill")
+                                                    .font(.system(size: 20)).foregroundStyle(.primary).padding(6)
+                                            }
                                         }
-                                    }
-                            }.buttonStyle(.plain)
-                        } else {
-                            HStack(spacing: 10) {
-                                Button { showingCamera = true } label: {
-                                    VStack(spacing: 6) {
-                                        Image(systemName: "camera.fill").font(.system(size: 20, weight: .semibold))
-                                            .foregroundStyle(Color.goTeal)
-                                            .frame(width: 44, height: 44)
-                                            .background(Color.goTeal.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
-                                        Text("拍照").font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
-                                    }.frame(maxWidth: .infinity)
                                 }.buttonStyle(.plain)
-                                PhotosPicker(selection: $photoPickerItem, matching: .images) {
-                                    VStack(spacing: 6) {
-                                        Image(systemName: "photo.fill").font(.system(size: 20, weight: .semibold))
-                                            .foregroundStyle(Color.goPrimary)
-                                            .frame(width: 44, height: 44)
-                                            .background(Color.goPrimary.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
-                                        Text("相册").font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
-                                    }.frame(maxWidth: .infinity)
-                                }
-                                .onChange(of: photoPickerItem) { _, item in
-                                    Task {
-                                        if let data = try? await item?.loadTransferable(type: Data.self),
-                                           let img = UIImage(data: data) {
-                                            await MainActor.run { attachmentImage = img }
+                            } else {
+                                HStack(spacing: 10) {
+                                    Button { showingCamera = true } label: {
+                                        VStack(spacing: 6) {
+                                            Image(systemName: "camera.fill").font(.system(size: 20, weight: .semibold))
+                                                .foregroundStyle(Color.goTeal)
+                                                .frame(width: 44, height: 44)
+                                                .background(Color.goTeal.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
+                                            Text("拍照").font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
+                                        }.frame(maxWidth: .infinity)
+                                    }.buttonStyle(.plain)
+                                    PhotosPicker(selection: $photoPickerItem, matching: .images) {
+                                        VStack(spacing: 6) {
+                                            Image(systemName: "photo.fill").font(.system(size: 20, weight: .semibold))
+                                                .foregroundStyle(Color.goPrimary)
+                                                .frame(width: 44, height: 44)
+                                                .background(Color.goPrimary.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
+                                            Text("相册").font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
+                                        }.frame(maxWidth: .infinity)
+                                    }
+                                    .onChange(of: photoPickerItem) { _, item in
+                                        Task {
+                                            if let data = try? await item?.loadTransferable(type: Data.self),
+                                               let img = UIImage(data: data) {
+                                                await MainActor.run { attachmentImage = img }
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
+                        .padding(.horizontal, 20).padding(.vertical, 12)
                     }
-                    .padding(.horizontal, 20).padding(.vertical, 12)
-                    .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 16))
                     .padding(.horizontal, 20)
                 }
                 .padding(.bottom, 24)
@@ -718,15 +724,16 @@ struct EditDocumentSheet: View {
         } message: { Text("此操作不可撤销。") }
     }
 
-    private func editRow<Content: View>(icon: String, iconColor: Color, label: String, @ViewBuilder content: () -> Content) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon).font(.system(size: 14, weight: .semibold)).foregroundStyle(iconColor).frame(width: 22)
-            Text(label).font(.system(size: 14, weight: .semibold, design: .rounded))
-            Spacer()
-            content()
+    private func editRow<Content: View>(icon: String, iconColor: Color, label: String, @ViewBuilder content: @escaping () -> Content) -> some View {
+        UltimateGlassCard {
+            HStack(spacing: 10) {
+                Image(systemName: icon).font(.system(size: 14, weight: .semibold)).foregroundStyle(iconColor).frame(width: 22)
+                Text(label).font(.system(size: 14, weight: .semibold, design: .rounded))
+                Spacer()
+                content()
+            }
+            .padding(.horizontal, 20).padding(.vertical, 13)
         }
-        .padding(.horizontal, 20).padding(.vertical, 13)
-        .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 16))
         .padding(.horizontal, 20)
     }
 

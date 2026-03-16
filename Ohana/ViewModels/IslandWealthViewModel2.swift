@@ -38,6 +38,7 @@ struct WealthLeaderRow: Identifiable {
 @Observable
 final class IslandWealthViewModel {
     var timeRange: WealthTimeRange = .week
+    var showSystemCoconuts: Bool = true
 
     // 注入实体列表（由 View 从 @Query 传入）
     var pets: [Pet] = []
@@ -122,6 +123,8 @@ final class IslandWealthViewModel {
                 eid  = "system"
                 name = "其他/系统"
             }
+            // 过滤系统椰子（当 toggle 关闭时）
+            if !showSystemCoconuts && eid == "system" { continue }
             let key = "\(bucket.timeIntervalSince1970)_\(eid)"
             if let existing = dict[key] {
                 dict[key] = (bucket, name, eid, existing.sum + log.amount)

@@ -17,54 +17,55 @@ struct PetHygieneCard: View {
     @State private var undoLabel: String = ""
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 8) {
-                // Header — NavigationLink 进入护理详情页
-                NavigationLink(destination: PetHygieneDetailView(pet: pet)) {
-                    HStack {
-                        Text("✨").font(.system(size: 14))
-                        Text("护理打卡")
-                            .font(.system(size: 14, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.primary.opacity(0.3))
-                    }
-                }
-                .buttonStyle(.plain)
-
-                // Only show items with records
-                let recordedTypes = HygieneType.allCases.filter { type in
-                    pet.hygieneLogs.contains { $0.type == type.rawValue }
-                }
-
-                if recordedTypes.isEmpty {
-                    Text("暂无记录")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.3))
-                        .padding(.vertical, 4)
-                } else {
-                    let cols = Array(repeating: GridItem(.flexible()), count: min(recordedTypes.count, 5))
-                    LazyVGrid(columns: cols, spacing: 8) {
-                        ForEach(recordedTypes, id: \.rawValue) { type in
-                            HygieneCheckButton(pet: pet, type: type, households: households, onUndo: { log in
-                                undoLog = log
-                                undoLabel = type.rawValue
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                                    if undoLog?.id == log.id {
-                                        withAnimation(.spring(response: 0.3)) { undoLog = nil }
-                                    }
-                                }
-                            }) {
-                                longPressedType = type
-                            }
+        UltimateGlassCard {
+            ZStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 8) {
+                    // Header — NavigationLink 进入护理详情页
+                    NavigationLink(destination: PetHygieneDetailView(pet: pet)) {
+                        HStack {
+                            Text("✨").font(.system(size: 14))
+                            Text("护理打卡")
+                                .font(OhanaFont.headline(.black))
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.primary.opacity(0.3))
                         }
                     }
-                    .padding(.vertical, 4)
+                    .buttonStyle(.plain)
+
+                    // Only show items with records
+                    let recordedTypes = HygieneType.allCases.filter { type in
+                        pet.hygieneLogs.contains { $0.type == type.rawValue }
+                    }
+
+                    if recordedTypes.isEmpty {
+                        Text("暂无记录")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(.primary.opacity(0.3))
+                            .padding(.vertical, 4)
+                    } else {
+                        let cols = Array(repeating: GridItem(.flexible()), count: min(recordedTypes.count, 5))
+                        LazyVGrid(columns: cols, spacing: 8) {
+                            ForEach(recordedTypes, id: \.rawValue) { type in
+                                HygieneCheckButton(pet: pet, type: type, households: households, onUndo: { log in
+                                    undoLog = log
+                                    undoLabel = type.rawValue
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                                        if undoLog?.id == log.id {
+                                            withAnimation(.spring(response: 0.3)) { undoLog = nil }
+                                        }
+                                    }
+                                }) {
+                                    longPressedType = type
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
                 }
-            }
-            .padding(.horizontal, 4)
+                .padding(.horizontal, 4)
 
             // U16: 3秒撤回 toast
             if undoLog != nil {
@@ -90,12 +91,13 @@ struct PetHygieneCard: View {
                 .padding(.horizontal, 8).padding(.bottom, 4)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-        }
-        .animation(.spring(response: 0.3), value: undoLog != nil)
-        .sheet(item: $longPressedType) { type in
-            HygieneTodoSheet(pet: pet, type: type)
-                .presentationDetents([.height(520)])
-                .presentationDragIndicator(.visible)
+            }
+            .animation(.spring(response: 0.3), value: undoLog != nil)
+            .sheet(item: $longPressedType) { type in
+                HygieneTodoSheet(pet: pet, type: type)
+                    .presentationDetents([.height(520)])
+                    .presentationDragIndicator(.visible)
+            }
         }
     }
 }

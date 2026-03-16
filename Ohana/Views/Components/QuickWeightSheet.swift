@@ -24,83 +24,124 @@ struct QuickWeightSheet: View {
         return true
     }
 
-    var body: some View {
-        ZStack {
-            ArkBackgroundView()
+    private var themeColor: Color { Color(hex: pet.themeColorHex.isEmpty ? "C8FF00" : pet.themeColorHex) }
 
-            VStack(spacing: 20) {
-                // 标题栏
+    var body: some View {
+        VStack(spacing: 0) {
+                // ── 顶栏
                 HStack {
-                    Text("记录体重")
-                        .font(.system(size: 18, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                    // 宠物头像 + 名字
+                    HStack(spacing: 10) {
+                        ZStack {
+                            Circle()
+                                .fill(themeColor.opacity(0.22))
+                                .frame(width: 40, height: 40)
+                            if let data = pet.avatarImageData, let img = UIImage(data: data) {
+                                Image(uiImage: img)
+                                    .resizable().scaledToFill()
+                                    .frame(width: 40, height: 40)
+                                    .clipShape(Circle())
+                            } else {
+                                Text(pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji)
+                                    .font(.system(size: 20))
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(pet.name)
+                                .font(.system(size: 16, weight: .black, design: .rounded))
+                                .foregroundStyle(.primary)
+                            Text("记录体重")
+                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .foregroundStyle(.primary.opacity(0.4))
+                        }
+                    }
                     Spacer()
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 20))
+                            .font(.system(size: 22))
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(.secondary)
                     }
                 }
-                .padding(.horizontal, 20).padding(.top, 20)
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 24)
 
-                // 体重输入
+                // ── 体重大数字输入卡
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     TextField("0.0", text: $weightText)
                         .keyboardType(.decimalPad)
-                        .font(.system(size: 52, weight: .black, design: .rounded))
+                        .font(.system(size: 64, weight: .black, design: .rounded))
                         .foregroundStyle(.primary)
-                        .minimumScaleFactor(0.5)
+                        .minimumScaleFactor(0.4)
                         .focused($focused)
+                        .multilineTextAlignment(.center)
                     Text("kg")
-                        .font(.system(size: 32, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.goLime)
+                        .font(.system(size: 26, weight: .black, design: .rounded))
+                        .foregroundStyle(themeColor)
                 }
+                .padding(.horizontal, 32)
+                .padding(.vertical, 28)
+                .frame(maxWidth: .infinity)
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
                 .padding(.horizontal, 20)
 
-                // 日期选择 row
+                // ── 上次体重提示
+                if let last = pet.weightLogs.sorted(by: { $0.date > $1.date }).first {
+                    HStack(spacing: 6) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("上次记录：\(last.weight, specifier: "%.1f") kg")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                    }
+                    .foregroundStyle(.primary.opacity(0.35))
+                    .padding(.top, 10)
+                }
+
+                Spacer(minLength: 20)
+
+                // ── 日期选择
                 HStack(spacing: 10) {
                     Image(systemName: "calendar")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.primary.opacity(0.4))
                     Text("记录日期")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(.primary.opacity(0.4))
                     Spacer()
                     DatePicker("", selection: $recordDate, in: ...Date(), displayedComponents: [.date])
                         .datePickerStyle(.compact)
                         .labelsHidden()
-                        .tint(Color.goLime)
-                        .colorScheme(.dark)
+                        .tint(themeColor)
                 }
-                .padding(.horizontal, 14).padding(.vertical, 10)
-                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 16).padding(.vertical, 12)
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .padding(.horizontal, 20)
 
-                // 保存按钮
+                // ── 保存按钮
                 Button { saveWeight() } label: {
                     HStack(spacing: 8) {
-                        if didSave {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 18, weight: .bold))
-                        }
-                        Text(didSave ? "已保存" : "保存记录")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                        Image(systemName: didSave ? "checkmark.circle.fill" : "scalemass.fill")
+                            .font(.system(size: 16, weight: .bold))
+                        Text(didSave ? "已保存 ✓" : "保存记录")
+                            .font(.system(size: 16, weight: .black, design: .rounded))
                     }
-                    .foregroundStyle(.black)
-                    .frame(maxWidth: .infinity).padding(.vertical, 14)
+                    .foregroundStyle(Color.arkInk)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
                     .background(
-                        didSave ? Color.goTeal : (isValid ? Color.goLime : Color.goLime.opacity(0.4)),
-                        in: RoundedRectangle(cornerRadius: 14)
+                        didSave ? Color.goTeal : (isValid ? themeColor : themeColor.opacity(0.35)),
+                        in: RoundedRectangle(cornerRadius: 20, style: .continuous)
                     )
                 }
                 .disabled(!isValid || didSave)
                 .buttonStyle(.plain)
                 .padding(.horizontal, 20)
-
-                Spacer()
-            }
+                .padding(.top, 16)
+                .padding(.bottom, 32)
         }
+        .background(.ultraThinMaterial)
+        .presentationBackground(.clear)
         .onAppear { focused = true }
     }
 
