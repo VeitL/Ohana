@@ -42,21 +42,20 @@ struct ArkCrewIDCardView: View {
     var body: some View {
         ZStack {
             cardFrontView
-                .opacity(cardRotation <= 90 ? 1 : 0)
+                .opacity(cardRotation < 90 ? 1 : 0)
             cardBackView
-                .scaleEffect(x: -1, y: 1)
-                .opacity(cardRotation > 90 ? 1 : 0)
+                .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+                .opacity(cardRotation >= 90 ? 1 : 0)
         }
         .frame(width: ScreenCompat.width - 48, height: (ScreenCompat.width - 48) / 1.586)
         .compositingGroup()
-        .scaleEffect(x: cardRotation > 90 ? -1 : 1)
-        .rotation3DEffect(.degrees(cardRotation), axis: (x: 0, y: 1, z: 0), perspective: 0.5)
+        .rotation3DEffect(.degrees(cardRotation), axis: (x: 0, y: 1, z: 0), perspective: 0.16)
         .shadow(color: glowFlash ? Color.goLime.opacity(0.8) : Color.black.opacity(0.15),
                 radius: glowFlash ? 20 : 24, x: 0, y: glowFlash ? 0 : 12)
         .scaleEffect(cardScale)
         .animation(.easeInOut(duration: 0.8), value: glowFlash)
         .onChange(of: flipped) { _, newFlipped in
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) {
+            withAnimation(.easeInOut(duration: 0.42)) {
                 cardRotation = newFlipped ? 180 : 0
             }
         }
@@ -1080,6 +1079,9 @@ struct ArkCrewIDCardView: View {
         }
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+        .transaction { tx in
+            tx.animation = nil
+        }
         // sheet 路由（由长按手势触发，非单击）
         .sheet(isPresented: $showWeightSheet) {
             WeightHistoryView(pet: pet)
@@ -1971,7 +1973,6 @@ private struct BackBentoDashboard: View {
                                     Capsule().fill(.white.opacity(0.08)).frame(height: 5)
                                     Capsule().fill(foodAccent)
                                         .frame(width: max(6, geo.size.width * foodProgress), height: 5)
-                                        .animation(.spring(response: 0.5), value: foodProgress)
                                 }
                             }
                             .frame(height: 5)
@@ -2074,7 +2075,6 @@ private struct BackBentoDashboard: View {
                     .trim(from: 0, to: exerciseProgress)
                     .stroke(Color.goLime, style: StrokeStyle(lineWidth: 5, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                    .animation(.spring(response: 0.6), value: exerciseProgress)
                 Image(systemName: "figure.walk")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(Color.goLime)

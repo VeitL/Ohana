@@ -26,6 +26,7 @@ struct GlobalWalkBanner: View {
     @GestureState private var dragDelta: CGFloat = 0 // B1: 实时拖动偏移（GestureState自动归零）
 
     private var mgr: PetWalkingManager { PetWalkingManager.shared }
+    private let flipCardHeight: CGFloat = 272
 
     private var isActive: Bool {
         switch mgr.phase {
@@ -40,6 +41,7 @@ struct GlobalWalkBanner: View {
                 // ── 展开大卡片（遛狗中，结束后立即隐藏）
                 if isActive, !isMinimized, !isStopped, let pet = mgr.currentPet {
                     expandedCard(pet: pet)
+                        .frame(height: flipCardHeight)
                         .padding(.horizontal, 16)
                         .padding(.bottom, safeBottom(geo) + 160)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
@@ -210,11 +212,8 @@ struct GlobalWalkBanner: View {
                     // B2: 先隐藏展开卡，同帧立即显示翻转卡（不中间消失）
                     isStopped = true
                     mgr.stop(modelContext: modelContext, household: households.first)
-                    // 稍等地图快照生成（100ms 足够），然后翻转
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                        showSummaryCard = true
-                        // summaryFlipCard.onAppear 会触发翻转动画
-                    }
+                    // 立即进入翻转卡，避免先露出旧背景再显示新卡
+                    showSummaryCard = true
                 } label: {
                     Label("结束", systemImage: "stop.fill")
                         .font(.system(size: 14, weight: .bold, design: .rounded))
@@ -236,11 +235,39 @@ struct GlobalWalkBanner: View {
         let distance = LocationManager.shared.totalDistance
         let poop = mgr.poopCount
         let latestWalk = pet.walkLogs.sorted { $0.startDate > $1.startDate }.first
+        let showBack = summaryRotation >= 90
 
-        // B2: 简化翻转——直接用 rotation3DEffect 从0→180
-        // summaryRotation: 0=正面(不可见) → 180=背面(可见)
-        return VStack(spacing: 0) {
-            // ── 顶栏
+        return ZStack {
+            summaryBackFace(pet: pet, elapsed: elapsed, distance: distance, poop: poop, latestWalk: latestWalk)
+                .opacity(showBack ? 0 : 1)
+
+            summaryBackFace(pet: pet, elapsed: elapsed, distance: distance, poop: poop, latestWalk: latestWalk)
+                .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+                .opacity(showBack ? 1 : 0)
+        }
+        .frame(maxWidth: .infinity, minHeight: flipCardHeight, maxHeight: flipCardHeight)
+        .rotation3DEffect(.degrees(summaryRotation), axis: (x: 0, y: 1, z: 0), perspective: 0.75)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .shadow(color: .black.opacity(0.25), radius: 16, x: 0, y: 6)
+        .padding(.horizontal, 16)
+        .padding(.bottom, safeBottom(geo) + 160)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .onAppear {
+            summaryRotation = 0
+            withAnimation(.easeInOut(duration: 0.42)) {
+                summaryRotation = 180
+            }
+        }
+    }
+
+    private func summaryBackFace(
+        pet: Pet,
+        elapsed: TimeInterval,
+        distance: Double,
+        poop: Int,
+        latestWalk: PetWalkLog?
+    ) -> some View {
+        VStack(spacing: 0) {
             HStack {
                 HStack(spacing: 8) {
                     petAvatar(pet: pet, size: 36)
@@ -254,7 +281,6 @@ struct GlobalWalkBanner: View {
                     }
                 }
                 Spacer()
-                // B2: 关闭按钮——直接操作 State，不嵌套 withAnimation 外层
                 Button {
                     withAnimation(.easeOut(duration: 0.2)) {
                         showSummaryCard = false
@@ -271,21 +297,19 @@ struct GlobalWalkBanner: View {
                 .contentShape(Rectangle())
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 20).padding(.top, 18)
+            .padding(.horizontal, 18).padding(.top, 12)
 
-            // ── 地图快照（B2: 点击打开 Apple Maps）
             Group {
                 if let walk = latestWalk, let data = walk.mapSnapshotData, let ui = UIImage(data: data) {
                     Button {
-                        // 打开 Apple Maps（以步行终点为中心）
                         if let url = URL(string: "maps://") { UIApplication.shared.open(url) }
                     } label: {
                         Image(uiImage: ui)
                             .resizable().scaledToFill()
-                            .frame(maxWidth: .infinity).frame(height: 160)
-                            .clipped()  // U19: 裁剪溢出像素
+                            .frame(maxWidth: .infinity).frame(height: 108)
+                            .clipped()
                             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous)) // U19: 约束触摸区域
+                            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                             .overlay(
                                 HStack(spacing: 4) {
                                     Image(systemName: "map.fill").font(.system(size: 11, weight: .bold))
@@ -303,7 +327,7 @@ struct GlobalWalkBanner: View {
                 } else {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(.white.opacity(0.06))
-                        .frame(maxWidth: .infinity).frame(height: 80)
+                        .frame(maxWidth: .infinity).frame(height: 108)
                         .overlay(
                             HStack(spacing: 6) {
                                 Image(systemName: "map").font(.system(size: 20)).foregroundStyle(.primary.opacity(0.2))
@@ -312,11 +336,10 @@ struct GlobalWalkBanner: View {
                         )
                 }
             }
-            .padding(.horizontal, 20).padding(.top, 10)
+            .padding(.horizontal, 18).padding(.top, 6)
 
-            GoDashedDivider().padding(.horizontal, 20).padding(.top, 12)
+            GoDashedDivider().padding(.horizontal, 18).padding(.top, 10)
 
-            // ── 数据行
             HStack(spacing: 0) {
                 summaryStatCell(label: "时长", value: formatElapsed(elapsed), accent: .goLime)
                 Rectangle().fill(.white.opacity(0.1)).frame(width: 1, height: 36)
@@ -326,23 +349,8 @@ struct GlobalWalkBanner: View {
                 Rectangle().fill(.white.opacity(0.1)).frame(width: 1, height: 36)
                 summaryStatCell(label: "便便", value: "\(poop) 💩", accent: .goYellow)
             }
-            .padding(.vertical, 14)
-        }
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .shadow(color: .black.opacity(0.25), radius: 16, x: 0, y: 6)
-        // C8: scaleEffect(x:-1) 纠正镜像，配合 rotation3DEffect
-        .scaleEffect(x: summaryRotation > 90 ? -1 : 1)
-        // B2: 从正面(0°)开始翻转到背面(180°)
-        .rotation3DEffect(.degrees(summaryRotation), axis: (0, 1, 0))
-        .opacity(summaryRotation > 90 ? 1 : 0)
-        .padding(.horizontal, 16)
-        .padding(.bottom, safeBottom(geo) + 160)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .onAppear {
-            summaryRotation = 0  // 确保从0开始
-            withAnimation(.spring(response: 0.55, dampingFraction: 0.82)) {
-                summaryRotation = 180
-            }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 10)
         }
     }
 
