@@ -41,7 +41,7 @@ struct GlobalWalkBanner: View {
                 if isActive, !isMinimized, !isStopped, let pet = mgr.currentPet {
                     expandedCard(pet: pet)
                         .padding(.horizontal, 16)
-                        .padding(.bottom, safeBottom(geo) + 100)
+                        .padding(.bottom, safeBottom(geo) + 160)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                         .transition(.opacity)
                         .zIndex(998)
@@ -104,7 +104,7 @@ struct GlobalWalkBanner: View {
                 }
         )
         .padding(.trailing, 20)
-        .padding(.bottom, safeBottom(geo) + 100)
+        .padding(.bottom, safeBottom(geo) + 160)
         .offset(y: clampedY)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
     }
@@ -226,13 +226,8 @@ struct GlobalWalkBanner: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 20).padding(.vertical, 14)
         }
-        .background(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Color(hex: "0D1A0D").opacity(0.97))
-                .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .strokeBorder(Color.goLime.opacity(0.28), lineWidth: 1.5))
-                .shadow(color: Color.goLime.opacity(0.18), radius: 24, y: -4)
-        )
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .shadow(color: .black.opacity(0.25), radius: 16, x: 0, y: 6)
     }
 
     // MARK: - 结束后翻转详情卡（B2 重写）
@@ -333,20 +328,15 @@ struct GlobalWalkBanner: View {
             }
             .padding(.vertical, 14)
         }
-        .background(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Color(hex: "0A1A10").opacity(0.97))
-                .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .strokeBorder(Color.goLime.opacity(0.3), lineWidth: 1.5))
-                .shadow(color: Color.goLime.opacity(0.2), radius: 24, y: -4)
-        )
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .shadow(color: .black.opacity(0.25), radius: 16, x: 0, y: 6)
         // C8: scaleEffect(x:-1) 纠正镜像，配合 rotation3DEffect
         .scaleEffect(x: summaryRotation > 90 ? -1 : 1)
         // B2: 从正面(0°)开始翻转到背面(180°)
         .rotation3DEffect(.degrees(summaryRotation), axis: (0, 1, 0))
         .opacity(summaryRotation > 90 ? 1 : 0)
         .padding(.horizontal, 16)
-        .padding(.bottom, safeBottom(geo) + 100)
+        .padding(.bottom, safeBottom(geo) + 160)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .onAppear {
             summaryRotation = 0  // 确保从0开始

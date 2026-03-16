@@ -25,7 +25,7 @@ struct ArkCrewIDCardView: View {
     @State private var _isFlipped = false
     @State private var glowFlash = false
     @State private var cardScale: CGFloat = 1.0
-    @State private var showFront = true
+    @State private var cardRotation: Double = 0
 
     private var flipped: Bool {
         isFlipped?.wrappedValue ?? _isFlipped
@@ -42,27 +42,25 @@ struct ArkCrewIDCardView: View {
     var body: some View {
         ZStack {
             cardFrontView
-                .opacity(showFront ? 1 : 0)
+                .opacity(cardRotation <= 90 ? 1 : 0)
             cardBackView
                 .scaleEffect(x: -1, y: 1)
-                .opacity(showFront ? 0 : 1)
+                .opacity(cardRotation > 90 ? 1 : 0)
         }
         .frame(width: ScreenCompat.width - 48, height: (ScreenCompat.width - 48) / 1.586)
         .compositingGroup()
-        .rotation3DEffect(.degrees(flipped ? 180 : 0), axis: (x: 0, y: 1, z: 0), perspective: 0.5)
+        .scaleEffect(x: cardRotation > 90 ? -1 : 1)
+        .rotation3DEffect(.degrees(cardRotation), axis: (x: 0, y: 1, z: 0), perspective: 0.5)
         .shadow(color: glowFlash ? Color.goLime.opacity(0.8) : Color.black.opacity(0.15),
                 radius: glowFlash ? 20 : 24, x: 0, y: glowFlash ? 0 : 12)
         .scaleEffect(cardScale)
-        .animation(.spring(response: 0.5, dampingFraction: 0.82), value: flipped)
         .animation(.easeInOut(duration: 0.8), value: glowFlash)
         .onChange(of: flipped) { _, newFlipped in
-            // 在旋转到 90° 时切换正反面内容（spring 动画 ~0.22s 到达中点）
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-                var t = Transaction(); t.disablesAnimations = true
-                withTransaction(t) { showFront = !newFlipped }
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) {
+                cardRotation = newFlipped ? 180 : 0
             }
         }
-        .onAppear { showFront = !flipped }
+        .onAppear { cardRotation = flipped ? 180 : 0 }
     }
     
     // Card theme color based on pet's themeColorHex

@@ -227,6 +227,37 @@ struct GoTranslucentCardModifier: ViewModifier {
     }
 }
 
+struct GoGlassBackground<S: InsettableShape>: ViewModifier {
+    var shape: S
+    
+    func body(content: Content) -> some View {
+        content
+            .background {
+                shape
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.goDarkBlue.opacity(0.82),
+                                Color.goDeepNavy.opacity(0.92)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        shape
+                            .fill(.ultraThinMaterial.opacity(0.08))
+                    )
+            }
+            .clipShape(shape)
+            .overlay(
+                shape
+                    .strokeBorder(Color.white.opacity(0.13), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.18), radius: 24, y: -6)
+    }
+}
+
 // MARK: - View Extensions
 extension View {
     func ohanaGlassStyle(cornerRadius: CGFloat = 32, fillOpacity: CGFloat = 0.12) -> some View {
@@ -247,6 +278,10 @@ extension View {
     
     func neonCapsuleButton() -> some View {
         modifier(NeonCapsuleButtonModifier())
+    }
+    
+    func goGlassBackground<S: InsettableShape>(_ shape: S) -> some View {
+        modifier(GoGlassBackground(shape: shape))
     }
     
     func capsuleButtonDark() -> some View {
@@ -335,8 +370,7 @@ struct GoBottomTabBar: View {
             }
         }
         .padding(6)
-        .background(.white, in: Capsule())
-        .shadow(color: .black.opacity(0.08), radius: 16, x: 0, y: -4)
+        .goGlassBackground(Capsule())
     }
 }
 
