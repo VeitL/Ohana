@@ -68,7 +68,7 @@ struct AchievementWallView: View {
             }
             .frame(maxWidth: .infinity)
 
-            Rectangle().fill(.white.opacity(0.12)).frame(width: 1, height: 40)
+            Rectangle().fill(.primary.opacity(0.12)).frame(width: 1, height: 40)
 
             VStack(spacing: 6) {
                 Text("\(total)")
@@ -80,7 +80,7 @@ struct AchievementWallView: View {
             }
             .frame(maxWidth: .infinity)
 
-            Rectangle().fill(.white.opacity(0.12)).frame(width: 1, height: 40)
+            Rectangle().fill(.primary.opacity(0.12)).frame(width: 1, height: 40)
 
             VStack(spacing: 6) {
                 Text(total > 0 ? "\(Int(Double(unlocked)/Double(total)*100))%" : "0%")
@@ -103,7 +103,7 @@ struct AchievementWallView: View {
         VStack(spacing: 8) {
             ZStack {
                 Circle()
-                    .fill(badge.isUnlocked ? badge.color.opacity(0.18) : Color.white.opacity(0.05))
+                    .fill(badge.isUnlocked ? badge.color.opacity(0.18) : Color.primary.opacity(0.05))
                     .frame(width: 60, height: 60)
 
                 if badge.isUnlocked {
@@ -128,7 +128,7 @@ struct AchievementWallView: View {
 
             Text(badge.title)
                 .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(badge.isUnlocked ? .white : .white.opacity(0.3))
+                .foregroundStyle(badge.isUnlocked ? Color.primary : Color.primary.opacity(0.3))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
 

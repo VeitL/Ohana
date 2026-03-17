@@ -64,13 +64,13 @@ struct WalkSummarySheet: View {
             statColumn(value: "\(sortedWalks.count)", label: "总次数", emoji: "🚶")
             
             Rectangle()
-                .fill(.white.opacity(0.15))
+                .fill(.primary.opacity(0.15))
                 .frame(width: 1, height: 40)
             
             statColumn(value: distanceFormatted(totalDistance), label: "总距离", emoji: "📏")
             
             Rectangle()
-                .fill(.white.opacity(0.15))
+                .fill(.primary.opacity(0.15))
                 .frame(width: 1, height: 40)
             
             statColumn(value: durationFormatted(totalDuration), label: "总时长", emoji: "⏱️")
@@ -136,12 +136,11 @@ struct WalkSummarySheet: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10))
             } else {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(.white.opacity(0.06))
-                        .frame(width: 56, height: 56)
                     Image(systemName: "map")
                         .foregroundStyle(.primary.opacity(0.3))
                 }
+                .frame(width: 56, height: 56)
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             // 右侧箭头提示
             Image(systemName: "chevron.right")

@@ -202,28 +202,7 @@ struct GoTranslucentCardModifier: ViewModifier {
     
     func body(content: Content) -> some View {
         content
-            .background {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.goDarkBlue.opacity(0.82),
-                                Color.goDeepNavy.opacity(0.92)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(.ultraThinMaterial.opacity(0.08))
-                    )
-            }
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(.white.opacity(0.13), lineWidth: 1)
-            }
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 }
 
@@ -232,29 +211,7 @@ struct GoGlassBackground<S: InsettableShape>: ViewModifier {
     
     func body(content: Content) -> some View {
         content
-            .background {
-                shape
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.goDarkBlue.opacity(0.82),
-                                Color.goDeepNavy.opacity(0.92)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay(
-                        shape
-                            .fill(.ultraThinMaterial.opacity(0.08))
-                    )
-            }
-            .clipShape(shape)
-            .overlay(
-                shape
-                    .strokeBorder(Color.white.opacity(0.13), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.18), radius: 24, y: -6)
+            .glassEffect(.regular, in: shape)
     }
 }
 

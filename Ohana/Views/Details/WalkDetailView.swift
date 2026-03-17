@@ -157,14 +157,10 @@ struct WalkDetailView: View {
                 .scaledToFill()
                 .frame(height: 220)
                 .clipShape(RoundedRectangle(cornerRadius: 20))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .strokeBorder(.white.opacity(0.12), lineWidth: 1)
-                )
         } else {
             ZStack {
                 RoundedRectangle(cornerRadius: 20)
-                    .fill(.white.opacity(0.05))
+                    .fill(.regularMaterial)
                     .frame(height: 160)
                 VStack(spacing: 8) {
                     Image(systemName: "map")
@@ -195,7 +191,7 @@ struct WalkDetailView: View {
 
     private var divider: some View {
         Rectangle()
-            .fill(.white.opacity(0.12))
+            .fill(.primary.opacity(0.12))
             .frame(width: 1, height: 40)
     }
 

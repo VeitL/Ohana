@@ -13,6 +13,7 @@ struct OverviewView: View {
     @Binding var selectedHuman: Human?
     @Binding var selectedPlant: Plant?
     @Binding var selectedPetTab: PetDetailTab
+    var heroNS: Namespace.ID
     
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.modelContext) private var modelContext
@@ -399,26 +400,26 @@ struct OverviewView: View {
 
                 // ── 层3：3D 宠物卡牌转盘（第一视界）
                 if (!pets.isEmpty || !humans.isEmpty) && !hiddenSections.contains("petCards") {
-                    CritterDeckCarousel(
+                    PetWalletStack(
                         pets: pets,
                         humans: humans,
+                        heroNS: heroNS,
                         onSelectPet: { selectedPetTab = .overview; selectedPet = $0 },
                         onSelectHuman: { selectedHuman = $0 },
                         onTopCardChanged: { item in
                             if case .pet(let p) = item { activeCritterIdStr = p.id.uuidString }
                             else { activeCritterIdStr = "" }
-                        },
-                        initialTopId: activeCritterId,  // N5: 返回时恢复上次顶牌
-                        resetFlip: deckResetFlip
+                        }
                     )
                     .onAppear {
-                        deckResetFlip.toggle()
-                        // N5: 仅首次（无保存值时）初始化为第一只宠物
                         if activeCritterIdStr.isEmpty {
                             activeCritterId = pets.first?.id
                         }
                     }
                 }
+
+                // ── 层3.5：间距，实现其他卡片下移一行
+                Spacer().frame(height: 24)
 
                 // ── 层4+：按 orderedSections 驱动渲染（严格绑定排序与显隐）
                 ForEach(orderedSections, id: \.self) { sectionId in
@@ -695,10 +696,16 @@ struct OverviewView: View {
         VStack(alignment: .leading, spacing: 8) {
                 // Section Header — 浮动标题，无背景
                 HStack {
-                    Text("ISLAND STATS")
-                        .font(OhanaFont.caption2(.bold))
-                        .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.45) : Color.black.opacity(0.4))
-                        .tracking(3)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("岛屿统计")
+                            .font(OhanaFont.caption2(.bold))
+                            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.45) : Color.black.opacity(0.4))
+                            .tracking(3)
+                        Text("ISLAND STATS")
+                            .font(OhanaFont.caption2(.bold))
+                            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.25) : Color.black.opacity(0.25))
+                            .tracking(2)
+                    }
                     Spacer()
                     HStack(spacing: 4) {
                         Text("左滑查看更多")
@@ -1110,8 +1117,9 @@ struct OverviewView: View {
             // E2: 标题行 + 右上角 + 按钮
             HStack {
                 Text("快捷操作")
-                    .font(OhanaFont.title3(.black))
-                    .foregroundStyle(.primary)
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.45) : Color.black.opacity(0.4))
+                    .tracking(3)
                 Spacer()
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -1125,7 +1133,7 @@ struct OverviewView: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 20)
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4), spacing: 10) {
                 // 现有卡片
@@ -1853,8 +1861,9 @@ struct OverviewView: View {
 //   Components/OverviewQuickActions.swift (QuickActionItem, GoQuickActionCard, AddQuickActionSheet, QuickFeedSheet)
 
 #Preview {
+    @Previewable @Namespace var previewNS
     NavigationStack {
-        OverviewView(selectedPet: .constant(nil), selectedHuman: .constant(nil), selectedPlant: .constant(nil), selectedPetTab: .constant(.overview))
+        OverviewView(selectedPet: .constant(nil), selectedHuman: .constant(nil), selectedPlant: .constant(nil), selectedPetTab: .constant(.overview), heroNS: previewNS)
     }
     .modelContainer(SharedModelContainer.make())
 }

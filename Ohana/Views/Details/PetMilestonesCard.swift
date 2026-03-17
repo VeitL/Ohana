@@ -51,21 +51,21 @@ struct PetMilestonesCard: View {
             VStack(spacing: 0) {
                 ZStack {
                     Circle()
-                        .fill(index == 0 ? Color.goYellow : Color.white.opacity(0.12))
+                        .fill(index == 0 ? Color.goYellow : Color.primary.opacity(0.12))
                         .frame(width: 28, height: 28)
                     Text(milestone.emoji)
                         .font(.system(size: 14))
                 }
                 if index < total - 1 {
                     Rectangle()
-                        .fill(.white.opacity(0.1))
+                        .fill(.primary.opacity(0.1))
                         .frame(width: 2, height: 32)
                 }
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(milestone.title)
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(index == 0 ? .white : .white.opacity(0.7))
+                    .foregroundStyle(index == 0 ? Color.primary : Color.primary.opacity(0.7))
                 Text(milestone.date, style: .date)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.primary.opacity(0.35))

@@ -38,7 +38,7 @@ struct PetHygieneDetailView: View {
     }
 
     private func statusColor(_ type: HygieneType) -> Color {
-        guard let d = daysSince(type) else { return .white.opacity(0.25) }
+        guard let d = daysSince(type) else { return .primary.opacity(0.25) }
         let p = Double(d) / Double(type.cycleDays)
         if p < 0.5  { return themeColor }
         if p < 0.85 { return Color.goYellow }
@@ -137,8 +137,7 @@ struct PetHygieneDetailView: View {
             }
         }
         .padding(.vertical, 14)
-        .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(.white.opacity(0.08), lineWidth: 1))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     // MARK: - 是否今天已完成
@@ -177,7 +176,7 @@ struct PetHygieneDetailView: View {
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.primary.opacity(0.3))
                         .padding(.horizontal, 7).padding(.vertical, 3)
-                        .background(.white.opacity(0.05), in: Capsule())
+                        .glassEffect(.regular, in: Capsule())
                 }
                 // 打卡胶囊（右上角精致按钮）
                 Button {
@@ -192,7 +191,7 @@ struct PetHygieneDetailView: View {
                             .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(.primary.opacity(0.45))
                             .padding(.horizontal, 10).padding(.vertical, 5)
-                            .background(.white.opacity(0.07), in: Capsule())
+                            .glassEffect(.regular, in: Capsule())
                     } else {
                         Text("打卡")
                             .font(.system(size: 11, weight: .black, design: .rounded))
@@ -246,10 +245,7 @@ struct PetHygieneDetailView: View {
             }
         }
         .padding(14)
-        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(
-            doneToday ? Color.goLime.opacity(0.18) : color.opacity(0.2), lineWidth: 1
-        ))
+        .glassEffect(doneToday ? .regular.tint(Color.goLime.opacity(0.15)) : .regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         // 动态透明度：今天已完成则降低，视觉重心自然转向未记录项
         .opacity(doneToday ? 0.55 : 1.0)
         .animation(.easeInOut(duration: 0.25), value: doneToday)
@@ -373,8 +369,7 @@ struct PetHygieneDetailView: View {
             }
         }
         .padding(16)
-        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.goYellow.opacity(0.2), lineWidth: 1))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private func statCell(emoji: String, value: String, label: String, color: Color) -> some View {

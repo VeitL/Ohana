@@ -64,7 +64,7 @@ struct DocumentDetailSheet: View {
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundStyle(.primary.opacity(0.4))
                                 .padding(.horizontal, 12).padding(.vertical, 4)
-                                .background(.white.opacity(0.08), in: Capsule())
+                                .glassEffect(.regular, in: Capsule())
                         }
                         .padding(.top, 8)
 
@@ -87,26 +87,25 @@ struct DocumentDetailSheet: View {
                         VStack(spacing: 0) {
                             if let issue = doc.issueDate {
                                 infoRow(icon: "calendar", label: "签发日期", value: issue.formatted(.dateTime.year().month().day()))
-                                Divider().background(.white.opacity(0.08))
+                                Divider()
                             }
                             if let expiry = doc.expiryDate {
                                 infoRow(icon: "clock", label: "到期日期", value: expiry.formatted(.dateTime.year().month().day()), valueColor: expiryColor)
-                                Divider().background(.white.opacity(0.08))
+                                Divider()
                             }
                             if !doc.issuingAuthority.isEmpty {
                                 infoRow(icon: "building.2", label: "签发机构", value: doc.issuingAuthority)
-                                Divider().background(.white.opacity(0.08))
+                                Divider()
                             }
                             if doc.cost > 0 {
                                 infoRow(icon: "yensign.circle", label: "花费", value: String(format: "¥%.2f", doc.cost))
-                                Divider().background(.white.opacity(0.08))
+                                Divider()
                             }
                             if !doc.notes.isEmpty {
                                 infoRow(icon: "note.text", label: "备注", value: doc.notes)
                             }
                         }
-                        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
-                        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.white.opacity(0.1), lineWidth: 1))
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                         // ── 图片附件（支持多附件）
                         if !imageAttachments.isEmpty {
@@ -120,10 +119,6 @@ struct DocumentDetailSheet: View {
                                                     .resizable().scaledToFill()
                                                     .frame(maxWidth: .infinity).frame(height: 140)
                                                     .clipShape(RoundedRectangle(cornerRadius: 12))
-                                                    .overlay(
-                                                        RoundedRectangle(cornerRadius: 12)
-                                                            .strokeBorder(.white.opacity(0.1), lineWidth: 1)
-                                                    )
                                             }
                                             .buttonStyle(.plain)
                                         }
@@ -148,7 +143,7 @@ struct DocumentDetailSheet: View {
                                         Spacer()
                                     }
                                     .padding(12)
-                                    .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                                 }
                             }
                         }

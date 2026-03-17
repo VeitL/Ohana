@@ -293,7 +293,7 @@ struct PetVetPDFShareSheet: View {
                     // 预览缩略图
                     ZStack {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(.white.opacity(0.08))
+                            .fill(.regularMaterial)
                             .frame(maxWidth: .infinity)
                             .frame(height: 200)
                         VStack(spacing: 8) {

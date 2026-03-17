@@ -224,7 +224,7 @@ struct SitterCardPreviewSheet: View {
             .font(.system(size: 10, weight: .bold, design: .rounded))
             .foregroundStyle(.primary.opacity(0.6))
             .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(.white.opacity(0.1), in: Capsule())
+            .glassEffect(.regular, in: Capsule())
     }
 
     // MARK: - Share

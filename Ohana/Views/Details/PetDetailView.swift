@@ -78,17 +78,23 @@ struct PetDetailView: View {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 20) {
 
-                    // ── L1: Hero 卡 ──────────────────────────────────────
-                    PetHeroRow(pet: pet, onTap: { showingPetInfo = true })
-
-                    // ── L1.5: 工具快捷栏 ──────────────────────────────────
+                    // ── L0: 工具快捷栏（卡片上方）────────────────────────
                     petToolbar
                         .padding(.horizontal, 16)
+
+                    // ── L1: Hero 卡（与首页 Wallet 堆叠卡片同款，zoom 过渡目标）
+                    Button { showingPetInfo = true } label: {
+                        WalletPetCardFront(pet: pet, cornerRadius: 24)
+                            .frame(height: (ScreenCompat.width - 32) / 1.586)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16)
+                    .shadow(color: .black.opacity(0.25), radius: 20, y: 8)
 
                     // ── L2: 智能预警横滚区（有警告时才出现）──────────────
                     PetAlertScrollSection(pet: pet)
 
-                    // ── L3: 图表仪表盘 ─────────────────────────────────────
+                    // ── L3: 图表仪表盘────────────────────────
                     PetChartDashboard(
                         pet: pet,
                         onWeight:  { showingWeightHistory  = true },
@@ -100,11 +106,14 @@ struct PetDetailView: View {
                         quickWeightInput: $quickWeightInput,
                         modelContext: modelContext
                     )
+                    .padding(16)
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .padding(.horizontal, 16)
 
                     // ── L3.5 - L5: 卡片网格 ──────────────────────────────
                     VStack(spacing: 12) {
                         // 免疫健康中枢卡（全宽）
-                        UltimateGlassCard {
+                        VStack(spacing: 8) {
                             PetHealthHubCard(pet: pet, onRecord: { type in
                                 healthRecordType = type
                             }, onViewPassport: {
@@ -112,38 +121,40 @@ struct PetDetailView: View {
                             }, onViewDetail: {
                                 showingHealthDetail = true
                             })
-                            .padding(14)
+                            .padding(16)
                         }
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
 
                         // 护理卡 + 饮食卡（横排）
                         HStack(spacing: 12) {
-                            UltimateGlassCard {
-                                PetHygieneCard(pet: pet).padding(14)
+                            VStack(spacing: 8) {
+                                PetHygieneCard(pet: pet).padding(16)
                             }
-                            UltimateGlassCard {
+                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                            VStack(spacing: 8) {
                                 DietCardWithQuickActions(
                                     pet: pet,
                                     onOpenDetail: { showingFoodManagement = true }
-                                ).padding(14)
+                                ).padding(16)
                             }
+                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
                         }
 
                         // 狗狗专属活动卡
                         if pet.species == "狗" {
-                            UltimateGlassCard {
-                                DogActivityCard(pet: pet).padding(14)
+                            VStack(spacing: 8) {
+                                DogActivityCard(pet: pet).padding(16)
                             }
+                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
                         }
 
-                        // 三列紧凑卡：证件 / 里程碑 / 成就
+                        // 三列紧凑卡：证件 / 回忆录 / 成就
                         HStack(spacing: 8) {
                             NavigationLink { DocumentsListView(pet: pet) } label: {
                                 compactDocumentsCard
                             }.buttonStyle(.plain)
 
-                            Button { showingMilestones = true } label: {
-                                compactMilestonesCard
-                            }.buttonStyle(.plain)
+                            compactMemoriesCard
 
                             Button { showingAchievements = true } label: {
                                 compactAchievementsCard
@@ -178,11 +189,6 @@ struct PetDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                CoconutBalanceCapsule { showingCoconutLog = true }
-            }
-        }
         .sheet(isPresented: $showingEditSheet)        { EditPetSheet(pet: pet) }
         .sheet(isPresented: $showingCalendar)         { CalendarView(preselectedPetId: pet.id.uuidString) }
         .sheet(isPresented: $showingSitterCard)       { SitterCardPreviewSheet(pet: pet) }
@@ -294,7 +300,7 @@ struct PetDetailView: View {
 
     // MARK: - Vaccine Banner Row
     private var vaccineBannerRow: some View {
-        UltimateGlassCard {
+        VStack(spacing: 8) {
             HStack(spacing: 14) {
                 Text("💉").font(.system(size: 28))
                 VStack(alignment: .leading, spacing: 3) {
@@ -311,8 +317,9 @@ struct PetDetailView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.primary.opacity(0.3))
             }
-            .padding(14)
+            .padding(16)
         }
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     // MARK: - Achievement Banner Row
@@ -320,7 +327,7 @@ struct PetDetailView: View {
         let achievements = AchievementManager.compute(for: pet)
         let unlocked = achievements.filter(\.isUnlocked).count
         let total    = achievements.count
-        return UltimateGlassCard {
+        return VStack(spacing: 8) {
             HStack(spacing: 14) {
                 ZStack {
                     Circle().fill(Color.goYellow.opacity(0.15)).frame(width: 44, height: 44)
@@ -341,14 +348,15 @@ struct PetDetailView: View {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold)).foregroundStyle(.primary.opacity(0.3))
             }
-            .padding(.horizontal, 16).padding(.vertical, 14)
+            .padding(16)
         }
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     // MARK: - Compact 三列卡（证件/里程碑/成就）
     private var compactDocumentsCard: some View {
         let expiring = pet.documents.filter { $0.isExpiringSoon || $0.isExpired }
-        return UltimateGlassCard {
+        return VStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 4) {
                     Image(systemName: "doc.text")
@@ -382,38 +390,47 @@ struct PetDetailView: View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    private var compactMilestonesCard: some View {
+    private var compactMemoriesCard: some View {
         let latest = pet.milestones.sorted { $0.date > $1.date }.first
-        return UltimateGlassCard {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 4) {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.goYellow)
-                    Text("里程碑")
-                        .font(OhanaFont.footnote(.black))
+        return NavigationLink(destination: PetMilestoneListView(pet: pet)) {
+            VStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 4) {
+                        Text("📸")
+                            .font(.system(size: 11))
+                        Text("回忆录")
+                            .font(OhanaFont.footnote(.black))
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Image(systemName: "plus")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(Color.goLime)
+                            .padding(4)
+                            .background(Color.goLime.opacity(0.15), in: Circle())
+                    }
+                    Text("\(pet.milestones.count)")
+                        .font(OhanaFont.metric(size: 26))
                         .foregroundStyle(.primary)
-                    Spacer()
+                    if let m = latest {
+                        Text(m.emoji + " " + m.title)
+                            .font(OhanaFont.caption2(.bold))
+                            .foregroundStyle(.primary.opacity(0.6))
+                            .lineLimit(1)
+                    } else {
+                        Text("暂无记录")
+                            .font(OhanaFont.caption2(.medium))
+                            .foregroundStyle(.primary.opacity(0.3))
+                    }
                 }
-                Text("\(pet.milestones.count)")
-                    .font(OhanaFont.metric(size: 26))
-                    .foregroundStyle(.primary)
-                if let m = latest {
-                    Text(m.emoji + " " + m.title)
-                        .font(OhanaFont.caption2(.bold))
-                        .foregroundStyle(.primary.opacity(0.6))
-                        .lineLimit(1)
-                } else {
-                    Text("暂无记录")
-                        .font(OhanaFont.caption2(.medium))
-                        .foregroundStyle(.primary.opacity(0.3))
-                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
+        .buttonStyle(.plain)
     }
 
     private var compactAchievementsCard: some View {
@@ -421,7 +438,7 @@ struct PetDetailView: View {
         let unlocked = achievements.filter(\.isUnlocked).count
         let total    = achievements.count
         let pct      = total > 0 ? Int(Double(unlocked) / Double(total) * 100) : 0
-        return UltimateGlassCard {
+        return VStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 4) {
                     Text("🏆").font(.system(size: 11))
@@ -443,6 +460,7 @@ struct PetDetailView: View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - Rainbow Bridge Section
@@ -1058,7 +1076,7 @@ private struct PetBentoGrid: View {
                             .font(OhanaFont.callout(.bold))
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 10).padding(.vertical, 6)
-                            .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                         Button {
                             if let w = Double(quickWeightInput.replacingOccurrences(of: ",", with: ".")) {
                                 let log = PetWeightLog(date: Date(), weight: w, pet: pet)
@@ -1123,7 +1141,7 @@ private struct PetBentoGrid: View {
                         Text("距离").font(.system(size: 9, weight: .semibold)).foregroundStyle(.primary.opacity(0.4))
                         Text(w.distanceText).font(.system(size: 18, weight: .black, design: .rounded)).foregroundStyle(.primary)
                     }
-                    Rectangle().fill(.white.opacity(0.1)).frame(width: 1, height: 28)
+                    Rectangle().fill(.primary.opacity(0.1)).frame(width: 1, height: 28)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("时长").font(.system(size: 9, weight: .semibold)).foregroundStyle(.primary.opacity(0.4))
                         Text(w.durationText).font(.system(size: 18, weight: .black, design: .rounded)).foregroundStyle(.primary)
@@ -1235,71 +1253,70 @@ private struct PetUnifiedTimeline: View {
     }
 
     var body: some View {
-        UltimateGlassCard {
-            VStack(alignment: .leading, spacing: 0) {
-                // 标题
-                HStack {
-                    Text("岁月史书")
-                        .font(OhanaFont.footnote(.black))
-                        .foregroundStyle(.primary.opacity(0.4))
-                        .tracking(2)
-                    Spacer()
-                    Text("\(items.count) 条")
-                        .font(OhanaFont.caption(.medium))
-                        .foregroundStyle(.primary.opacity(0.25))
-                }
-                .padding(.bottom, 16)
+        VStack(alignment: .leading, spacing: 0) {
+            // 标题
+            HStack {
+                Text("岁月史书")
+                    .font(OhanaFont.footnote(.black))
+                    .foregroundStyle(.primary.opacity(0.4))
+                    .tracking(2)
+                Spacer()
+                Text("\(items.count) 条")
+                    .font(OhanaFont.caption(.medium))
+                    .foregroundStyle(.primary.opacity(0.25))
+            }
+            .padding(.bottom, 16)
 
-                if items.isEmpty {
-                    Text("还没有任何记录")
-                        .font(OhanaFont.subheadline(.medium))
-                        .foregroundStyle(.primary.opacity(0.3))
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 24)
-                } else {
-                    ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
-                        HStack(alignment: .top, spacing: 14) {
-                            // 左侧时间轴
-                            VStack(spacing: 0) {
-                                ZStack {
-                                    Circle().fill(item.color.opacity(0.18)).frame(width: 34, height: 34)
-                                    Image(systemName: item.iconName)
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(item.color)
-                                }
-                                if idx < items.count - 1 {
-                                    Rectangle()
-                                        .fill(.white.opacity(0.08))
-                                        .frame(width: 1)
-                                        .frame(minHeight: 20)
-                                }
+            if items.isEmpty {
+                Text("还没有任何记录")
+                    .font(OhanaFont.subheadline(.medium))
+                    .foregroundStyle(.primary.opacity(0.3))
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 24)
+            } else {
+                ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
+                    HStack(alignment: .top, spacing: 14) {
+                        // 左侧时间轴
+                        VStack(spacing: 0) {
+                            ZStack {
+                                Circle().fill(item.color.opacity(0.18)).frame(width: 34, height: 34)
+                                Image(systemName: item.iconName)
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(item.color)
                             }
-
-                            // 右侧内容
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(item.title)
-                                    .font(OhanaFont.footnote(.bold))
-                                    .foregroundStyle(.primary)
-                                if !item.subtitle.isEmpty {
-                                    Text(item.subtitle)
-                                        .font(OhanaFont.caption(.medium))
-                                        .foregroundStyle(.primary.opacity(0.4))
-                                        .lineLimit(1)
-                                }
-                                Text(item.date, format: .dateTime.year().month().day().hour().minute())
-                                    .font(OhanaFont.caption2(.medium))
-                                    .foregroundStyle(.primary.opacity(0.25))
+                            if idx < items.count - 1 {
+                                Rectangle()
+                                    .fill(.primary.opacity(0.08))
+                                    .frame(width: 1)
+                                    .frame(minHeight: 20)
                             }
-                            .padding(.top, 6)
-                            .padding(.bottom, idx < items.count - 1 ? 16 : 0)
-
-                            Spacer()
                         }
+
+                        // 右侧内容
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(item.title)
+                                .font(OhanaFont.footnote(.bold))
+                                .foregroundStyle(.primary)
+                            if !item.subtitle.isEmpty {
+                                Text(item.subtitle)
+                                    .font(OhanaFont.caption(.medium))
+                                    .foregroundStyle(.primary.opacity(0.4))
+                                    .lineLimit(1)
+                            }
+                            Text(item.date, format: .dateTime.year().month().day().hour().minute())
+                                .font(OhanaFont.caption2(.medium))
+                                .foregroundStyle(.primary.opacity(0.25))
+                        }
+                        .padding(.top, 6)
+                        .padding(.bottom, idx < items.count - 1 ? 16 : 0)
+
+                        Spacer()
                     }
                 }
             }
-            .padding(16)
         }
+        .padding(16)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 }
 

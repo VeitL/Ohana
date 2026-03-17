@@ -894,7 +894,7 @@ button.glassEffect(.regular, in: .capsule)  // ✅ 面积小，可接受
 
 | 口号 | 含义 | 代码实现 | 使用场景 | 参考组件 |
 |------|------|----------|----------|----------|
-| **卡片标准背景** | 8 层 Liquid Glass 折射系统，自适应透明度 | `glassCard { content }` 或 `UltimateGlassCard { content }` | 大面积内容卡片、设置组、表单容器 | Typography 卡片、生命之树卡片、设置页 section |
+| **卡片标准背景** | iOS 26 原生 `.glassEffect()` 单层磨砂折射 | `.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24))` | 大面积内容卡片、设置组、表单容器 | 生命之树卡片、统计卡片、设置页 section |
 | **玻璃背景** | iOS 26 原生 `.glassEffect()` 单层磨砂折射 | `.glassEffect(.regular, in: shape)` | 浮动按钮、导航栏、Dock、小型交互控件 | Dock 栏、详情页右上角椰子+编辑按钮、胶囊按钮 |
 | **内嵌背景** | 卡片内部的次级区域背景 | `.background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))` | 卡片内的 Bento 格、输入框、标签区 | statsBento 内的 mini 格子、体重/卡路里格子 |
 | **纯色背景** | 不透明实色，用于需要强对比度的场景 | `.background(Color.goLime, in: Capsule())` | CTA 按钮、Alert Banner、危险操作 | 主要按钮、成功/失败提示条 |
@@ -902,67 +902,35 @@ button.glassEffect(.regular, in: .capsule)  // ✅ 面积小，可接受
 ### 14.2 「卡片标准背景」详细参数
 
 ```swift
-// glassCard — 自适应透明度容器（推荐使用）
-// Dark Mode: .glassEffect(.regular, in: RoundedRectangle(24))
-// Light Mode: .ultraThinMaterial.opacity(0.3) + RoundedRectangle(24)
-// 无障碍降级: Color(.systemBackground).opacity(0.95) + RoundedRectangle(24)
-
-@ViewBuilder
-private func glassCard<C: View>(@ViewBuilder content: () -> C) -> some View {
-    if reduceTransparency {
-        // 无障碍降级：纯色不透明背景
-        content()
-            .background(Color(.systemBackground).opacity(0.95))
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-    } else {
-        // 浅色模式下更透明
-        if colorScheme == .light {
-            content()
-                .background(.ultraThinMaterial.opacity(0.3), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        } else {
-            content()
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        }
-    }
-}
-
-// 使用示例
-glassCard {
-    VStack(spacing: 14) {
-        sectionTitle("Typography System")
-        // ... 内容
-    }
-    .padding(16)
-}
-```
-
-```swift
-// UltimateGlassCard — 8 层 Liquid Glass 折射系统（传统实现）
-// Dark Mode 层级：
-//   L1: .ultraThinMaterial（系统毛玻璃基底）
-//   L2: Color.white.opacity(0.05)（微亮层）
-//   L3: LinearGradient 顶底白边（折射模拟）
-//   L4: RadialGradient 暗角（multiply 混合）
-//   L5: strokeBorder white 0.12（内描边）
-//   L6: 蓝色 + 红色极细描边（色散模拟）
-//   L7: 顶部高光胶囊条（0.5pt）
-//   L8: 左上角椭圆光斑（blur 8）
+// 卡片标准背景 — 与 BentoStatCard 一致的简化实现
+// 使用 iOS 26 原生 .glassEffect() 单层磨砂折射
 // 圆角: 24pt continuous
-// 阴影: black 0.20 radius 20 y10 + white 0.06 radius 30 y20
+// 说明：与生命之树卡片、统计卡片保持一致的视觉效果
 
-UltimateGlassCard {
-    VStack { /* 内容 */ }
-        .padding(16)
-}
+// 标准实现（BentoStatCard 风格）
+VStack { /* 内容 */ }
+    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    .padding(16)
 ```
 
-### 14.3 「玻璃背景」详细参数
+### 14.3 「玻璃背景」详细参数（已对齐 WalkBanner）
 
 ```swift
 // iOS 26 原生 Liquid Glass — 系统自动处理折射、反光、Dark/Light 适配
 // 圆角由 shape 参数决定
 
-// Dock 样式（标准实现）
+// Dock / WalkBanner 统一玻璃参数
+// - material: .glassEffect(.regular)
+// - shape: RoundedRectangle(cornerRadius: 28, style: .continuous)  // 大卡
+// - shadow: black 0.25, radius 16, y 6
+// 说明：WalkBanner 正反面卡片与 Dock 统一使用同一套玻璃材质强度，仅通过尺寸区分。
+
+// WalkBanner / 大卡片样式（当前实现）
+VStack { /* 内容 */ }
+.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+.shadow(color: .black.opacity(0.25), radius: 16, x: 0, y: 6)
+
+// Dock 样式（小型控件可降圆角）
 HStack(spacing: 16) {
     ForEach(["house.fill", "calendar", "pawprint.fill", "leaf.fill"], id: \.self) { icon in
         Image(systemName: icon)
@@ -972,6 +940,7 @@ HStack(spacing: 16) {
 }
 .padding(.horizontal, 20).padding(.vertical, 12)
 .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+.shadow(color: .black.opacity(0.25), radius: 16, x: 0, y: 6)
 
 // 胶囊按钮
 HStack(spacing: 6) {
@@ -1076,9 +1045,8 @@ HStack(spacing: 10) {
 ```
 需要背景？
 ├─ 大面积内容卡片（表单/详情/数据面板）
-│   └─ 「卡片标准背景」glassCard { content }
-│       ├─ Dark Mode: .glassEffect(.regular, in: RoundedRectangle(24))
-│       └─ Light Mode: .ultraThinMaterial.opacity(0.3) + RoundedRectangle(24)
+│   └─ 「卡片标准背景」.glassEffect(.regular, in: RoundedRectangle(24))
+│       └─ 说明：与 BentoStatCard 保持一致的简化实现
 ├─ 浮动小型控件（按钮/Dock/胶囊/Badge）
 │   └─ 「玻璃背景」.glassEffect(.regular, in: shape)
 │       ├─ Dock: RoundedRectangle(cornerRadius: 22)
@@ -1101,8 +1069,8 @@ private var cardBackgroundComparison: some View {
         sectionTitle("背景口号系统 · Shorthand")
         thinDivider
 
-        // 1. 卡片标准背景 — 使用 glassCard 容器
-        glassCard {
+        // 1. 卡片标准背景 — 与 BentoStatCard 一致
+        VStack(spacing: 12) {
             HStack(spacing: 12) {
                 Image(systemName: "tree.fill")
                     .font(.system(size: 24))
@@ -1119,6 +1087,7 @@ private var cardBackgroundComparison: some View {
             }
             .padding(16)
         }
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
 
         // 2. 玻璃背景 — 直接使用 .glassEffect()
         HStack(spacing: 12) {

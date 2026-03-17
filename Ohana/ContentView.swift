@@ -14,6 +14,7 @@ struct ContentView: View {
     @State private var selectedPlant: Plant?
     @State private var selectedPetTab: PetDetailTab = .overview
     @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
+    @Namespace private var heroNS
     
     var body: some View {
         ZStack {
@@ -27,7 +28,8 @@ struct ContentView: View {
                     selectedPet: $selectedPet,
                     selectedHuman: $selectedHuman,
                     selectedPlant: $selectedPlant,
-                    selectedPetTab: $selectedPetTab
+                    selectedPetTab: $selectedPetTab,
+                    heroNS: heroNS
                 )
                 .navigationDestination(item: $selectedPet) { pet in
                     PetDetailView(
@@ -35,6 +37,7 @@ struct ContentView: View {
                         initialTab: selectedPetTab,
                         openHealthOnAppear: selectedPetTab == .health
                     )
+                    .navigationTransition(.zoom(sourceID: pet.id, in: heroNS))
                 }
                 .navigationDestination(item: $selectedHuman) { human in
                     HumanDetailView(human: human)

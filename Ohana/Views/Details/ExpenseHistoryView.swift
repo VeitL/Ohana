@@ -116,7 +116,7 @@ struct ExpenseHistoryView: View {
                 if let data = pet.avatarImageData, let img = UIImage(data: data) {
                     Image(uiImage: img).resizable().scaledToFill()
                         .frame(width: 48, height: 48).clipShape(Circle())
-                        .overlay(Circle().strokeBorder(.white.opacity(0.2), lineWidth: 2))
+                        .overlay(Circle().strokeBorder(.primary.opacity(0.2), lineWidth: 2))
                 } else {
                     Text(pet.avatarEmoji).font(.system(size: 36))
                 }
@@ -130,12 +130,10 @@ struct ExpenseHistoryView: View {
                     Button { withAnimation(.spring(response: 0.3)) { selectedRange = range } } label: {
                         Text(range.rawValue)
                             .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .foregroundStyle(selectedRange == range ? .black : .white.opacity(0.5))
+                            .foregroundStyle(selectedRange == range ? Color.arkInk : .primary.opacity(0.5))
                             .padding(.horizontal, 14).padding(.vertical, 7)
-                            .background(
-                                selectedRange == range ? Color.goYellow : Color.white.opacity(0.08),
-                                in: Capsule()
-                            )
+                            .background(selectedRange == range ? Color.goYellow : .clear, in: Capsule())
+                            .glassEffect(selectedRange == range ? .regular.tint(Color.goYellow.opacity(0.3)) : .regular, in: Capsule())
                     }
                     .buttonStyle(.plain)
                 }
@@ -203,12 +201,12 @@ struct ExpenseHistoryView: View {
     private var recordListLayer: some View {
         ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(Color.goDeepNavy.opacity(0.95))
+                .fill(.regularMaterial)
                 .ignoresSafeArea(edges: .bottom)
 
             VStack(spacing: 0) {
                 Capsule()
-                    .fill(Color.white.opacity(0.2))
+                    .fill(.primary.opacity(0.15))
                     .frame(width: 40, height: 4)
                     .padding(.top, 12).padding(.bottom, 8)
 
@@ -219,7 +217,7 @@ struct ExpenseHistoryView: View {
                     Spacer()
                     Text("\(sortedLogs.count) 条")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.primary.opacity(0.4))
+                        .foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 12)
@@ -285,9 +283,7 @@ struct ExpenseHistoryView: View {
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
-        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .strokeBorder(.white.opacity(0.08), lineWidth: 1))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - Add Expense Sheet
@@ -295,7 +291,7 @@ struct ExpenseHistoryView: View {
         VStack(spacing: 0) {
             // 把手
             Capsule()
-                .fill(Color.white.opacity(0.2))
+                .fill(.primary.opacity(0.2))
                 .frame(width: 40, height: 4)
                 .padding(.top, 12)
                 .padding(.bottom, 20)
@@ -320,8 +316,7 @@ struct ExpenseHistoryView: View {
                                 .foregroundStyle(.primary)
                         }
                         .padding(.horizontal, 24).padding(.vertical, 20)
-                        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 20))
-                        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(.white.opacity(0.1), lineWidth: 1))
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                         .padding(.horizontal, 24)
                         Text("金额 (元)")
                             .font(.system(size: 12, weight: .medium))
@@ -342,13 +337,11 @@ struct ExpenseHistoryView: View {
                                             Text(cat.emoji)
                                             Text(cat.rawValue)
                                                 .font(.system(size: 14, weight: .bold, design: .rounded))
-                                                .foregroundStyle(newCategory == cat ? .black : .white.opacity(0.7))
+                                                .foregroundStyle(newCategory == cat ? Color.arkInk : .primary.opacity(0.7))
                                         }
                                         .padding(.horizontal, 16).padding(.vertical, 10)
-                                        .background(
-                                            newCategory == cat ? Color.goYellow : Color.white.opacity(0.08),
-                                            in: Capsule()
-                                        )
+                                        .background(newCategory == cat ? Color.goYellow : .clear, in: Capsule())
+                                        .glassEffect(newCategory == cat ? .regular.tint(Color.goYellow.opacity(0.3)) : .regular, in: Capsule())
                                     }
                                 }
                             }
@@ -365,8 +358,7 @@ struct ExpenseHistoryView: View {
                             .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 16).padding(.vertical, 14)
-                            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.white.opacity(0.1), lineWidth: 1))
+                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                     .padding(.horizontal, 24)
 
@@ -413,8 +405,8 @@ struct ExpenseHistoryView: View {
                 }
             }
         }
-        .background(Color.goDeepNavy)
-        .presentationDetents([.large])
-        .presentationDragIndicator(.hidden)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(.regularMaterial)
     }
 }

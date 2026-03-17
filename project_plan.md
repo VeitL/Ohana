@@ -1,6 +1,36 @@
 # Ohana App 开发进度
 
-> 最后更新: 2026-03-15 | Schema: ArkSchemaV22 | Phase 1-77 + 第二十章～第三十二章完成
+> 最后更新: 2026-03-16 | Schema: ArkSchemaV22 | Phase 1-77 + 第二十章～第三十五章完成
+
+## 第三十五章 PetWalletStack 行为修复 & 全页面 iOS 26 glassEffect 统一（2026-03-16）
+
+| ID | 内容 | 修复文件 | 说明 |
+|----|------|----------|------|
+| STACK-BEHAVIOR | 首页卡片堆滑动行为修正 | `PetWalletStack.swift` | 上/下滑前卡时，改为将当前卡移到堆末尾（activeIndex+1 mod count），而非之前的循环到最前 |
+| DETAIL-TOOLBAR | 宠物详情页工具栏位置 | `PetDetailView.swift` | 编辑/日历/即养卡三个按钮 (`petToolbar`) 从 NavigationBar 移到 Hero 卡片上方（ScrollView 内顶部）；同步移除 NavigationBar 里的 CoconutBalanceCapsule（已包含在 petToolbar 中） |
+| DETAIL-CHART-BG | Chart 仪表盘去背景 | `PetDetailView.swift` | `PetChartDashboard` 外层去掉 UltimateGlassCard 包裹，直接渲染无背景 |
+| DETAIL-HYGIENE | 护理卡片移除内部背景 | `PetHygieneCard.swift` | 移除 `UltimateGlassCard` wrapper，由外层 `PetDetailView` 的 glassEffect 提供背景；同步修复多出的尾部括号 |
+| DETAIL-COMPACT | 三列紧凑卡圆角减小 | `PetDetailView.swift` | `compactDocumentsCard`、`compactMemoriesCard`（原里程碑）、`compactAchievementsCard` cornerRadius 由 24 改为 16 |
+| DETAIL-MEMORIES | 里程碑改名+快捷添加 | `PetDetailView.swift` | `compactMilestonesCard` 重命名为 `compactMemoriesCard`，标题改为"回忆录"，右上角添加 goLime + 按钮；点击 NavigationLink 直接进入 `PetMilestoneListView` |
+| DETAIL-TIMELINE | 岁月史书标准卡片背景 | `PetDetailView.swift` | `PetUnifiedTimeline` 改用 `.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24))` 替代旧背景 |
+| WEIGHT-UI | 体重追踪页深/浅色模式 | `WeightHistoryView.swift` | `recordListLayer` 背景改为 `.regularMaterial`；行卡片改用 `.glassEffect(cornerRadius: 16)`；拖动把手由 `.black.opacity(0.12)` 改为 `.primary.opacity(0.15)`；add sheet 添加 `.presentationBackground(.regularMaterial)` |
+| POTTY-UI | 噗噗电台深/浅色模式 | `PottyOverviewView.swift` | `recordListLayer` 背景改为 `.regularMaterial`；行卡片改用 `.glassEffect`；把手颜色适配 |
+| EXPENSE-UI | 花费记录页 UI + 玻璃 add sheet | `ExpenseHistoryView.swift` | `recordListLayer` 背景 `.regularMaterial`；行卡片 `.glassEffect`；`addExpenseSheet` 金额框/备注框改 `.glassEffect`；sheet 底色 `.presentationBackground(.regularMaterial)`，detents 改为 `.medium, .large` |
+| FOOD-UI | 饮食管理页面 glassEffect 统一 | `PetFoodManagementView.swift` | 所有 `.white.opacity(0.04/0.06/0.08)` 卡片背景替换为 `.glassEffect(cornerRadius: 16/20)`；`FoodReminderSheet` 背景改 `.presentationBackground(.regularMaterial)` |
+| HEALTH-UI | 免疫健康页面深/浅色适配 | `PetHealthDetailView.swift` | `immunityOverviewRow`、`healthTrendCard`、`healthLogsCard`、`alertsSection` 全部改为 `.glassEffect`；未记录状态颜色由 `.white.opacity(0.3)` 改为 `.primary.opacity(0.3)`；逾期颜色修正为 `Color.goRed` |
+
+## 第三十四章 首页宠物卡片 Wallet 堆叠重构 + 玻璃背景修复（2026-03-16）
+
+| ID | 内容 | 修复文件 | 说明 |
+|----|------|----------|------|
+| WALLET-STACK | 首页宠物卡片 iOS Wallet 堆叠 | `PetWalletStack.swift`(新), `ContentView.swift`, `OverviewView.swift` | 替换 `CritterDeckCarousel` 横向 TabView 为 ZStack Wallet 堆叠布局：**下边卡片在最前面(zIndex最高)，上边在最后面**；后牌 Y 偏移 56pt + scaleEffect 0.98 + brightness -0.05 衰减；active 卡片在最底部全尺寸可交互；顶牌上下拖拽切换(highPriorityGesture 不与页面 ScrollView 冲突)；分页指示器保留 |
+| HERO-ZOOM | App Store Today 英雄展开动画 | `ContentView.swift`, `PetWalletStack.swift` | 使用 iOS 18+ `matchedTransitionSource(id:in:)` + `navigationTransition(.zoom(sourceID:in:))` 实现原生 App Store Today 卡片展开过渡；`@Namespace` 从 ContentView 传递到 OverviewView → PetWalletStack |
+| CARD-VISUAL | Wallet 卡片视觉 GO UI 蓝橙配色 | `PetWalletStack.swift` | `WalletPetCardFront`: GO UI 蓝色渐变底(#233BFF→#141FAE) + **橙色(#FF5A3D)**超大背景名字**锚定卡片顶部**(堆叠时漏出的部分可见) + 左侧头像/剪影 + 右侧信息列 + 条码；`WalletHumanCardFront`: 同蓝底 + teal 配色 + 顶部大字 |
+| DETAIL-HERO | 详情页顶部卡片统一 | `PetDetailView.swift` | 替换 `PetHeroRow` 为 `WalletPetCardFront`，与首页 Wallet 卡片同款视觉，zoom 过渡自然衔接；点击跳转宠物基本信息页 |
+| DETAIL-GLASS | 详情页卡片标准背景统一 | `PetDetailView.swift` | `PetChartDashboard` 横滚图表仪表盘包裹 `UltimateGlassCard` 标准背景；其余卡片(健康/护理/饮食/活动/证件/里程碑/成就/时间轴)已全部使用 `UltimateGlassCard` |
+| STREAK-FIX | 首页打卡连击天数修复 | `HomeBentoBoxes.swift`, `DailyStreakDetailView.swift` | 从独立 `loginStreak` AppStorage 改为基于 `oasis_checkedIn_dates` 倒推计算真实连续天数；日期格式统一为 `yyyy-MM-dd` + TimeZone.current |
+| GLASS-SETTINGS | 设置页玻璃卡片修复 | `SettingsView.swift` | 修复 `glassCard` 函数作用域错误（从 BackgroundStyleCard 移回 SettingsView 结构体内部）；添加 `reduceTransparency` 无障碍降级 |
+| GLASS-BG | GoGlassBackground 新增 | `OhanaDesignSystem.swift` | 新增 `GoGlassBackground` ViewModifier（深蓝渐变 + ultraThinMaterial 叠加 + 白色描边 + 阴影）+ `.goGlassBackground()` View extension；Dock 栏改用 goGlassBackground |
 
 ## 第三十三章 UI 规范化系统 & 全岛体重过滤修复（2026-03-15）
 

@@ -270,7 +270,7 @@ struct PetBasicInfoDetailView: View {
                         set: { if let h = $0.toHex() { eThemeColorHex = h } }
                     ), supportsOpacity: false)
                     .labelsHidden().frame(width: 38, height: 38).scaleEffect(1.3).clipShape(Circle())
-                    .overlay(Circle().strokeBorder(.white.opacity(0.3), lineWidth: 1))
+                    .overlay(Circle().strokeBorder(.primary.opacity(0.3), lineWidth: 1))
                 }
             }
             // 备注

@@ -70,7 +70,7 @@ struct PetCareTrackingCard: View {
                             .padding(.horizontal, 16).padding(.vertical, 10)
 
                         if idx < visibleTypes.count - 1 {
-                            Divider().background(.white.opacity(0.06)).padding(.leading, 16)
+                            Divider().padding(.leading, 16)
                         }
                     }
                 }
@@ -146,7 +146,7 @@ struct CareTrackingDetailSheet: View {
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(.primary.opacity(0.6))
                             .frame(width: 34, height: 34)
-                            .background(.white.opacity(0.08), in: Circle())
+                            .glassEffect(.regular, in: Circle())
                     }
                     Spacer()
                     VStack(spacing: 2) {
@@ -294,9 +294,7 @@ struct CareTrackingDetailSheet: View {
             }
         }
         .padding(14)
-        .background(Color.white.opacity(0.8), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .strokeBorder(accent.opacity(0.15), lineWidth: 1))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
@@ -363,7 +361,7 @@ private struct CareTypeRow: View {
                         RoundedRectangle(cornerRadius: 2)
                             .fill(count > 0
                                   ? Color(hex: type.accentColorHex)
-                                  : Color.white.opacity(0.08))
+                                  : Color.primary.opacity(0.08))
                             .frame(width: 12, height: h)
                     }
                 }

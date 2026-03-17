@@ -52,9 +52,9 @@ struct PetHealthLogCard: View {
                                 Text(isExpired ? "已过期" : (isUrgent ? "剩余\(daysUntil)天" : "有效期至\(expirationDate.formatted(.dateTime.month().day()))"))
                                     .font(.system(size: 10, weight: .medium))
                             }
-                            .foregroundStyle(isExpired ? Color.goRed : (isUrgent ? Color.goYellow : .white.opacity(0.5)))
+                            .foregroundStyle(isExpired ? Color.goRed : (isUrgent ? Color.goYellow : .primary.opacity(0.5)))
                             .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background((isExpired ? Color.goRed : (isUrgent ? Color.goYellow : .white.opacity(0.1))).opacity(0.2), in: Capsule())
+                            .background((isExpired ? Color.goRed : (isUrgent ? Color.goYellow : .primary.opacity(0.08))).opacity(0.2), in: Capsule())
                         }
                         
                         // 显示下次体检提醒（仅体检记录）
@@ -177,10 +177,11 @@ struct HealthLogListView: View {
         Button(action: action) {
             Text(label)
                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(isSelected ? Color.arkInk : .white.opacity(0.7))
+                .foregroundStyle(isSelected ? Color.arkInk : .primary.opacity(0.7))
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
-                .background(isSelected ? Color.goLime : Color.white.opacity(0.1), in: Capsule())
+                .background(isSelected ? Color.goLime : .clear, in: Capsule())
+                .glassEffect(isSelected ? .regular.tint(Color.goLime.opacity(0.2)) : .regular, in: Capsule())
         }
         .buttonStyle(.plain)
     }

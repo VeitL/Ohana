@@ -121,7 +121,6 @@ struct PetChartDashboard: View {
                         .font(.system(size: 14, weight: .bold, design: .rounded))
                         .foregroundStyle(.primary)
                         .padding(.horizontal, 8).padding(.vertical, 5)
-                        .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
                     Button {
                         if let w = Double(quickWeightInput.replacingOccurrences(of: ",", with: ".")) {
                             let log = PetWeightLog(date: Date(), weight: w, pet: pet)

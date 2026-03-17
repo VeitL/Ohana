@@ -88,7 +88,7 @@ struct PottyOverviewView: View {
                         .resizable().scaledToFill()
                         .frame(width: 56, height: 56)
                         .clipShape(Circle())
-                        .overlay(Circle().strokeBorder(.white.opacity(0.2), lineWidth: 2))
+                        .overlay(Circle().strokeBorder(.primary.opacity(0.2), lineWidth: 2))
                 } else {
                     Text(pet.avatarEmoji).font(.system(size: 40))
                 }
@@ -111,7 +111,7 @@ struct PottyOverviewView: View {
                                     ? Color(red: 0.6, green: 0.4, blue: 0.2)
                                     : (item.count > 0
                                        ? Color(red: 0.6, green: 0.4, blue: 0.2).opacity(0.4)
-                                       : Color.white.opacity(0.08))
+                                       : Color.primary.opacity(0.08))
                             )
                             .frame(height: max(6, CGFloat(item.count) * 18))
                         Text(item.date, format: .dateTime.weekday(.abbreviated))
@@ -137,11 +137,7 @@ struct PottyOverviewView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .strokeBorder(.white.opacity(0.12), lineWidth: 1)
-                        )
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                     .buttonStyle(.plain)
                 }
@@ -157,12 +153,12 @@ struct PottyOverviewView: View {
     private var recordListLayer: some View {
         ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(Color(hex: "F2F0F5"))
+                .fill(.regularMaterial)
                 .ignoresSafeArea(edges: .bottom)
 
             VStack(spacing: 0) {
                 Capsule()
-                    .fill(Color.black.opacity(0.12))
+                    .fill(.primary.opacity(0.15))
                     .frame(width: 40, height: 4)
                     .padding(.top, 12)
                     .padding(.bottom, 8)
@@ -170,7 +166,7 @@ struct PottyOverviewView: View {
                 HStack {
                     Text("历史记录")
                         .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(.primary)
                     Spacer()
                     Text("\(sortedLogs.count) 条")
                         .font(.system(size: 12, weight: .bold))
@@ -233,8 +229,7 @@ struct PottyOverviewView: View {
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - Actions

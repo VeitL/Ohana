@@ -215,7 +215,7 @@ struct PetHealthDetailView: View {
                 let due  = dueDate(for: type)
                 let days = daysUntil(due)
                 let color: Color = {
-                    guard let d = days else { return .white.opacity(0.3) }
+                    guard let d = days else { return .primary.opacity(0.3) }
                     if d < 0  { return Color.goRed }
                     if d < 30 { return Color.goYellow }
                     return themeColor
@@ -250,8 +250,7 @@ struct PetHealthDetailView: View {
             }
         }
         .padding(.vertical, 14)
-        .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(.white.opacity(0.08), lineWidth: 1))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     // MARK: - 散点图主体
@@ -332,8 +331,7 @@ struct PetHealthDetailView: View {
             trendLegend
         }
         .padding(16)
-        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(themeColor.opacity(0.18), lineWidth: 1))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     // MARK: - 健康记录列表卡
@@ -348,7 +346,7 @@ struct PetHealthDetailView: View {
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.primary.opacity(0.4))
                     .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(.white.opacity(0.06), in: Capsule())
+                    .glassEffect(.regular, in: Capsule())
             }
 
             if sortedLogs.isEmpty {
@@ -401,14 +399,13 @@ struct PetHealthDetailView: View {
                     }
                     .padding(.vertical, 6)
                     if log.id != sortedLogs.last?.id {
-                                Divider().background(.white.opacity(0.06))
-                            }
+                    Divider()
+                }
                 }
             }
         }
         .padding(16)
-        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.goCardCyan.opacity(0.2), lineWidth: 1))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     // MARK: - Alerts Section（TASK 7）
@@ -450,13 +447,12 @@ struct PetHealthDetailView: View {
                 }
                 .padding(.vertical, 4)
                 if alert.id != healthAlerts.prefix(5).last?.id {
-                    Divider().background(.white.opacity(0.06))
+                    Divider()
                 }
             }
         }
         .padding(14)
-        .background(Color.goOrange.opacity(0.06), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Color.goOrange.opacity(0.2), lineWidth: 1))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func alertColor(_ alert: HealthAlert) -> Color {

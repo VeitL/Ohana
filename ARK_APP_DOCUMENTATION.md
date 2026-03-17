@@ -1,6 +1,6 @@
 # Ohana (欧哈纳) iOS App 完整技术文档
 
-> 最后更新: 2026-03-15 | Schema: ArkSchemaV22 | Phase 1-79 + 第二十章～第三十二章 | 编译: iPhone 17 Pro Simulator, iOS 26.2
+> 最后更新: 2026-03-16 | Schema: ArkSchemaV22 | Phase 1-79 + 第二十章～第三十五章 | 编译: iPhone 17 Pro Simulator, iOS 26.2
 
 ---
 
@@ -448,25 +448,35 @@ func awardAction(type: OhanaActionType, pet: Pet?, context: ModelContext) -> (hu
   - `title_pioneer` (先锋): 在 `IslandExplorationDashboard` 为劳模铲屎官头衔加 Rocket badge
   - `title_chef` (厨神): 在 `QuestManager.swift` 发生喂食 (`.feed`) 判定时，Human 额外 +1 椰子奖励
 
-### 5.17 CritterDeckCarousel / HumanIDCardView（Phase 76 更新）
+### 5.17 PetWalletStack（第三十四章重构，替换 CritterDeckCarousel）
 
-**位置**：`Views/Home/CritterDeckCarousel.swift`
+**位置**：`Views/Home/PetWalletStack.swift`
 
-- `DeckItem` enum（`.pet(Pet)` / `.human(Human)`），`HumanIDCardView` 同文件
-- 首页卡片切换方式当前为 **横向分页焦点卡**：
-  - 使用 `TabView(selection:) + .page(indexDisplayMode: .never)`
-  - 当前卡片为唯一视觉焦点，非当前卡仅做轻微 `scale/opacity` 退场
-  - 底部使用自定义分页胶囊（当前页 24×7，其余 7×7）
-  - “全部 N 张”作为次级入口保留在右下，不与焦点卡争抢注意力
-  - `activeIndex` 变化时自动 `isTopFlipped = false`，并通过 `onTopCardChanged` 同步首页当前宠物
-- **humanFrontView 重构**（Phase 76）：完全复刻 `PetCardFrontView` 杂志封面布局
-  - 左侧头像 52% 宽度底部对齐，支持贴纸白边描边效果（透明 PNG）/ emoji fallback
-  - 右侧：相识天数（HStack firstTextBaseline）、大名字（28pt heavy）、角色+性别胶囊、年龄胶囊、血型胶囊
-  - 翻转 icon 移至左下角（与宠物卡片一致）；右侧 VStack 加 `.padding(.bottom, 28)` 防遮挡
-  - `humanThemeColor` 从 `notes` 字段 `themeColor:XXXXXX` 格式解析
-- **humanBackView 重构**（Phase 76）：QUICK ACCESS 标题 + `HumanQuickAccessGrid`（⚖️体重/💧喝水/💸花费/📝心愿）+ 底部 chip 行
-- **`HumanQuickAccessGrid`**（新增组件）：4 格 LazyVGrid；喝水打卡写 `WaterLog` + `QuestManager.awardAction(.general)`；体重跳 `GenericWeightEntrySheet`；待办跳 `HumanWishlistView`；水打卡有 3s 视觉反馈
-- **AllCardsSheet 重构**（Phase 76）：`LazyVGrid` 双列缩略卡，每格为 `MiniFlipCard`（信用卡比例 cardWidth/1.586）；点击翻面显示「进入详情」青柠按钮 + 「置顶显示」按钮；当前顶牌显示「当前」标签；`import SwiftData` 已补加
+- **iOS Wallet 堆叠 + App Store Today 展开**：
+  - 首页卡片从横向 `TabView` 分页改为 **ZStack Wallet 堆叠**布局
+  - **下边的卡片在最前面**（zIndex最高，active卡片在底部全尺寸可交互），上边在最后面（behind卡片仅露出顶部56pt条纹）
+  - behind卡片 `scaleEffect(1-depth*0.02, anchor: .bottom)` + `brightness(-depth*0.05)` 衰减
+  - 顶牌上下拖拽切换（`highPriorityGesture` + `contentShape(Rectangle())` 不与页面 ScrollView 冲突）
+  - **上/下滑均把当前前卡移到堆末尾**（`activeIndex = (activeIndex + 1) % count`），不再循环回堆顶
+  - 底部自定义分页胶囊指示器（当前页 24×7 goLime，其余 7×7 白色半透）
+  - 最多显示 4 张卡片（`maxVisible = 4`）
+- **App Store Today 英雄过渡**：
+  - 使用 iOS 18+ `matchedTransitionSource(id: pet.id, in: heroNS)` 标记卡片为过渡源
+  - ContentView 的 `navigationDestination` 添加 `.navigationTransition(.zoom(sourceID: pet.id, in: heroNS))`
+  - `@Namespace` 从 `ContentView` → `OverviewView` → `PetWalletStack` 层层传递
+  - 点击宠物卡片 → 原生 zoom 过渡到 `PetDetailView`（完整详情页，零内容复制）
+- **WalletPetCardFront**（GO UI 蓝橙配色）：蓝色渐变底(`#233BFF` → `#141FAE`) + 橙色(`#FF5A3D`)超大背景名字**锚定卡片顶部**（堆叠时漏出的peeking区域可见）+ 左侧头像层（透明抠图/普通照片羽化/剪影三方案）+ 右侧信息列（连续打卡徽章、daysTogether主数字、footnote、条码）+ 彩虹桥覆盖
+- **WalletHumanCardFront**：同蓝底 + teal 配色 + 顶部大字 + 岛民信息 + 条码
+- **PetDetailView 顶部卡片统一**：`PetHeroRow` 替换为 `WalletPetCardFront`，与首页 Wallet 卡片同款视觉，zoom 过渡自然衔接
+- **PetDetailView 布局（第三十五章更新）**：
+  - `petToolbar`（编辑/日历/即养卡）移到 Hero 卡上方（ScrollView 内顶部，椰子数左边）
+  - `PetChartDashboard` 无背景直接渲染（去掉外层背景包裹）
+  - `PetHygieneCard` 移除内部 `UltimateGlassCard`，由外层 glassEffect 提供背景
+  - `compactDocumentsCard` / `compactMemoriesCard` / `compactAchievementsCard` cornerRadius = 16
+  - **"里程碑"改名为"回忆录"**：右上角新增 goLime + 快捷添加按钮，直接 NavigationLink 进 `PetMilestoneListView`
+  - `PetUnifiedTimeline`（岁月史书）改用 `.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24))`
+  - 所有卡片统一标准背景：`.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))`
+- `DeckItem` enum 和 `HumanIDCardView` 仍保留在 `CritterDeckCarousel.swift`（供 AllCardsSheet 等使用）
 
 ### 5.13 首页组件
 

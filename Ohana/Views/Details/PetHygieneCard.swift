@@ -17,23 +17,22 @@ struct PetHygieneCard: View {
     @State private var undoLabel: String = ""
 
     var body: some View {
-        UltimateGlassCard {
-            ZStack(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: 8) {
-                    // Header — NavigationLink 进入护理详情页
-                    NavigationLink(destination: PetHygieneDetailView(pet: pet)) {
-                        HStack {
-                            Text("✨").font(.system(size: 14))
-                            Text("护理打卡")
-                                .font(OhanaFont.headline(.black))
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(.primary.opacity(0.3))
-                        }
+        ZStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 8) {
+                // Header — NavigationLink 进入护理详情页
+                NavigationLink(destination: PetHygieneDetailView(pet: pet)) {
+                    HStack {
+                        Text("✨").font(.system(size: 14))
+                        Text("护理打卡")
+                            .font(OhanaFont.headline(.black))
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.primary.opacity(0.3))
                     }
-                    .buttonStyle(.plain)
+                }
+                .buttonStyle(.plain)
 
                     // Only show items with records
                     let recordedTypes = HygieneType.allCases.filter { type in
@@ -98,7 +97,6 @@ struct PetHygieneCard: View {
                     .presentationDetents([.height(520)])
                     .presentationDragIndicator(.visible)
             }
-        }
     }
 }
 
@@ -120,7 +118,7 @@ private struct HygieneDetailSheet: View {
         return Calendar.current.dateComponents([.day], from: d.date, to: Date()).day
     }
     private func statusColor(_ type: HygieneType) -> Color {
-        guard let d = daysSince(type) else { return .white.opacity(0.25) }
+        guard let d = daysSince(type) else { return .primary.opacity(0.25) }
         let p = Double(d) / Double(type.cycleDays)
         if p < 0.5 { return Color.goTeal }
         if p < 0.85 { return Color.goYellow }
@@ -146,7 +144,7 @@ private struct HygieneDetailSheet: View {
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(.primary.opacity(0.6))
                             .frame(width: 34, height: 34)
-                            .background(.white.opacity(0.08), in: Circle())
+                            .glassEffect(.regular, in: Circle())
                     }
                     Spacer()
                     VStack(spacing: 2) {
@@ -381,9 +379,7 @@ private struct HygieneDetailSheet: View {
             }
         }
         .padding(14)
-        .background(Color.white.opacity(0.8), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .strokeBorder(Color.goYellow.opacity(0.2), lineWidth: 1))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func hygieneSectionCard(_ type: HygieneType) -> some View {
@@ -448,9 +444,7 @@ private struct HygieneDetailSheet: View {
             }
         }
         .padding(14)
-        .background(Color.white.opacity(0.8), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .strokeBorder(color.opacity(0.15), lineWidth: 1))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
@@ -491,7 +485,7 @@ private struct HygieneCheckButton: View {
                 }
                 Text(type.rawValue)
                     .font(.system(size: 9, weight: .semibold, design: .rounded))
-                    .foregroundStyle(isDoneToday ? statusColor : .white.opacity(0.6))
+                    .foregroundStyle(isDoneToday ? statusColor : .primary.opacity(0.6))
                     .lineLimit(1)
             }
         }

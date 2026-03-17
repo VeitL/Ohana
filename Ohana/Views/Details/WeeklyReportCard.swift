@@ -267,7 +267,7 @@ struct WeeklyReportCard: View {
                     let active = hasActivityOn(d)
                     VStack(spacing: 3) {
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(active ? Color.goLime.opacity(0.7) : Color.white.opacity(0.08))
+                            .fill(active ? Color.goLime.opacity(0.7) : Color.primary.opacity(0.08))
                             .frame(height: 20)
                         Text(d, format: .dateTime.weekday(.narrow))
                             .font(.system(size: 8, weight: .medium))
@@ -316,6 +316,6 @@ struct WeeklyReportCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }

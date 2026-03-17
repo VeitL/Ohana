@@ -96,7 +96,7 @@ struct VaccinePassportView: View {
             Text("💉").font(.system(size: 36))
         }
         .padding(16)
-        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 18))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     // MARK: - Empty State
@@ -113,7 +113,7 @@ struct VaccinePassportView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(32)
-        .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 18))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
@@ -129,7 +129,7 @@ private struct VaccineRow: View {
     }
 
     private var expiryColor: Color {
-        guard let days = daysUntilExpiry else { return .white.opacity(0.3) }
+        guard let days = daysUntilExpiry else { return .primary.opacity(0.3) }
         if days < 0 { return Color.goRed }
         if days <= 30 { return Color.goYellow }
         return Color.goTeal
@@ -161,7 +161,7 @@ private struct VaccineRow: View {
 
             // 竖线
             Rectangle()
-                .fill(.white.opacity(0.1))
+                .fill(.primary.opacity(0.1))
                 .frame(width: 1)
                 .frame(maxHeight: .infinity)
 
@@ -199,7 +199,7 @@ private struct VaccineRow: View {
             Spacer()
         }
         .padding(14)
-        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .contextMenu {
             Button(role: .destructive) { onDelete() } label: {
                 Label("删除记录", systemImage: "trash")
@@ -228,7 +228,7 @@ struct AddVaccineSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(hex: "0D0638").ignoresSafeArea()
+                ArkBackgroundView().ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 16) {
                         // 宠物行
@@ -255,7 +255,7 @@ struct AddVaccineSheet: View {
                             Text("💉").font(.system(size: 28))
                         }
                         .padding(14)
-                        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                         // 疫苗名称
                         fieldCard {
@@ -324,14 +324,13 @@ struct AddVaccineSheet: View {
                                                 } label: {
                                                     Text("\(days)天")
                                                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                                                        .foregroundStyle(reminderDaysBefore == days ? .black : .white.opacity(0.5))
+                                                        .foregroundStyle(reminderDaysBefore == days ? Color.arkInk : .primary.opacity(0.5))
                                                         .padding(.horizontal, 12).padding(.vertical, 6)
                                                         .background(
-                                                            reminderDaysBefore == days
-                                                                ? Color.goYellow
-                                                                : Color.white.opacity(0.08),
+                                                            reminderDaysBefore == days ? Color.goYellow : .clear,
                                                             in: Capsule()
                                                         )
+                                                        .glassEffect(reminderDaysBefore == days ? .regular.tint(Color.goYellow.opacity(0.4)) : .regular, in: Capsule())
                                                 }
                                             }
                                         }
@@ -394,7 +393,7 @@ struct AddVaccineSheet: View {
         content()
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func save() {

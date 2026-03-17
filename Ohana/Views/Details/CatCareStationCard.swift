@@ -101,7 +101,7 @@ struct CatCareStationCard: View {
             .background(.ultraThinMaterial.opacity(0.3), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+                    .strokeBorder(.primary.opacity(0.12), lineWidth: 1)
             }
         }
     }

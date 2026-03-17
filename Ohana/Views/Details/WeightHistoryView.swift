@@ -53,6 +53,7 @@ struct WeightHistoryView: View {
             GenericWeightEntrySheet(target: .pet(pet))
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
+                .presentationBackground(.regularMaterial)
         }
     }
 
@@ -72,7 +73,7 @@ struct WeightHistoryView: View {
                                 .foregroundStyle(.primary)
                             Text("kg")
                                 .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(Color.goTeal)
+                                .foregroundStyle(.primary.opacity(0.7))
                         }
                     }
                 }
@@ -83,7 +84,7 @@ struct WeightHistoryView: View {
                         .resizable().scaledToFill()
                         .frame(width: 56, height: 56)
                         .clipShape(Circle())
-                        .overlay(Circle().strokeBorder(.white.opacity(0.2), lineWidth: 2))
+                        .overlay(Circle().strokeBorder(.primary.opacity(0.2), lineWidth: 2))
                 } else {
                     Text(pet.avatarEmoji).font(.system(size: 40))
                 }
@@ -102,12 +103,9 @@ struct WeightHistoryView: View {
                     Text(String(format: "%+.1f kg", delta))
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                 }
-                .foregroundStyle(delta >= 0 ? Color.goYellow : Color.goTeal)
+                .foregroundStyle(.primary)
                 .padding(.horizontal, 10).padding(.vertical, 4)
-                .background(
-                    (delta >= 0 ? Color.goYellow : Color.goTeal).opacity(0.12),
-                    in: Capsule()
-                )
+                .glassEffect(.regular, in: Capsule())
                 .padding(.horizontal, 24)
             }
 
@@ -146,12 +144,12 @@ struct WeightHistoryView: View {
     private var recordListLayer: some View {
         ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(Color(hex: "F2F0F5"))
+                .fill(.regularMaterial)
                 .ignoresSafeArea(edges: .bottom)
 
             VStack(spacing: 0) {
                 Capsule()
-                    .fill(Color.black.opacity(0.12))
+                    .fill(.primary.opacity(0.15))
                     .frame(width: 40, height: 4)
                     .padding(.top, 12)
                     .padding(.bottom, 8)
@@ -159,7 +157,7 @@ struct WeightHistoryView: View {
                 HStack {
                     Text("历史记录")
                         .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(.primary)
                     Spacer()
                     Text("\(sortedLogs.count) 条")
                         .font(.system(size: 12, weight: .bold))
@@ -190,15 +188,14 @@ struct WeightHistoryView: View {
 
     private func weightRow(log: PetWeightLog) -> some View {
         HStack(spacing: 14) {
-            // 颜色指示点
             Circle()
-                .fill(Color.goTeal)
+                .fill(.primary.opacity(0.6))
                 .frame(width: 8, height: 8)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(log.date, format: .dateTime.year().month().day())
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.black.opacity(0.7))
+                    .foregroundStyle(.primary.opacity(0.8))
                 Text(log.date, format: .dateTime.weekday(.wide))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
@@ -209,10 +206,10 @@ struct WeightHistoryView: View {
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(String(format: "%.1f", log.weight))
                     .font(.system(size: 20, weight: .black, design: .rounded))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(.primary)
                 Text("kg")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(Color.goTeal)
+                    .foregroundStyle(.primary.opacity(0.7))
             }
 
             Button {
@@ -226,8 +223,8 @@ struct WeightHistoryView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .shadow(color: .black.opacity(0.25), radius: 16, x: 0, y: 6)
     }
 
 }
@@ -259,7 +256,7 @@ struct WeightDetailLineChart: View {
                         p.move(to: CGPoint(x: 0, y: y))
                         p.addLine(to: CGPoint(x: w, y: y))
                     }
-                    .stroke(Color.white.opacity(0.06), style: StrokeStyle(lineWidth: 1, dash: [4, 6]))
+                    .stroke(Color.primary.opacity(0.06), style: StrokeStyle(lineWidth: 1, dash: [4, 6]))
                 }
 
                 if logs.count >= 2 {
@@ -277,10 +274,7 @@ struct WeightDetailLineChart: View {
                         path.addLine(to: CGPoint(x: xPos(logs.count-1, w: w), y: h))
                         path.closeSubpath()
                     }
-                    .fill(LinearGradient(
-                        colors: [Color.goTeal.opacity(0.4), Color.goTeal.opacity(0)],
-                        startPoint: .top, endPoint: .bottom
-                    ))
+                    .fill(.regularMaterial.opacity(0.3))
 
                     // 折线
                     Path { path in
@@ -293,12 +287,12 @@ struct WeightDetailLineChart: View {
                             path.addCurve(to: curr, control1: cp1, control2: cp2)
                         }
                     }
-                    .stroke(Color.goTeal, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    .stroke(.primary.opacity(0.4), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
 
                     // 数据点
                     ForEach(Array(logs.enumerated()), id: \.offset) { i, log in
                         Circle()
-                            .fill(i == logs.count - 1 ? Color.goTeal : Color.goTeal.opacity(0.5))
+                            .fill(i == logs.count - 1 ? Color.primary : Color.primary.opacity(0.5))
                             .frame(width: i == logs.count - 1 ? 8 : 5, height: i == logs.count - 1 ? 8 : 5)
                             .position(x: xPos(i, w: w), y: yPos(log.weight, h: h))
                     }

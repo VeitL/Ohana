@@ -50,7 +50,7 @@ private struct FoodReminderSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             Capsule()
-                .fill(Color.white.opacity(0.2))
+                .fill(.primary.opacity(0.2))
                 .frame(width: 40, height: 4)
                 .padding(.top, 12).padding(.bottom, 20)
 
@@ -80,8 +80,7 @@ private struct FoodReminderSheet: View {
                         TextField("标题", text: $title)
                             .font(.system(size: 15, weight: .semibold, design: .rounded))
                             .padding(.horizontal, 16).padding(.vertical, 12)
-                            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
-                            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.white.opacity(0.1), lineWidth: 1))
+                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                             .padding(.horizontal, 24)
                     }
 
@@ -96,7 +95,7 @@ private struct FoodReminderSheet: View {
                             .labelsHidden()
                     }
                     .padding(.horizontal, 24).padding(.vertical, 14)
-                    .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .padding(.horizontal, 24)
 
                     // 开始时间（可选）
@@ -159,12 +158,10 @@ private struct FoodReminderSheet: View {
                                     Button { recurrenceDays = days } label: {
                                         Text(label)
                                             .font(.system(size: 14, weight: .bold, design: .rounded))
-                                            .foregroundStyle(recurrenceDays == days ? .black : .white.opacity(0.7))
+                                            .foregroundStyle(recurrenceDays == days ? Color.arkInk : .primary.opacity(0.7))
                                             .padding(.horizontal, 16).padding(.vertical, 10)
-                                            .background(
-                                                recurrenceDays == days ? Color.goLime : Color.white.opacity(0.08),
-                                                in: Capsule()
-                                            )
+                                            .background(recurrenceDays == days ? Color.goLime : .clear, in: Capsule())
+                                            .glassEffect(recurrenceDays == days ? .regular.tint(Color.goLime.opacity(0.2)) : .regular, in: Capsule())
                                     }
                                 }
                             }
@@ -186,9 +183,9 @@ private struct FoodReminderSheet: View {
                 }
             }
         }
-        .background(Color.goDeepNavy)
-        .presentationDetents([.large])
-        .presentationDragIndicator(.hidden)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(.regularMaterial)
     }
 
     private func saveReminder() {
@@ -402,9 +399,7 @@ struct PetFoodManagementView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(14)
-        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .strokeBorder(.white.opacity(0.1), lineWidth: 1))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - 佛系模式卡
@@ -447,12 +442,10 @@ struct PetFoodManagementView: View {
                             } label: {
                                 Text(label)
                                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                                    .foregroundStyle(casualDurationDays == days ? .black : .white)
+                                    .foregroundStyle(casualDurationDays == days ? Color.arkInk : .primary)
                                     .padding(.horizontal, 16).padding(.vertical, 9)
-                                    .background(
-                                        casualDurationDays == days ? Color.goLime : Color.white.opacity(0.1),
-                                        in: Capsule()
-                                    )
+                                    .background(casualDurationDays == days ? Color.goLime : .clear, in: Capsule())
+                                    .glassEffect(casualDurationDays == days ? .regular.tint(Color.goLime.opacity(0.2)) : .regular, in: Capsule())
                             }
                             .buttonStyle(.plain)
                         }
@@ -490,9 +483,7 @@ struct PetFoodManagementView: View {
             }
         }
         .padding(16)
-        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
-            .strokeBorder(Color.goLime.opacity(0.2), lineWidth: 1))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     // MARK: - 库存卡（品牌 Picker）
@@ -528,16 +519,14 @@ struct PetFoodManagementView: View {
                         .tint(Color.goOrange)
                         .padding(.horizontal, 12).padding(.vertical, 8)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
-                        .overlay(RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(Color.goOrange.opacity(0.25), lineWidth: 1))
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                         if selectedBrand == "自定义品牌" {
                             TextField("输入自定义品牌名", text: $customBrandInput)
                                 .font(.system(size: 14, weight: .medium, design: .rounded))
                                 .foregroundStyle(.primary)
                                 .padding(.horizontal, 12).padding(.vertical, 8)
-                                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                         }
                     }
 
@@ -571,13 +560,11 @@ struct PetFoodManagementView: View {
                                                 Text(human.avatarEmoji).font(.system(size: 14))
                                                 Text(human.name)
                                                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                                                    .foregroundStyle(stockPayerId == human.id.uuidString ? .black : .white)
+                                                    .foregroundStyle(stockPayerId == human.id.uuidString ? Color.arkInk : .primary)
                                             }
                                             .padding(.horizontal, 10).padding(.vertical, 6)
-                                            .background(
-                                                stockPayerId == human.id.uuidString ? Color.goLime : Color.white.opacity(0.08),
-                                                in: Capsule()
-                                            )
+                                            .background(stockPayerId == human.id.uuidString ? Color.goLime : .clear, in: Capsule())
+                                            .glassEffect(stockPayerId == human.id.uuidString ? .regular.tint(Color.goLime.opacity(0.2)) : .regular, in: Capsule())
                                         }
                                         .buttonStyle(.plain)
                                     }
@@ -599,17 +586,17 @@ struct PetFoodManagementView: View {
                     stockStatCell(label: "品牌",
                                   value: pet.foodBrand.isEmpty ? "未设置" : pet.foodBrand,
                                   accent: .goOrange)
-                    Divider().frame(height: 40).background(.white.opacity(0.1))
+                    Divider().frame(height: 40)
                     stockStatCell(label: "剩余天数",
                                   value: pet.remainingFoodDays > 0 ? "\(pet.remainingFoodDays)天" : "--",
-                                  accent: pet.remainingFoodDays <= 7 && pet.remainingFoodDays > 0 ? .goRed : .white)
-                    Divider().frame(height: 40).background(.white.opacity(0.1))
+                                  accent: pet.remainingFoodDays <= 7 && pet.remainingFoodDays > 0 ? .goRed : .primary)
+                    Divider().frame(height: 40)
                     stockStatCell(label: "每日份量",
                                   value: pet.dailyPortionGrams > 0 ? "\(Int(pet.dailyPortionGrams))g" : "--",
                                   accent: .goYellow)
                 }
                 .padding(.vertical, 10)
-                .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 14))
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                 if pet.remainingFoodDays > 0 {
                     VStack(spacing: 4) {
@@ -620,7 +607,7 @@ struct PetFoodManagementView: View {
                             if let runOut = pet.estimatedRunOutDate {
                                 Text("预计 \(runOut, format: .dateTime.month().day()) 断粮")
                                     .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(pet.remainingFoodDays <= 7 ? Color.goRed : .white.opacity(0.4))
+                                    .foregroundStyle(pet.remainingFoodDays <= 7 ? Color.goRed : .primary.opacity(0.4))
                             }
                         }
                         ProgressView(value: pet.remainingFoodPercent)
@@ -631,9 +618,7 @@ struct PetFoodManagementView: View {
             }
         }
         .padding(16)
-        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
-            .strokeBorder(Color.goOrange.opacity(0.2), lineWidth: 1))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     // MARK: - 喂食打卡卡
@@ -700,7 +685,7 @@ struct PetFoodManagementView: View {
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 10).padding(.vertical, 8)
-                            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                         Text("g").font(.system(size: 13, weight: .bold)).foregroundStyle(.primary.opacity(0.4))
                         Button {
                             let g = Double(feedGramsInput.replacingOccurrences(of: ",", with: ".")) ?? 0
@@ -719,7 +704,7 @@ struct PetFoodManagementView: View {
                     Button { setAsDefault.toggle() } label: {
                         HStack(spacing: 6) {
                             Image(systemName: setAsDefault ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 14)).foregroundStyle(setAsDefault ? Color.goLime : .white.opacity(0.3))
+                                .font(.system(size: 14)).foregroundStyle(setAsDefault ? Color.goLime : .primary.opacity(0.3))
                             Text("设为默认单次喂食量")
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
                                 .foregroundStyle(.primary.opacity(0.5))
@@ -746,9 +731,7 @@ struct PetFoodManagementView: View {
             }
         }
         .padding(16)
-        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
-            .strokeBorder(Color.goOrange.opacity(0.2), lineWidth: 1))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     // MARK: - 喂水卡
@@ -808,7 +791,7 @@ struct PetFoodManagementView: View {
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 10).padding(.vertical, 8)
-                            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                         Text("ml").font(.system(size: 13, weight: .bold)).foregroundStyle(.primary.opacity(0.4))
                         Button {
                             let ml = Double(waterMlInput) ?? 0
@@ -826,7 +809,7 @@ struct PetFoodManagementView: View {
                     Button { setWaterAsDefault.toggle() } label: {
                         HStack(spacing: 6) {
                             Image(systemName: setWaterAsDefault ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 14)).foregroundStyle(setWaterAsDefault ? Color.goLime : .white.opacity(0.3))
+                                .font(.system(size: 14)).foregroundStyle(setWaterAsDefault ? Color.goLime : .primary.opacity(0.3))
                             Text("设为默认加水量")
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
                                 .foregroundStyle(.primary.opacity(0.5))
@@ -852,9 +835,7 @@ struct PetFoodManagementView: View {
             }
         }
         .padding(16)
-        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
-            .strokeBorder(Color.goTeal.opacity(0.2), lineWidth: 1))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
 
@@ -881,7 +862,7 @@ struct PetFoodManagementView: View {
                 }
             }
             .padding(16)
-            .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         )
     }
 
@@ -907,7 +888,7 @@ struct PetFoodManagementView: View {
             field().foregroundStyle(.primary)
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
-        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     // MARK: - 数据操作

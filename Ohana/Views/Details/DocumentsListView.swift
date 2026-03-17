@@ -76,7 +76,7 @@ struct DocumentsListView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(40)
-        .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 18))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
@@ -102,7 +102,7 @@ private struct DocumentDetailRow: View {
                 Text(doc.documentCategory.emoji)
                     .font(.system(size: 26))
                     .frame(width: 40, height: 40)
-                    .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(doc.title.isEmpty ? doc.category : doc.title)
@@ -159,10 +159,6 @@ private struct DocumentDetailRow: View {
                         .resizable().scaledToFill()
                         .frame(maxWidth: .infinity).frame(height: 100)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .strokeBorder(.white.opacity(0.1), lineWidth: 1)
-                        )
                 }
                 .buttonStyle(.plain)
             } else if !doc.attachmentFilename.isEmpty {
@@ -174,11 +170,11 @@ private struct DocumentDetailRow: View {
                         .lineLimit(1)
                 }
                 .padding(10)
-                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
         }
         .padding(14)
-        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onTapGesture { onDetail() }
         .contextMenu {
             Button { onDetail() } label: {
@@ -211,7 +207,7 @@ private struct DocumentDetailRow: View {
         }
     }
 
-    private func infoChip(icon: String, text: String, color: Color = .white.opacity(0.4)) -> some View {
+    private func infoChip(icon: String, text: String, color: Color = .primary.opacity(0.4)) -> some View {
         HStack(spacing: 4) {
             Image(systemName: icon).font(.system(size: 10)).foregroundStyle(color)
             Text(text).font(.system(size: 11, weight: .medium)).foregroundStyle(color)
