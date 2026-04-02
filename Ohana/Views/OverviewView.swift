@@ -114,16 +114,24 @@ struct OverviewView: View {
     @State private var memoryDismissed = false
     @State private var memoryDragOffset: CGFloat = 0
     // 卡片背面功能弹窗
-    @State private var cardBackDocumentsPet: Pet? = nil
-    @State private var cardBackMomentsPet: Pet? = nil
-    @State private var cardBackAchievementsPet: Pet? = nil
-    @State private var cardBackHealthPet: Pet? = nil
     @State private var cardBackSettingsPet: Pet? = nil
-    // Feature hub new callbacks
-    @State private var cardBackCalendarPet: Pet? = nil
+    // 健康管理
+    @State private var cardBackHealthPet: Pet? = nil
     @State private var cardBackMedicationsPet: Pet? = nil
+    @State private var cardBackWeightPet: Pet? = nil
+    // 日常生活
     @State private var cardBackFoodPet: Pet? = nil
-    @State private var cardBackEditPet: Pet? = nil
+    @State private var cardBackHygienePet: Pet? = nil
+    @State private var cardBackWalksPet: Pet? = nil
+    @State private var cardBackPottyPet: Pet? = nil
+    @State private var cardBackExpensesPet: Pet? = nil
+    // 档案证件
+    @State private var cardBackBasicInfoPet: Pet? = nil
+    @State private var cardBackDocumentsPet: Pet? = nil
+    // 记忆成长
+    @State private var cardBackMomentsPet: Pet? = nil
+    @State private var cardBackCalendarPet: Pet? = nil
+    @State private var cardBackAchievementsPet: Pet? = nil
     // 全局椰子日志显示
     @State private var showingCoconutLog = false
     // 打卡连击详情（顶栏 / 横滑甲板共用）
@@ -526,15 +534,20 @@ struct OverviewView: View {
                             if case .pet(let p) = item { activeCritterIdStr = p.id.uuidString }
                             else { activeCritterIdStr = "" }
                         },
-                        onShowDocuments: { cardBackDocumentsPet = $0 },
-                        onShowMoments: { cardBackMomentsPet = $0 },
-                        onShowAchievements: { cardBackAchievementsPet = $0 },
-                        onShowHealth: { cardBackHealthPet = $0 },
                         onShowBackSettings: { cardBackSettingsPet = $0 },
-                        onShowCalendar: { cardBackCalendarPet = $0 },
-                        onShowMedications: { cardBackMedicationsPet = $0 },
-                        onShowFood: { cardBackFoodPet = $0 },
-                        onShowEdit: { cardBackEditPet = $0 }
+                        onShowHealth:       { cardBackHealthPet = $0 },
+                        onShowMedications:  { cardBackMedicationsPet = $0 },
+                        onShowWeight:       { cardBackWeightPet = $0 },
+                        onShowFood:         { cardBackFoodPet = $0 },
+                        onShowHygiene:      { cardBackHygienePet = $0 },
+                        onShowWalks:        { cardBackWalksPet = $0 },
+                        onShowPotty:        { cardBackPottyPet = $0 },
+                        onShowExpenses:     { cardBackExpensesPet = $0 },
+                        onShowBasicInfo:    { cardBackBasicInfoPet = $0 },
+                        onShowDocuments:    { cardBackDocumentsPet = $0 },
+                        onShowMoments:      { cardBackMomentsPet = $0 },
+                        onShowCalendar:     { cardBackCalendarPet = $0 },
+                        onShowAchievements: { cardBackAchievementsPet = $0 }
                     )
                     .onAppear {
                         if activeCritterIdStr.isEmpty {
@@ -1669,36 +1682,62 @@ struct OverviewView: View {
                 .presentationDragIndicator(.visible)
                 .presentationContentInteraction(.scrolls)
             }
-            // 卡片背面 — 功能入口 sheets
-            .sheet(item: $cardBackDocumentsPet) { pet in
-                NavigationStack { DocumentsListView(pet: pet) }
-            }
-            .sheet(item: $cardBackMomentsPet) { pet in
-                PetMomentsHubView(pet: pet)
-            }
-            .sheet(item: $cardBackAchievementsPet) { pet in
-                AchievementWallView(pet: pet)
-            }
-            .sheet(item: $cardBackHealthPet) { pet in
-                NavigationStack { PetHealthDetailView(pet: pet, isModal: true) }
-            }
+            // 卡片背面 — 功能入口 sheets（独立 background context 避免编译器类型检查超时）
+            .background(cardBackSheets)
+    }
+
+
+    // MARK: - 卡片背面功能入口 sheets（独立 computed property，打破类型检查链）
+    @ViewBuilder private var cardBackSheets: some View {
+        Color.clear
+            // 设置
             .sheet(item: $cardBackSettingsPet) { pet in
                 PetCardBackSettingsSheet(pet: pet)
             }
-            .sheet(item: $cardBackCalendarPet) { pet in
-                NavigationStack { CalendarView(preselectedPetId: pet.id.uuidString) }
+            // 健康管理
+            .sheet(item: $cardBackHealthPet) { pet in
+                NavigationStack { PetHealthDetailView(pet: pet, isModal: true) }
             }
             .sheet(item: $cardBackMedicationsPet) { pet in
                 NavigationStack { PetMedicationView(pet: pet) }
             }
+            .sheet(item: $cardBackWeightPet) { pet in
+                NavigationStack { WeightHistoryView(pet: pet) }
+            }
+            // 日常生活
             .sheet(item: $cardBackFoodPet) { pet in
                 NavigationStack { PetFoodManagementView(pet: pet) }
             }
-            .sheet(item: $cardBackEditPet) { pet in
-                EditPetSheet(pet: pet)
+            .sheet(item: $cardBackHygienePet) { pet in
+                NavigationStack { PetHygieneDetailView(pet: pet) }
+            }
+            .sheet(item: $cardBackWalksPet) { pet in
+                WalkSummarySheet(pet: pet)
+            }
+            .sheet(item: $cardBackPottyPet) { pet in
+                NavigationStack { PottyOverviewView(pet: pet) }
+            }
+            .sheet(item: $cardBackExpensesPet) { pet in
+                NavigationStack { ExpenseHistoryView(pet: pet) }
+            }
+            // 档案证件
+            .sheet(item: $cardBackBasicInfoPet) { pet in
+                NavigationStack { PetBasicInfoDetailView(pet: pet) }
+            }
+            .sheet(item: $cardBackDocumentsPet) { pet in
+                NavigationStack { DocumentsListView(pet: pet) }
+            }
+            // 记忆成长
+            .sheet(item: $cardBackMomentsPet) { pet in
+                PetMomentsHubView(pet: pet)
+            }
+            .sheet(item: $cardBackCalendarPet) { pet in
+                NavigationStack { CalendarView(preselectedPetId: pet.id.uuidString) }
+            }
+            .sheet(item: $cardBackAchievementsPet) { pet in
+                AchievementWallView(pet: pet)
             }
     }
-
 
     // Task2: 根据顶牌过滤 Quick Access items（顶牌是宠物时，过滤出该宠物 + 无宠物 items；顶牌是人时显示全部）
     private var activeQuickActionItems: [QuickActionItem] {
