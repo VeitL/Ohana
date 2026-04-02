@@ -1,0 +1,28 @@
+---
+description: 
+alwaysApply: true
+---
+
+# Ohana 项目规范
+
+## UI / UX 规范
+- **修改或新建任何页面前，必须阅读并严格遵守 `/Users/guanchenli/Documents/Space/Ohana/UIRules.md`**
+- 使用 `OhanaFont` 系统字体，禁止直接 `.font(.system(size:weight:))`
+- 禁止硬编码 `.white` 文字颜色，改用 `primaryText/secondaryText/tertiaryText` 自适应色
+- 禁止 Emoji 作为功能图标，使用 SF Symbols
+- 全局主色统一使用 `Color.goPrimary`（浅色橙/深色荧光绿），不直接用 `Color.goLime`
+
+## 文档更新规则
+- **仅在完成新功能模块或重大 UI 重构时，才更新 `Project_doc.md` 和 `Check_list.md`**
+- 小 bug 修复、细节调整不需要更新文档
+- 更新时保持文档精简，不记录每个细节调整步骤
+
+## SwiftData
+- 新增模型字段必须提供属性默认值（轻量迁移），并在 `SharedModelContainer` 中升级 Schema 版本
+- 模型关系必须声明 `@Relationship(deleteRule: .cascade)`
+
+## 代码质量
+- 新建文件后必须添加到 `project.pbxproj`，删除文件必须从中移除
+- 构建命令：`xcodebuild -scheme Ohana -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2'`
+
+##每次更改完以后build并更新Proejct_doc.md和check_list.md

@@ -1,0 +1,616 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXContainerItemProxy section */
+		4FDA023F2F54E0D6004B725F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4FDA02292F54E0D4004B725F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4FDA02302F54E0D4004B725F;
+			remoteInfo = Ohana;
+		};
+		4FDA02492F54E0D6004B725F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4FDA02292F54E0D4004B725F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4FDA02302F54E0D4004B725F;
+			remoteInfo = Ohana;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		4FDA02312F54E0D4004B725F /* Ohana.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ohana.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4FDA023E2F54E0D6004B725F /* OhanaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OhanaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4FDA02482F54E0D6004B725F /* OhanaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OhanaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		4FDA07102F5C3A14004B725F /* Exceptions for "Ohana" folder in "Ohana" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 4FDA02302F54E0D4004B725F /* Ohana */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		4FDA02332F54E0D4004B725F /* Ohana */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4FDA07102F5C3A14004B725F /* Exceptions for "Ohana" folder in "Ohana" target */,
+			);
+			path = Ohana;
+			sourceTree = "<group>";
+		};
+		4FDA02412F54E0D6004B725F /* OhanaTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = OhanaTests;
+			sourceTree = "<group>";
+		};
+		4FDA024B2F54E0D6004B725F /* OhanaUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = OhanaUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		4FDA022E2F54E0D4004B725F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4FDA023B2F54E0D6004B725F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4FDA02452F54E0D6004B725F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		4FDA02282F54E0D4004B725F = {
+			isa = PBXGroup;
+			children = (
+				4FDA02332F54E0D4004B725F /* Ohana */,
+				4FDA02412F54E0D6004B725F /* OhanaTests */,
+				4FDA024B2F54E0D6004B725F /* OhanaUITests */,
+				4FDA02322F54E0D4004B725F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		4FDA02322F54E0D4004B725F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4FDA02312F54E0D4004B725F /* Ohana.app */,
+				4FDA023E2F54E0D6004B725F /* OhanaTests.xctest */,
+				4FDA02482F54E0D6004B725F /* OhanaUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		4FDA02302F54E0D4004B725F /* Ohana */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4FDA02522F54E0D6004B725F /* Build configuration list for PBXNativeTarget "Ohana" */;
+			buildPhases = (
+				4FDA022D2F54E0D4004B725F /* Sources */,
+				4FDA022E2F54E0D4004B725F /* Frameworks */,
+				4FDA022F2F54E0D4004B725F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				4FDA02332F54E0D4004B725F /* Ohana */,
+			);
+			name = Ohana;
+			packageProductDependencies = (
+			);
+			productName = Ohana;
+			productReference = 4FDA02312F54E0D4004B725F /* Ohana.app */;
+			productType = "com.apple.product-type.application";
+		};
+		4FDA023D2F54E0D6004B725F /* OhanaTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4FDA02552F54E0D6004B725F /* Build configuration list for PBXNativeTarget "OhanaTests" */;
+			buildPhases = (
+				4FDA023A2F54E0D6004B725F /* Sources */,
+				4FDA023B2F54E0D6004B725F /* Frameworks */,
+				4FDA023C2F54E0D6004B725F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4FDA02402F54E0D6004B725F /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				4FDA02412F54E0D6004B725F /* OhanaTests */,
+			);
+			name = OhanaTests;
+			packageProductDependencies = (
+			);
+			productName = OhanaTests;
+			productReference = 4FDA023E2F54E0D6004B725F /* OhanaTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		4FDA02472F54E0D6004B725F /* OhanaUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4FDA02582F54E0D6004B725F /* Build configuration list for PBXNativeTarget "OhanaUITests" */;
+			buildPhases = (
+				4FDA02442F54E0D6004B725F /* Sources */,
+				4FDA02452F54E0D6004B725F /* Frameworks */,
+				4FDA02462F54E0D6004B725F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4FDA024A2F54E0D6004B725F /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				4FDA024B2F54E0D6004B725F /* OhanaUITests */,
+			);
+			name = OhanaUITests;
+			packageProductDependencies = (
+			);
+			productName = OhanaUITests;
+			productReference = 4FDA02482F54E0D6004B725F /* OhanaUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		4FDA02292F54E0D4004B725F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2630;
+				LastUpgradeCheck = 2630;
+				TargetAttributes = {
+					4FDA02302F54E0D4004B725F = {
+						CreatedOnToolsVersion = 26.3;
+					};
+					4FDA023D2F54E0D6004B725F = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = 4FDA02302F54E0D4004B725F;
+					};
+					4FDA02472F54E0D6004B725F = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = 4FDA02302F54E0D4004B725F;
+					};
+				};
+			};
+			buildConfigurationList = 4FDA022C2F54E0D4004B725F /* Build configuration list for PBXProject "Ohana" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 4FDA02282F54E0D4004B725F;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 4FDA02322F54E0D4004B725F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				4FDA02302F54E0D4004B725F /* Ohana */,
+				4FDA023D2F54E0D6004B725F /* OhanaTests */,
+				4FDA02472F54E0D6004B725F /* OhanaUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		4FDA022F2F54E0D4004B725F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4FDA023C2F54E0D6004B725F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4FDA02462F54E0D6004B725F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		4FDA022D2F54E0D4004B725F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4FDA023A2F54E0D6004B725F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4FDA02442F54E0D6004B725F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		4FDA02402F54E0D6004B725F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4FDA02302F54E0D4004B725F /* Ohana */;
+			targetProxy = 4FDA023F2F54E0D6004B725F /* PBXContainerItemProxy */;
+		};
+		4FDA024A2F54E0D6004B725F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4FDA02302F54E0D4004B725F /* Ohana */;
+			targetProxy = 4FDA02492F54E0D6004B725F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		4FDA02502F54E0D6004B725F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 567SK733UN;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		4FDA02512F54E0D6004B725F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 567SK733UN;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		4FDA02532F54E0D6004B725F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Ohana/Ohana.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 567SK733UN;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Ohana/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Ohana 需要访问相机来拍摄宠物头像";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Ohana 需要读取您的步数、消耗和运动记录，以便在您的岛民档案中展示并参与全岛探索里程统计。";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Ohana 需要此权限来帮您将手动记录的运动数据同步至苹果健康。";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "开启始终允许定位，Ohana 可在后台持续追踪遛狗路线，确保数据完整。";
+				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "开启始终允许定位，Ohana 可在后台持续追踪遛狗路线，确保数据完整。";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Ohana 在遛狗时需要获取您的位置，以记录步行路线和距离。";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Ohana 需要访问相册来选择宠物头像";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIBackgroundModes = "(location)";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = HT.Ohana;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		4FDA02542F54E0D6004B725F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Ohana/Ohana.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 567SK733UN;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Ohana/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Ohana 需要访问相机来拍摄宠物头像";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Ohana 需要读取您的步数、消耗和运动记录，以便在您的岛民档案中展示并参与全岛探索里程统计。";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Ohana 需要此权限来帮您将手动记录的运动数据同步至苹果健康。";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "开启始终允许定位，Ohana 可在后台持续追踪遛狗路线，确保数据完整。";
+				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "开启始终允许定位，Ohana 可在后台持续追踪遛狗路线，确保数据完整。";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Ohana 在遛狗时需要获取您的位置，以记录步行路线和距离。";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Ohana 需要访问相册来选择宠物头像";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIBackgroundModes = "(location)";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = HT.Ohana;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		4FDA02562F54E0D6004B725F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 567SK733UN;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = HT.OhanaTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Ohana.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Ohana";
+			};
+			name = Debug;
+		};
+		4FDA02572F54E0D6004B725F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 567SK733UN;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = HT.OhanaTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Ohana.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Ohana";
+			};
+			name = Release;
+		};
+		4FDA02592F54E0D6004B725F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 567SK733UN;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = HT.OhanaUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Ohana;
+			};
+			name = Debug;
+		};
+		4FDA025A2F54E0D6004B725F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 567SK733UN;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = HT.OhanaUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Ohana;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		4FDA022C2F54E0D4004B725F /* Build configuration list for PBXProject "Ohana" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4FDA02502F54E0D6004B725F /* Debug */,
+				4FDA02512F54E0D6004B725F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4FDA02522F54E0D6004B725F /* Build configuration list for PBXNativeTarget "Ohana" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4FDA02532F54E0D6004B725F /* Debug */,
+				4FDA02542F54E0D6004B725F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4FDA02552F54E0D6004B725F /* Build configuration list for PBXNativeTarget "OhanaTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4FDA02562F54E0D6004B725F /* Debug */,
+				4FDA02572F54E0D6004B725F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4FDA02582F54E0D6004B725F /* Build configuration list for PBXNativeTarget "OhanaUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4FDA02592F54E0D6004B725F /* Debug */,
+				4FDA025A2F54E0D6004B725F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 4FDA02292F54E0D4004B725F /* Project object */;
+}

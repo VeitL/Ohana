@@ -1,0 +1,29 @@
+# Xcode / Swift
+build/
+DerivedData/
+*.xcuserstate
+*.xcuserdatad
+xcuserdata/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# SwiftPM
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Tooling / local
+*.xcresult
+
+# Accidental duplicate git metadata (do not track)
+.git 2/
+
+# Node (design tooling subfolder)
+Ai_Studio_New_UI/node_modules/

@@ -1,0 +1,1107 @@
+//
+//  OasisRewardView.swift
+//  Ohana
+//
+//  绿洲圣地 — 生命之树动态进化 + 注入能量 + Bento 功能区
+//
+
+import SwiftUI
+import SwiftData
+
+struct OasisRewardView: View {
+    var hideToolbar: Bool = false
+    var rulesTrigger: Bool = false
+    var inventoryTrigger: Bool = false
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Pet.createdAt)   private var pets:   [Pet]
+    @Query(sort: \Human.createdAt) private var humans: [Human]
+    @Query(sort: \Plant.createdAt) private var plants: [Plant]
+
+    @State private var treeScale: CGFloat   = 1.0
+    @State private var treeGlow: CGFloat    = 0.4
+    @State private var showAchievements     = false
+    @State private var showingCoconutLog    = false
+    @State private var showCoconutShop      = false
+    @State private var showGacha            = false
+    @State private var showBountyBoard      = false
+    @State private var showInventory        = false
+    @State private var showCoconutRules     = false
+    @State private var showCheckInCalendar  = false
+    @State private var energyParticles: [EnergyParticle] = []
+    // 模块六：打卡日历
+    @State private var checkedInDates: Set<String> = []   // "yyyy-MM-dd" 格式
+    @State private var makeupPackCount: Int = 0            // 补签包数量
+    @State private var showMakeupConfirm: String? = nil    // 待确认补签的日期
+    private let checkedInKey = "oasis_checkedIn_dates"
+    private let makeupDatesKey = "oasis_makeup_dates"      // 补签日期独立记录
+    private let makeupPackKey = "inventory_backdate_1day_count" // 与椰子商店统一 key
+    @State private var makeupDates: Set<String> = []       // 补签过的日期集合
+    @AppStorage("checkIn_lastClaimedMilestone") private var lastClaimedMilestone: Int = 0
+    @AppStorage("appUIStyle") private var appUIStyle: String = "classic"
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var isMaterial: Bool { appUIStyle == "material" }
+    private var matBg:      Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
+    private var matSurface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
+    private var matAccent:  Color { Color(hex: "FF5A00") }
+    @State private var lastLevel: TreeLevel = .lv1
+    @State private var isInjecting: Bool = false
+    @State private var levelUpPulse         = false
+    @State private var harvestBubbleBounce  = false
+    @State private var justHarvested        = false
+    // 任务7：环境光晕 + 采摘飞出
+    @State private var glowBreathing: Bool  = false
+    @State private var flyCoconut: Bool     = false
+    @State private var flyOpacity: Double   = 0
+    @State private var harvestedCoconutIndices: Set<Int> = []
+
+    private let treeMgr = OasisTreeManager.shared
+
+    private struct EnergyParticle: Identifiable {
+        let id = UUID()
+        var offsetX: CGFloat = CGFloat.random(in: -80...80)
+        var offsetY: CGFloat = 0
+        var opacity: Double  = 1.0
+    }
+
+    var body: some View {
+        ZStack {
+            if isMaterial { matBg.ignoresSafeArea() } else { ArkBackgroundView() }
+
+            // task21: 粒子特效放在最外层 ZStack，不被 ScrollView 裁剪
+            ForEach(energyParticles) { p in
+                Text("✨")
+                    .font(.system(size: 22))
+                    .offset(x: p.offsetX, y: p.offsetY)
+                    .opacity(p.opacity)
+                    .allowsHitTesting(false)
+            }
+            .zIndex(99)
+
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 0) {
+                    // R6: 全局 header 占位
+                    Spacer().frame(height: 70)
+
+                    if !hideToolbar {
+                        // 绿洲工具栏（独立使用时显示，嵌入 tab 时由全局 header 提供）
+                        HStack(spacing: 8) {
+                            Spacer()
+                            Button { showCoconutRules = true } label: {
+                                Image(systemName: "info.circle")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundStyle(.primary.opacity(0.45))
+                            }
+                            .buttonStyle(.plain)
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                showInventory = true
+                            } label: {
+                                Image(systemName: "shippingbox.fill")
+                                    .font(.system(size: 15))
+                                    .foregroundStyle(.primary)
+                                    .frame(width: 32, height: 32)
+                                    .background(Color.goPrimary.opacity(0.12), in: Circle())
+                                    .overlay(Circle().strokeBorder(Color.goPrimary.opacity(0.3), lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, 24).padding(.top, 4)
+                    }
+
+                    // 新手任务面板
+                    if !QuestManager.shared.isAllWelcomeQuestsCompleted {
+                        WelcomeQuestBentoView()
+                            .padding(.horizontal, 20).padding(.top, 12)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+
+                    // ── 生命之树核心区
+                    treeSection
+                        .padding(.top, 60)
+
+                    // ── 树等级说明
+                    treeLevelLabel
+                        .padding(.top, 20)
+
+                    // ── 注入能量按钮
+                    injectEnergyButton
+                        .padding(.top, 18)
+
+                    // ── Bento 功能区（紧凑小卡）
+                    oasisBentoGrid
+                        .padding(.horizontal, 20)
+                        .padding(.top, 24)
+                        .padding(.bottom, 140)
+                }
+            }
+        }
+        .sheet(isPresented: $showingCoconutLog) { CoconutLogView() }
+        .sheet(isPresented: $showCoconutRules) { CoconutRulesSheet() }
+        .sheet(isPresented: $showAchievements) {
+            if let pet = pets.first {
+                NavigationStack { AchievementWallView(pet: pet) }
+                    .presentationDetents([.large])
+            }
+        }
+        .sheet(isPresented: $showInventory) {
+            InventoryView()
+                .presentationDetents([.large])
+        }
+        .sheet(isPresented: $showCoconutShop) {
+            CoconutShopView()
+                .presentationDetents([.large])
+        }
+        .sheet(isPresented: $showGacha) {
+            GachaView()
+                .presentationDetents([.large])
+        }
+        .sheet(isPresented: $showBountyBoard) {
+            BountyBoardView()
+                .presentationDetents([.large])
+        }
+        .onAppear {
+            treeMgr.refreshEnergy(modelContext: modelContext, pets: pets, humans: humans, plants: plants)
+            lastLevel = treeMgr.treeLevel
+            startBreathing()
+            loadCheckInData()
+            triggerTodayCheckIn()
+        }
+        // 补签确认弹窗
+        .confirmationDialog(
+            showMakeupConfirm.map { "补签 \($0)？" } ?? "",
+            isPresented: Binding(get: { showMakeupConfirm != nil }, set: { if !$0 { showMakeupConfirm = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("消耗1个补签包确认补签") {
+                if let d = showMakeupConfirm { applyMakeup(date: d) }
+                showMakeupConfirm = nil
+            }
+            Button("取消", role: .cancel) { showMakeupConfirm = nil }
+        }
+        .onChange(of: pets.count)   { treeMgr.refreshEnergy(modelContext: modelContext, pets: pets, humans: humans, plants: plants) }
+        .onChange(of: humans.count) { treeMgr.refreshEnergy(modelContext: modelContext, pets: pets, humans: humans, plants: plants) }
+        .onChange(of: plants.count) { treeMgr.refreshEnergy(modelContext: modelContext, pets: pets, humans: humans, plants: plants) }
+        .onChange(of: rulesTrigger) { _, _ in showCoconutRules = true }
+        .onChange(of: inventoryTrigger) { _, _ in showInventory = true }
+    }
+
+    // MARK: - Tree Section
+
+    private var treeSection: some View {
+        ZStack(alignment: .bottom) {
+            // 呈呆呹呢呢呢呢呢呢呢：呼吸圆形环境光晕
+            Circle()
+                .fill(RadialGradient(
+                    colors: [treeMgr.treeLevel.glowColor.opacity(glowBreathing ? 0.28 : 0.08), .clear],
+                    center: .center, startRadius: 20, endRadius: 180
+                ))
+                .frame(width: 340, height: 340)
+                .scaleEffect(glowBreathing ? 1.08 : 0.92)
+                .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: glowBreathing)
+
+            // 外圈发光輪廓（goLime shadow 呼吸）
+            Circle()
+                .stroke(Color.goPrimary.opacity(glowBreathing ? 0.22 : 0.06), lineWidth: 2)
+                .frame(width: 260, height: 260)
+                .blur(radius: glowBreathing ? 6 : 2)
+                .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: glowBreathing)
+
+            // 动态生长椰子树
+            BeautifulCoconutTree(
+                level: treeMgr.treeLevel.rawValue,
+                isInjecting: isInjecting,
+                harvestedCoconuts: harvestedCoconutIndices,
+                onHarvest: { idx in
+                    // 单椰子点击 → +1 椰子，标记该椰子为已采摘
+                    guard !harvestedCoconutIndices.contains(idx) else { return }
+                    harvestedCoconutIndices.insert(idx)
+                    QuestManager.shared.addCoconuts(1, emoji: "🥥", title: "摘下椰子 +1🥥")
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    flyCoconut = false
+                    flyOpacity = 1
+                    withAnimation(.spring(response: 0.55, dampingFraction: 0.6).delay(0.05)) {
+                        flyCoconut = true
+                    }
+                    withAnimation(.easeOut(duration: 0.3).delay(0.6)) {
+                        flyOpacity = 0
+                    }
+                }
+            )
+            .shadow(color: Color.goPrimary.opacity(glowBreathing ? 0.45 : 0.15), radius: glowBreathing ? 24 : 10, x: 0, y: 0)
+            .scaleEffect(levelUpPulse ? 1.12 : treeScale)
+            .animation(.spring(response: 0.4, dampingFraction: 0.5), value: levelUpPulse)
+            .animation(.spring(response: 0.4, dampingFraction: 0.5), value: treeScale)
+            .offset(y: -20)
+
+            // 采摘气泡（升级交互闭环）
+            if treeMgr.canHarvestToday && !justHarvested {
+                Button {
+                    guard treeMgr.harvestDailyPassiveIncome() else { return }
+                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                    withAnimation(.spring(response: 0.3)) { justHarvested = true }
+                    spawnEnergyParticles()
+                    // 椰子飞出动画
+                    flyCoconut = false
+                    flyOpacity = 1
+                    withAnimation(.spring(response: 0.55, dampingFraction: 0.6).delay(0.05)) {
+                        flyCoconut = true
+                    }
+                    withAnimation(.easeOut(duration: 0.3).delay(0.6)) {
+                        flyOpacity = 0
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("🥥").font(.system(size: 18))
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("点击采摘今日推落")
+                                .font(.system(size: 13, weight: .black, design: .rounded))
+                                .foregroundStyle(.black)
+                            Text("+\(treeMgr.passiveIncomeAmount) 椰子")
+                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                                .foregroundStyle(.black.opacity(0.6))
+                        }
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.black.opacity(0.5))
+                    }
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .background(
+                        LinearGradient(colors: [Color.goYellow, Color(hex: "FFB800")],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing),
+                        in: Capsule()
+                    )
+                    .shadow(color: Color.goYellow.opacity(harvestBubbleBounce ? 0.75 : 0.35),
+                            radius: harvestBubbleBounce ? 16 : 8, x: 0, y: 4)
+                    .scaleEffect(harvestBubbleBounce ? 1.06 : 1.0)
+                    .animation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true), value: harvestBubbleBounce)
+                }
+                .buttonStyle(.plain)
+                .offset(y: 42)
+                .transition(.scale.combined(with: .opacity))
+                .onAppear { harvestBubbleBounce = true }
+            }
+
+            // 椰子飞入余额区动画层
+            if flyOpacity > 0 {
+                Text("🥥")
+                    .font(.system(size: 28))
+                    .offset(y: flyCoconut ? -280 : -60)
+                    .opacity(flyOpacity)
+                    .allowsHitTesting(false)
+            }
+        }
+        .frame(height: 320)
+        .onAppear {
+            justHarvested = !treeMgr.canHarvestToday
+            withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
+                glowBreathing = true
+            }
+        }
+        .onChange(of: treeMgr.treeLevel) { _, _ in justHarvested = !treeMgr.canHarvestToday }
+    }
+
+    private var treeLevelLabel: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 6) {
+                Text("Lv.\(treeMgr.treeLevel.rawValue)")
+                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .foregroundStyle(treeMgr.treeLevel.glowColor)
+                Text(treeMgr.treeLevel.displayName)
+                    .font(.system(size: 20, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                Text("·  生命之树")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(.primary.opacity(0.4))
+            }
+
+            // 进度条
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(.white.opacity(0.1))
+                        .frame(height: 6)
+                    Capsule()
+                        .fill(LinearGradient(
+                            colors: [treeMgr.treeLevel.glowColor, treeMgr.treeLevel.glowColor.opacity(0.5)],
+                            startPoint: .leading, endPoint: .trailing
+                        ))
+                        .frame(width: geo.size.width * treeMgr.progressToNextLevel, height: 6)
+                        .animation(.spring(response: 0.6), value: treeMgr.progressToNextLevel)
+                }
+            }
+            .frame(height: 6)
+            .padding(.horizontal, 60)
+
+            Text("能量 \(treeMgr.totalEnergy) · 下一级需 \(treeMgr.nextLevelThreshold)")
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundStyle(.primary.opacity(0.3))
+        }
+    }
+
+    private var injectEnergyButton: some View {
+        let canInject = QuestManager.shared.coconutCount >= 10
+        let btnColor  = isMaterial ? matAccent : Color.goPrimary
+        return Button {
+            let beforeLevel = treeMgr.treeLevel
+            withAnimation { isInjecting = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                withAnimation { isInjecting = false }
+            }
+            if treeMgr.injectEnergy(cost: 10) {
+                spawnEnergyParticles()
+                if treeMgr.treeLevel != beforeLevel {
+                    withAnimation { levelUpPulse = true }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                        withAnimation { levelUpPulse = false }
+                    }
+                }
+            } else {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Text("✨")
+                Text("注入能量")
+                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .foregroundStyle(isMaterial ? .white : .black)
+                Text("(-10🥥)")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(isMaterial ? .white.opacity(0.7) : .black.opacity(0.5))
+            }
+            .padding(.horizontal, 28).padding(.vertical, 14)
+            .background(
+                canInject ? btnColor : (isMaterial ? matSurface : Color.white.opacity(0.1)),
+                in: Capsule()
+            )
+            .overlay(Capsule().strokeBorder(
+                canInject ? Color.clear : (isMaterial ? btnColor.opacity(0.3) : Color.white.opacity(0.2)),
+                lineWidth: 1
+            ))
+            .shadow(color: canInject && isMaterial ? btnColor.opacity(0.3) : .clear, radius: 10, x: 0, y: 4)
+        }
+        .buttonStyle(.plain)
+        .opacity(canInject ? 1 : 0.45)
+    }
+
+    // MARK: - 模块六：打卡日历（完整月视图）
+
+    @State private var calendarDisplayMonth: Date = Date()
+
+    private var checkInCalendarCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // ── 标题 + 连胜
+            HStack {
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar.badge.checkmark")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Color.goPrimary)
+                    Text("打卡日历")
+                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .foregroundStyle(.primary)
+                }
+                Spacer()
+                HStack(spacing: 4) {
+                    Text("🔥")
+                    Text("\(currentStreak) 天连胜")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.goYellow)
+                }
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background(Color.goYellow.opacity(0.12), in: Capsule())
+            }
+
+            // ── 统计面板
+            checkInStatsRow
+
+            OhanaDashedDivider(color: .white.opacity(0.1))
+
+            // ── 月份导航
+            HStack {
+                Button {
+                    withAnimation(.spring(response: 0.3)) {
+                        calendarDisplayMonth = Calendar.current.date(byAdding: .month, value: -1, to: calendarDisplayMonth) ?? calendarDisplayMonth
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.primary.opacity(0.5))
+                }
+                Spacer()
+                Text(monthYearString(calendarDisplayMonth))
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Button {
+                    let next = Calendar.current.date(byAdding: .month, value: 1, to: calendarDisplayMonth) ?? calendarDisplayMonth
+                    if next <= Date() {
+                        withAnimation(.spring(response: 0.3)) { calendarDisplayMonth = next }
+                    }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(
+                            Calendar.current.isDate(calendarDisplayMonth, equalTo: Date(), toGranularity: .month)
+                                ? Color.primary.opacity(0.15) : Color.primary.opacity(0.5)
+                        )
+                }
+                .disabled(Calendar.current.isDate(calendarDisplayMonth, equalTo: Date(), toGranularity: .month))
+            }
+            .padding(.horizontal, 4)
+
+            // ── 星期标题行
+            HStack(spacing: 0) {
+                ForEach(["日","一","二","三","四","五","六"], id: \.self) { d in
+                    Text(d)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(.primary.opacity(0.3))
+                        .frame(maxWidth: .infinity)
+                }
+            }
+
+            // ── 月视图网格（按星期正确对齐）
+            let cells = monthCalendarCells(for: calendarDisplayMonth)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 4) {
+                ForEach(Array(cells.enumerated()), id: \.offset) { _, cell in
+                    calendarDayCell(cell)
+                }
+            }
+
+            OhanaDashedDivider(color: .white.opacity(0.1))
+
+            // ── 补签包区域
+            HStack(spacing: 12) {
+                HStack(spacing: 4) {
+                    Text("📦").font(.system(size: 14))
+                    Text("补签包")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(.primary.opacity(0.7))
+                    Text("×\(makeupPackCount)")
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(makeupPackCount > 0 ? Color.goPrimary : .white.opacity(0.3))
+                }
+                Spacer()
+                if makeupPackCount > 0 {
+                    Text("点击灰色日期补签")
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.goPrimary.opacity(0.6))
+                } else {
+                    Button { showCoconutShop = true } label: {
+                        Text("去商店购买 →")
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.goYellow.opacity(0.8))
+                    }
+                }
+            }
+
+            // ── 里程碑奖励提示
+            if currentStreak > 0 {
+                checkInMilestoneRow
+            }
+        }
+        .padding(16)
+        .background {
+            ZStack {
+                Color.goDeepNavy
+                Color.goPrimary.opacity(0.1)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
+            .strokeBorder(Color.goPrimary.opacity(0.15), lineWidth: 1))
+    }
+
+    // MARK: - 统计面板
+    private var checkInStatsRow: some View {
+        HStack(spacing: 0) {
+            checkInStatCell(value: "\(checkedInDates.count)", label: "总打卡", icon: "checkmark.circle.fill", color: Color.goPrimary)
+            checkInStatCell(value: "\(currentStreak)", label: "当前连胜", icon: "flame.fill", color: Color.goYellow)
+            checkInStatCell(value: "\(longestStreak)", label: "最长连胜", icon: "trophy.fill", color: Color.goOrange)
+            checkInStatCell(value: "\(monthCheckInRate)%", label: "本月", icon: "chart.bar.fill", color: Color.goCardCyan)
+        }
+    }
+
+    private func checkInStatCell(value: String, label: String, icon: String, color: Color) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(color)
+            Text(value)
+                .font(.system(size: 16, weight: .black, design: .rounded))
+                .foregroundStyle(.primary)
+            Text(label)
+                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .foregroundStyle(.primary.opacity(0.35))
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - 里程碑奖励行
+    private var checkInMilestoneRow: some View {
+        let milestones: [(days: Int, reward: Int, emoji: String)] = [
+            (7, 10, "⭐️"), (14, 25, "🌟"), (30, 60, "💎"), (60, 150, "👑"), (100, 300, "🏆")
+        ]
+        let nextMilestone = milestones.first(where: { $0.days > currentStreak })
+        let lastClaimed = lastClaimedMilestone
+
+        return VStack(spacing: 6) {
+            OhanaDashedDivider(color: .white.opacity(0.1))
+            if let next = nextMilestone {
+                HStack(spacing: 6) {
+                    Text(next.emoji)
+                    Text("再连续 \(next.days - currentStreak) 天即可领取 +\(next.reward)🥥")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.goPrimary.opacity(0.7))
+                    Spacer()
+                }
+            }
+
+            // 可领取的里程碑
+            let claimable = milestones.filter { $0.days <= currentStreak && $0.days > lastClaimed }
+            if !claimable.isEmpty {
+                ForEach(claimable, id: \.days) { m in
+                    Button {
+                        claimMilestone(m.days, reward: m.reward, emoji: m.emoji)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text(m.emoji).font(.system(size: 16))
+                            Text("\(m.days) 天连胜达成！")
+                                .font(.system(size: 13, weight: .black, design: .rounded))
+                                .foregroundStyle(.black)
+                            Spacer()
+                            Text("+\(m.reward)🥥 领取")
+                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .foregroundStyle(.black.opacity(0.7))
+                        }
+                        .padding(.horizontal, 14).padding(.vertical, 10)
+                        .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    // MARK: - 月历单元格模型
+    private struct CalendarCell {
+        let dateStr: String  // "" = 占位空格
+        let day: Int
+        let isToday: Bool
+        let isChecked: Bool
+        let isMakeup: Bool   // 补签的日期
+        let isFuture: Bool
+    }
+
+    private func monthCalendarCells(for month: Date) -> [CalendarCell] {
+        let cal = Calendar.current
+        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+        let todayString = fmt.string(from: Date())
+
+        let comps = cal.dateComponents([.year, .month], from: month)
+        guard let firstOfMonth = cal.date(from: comps) else { return [] }
+        let weekdayOfFirst = cal.component(.weekday, from: firstOfMonth) - 1 // 0=Sun
+        let daysInMonth = cal.range(of: .day, in: .month, for: firstOfMonth)?.count ?? 30
+
+        var cells: [CalendarCell] = []
+
+        // 前置空位
+        for _ in 0..<weekdayOfFirst {
+            cells.append(CalendarCell(dateStr: "", day: 0, isToday: false, isChecked: false, isMakeup: false, isFuture: false))
+        }
+
+        // 每天
+        for d in 1...daysInMonth {
+            var dc = DateComponents(); dc.year = comps.year; dc.month = comps.month; dc.day = d
+            let date = cal.date(from: dc) ?? firstOfMonth
+            let dateStr = fmt.string(from: date)
+            let isToday = dateStr == todayString
+            let isChecked = checkedInDates.contains(dateStr)
+            let isMakeup = makeupDates.contains(dateStr)
+            let isFuture = date > Date() && !isToday
+            cells.append(CalendarCell(dateStr: dateStr, day: d, isToday: isToday, isChecked: isChecked, isMakeup: isMakeup, isFuture: isFuture))
+        }
+
+        return cells
+    }
+
+    @ViewBuilder
+    private func calendarDayCell(_ cell: CalendarCell) -> some View {
+        if cell.dateStr.isEmpty {
+            Color.clear.frame(width: 34, height: 34)
+        } else {
+            Button {
+                if !cell.isChecked && !cell.isToday && !cell.isFuture && makeupPackCount > 0 {
+                    showMakeupConfirm = cell.dateStr
+                }
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(cellFillColor(cell))
+                        .frame(width: 34, height: 34)
+                        .overlay(
+                            Circle().strokeBorder(
+                                cell.isToday ? Color.goPrimary : .clear, lineWidth: 1.5
+                            )
+                        )
+                    if cell.isChecked {
+                        if cell.isMakeup {
+                            // 补签：用不同图标区分
+                            Image(systemName: "arrow.uturn.backward")
+                                .font(.system(size: 9, weight: .black))
+                                .foregroundStyle(.black.opacity(0.7))
+                        } else {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 10, weight: .black))
+                                .foregroundStyle(.black)
+                        }
+                    } else {
+                        Text("\(cell.day)")
+                            .font(.system(size: 11, weight: cell.isToday ? .black : .medium, design: .rounded))
+                            .foregroundStyle(
+                                cell.isFuture ? .white.opacity(0.15) :
+                                cell.isToday ? Color.goPrimary : .white.opacity(0.4)
+                            )
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(cell.isChecked || cell.isToday || cell.isFuture || makeupPackCount == 0)
+        }
+    }
+
+    private func cellFillColor(_ cell: CalendarCell) -> Color {
+        if cell.isChecked && cell.isMakeup {
+            return Color.goYellow.opacity(0.85) // 补签用黄色
+        } else if cell.isChecked {
+            return Color.goPrimary // 正常打卡用青柠
+        } else if cell.isToday {
+            return Color.goPrimary.opacity(0.22)
+        } else {
+            return Color.white.opacity(0.05)
+        }
+    }
+
+    private func monthYearString(_ date: Date) -> String {
+        let cal = Calendar.current
+        let y = cal.component(.year, from: date)
+        let m = cal.component(.month, from: date)
+        return "\(y) 年 \(m) 月"
+    }
+
+    // MARK: - 打卡工具函数
+
+    private func todayStr() -> String {
+        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"; return fmt.string(from: Date())
+    }
+
+    private var currentStreak: Int {
+        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+        let cal = Calendar.current
+        var streak = 0
+        var day = Date()
+        while true {
+            let s = fmt.string(from: day)
+            if checkedInDates.contains(s) {
+                streak += 1
+                day = cal.date(byAdding: .day, value: -1, to: day)!
+            } else { break }
+        }
+        return streak
+    }
+
+    private var longestStreak: Int {
+        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+        let cal = Calendar.current
+        let sorted = checkedInDates.compactMap { fmt.date(from: $0) }.sorted()
+        guard !sorted.isEmpty else { return 0 }
+        var longest = 1, current = 1
+        for i in 1..<sorted.count {
+            if let expected = cal.date(byAdding: .day, value: 1, to: sorted[i-1]),
+               cal.isDate(expected, inSameDayAs: sorted[i]) {
+                current += 1
+                longest = max(longest, current)
+            } else {
+                current = 1
+            }
+        }
+        return longest
+    }
+
+    private var monthCheckInRate: Int {
+        let cal = Calendar.current
+        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+        let today = Date()
+        let comps = cal.dateComponents([.year, .month], from: today)
+        guard let firstOfMonth = cal.date(from: comps) else { return 0 }
+        let dayOfMonth = cal.component(.day, from: today)
+        var count = 0
+        for d in 0..<dayOfMonth {
+            if let date = cal.date(byAdding: .day, value: d, to: firstOfMonth) {
+                let s = fmt.string(from: date)
+                if checkedInDates.contains(s) { count += 1 }
+            }
+        }
+        return dayOfMonth > 0 ? Int(Double(count) / Double(dayOfMonth) * 100) : 0
+    }
+
+    private func loadCheckInData() {
+        if let arr = UserDefaults.standard.stringArray(forKey: checkedInKey) {
+            checkedInDates = Set(arr)
+        }
+        if let arr = UserDefaults.standard.stringArray(forKey: makeupDatesKey) {
+            makeupDates = Set(arr)
+        }
+        makeupPackCount = UserDefaults.standard.integer(forKey: makeupPackKey)
+    }
+
+    private func triggerTodayCheckIn() {
+        let today = todayStr()
+        guard !checkedInDates.contains(today) else { return }
+        checkedInDates.insert(today)
+        UserDefaults.standard.set(Array(checkedInDates), forKey: checkedInKey)
+        // 奖励1椰子
+        QuestManager.shared.addCoconuts(1, emoji: "📅", title: "每日打卡奖励")
+    }
+
+    private func applyMakeup(date: String) {
+        guard makeupPackCount > 0, !checkedInDates.contains(date) else { return }
+        makeupPackCount -= 1
+        UserDefaults.standard.set(makeupPackCount, forKey: makeupPackKey)
+        checkedInDates.insert(date)
+        makeupDates.insert(date)
+        UserDefaults.standard.set(Array(checkedInDates), forKey: checkedInKey)
+        UserDefaults.standard.set(Array(makeupDates), forKey: makeupDatesKey)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    private func claimMilestone(_ days: Int, reward: Int, emoji: String) {
+        QuestManager.shared.addCoconuts(reward, emoji: emoji, title: "\(days)天连胜奖励")
+        lastClaimedMilestone = days
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+
+    // MARK: - Bento Grid
+
+    private var oasisBentoGrid: some View {
+        let allAchievements = pets.flatMap { AchievementManager.compute(for: $0) }
+        let unlockedCount   = allAchievements.filter { $0.isUnlocked }.count
+        let totalCount      = allAchievements.count
+
+        return VStack(spacing: 8) {
+            // 行一：椰子商店 + 成就解锁
+            HStack(spacing: 8) {
+                bentoMiniCard(emoji: "🛒", title: "椰子商店",
+                    subtitle: "兑换特效称号", accent: Color.goYellow,
+                    action: { showCoconutShop = true })
+                bentoMiniCard(emoji: "🏆", title: "成就解锁",
+                    subtitle: "\(unlockedCount)/\(totalCount)", accent: Color.goTeal,
+                    action: { showAchievements = true })
+            }
+            // 行二：扭蛋机 + 悬赏榜
+            HStack(spacing: 8) {
+                bentoMiniCard(emoji: "🎰", title: "欧气扭蛋机",
+                    subtitle: "30🥥/次", accent: Color.goPrimary,
+                    action: { showGacha = true })
+                bentoMiniCard(emoji: "📋", title: "家庭悬赏榜",
+                    subtitle: "发布任务", accent: Color.goOrange,
+                    action: { showBountyBoard = true })
+            }
+        }
+    }
+
+    private func bentoBigCard(emoji: String, title: String, subtitle: String, accent: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(emoji).font(.system(size: 30))
+                Text(title)
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Text(subtitle)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(accent.opacity(0.8))
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .frame(minHeight: 130)
+            .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(accent.opacity(0.2), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func bentoSmallCard(emoji: String, title: String, subtitle: String, accent: Color, locked: Bool) -> some View {
+        HStack(spacing: 12) {
+            Text(emoji).font(.system(size: 22))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                Text(locked ? "即将上线" : subtitle)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(locked ? .white.opacity(0.25) : accent.opacity(0.8))
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 16).padding(.vertical, 14)
+        .frame(maxWidth: .infinity)
+        .background(accent.opacity(locked ? 0.04 : 0.1), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .strokeBorder(accent.opacity(locked ? 0.08 : 0.2), lineWidth: 1))
+        .opacity(locked ? 0.6 : 1)
+    }
+
+    private func bentoMiniCard(emoji: String, title: String, subtitle: String, accent: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Text(emoji).font(.system(size: 20))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(.primary)
+                    Text(subtitle)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(isMaterial ? Color(hex: "8E8E93") : accent.opacity(0.75))
+                        .lineLimit(1)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.primary.opacity(0.2))
+            }
+            .padding(.horizontal, 14).padding(.vertical, 11)
+            .frame(maxWidth: .infinity)
+            .background(
+                isMaterial ? matSurface : accent.opacity(0.1),
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(isMaterial ? Color(hex: "E5E5EA") : accent.opacity(0.2), lineWidth: 1))
+            .shadow(color: isMaterial ? .black.opacity(0.04) : .clear, radius: 6, x: 0, y: 2)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Animations
+
+    private func startBreathing() {
+        withAnimation(.easeInOut(duration: 2.8).repeatForever(autoreverses: true)) {
+            treeScale = 1.055
+            treeGlow  = 0.7
+        }
+    }
+
+    private func spawnEnergyParticles() {
+        energyParticles = (0..<8).map { _ in EnergyParticle() }
+        for i in energyParticles.indices {
+            withAnimation(.easeOut(duration: Double.random(in: 0.8...1.4)).delay(Double(i) * 0.06)) {
+                energyParticles[i].offsetY  = CGFloat.random(in: -180 ... -80)
+                energyParticles[i].opacity  = 0
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+            energyParticles.removeAll()
+        }
+    }
+}
+
+// MARK: - 椰子获取与消耗指南（Bento 卡片风格）
+private struct CoconutRulesSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var appeared = false
+
+    // 每条规则独立卡片数据
+    private struct RuleCard: Identifiable {
+        let id = UUID()
+        let emoji: String
+        let title: String
+        let desc: String
+        let glowColor: Color
+        let reward: String
+    }
+
+    private let earnCards: [RuleCard] = [
+        RuleCard(emoji: "�", title: "遛狗", desc: "带毛孩子出门溜达", glowColor: Color(hex: "C8FF00"), reward: "每100m得1🥥"),
+        RuleCard(emoji: "🍗", title: "喂食·喂水", desc: "按时投喂，爱意满满", glowColor: Color(hex: "FF8C42"), reward: "每次2~3🥥"),
+        RuleCard(emoji: "🧹", title: "铲屎官在线", desc: "勤劳铲屎，功德无量", glowColor: Color(hex: "A8E6CF"), reward: "每次5~8🥥"),
+        RuleCard(emoji: "🪮", title: "护理·梳毛", desc: "精心打理，美美的", glowColor: Color(hex: "DDA0DD"), reward: "5~10🥥，洗澡15🥥"),
+        RuleCard(emoji: "💉", title: "健康打卡", desc: "关注健康，守护生命", glowColor: Color(hex: "FF6B6B"), reward: "每次20🥥"),
+        RuleCard(emoji: "💰", title: "记一笔账", desc: "精打细算，爱的花销", glowColor: Color(hex: "FFD93D"), reward: "每次10🥥"),
+        RuleCard(emoji: "🎾", title: "逗玩互动", desc: "玩耍时光最快乐", glowColor: Color(hex: "6BCB77"), reward: "每次10~12🥥"),
+        RuleCard(emoji: "🌳", title: "每日掉落", desc: "生命之树被动收益", glowColor: Color(hex: "C8FF00"), reward: "定时领取"),
+        RuleCard(emoji: "🎲", title: "暴击加成", desc: "幸运降临！", glowColor: Color(hex: "FFCC00"), reward: "10%双倍·1%五倍🔥"),
+    ]
+
+    private let spendCards: [RuleCard] = [
+        RuleCard(emoji: "✨", title: "注入生命之树", desc: "让生命之树更旺盛", glowColor: Color(hex: "C8FF00"), reward: "每次10🥥"),
+        RuleCard(emoji: "🛍️", title: "椰子商店", desc: "兑换特效/称号/加成", glowColor: Color(hex: "667eea"), reward: "各种道具"),
+        RuleCard(emoji: "🎰", title: "欧气扭蛋机", desc: "测测你的运气！", glowColor: Color(hex: "FF6B9D"), reward: "每次30🥥"),
+        RuleCard(emoji: "�", title: "悬赏任务", desc: "发布·接单·奖励", glowColor: Color(hex: "FF8C42"), reward: "转给完成者"),
+    ]
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color(hex: "060E24").ignoresSafeArea()
+                LinearGradient(
+                    colors: [Color.goPrimary.opacity(0.15), Color(hex: "060E24")],
+                    startPoint: .top, endPoint: .bottom
+                ).ignoresSafeArea()
+
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 24) {
+                        // ── 收入区
+                        bentoCategoryHeader(emoji: "🥥", title: "赚取椰子", subtitle: "打卡越多，岛屿越繁荣！")
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                            ForEach(Array(earnCards.enumerated()), id: \.element.id) { idx, card in
+                                bentoCard(card, delay: Double(idx) * 0.05)
+                            }
+                        }
+
+                        // ── 支出区
+                        bentoCategoryHeader(emoji: "💸", title: "花费椰子", subtitle: "用来升级岛屿，感受不同体验")
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                            ForEach(Array(spendCards.enumerated()), id: \.element.id) { idx, card in
+                                bentoCard(card, delay: Double(earnCards.count + idx) * 0.05)
+                            }
+                        }
+
+                        // ── 双账本说明
+                        bentoCategoryHeader(emoji: "👥", title: "双账本系统", subtitle: "人宠各有账户，共同建设岛屿")
+                        VStack(spacing: 10) {
+                            doubleAccountRow(emoji: "🐾", title: "宠物账户", desc: "记录宠物自己赚取的椰子")
+                            doubleAccountRow(emoji: "🧑", title: "主人账户", desc: "记录协助打卡的人类获得的椰子")
+                            doubleAccountRow(emoji: "🏝️", title: "全岛总库", desc: "所有椰子之和，用于商店与扭蛋")
+                        }
+                        .padding(14)
+                        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .strokeBorder(.white.opacity(0.08), lineWidth: 1))
+
+                        // ── 底部口号
+                        HStack {
+                            Spacer()
+                            VStack(spacing: 6) {
+                                Text("💡")
+                                    .font(.system(size: 28))
+                                Text("打卡次数越多，椰子越多，生命之树越旺！")
+                                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                                    .foregroundStyle(.primary.opacity(0.35))
+                                    .multilineTextAlignment(.center)
+                            }
+                            Spacer()
+                        }
+                        .padding(.vertical, 16)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 40)
+                }
+            }
+            .navigationTitle("椰子指南 🥥")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 20))
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .onAppear {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) { appeared = true }
+        }
+    }
+
+    @ViewBuilder
+    private func bentoCategoryHeader(emoji: String, title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Text(emoji).font(.system(size: 18))
+                Text(title)
+                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+            }
+            Text(subtitle)
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(.primary.opacity(0.4))
+        }
+    }
+
+    @ViewBuilder
+    private func bentoCard(_ card: RuleCard, delay: Double) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(card.emoji)
+                .font(.system(size: 28))
+            Text(card.title)
+                .font(.system(size: 14, weight: .black, design: .rounded))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text(card.desc)
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundStyle(.primary.opacity(0.45))
+                .lineLimit(2)
+            Spacer(minLength: 0)
+            Text(card.reward)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(card.glowColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(card.glowColor.opacity(0.15), in: Capsule())
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(.white.opacity(0.04))
+                // 霓虹微光
+                RadialGradient(
+                    colors: [card.glowColor.opacity(0.18), .clear],
+                    center: .topLeading, startRadius: 0, endRadius: 80
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(card.glowColor.opacity(0.2), lineWidth: 1)
+        )
+        .scaleEffect(appeared ? 1 : 0.88)
+        .opacity(appeared ? 1 : 0)
+        .animation(.spring(response: 0.45, dampingFraction: 0.7).delay(delay), value: appeared)
+    }
+
+    @ViewBuilder
+    private func doubleAccountRow(emoji: String, title: String, desc: String) -> some View {
+        HStack(spacing: 12) {
+            Text(emoji).font(.system(size: 20)).frame(width: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary)
+                Text(desc)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(.primary.opacity(0.4))
+            }
+            Spacer()
+        }
+    }
+}
+
+#Preview {
+    OasisRewardView()
+        .modelContainer(SharedModelContainer.make())
+}

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSCameraUsageDescription</key>
+	<string>用于在「记录时刻」中拍照并保存到相册。</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>用于在「记录时刻」中附加当前地点信息。</string>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.guanchen.li.Ark.reminderRefill</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>bluetooth-peripheral</string>
+		<string>audio</string>
+		<string>fetch</string>
+		<string>processing</string>
+		<string>location</string>
+		<string>push-to-talk</string>
+		<string>bluetooth-central</string>
+		<string>remote-notification</string>
+		<string>nearby-interaction</string>
+		<string>voip</string>
+		<string>external-accessory</string>
+	</array>
+</dict>
+</plist>
