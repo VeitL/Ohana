@@ -72,6 +72,7 @@ struct HomeHighlightDeck: View {
     @State private var showRewardToast = false
     @State private var toastMessage = ""
     @State private var lastCompletedCount: Int = -1
+    @State private var pendingCompleteQuest: IslandQuest? = nil
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -133,6 +134,7 @@ struct HomeHighlightDeck: View {
                 .contentMargins(.horizontal, margin, for: .scrollContent)
                 .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
                 .scrollPosition(id: $scrollTarget)
+                .background(.clear)
                 .onAppear {
                     if scrollTarget == nil, let first = cards.first {
                         scrollTarget = first.stableId
@@ -165,6 +167,20 @@ struct HomeHighlightDeck: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .padding(.top, 4)
                     .allowsHitTesting(false)
+            }
+        }
+        .sheet(item: $pendingCompleteQuest) { quest in
+            QuestConfirmationSheet(
+                quest: quest,
+                pets: pets,
+                reward: IslandQuestEngine.coconutReward(forQuestId: quest.id)
+            ) {
+                withAnimation(.spring(response: 0.3)) {
+                    onCompleteQuest(quest)
+                }
+                pendingCompleteQuest = nil
+            } onCancel: {
+                pendingCompleteQuest = nil
             }
         }
         .sheet(isPresented: $showCoconut, onDismiss: {
@@ -213,9 +229,8 @@ struct HomeHighlightDeck: View {
                     pets: pets,
                     plants: plants,
                     onComplete: {
-                        withAnimation(.spring(response: 0.3)) {
-                            onCompleteQuest(quest)
-                        }
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        pendingCompleteQuest = quest
                     },
                     onSkip: {
                         let qid = quest.id
@@ -803,5 +818,108 @@ private struct DeckLevelCard: View {
         .onChange(of: mgr.progressToNextLevel) { _, v in
             withAnimation(.easeOut(duration: 0.5)) { animatedProgress = v }
         }
+    }
+}
+
+// MARK: - QuestConfirmationSheet
+
+private struct QuestConfirmationSheet: View {
+    let quest: IslandQuest
+    let pets: [Pet]
+    let reward: Int
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    private var relatedPet: Pet? {
+        guard let pid = quest.targetPetId else { return nil }
+        return pets.first { $0.id == pid }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Handle
+            Capsule()
+                .fill(Color.primary.opacity(0.15))
+                .frame(width: 36, height: 4)
+                .padding(.top, 12)
+
+            VStack(spacing: 24) {
+                // Quest preview
+                VStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.goPrimary.opacity(0.12))
+                            .frame(width: 72, height: 72)
+                        if let pet = relatedPet,
+                           let data = pet.avatarImageData,
+                           let ui = UIImage(data: data) {
+                            Image(uiImage: ui)
+                                .resizable().scaledToFill()
+                                .frame(width: 72, height: 72)
+                                .clipShape(Circle())
+                        } else {
+                            Text(quest.emoji)
+                                .font(.system(size: 36))
+                        }
+                    }
+
+                    VStack(spacing: 6) {
+                        Text(quest.title)
+                            .font(OhanaFont.title3(.bold))
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.center)
+
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(OhanaFont.footnote())
+                            Text("+\(reward) 🥥 椰子奖励")
+                                .font(OhanaFont.footnote(.semibold))
+                        }
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 14).padding(.vertical, 6)
+                        .background(Color.goPrimary.opacity(0.08), in: Capsule())
+                    }
+                }
+                .padding(.top, 8)
+
+                // Info text
+                Text("确认已完成此委托？")
+                    .font(OhanaFont.subheadline(.medium))
+                    .foregroundStyle(.secondary)
+
+                // Buttons
+                VStack(spacing: 10) {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        onConfirm()
+                    } label: {
+                        Text("确认完成")
+                            .font(OhanaFont.body(.bold))
+                            .foregroundStyle(Color.arkInk)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        onCancel()
+                    } label: {
+                        Text("再想想")
+                            .font(OhanaFont.body(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 32)
+        }
+        .presentationDetents([.height(380)])
+        .presentationDragIndicator(.hidden)
+        .presentationCornerRadius(28)
     }
 }

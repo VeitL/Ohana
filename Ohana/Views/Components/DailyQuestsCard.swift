@@ -31,10 +31,13 @@ struct IslandQuestEngine {
         let cal = Calendar.current
         let now = Date()
         var quests: [IslandQuest] = []
+        let activePets = pets.filter { !$0.hasPassedAway }
 
-        // 用药委托（优先）：今日未达频次的活跃疗程
-        for pet in pets {
+        // ── 用药委托（最高优先级）：今日未达频次的活跃疗程
+        for pet in activePets {
+            guard quests.count < 3 else { break }
             for med in pet.medications where med.isActiveToday {
+                guard quests.count < 3 else { break }
                 let need = PetMedicationDoseLogging.requiredDoses(on: now, for: med)
                 guard need > 0 else { continue }
                 let done = PetMedicationDoseLogging.todayDoseCount(events: events, medicationId: med.id)
@@ -52,87 +55,103 @@ struct IslandQuestEngine {
             }
         }
 
-        // 任务1: 遛狗（仅限有狗的家庭）
-        if let dog = pets.first(where: { $0.species == "狗" }) {
+        // ── 遛狗（仅限狗 & 今日未遛）
+        if quests.count < 3, let dog = activePets.first(where: { $0.species == "狗" }) {
             let done = dog.walkLogs.contains { cal.isDateInToday($0.startDate) }
             quests.append(IslandQuest(
                 id: "q_walk",
                 emoji: done ? "✅" : "🐾",
-                title: "带 \(dog.name) 巡岛一次",
-                subtitle: done ? "已完成！辛苦了" : "出门走走，活力满满",
+                title: "带 \(dog.name) 出门巡岛",
+                subtitle: done ? "今日已遛，辛苦了！" : "今日未遛狗，出门走走吧",
                 isCompleted: done,
                 targetPetId: dog.id,
                 targetPlantId: nil
             ))
         }
 
-        // 任务2: 便便打卡
-        if let pet = pets.first {
-            let done = pet.pottyLogs.contains { cal.isDateInToday($0.date) }
+        // ── 喂食（今日未喂任何一只宠物）
+        if quests.count < 3, let pet = activePets.first(where: { p in
+            !p.careLogs.contains { $0.type == "feeding" && cal.isDateInToday($0.date) }
+        }) {
             quests.append(IslandQuest(
-                id: "q_potty",
-                emoji: done ? "✅" : "💩",
-                title: "记录 \(pet.name) 今日排泄",
-                subtitle: done ? "已完成！噗噗电台已更新" : "健康监测从如厕开始",
-                isCompleted: done,
+                id: "q_feed_\(pet.id.uuidString)",
+                emoji: "🍖",
+                title: "给 \(pet.name) 喂食",
+                subtitle: "今日还未记录喂食，记得填肚子",
+                isCompleted: false,
                 targetPetId: pet.id,
                 targetPlantId: nil
             ))
         }
 
-        // 任务: 浇水（需要浇水的植物）
-        if let thirstyPlant = plants.first(where: { $0.needsWatering }) {
-            let done = !plants.contains { $0.needsWatering }
+        // ── 饮水（今日未喂水）
+        if quests.count < 3, let pet = activePets.first(where: { p in
+            !p.careLogs.contains { $0.type == "watering" && cal.isDateInToday($0.date) }
+        }) {
+            quests.append(IslandQuest(
+                id: "q_water_\(pet.id.uuidString)",
+                emoji: "💧",
+                title: "给 \(pet.name) 换水",
+                subtitle: "新鲜饮水很重要，今日还未记录",
+                isCompleted: false,
+                targetPetId: pet.id,
+                targetPlantId: nil
+            ))
+        }
+
+        // ── 便便打卡（今日未记录）
+        if quests.count < 3, let pet = activePets.first(where: { p in
+            !p.pottyLogs.contains { cal.isDateInToday($0.date) }
+        }) {
+            quests.append(IslandQuest(
+                id: "q_potty",
+                emoji: "💩",
+                title: "记录 \(pet.name) 今日如厕",
+                subtitle: "如厕健康监测，今日尚未记录",
+                isCompleted: false,
+                targetPetId: pet.id,
+                targetPlantId: nil
+            ))
+        }
+
+        // ── 植物浇水（需要浇水的植物）
+        if quests.count < 3, let thirstyPlant = plants.first(where: { $0.needsWatering }) {
             quests.append(IslandQuest(
                 id: "q_water_plant",
-                emoji: done ? "✅" : "💧",
+                emoji: "💧",
                 title: "给 \(thirstyPlant.name) 浇水",
-                subtitle: done ? "已完成！植物喝饱了" : "植物渴了，快去浇水",
-                isCompleted: done,
+                subtitle: "植物渴了，快去浇水",
+                isCompleted: false,
                 targetPetId: nil,
                 targetPlantId: thirstyPlant.id
             ))
         }
 
-        // 任务: 施肥（需要施肥的植物）
+        // ── 植物施肥（需要施肥的植物）
         if quests.count < 3, let hungryPlant = plants.first(where: { $0.needsFertilizing }) {
-            let done = !plants.contains { $0.needsFertilizing }
             quests.append(IslandQuest(
                 id: "q_fertilize_plant",
-                emoji: done ? "✅" : "🌿",
+                emoji: "🌿",
                 title: "给 \(hungryPlant.name) 施肥",
-                subtitle: done ? "已完成！营养满满" : "植物需要补充养分",
-                isCompleted: done,
+                subtitle: "植物需要补充养分",
+                isCompleted: false,
                 targetPetId: nil,
                 targetPlantId: hungryPlant.id
             ))
         }
 
-        // 探访宠物（点进详情页算完成）
-        let visitKey = "quest_visit_\(cal.startOfDay(for: now).timeIntervalSince1970)"
-        let visited = UserDefaults.standard.bool(forKey: visitKey)
-        if quests.count < 3, let pet = pets.first {
-            quests.append(IslandQuest(
-                id: "q_visit",
-                emoji: visited ? "✅" : "🏝️",
-                title: "探望 \(pet.name)",
-                subtitle: visited ? "已完成！感情升温中" : "点击查看宠物详情",
-                isCompleted: visited,
-                targetPetId: pet.id,
-                targetPlantId: nil
-            ))
-        }
-
-        // 兜底：补充通用任务
-        if quests.count < 3 {
-            let done = reminders.contains { cal.isDateInToday($0.scheduledAt) && $0.isCompleted }
+        // ── 今日提醒（仅在有真实提醒时显示）
+        let todayReminders = reminders.filter { cal.isDateInToday($0.scheduledAt) }
+        if quests.count < 3, !todayReminders.isEmpty {
+            let allDone = todayReminders.allSatisfy { $0.isCompleted }
+            let pending = todayReminders.filter { !$0.isCompleted }.count
             quests.append(IslandQuest(
                 id: "q_reminder",
-                emoji: done ? "✅" : "📅",
-                title: "完成今日提醒",
-                subtitle: done ? "所有提醒已完成" : "查看今日日历",
-                isCompleted: done,
-                targetPetId: pets.first?.id,
+                emoji: allDone ? "✅" : "📅",
+                title: allDone ? "今日提醒全部完成" : "完成今日 \(pending) 个提醒",
+                subtitle: allDone ? "所有提醒已处理" : "查看日历，处理待办提醒",
+                isCompleted: allDone,
+                targetPetId: activePets.first?.id,
                 targetPlantId: nil
             ))
         }
@@ -151,17 +170,18 @@ struct IslandQuestEngine {
         !quests.isEmpty && quests.allSatisfy { $0.isCompleted }
     }
 
-    /// 委托完成时椰子粒子数量（与 `DailyQuestsCard.coconutReward` 一致）
+    /// 委托完成时椰子粒子数量
     static func coconutReward(forQuestId id: String) -> Int {
         switch id {
         case "q_walk":            return 3
         case "q_potty":           return 1
         case "q_water_plant":     return 1
         case "q_fertilize_plant": return 1
-        case "q_visit":         return 2
-        case "q_reminder":      return 2
+        case "q_reminder":        return 2
         default:
-            if id.hasPrefix("q_med_") { return 2 }
+            if id.hasPrefix("q_med_")   { return 2 }
+            if id.hasPrefix("q_feed_")  { return 2 }
+            if id.hasPrefix("q_water_") { return 1 }
             return 1
         }
     }

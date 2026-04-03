@@ -294,7 +294,8 @@ struct IslandWeightDashboard: View {
                 ForEach(series.points) { pt in
                     AreaMark(
                         x: .value("日期", pt.date),
-                        y: .value("kg", pt.weight)
+                        y: .value("kg", pt.weight),
+                        series: .value("s", series.seriesID)
                     )
                     .foregroundStyle(
                         LinearGradient(
@@ -308,7 +309,8 @@ struct IslandWeightDashboard: View {
                 ForEach(series.points) { pt in
                     LineMark(
                         x: .value("日期", pt.date),
-                        y: .value("kg", pt.weight)
+                        y: .value("kg", pt.weight),
+                        series: .value("s", series.seriesID)
                     )
                     .foregroundStyle(c)
                     .interpolationMethod(.catmullRom)

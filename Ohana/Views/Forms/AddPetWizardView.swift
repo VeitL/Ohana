@@ -313,6 +313,7 @@ struct AddPetWizardView: View {
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.spring(response: 0.4, dampingFraction: 0.82), value: wizardPageIndex)
                 .padding(.horizontal, 14)
+                .background(.clear)
 
                 HStack(spacing: 6) {
                     ForEach(0..<6, id: \.self) { i in

@@ -337,6 +337,17 @@ struct OverviewView: View {
             }
             NotificationManager.shared.compensate(reminders: Array(pendingReminders))
             modelContext.safeSave()
+            // 每日首次打开自动打卡（oasis_checkedIn_dates）
+            let checkInFmt: DateFormatter = { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f }()
+            let checkInKey = "oasis_checkedIn_dates"
+            let checkInToday = checkInFmt.string(from: Date())
+            var checkedInSet = Set(UserDefaults.standard.stringArray(forKey: checkInKey) ?? [])
+            if !checkedInSet.contains(checkInToday) {
+                checkedInSet.insert(checkInToday)
+                UserDefaults.standard.set(Array(checkedInSet), forKey: checkInKey)
+                QuestManager.shared.addCoconuts(1, emoji: "📅", title: "每日打卡奖励")
+                refreshHeaderStreak()
+            }
             // U5: 每日首次打开椰子收集
             let dailyKey = "daily_coconut_shown"
             let today = Calendar.current.startOfDay(for: Date())
