@@ -164,20 +164,8 @@ struct OasisRewardView: View {
                 .presentationDetents([.large])
         }
         .sheet(isPresented: $showCheckInSheet) {
-            NavigationStack {
-                ScrollView {
-                    checkInCalendarCard
-                        .padding()
-                }
-                .navigationTitle("打卡日历")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("关闭") { showCheckInSheet = false }
-                    }
-                }
-            }
-            .presentationDetents([.large])
+            DailyStreakDetailView(pets: pets)
+                .presentationDetents([.large])
         }
         .onAppear {
             treeMgr.refreshEnergy(modelContext: modelContext, pets: pets, humans: humans, plants: plants)
@@ -848,17 +836,11 @@ struct OasisRewardView: View {
                     subtitle: bountySubtitle, accent: Color.goOrange,
                     action: { showBountyBoard = true })
             }
-            // 行三：打卡日历 + 椰子流水
-            HStack(spacing: 8) {
-                bentoMiniCard(emoji: "📅", title: "打卡日历",
-                    subtitle: currentStreak > 0 ? "🔥 \(currentStreak)天连胜" : "今日待打卡",
-                    accent: Color.goOrange,
-                    action: { loadCheckInData(); showCheckInSheet = true })
-                bentoMiniCard(emoji: "🥥", title: "椰子流水",
-                    subtitle: "余额 \(QuestManager.shared.coconutCount)🥥",
-                    accent: Color.goYellow,
-                    action: { showingCoconutLog = true })
-            }
+            // 行三：打卡日历（全宽）
+            bentoMiniCard(emoji: "📅", title: "打卡日历",
+                subtitle: currentStreak > 0 ? "🔥 \(currentStreak)天连胜" : "今日待打卡",
+                accent: Color.goOrange,
+                action: { loadCheckInData(); showCheckInSheet = true })
         }
     }
 
