@@ -112,6 +112,7 @@ struct HomeHighlightDeck: View {
 
     var body: some View {
         VStack(spacing: 8) {
+            Color.clear.frame(height: 0)  // prevents implicit background bleed
             GeometryReader { geo in
                 let cardW = geo.size.width * 0.88
                 let margin = (geo.size.width - cardW) / 2
@@ -169,6 +170,7 @@ struct HomeHighlightDeck: View {
                     .allowsHitTesting(false)
             }
         }
+        .background(.clear)
         .sheet(item: $pendingCompleteQuest) { quest in
             QuestConfirmationSheet(
                 quest: quest,

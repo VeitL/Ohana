@@ -105,8 +105,6 @@ struct WalletPetCardBack: View {
         ]
     }
 
-    private let tileColumns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 3)
-
     // MARK: - Body
     var body: some View {
         ZStack {
@@ -156,12 +154,12 @@ struct WalletPetCardBack: View {
 
     // MARK: - Section view
     private func sectionView(_ section: FeatureSection) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
                 Image(systemName: section.symbol)
-                    .font(.system(size: 8, weight: .bold))
+                    .font(.system(size: 7, weight: .bold))
                 Text(section.title)
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .font(.system(size: 8, weight: .bold, design: .rounded))
                     .kerning(0.3)
                 Rectangle()
                     .fill(.white.opacity(0.2))
@@ -169,7 +167,7 @@ struct WalletPetCardBack: View {
             }
             .foregroundStyle(.white.opacity(0.55))
 
-            LazyVGrid(columns: tileColumns, spacing: 6) {
+            HStack(spacing: 5) {
                 ForEach(section.entries) { entry in
                     featureTile(entry: entry)
                 }
@@ -180,21 +178,21 @@ struct WalletPetCardBack: View {
     // MARK: - Feature tile
     private func featureTile(entry: FeatureEntry) -> some View {
         Button { entry.action() } label: {
-            VStack(spacing: 4) {
+            HStack(spacing: 4) {
                 Image(systemName: entry.symbol)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(.white.opacity(0.95))
-                    .frame(height: 18)
                 Text(entry.title)
-                    .font(.system(size: 8, weight: .bold, design: .rounded))
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.9))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .minimumScaleFactor(0.75)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 7)
-            .background(.white.opacity(0.13), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 6)
+            .background(.white.opacity(0.13), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
     }

@@ -702,6 +702,9 @@ struct OverviewView: View {
                             Button { showingAddEntity = true } label: {
                                 Label("添加成员", systemImage: "person.badge.plus")
                             }
+                            Button { showingManageSheet = true } label: {
+                                Label("管理主页模块", systemImage: "slider.horizontal.3")
+                            }
                             Button { showingSettings = true } label: {
                                 Label("设置", systemImage: "gearshape")
                             }
@@ -1160,6 +1163,37 @@ struct OverviewView: View {
         }
     }
 
+    // MARK: - Batch Check-In Enable Prompt
+    private var batchCheckInEnablePrompt: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "rectangle.grid.2x2")
+                .font(OhanaFont.body(.semibold))
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("一键全家打卡")
+                    .font(OhanaFont.footnote(.bold))
+                    .foregroundStyle(.primary)
+                Text("多宠物同步打卡，省时省力")
+                    .font(OhanaFont.caption2())
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button {
+                withAnimation(.spring(response: 0.3)) { showBatchCheckIn = true }
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            } label: {
+                Text("开启")
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(Color.arkInk)
+                    .padding(.horizontal, 14).padding(.vertical, 7)
+                    .background(Color.goPrimary, in: Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .goTranslucentCard(cornerRadius: 14)
+    }
+
     // MARK: - Batch Check-In Grid（与快捷操作一致的网格布局）
     @State private var batchPressedId: String? = nil
 
@@ -1367,10 +1401,16 @@ struct OverviewView: View {
                 .animation(.spring(response: 0.38, dampingFraction: 0.78),
                            value: activeQuickActionItems.map(\.id))
 
-            // Batch check-in (collapsed into single row)
-            if pets.filter({ !$0.hasPassedAway }).count > 1 {
-                batchCheckInBar
-                    .padding(.horizontal, 16)
+            // Batch check-in
+            let livePetCount = pets.filter { !$0.hasPassedAway }.count
+            if livePetCount > 1 {
+                if showBatchCheckIn {
+                    batchCheckInBar
+                        .padding(.horizontal, 16)
+                } else {
+                    batchCheckInEnablePrompt
+                        .padding(.horizontal, 16)
+                }
             }
         }
     }
@@ -2155,7 +2195,45 @@ struct OverviewView: View {
         return items
     }
 
-    private var defaultQuickActionItems: [QuickActionItem] { [] }
+    private var defaultQuickActionItems: [QuickActionItem] {
+        guard let pet = pets.first(where: { !$0.hasPassedAway }) else { return [] }
+        let isDog = pet.species.contains("狗") || pet.species.lowercased().contains("dog")
+        let isCat = pet.species.contains("猫") || pet.species.lowercased().contains("cat")
+        let isFish = pet.species.contains("鱼") || pet.species.lowercased().contains("fish")
+        var items: [QuickActionItem] = []
+        items.append(QuickActionItem(label: "喂食", icon: "fork.knife", colorHex: "FFDD44",
+                                     petId: pet.id, actionType: "feed", entityId: pet.id, entityKind: .pet))
+        if isFish {
+            items.append(QuickActionItem(label: "换水", icon: "drop.circle.fill", colorHex: "4ECDC4",
+                                         petId: pet.id, actionType: "waterChange", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "清滤材", icon: "wrench.and.screwdriver.fill", colorHex: "A78BFA",
+                                         petId: pet.id, actionType: "filterClean", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "体重", icon: "scalemass.fill", colorHex: "80FFEA",
+                                         petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet))
+        } else if isDog {
+            items.append(QuickActionItem(label: "喂水", icon: "drop.fill", colorHex: "00D4AA",
+                                         petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "遛狗", icon: "figure.walk", colorHex: "C8FF00",
+                                         petId: pet.id, actionType: "walk", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "便便", icon: "allergens", colorHex: "FF8C42",
+                                         petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
+        } else if isCat {
+            items.append(QuickActionItem(label: "喂水", icon: "drop.fill", colorHex: "00D4AA",
+                                         petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "铲屎", icon: "trash.fill", colorHex: "5B6AFF",
+                                         petId: pet.id, actionType: "litter", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "便便", icon: "allergens", colorHex: "FF8C42",
+                                         petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
+        } else {
+            items.append(QuickActionItem(label: "喂水", icon: "drop.fill", colorHex: "00D4AA",
+                                         petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "护理", icon: "scissors", colorHex: "FF8C42",
+                                         petId: pet.id, actionType: "groom", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "体重", icon: "scalemass.fill", colorHex: "80FFEA",
+                                         petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet))
+        }
+        return Array(items.prefix(4))
+    }
 
     private func addQuickAction(_ item: QuickActionItem) {
         var current = savedQuickActionItems
