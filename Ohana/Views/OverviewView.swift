@@ -612,6 +612,8 @@ struct OverviewView: View {
                                     insertion: .opacity,
                                     removal: .move(edge: .trailing).combined(with: .opacity)
                                 ))
+                        } else if !memoryDismissed && !pets.isEmpty {
+                            memoryDropPlaceholder
                         }
                     case "islandStats":
                         if (!pets.isEmpty || !plants.isEmpty) && !hiddenSections.contains("islandStats") {
@@ -639,6 +641,30 @@ struct OverviewView: View {
         return result.filter { seen.insert($0).inserted }
     }
     
+    // MARK: - Memory Drop Placeholder
+    private var memoryDropPlaceholder: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Color.goPrimary.opacity(0.8))
+                .frame(width: 44, height: 44)
+                .background(Color.goPrimary.opacity(0.1), in: Circle())
+            VStack(alignment: .leading, spacing: 3) {
+                Text("记忆碎片")
+                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                Text("继续记录喂食、散步或体重数据\n美好时刻会在这里浮现 ✨")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.leading)
+            }
+            Spacer()
+        }
+        .padding(14)
+        .goTranslucentCard(cornerRadius: 16)
+        .padding(.horizontal, 16)
+    }
+
     // MARK: - Header Streak
     private func refreshHeaderStreak() {
         let calendar = Calendar.current

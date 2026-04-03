@@ -41,7 +41,7 @@ struct PetHygieneDetailView: View {
 
     private func statusColor(_ type: HygieneType) -> Color {
         guard let d = daysSince(type) else { return themeColor.opacity(0.42) }
-        let p = Double(d) / Double(type.cycleDays)
+        let p = Double(d) / Double(type.effectiveCycleDays(for: pet.id))
         if p < 0.5 { return themeColor }
         if p < 0.85 { return themeColor.opacity(0.62) }
         return Color.goRed
@@ -134,9 +134,12 @@ struct PetHygieneDetailView: View {
     private var overdueTypes: [HygieneType] {
         HygieneType.allCases.filter { type in
             guard let d = daysSince(type) else { return false }
-            return d >= type.cycleDays
+            return d >= type.effectiveCycleDays(for: pet.id)
         }
     }
+    // P1: 护理周期自定义状态
+    @State private var editingCycleType: HygieneType? = nil
+    @State private var cycleDayDraft: Int = 1
 
     var body: some View {
         ZStack {
@@ -181,6 +184,88 @@ struct PetHygieneDetailView: View {
             HygieneTodoSheet(pet: pet, type: hygieneType, accent: themeColor)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+        }
+        // 周期天数自定义 sheet
+        .sheet(item: $editingCycleType) { hygieneType in
+            cycleDaysEditorSheet(for: hygieneType)
+                .presentationDetents([.height(300)])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(.regularMaterial)
+        }
+    }
+
+    // MARK: - Cycle Days Editor Sheet
+    private func cycleDaysEditorSheet(for type: HygieneType) -> some View {
+        VStack(spacing: 20) {
+            HStack {
+                Text("\(type.emoji) \(type.rawValue) · 提醒周期")
+                    .font(.system(size: 17, weight: .black, design: .rounded))
+                Spacer()
+                Button {
+                    // 恢复默认
+                    HygieneType.setCustomCycleDays(0, for: type, petId: pet.id)
+                    editingCycleType = nil
+                } label: {
+                    Text("恢复默认")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.top, 20)
+            .padding(.horizontal, 24)
+
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("\(cycleDayDraft)")
+                    .font(.system(size: 52, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .animation(.spring(duration: 0.2), value: cycleDayDraft)
+                Text("天 / 次")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 14) {
+                Button {
+                    if cycleDayDraft > 1 { cycleDayDraft -= 1 }
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                        .font(.system(size: 32))
+                        .foregroundStyle(Color.primary.opacity(0.25))
+                }
+                .buttonStyle(.plain)
+
+                Stepper("", value: $cycleDayDraft, in: 1...90)
+                    .labelsHidden()
+
+                Button {
+                    if cycleDayDraft < 90 { cycleDayDraft += 1 }
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 32))
+                        .foregroundStyle(themeColor)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Button {
+                HygieneType.setCustomCycleDays(cycleDayDraft, for: type, petId: pet.id)
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                editingCycleType = nil
+            } label: {
+                Text("保存")
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(themeColor, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 24)
+            Spacer()
+        }
+        .onAppear {
+            cycleDayDraft = type.effectiveCycleDays(for: pet.id)
         }
     }
 
@@ -341,6 +426,30 @@ struct PetHygieneDetailView: View {
 
             if stripHasData {
                 monthFrequencyStrip(type)
+            }
+
+            // 周期标签 + 自定义按钮
+            HStack(spacing: 6) {
+                let effectiveDays = type.effectiveCycleDays(for: pet.id)
+                let isCustom = HygieneType.customCycleDays(for: type, petId: pet.id) != nil
+                Image(systemName: "repeat")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(themeColor.opacity(0.6))
+                Text("每\(effectiveDays)天\(isCustom ? " · 已自定义" : "")")
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary.opacity(0.7))
+                Spacer()
+                Button {
+                    cycleDayDraft = type.effectiveCycleDays(for: pet.id)
+                    editingCycleType = type
+                } label: {
+                    Text("调整周期")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundStyle(themeColor)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(themeColor.opacity(0.1), in: Capsule())
+                }
+                .buttonStyle(.plain)
             }
 
             // 最近记录（无分割线）

@@ -1,6 +1,6 @@
 # Ohana iOS App 项目文档
 
-> 最后更新: 2026-04-03 | Build: ✅ | Schema: ArkSchemaV31
+> 最后更新: 2026-04-03（全App产品审计优化批次）| Build: ✅ | Schema: ArkSchemaV32
 
 ---
 
@@ -84,11 +84,13 @@ Ohana/
 | V29 | `SymptomLog` / `HeatCycleLog` |
 | V30 | `InsuranceClaim` / `PetInsurance.paymentFrequencyRaw` |
 | V31 | `PetInsurance.paymentDayOfMonth/showInCalendar/otherFeeAmount/otherFeeNote` |
+| V32 | `PetWalkLog.behaviorNotes` / `PetWalkLog.moodRating` |
 
 ### 关键模型字段
-**Pet**：`species`、`themeColorHex`、`personalityTagsRaw`、`currentStreak`、`foodTrackingMode`  
-**PetInsurance**：`annualPremium`、`paymentFrequency`、`paymentDayOfMonth`、`showInCalendar`、`otherFeeAmount`  
-**PetWeightLog**：`weight`、`weightUnit`（"kg"/"g"）、`weightInKg`（计算属性）、`bcsScore`  
+**Pet**：`species`、`themeColorHex`、`personalityTagsRaw`、`currentStreak`、`foodTrackingMode`
+**PetInsurance**：`annualPremium`、`paymentFrequency`、`paymentDayOfMonth`、`showInCalendar`、`otherFeeAmount`
+**PetWeightLog**：`weight`、`weightUnit`（"kg"/"g"）、`weightInKg`（计算属性）、`bcsScore`
+**PetWalkLog**：`distanceMeters`、`coconutsEarned`、`mapSnapshotData`、`routeLocationsData`、`behaviorNotes`（可选文字备注）、`moodRating`（0=未评 / 1-5星）
 **Event**：`relatedEntityType`（`EntityKind.rawValue`）、`relatedEntityId`  
 
 ---
@@ -119,8 +121,10 @@ ForEach(orderedSections)     // 受 HomeSectionManageSheet 控制（顺序 + 显
 |-----------|------|------|
 | `quickActions` | 快捷操作 | HomeHighlightDeck + 快捷操作网格 + WalkTrackingCard（狗） |
 | `batchCheckIn` | 一键打卡 | 多宠物批量喂食/喂水；未开启时显示极简开启提示 |
-| `memoryDrop` | 记忆碎片 | 随机浮现历史温馨时刻；需有记录数据；左右滑消失 |
+| `memoryDrop` | 记忆碎片 | 随机浮现历史温馨时刻；无数据时显示引导占位卡；左右滑消失 |
 | `islandStats` | 岛屿统计 | 体重/步数/花费/粮仓 Bento 横滑 |
+
+> **记忆碎片空态**：`MemoryEngine.pickFragment()` 返回 nil 时，若有宠物数据则渲染引导占位卡（`memoryDropPlaceholder`），而非直接隐藏模块。
 
 ### HomeHighlightDeck（宠物卡下方横滑甲板，160pt）
 卡片顺序：`DeckPetStatusCard` → `DeckCheckInStreakCard`（打卡连击，含里程碑进度条）→ 委托卡 → `DeckLevelCard`（岛屿等级）
@@ -238,6 +242,29 @@ ForEach(orderedSections)     // 受 HomeSectionManageSheet 控制（顺序 + 显
 - **岛屿委托**：`IslandQuestEngine.todayQuests(pets:reminders:plants:events:)`，含用药委托 `q_med_<UUID>`
 - **打卡连击**：`oasis_checkedIn_dates` UserDefaults，首页顶栏与 `DeckCheckInStreakCard` 同步
 
+### 成就系统（AchievementManager，15枚）
+`static func compute(for pet: Pet) -> [Achievement]` 纯计算，无副作用
+
+| 序号 | ID | 触发条件 |
+|------|----|---------|
+| 1 | `iron_gut` | 连续7天每天有 perfectPoop 记录 |
+| 2 | `iron_paw` | 累计遛狗 ≥ 100km |
+| 3 | `walk_streak` | 连续7天有遛狗记录 |
+| 4 | `health_hero` | 30天内无紧急就医/手术 |
+| 5 | `nutritionist` | 喂食记录跨度 ≥ 14天 |
+| 6 | `happy_birthday` | 今天是宠物生日 |
+| 7 | `hundred_days` | `pet.daysTogether >= 100` |
+| 8 | `first_record` | 至少一条任意记录 |
+| 9 | `day_one_checkin` | 今天完成至少一次打卡 |
+| 10 | `old_friend` | App 使用 ≥ 7天 |
+| 11 | `long_runner` | 单次遛狗 ≥ 5km |
+| 12 | `medication_complete` | 完成至少一个完整用药疗程 |
+| 13 | `photo_enthusiast` | 照片数 ≥ 20张 |
+| 14 | `expense_tracker` | 花费记录 ≥ 10条 |
+| 15 | `weight_manager` | 体重记录 ≥ 7条 |
+
+另有2枚人宠联动成就（需 HealthKit）：`bonded_walk` / `step_champion`，通过 `computeBonded(for:humanDistanceKm:)` 计算。
+
 ---
 
 ## 十一、颜色系统
@@ -276,7 +303,100 @@ Color.petThemeMagenta / Pink / Purple / Indigo / Violet / Navy / Blue / SkyBlue
 
 ---
 
-## 十三、背景系统（AppBackgroundStyle）
+## 十三、用药提醒系统（MedicationReminderService）
+
+**文件**：`Ohana/Models/MedicationReminderService.swift`
+
+- 单例 `MedicationReminderService.shared`
+- `scheduleMedicationReminders(for pet: Pet)`：先移除该宠物旧通知，再按各药品频次重新注册未来 14 天推送
+- 频次 → 每日次数：`PetMedicationFrequency.dosesPerDay`（daily=1 / twiceDaily=2 / threeTimesDaily=3 / everyOtherDay=1 / weekly=1 / asNeeded&custom=0）
+- 基准时间 08:00，多次服药按 `24h / dosesPerDay` 间隔递推
+- 疗程结束前3天追加提醒推送（`cancelMedicationReminders(for petId:)` 可取消）
+- **今日进度追踪**（UserDefaults，键名 `med_doses_YYYY-MM-dd_<UUID>`）：
+  - `dosesTakenToday(for:)` / `recordDose(for:)` / `undoDose(for:)`
+- `PetMedicationView` 用药卡片新增今日进度条（`dosesTaken / dosesPerDay`）+ 快捷 ＋ 按钮
+
+---
+
+## 十四、清洁护理周期自定义
+
+**文件**：`Ohana/Models/PetHygieneLog.swift`
+
+- `HygieneType` 新增：`defaultCycleDays`（硬编码默认值）、`effectiveCycleDays(for petId: UUID)`（读自定义，否则用默认）
+- 自定义存储键：`hygiene_cycle_<petUUID>_<typeRawValue>`（UserDefaults）
+- 静态工具：`customCycleDays(for:petId:)` / `setCustomCycleDays(_:for:petId:)`
+- `PetHygieneDetailView` 每张类型卡底部新增「调整周期」按钮 → Sheet（`cycleDaysEditorSheet`）
+  - Stepper 范围 1-90 天，保存后立即生效于超期判断和状态色
+
+---
+
+## 十五、遛狗行为备注与心情评价
+
+**模型**：`PetWalkLog.behaviorNotes: String?`（可选文字备注） + `moodRating: Int`（0=未评/1-5星）
+
+**视图**：`WalkSummarySheet`
+- 检测「新鲜步行」（10分钟内完成）时，在汇总页顶部显示「本次巡岛心情」卡
+- 支持1-5星评分 + 文字备注输入，保存后写入最近一条 `PetWalkLog`
+- 历史记录行显示星级（★★★）+ 备注摘要（单行截断）
+
+---
+
+## 十六、品种护理贴士
+
+**数据**：`PetBreedDatabase.breedCareTips: [String: [String]]`（21个常见品种，含狗/猫）
+- 查询函数 `careTips(for breed: String) -> [String]?`：先精确匹配，再模糊匹配（contains 双向）
+
+**视图**：`PetBasicInfoDetailView.breedTipsCard(breed:tips:)` — 折叠卡
+- 仅在非编辑模式 + 品种字段有值 + 数据库有匹配时渲染
+- 默认展开，点击标题栏折叠/展开（带弹性动画）
+
+---
+
+## 十七、家庭悬赏榜历史归档
+
+**文件**：`BountyBoardView.swift`
+
+「已完成」Tab 新增分层显示：
+- **近7天完成**：正常透明度显示
+- **历史归档**（> 7天前）：折叠在「历史归档 (N)」按钮后，透明度 0.7，可点击展开/收起
+
+---
+
+## 十八、通知分类管理（SettingsView）
+
+设置页「通知」区新增4个功能级别开关（UserDefaults bool，默认 `true`）：
+
+| 开关标题 | UserDefaults Key |
+|---------|-----------------|
+| 用药提醒 | `notif_medication_enabled` |
+| 喂食提醒 | `notif_feeding_enabled` |
+| 护理提醒 | `notif_hygiene_enabled` |
+| 打卡提醒 | `notif_checkin_enabled` |
+
+工具函数：`notificationToggleRow(icon:iconColor:title:key:)` — Toggle 行复用组件
+
+---
+
+## 十九、体重页饮食-体重关联
+
+**文件**：`WeightHistoryView.swift`
+
+- 新增 `feedingInsightBanner(avg:)` 横幅卡，位于折线图与历史记录列表之间
+- 显示条件：宠物有精准模式喂食记录（`dailyGrams > 0`），取近7条计算日均
+- 内容：日均摄入克数 + 最新体重变化方向箭头 + 近5天摄入 mini 柱状图
+
+---
+
+## 二十、照片分享
+
+**文件**：`PetPhotoAlbumView.swift`
+
+- 照片缩略图 contextMenu 新增「分享」选项（排在「删除」前）
+- 调用 `shareImage(_:)` → `UIActivityViewController`，自动找最顶层 presentedViewController 弹出
+
+---
+
+## 二十一、背景系统（AppBackgroundStyle）
 
 | 风格 | `@AppStorage("appBackgroundStyle")` 值 |
 |------|---------------------------------------|

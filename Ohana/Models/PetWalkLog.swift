@@ -19,7 +19,10 @@ final class PetWalkLog {
     @Attribute(.externalStorage) var mapSnapshotData: Data?
     @Attribute(.externalStorage) var routeLocationsData: Data?
     var pet: Pet?
-    
+    // P1: 遛狗行为备注
+    var behaviorNotes: String?   // 如"今天很兴奋，追了一只猫"
+    var moodRating: Int          // 1-5颗星，0 = 未评价
+
     init(startDate: Date = Date(), pet: Pet? = nil, executorId: String? = nil) {
         self.id = UUID()
         self.startDate = startDate
@@ -30,6 +33,8 @@ final class PetWalkLog {
         self.mapSnapshotData = nil
         self.routeLocationsData = nil
         self.pet = pet
+        self.behaviorNotes = nil
+        self.moodRating = 0
     }
 
     /// 每 500m 奖励 1 椰子，最少 1 个

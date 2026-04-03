@@ -102,6 +102,11 @@ struct PetBasicInfoDetailView: View {
     // MARK: - Read View
     private var readContent: some View {
         VStack(spacing: 16) {
+            // 品种护理小贴士（有品种且有数据时显示）
+            if !pet.breed.isEmpty, let tips = PetBreedDatabase.careTips(for: pet.breed) {
+                breedTipsCard(breed: pet.breed, tips: tips)
+            }
+
             infoSection(title: "基本信息", icon: "pawprint.fill", iconColor: Color.goPrimary) {
                 infoRow(label: "名字", value: pet.name)
                 infoRow(label: "物种", value: pet.species)
@@ -170,6 +175,57 @@ struct PetBasicInfoDetailView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Breed Tips Card
+    @State private var breedTipsExpanded = true
+
+    private func breedTipsCard(breed: String, tips: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                withAnimation(.spring(response: 0.3)) { breedTipsExpanded.toggle() }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.goYellow)
+                        .frame(width: 32, height: 32)
+                        .background(Color.goYellow.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("\(breed) · 护理贴士")
+                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .foregroundStyle(.primary)
+                        Text("基于品种特点的个性化建议")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: breedTipsExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+
+            if breedTipsExpanded {
+                VStack(alignment: .leading, spacing: 7) {
+                    ForEach(tips, id: \.self) { tip in
+                        HStack(alignment: .top, spacing: 8) {
+                            Circle()
+                                .fill(Color.goYellow.opacity(0.7))
+                                .frame(width: 5, height: 5)
+                                .padding(.top, 5)
+                            Text(tip)
+                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .foregroundStyle(.primary.opacity(0.75))
+                        }
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(14)
+        .goTranslucentCard(cornerRadius: 16)
     }
 
     // MARK: - Edit View
