@@ -27,13 +27,10 @@ struct WalletPetCardBack: View {
     var onShowPotty:        () -> Void = {}
     var onShowExpenses:     () -> Void = {}
 
-    // 档案证件
+    // 档案与记忆
     var onShowBasicInfo:    () -> Void = {}
     var onShowDocuments:    () -> Void = {}
-
-    // 记忆成长
     var onShowMoments:      () -> Void = {}
-    var onShowCalendar:     () -> Void = {}
     var onShowAchievements: () -> Void = {}
 
     // MARK: - Models
@@ -84,24 +81,18 @@ struct WalletPetCardBack: View {
             )
         }
 
-        // ── 档案证件 ──────────────────────────
-        let profileEntries: [FeatureEntry] = [
-            FeatureEntry(id: "basicInfo",  symbol: "person.fill", title: "基本信息", action: onShowBasicInfo),
-            FeatureEntry(id: "documents",  symbol: "doc.fill",    title: "证件保障", action: onShowDocuments),
-        ]
-
-        // ── 记忆成长 ──────────────────────────
-        let memoriesEntries: [FeatureEntry] = [
+        // ── 档案与记忆 ──────────────────────────
+        let archiveEntries: [FeatureEntry] = [
+            FeatureEntry(id: "basicInfo",    symbol: "person.fill", title: "基本信息", action: onShowBasicInfo),
+            FeatureEntry(id: "documents",    symbol: "doc.fill",    title: "证件保障", action: onShowDocuments),
             FeatureEntry(id: "moments",      symbol: "sparkles",    title: "重要时刻", action: onShowMoments),
-            FeatureEntry(id: "calendar",     symbol: "calendar",    title: "日历",   action: onShowCalendar),
-            FeatureEntry(id: "achievements", symbol: "trophy.fill", title: "成就",   action: onShowAchievements),
+            FeatureEntry(id: "achievements", symbol: "trophy.fill", title: "成就",     action: onShowAchievements),
         ]
 
         return [
-            FeatureSection(id: "health",   symbol: "cross.fill",    title: "健康管理", entries: healthEntries),
-            FeatureSection(id: "daily",    symbol: "sun.max.fill",  title: "日常生活", entries: dailyEntries),
-            FeatureSection(id: "profile",  symbol: "folder.fill",   title: "档案证件", entries: profileEntries),
-            FeatureSection(id: "memories", symbol: "heart.fill",    title: "记忆成长", entries: memoriesEntries),
+            FeatureSection(id: "health",  symbol: "cross.fill",   title: "健康管理", entries: healthEntries),
+            FeatureSection(id: "daily",   symbol: "sun.max.fill", title: "日常生活", entries: dailyEntries),
+            FeatureSection(id: "archive", symbol: "folder.fill",  title: "档案与记忆", entries: archiveEntries),
         ]
     }
 

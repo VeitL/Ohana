@@ -121,7 +121,6 @@ struct PetWalletStack: View {
     var onShowDocuments: ((Pet) -> Void)? = nil
     // 记忆成长
     var onShowMoments: ((Pet) -> Void)? = nil
-    var onShowCalendar: ((Pet) -> Void)? = nil
     var onShowAchievements: ((Pet) -> Void)? = nil
 
     @State private var dragOffset: CGFloat = 0
@@ -236,7 +235,6 @@ struct PetWalletStack: View {
                         onShowBasicInfo:    { onShowBasicInfo?(pet) },
                         onShowDocuments:    { onShowDocuments?(pet) },
                         onShowMoments:      { onShowMoments?(pet) },
-                        onShowCalendar:     { onShowCalendar?(pet) },
                         onShowAchievements: { onShowAchievements?(pet) }
                     )
                     .frame(height: stackCardHeight)

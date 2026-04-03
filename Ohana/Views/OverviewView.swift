@@ -49,7 +49,7 @@ struct OverviewView: View {
     @State private var showingAllFoodManagement = false
     @AppStorage("quickActionItems_v2") private var quickActionItemsJSON: String = ""
     // 首页 section 可见性
-    @AppStorage("home_section_order") private var sectionOrderRaw: String = "todayActions,memoryDrop,islandStats"
+    @AppStorage("home_section_order") private var sectionOrderRaw: String = "quickActions,batchCheckIn,memoryDrop,islandStats"
     @AppStorage("home_section_hidden") private var hiddenSectionsRaw: String = ""
     @AppStorage("appLanguage") private var appLanguage = "zh"
     private var l: L10n { L10n(appLanguage) }
@@ -128,9 +128,8 @@ struct OverviewView: View {
     // 档案证件
     @State private var cardBackBasicInfoPet: Pet? = nil
     @State private var cardBackDocumentsPet: Pet? = nil
-    // 记忆成长
+    // 档案与记忆
     @State private var cardBackMomentsPet: Pet? = nil
-    @State private var cardBackCalendarPet: Pet? = nil
     @State private var cardBackAchievementsPet: Pet? = nil
     // 全局椰子日志显示
     @State private var showingCoconutLog = false
@@ -557,7 +556,6 @@ struct OverviewView: View {
                         onShowBasicInfo:    { cardBackBasicInfoPet = $0 },
                         onShowDocuments:    { cardBackDocumentsPet = $0 },
                         onShowMoments:      { cardBackMomentsPet = $0 },
-                        onShowCalendar:     { cardBackCalendarPet = $0 },
                         onShowAchievements: { cardBackAchievementsPet = $0 }
                     )
                     .onAppear {
@@ -575,10 +573,13 @@ struct OverviewView: View {
                 // ── 层4+：按 orderedSections 驱动渲染（严格绑定排序与显隐）
                 ForEach(orderedSections, id: \.self) { sectionId in
                     switch sectionId {
-                    case "todayActions", "quickAccess", "batchCheckIn", "todayTasks":
-                        if sectionId == (orderedSections.first(where: { ["todayActions", "quickAccess", "batchCheckIn", "todayTasks"].contains($0) }) ?? "") &&
-                           !hiddenSections.contains("todayActions") {
-                            todayActionsSection
+                    case "quickActions", "todayActions", "quickAccess", "todayTasks":
+                        if !hiddenSections.contains("quickActions") && !hiddenSections.contains("todayActions") {
+                            quickActionsOnlySection
+                        }
+                    case "batchCheckIn":
+                        if !hiddenSections.contains("batchCheckIn") {
+                            batchCheckInOnlySection
                         }
                     case "memoryDrop":
                         if !memoryDismissed, let memory = MemoryEngine.pickFragment(pets: pets, plants: plants) {
@@ -629,11 +630,13 @@ struct OverviewView: View {
 
     private var orderedSections: [String] {
         let order = sectionOrder
-        let allIds = ["todayActions", "memoryDrop", "islandStats"]
-        let legacyIds = ["quickAccess", "batchCheckIn", "todayTasks"]
+        let allIds = ["quickActions", "batchCheckIn", "memoryDrop", "islandStats"]
+        let legacyIds = ["todayActions", "quickAccess", "todayTasks"]
         var result = order.filter { allIds.contains($0) || legacyIds.contains($0) }
         for id in allIds where !result.contains(id) { result.append(id) }
-        return result
+        // Dedup (legacy todayActions might coexist with new quickActions)
+        var seen = Set<String>()
+        return result.filter { seen.insert($0).inserted }
     }
     
     // MARK: - Header Streak
@@ -1375,11 +1378,10 @@ struct OverviewView: View {
         return pets.first(where: { !$0.hasPassedAway })
     }
 
-    // MARK: - Today Actions (unified section)
+    // MARK: - Quick Actions section (deck + grid + walk card)
     @ViewBuilder
-    private var todayActionsSection: some View {
+    private var quickActionsOnlySection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // 横滑高亮甲板：宠物状态 + 委托 + 岛屿等级（替代独立 PetWellnessCard + EnergyBar + QuestCarousel）
             HomeHighlightDeck(
                 activePet: deckActivePet,
                 pets: pets,
@@ -1396,21 +1398,31 @@ struct OverviewView: View {
             )
             .padding(.top, 12)
 
-            // Quick actions grid
             quickActionsSection
                 .animation(.spring(response: 0.38, dampingFraction: 0.78),
                            value: activeQuickActionItems.map(\.id))
 
-            // Batch check-in
-            let livePetCount = pets.filter { !$0.hasPassedAway }.count
-            if livePetCount > 1 {
-                if showBatchCheckIn {
-                    batchCheckInBar
-                        .padding(.horizontal, 16)
-                } else {
-                    batchCheckInEnablePrompt
-                        .padding(.horizontal, 16)
-                }
+            // Walk tracking card: shown for dog pets
+            if let walkPet = deckActivePet,
+               walkPet.species.lowercased().contains("dog") || walkPet.species.contains("狗") {
+                WalkTrackingCard(pet: walkPet)
+                    .frame(height: 160)
+                    .padding(.horizontal, 16)
+            }
+        }
+    }
+
+    // MARK: - Batch Check-in section
+    @ViewBuilder
+    private var batchCheckInOnlySection: some View {
+        let livePetCount = pets.filter { !$0.hasPassedAway }.count
+        if livePetCount > 1 {
+            if showBatchCheckIn {
+                batchCheckInBar
+                    .padding(.horizontal, 16)
+            } else {
+                batchCheckInEnablePrompt
+                    .padding(.horizontal, 16)
             }
         }
     }
@@ -1757,7 +1769,7 @@ struct OverviewView: View {
             }
             // 日常生活
             .sheet(item: $cardBackFoodPet) { pet in
-                NavigationStack { PetFoodManagementView(pet: pet) }
+                PetFoodManagementView(pet: pet)
             }
             .sheet(item: $cardBackHygienePet) { pet in
                 NavigationStack { PetHygieneDetailView(pet: pet) }
@@ -1771,19 +1783,15 @@ struct OverviewView: View {
             .sheet(item: $cardBackExpensesPet) { pet in
                 NavigationStack { ExpenseHistoryView(pet: pet) }
             }
-            // 档案证件
+            // 档案与记忆
             .sheet(item: $cardBackBasicInfoPet) { pet in
                 NavigationStack { PetBasicInfoDetailView(pet: pet) }
             }
             .sheet(item: $cardBackDocumentsPet) { pet in
                 NavigationStack { DocumentsListView(pet: pet) }
             }
-            // 记忆成长
             .sheet(item: $cardBackMomentsPet) { pet in
                 PetMomentsHubView(pet: pet)
-            }
-            .sheet(item: $cardBackCalendarPet) { pet in
-                NavigationStack { CalendarView(preselectedPetId: pet.id.uuidString) }
             }
             .sheet(item: $cardBackAchievementsPet) { pet in
                 AchievementWallView(pet: pet)
