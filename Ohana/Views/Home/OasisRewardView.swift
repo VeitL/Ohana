@@ -29,6 +29,7 @@ struct OasisRewardView: View {
     @State private var showInventory        = false
     @State private var showCoconutRules     = false
     @State private var showCheckInCalendar  = false
+    @State private var showCheckInSheet     = false
     @State private var energyParticles: [EnergyParticle] = []
     // 模块六：打卡日历
     @State private var checkedInDates: Set<String> = []   // "yyyy-MM-dd" 格式
@@ -161,6 +162,22 @@ struct OasisRewardView: View {
         .sheet(isPresented: $showBountyBoard) {
             BountyBoardView()
                 .presentationDetents([.large])
+        }
+        .sheet(isPresented: $showCheckInSheet) {
+            NavigationStack {
+                ScrollView {
+                    checkInCalendarCard
+                        .padding()
+                }
+                .navigationTitle("打卡日历")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("关闭") { showCheckInSheet = false }
+                    }
+                }
+            }
+            .presentationDetents([.large])
         }
         .onAppear {
             treeMgr.refreshEnergy(modelContext: modelContext, pets: pets, humans: humans, plants: plants)
@@ -782,6 +799,29 @@ struct OasisRewardView: View {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
+    // MARK: - Bento Dynamic Subtitles
+
+    private var shopSubtitle: String {
+        let canAfford = QuestManager.shared.coconutCount >= 25
+        return canAfford ? "13件道具 · 最低25🥥" : "攒够椰子再来"
+    }
+
+    private var gachaSubtitle: String {
+        let raw = UserDefaults.standard.string(forKey: "gachaHistory") ?? ""
+        let count = raw.isEmpty ? 0 : raw.split(separator: ",").count
+        return count == 0 ? "30🥥/次 · 快来试试" : "30🥥/次 · 已抽\(min(count, 999))次"
+    }
+
+    private var bountySubtitle: String {
+        guard let raw = UserDefaults.standard.string(forKey: "bountyTasks"),
+              let data = raw.data(using: .utf8),
+              let tasks = try? JSONDecoder().decode([BountyTask].self, from: data) else {
+            return "发布首个任务"
+        }
+        let active = tasks.filter { !$0.isCompleted }.count
+        return active == 0 ? "暂无进行中任务" : "\(active)个进行中"
+    }
+
     // MARK: - Bento Grid
 
     private var oasisBentoGrid: some View {
@@ -793,7 +833,7 @@ struct OasisRewardView: View {
             // 行一：椰子商店 + 成就解锁
             HStack(spacing: 8) {
                 bentoMiniCard(emoji: "🛒", title: "椰子商店",
-                    subtitle: "兑换特效称号", accent: Color.goYellow,
+                    subtitle: shopSubtitle, accent: Color.goYellow,
                     action: { showCoconutShop = true })
                 bentoMiniCard(emoji: "🏆", title: "成就解锁",
                     subtitle: "\(unlockedCount)/\(totalCount)", accent: Color.goTeal,
@@ -802,11 +842,22 @@ struct OasisRewardView: View {
             // 行二：扭蛋机 + 悬赏榜
             HStack(spacing: 8) {
                 bentoMiniCard(emoji: "🎰", title: "欧气扭蛋机",
-                    subtitle: "30🥥/次", accent: Color.goPrimary,
+                    subtitle: gachaSubtitle, accent: Color.goPrimary,
                     action: { showGacha = true })
                 bentoMiniCard(emoji: "📋", title: "家庭悬赏榜",
-                    subtitle: "发布任务", accent: Color.goOrange,
+                    subtitle: bountySubtitle, accent: Color.goOrange,
                     action: { showBountyBoard = true })
+            }
+            // 行三：打卡日历 + 椰子流水
+            HStack(spacing: 8) {
+                bentoMiniCard(emoji: "📅", title: "打卡日历",
+                    subtitle: currentStreak > 0 ? "🔥 \(currentStreak)天连胜" : "今日待打卡",
+                    accent: Color.goOrange,
+                    action: { loadCheckInData(); showCheckInSheet = true })
+                bentoMiniCard(emoji: "🥥", title: "椰子流水",
+                    subtitle: "余额 \(QuestManager.shared.coconutCount)🥥",
+                    accent: Color.goYellow,
+                    action: { showingCoconutLog = true })
             }
         }
     }
