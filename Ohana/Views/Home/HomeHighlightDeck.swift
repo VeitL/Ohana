@@ -2,22 +2,44 @@
 //  HomeHighlightDeck.swift
 //  Ohana
 //
-//  首页横滑高亮甲板：将 PetWellnessCard + IslandEnergyBar + IslandQuestCarousel
-//  三块内容合并成一条 130pt 高的横向可滑动卡片组，节省约 270pt 垂直空间。
+//  首页横滑高亮甲板：宠物状态 + 打卡连击 + 岛屿委托 + 等级成长
+//  高度 160pt，真实 ScrollView（无虚拟倍增），含页码指示器。
 //
 
 import SwiftUI
 import SwiftData
 
-// MARK: - Main Deck
+// MARK: - CardKind
+
+private enum CardKind: Hashable {
+    case petStatus
+    case streak
+    case quest(String)   // quest.id
+    case questDone
+    case coconutCall
+    case questEmpty
+    case level
+
+    var stableId: String {
+        switch self {
+        case .petStatus:     return "petStatus"
+        case .streak:        return "streak"
+        case .quest(let id): return "quest_\(id)"
+        case .questDone:     return "questDone"
+        case .coconutCall:   return "coconutCall"
+        case .questEmpty:    return "questEmpty"
+        case .level:         return "level"
+        }
+    }
+}
+
+// MARK: - HomeHighlightDeck
 
 struct HomeHighlightDeck: View {
-    // 当前顶牌宠物（nil = 无宠物 / 顶牌为人类）
     var activePet: Pet?
     let pets: [Pet]
     let plants: [Plant]
     let quests: [IslandQuest]
-    /// 全岛每日打开打卡连击（与 `oasis_checkedIn_dates` 一致）
     var checkInStreak: Int = 0
     var onStreakTap: (() -> Void)? = nil
 
@@ -26,23 +48,34 @@ struct HomeHighlightDeck: View {
     var onQuestProgress: ((Int, Int) -> Void)? = nil
     var onOasisTap: (() -> Void)? = nil
 
-    // MARK: - Internal state
-    @State private var skippedIds: Set<String> = []
-    @State private var showCoconut = false
-    @State private var coconutClaimed: Bool = {
-        let key = "coconut_claimed_\(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970)"
-        return UserDefaults.standard.bool(forKey: key)
+    // MARK: Persistence helpers
+
+    private static func todayKey(_ prefix: String) -> String {
+        let ts = Int(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970)
+        return "\(prefix)_\(ts)"
+    }
+
+    // MARK: State
+
+    @State private var skippedIds: Set<String> = {
+        let key = HomeHighlightDeck.todayKey("hd_skip")
+        let arr = UserDefaults.standard.stringArray(forKey: key) ?? []
+        return Set(arr)
     }()
+
+    @State private var coconutClaimed: Bool = {
+        UserDefaults.standard.bool(forKey: HomeHighlightDeck.todayKey("coconut_claimed"))
+    }()
+
+    @State private var scrollTarget: String? = nil
+    @State private var showCoconut = false
     @State private var showRewardToast = false
     @State private var toastMessage = ""
     @State private var lastCompletedCount: Int = -1
-    @State private var deckScrollTarget: String? = nil
 
     @Environment(\.colorScheme) private var colorScheme
 
-    private let deckVirtualMultiplier = 20
-
-    // MARK: - Computed
+    // MARK: Computed
 
     private var visibleQuests: [IslandQuest] {
         quests.filter { !$0.isCompleted && !skippedIds.contains($0.id) }
@@ -50,119 +83,81 @@ struct HomeHighlightDeck: View {
     private var completedCount: Int { quests.filter(\.isCompleted).count }
     private var allQuestsDone: Bool { IslandQuestEngine.allCompleted(quests: quests) }
 
-    // MARK: - Slot kinds
-
-    private enum DeckSlotKind: Equatable {
-        case petStatus
-        case checkInStreak
-        case quest(String)
-        case questDone
-        case coconutCall
-        case questEmpty
-        case level
-    }
-
-    private var baseSlotKinds: [DeckSlotKind] {
-        var slots: [DeckSlotKind] = []
-        if activePet != nil { slots.append(.petStatus) }
-        slots.append(.checkInStreak)
+    private var cards: [CardKind] {
+        var result: [CardKind] = []
+        if activePet != nil { result.append(.petStatus) }
+        result.append(.streak)
         if !quests.isEmpty {
             if allQuestsDone && coconutClaimed {
-                slots.append(.questDone)
+                result.append(.questDone)
             } else if allQuestsDone {
-                slots.append(.coconutCall)
+                result.append(.coconutCall)
             } else if visibleQuests.isEmpty {
-                slots.append(.questEmpty)
+                result.append(.questEmpty)
             } else {
-                for quest in visibleQuests { slots.append(.quest(quest.id)) }
+                for q in visibleQuests { result.append(.quest(q.id)) }
             }
         }
-        slots.append(.level)
-        return slots
+        result.append(.level)
+        return result
     }
 
-    @ViewBuilder
-    private func cardView(for slot: DeckSlotKind) -> some View {
-        switch slot {
-        case .petStatus:
-            if let pet = activePet { DeckPetStatusCard(pet: pet) } else { Color.clear }
-        case .checkInStreak:
-            DeckCheckInStreakCard(streak: checkInStreak, onTap: { onStreakTap?() })
-        case .quest(let id):
-            if let quest = visibleQuests.first(where: { $0.id == id }) {
-                DeckQuestCard(
-                    quest: quest,
-                    pets: pets,
-                    plants: plants,
-                    onSkip: {
-                        let qid = quest.id
-                        _ = withAnimation(.spring(response: 0.3)) { skippedIds.insert(qid) }
-                        onSkipQuest(quest)
-                    }
-                )
-            } else { Color.clear }
-        case .questDone:
-            DeckQuestDoneCard()
-        case .coconutCall:
-            DeckCoconutCallCard(claimed: coconutClaimed) {
-                if !coconutClaimed { showCoconut = true }
-            }
-        case .questEmpty:
-            DeckQuestEmptyCard()
-        case .level:
-            DeckLevelCard(onTap: onOasisTap)
-        }
+    private var currentIndex: Int {
+        guard let target = scrollTarget else { return 0 }
+        return cards.firstIndex { $0.stableId == target } ?? 0
     }
 
-    // MARK: - Body
+    // MARK: Body
 
     var body: some View {
-        let slots = baseSlotKinds
-        let n = max(1, slots.count)
-        let virtualN = n * deckVirtualMultiplier
-        let startVIdx = n * (deckVirtualMultiplier / 2)
-
-        ZStack(alignment: .top) {
+        VStack(spacing: 8) {
             GeometryReader { geo in
                 let cardW = geo.size.width * 0.88
-                let margin = (geo.size.width - cardW) / 2   // 居中磁吸边距
+                let margin = (geo.size.width - cardW) / 2
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 10) {
-                        ForEach(0..<virtualN, id: \.self) { vIdx in
-                            cardView(for: slots[vIdx % n])
-                                .id("vdeck_\(vIdx)")
-                                .frame(width: cardW, height: 130)
-                                .scrollTransition(.animated(.bouncy)) { content, phase in
+                        ForEach(cards, id: \.stableId) { kind in
+                            cardView(for: kind)
+                                .id(kind.stableId)
+                                .frame(width: cardW, height: 160)
+                                .scrollTransition(.animated(.spring(response: 0.3, dampingFraction: 0.8))) { content, phase in
                                     content
-                                        .opacity(phase.isIdentity ? 1 : 0.85)
-                                        .scaleEffect(phase.isIdentity ? 1 : 0.97)
+                                        .opacity(phase.isIdentity ? 1 : 0.82)
+                                        .scaleEffect(phase.isIdentity ? 1 : 0.96)
                                 }
                         }
                     }
                     .scrollTargetLayout()
                 }
                 .contentMargins(.horizontal, margin, for: .scrollContent)
-                .scrollTargetBehavior(.viewAligned(limitBehavior: .never))
-                .scrollPosition(id: $deckScrollTarget)
-                .background(.clear)
+                .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
+                .scrollPosition(id: $scrollTarget)
                 .onAppear {
-                    if deckScrollTarget == nil {
-                        deckScrollTarget = "vdeck_\(startVIdx)"
+                    if scrollTarget == nil, let first = cards.first {
+                        scrollTarget = first.stableId
                     }
                 }
-                .onChange(of: slots.count) { _, newCount in
-                    let newN = max(1, newCount)
-                    deckScrollTarget = "vdeck_\(newN * (deckVirtualMultiplier / 2))"
+            }
+            .frame(height: 160)
+
+            // Page indicator
+            if cards.count > 1 {
+                HStack(spacing: 5) {
+                    ForEach(Array(cards.enumerated()), id: \.offset) { idx, _ in
+                        Capsule()
+                            .fill(idx == currentIndex ? Color.goPrimary : Color.primary.opacity(0.18))
+                            .frame(width: idx == currentIndex ? 18 : 5, height: 5)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentIndex)
+                    }
                 }
             }
-            .frame(height: 130)
-            .background(.clear)
-
-            // Reward toast
+        }
+        // Reward toast
+        .overlay(alignment: .top) {
             if showRewardToast {
                 Text(toastMessage)
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.subheadline(.black))
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 18).padding(.vertical, 9)
                     .background(Color.goPrimary, in: Capsule())
@@ -173,7 +168,7 @@ struct HomeHighlightDeck: View {
             }
         }
         .sheet(isPresented: $showCoconut, onDismiss: {
-            let key = "coconut_claimed_\(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970)"
+            let key = HomeHighlightDeck.todayKey("coconut_claimed")
             UserDefaults.standard.set(true, forKey: key)
             coconutClaimed = true
             toastMessage = "🥥 今日椰子盲盒已领取！"
@@ -192,73 +187,71 @@ struct HomeHighlightDeck: View {
             }
             lastCompletedCount = newVal
         }
-    }
-}
-
-// MARK: - Card: 全岛打卡连击（原 HomeBentoBoxes 打卡卡，迁入横滑甲板）
-
-private struct DeckCheckInStreakCard: View {
-    let streak: Int
-    let onTap: () -> Void
-
-    private var accentColor: Color { .goOrange }
-    private var trendText: String { streak >= 7 ? "🔥 火热连击！" : "继续保持！" }
-    private var filledBars: Int { min(7, streak) }
-
-    var body: some View {
-        Button(action: {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            onTap()
-        }) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(accentColor)
-                    Text("打卡连击")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.55))
-                }
-                HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Text("\(streak)")
-                        .font(.system(size: 28, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
-                        .contentTransition(.numericText())
-                    Text("天")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.4))
-                }
-                Text(trendText)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundStyle(accentColor.opacity(0.85))
-                    .lineLimit(1)
-                HStack(spacing: 3) {
-                    ForEach(0..<7, id: \.self) { i in
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(i < filledBars ? accentColor : accentColor.opacity(0.18))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 4)
-                    }
-                }
-            }
-            .padding(14)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(accentColor.opacity(0.22), lineWidth: 1)
-            )
+        .onChange(of: skippedIds) { _, newVal in
+            let key = HomeHighlightDeck.todayKey("hd_skip")
+            UserDefaults.standard.set(Array(newVal), forKey: key)
         }
-        .buttonStyle(.plain)
+    }
+
+    // MARK: Card factory
+
+    @ViewBuilder
+    private func cardView(for kind: CardKind) -> some View {
+        switch kind {
+        case .petStatus:
+            if let pet = activePet {
+                DeckPetStatusCard(pet: pet)
+            } else {
+                Color.clear
+            }
+        case .streak:
+            DeckCheckInStreakCard(streak: checkInStreak) { onStreakTap?() }
+        case .quest(let id):
+            if let quest = visibleQuests.first(where: { $0.id == id }) {
+                DeckQuestCard(
+                    quest: quest,
+                    pets: pets,
+                    plants: plants,
+                    onComplete: {
+                        withAnimation(.spring(response: 0.3)) {
+                            onCompleteQuest(quest)
+                        }
+                    },
+                    onSkip: {
+                        let qid = quest.id
+                        withAnimation(.spring(response: 0.3)) {
+                            skippedIds.insert(qid)
+                        }
+                        onSkipQuest(quest)
+                    }
+                )
+            } else {
+                Color.clear
+            }
+        case .questDone:
+            DeckQuestDoneCard()
+        case .coconutCall:
+            DeckCoconutCallCard(claimed: coconutClaimed) {
+                if !coconutClaimed { showCoconut = true }
+            }
+        case .questEmpty:
+            DeckQuestEmptyCard {
+                withAnimation(.spring(response: 0.3)) {
+                    skippedIds.removeAll()
+                }
+                let key = HomeHighlightDeck.todayKey("hd_skip")
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+        case .level:
+            DeckLevelCard(onTap: onOasisTap)
+        }
     }
 }
 
-// MARK: - Card: Pet Status
+// MARK: - DeckPetStatusCard
 
 private struct DeckPetStatusCard: View {
     let pet: Pet
-    @Environment(\.colorScheme) private var colorScheme
-
     private let cal = Calendar.current
 
     private var todayFeedCount: Int {
@@ -285,24 +278,21 @@ private struct DeckPetStatusCard: View {
     private var streakColor: Color {
         pet.currentStreak >= 30 ? .orange : (pet.currentStreak >= 7 ? Color.goPrimary : .secondary)
     }
-    private var todaySummaryText: String {
-        let total = todayFeedCount + todayWaterCount + todayWalkCount + todayPottyCount
-        return total == 0 ? "今天还没有打卡记录" : "今日已完成 \(total) 项打卡"
-    }
+    private var totalToday: Int { todayFeedCount + todayWaterCount + todayWalkCount + todayPottyCount }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             // Header
             HStack(spacing: 8) {
                 Text(pet.avatarEmoji)
-                    .font(.system(size: 24))
-                VStack(alignment: .leading, spacing: 1) {
+                    .font(.system(size: 26))
+                VStack(alignment: .leading, spacing: 2) {
                     Text(pet.name)
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .font(OhanaFont.title3())
                         .foregroundStyle(.primary)
                         .lineLimit(1)
-                    Text(todaySummaryText)
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                    Text(totalToday == 0 ? "今天还没有打卡记录" : "今日已完成 \(totalToday) 项打卡")
+                        .font(OhanaFont.caption())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -310,9 +300,9 @@ private struct DeckPetStatusCard: View {
                 if pet.currentStreak > 1 {
                     HStack(spacing: 2) {
                         Image(systemName: "flame.fill")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(OhanaFont.caption2())
                         Text("\(pet.currentStreak)")
-                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.footnote(.black))
                     }
                     .foregroundStyle(streakColor)
                     .padding(.horizontal, 8).padding(.vertical, 4)
@@ -331,36 +321,42 @@ private struct DeckPetStatusCard: View {
                 Spacer(minLength: 0)
             }
 
-            // Status row (food + alert)
+            // Status row
             HStack(spacing: 6) {
                 if let days = foodDaysLeft {
                     let urgent = days <= 3
                     HStack(spacing: 3) {
-                        Image(systemName: "bag.fill").font(.system(size: 9, weight: .bold))
-                        Text("粮仓 \(days) 天").font(.system(size: 10, weight: .bold, design: .rounded))
+                        Image(systemName: "bag.fill")
+                            .font(OhanaFont.caption2())
+                        Text("粮仓 \(days) 天")
+                            .font(OhanaFont.caption(.bold))
                     }
                     .foregroundStyle(urgent ? .white : .primary.opacity(0.65))
                     .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(Capsule().fill(urgent ? Color.red.opacity(0.8) : Color.primary.opacity(0.06)))
+                    .background(Capsule().fill(urgent ? Color.goRed.opacity(0.8) : Color.primary.opacity(0.06)))
                 }
                 if let a = urgentAlert {
                     HStack(spacing: 2) {
-                        Text(a.emoji).font(.system(size: 9))
-                        Text(a.title).font(.system(size: 10, weight: .medium, design: .rounded)).lineLimit(1)
+                        Text(a.emoji).font(OhanaFont.caption2())
+                        Text(a.title)
+                            .font(OhanaFont.caption())
+                            .lineLimit(1)
                     }
                     .foregroundStyle(a.severity == .urgent ? .white : .primary.opacity(0.65))
                     .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(Capsule().fill(a.severity == .urgent ? Color.red.opacity(0.75) : Color.orange.opacity(0.15)))
+                    .background(Capsule().fill(
+                        a.severity == .urgent ? Color.goRed.opacity(0.75) : Color.goOrange.opacity(0.15)
+                    ))
                 }
                 Spacer(minLength: 0)
             }
         }
         .padding(14)
-        .frame(height: 130)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .goTranslucentCard(cornerRadius: 20)
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(themeColor.opacity(0.18), lineWidth: 1)
+                .strokeBorder(themeColor.opacity(0.2), lineWidth: 1)
         )
     }
 
@@ -368,10 +364,11 @@ private struct DeckPetStatusCard: View {
         let done = count > 0
         return HStack(spacing: 2) {
             Image(systemName: icon)
-                .font(.system(size: 10, weight: .bold))
+                .font(OhanaFont.caption2())
                 .foregroundStyle(done ? themeColor : .secondary.opacity(0.5))
             if count > 1 {
-                Text("\(count)").font(.system(size: 10, weight: .bold, design: .rounded))
+                Text("\(count)")
+                    .font(OhanaFont.caption(.bold))
                     .foregroundStyle(done ? themeColor : .secondary.opacity(0.5))
             }
         }
@@ -382,12 +379,111 @@ private struct DeckPetStatusCard: View {
     }
 }
 
-// MARK: - Card: Quest (compact)
+// MARK: - DeckCheckInStreakCard
+
+private struct DeckCheckInStreakCard: View {
+    let streak: Int
+    let onTap: () -> Void
+
+    private let milestones = [7, 14, 30, 60, 100, 180, 365]
+
+    private var accentColor: Color { .goOrange }
+
+    private var nextMilestone: Int {
+        milestones.first { $0 > streak } ?? milestones.last!
+    }
+    private var prevMilestone: Int {
+        milestones.last { $0 <= streak } ?? 0
+    }
+    private var milestoneProgress: Double {
+        let range = Double(nextMilestone - prevMilestone)
+        guard range > 0 else { return 1.0 }
+        return min(1.0, Double(streak - prevMilestone) / range)
+    }
+    private var daysToNext: Int { max(0, nextMilestone - streak) }
+    private var trendText: String {
+        if streak >= 365 { return "🏆 年度守护者！" }
+        if streak >= 180 { return "🌟 半年传奇！" }
+        if streak >= 100 { return "💎 百日坚持！" }
+        if streak >= 30  { return "🔥 三十天火焰！" }
+        if streak >= 7   { return "🔥 连击达人！" }
+        return "继续加油！"
+    }
+
+    var body: some View {
+        Button(action: {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            onTap()
+        }) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "flame.fill")
+                        .font(OhanaFont.footnote(.bold))
+                        .foregroundStyle(accentColor)
+                    Text("打卡连击")
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("🎯 下一里程碑 \(nextMilestone) 天")
+                        .font(OhanaFont.caption2())
+                        .foregroundStyle(.secondary.opacity(0.7))
+                }
+
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    Text("\(streak)")
+                        .font(OhanaFont.metric(size: 32))
+                        .foregroundStyle(.primary)
+                        .contentTransition(.numericText())
+                    Text("天")
+                        .font(OhanaFont.footnote(.bold))
+                        .foregroundStyle(.primary.opacity(0.4))
+                    Spacer()
+                    Text(trendText)
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(accentColor.opacity(0.9))
+                }
+
+                // Milestone progress bar
+                VStack(alignment: .leading, spacing: 4) {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(accentColor.opacity(0.12))
+                                .frame(height: 6)
+                            Capsule()
+                                .fill(LinearGradient(
+                                    colors: [accentColor.opacity(0.7), accentColor],
+                                    startPoint: .leading, endPoint: .trailing
+                                ))
+                                .frame(width: geo.size.width * milestoneProgress, height: 6)
+                        }
+                    }
+                    .frame(height: 6)
+
+                    Text(daysToNext == 0 ? "🎉 里程碑达成！" : "距 \(nextMilestone) 天里程碑还差 \(daysToNext) 天")
+                        .font(OhanaFont.caption2())
+                        .foregroundStyle(.secondary.opacity(0.65))
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .goTranslucentCard(cornerRadius: 20)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(accentColor.opacity(0.2), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - DeckQuestCard
 
 private struct DeckQuestCard: View {
     let quest: IslandQuest
     let pets: [Pet]
     let plants: [Plant]
+    let onComplete: () -> Void
     let onSkip: () -> Void
 
     private var relatedPet: Pet? {
@@ -403,7 +499,7 @@ private struct DeckQuestCard: View {
         if let pl = relatedPlant { return Color(hex: pl.themeColorHex.isEmpty ? "4CAF50" : pl.themeColorHex) }
         return Color.goPrimary
     }
-    private var typeCapsule: String {
+    private var typeLabel: String {
         switch quest.id {
         case "q_walk": return "遛狗"
         case "q_potty": return "噗噗"
@@ -417,53 +513,67 @@ private struct DeckQuestCard: View {
     private var reward: Int { IslandQuestEngine.coconutReward(forQuestId: quest.id) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Top row: avatar + badge + skip
+        VStack(alignment: .leading, spacing: 0) {
+            // Top row: avatar + type badge + skip
             HStack(spacing: 8) {
                 avatarView
-                Text(typeCapsule)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                Text(typeLabel)
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(.white)
                     .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(Color.goPrimary.opacity(0.22), in: Capsule())
+                    .background(Color.goPrimary.opacity(0.85), in: Capsule())
                 Spacer()
                 Button { onSkip() } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 19))
+                        .font(.system(size: 20))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
             }
+            .padding(.bottom, 8)
 
             // Title
             Text(quest.title)
-                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .font(OhanaFont.body(.bold))
                 .foregroundStyle(.primary)
                 .lineLimit(2)
                 .minimumScaleFactor(0.88)
+                .fixedSize(horizontal: false, vertical: true)
 
-            Spacer(minLength: 0)
+            Spacer(minLength: 6)
 
-            // Reward hint
-            HStack(spacing: 4) {
-                Image(systemName: "checkmark.circle")
-                    .font(.system(size: 11, weight: .semibold))
-                Text("完成任务自动获得")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+            // Bottom row: reward + CTA
+            HStack(spacing: 8) {
+                HStack(spacing: 3) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(OhanaFont.caption2())
+                    Text("+\(reward) 🥥")
+                        .font(OhanaFont.caption(.bold))
+                }
+                .foregroundStyle(.secondary)
+
                 Spacer()
-                Text("+\(reward)")
-                    .font(.system(size: 12, weight: .black, design: .rounded))
-                Text("🥥").font(.system(size: 11))
+
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    onComplete()
+                } label: {
+                    Text("去完成")
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14).padding(.vertical, 6)
+                        .background(Color.goPrimary, in: Capsule())
+                }
+                .buttonStyle(.plain)
             }
-            .foregroundStyle(.secondary)
         }
-        .padding(12)
-        .frame(height: 130)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .goTranslucentCard(cornerRadius: 20)
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                .strokeBorder(stripColor.opacity(0.25), lineWidth: 1)
         )
     }
 
@@ -475,56 +585,54 @@ private struct DeckQuestCard: View {
                 if let data = p.avatarImageData, let ui = UIImage(data: data) {
                     Image(uiImage: ui).resizable().scaledToFill()
                 } else {
-                    Text(p.speciesEmoji).font(.system(size: 16))
+                    Text(p.speciesEmoji)
+                        .font(.system(size: 16))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(stripColor.opacity(0.2))
                 }
             }
             .frame(width: sz, height: sz).clipShape(Circle())
         } else if let pl = relatedPlant {
-            Text(pl.avatarEmoji).font(.system(size: 16))
+            Text(pl.avatarEmoji)
+                .font(.system(size: 16))
                 .frame(width: sz, height: sz)
                 .background(stripColor.opacity(0.2), in: Circle())
         } else {
-            Text(quest.emoji).font(.system(size: 16))
+            Text(quest.emoji)
+                .font(.system(size: 16))
                 .frame(width: sz, height: sz)
                 .background(Color.primary.opacity(0.08), in: Circle())
         }
     }
 }
 
-// MARK: - Card: All Quests Done (collapsed)
+// MARK: - DeckQuestDoneCard
 
 private struct DeckQuestDoneCard: View {
     var body: some View {
-        HStack(spacing: 10) {
+        VStack(spacing: 10) {
             Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 22))
-                .foregroundStyle(Color.goPrimary)
-            VStack(alignment: .leading, spacing: 2) {
+                .font(.system(size: 32))
+                .foregroundStyle(Color.goTeal)
+            VStack(spacing: 4) {
                 Text("今日委托全部完成！")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(OhanaFont.body(.bold))
                     .foregroundStyle(.primary)
                 Text("岛屿很平静，居民们很满足 🌴")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.caption())
                     .foregroundStyle(.secondary)
             }
-            Spacer()
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 20))
-                    .foregroundStyle(Color.goPrimary)
         }
-        .padding(14)
-        .frame(height: 130)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .goTranslucentCard(cornerRadius: 20)
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                .strokeBorder(Color.goTeal.opacity(0.2), lineWidth: 1)
         )
     }
 }
 
-// MARK: - Card: Coconut Callout (collect reward)
+// MARK: - DeckCoconutCallCard
 
 private struct DeckCoconutCallCard: View {
     let claimed: Bool
@@ -532,64 +640,90 @@ private struct DeckCoconutCallCard: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 12) {
-                Text("🥥").font(.system(size: 32))
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(claimed ? "今日盲盒已领取" : "领取今日椰子盲盒！")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(claimed ? .secondary : Color.arkInk)
-                    if !claimed {
-                        Text("全勤奖励 · 全勤额外 +5🥥")
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(Color.arkInk.opacity(0.6))
+            if claimed {
+                // Claimed state
+                VStack(spacing: 10) {
+                    Text("🌴").font(.system(size: 32))
+                    VStack(spacing: 4) {
+                        Text("今日盲盒已领取！")
+                            .font(OhanaFont.body(.bold))
+                            .foregroundStyle(.primary)
+                        Text("感谢认真照料你的宠物 🌴")
+                            .font(OhanaFont.caption())
+                            .foregroundStyle(.secondary)
                     }
                 }
-                Spacer()
-                if !claimed {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color.arkInk.opacity(0.4))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .goTranslucentCard(cornerRadius: 20)
+            } else {
+                // Unclaimed CTA
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Text("🥥").font(.system(size: 30))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("领取今日椰子盲盒！")
+                                .font(OhanaFont.body(.bold))
+                                .foregroundStyle(Color.arkInk)
+                            Text("全勤奖励 · 额外 +5 🥥")
+                                .font(OhanaFont.caption())
+                                .foregroundStyle(Color.arkInk.opacity(0.65))
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(OhanaFont.footnote(.bold))
+                            .foregroundStyle(Color.arkInk.opacity(0.5))
+                    }
+                    Text("所有委托已完成，快来领奖吧！")
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(Color.arkInk.opacity(0.7))
                 }
+                .padding(14)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(Color.goLime)
+                )
             }
-            .padding(14)
-            .frame(height: 130)
-            .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(claimed ? Color.primary.opacity(0.06) : Color.goPrimary)
-            )
         }
         .buttonStyle(.plain)
         .disabled(claimed)
     }
 }
 
-// MARK: - Card: Empty quests placeholder
+// MARK: - DeckQuestEmptyCard
 
 private struct DeckQuestEmptyCard: View {
+    let onReset: () -> Void
+
     var body: some View {
-        HStack(spacing: 12) {
-            Text("🌴").font(.system(size: 32))
-            VStack(alignment: .leading, spacing: 3) {
+        VStack(spacing: 10) {
+            Text("🌴").font(.system(size: 30))
+            VStack(spacing: 4) {
                 Text("暂无委托")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(OhanaFont.body(.bold))
                     .foregroundStyle(.primary)
                 Text("今日委托已跳过或暂无任务")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.caption())
                     .foregroundStyle(.secondary)
             }
-            Spacer()
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                onReset()
+            } label: {
+                Text("重置今日委托")
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.goPrimary)
+                    .padding(.horizontal, 14).padding(.vertical, 6)
+                    .background(Color.goPrimary.opacity(0.1), in: Capsule())
+            }
+            .buttonStyle(.plain)
         }
-        .padding(14)
-        .frame(height: 130)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .goTranslucentCard(cornerRadius: 20)
     }
 }
 
-// MARK: - Card: Island Level (合并 EnergyBar + OasisTree)
+// MARK: - DeckLevelCard
 
 private struct DeckLevelCard: View {
     var onTap: (() -> Void)? = nil
@@ -597,11 +731,15 @@ private struct DeckLevelCard: View {
     @State private var animatedProgress: Double = 0
 
     private var levelLabel: String {
-        "Lv.\(mgr.treeLevel.rawValue) \(mgr.treeLevel.displayName)"
+        "Lv.\(mgr.treeLevel.rawValue)  \(mgr.treeLevel.displayName)"
+    }
+    private var accentColor: Color {
+        mgr.treeLevel.glowColor
     }
     private var nextHint: String {
         guard mgr.treeLevel < .lv10 else { return "🎉 生命之树已达满级！" }
-        return "还需 \(mgr.nextLevelThreshold - mgr.totalEnergy) 点能量升级"
+        let need = mgr.nextLevelThreshold - mgr.totalEnergy
+        return "还需 \(need) 点能量 · 喂食/遛狗均可获得"
     }
 
     var body: some View {
@@ -609,52 +747,51 @@ private struct DeckLevelCard: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             onTap?()
         } label: {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
                     Text("🌿")
                         .font(.system(size: 13))
                     Text("岛屿成长")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.6))
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(.secondary)
                     Spacer()
                     Text("\(Int(mgr.progressToNextLevel * 100))%")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.caption(.bold))
                         .foregroundStyle(.secondary)
                 }
 
                 Text(levelLabel)
-                    .font(.system(size: 22, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.goPrimary)
+                    .font(OhanaFont.metric(size: 26))
+                    .foregroundStyle(accentColor)
 
                 // Progress bar
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(Color.primary.opacity(0.08))
+                        Capsule()
+                            .fill(accentColor.opacity(0.12))
                             .frame(height: 7)
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        Capsule()
                             .fill(LinearGradient(
-                                colors: [Color.goPrimary.opacity(0.75), Color.goPrimary],
-                                startPoint: .leading,
-                                endPoint: .trailing
+                                colors: [accentColor.opacity(0.7), accentColor],
+                                startPoint: .leading, endPoint: .trailing
                             ))
                             .frame(width: geo.size.width * animatedProgress, height: 7)
-                            .shadow(color: Color.goPrimary.opacity(0.4), radius: 3, y: 0)
+                            .shadow(color: accentColor.opacity(0.45), radius: 4, y: 0)
                     }
                 }
                 .frame(height: 7)
 
                 Text(nextHint)
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary.opacity(0.65))
+                    .font(OhanaFont.caption2())
+                    .foregroundStyle(.secondary.opacity(0.7))
                     .lineLimit(1)
             }
             .padding(14)
-            .frame(height: 130)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .goTranslucentCard(cornerRadius: 20)
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(Color.goPrimary.opacity(0.18), lineWidth: 0.5)
+                    .strokeBorder(accentColor.opacity(0.2), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)

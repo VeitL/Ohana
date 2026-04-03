@@ -356,7 +356,7 @@ struct AddPetWizardView: View {
                 }
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("取消") { cropImageItem = nil }.foregroundStyle(.primary.opacity(0.6))
+                        Button("取消") { cropImageItem = nil }
                     }
                 }
                 .navigationBarTitleDisplayMode(.inline)
@@ -1921,8 +1921,6 @@ struct AddPetWizardView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("完成") { dismiss() }
-                            .fontWeight(.bold)
-                            .foregroundStyle(Color.goPrimary)
                     }
                 }
             }

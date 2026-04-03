@@ -336,8 +336,6 @@ struct PetVetPDFShareSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("完成") { dismiss() }
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(pet.themeColor.color)
                 }
             }
         }

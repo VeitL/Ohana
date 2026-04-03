@@ -169,6 +169,45 @@ ZStack {
 
 ---
 
+## 11. Toolbar 返回 / 关闭 / 取消 / 完成按钮规范
+
+**导航控制类按钮（返回、关闭、取消、完成）必须使用系统默认样式，禁止添加任何额外修饰符。**
+
+```swift
+// ✅ 正确 — 无额外修饰符，系统自动处理颜色
+ToolbarItem(placement: .cancellationAction) {
+    Button("取消") { dismiss() }
+}
+ToolbarItem(placement: .confirmationAction) {
+    Button("完成") { dismiss() }
+}
+ToolbarItem(placement: .topBarLeading) {
+    Button("关闭") { dismiss() }
+}
+
+// ❌ 错误 — 自定义颜色
+Button("取消") { dismiss() }.foregroundStyle(Color.goPrimary)
+Button("完成") { dismiss() }.fontWeight(.bold).foregroundStyle(Color.goPrimary)
+Button("取消") { dismiss() }.foregroundStyle(.primary.opacity(0.6))
+
+// ❌ 错误 — 图标式关闭按钮（改用文字）
+Button { dismiss() } label: {
+    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+}
+
+// ✅ 图标式关闭按钮的正确替代
+ToolbarItem(placement: .topBarTrailing) {
+    Button("关闭") { dismiss() }
+}
+```
+
+**规则摘要：**
+- 纯导航控制按钮：只写 `Button("文字") { action }`，不加任何 `.foregroundStyle` / `.font` / `.fontWeight` / `.tint`
+- 图标式 xmark / chevron 关闭按钮：统一改为文字按钮
+- 功能性按钮（分享、添加、保存等）不受此规则限制，可保留自定义样式
+
+---
+
 ## 6. 动画规范
 
 ```swift

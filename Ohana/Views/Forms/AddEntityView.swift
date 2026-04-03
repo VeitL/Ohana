@@ -88,29 +88,13 @@ struct AddEntityView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     if selectedType != nil {
-                        Button {
+                        Button("返回") {
                             withAnimation(.easeInOut(duration: 0.22)) { selectedType = nil }
-                        } label: {
-                            Image(systemName: "chevron.backward")
-                                .font(OhanaFont.headline(.semibold))
-                                .symbolRenderingMode(.monochrome)
-                                .foregroundStyle(toolbarNavIconTint)
-                                .frame(minWidth: 44, minHeight: 44)
-                                .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(OhanaFont.headline(.bold))
-                            .symbolRenderingMode(.monochrome)
-                            .foregroundStyle(toolbarNavIconTint)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
+                    Button("关闭") { dismiss() }
                 }
             }
         }

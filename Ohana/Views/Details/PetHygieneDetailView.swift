@@ -161,18 +161,14 @@ struct PetHygieneDetailView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 14) {
-                    Button { showingPottyOverview = true } label: {
-                        Image(systemName: "chart.bar.doc.horizontal")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(themeColor)
-                    }
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
+                Button { showingPottyOverview = true } label: {
+                    Image(systemName: "chart.bar.doc.horizontal")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(themeColor)
                 }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("关闭") { dismiss() }
             }
         }
         .sheet(isPresented: $showingPottyOverview) {

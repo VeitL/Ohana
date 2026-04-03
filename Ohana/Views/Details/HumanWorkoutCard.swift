@@ -352,7 +352,6 @@ struct AddWorkoutSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("取消") { dismiss() }
-                        .foregroundStyle(.primary.opacity(0.7))
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("保存") { save() }

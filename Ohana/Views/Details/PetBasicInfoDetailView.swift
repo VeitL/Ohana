@@ -93,9 +93,7 @@ struct PetBasicInfoDetailView: View {
             }
             if isEditing {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { withAnimation { isEditing = false } } label: {
-                        Text("取消").foregroundStyle(.primary.opacity(0.5))
-                    }
+                    Button("取消") { withAnimation { isEditing = false } }
                 }
             }
         }

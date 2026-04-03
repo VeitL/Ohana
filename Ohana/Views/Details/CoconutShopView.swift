@@ -128,7 +128,6 @@ struct CoconutShopView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("关闭") { dismiss() }
-                        .foregroundStyle(Color.goPrimary)
                 }
             }
         }
