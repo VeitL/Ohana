@@ -246,10 +246,11 @@ struct IslandWeightDashboard: View {
         let now = Date()
         let cal = Calendar.current
         let cutoff: Date? = {
+            let today = cal.startOfDay(for: now)
             switch weightTimeRange {
-            case .week:  return cal.date(byAdding: .day, value: -6, to: cal.startOfDay(for: now))
-            case .month: return cal.dateInterval(of: .month, for: now)?.start
-            case .year:  return cal.dateInterval(of: .year,  for: now)?.start
+            case .week:  return cal.date(byAdding: .day,   value: -6,  to: today)
+            case .month: return cal.date(byAdding: .month, value: -1,  to: today)
+            case .year:  return cal.date(byAdding: .year,  value: -1,  to: today)
             case .all:   return nil
             }
         }()
@@ -294,7 +295,8 @@ struct IslandWeightDashboard: View {
                 ForEach(series.points) { pt in
                     AreaMark(
                         x: .value("日期", pt.date),
-                        y: .value("kg", pt.weight)
+                        y: .value("kg", pt.weight),
+                        series: .value("s", series.seriesID)
                     )
                     .foregroundStyle(
                         LinearGradient(
@@ -308,7 +310,8 @@ struct IslandWeightDashboard: View {
                 ForEach(series.points) { pt in
                     LineMark(
                         x: .value("日期", pt.date),
-                        y: .value("kg", pt.weight)
+                        y: .value("kg", pt.weight),
+                        series: .value("s", series.seriesID)
                     )
                     .foregroundStyle(c)
                     .interpolationMethod(.catmullRom)

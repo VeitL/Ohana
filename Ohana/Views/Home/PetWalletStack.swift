@@ -105,16 +105,23 @@ struct PetWalletStack: View {
     var onSelectHuman: ((Human) -> Void)? = nil
     var onTopCardChanged: ((DeckItem) -> Void)? = nil
 
+    var onShowBackSettings: ((Pet) -> Void)? = nil
+    // 健康管理
+    var onShowHealth: ((Pet) -> Void)? = nil
+    var onShowMedications: ((Pet) -> Void)? = nil
+    var onShowWeight: ((Pet) -> Void)? = nil
+    // 日常生活
+    var onShowFood: ((Pet) -> Void)? = nil
+    var onShowHygiene: ((Pet) -> Void)? = nil
+    var onShowWalks: ((Pet) -> Void)? = nil
+    var onShowPotty: ((Pet) -> Void)? = nil
+    var onShowExpenses: ((Pet) -> Void)? = nil
+    // 档案证件
+    var onShowBasicInfo: ((Pet) -> Void)? = nil
     var onShowDocuments: ((Pet) -> Void)? = nil
+    // 记忆成长
     var onShowMoments: ((Pet) -> Void)? = nil
     var onShowAchievements: ((Pet) -> Void)? = nil
-    var onShowHealth: ((Pet) -> Void)? = nil
-    var onShowBackSettings: ((Pet) -> Void)? = nil
-    // New feature hub callbacks
-    var onShowCalendar: ((Pet) -> Void)? = nil
-    var onShowMedications: ((Pet) -> Void)? = nil
-    var onShowFood: ((Pet) -> Void)? = nil
-    var onShowEdit: ((Pet) -> Void)? = nil
 
     @State private var dragOffset: CGFloat = 0
     @State private var activeIndex: Int = 0
@@ -216,15 +223,19 @@ struct PetWalletStack: View {
                         pet: pet,
                         cornerRadius: cardCorner,
                         onShowSettings:     { onShowBackSettings?(pet) },
+                        onFlipBack:         { withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { _ = flippedPetIds.remove(pet.id) } },
+                        onShowHealth:       { onShowHealth?(pet) },
+                        onShowMedications:  { onShowMedications?(pet) },
+                        onShowWeight:       { onShowWeight?(pet) },
+                        onShowFood:         { onShowFood?(pet) },
+                        onShowHygiene:      { onShowHygiene?(pet) },
+                        onShowWalks:        { onShowWalks?(pet) },
+                        onShowPotty:        { onShowPotty?(pet) },
+                        onShowExpenses:     { onShowExpenses?(pet) },
+                        onShowBasicInfo:    { onShowBasicInfo?(pet) },
                         onShowDocuments:    { onShowDocuments?(pet) },
                         onShowMoments:      { onShowMoments?(pet) },
-                        onShowAchievements: { onShowAchievements?(pet) },
-                        onShowHealth:       { onShowHealth?(pet) },
-                        onFlipBack:         { withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { _ = flippedPetIds.remove(pet.id) } },
-                        onShowCalendar:     { onShowCalendar?(pet) },
-                        onShowMedications:  { onShowMedications?(pet) },
-                        onShowFood:         { onShowFood?(pet) },
-                        onShowEdit:         { onShowEdit?(pet) }
+                        onShowAchievements: { onShowAchievements?(pet) }
                     )
                     .frame(height: stackCardHeight)
                     .rotation3DEffect(.degrees(isFlipped ? 0 : -180), axis: (x: 0, y: 1, z: 0))

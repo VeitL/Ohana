@@ -111,7 +111,6 @@ struct InventoryView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("关闭") { dismiss() }
-                        .foregroundStyle(Color.goPrimary)
                 }
             }
         }

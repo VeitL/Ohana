@@ -14,10 +14,7 @@ struct PetCardBackSettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var showEditPet = false
-    @State private var showBasicInfo = false
     @State private var showSitterCard = false
-    @State private var showHealthDetail = false
-    @State private var showMedication = false
 
     @State private var showRainbowAlert = false
     @State private var rainbowDate = Date()
@@ -33,7 +30,6 @@ struct PetCardBackSettingsSheet: View {
         NavigationStack {
             List {
                 petInfoSection
-                medicalSection
                 rainbowSection
                 dangerSection
             }
@@ -45,10 +41,7 @@ struct PetCardBackSettingsSheet: View {
                 }
             }
             .sheet(isPresented: $showEditPet) { EditPetSheet(pet: pet) }
-            .sheet(isPresented: $showBasicInfo) { NavigationStack { PetBasicInfoDetailView(pet: pet) } }
             .sheet(isPresented: $showSitterCard) { SitterCardPreviewSheet(pet: pet) }
-            .sheet(isPresented: $showHealthDetail) { NavigationStack { PetHealthDetailView(pet: pet) } }
-            .sheet(isPresented: $showMedication) { NavigationStack { PetMedicationView(pet: pet) } }
             .alert("确认标记离世", isPresented: $showRainbowAlert) {
                 Button("确认", role: .destructive) {
                     RainbowBridgeService.markPassedAway(pet: pet, date: rainbowDate, context: modelContext)
@@ -83,15 +76,7 @@ struct PetCardBackSettingsSheet: View {
     private var petInfoSection: some View {
         Section("宠物信息") {
             Button { showEditPet = true } label: { Label("编辑资料", systemImage: "pencil.circle.fill") }
-            Button { showBasicInfo = true } label: { Label("基本信息", systemImage: "info.circle.fill") }
             Button { showSitterCard = true } label: { Label("寄养卡", systemImage: "person.crop.rectangle.fill") }
-        }
-    }
-
-    private var medicalSection: some View {
-        Section("医疗") {
-            Button { showHealthDetail = true } label: { Label("健康详情", systemImage: "heart.text.clipboard") }
-            Button { showMedication = true } label: { Label("用药管理", systemImage: "pills.fill") }
         }
     }
 

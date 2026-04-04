@@ -69,6 +69,18 @@ struct BountyBoardView: View {
     private var activeTasks: [BountyTask]    { tasks.filter { !$0.isCompleted } }
     private var completedTasks: [BountyTask] { tasks.filter { $0.isCompleted } }
 
+    // P2: 历史归档 — 7天前完成的任务
+    private var recentCompleted: [BountyTask] {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+        return completedTasks.filter { ($0.completedAt ?? $0.createdAt) >= cutoff }
+    }
+    private var archivedCompleted: [BountyTask] {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+        return completedTasks.filter { ($0.completedAt ?? $0.createdAt) < cutoff }
+    }
+
+    @State private var showArchive = false
+
     private var currentHuman: Human? {
         humans.first { $0.id.uuidString == activeHumanId }
     }
@@ -105,8 +117,33 @@ struct BountyBoardView: View {
                                 if completedTasks.isEmpty {
                                     emptyState(message: "还没有完成的任务")
                                 } else {
-                                    ForEach(completedTasks) { task in
+                                    // 近7天完成
+                                    ForEach(recentCompleted) { task in
                                         taskCard(task, isActive: false)
+                                    }
+                                    // 历史归档（7天前完成）
+                                    if !archivedCompleted.isEmpty {
+                                        Button {
+                                            withAnimation(.spring(response: 0.3)) { showArchive.toggle() }
+                                        } label: {
+                                            HStack(spacing: 8) {
+                                                Image(systemName: showArchive ? "chevron.down" : "chevron.right")
+                                                    .font(.system(size: 11, weight: .bold))
+                                                Text("历史归档 (\(archivedCompleted.count))")
+                                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                                Spacer()
+                                            }
+                                            .foregroundStyle(.white.opacity(0.35))
+                                            .padding(.vertical, 4)
+                                        }
+                                        .buttonStyle(.plain)
+                                        if showArchive {
+                                            ForEach(archivedCompleted) { task in
+                                                taskCard(task, isActive: false)
+                                                    .opacity(0.7)
+                                            }
+                                            .transition(.opacity.combined(with: .move(edge: .top)))
+                                        }
                                     }
                                 }
                             }

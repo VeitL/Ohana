@@ -2,7 +2,7 @@
 //  WalkTrackingCard.swift
 //  Ohana
 //
-//  Created by Guanchenulous on 01.03.26.
+//  遛狗追踪卡片：地图铺满卡片背景，控制面板以玻璃层叠加。
 //
 
 import SwiftUI
@@ -14,83 +14,48 @@ struct WalkTrackingCard: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Household.createdAt) private var households: [Household]
 
-    // 单一数据源
     private var mgr: PetWalkingManager { PetWalkingManager.shared }
+    private var locationMgr: LocationManager { LocationManager.shared }
 
     @State private var showFloatingPoop = false
     @State private var showWalkDetail: PetWalkLog? = nil
     @State private var showSummarySheet = false
     @State private var showAlwaysBanner = false
-    private var locationMgr: LocationManager { LocationManager.shared }
 
-    // 当前 pet 是否是正在遛的 pet（多宠物场景下隔离）
     private var isActivePet: Bool {
         mgr.currentPet?.id == pet.id || mgr.phase == .idle
     }
+    private var isWalking: Bool {
+        guard isActivePet else { return false }
+        switch mgr.phase {
+        case .running, .paused: return true
+        default: return false
+        }
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Always 权限升级横幅（仅 WhenInUse 时显示）
-            if showAlwaysBanner {
-                HStack(spacing: 8) {
-                    Image(systemName: "location.fill")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Color.goYellow)
-                    Text("开启「始终允许」定位，后台路线追踪更完整")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.primary.opacity(0.85))
-                    Spacer()
-                    Button {
-                        locationMgr.upgradeToAlways()
-                    } label: {
-                        Text("升级")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.goYellow)
-                            .padding(.horizontal, 10).padding(.vertical, 4)
-                            .background(Color.goYellow.opacity(0.15), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    Button {
-                        withAnimation { showAlwaysBanner = false }
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.primary.opacity(0.4))
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal, 14).padding(.vertical, 8)
-                .background(Color.goYellow.opacity(0.08))
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
+        ZStack(alignment: .bottom) {
+            // ── 背景层：地图或快照
+            mapBackground
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            HStack(spacing: 16) {
-                // 左列
-                VStack(alignment: .leading, spacing: 10) {
-                    headerRow
-                    timerArea
-                    buttonRow
+            // ── 控制层：半透明玻璃条
+            VStack(spacing: 0) {
+                if showAlwaysBanner {
+                    alwaysBanner
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                // 右列 — 地图小图
-                mapPreview
-                    .frame(width: 110, height: 130)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(.white.opacity(0.12), lineWidth: 1)
-                    }
+                controlPanel
             }
-            .padding(16)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
-        .goTranslucentCard(cornerRadius: 20)
-        .sheet(item: $showWalkDetail) { walk in
-            WalkDetailView(walk: walk, pet: pet)
-        }
-        .sheet(isPresented: $showSummarySheet) {
-            WalkSummarySheet(pet: pet)
-        }
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+        )
+        .sheet(item: $showWalkDetail) { walk in WalkDetailView(walk: walk, pet: pet) }
+        .sheet(isPresented: $showSummarySheet) { WalkSummarySheet(pet: pet) }
         .onChange(of: mgr.showSummary) { _, newVal in
             if newVal && mgr.currentPet?.id == pet.id {
                 showSummarySheet = true
@@ -98,165 +63,187 @@ struct WalkTrackingCard: View {
             }
         }
         .onAppear {
-            withAnimation {
-                showAlwaysBanner = locationMgr.authorizationStatus == .authorizedWhenInUse
-            }
+            withAnimation { showAlwaysBanner = locationMgr.authorizationStatus == .authorizedWhenInUse }
         }
         .onChange(of: locationMgr.authorizationStatus) { _, status in
-            withAnimation {
-                showAlwaysBanner = (status == .authorizedWhenInUse)
-            }
+            withAnimation { showAlwaysBanner = (status == .authorizedWhenInUse) }
         }
     }
-    
-    // MARK: - Header Row
-    private var headerRow: some View {
-        HStack(spacing: 8) {
-            // 宠物头像
+
+    // MARK: - Map Background
+
+    @ViewBuilder
+    private var mapBackground: some View {
+        if isWalking {
+            // 活跃遛狗中：实时位置地图
             ZStack {
-                Circle()
-                    .fill(pet.themeColor.color.opacity(0.3))
-                    .frame(width: 36, height: 36)
-                    .overlay(Circle().strokeBorder(.white.opacity(0.3), lineWidth: 1.5))
-                Text(pet.avatarEmoji)
-                    .font(.system(size: 18))
+                Color(hex: "1A1F2E")
+                // Live route overlay indicator
+                VStack(spacing: 4) {
+                    Image(systemName: "location.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(Color.goPrimary)
+                        .shadow(color: Color.goPrimary.opacity(0.6), radius: 8)
+                    Text(distanceText)
+                        .font(OhanaFont.footnote(.bold))
+                        .foregroundStyle(.white.opacity(0.7))
+                }
             }
-            
+        } else {
+            // 待出发：显示上次遛狗地图快照
+            let lastWalk = pet.walkLogs.sorted { $0.startDate > $1.startDate }.first
+            if let data = lastWalk?.mapSnapshotData, let ui = UIImage(data: data) {
+                Button {
+                    if let walk = lastWalk { showWalkDetail = walk }
+                } label: {
+                    Image(uiImage: ui)
+                        .resizable()
+                        .scaledToFill()
+                }
+                .buttonStyle(.plain)
+            } else {
+                // 无快照：渐变占位
+                LinearGradient(
+                    colors: [Color(hex: "1A2744"), Color(hex: "0D1526")],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                )
+                .overlay(
+                    VStack(spacing: 6) {
+                        Image(systemName: "map")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.white.opacity(0.2))
+                        Text("暂无路线记录")
+                            .font(OhanaFont.caption())
+                            .foregroundStyle(.white.opacity(0.2))
+                    }
+                )
+            }
+        }
+    }
+
+    private var distanceText: String {
+        let d = locationMgr.totalDistance
+        return d >= 1000
+            ? String(format: "%.1f km", d / 1000)
+            : String(format: "%.0f m", d)
+    }
+
+    // MARK: - Always Permission Banner
+
+    private var alwaysBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "location.fill")
+                .font(OhanaFont.caption2())
+                .foregroundStyle(Color.goYellow)
+            Text("开启「始终允许」定位，后台追踪更完整")
+                .font(OhanaFont.caption())
+                .foregroundStyle(.primary.opacity(0.8))
+            Spacer()
+            Button { locationMgr.upgradeToAlways() } label: {
+                Text("升级")
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(Color.goYellow)
+                    .padding(.horizontal, 10).padding(.vertical, 4)
+                    .background(Color.goYellow.opacity(0.15), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            Button { withAnimation { showAlwaysBanner = false } } label: {
+                Image(systemName: "xmark")
+                    .font(OhanaFont.caption2())
+                    .foregroundStyle(.primary.opacity(0.4))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+
+    // MARK: - Control Panel
+
+    private var controlPanel: some View {
+        HStack(spacing: 0) {
+            // Left: pet info + timer
             VStack(alignment: .leading, spacing: 2) {
-                Text(pet.name)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
-                statusBadge
+                HStack(spacing: 6) {
+                    Text(pet.avatarEmoji).font(.system(size: 18))
+                    Text(pet.name)
+                        .font(OhanaFont.footnote(.bold))
+                        .foregroundStyle(.primary)
+                    statusDot
+                }
+                timerText
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Right: action buttons
+            actionButtons
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
-    
-    // MARK: - Status Badge
-    private var statusBadge: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 6, height: 6)
-            Text(statusText)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-        }
+
+    private var statusDot: some View {
+        Circle()
+            .fill(statusColor)
+            .frame(width: 6, height: 6)
     }
-    
+
     private var statusColor: Color {
         guard isActivePet else { return .white.opacity(0.3) }
         switch mgr.phase {
-        case .idle: return .white.opacity(0.3)
-        case .running: return Color.goPrimary
-        case .paused: return Color.goYellow
+        case .idle:     return .white.opacity(0.3)
+        case .running:  return Color.goPrimary
+        case .paused:   return Color.goYellow
         case .finished: return Color.goTeal
         }
     }
-    
-    private var statusText: String {
-        guard isActivePet else { return "待出发" }
-        switch mgr.phase {
-        case .idle: return "待出发"
-        case .running: return "运动中"
-        case .paused: return "已暂停"
-        case .finished: return "已完成"
-        }
-    }
-    
-    // MARK: - Timer Area
-    private var timerArea: some View {
+
+    private var timerText: some View {
         let elapsed = isActivePet ? Int(mgr.elapsedTime) : 0
         let h = elapsed / 3600
         let m = (elapsed % 3600) / 60
         let s = elapsed % 60
-        return HStack(spacing: 2) {
-            Text(String(format: "%02d", h))
-                .font(.system(size: 28, weight: .heavy, design: .rounded))
+        return TimelineView(.periodic(from: .now, by: 1)) { _ in
+            Text(h > 0
+                 ? String(format: "%d:%02d:%02d", h, m, s)
+                 : String(format: "%02d:%02d", m, s))
+                .font(OhanaFont.metric(size: 22))
                 .foregroundStyle(.primary)
-                .contentTransition(.numericText())
-            Text(":")
-                .font(.system(size: 28, weight: .heavy, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.4))
-            Text(String(format: "%02d", m))
-                .font(.system(size: 28, weight: .heavy, design: .rounded))
-                .foregroundStyle(.primary)
-                .contentTransition(.numericText())
-            Text(":")
-                .font(.system(size: 28, weight: .heavy, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.4))
-            Text(String(format: "%02d", s))
-                .font(.system(size: 28, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.goPrimary)
                 .contentTransition(.numericText())
         }
-        .animation(.default, value: elapsed)
     }
-    
-    // MARK: - Button Row
-    private var buttonRow: some View {
+
+    // MARK: - Action Buttons
+
+    @ViewBuilder
+    private var actionButtons: some View {
         let phase = isActivePet ? mgr.phase : .idle
-        return HStack(spacing: 8) {
+        HStack(spacing: 8) {
             switch phase {
             case .idle:
                 Button {
                     mgr.start(pet: pet)
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "figure.walk")
-                            .font(.system(size: 12, weight: .bold))
-                        Text("出发")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                    }
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
-                    .background(Color.goPrimary, in: Capsule())
+                    Label("出发", systemImage: "figure.walk")
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(Color.arkInk)
+                        .padding(.horizontal, 16).padding(.vertical, 8)
+                        .background(Color.goPrimary, in: Capsule())
                 }
+                .buttonStyle(.plain)
 
             case .running:
-                Button {
-                    mgr.pause()
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                } label: {
-                    Image(systemName: "pause.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.black)
-                        .frame(width: 32, height: 32)
-                        .background(Color.goYellow, in: Circle())
-                }
-                Button {
+                circleButton(icon: "pause.fill", color: Color.goYellow) { mgr.pause() }
+                circleButton(icon: "stop.fill", color: Color.goRed) {
                     mgr.stop(modelContext: modelContext, household: households.first)
-                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                } label: {
-                    Image(systemName: "stop.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.primary)
-                        .frame(width: 32, height: 32)
-                        .background(Color.goRed, in: Circle())
                 }
                 poopButton
 
             case .paused:
-                Button {
-                    mgr.resume()
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                } label: {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.black)
-                        .frame(width: 32, height: 32)
-                        .background(Color.goTeal, in: Circle())
-                }
-                Button {
+                circleButton(icon: "play.fill", color: Color.goTeal) { mgr.resume() }
+                circleButton(icon: "stop.fill", color: Color.goRed) {
                     mgr.stop(modelContext: modelContext, household: households.first)
-                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                } label: {
-                    Image(systemName: "stop.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.primary)
-                        .frame(width: 32, height: 32)
-                        .background(Color.goRed, in: Circle())
                 }
                 poopButton
 
@@ -265,105 +252,52 @@ struct WalkTrackingCard: View {
                     mgr.reset()
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 12, weight: .bold))
-                        Text("再来一次")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                    }
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
-                    .background(Color.goPrimary, in: Capsule())
+                    Label("再来", systemImage: "arrow.clockwise")
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(Color.arkInk)
+                        .padding(.horizontal, 16).padding(.vertical, 8)
+                        .background(Color.goPrimary, in: Capsule())
                 }
+                .buttonStyle(.plain)
             }
         }
     }
-    
-    // MARK: - Poop Button
+
+    private func circleButton(icon: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button {
+            action()
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        } label: {
+            Image(systemName: icon)
+                .font(OhanaFont.caption(.bold))
+                .foregroundStyle(.black)
+                .frame(width: 34, height: 34)
+                .background(color, in: Circle())
+        }
+        .buttonStyle(.plain)
+    }
+
     private var poopButton: some View {
         ZStack(alignment: .topTrailing) {
             Button {
                 mgr.addPoop()
                 showFloatingPoop = true
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                    showFloatingPoop = false
-                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { showFloatingPoop = false }
             } label: {
                 Text("💩")
-                    .font(.system(size: 16))
-                    .frame(width: 32, height: 32)
-                    .background(.regularMaterial, in: Circle())
+                    .font(.system(size: 15))
+                    .frame(width: 34, height: 34)
+                    .background(.ultraThinMaterial, in: Circle())
             }
-            
             if mgr.poopCount > 0 {
                 Text("\(mgr.poopCount)")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.primary)
-                    .frame(width: 16, height: 16)
-                    .background(.orange, in: Circle())
-                    .offset(x: 4, y: -4)
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 15, height: 15)
+                    .background(Color.goOrange, in: Circle())
+                    .offset(x: 3, y: -3)
             }
         }
     }
-    
-    // MARK: - Map Preview
-    @ViewBuilder
-    private var mapPreview: some View {
-        let phase = isActivePet ? mgr.phase : .idle
-        if phase == .idle {
-            let lastWalk = pet.walkLogs.sorted(by: { $0.startDate > $1.startDate }).first
-            Button {
-                if let walk = lastWalk { showWalkDetail = walk }
-            } label: {
-                ZStack {
-                    if let data = lastWalk?.mapSnapshotData, let uiImage = UIImage(data: data) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFill()
-                    } else {
-                        Color.white.opacity(0.04)
-                        VStack(spacing: 6) {
-                            Image(systemName: "map")
-                                .font(.system(size: 26))
-                                .foregroundStyle(.primary.opacity(0.25))
-                            Text("无记录")
-                                .font(.system(size: 10, weight: .medium, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.2))
-                        }
-                    }
-                    if lastWalk != nil {
-                        VStack {
-                            Spacer()
-                            HStack {
-                                Spacer()
-                                Image(systemName: "arrow.up.forward.circle.fill")
-                                    .font(.system(size: 18))
-                                    .foregroundStyle(Color.goPrimary)
-                                    .shadow(radius: 4)
-                                    .padding(6)
-                            }
-                        }
-                    }
-                }
-            }
-            .buttonStyle(.plain)
-        } else {
-            ZStack {
-                Color.goPrimary.opacity(0.07)
-                VStack(spacing: 4) {
-                    Image(systemName: "location.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(Color.goPrimary)
-                    Text(LocationManager.shared.totalDistance >= 1000
-                         ? String(format: "%.1f km", LocationManager.shared.totalDistance / 1000)
-                         : String(format: "%.0f m", LocationManager.shared.totalDistance))
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary)
-                }
-            }
-        }
-    }
-    
 }

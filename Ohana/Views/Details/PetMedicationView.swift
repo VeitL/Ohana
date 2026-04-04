@@ -14,6 +14,7 @@ struct PetMedicationView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showingAddSheet = false
     @State private var selectedMedication: PetMedication?
+    @State private var doseRefreshToken = UUID() // 触发今日进度刷新
 
     private var activeMeds: [PetMedication] {
         pet.medications.filter { $0.isActiveToday }.sorted { $0.createdAt > $1.createdAt }
@@ -54,11 +55,7 @@ struct PetMedicationView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
+                    Button("关闭") { dismiss() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -119,50 +116,99 @@ struct PetMedicationView: View {
 
     // MARK: - Med Card
     private func medCard(_ med: PetMedication) -> some View {
-        Button {
+        let dosesPerDay = med.frequency.dosesPerDay
+        let dosesTaken = MedicationReminderService.dosesTakenToday(for: med.id)
+        let _ = doseRefreshToken // observe refresh token
+
+        return Button {
             selectedMedication = med
         } label: {
-            HStack(spacing: 14) {
-                Circle()
-                    .fill(Color(hex: med.colorHex))
-                    .frame(width: 10, height: 10)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 14) {
+                    Circle()
+                        .fill(Color(hex: med.colorHex))
+                        .frame(width: 10, height: 10)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text(med.name.isEmpty ? "未命名药物" : med.name)
-                            .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
-                        Text(med.frequency.emoji)
-                            .font(.system(size: 13))
-                    }
-                    HStack(spacing: 8) {
-                        if !med.dosage.isEmpty {
-                            Text(med.dosage)
-                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
+                            Text(med.name.isEmpty ? "未命名药物" : med.name)
+                                .font(.system(size: 15, weight: .black, design: .rounded))
+                                .foregroundStyle(.primary)
+                            Text(med.frequency.emoji)
+                                .font(.system(size: 13))
+                        }
+                        HStack(spacing: 8) {
+                            if !med.dosage.isEmpty {
+                                Text(med.dosage)
+                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text(med.frequency.rawValue)
+                                .font(.system(size: 12, weight: .medium, design: .rounded))
                                 .foregroundStyle(.secondary)
                         }
-                        Text(med.frequency.rawValue)
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
                     }
+
+                    Spacer()
+
+                    Text(med.statusLabel)
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(med.isActiveToday ? .black : .secondary)
+                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .background(med.isActiveToday ? Color.goPrimary : Color.primary.opacity(0.08), in: Capsule())
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.tertiary)
                 }
 
-                Spacer()
+                // 今日进度条（仅当 dosesPerDay > 0 且药物活跃）
+                if med.isActiveToday && dosesPerDay > 0 {
+                    HStack(spacing: 8) {
+                        // 进度条
+                        GeometryReader { g in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(Color.primary.opacity(0.1))
+                                    .frame(height: 5)
+                                Capsule()
+                                    .fill(dosesTaken >= dosesPerDay ? Color.goTeal : Color(hex: med.colorHex))
+                                    .frame(width: max(0, g.size.width * CGFloat(min(dosesTaken, dosesPerDay)) / CGFloat(dosesPerDay)), height: 5)
+                            }
+                        }
+                        .frame(height: 5)
 
-                Text(med.statusLabel)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(med.isActiveToday ? .black : .secondary)
-                    .padding(.horizontal, 10).padding(.vertical, 4)
-                    .background(med.isActiveToday ? Color.goPrimary : Color.primary.opacity(0.08), in: Capsule())
+                        Text(dosesTaken >= dosesPerDay ? "✓ 今日完成" : "今日 \(dosesTaken)/\(dosesPerDay) 次")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundStyle(dosesTaken >= dosesPerDay ? Color.goTeal : Color.primary.opacity(0.5))
+                            .fixedSize()
 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.tertiary)
+                        // 快速记录按钮
+                        if dosesTaken < dosesPerDay {
+                            Button {
+                                MedicationReminderService.recordDose(for: med.id)
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                doseRefreshToken = UUID()
+                            } label: {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(Color(hex: med.colorHex))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.leading, 24)
+                }
             }
             .padding(14)
             .goTranslucentCard(cornerRadius: 16)
         }
         .buttonStyle(.plain)
+        .onAppear {
+            // 首次出现时调度通知
+            if med.isActiveToday {
+                MedicationReminderService.shared.scheduleMedicationReminders(for: pet)
+            }
+        }
         .contextMenu {
             Button(role: .destructive) {
                 modelContext.delete(med)

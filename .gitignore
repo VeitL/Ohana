@@ -21,6 +21,7 @@ xcuserdata/
 
 # Tooling / local
 *.xcresult
+.claude/
 
 # Accidental duplicate git metadata (do not track)
 .git 2/

@@ -15,6 +15,10 @@ struct WalkSummarySheet: View {
     @State private var selectedWalk: PetWalkLog? = nil
     @State private var showingGoalSetter = false
     @State private var goalDraft: Double = 0
+    // P1: 本次巡岛心情备注
+    @State private var draftMoodRating: Int = 0
+    @State private var draftNotes: String = ""
+    @State private var moodSaved = false
 
     private var sortedWalks: [PetWalkLog] {
         pet.walkLogs.sorted(by: { $0.startDate > $1.startDate })
@@ -58,15 +62,20 @@ struct WalkSummarySheet: View {
                 
                 ScrollView {
                     VStack(spacing: 20) {
+                        // 本次心情备注（仅最近一次步行完成后显示）
+                        if let latest = sortedWalks.first, isFreshWalk(latest), !moodSaved {
+                            walkMoodCard(walk: latest)
+                        }
+
                         // 本周目标卡
                         weeklyGoalCard
 
                         // 总览卡
                         summaryCard
-                        
+
                         // 记录列表
                         walkListSection
-                        
+
                         Spacer(minLength: 40)
                     }
                     .padding(.horizontal, 16)
@@ -77,16 +86,74 @@ struct WalkSummarySheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.secondary)
-                    }
+                    Button("关闭") { dismiss() }
                 }
             }
         }
     }
     
+    // MARK: - Fresh Walk Helpers
+
+    private func isFreshWalk(_ walk: PetWalkLog) -> Bool {
+        Date().timeIntervalSince(walk.startDate) < 600 // 10 分钟内完成的步行
+    }
+
+    private func walkMoodCard(walk: PetWalkLog) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("🐾 本次巡岛心情")
+                .font(.system(size: 14, weight: .black, design: .rounded))
+                .foregroundStyle(.primary)
+
+            // 星级评分
+            HStack(spacing: 10) {
+                ForEach(1...5, id: \.self) { star in
+                    Button {
+                        withAnimation(.spring(response: 0.2)) { draftMoodRating = star }
+                    } label: {
+                        Image(systemName: star <= draftMoodRating ? "star.fill" : "star")
+                            .font(.system(size: 22))
+                            .foregroundStyle(star <= draftMoodRating ? Color.goYellow : Color.primary.opacity(0.25))
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer()
+                if draftMoodRating > 0 {
+                    let labels = ["", "一般", "还行", "不错", "很好", "超棒！"]
+                    Text(labels[draftMoodRating])
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.goYellow)
+                }
+            }
+
+            // 备注输入
+            TextField("记录今天发生的趣事... (可选)", text: $draftNotes, axis: .vertical)
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .lineLimit(1...3)
+                .padding(10)
+                .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            // 保存按钮
+            Button {
+                walk.moodRating = draftMoodRating
+                walk.behaviorNotes = draftNotes.isEmpty ? nil : draftNotes
+                modelContext.safeSave()
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                withAnimation { moodSaved = true }
+            } label: {
+                Text("保存")
+                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.arkInk)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(draftMoodRating == 0 && draftNotes.isEmpty)
+        }
+        .padding(16)
+        .goTranslucentCard(cornerRadius: 20)
+    }
+
     // MARK: - Weekly Goal Card
     private var weeklyGoalCard: some View {
         VStack(spacing: 16) {
@@ -328,10 +395,26 @@ struct WalkSummarySheet: View {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.primary.opacity(0.5))
                 }
+                // 心情 + 备注
+                if walk.moodRating > 0 || walk.behaviorNotes != nil {
+                    HStack(spacing: 4) {
+                        if walk.moodRating > 0 {
+                            Text(String(repeating: "★", count: walk.moodRating))
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(Color.goYellow)
+                        }
+                        if let notes = walk.behaviorNotes, !notes.isEmpty {
+                            Text(notes)
+                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                                .foregroundStyle(.primary.opacity(0.4))
+                                .lineLimit(1)
+                        }
+                    }
+                }
             }
-            
+
             Spacer()
-            
+
             Text(walk.startDate, format: .dateTime.hour().minute())
                 .font(.system(size: 12, weight: .medium, design: .rounded))
                 .foregroundStyle(.primary.opacity(0.4))

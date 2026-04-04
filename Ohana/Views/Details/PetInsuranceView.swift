@@ -43,10 +43,7 @@ struct PetInsuranceView: View {
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
-                            Button { dismiss() } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .symbolRenderingMode(.hierarchical).foregroundStyle(.secondary)
-                            }
+                            Button("关闭") { dismiss() }
                         }
                         ToolbarItem(placement: .topBarTrailing) {
                             Button { showingAdd = true } label: {

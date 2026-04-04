@@ -330,7 +330,7 @@ struct PlantGardenCard: View {
 struct HomeSectionManageSheet: View {
     @Environment(\.dismiss) private var dismiss
 
-    @AppStorage("home_section_order") private var sectionOrderRaw: String = "todayActions,memoryDrop,islandStats"
+    @AppStorage("home_section_order") private var sectionOrderRaw: String = "quickActions,batchCheckIn,memoryDrop,islandStats"
     @AppStorage("home_section_hidden") private var hiddenRaw: String = ""
 
     @State private var sections: [HomeSectionEntry] = []
@@ -422,17 +422,23 @@ struct HomeSectionManageSheet: View {
 
     private func loadState() {
         var order = sectionOrderRaw.split(separator: ",").map(String.init)
-        let legacyIds = ["quickAccess", "batchCheckIn", "todayTasks"]
-        if order.contains(where: { legacyIds.contains($0) }) && !order.contains("todayActions") {
-            order.removeAll { legacyIds.contains($0) }
-            order.insert("todayActions", at: 0)
+        // Migrate legacy IDs → new split IDs
+        let legacyGroup = ["quickAccess", "todayTasks", "todayActions"]
+        if order.contains(where: { legacyGroup.contains($0) }) {
+            let insertIdx = order.firstIndex(where: { legacyGroup.contains($0) }) ?? 0
+            order.removeAll { legacyGroup.contains($0) }
+            if !order.contains("batchCheckIn") { order.insert("batchCheckIn", at: min(insertIdx + 1, order.count)) }
+            if !order.contains("quickActions") { order.insert("quickActions",  at: min(insertIdx,     order.count)) }
             sectionOrderRaw = order.joined(separator: ",")
         }
+        // Also drop old batchCheckIn if it was already there separately (dedup)
+        var seen = Set<String>()
+        order = order.filter { seen.insert($0).inserted }
         let hidden = Set(hiddenRaw.split(separator: ",").map(String.init))
         let allSections = HomeSectionEntry.defaults
         var sorted: [HomeSectionEntry] = order.compactMap { id in allSections.first(where: { $0.id == id }) }
         for s in allSections where !sorted.contains(where: { $0.id == s.id }) { sorted.append(s) }
-        sections = sorted.map { var s = $0; s.isVisible = !hidden.contains(s.id); return s }
+        sections = sorted.map { var s = $0; s.isVisible = !hidden.contains(s.id) && !hidden.contains("todayActions"); return s }
     }
 
     private func saveState() {
@@ -451,8 +457,9 @@ struct HomeSectionEntry: Identifiable {
     var isVisible: Bool = true
 
     static let defaults: [HomeSectionEntry] = [
-        HomeSectionEntry(id: "todayActions",  title: "今日待办",   subtitle: "快捷操作 + 一键打卡 + 横滑甲板含打卡连击", icon: "bolt.fill",             colorHex: "FF8C42"),
-        HomeSectionEntry(id: "memoryDrop",    title: "记忆碎片",   subtitle: "温馨记忆情感分割带",             icon: "heart.text.square.fill", colorHex: "FF6B9D"),
+        HomeSectionEntry(id: "quickActions",  title: "快捷操作",   subtitle: "按宠物物种自定义的快捷打卡卡片网格",     icon: "bolt.fill",              colorHex: "FF8C42"),
+        HomeSectionEntry(id: "batchCheckIn",  title: "一键打卡",   subtitle: "多宠物同时喂食/喂水，一键全员打卡",     icon: "checkmark.circle.fill",  colorHex: "34C759"),
+        HomeSectionEntry(id: "memoryDrop",    title: "记忆碎片",   subtitle: "随机浮现历史记录中的温馨时刻（需有记录数据）", icon: "heart.text.square.fill", colorHex: "FF6B9D"),
         HomeSectionEntry(id: "islandStats",   title: "岛屿统计",   subtitle: "体重/步数/花费/粮仓",           icon: "chart.bar.fill",         colorHex: "00D4AA"),
     ]
 }

@@ -49,7 +49,7 @@ struct OverviewView: View {
     @State private var showingAllFoodManagement = false
     @AppStorage("quickActionItems_v2") private var quickActionItemsJSON: String = ""
     // 首页 section 可见性
-    @AppStorage("home_section_order") private var sectionOrderRaw: String = "todayActions,memoryDrop,islandStats"
+    @AppStorage("home_section_order") private var sectionOrderRaw: String = "quickActions,batchCheckIn,memoryDrop,islandStats"
     @AppStorage("home_section_hidden") private var hiddenSectionsRaw: String = ""
     @AppStorage("appLanguage") private var appLanguage = "zh"
     private var l: L10n { L10n(appLanguage) }
@@ -114,16 +114,23 @@ struct OverviewView: View {
     @State private var memoryDismissed = false
     @State private var memoryDragOffset: CGFloat = 0
     // 卡片背面功能弹窗
+    @State private var cardBackSettingsPet: Pet? = nil
+    // 健康管理
+    @State private var cardBackHealthPet: Pet? = nil
+    @State private var cardBackMedicationsPet: Pet? = nil
+    @State private var cardBackWeightPet: Pet? = nil
+    // 日常生活
+    @State private var cardBackFoodPet: Pet? = nil
+    @State private var cardBackHygienePet: Pet? = nil
+    @State private var cardBackWalksPet: Pet? = nil
+    @State private var cardBackPottyPet: Pet? = nil
+    @State private var cardBackExpensesPet: Pet? = nil
+    // 档案证件
+    @State private var cardBackBasicInfoPet: Pet? = nil
     @State private var cardBackDocumentsPet: Pet? = nil
+    // 档案与记忆
     @State private var cardBackMomentsPet: Pet? = nil
     @State private var cardBackAchievementsPet: Pet? = nil
-    @State private var cardBackHealthPet: Pet? = nil
-    @State private var cardBackSettingsPet: Pet? = nil
-    // Feature hub new callbacks
-    @State private var cardBackCalendarPet: Pet? = nil
-    @State private var cardBackMedicationsPet: Pet? = nil
-    @State private var cardBackFoodPet: Pet? = nil
-    @State private var cardBackEditPet: Pet? = nil
     // 全局椰子日志显示
     @State private var showingCoconutLog = false
     // 打卡连击详情（顶栏 / 横滑甲板共用）
@@ -329,6 +336,17 @@ struct OverviewView: View {
             }
             NotificationManager.shared.compensate(reminders: Array(pendingReminders))
             modelContext.safeSave()
+            // 每日首次打开自动打卡（oasis_checkedIn_dates）
+            let checkInFmt: DateFormatter = { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f }()
+            let checkInKey = "oasis_checkedIn_dates"
+            let checkInToday = checkInFmt.string(from: Date())
+            var checkedInSet = Set(UserDefaults.standard.stringArray(forKey: checkInKey) ?? [])
+            if !checkedInSet.contains(checkInToday) {
+                checkedInSet.insert(checkInToday)
+                UserDefaults.standard.set(Array(checkedInSet), forKey: checkInKey)
+                QuestManager.shared.addCoconuts(1, emoji: "📅", title: "每日打卡奖励")
+                refreshHeaderStreak()
+            }
             // U5: 每日首次打开椰子收集
             let dailyKey = "daily_coconut_shown"
             let today = Calendar.current.startOfDay(for: Date())
@@ -526,15 +544,19 @@ struct OverviewView: View {
                             if case .pet(let p) = item { activeCritterIdStr = p.id.uuidString }
                             else { activeCritterIdStr = "" }
                         },
-                        onShowDocuments: { cardBackDocumentsPet = $0 },
-                        onShowMoments: { cardBackMomentsPet = $0 },
-                        onShowAchievements: { cardBackAchievementsPet = $0 },
-                        onShowHealth: { cardBackHealthPet = $0 },
                         onShowBackSettings: { cardBackSettingsPet = $0 },
-                        onShowCalendar: { cardBackCalendarPet = $0 },
-                        onShowMedications: { cardBackMedicationsPet = $0 },
-                        onShowFood: { cardBackFoodPet = $0 },
-                        onShowEdit: { cardBackEditPet = $0 }
+                        onShowHealth:       { cardBackHealthPet = $0 },
+                        onShowMedications:  { cardBackMedicationsPet = $0 },
+                        onShowWeight:       { cardBackWeightPet = $0 },
+                        onShowFood:         { cardBackFoodPet = $0 },
+                        onShowHygiene:      { cardBackHygienePet = $0 },
+                        onShowWalks:        { cardBackWalksPet = $0 },
+                        onShowPotty:        { cardBackPottyPet = $0 },
+                        onShowExpenses:     { cardBackExpensesPet = $0 },
+                        onShowBasicInfo:    { cardBackBasicInfoPet = $0 },
+                        onShowDocuments:    { cardBackDocumentsPet = $0 },
+                        onShowMoments:      { cardBackMomentsPet = $0 },
+                        onShowAchievements: { cardBackAchievementsPet = $0 }
                     )
                     .onAppear {
                         if activeCritterIdStr.isEmpty {
@@ -551,10 +573,13 @@ struct OverviewView: View {
                 // ── 层4+：按 orderedSections 驱动渲染（严格绑定排序与显隐）
                 ForEach(orderedSections, id: \.self) { sectionId in
                     switch sectionId {
-                    case "todayActions", "quickAccess", "batchCheckIn", "todayTasks":
-                        if sectionId == (orderedSections.first(where: { ["todayActions", "quickAccess", "batchCheckIn", "todayTasks"].contains($0) }) ?? "") &&
-                           !hiddenSections.contains("todayActions") {
-                            todayActionsSection
+                    case "quickActions", "todayActions", "quickAccess", "todayTasks":
+                        if !hiddenSections.contains("quickActions") && !hiddenSections.contains("todayActions") {
+                            quickActionsOnlySection
+                        }
+                    case "batchCheckIn":
+                        if !hiddenSections.contains("batchCheckIn") {
+                            batchCheckInOnlySection
                         }
                     case "memoryDrop":
                         if !memoryDismissed, let memory = MemoryEngine.pickFragment(pets: pets, plants: plants) {
@@ -587,6 +612,8 @@ struct OverviewView: View {
                                     insertion: .opacity,
                                     removal: .move(edge: .trailing).combined(with: .opacity)
                                 ))
+                        } else if !memoryDismissed && !pets.isEmpty {
+                            memoryDropPlaceholder
                         }
                     case "islandStats":
                         if (!pets.isEmpty || !plants.isEmpty) && !hiddenSections.contains("islandStats") {
@@ -605,13 +632,39 @@ struct OverviewView: View {
 
     private var orderedSections: [String] {
         let order = sectionOrder
-        let allIds = ["todayActions", "memoryDrop", "islandStats"]
-        let legacyIds = ["quickAccess", "batchCheckIn", "todayTasks"]
+        let allIds = ["quickActions", "batchCheckIn", "memoryDrop", "islandStats"]
+        let legacyIds = ["todayActions", "quickAccess", "todayTasks"]
         var result = order.filter { allIds.contains($0) || legacyIds.contains($0) }
         for id in allIds where !result.contains(id) { result.append(id) }
-        return result
+        // Dedup (legacy todayActions might coexist with new quickActions)
+        var seen = Set<String>()
+        return result.filter { seen.insert($0).inserted }
     }
     
+    // MARK: - Memory Drop Placeholder
+    private var memoryDropPlaceholder: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Color.goPrimary.opacity(0.8))
+                .frame(width: 44, height: 44)
+                .background(Color.goPrimary.opacity(0.1), in: Circle())
+            VStack(alignment: .leading, spacing: 3) {
+                Text("记忆碎片")
+                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                Text("继续记录喂食、散步或体重数据\n美好时刻会在这里浮现 ✨")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.leading)
+            }
+            Spacer()
+        }
+        .padding(14)
+        .goTranslucentCard(cornerRadius: 16)
+        .padding(.horizontal, 16)
+    }
+
     // MARK: - Header Streak
     private func refreshHeaderStreak() {
         let calendar = Calendar.current
@@ -677,6 +730,9 @@ struct OverviewView: View {
                         Menu {
                             Button { showingAddEntity = true } label: {
                                 Label("添加成员", systemImage: "person.badge.plus")
+                            }
+                            Button { showingManageSheet = true } label: {
+                                Label("管理主页模块", systemImage: "slider.horizontal.3")
                             }
                             Button { showingSettings = true } label: {
                                 Label("设置", systemImage: "gearshape")
@@ -1136,6 +1192,37 @@ struct OverviewView: View {
         }
     }
 
+    // MARK: - Batch Check-In Enable Prompt
+    private var batchCheckInEnablePrompt: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "rectangle.grid.2x2")
+                .font(OhanaFont.body(.semibold))
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("一键全家打卡")
+                    .font(OhanaFont.footnote(.bold))
+                    .foregroundStyle(.primary)
+                Text("多宠物同步打卡，省时省力")
+                    .font(OhanaFont.caption2())
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button {
+                withAnimation(.spring(response: 0.3)) { showBatchCheckIn = true }
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            } label: {
+                Text("开启")
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(Color.arkInk)
+                    .padding(.horizontal, 14).padding(.vertical, 7)
+                    .background(Color.goPrimary, in: Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .goTranslucentCard(cornerRadius: 14)
+    }
+
     // MARK: - Batch Check-In Grid（与快捷操作一致的网格布局）
     @State private var batchPressedId: String? = nil
 
@@ -1317,11 +1404,10 @@ struct OverviewView: View {
         return pets.first(where: { !$0.hasPassedAway })
     }
 
-    // MARK: - Today Actions (unified section)
+    // MARK: - Quick Actions section (deck + grid + walk card)
     @ViewBuilder
-    private var todayActionsSection: some View {
+    private var quickActionsOnlySection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // 横滑高亮甲板：宠物状态 + 委托 + 岛屿等级（替代独立 PetWellnessCard + EnergyBar + QuestCarousel）
             HomeHighlightDeck(
                 activePet: deckActivePet,
                 pets: pets,
@@ -1338,14 +1424,30 @@ struct OverviewView: View {
             )
             .padding(.top, 12)
 
-            // Quick actions grid
             quickActionsSection
                 .animation(.spring(response: 0.38, dampingFraction: 0.78),
                            value: activeQuickActionItems.map(\.id))
 
-            // Batch check-in (collapsed into single row)
-            if pets.filter({ !$0.hasPassedAway }).count > 1 {
+            // Walk tracking card: shown for dog pets
+            if let walkPet = deckActivePet,
+               walkPet.species.lowercased().contains("dog") || walkPet.species.contains("狗") {
+                WalkTrackingCard(pet: walkPet)
+                    .frame(height: 160)
+                    .padding(.horizontal, 16)
+            }
+        }
+    }
+
+    // MARK: - Batch Check-in section
+    @ViewBuilder
+    private var batchCheckInOnlySection: some View {
+        let livePetCount = pets.filter { !$0.hasPassedAway }.count
+        if livePetCount > 1 {
+            if showBatchCheckIn {
                 batchCheckInBar
+                    .padding(.horizontal, 16)
+            } else {
+                batchCheckInEnablePrompt
                     .padding(.horizontal, 16)
             }
         }
@@ -1669,7 +1771,48 @@ struct OverviewView: View {
                 .presentationDragIndicator(.visible)
                 .presentationContentInteraction(.scrolls)
             }
-            // 卡片背面 — 功能入口 sheets
+            // 卡片背面 — 功能入口 sheets（独立 background context 避免编译器类型检查超时）
+            .background(cardBackSheets)
+    }
+
+
+    // MARK: - 卡片背面功能入口 sheets（独立 computed property，打破类型检查链）
+    @ViewBuilder private var cardBackSheets: some View {
+        Color.clear
+            // 设置
+            .sheet(item: $cardBackSettingsPet) { pet in
+                PetCardBackSettingsSheet(pet: pet)
+            }
+            // 健康管理
+            .sheet(item: $cardBackHealthPet) { pet in
+                NavigationStack { PetHealthDetailView(pet: pet, isModal: true) }
+            }
+            .sheet(item: $cardBackMedicationsPet) { pet in
+                NavigationStack { PetMedicationView(pet: pet) }
+            }
+            .sheet(item: $cardBackWeightPet) { pet in
+                NavigationStack { WeightHistoryView(pet: pet) }
+            }
+            // 日常生活
+            .sheet(item: $cardBackFoodPet) { pet in
+                PetFoodManagementView(pet: pet)
+            }
+            .sheet(item: $cardBackHygienePet) { pet in
+                NavigationStack { PetHygieneDetailView(pet: pet) }
+            }
+            .sheet(item: $cardBackWalksPet) { pet in
+                WalkSummarySheet(pet: pet)
+            }
+            .sheet(item: $cardBackPottyPet) { pet in
+                NavigationStack { PottyOverviewView(pet: pet) }
+            }
+            .sheet(item: $cardBackExpensesPet) { pet in
+                NavigationStack { ExpenseHistoryView(pet: pet) }
+            }
+            // 档案与记忆
+            .sheet(item: $cardBackBasicInfoPet) { pet in
+                NavigationStack { PetBasicInfoDetailView(pet: pet) }
+            }
             .sheet(item: $cardBackDocumentsPet) { pet in
                 NavigationStack { DocumentsListView(pet: pet) }
             }
@@ -1679,26 +1822,7 @@ struct OverviewView: View {
             .sheet(item: $cardBackAchievementsPet) { pet in
                 AchievementWallView(pet: pet)
             }
-            .sheet(item: $cardBackHealthPet) { pet in
-                NavigationStack { PetHealthDetailView(pet: pet, isModal: true) }
-            }
-            .sheet(item: $cardBackSettingsPet) { pet in
-                PetCardBackSettingsSheet(pet: pet)
-            }
-            .sheet(item: $cardBackCalendarPet) { pet in
-                NavigationStack { CalendarView(preselectedPetId: pet.id.uuidString) }
-            }
-            .sheet(item: $cardBackMedicationsPet) { pet in
-                NavigationStack { PetMedicationView(pet: pet) }
-            }
-            .sheet(item: $cardBackFoodPet) { pet in
-                NavigationStack { PetFoodManagementView(pet: pet) }
-            }
-            .sheet(item: $cardBackEditPet) { pet in
-                EditPetSheet(pet: pet)
-            }
     }
-
 
     // Task2: 根据顶牌过滤 Quick Access items（顶牌是宠物时，过滤出该宠物 + 无宠物 items；顶牌是人时显示全部）
     private var activeQuickActionItems: [QuickActionItem] {
@@ -2105,7 +2229,45 @@ struct OverviewView: View {
         return items
     }
 
-    private var defaultQuickActionItems: [QuickActionItem] { [] }
+    private var defaultQuickActionItems: [QuickActionItem] {
+        guard let pet = pets.first(where: { !$0.hasPassedAway }) else { return [] }
+        let isDog = pet.species.contains("狗") || pet.species.lowercased().contains("dog")
+        let isCat = pet.species.contains("猫") || pet.species.lowercased().contains("cat")
+        let isFish = pet.species.contains("鱼") || pet.species.lowercased().contains("fish")
+        var items: [QuickActionItem] = []
+        items.append(QuickActionItem(label: "喂食", icon: "fork.knife", colorHex: "FFDD44",
+                                     petId: pet.id, actionType: "feed", entityId: pet.id, entityKind: .pet))
+        if isFish {
+            items.append(QuickActionItem(label: "换水", icon: "drop.circle.fill", colorHex: "4ECDC4",
+                                         petId: pet.id, actionType: "waterChange", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "清滤材", icon: "wrench.and.screwdriver.fill", colorHex: "A78BFA",
+                                         petId: pet.id, actionType: "filterClean", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "体重", icon: "scalemass.fill", colorHex: "80FFEA",
+                                         petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet))
+        } else if isDog {
+            items.append(QuickActionItem(label: "喂水", icon: "drop.fill", colorHex: "00D4AA",
+                                         petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "遛狗", icon: "figure.walk", colorHex: "C8FF00",
+                                         petId: pet.id, actionType: "walk", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "便便", icon: "allergens", colorHex: "FF8C42",
+                                         petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
+        } else if isCat {
+            items.append(QuickActionItem(label: "喂水", icon: "drop.fill", colorHex: "00D4AA",
+                                         petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "铲屎", icon: "trash.fill", colorHex: "5B6AFF",
+                                         petId: pet.id, actionType: "litter", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "便便", icon: "allergens", colorHex: "FF8C42",
+                                         petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
+        } else {
+            items.append(QuickActionItem(label: "喂水", icon: "drop.fill", colorHex: "00D4AA",
+                                         petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "护理", icon: "scissors", colorHex: "FF8C42",
+                                         petId: pet.id, actionType: "groom", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "体重", icon: "scalemass.fill", colorHex: "80FFEA",
+                                         petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet))
+        }
+        return Array(items.prefix(4))
+    }
 
     private func addQuickAction(_ item: QuickActionItem) {
         var current = savedQuickActionItems

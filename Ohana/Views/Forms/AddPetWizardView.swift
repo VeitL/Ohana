@@ -313,6 +313,7 @@ struct AddPetWizardView: View {
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.spring(response: 0.4, dampingFraction: 0.82), value: wizardPageIndex)
                 .padding(.horizontal, 14)
+                .background(.clear)
 
                 HStack(spacing: 6) {
                     ForEach(0..<6, id: \.self) { i in
@@ -356,7 +357,7 @@ struct AddPetWizardView: View {
                 }
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("取消") { cropImageItem = nil }.foregroundStyle(.primary.opacity(0.6))
+                        Button("取消") { cropImageItem = nil }
                     }
                 }
                 .navigationBarTitleDisplayMode(.inline)
@@ -1921,8 +1922,6 @@ struct AddPetWizardView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("完成") { dismiss() }
-                            .fontWeight(.bold)
-                            .foregroundStyle(Color.goPrimary)
                     }
                 }
             }
@@ -2359,9 +2358,8 @@ struct AddPetWizardView: View {
     private func pagedCard<Content: View>(index: Int, @ViewBuilder content: () -> Content) -> some View {
         content()
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .goTranslucentCard(cornerRadius: 24)
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 4)
     }
 
     private var wizardCardMesh: some View {
@@ -3188,108 +3186,158 @@ struct PetImageCropView: View {
     let image: UIImage
     let onCrop: (UIImage?) -> Void
 
-    // 取景框边长
-    private let cropSize: CGFloat = 280
-    private let cornerRadius: CGFloat = 28
+    // 取景框尺寸 — 与宠物钱包卡片等比（信用卡 1.586:1 横向）
+    private let cropW: CGFloat = 300
+    private let cropH: CGFloat = 300 / 1.586   // ≈ 189
+    private let cornerRadius: CGFloat = 20
 
-    // 图片变换：所有变换作用于同一 ZStack 内，坐标系完全一致
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
+    @State private var fitDisplaySize: CGSize = .zero
 
-    // scaledToFit 后图片在 canvasSize 内的实际渲染尺寸（onAppear 时计算一次）
-    @State private var canvasSize: CGSize = .zero      // ZStack 的可用区域
-    @State private var fitDisplaySize: CGSize = .zero  // scaledToFit 结果尺寸
-
-    /// 最小缩放：允许缩到 0.5，让用户可把大图整体缩进取景框
     private var minScale: CGFloat {
-        guard fitDisplaySize.width > 0, fitDisplaySize.height > 0 else { return 0.5 }
-        let fitMin = max(cropSize / fitDisplaySize.width, cropSize / fitDisplaySize.height)
-        return min(fitMin, 0.5)
+        guard fitDisplaySize.width > 0, fitDisplaySize.height > 0 else { return 0.3 }
+        // 确保图片至少覆盖取景框短边
+        let fw = cropW / fitDisplaySize.width
+        let fh = cropH / fitDisplaySize.height
+        return max(min(fw, fh), 0.3)
     }
-
-    /// 最大缩放：让图片短边恰好等于取景框边长（即 1:1 像素级填满）
-    private var maxScale: CGFloat {
-        guard fitDisplaySize.width > 0, fitDisplaySize.height > 0 else { return 8.0 }
-        let shortSide = min(fitDisplaySize.width, fitDisplaySize.height)
-        return shortSide > 0 ? cropSize / shortSide : 8.0
-    }
+    private var maxScale: CGFloat { 6.0 }
 
     var body: some View {
         GeometryReader { geo in
             ZStack {
                 Color.black
 
-                // ── 图片层：scaledToFit 保证和遮罩/框线完全同一坐标系
+                // ── 图片层
                 Image(uiImage: normalizedImage(image))
                     .resizable()
                     .scaledToFit()
                     .frame(width: geo.size.width, height: geo.size.height)
                     .scaleEffect(scale, anchor: .center)
                     .offset(offset)
+                    .simultaneousGesture(
+                        SimultaneousGesture(
+                            MagnifyGesture()
+                                .onChanged { v in
+                                    let proposed = lastScale * v.magnification
+                                    scale = min(maxScale, max(minScale, proposed))
+                                }
+                                .onEnded { _ in lastScale = scale },
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { v in
+                                    offset = CGSize(
+                                        width:  lastOffset.width  + v.translation.width,
+                                        height: lastOffset.height + v.translation.height
+                                    )
+                                }
+                                .onEnded { _ in lastOffset = offset }
+                        )
+                    )
 
-                // ── 遮罩层（同一 ZStack 内，坐标系完全一致）
-                PetCropOverlay(cropSize: cropSize, cornerRadius: cornerRadius)
+                // ── 暗色遮罩
+                CardCropOverlay(cropW: cropW, cropH: cropH, cornerRadius: cornerRadius)
 
-                // ── 取景框描边（goLime 颜色）
+                // ── 宠物位置引导（左半区轮廓）
+                HStack(spacing: 0) {
+                    ZStack {
+                        // 半透明提示区
+                        RoundedRectangle(cornerRadius: cornerRadius - 2, style: .continuous)
+                            .fill(Color.white.opacity(0.06))
+                            .frame(width: cropW / 2, height: cropH)
+                        // 竖向虚线分隔
+                        Rectangle()
+                            .fill(Color.white.opacity(0.25))
+                            .frame(width: 1, height: cropH * 0.7)
+                            .offset(x: cropW / 4)
+                        // 爪印提示
+                        VStack(spacing: 4) {
+                            Image(systemName: "pawprint.fill")
+                                .font(.system(size: 22))
+                                .foregroundStyle(.white.opacity(0.25))
+                            Text("宠物放这里")
+                                .font(.system(size: 9, weight: .medium, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.25))
+                        }
+                        .offset(x: -cropW / 4)
+                    }
+                    .frame(width: cropW / 2, height: cropH)
+                    .allowsHitTesting(false)
+                    Spacer()
+                }
+                .frame(width: cropW, height: cropH)
+                .allowsHitTesting(false)
+
+                // ── 取景框描边
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .strokeBorder(Color.goPrimary, lineWidth: 2)
-                    .frame(width: cropSize, height: cropSize)
+                    .frame(width: cropW, height: cropH)
+                    .allowsHitTesting(false)
 
                 // ── L 形角标
-                PetCropCorners(size: cropSize, radius: cornerRadius)
+                CardCropCorners(width: cropW, height: cropH, radius: cornerRadius)
+                    .allowsHitTesting(false)
 
-                // ── 底部操作栏
+                // ── 提示文字
                 VStack {
                     Spacer()
-                    HStack(spacing: 16) {
-                        Button("取消") { onCrop(nil) }
-                            .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.7))
-                            .padding(.horizontal, 32).padding(.vertical, 14)
-                            .background(.white.opacity(0.12), in: Capsule())
-                        Button("确认裁剪") { performCrop(in: geo.size) }
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 32).padding(.vertical, 14)
-                            .background(Color.goPrimary, in: Capsule())
-                    }
-                    .padding(.bottom, 48)
+                    Text("双指缩放 · 拖动调整位置")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.45))
+                        .padding(.bottom, 104)
                 }
+                .allowsHitTesting(false)
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .clipped()
             .onAppear {
-                canvasSize = geo.size
-                // scaledToFit 在 geo.size 内的实际渲染尺寸
                 let img = normalizedImage(image)
                 let iw = img.size.width, ih = img.size.height
                 guard iw > 0, ih > 0 else { return }
                 let aspectFit = min(geo.size.width / iw, geo.size.height / ih)
                 fitDisplaySize = CGSize(width: iw * aspectFit, height: ih * aspectFit)
-                let s = minScale
+                let s = max(minScale, 1.0)
                 scale = s; lastScale = s
             }
         }
-        .gesture(
-            MagnificationGesture()
-                .onChanged { v in
-                    let proposed = lastScale * v
-                    scale = min(maxScale, max(minScale, proposed))
+        // ── 底部操作栏（Toolbar 内）由外层 NavigationStack 提供取消按钮
+        .safeAreaInset(edge: .bottom) {
+            HStack(spacing: 12) {
+                Button {
+                    onCrop(nil)
+                } label: {
+                    Text("取消")
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.75))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
                 }
-                .onEnded { _ in lastScale = scale }
-        )
-        .simultaneousGesture(
-            DragGesture()
-                .onChanged { v in
-                    offset = CGSize(
-                        width:  lastOffset.width  + v.translation.width,
-                        height: lastOffset.height + v.translation.height
-                    )
+                .buttonStyle(.plain)
+
+                Button {
+                    // Geometry captured at build; use UIScreen fallback
+                    let screenW = UIScreen.main.bounds.width
+                    let screenH = UIScreen.main.bounds.height
+                    performCrop(in: CGSize(width: screenW, height: screenH))
+                } label: {
+                    Text("确认裁剪")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14))
                 }
-                .onEnded { _ in lastOffset = offset }
-        )
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(Color.black.opacity(0.8))
+        }
+        .navigationBarHidden(true)
+        .ignoresSafeArea(edges: .top)
     }
 
     // MARK: - 方向修正
@@ -3300,60 +3348,48 @@ struct PetImageCropView: View {
         return renderer.image { _ in src.draw(in: CGRect(origin: .zero, size: src.size)) }
     }
 
-    // MARK: - 精准裁剪（基于 scaledToFit 坐标系）
+    // MARK: - 精准裁剪（矩形取景框，基于 scaledToFit 坐标系）
 
     private func performCrop(in viewSize: CGSize) {
         let src = normalizedImage(image)
         let iw = src.size.width, ih = src.size.height
         guard iw > 0, ih > 0, viewSize.width > 0 else { onCrop(src); return }
 
-        // scaledToFit 基础缩放
         let fitScale = min(viewSize.width / iw, viewSize.height / ih)
-        // 用户额外缩放
         let totalScale = fitScale * scale
-
-        // 图片渲染后的实际尺寸
         let displayW = iw * totalScale
         let displayH = ih * totalScale
 
-        // 图片左上角在 ZStack 中的位置（ZStack 中心对齐）
         let imgOriginX = (viewSize.width  - displayW) / 2 + offset.width
         let imgOriginY = (viewSize.height - displayH) / 2 + offset.height
 
-        // 取景框左上角（居中）
-        let cropOriginX = (viewSize.width  - cropSize) / 2
-        let cropOriginY = (viewSize.height - cropSize) / 2
+        let cropOriginX = (viewSize.width  - cropW) / 2
+        let cropOriginY = (viewSize.height - cropH) / 2
 
-        // 取景框相对图片左上角的偏移（视图点）
         let relX = cropOriginX - imgOriginX
         let relY = cropOriginY - imgOriginY
 
-        // 映射回原始像素（注意 src.scale = UIScreen scale）
-        let pixelScale = totalScale / src.scale   // 视图点 → 原图逻辑像素
+        let pixelScale = totalScale / src.scale
         let srcX = max(0, relX / pixelScale)
         let srcY = max(0, relY / pixelScale)
-        let srcLen = cropSize / pixelScale
-        let clampedW = min(srcLen, iw - srcX)
-        let clampedH = min(srcLen, ih - srcY)
+        let srcW = cropW / pixelScale
+        let srcH = cropH / pixelScale
+        let clampedW = min(srcW, iw - srcX)
+        let clampedH = min(srcH, ih - srcY)
 
         guard clampedW > 0, clampedH > 0,
               let cgCrop = src.cgImage?.cropping(to: CGRect(
-                x: srcX * src.scale,
-                y: srcY * src.scale,
-                width:  clampedW * src.scale,
-                height: clampedH * src.scale
+                x: srcX * src.scale, y: srcY * src.scale,
+                width: clampedW * src.scale, height: clampedH * src.scale
               ))
         else { onCrop(src); return }
 
-        // 输出为 cropSize pt × cropSize pt @screen scale
         let screenScale = UIGraphicsImageRendererFormat.default().scale
-        let outputPx = cropSize * screenScale
-        let renderer = UIGraphicsImageRenderer(
-            size: CGSize(width: outputPx, height: outputPx)
-        )
+        let outW = cropW * screenScale
+        let outH = cropH * screenScale
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: outW, height: outH))
         let cropped = renderer.image { _ in
-            UIImage(cgImage: cgCrop)
-                .draw(in: CGRect(x: 0, y: 0, width: outputPx, height: outputPx))
+            UIImage(cgImage: cgCrop).draw(in: CGRect(x: 0, y: 0, width: outW, height: outH))
         }
         onCrop(cropped)
     }
@@ -3403,6 +3439,58 @@ private struct PetCropCorners: View {
                         .fill(Color.goPrimary)
                         .frame(width: thick, height: len)
                         .offset(x: xSign * (size / 2), y: ySign * (size / 2 - len / 2))
+                }
+            }
+        }
+    }
+}
+
+// Dim overlay with transparent rectangular crop hole
+private struct CardCropOverlay: View {
+    let cropW: CGFloat
+    let cropH: CGFloat
+    let cornerRadius: CGFloat
+    var body: some View {
+        GeometryReader { geo in
+            Path { path in
+                path.addRect(CGRect(origin: .zero, size: geo.size))
+                let x = (geo.size.width  - cropW) / 2
+                let y = (geo.size.height - cropH) / 2
+                path.addRoundedRect(
+                    in: CGRect(x: x, y: y, width: cropW, height: cropH),
+                    cornerSize: CGSize(width: cornerRadius, height: cornerRadius)
+                )
+            }
+            .fill(style: FillStyle(eoFill: true))
+            .foregroundStyle(.black.opacity(0.62))
+        }
+    }
+}
+
+// Corner L-shape indicators for rectangular crop frame
+private struct CardCropCorners: View {
+    let width: CGFloat
+    let height: CGFloat
+    let radius: CGFloat
+    private let len: CGFloat = 20
+    private let thick: CGFloat = 3
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<4, id: \.self) { i in
+                let xSign: CGFloat = i < 2 ? -1 : 1
+                let ySign: CGFloat = (i % 2 == 0) ? -1 : 1
+                ZStack {
+                    // Horizontal
+                    RoundedRectangle(cornerRadius: thick / 2)
+                        .fill(Color.goPrimary)
+                        .frame(width: len, height: thick)
+                        .offset(x: xSign * (width / 2 - len / 2), y: ySign * (height / 2))
+                    // Vertical
+                    RoundedRectangle(cornerRadius: thick / 2)
+                        .fill(Color.goPrimary)
+                        .frame(width: thick, height: len)
+                        .offset(x: xSign * (width / 2), y: ySign * (height / 2 - len / 2))
                 }
             }
         }

@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import Charts
 
 struct WeightHistoryView: View {
     let pet: Pet
@@ -24,6 +25,16 @@ struct WeightHistoryView: View {
         Array(pet.weightLogs.sorted(by: { $0.date < $1.date }).suffix(20))
     }
 
+    // MARK: - Feeding data helpers
+    private var recentFoodRecords: [PetFoodRecord] {
+        pet.foodRecords.sorted { $0.startDate > $1.startDate }.prefix(7).map { $0 }
+    }
+    private var avgDailyGrams: Double? {
+        let precise = recentFoodRecords.filter { $0.dailyGrams > 0 }
+        guard !precise.isEmpty else { return nil }
+        return precise.reduce(0.0) { $0 + $1.dailyGrams } / Double(precise.count)
+    }
+
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
@@ -32,6 +43,12 @@ struct WeightHistoryView: View {
                 VStack(spacing: 0) {
                     chartSection
                         .frame(maxHeight: .infinity)
+
+                    if let avg = avgDailyGrams {
+                        feedingInsightBanner(avg: avg)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
+                    }
 
                     recordListLayer
                         .frame(height: geo.size.height * 0.52)
@@ -141,6 +158,53 @@ struct WeightHistoryView: View {
 
             Spacer()
         }
+    }
+
+    // MARK: - Feeding Insight Banner
+    private func feedingInsightBanner(avg: Double) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "fork.knife")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color.goOrange)
+                .frame(width: 36, height: 36)
+                .background(Color.goOrange.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("饮食 · 体重关联")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary.opacity(0.6))
+                HStack(spacing: 4) {
+                    Text(String(format: "近期日均摄入 %.0fg", avg))
+                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .foregroundStyle(.primary)
+                    if let latest = sortedLogs.first, let prev = sortedLogs.dropFirst().first {
+                        let delta = latest.weightInKg - prev.weightInKg
+                        Image(systemName: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(delta >= 0 ? Color.goOrange : Color.goTeal)
+                        Text(String(format: "%+.2fkg", delta))
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundStyle(delta >= 0 ? Color.goOrange : Color.goTeal)
+                    }
+                }
+            }
+
+            Spacer()
+
+            // Mini bar showing last few food records
+            HStack(alignment: .bottom, spacing: 3) {
+                let maxG = recentFoodRecords.map { $0.dailyGrams }.max() ?? 1
+                ForEach(Array(recentFoodRecords.prefix(5).enumerated()), id: \.offset) { i, rec in
+                    let h = max(6, CGFloat(rec.dailyGrams / maxG) * 28)
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(i == 0 ? Color.goOrange : Color.goOrange.opacity(0.35))
+                        .frame(width: 6, height: h)
+                }
+            }
+            .frame(height: 28)
+        }
+        .padding(12)
+        .goTranslucentCard(cornerRadius: 14)
     }
 
     // MARK: - Record List Layer
