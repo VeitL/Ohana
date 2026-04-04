@@ -207,11 +207,31 @@ struct SettingsView: View {
                         
                         // 通知
                         settingsSection(title: "通知") {
-                            settingsRow(icon: "bell.badge", title: "通知权限", subtitle: "管理通知设置") {
+                            settingsRow(icon: "bell.badge", title: "通知权限", subtitle: "管理系统级通知授权") {
                                 if let url = URL(string: UIApplication.openSettingsURLString) {
                                     UIApplication.shared.open(url)
                                 }
                             }
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+                            notificationToggleRow(
+                                icon: "pills.fill", iconColor: Color(hex: "FF5A00"),
+                                title: "用药提醒", key: "notif_medication_enabled"
+                            )
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+                            notificationToggleRow(
+                                icon: "fork.knife", iconColor: Color.goPrimary,
+                                title: "喂食提醒", key: "notif_feeding_enabled"
+                            )
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+                            notificationToggleRow(
+                                icon: "bubbles.and.sparkles.fill", iconColor: Color.goTeal,
+                                title: "护理提醒", key: "notif_hygiene_enabled"
+                            )
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+                            notificationToggleRow(
+                                icon: "checkmark.seal.fill", iconColor: Color.goYellow,
+                                title: "打卡提醒", key: "notif_checkin_enabled"
+                            )
                         }
                         
                         // ── 备份与恢复
@@ -753,6 +773,30 @@ struct SettingsView: View {
             .padding(.vertical, 4)
         }
         .buttonStyle(.plain)
+    }
+
+    private func notificationToggleRow(icon: String, iconColor: Color, title: String, key: String) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(iconColor.opacity(colorScheme == .dark ? 0.16 : 0.10))
+                    .frame(width: 32, height: 32)
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(iconColor)
+            }
+            Text(title)
+                .font(OhanaFont.body(.semibold))
+                .foregroundStyle(primaryText)
+            Spacer()
+            Toggle("", isOn: Binding(
+                get: { UserDefaults.standard.object(forKey: key) == nil ? true : UserDefaults.standard.bool(forKey: key) },
+                set: { UserDefaults.standard.set($0, forKey: key) }
+            ))
+            .tint(accentColor)
+            .labelsHidden()
+        }
+        .padding(.vertical, 4)
     }
 
     private func removeQuickAccessItems(for petId: UUID) {

@@ -210,7 +210,48 @@ final class AchievementManager {
                                color: Color.goPrimary, isUnlocked: daysSinceCreated >= 7)
         }()
 
+        // 11. 🐾 长跑健将：单次遛狗超过 5km
+        let longRunner: Achievement = {
+            let has5km = pet.walkLogs.contains { $0.distanceMeters >= 5000 }
+            return Achievement(id: "long_runner", emoji: "🐾", title: "长跑健将",
+                               description: "单次遛狗距离超过 5km",
+                               color: Color.goLime, isUnlocked: has5km)
+        }()
+
+        // 12. 💊 坚持到底：完成至少一个疗程用药（有 endDate 且已过期的药）
+        let medicationComplete: Achievement = {
+            let completed = pet.medications.contains {
+                guard let end = $0.endDate else { return false }
+                return end < now && $0.isActive
+            }
+            return Achievement(id: "medication_complete", emoji: "💊", title: "坚持到底",
+                               description: "认真完成了一个完整的用药疗程",
+                               color: Color.goTeal, isUnlocked: completed)
+        }()
+
+        // 13. 📸 拍照达人：上传 20 张以上照片
+        let photoEnthusiast: Achievement = {
+            return Achievement(id: "photo_enthusiast", emoji: "📸", title: "拍照达人",
+                               description: "为宠物上传了 20 张以上照片",
+                               color: Color.goPrimary, isUnlocked: pet.photoLogs.count >= 20)
+        }()
+
+        // 14. 💰 记账能手：累计记录 10 条以上花费
+        let expenseTracker: Achievement = {
+            return Achievement(id: "expense_tracker", emoji: "💰", title: "记账能手",
+                               description: "累计记录了 10 条以上花费",
+                               color: Color.goYellow, isUnlocked: pet.expenseLogs.count >= 10)
+        }()
+
+        // 15. 🏋️ 体重管理师：累计体重记录 7 条以上
+        let weightManager: Achievement = {
+            return Achievement(id: "weight_manager", emoji: "🏋️", title: "体重管理师",
+                               description: "坚持记录体重，累计超过 7 条记录",
+                               color: Color.goCardBlue, isUnlocked: pet.weightLogs.count >= 7)
+        }()
+
         return [ironGut, ironPaw, walkStreak, healthHero, nutritionist, happyBirthday, hundredDays,
-                firstRecord, dayOneCheckin, oldFriend]
+                firstRecord, dayOneCheckin, oldFriend,
+                longRunner, medicationComplete, photoEnthusiast, expenseTracker, weightManager]
     }
 }

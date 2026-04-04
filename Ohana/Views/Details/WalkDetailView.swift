@@ -79,11 +79,7 @@ struct WalkDetailView: View {
                     .disabled(isRendering)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.primary.opacity(0.6))
-                    }
+                    Button("关闭") { dismiss() }
                 }
             }
             .sheet(isPresented: $isSharing) {

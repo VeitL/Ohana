@@ -353,7 +353,6 @@ struct AddDocumentSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }
-                        .foregroundStyle(.primary.opacity(0.65))
                 }
             }
         }
@@ -744,7 +743,6 @@ struct EditDocumentSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }
-                        .foregroundStyle(.primary.opacity(0.65))
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showingDelete = true } label: {

@@ -64,7 +64,6 @@ struct BackdateCheckInSheet: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("取消") { dismiss() }
-                        .foregroundStyle(Color.goPrimary)
                 }
             }
         }

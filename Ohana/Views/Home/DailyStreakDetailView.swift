@@ -80,11 +80,7 @@ struct DailyStreakDetailView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 8) {
                         CoconutBalanceCapsule { showingCoconutLog = true }
-                        Button { dismiss() } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 20))
-                                .foregroundStyle(.primary.opacity(0.5))
-                        }
+                        Button("关闭") { dismiss() }
                     }
                 }
             }

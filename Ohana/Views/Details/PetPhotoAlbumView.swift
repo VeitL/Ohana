@@ -129,6 +129,14 @@ struct PetPhotoAlbumView: View {
                                         }
                                         .buttonStyle(.plain)
                                         .contextMenu {
+                                            Button {
+                                                if let img = UIImage(data: photo.imageData) {
+                                                    shareImage(img)
+                                                }
+                                            } label: {
+                                                Label("分享", systemImage: "square.and.arrow.up")
+                                            }
+                                            Divider()
                                             Button(role: .destructive) {
                                                 modelContext.delete(photo)
                                                 modelContext.safeSave()
@@ -163,6 +171,17 @@ struct PetPhotoAlbumView: View {
             }
         }
         .padding(.top, 60)
+    }
+
+    private func shareImage(_ image: UIImage) {
+        let av = UIActivityViewController(activityItems: [image], applicationActivities: nil)
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let root = scene.windows.first?.rootViewController {
+            var presenter = root
+            while let presented = presenter.presentedViewController { presenter = presented }
+            av.popoverPresentationController?.sourceView = presenter.view
+            presenter.present(av, animated: true)
+        }
     }
 
     @ViewBuilder
