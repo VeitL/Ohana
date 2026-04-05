@@ -21,7 +21,7 @@ final class PetWalkLog {
     var pet: Pet?
     // P1: 遛狗行为备注
     var behaviorNotes: String?   // 如"今天很兴奋，追了一只猫"
-    var moodRating: Int          // 1-5颗星，0 = 未评价
+    var moodRating: Int = 0      // 1-5颗星，0 = 未评价
 
     init(startDate: Date = Date(), pet: Pet? = nil, executorId: String? = nil) {
         self.id = UUID()

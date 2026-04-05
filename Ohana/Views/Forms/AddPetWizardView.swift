@@ -302,29 +302,52 @@ struct AddPetWizardView: View {
             VStack(spacing: 0) {
                 stickyWalletPreview
 
-                TabView(selection: $wizardPageIndex) {
-                    pagedCard(index: 0, content: { wizardCard1BasicInfo }).tag(0)
-                    pagedCard(index: 1, content: { wizardCard2Avatar }).tag(1)
-                    pagedCard(index: 2, content: { wizardCard3Bio }).tag(2)
-                    pagedCard(index: 3, content: { wizardCard4Appearance }).tag(3)
-                    pagedCard(index: 4, content: { wizardCard5Tags }).tag(4)
-                    pagedCard(index: 5, content: { wizardCard6Confirm }).tag(5)
+                GeometryReader { pagerGeo in
+                    let pageW = pagerGeo.size.width
+                    let pageH = pagerGeo.size.height
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 0) {
+                            pagedCard(index: 0, content: { wizardCard1BasicInfo }).frame(width: pageW, height: pageH).id(0)
+                            pagedCard(index: 1, content: { wizardCard2Avatar }).frame(width: pageW, height: pageH).id(1)
+                            pagedCard(index: 2, content: { wizardCard3Bio }).frame(width: pageW, height: pageH).id(2)
+                            pagedCard(index: 3, content: { wizardCard4Appearance }).frame(width: pageW, height: pageH).id(3)
+                            pagedCard(index: 4, content: { wizardCard5Tags }).frame(width: pageW, height: pageH).id(4)
+                            pagedCard(index: 5, content: { wizardCard6Confirm }).frame(width: pageW, height: pageH).id(5)
+                        }
+                        .scrollTargetLayout()
+                    }
+                    .scrollTargetBehavior(.paging)
+                    .scrollPosition(
+                        id: Binding(
+                            get: { Optional(wizardPageIndex) },
+                            set: { if let v = $0 { wizardPageIndex = v } }
+                        ),
+                        anchor: .leading
+                    )
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.spring(response: 0.4, dampingFraction: 0.82), value: wizardPageIndex)
                 .padding(.horizontal, 14)
+                .frame(maxHeight: .infinity)
                 .background(.clear)
 
                 HStack(spacing: 6) {
                     ForEach(0..<6, id: \.self) { i in
-                        Capsule()
-                            .fill(i == wizardPageIndex ? Color.goPrimary : Color.primary.opacity(0.2))
-                            .frame(width: i == wizardPageIndex ? 20 : 6, height: 6)
-                            .animation(.spring(response: 0.3), value: wizardPageIndex)
+                        Button {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                                wizardPageIndex = i
+                            }
+                        } label: {
+                            Capsule()
+                                .fill(i == wizardPageIndex ? Color.goPrimary : Color.primary.opacity(0.2))
+                                .frame(width: i == wizardPageIndex ? 20 : 6, height: 6)
+                        }
+                        .buttonStyle(.plain)
+                        .animation(.spring(response: 0.3), value: wizardPageIndex)
                     }
                 }
                 .padding(.top, 8).padding(.bottom, 4)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .onAppear { scheduleWalletAvatarDecode() }
         .onChange(of: avatarImageData) { _, _ in scheduleWalletAvatarDecode() }
@@ -351,7 +374,7 @@ struct AddPetWizardView: View {
         }
         .sheet(item: $cropImageItem) { item in
             NavigationStack {
-                PetImageCropView(image: item.image) { cropped in
+                PetImageCropView(image: item.image, species: effectiveSpeciesForData) { cropped in
                     if let cropped { avatarImageData = cropped.jpegData(compressionQuality: 0.92) }
                     cropImageItem = nil; photosPickerItem = nil
                 }
@@ -2403,7 +2426,7 @@ struct AddPetWizardView: View {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .strokeBorder(
                                 name.isEmpty ? Color.red.opacity(0.5) :
-                                isNameDuplicate ? Color.orange.opacity(0.7) : Color.black.opacity(0.15),
+                                isNameDuplicate ? Color.orange.opacity(0.7) : Color.goPrimary.opacity(colorScheme == .dark ? 0.55 : 0.4),
                                 lineWidth: 1.5
                             )
                     )
@@ -2501,18 +2524,30 @@ struct AddPetWizardView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     }
                 } else {
-                    VStack(spacing: 8) {
-                        Image(systemName: Pet.speciesSilhouetteSymbol(forSpecies: effectiveSpeciesForData))
-                            .font(.system(size: 44, weight: .bold)).symbolRenderingMode(.monochrome)
-                            .foregroundStyle(Color.primary.opacity(0.35))
-                        Text("点击下方按钮选择头像")
-                            .font(.system(size: 12, weight: .medium, design: .rounded)).foregroundStyle(Color.primary.opacity(0.55))
+                    ZStack {
+                        PetSilhouetteView(
+                            species: effectiveSpeciesForData,
+                            coatColor: resolvedCoatColor,
+                            eyeColor: resolvedEyeColor,
+                            patternName: PetCoatPattern.allCases.first(where: { $0.displayName == coatColor })?.displayName,
+                            isAnimationEnabled: false
+                        )
+                        .scaleEffect(0.85)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 130)
+                        .opacity(0.4)
                     }
                     .frame(maxWidth: .infinity).frame(height: 130)
                 }
             }
             .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.black.opacity(avatarImageData != nil ? 0.2 : 0.1), lineWidth: 1.5))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(
+                        Color.goPrimary.opacity(avatarImageData != nil ? (colorScheme == .dark ? 0.55 : 0.45) : (colorScheme == .dark ? 0.35 : 0.22)),
+                        lineWidth: 1.5
+                    )
+            )
             .onTapGesture { pastePasteboardImage() }
             .padding(.horizontal, 20)
 
@@ -2599,7 +2634,9 @@ struct AddPetWizardView: View {
                 }
                 if hasBirthday {
                     DatePicker("", selection: $birthday, in: ...Date(), displayedComponents: .date)
-                        .labelsHidden().tint(Color.goPrimary).environment(\.colorScheme, .light)
+                        .labelsHidden()
+                        .tint(Color.goPrimary)
+                        .foregroundStyle(.primary)
                     if !humanAgeText.isEmpty {
                         Label(humanAgeText, systemImage: "person.fill")
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
@@ -2619,7 +2656,9 @@ struct AddPetWizardView: View {
                 }
                 if hasHomeDate {
                     DatePicker("", selection: $homeDate, in: (hasBirthday ? birthday : .distantPast)...Date(), displayedComponents: .date)
-                        .labelsHidden().tint(Color.goPrimary).environment(\.colorScheme, .light)
+                        .labelsHidden()
+                        .tint(Color.goPrimary)
+                        .foregroundStyle(.primary)
                         .onChange(of: birthday) { _, newB in if homeDate < newB { homeDate = newB } }
                     if !daysTogetherText.isEmpty {
                         Label(daysTogetherText, systemImage: "heart.fill")
@@ -3181,37 +3220,48 @@ struct PetCameraPickerView: UIViewControllerRepresentable {
     }
 }
 
-// MARK: - Image Crop View（方形取景框，统一坐标空间）
+// MARK: - Image Crop View（取景框与钱包卡同比例，裁剪坐标与屏幕布局一致）
 struct PetImageCropView: View {
     let image: UIImage
+    /// 用于左半区大轮廓引导
+    var species: String = "狗"
     let onCrop: (UIImage?) -> Void
 
-    // 取景框尺寸 — 与宠物钱包卡片等比（信用卡 1.586:1 横向）
-    private let cropW: CGFloat = 300
-    private let cropH: CGFloat = 300 / 1.586   // ≈ 189
-    private let cornerRadius: CGFloat = 20
+    private let cardAspect: CGFloat = 1.586
+    private let cornerRadius: CGFloat = 24
+
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
     @State private var fitDisplaySize: CGSize = .zero
+    /// 与 performCrop 使用同一容器尺寸（禁止再用 UIScreen 与布局脱节）
+    @State private var containerSize: CGSize = .zero
 
-    private var minScale: CGFloat {
+    private func cropSize(for container: CGSize) -> (w: CGFloat, h: CGFloat) {
+        let maxW = max(container.width - 24, 220)
+        let cw = min(maxW, max(ScreenCompat.width - 48, 220))
+        let ch = cw / cardAspect
+        return (cw, ch)
+    }
+
+    private func minScale(cropW: CGFloat, cropH: CGFloat) -> CGFloat {
         guard fitDisplaySize.width > 0, fitDisplaySize.height > 0 else { return 0.3 }
-        // 确保图片至少覆盖取景框短边
         let fw = cropW / fitDisplaySize.width
         let fh = cropH / fitDisplaySize.height
         return max(min(fw, fh), 0.3)
     }
-    private var maxScale: CGFloat { 6.0 }
+
+    private let maxScale: CGFloat = 6.0
 
     var body: some View {
         GeometryReader { geo in
+            let (cropW, cropH) = cropSize(for: geo.size)
             ZStack {
                 Color.black
 
-                // ── 图片层
                 Image(uiImage: normalizedImage(image))
                     .resizable()
                     .scaledToFit()
@@ -3223,13 +3273,14 @@ struct PetImageCropView: View {
                             MagnifyGesture()
                                 .onChanged { v in
                                     let proposed = lastScale * v.magnification
-                                    scale = min(maxScale, max(minScale, proposed))
+                                    let mn = minScale(cropW: cropW, cropH: cropH)
+                                    scale = min(maxScale, max(mn, proposed))
                                 }
                                 .onEnded { _ in lastScale = scale },
                             DragGesture(minimumDistance: 0)
                                 .onChanged { v in
                                     offset = CGSize(
-                                        width:  lastOffset.width  + v.translation.width,
+                                        width: lastOffset.width + v.translation.width,
                                         height: lastOffset.height + v.translation.height
                                     )
                                 }
@@ -3237,50 +3288,33 @@ struct PetImageCropView: View {
                         )
                     )
 
-                // ── 暗色遮罩
                 CardCropOverlay(cropW: cropW, cropH: cropH, cornerRadius: cornerRadius)
 
-                // ── 宠物位置引导（左半区轮廓）
+                // 左半区大轮廓引导（居中于取景框左半）
                 HStack(spacing: 0) {
                     ZStack {
-                        // 半透明提示区
-                        RoundedRectangle(cornerRadius: cornerRadius - 2, style: .continuous)
-                            .fill(Color.white.opacity(0.06))
+                        RoundedRectangle(cornerRadius: max(4, cornerRadius - 4), style: .continuous)
+                            .fill(Color.white.opacity(colorScheme == .dark ? 0.1 : 0.07))
                             .frame(width: cropW / 2, height: cropH)
-                        // 竖向虚线分隔
-                        Rectangle()
-                            .fill(Color.white.opacity(0.25))
-                            .frame(width: 1, height: cropH * 0.7)
-                            .offset(x: cropW / 4)
-                        // 爪印提示
-                        VStack(spacing: 4) {
-                            Image(systemName: "pawprint.fill")
-                                .font(.system(size: 22))
-                                .foregroundStyle(.white.opacity(0.25))
-                            Text("宠物放这里")
-                                .font(.system(size: 9, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.25))
-                        }
-                        .offset(x: -cropW / 4)
+                        Image(systemName: Pet.speciesSilhouetteSymbol(forSpecies: species))
+                            .font(.system(size: min(cropH * 0.52, 128), weight: .bold))
+                            .symbolRenderingMode(.monochrome)
+                            .foregroundStyle(.white.opacity(colorScheme == .dark ? 0.38 : 0.26))
                     }
                     .frame(width: cropW / 2, height: cropH)
-                    .allowsHitTesting(false)
-                    Spacer()
+                    Color.clear.frame(width: cropW / 2, height: cropH)
                 }
                 .frame(width: cropW, height: cropH)
                 .allowsHitTesting(false)
 
-                // ── 取景框描边
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .strokeBorder(Color.goPrimary, lineWidth: 2)
                     .frame(width: cropW, height: cropH)
                     .allowsHitTesting(false)
 
-                // ── L 形角标
                 CardCropCorners(width: cropW, height: cropH, radius: cornerRadius)
                     .allowsHitTesting(false)
 
-                // ── 提示文字
                 VStack {
                     Spacer()
                     Text("双指缩放 · 拖动调整位置")
@@ -3293,21 +3327,24 @@ struct PetImageCropView: View {
             .frame(width: geo.size.width, height: geo.size.height)
             .clipped()
             .onAppear {
+                containerSize = geo.size
                 let img = normalizedImage(image)
                 let iw = img.size.width, ih = img.size.height
                 guard iw > 0, ih > 0 else { return }
                 let aspectFit = min(geo.size.width / iw, geo.size.height / ih)
                 fitDisplaySize = CGSize(width: iw * aspectFit, height: ih * aspectFit)
-                let s = max(minScale, 1.0)
-                scale = s; lastScale = s
+                let mn = minScale(cropW: cropW, cropH: cropH)
+                let s = max(mn, 1.0)
+                scale = s
+                lastScale = s
+            }
+            .onChange(of: geo.size) { _, new in
+                containerSize = new
             }
         }
-        // ── 底部操作栏（Toolbar 内）由外层 NavigationStack 提供取消按钮
         .safeAreaInset(edge: .bottom) {
             HStack(spacing: 12) {
-                Button {
-                    onCrop(nil)
-                } label: {
+                Button { onCrop(nil) } label: {
                     Text("取消")
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white.opacity(0.75))
@@ -3317,15 +3354,10 @@ struct PetImageCropView: View {
                 }
                 .buttonStyle(.plain)
 
-                Button {
-                    // Geometry captured at build; use UIScreen fallback
-                    let screenW = UIScreen.main.bounds.width
-                    let screenH = UIScreen.main.bounds.height
-                    performCrop(in: CGSize(width: screenW, height: screenH))
-                } label: {
+                Button { performCrop() } label: {
                     Text("确认裁剪")
                         .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(Color.arkInk)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                         .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14))
@@ -3340,30 +3372,33 @@ struct PetImageCropView: View {
         .ignoresSafeArea(edges: .top)
     }
 
-    // MARK: - 方向修正
-
     private func normalizedImage(_ src: UIImage) -> UIImage {
         guard src.imageOrientation != .up else { return src }
         let renderer = UIGraphicsImageRenderer(size: src.size)
         return renderer.image { _ in src.draw(in: CGRect(origin: .zero, size: src.size)) }
     }
 
-    // MARK: - 精准裁剪（矩形取景框，基于 scaledToFit 坐标系）
-
-    private func performCrop(in viewSize: CGSize) {
+    private func performCrop() {
+        let viewSize: CGSize = (containerSize.width > 10 && containerSize.height > 10)
+            ? containerSize
+            : CGSize(width: ScreenCompat.width, height: max(ScreenCompat.height - 300, 420))
+        let (cropW, cropH) = cropSize(for: viewSize)
         let src = normalizedImage(image)
         let iw = src.size.width, ih = src.size.height
-        guard iw > 0, ih > 0, viewSize.width > 0 else { onCrop(src); return }
+        guard iw > 0, ih > 0, viewSize.width > 0, viewSize.height > 0 else {
+            onCrop(src)
+            return
+        }
 
         let fitScale = min(viewSize.width / iw, viewSize.height / ih)
         let totalScale = fitScale * scale
         let displayW = iw * totalScale
         let displayH = ih * totalScale
 
-        let imgOriginX = (viewSize.width  - displayW) / 2 + offset.width
+        let imgOriginX = (viewSize.width - displayW) / 2 + offset.width
         let imgOriginY = (viewSize.height - displayH) / 2 + offset.height
 
-        let cropOriginX = (viewSize.width  - cropW) / 2
+        let cropOriginX = (viewSize.width - cropW) / 2
         let cropOriginY = (viewSize.height - cropH) / 2
 
         let relX = cropOriginX - imgOriginX
@@ -3382,7 +3417,10 @@ struct PetImageCropView: View {
                 x: srcX * src.scale, y: srcY * src.scale,
                 width: clampedW * src.scale, height: clampedH * src.scale
               ))
-        else { onCrop(src); return }
+        else {
+            onCrop(src)
+            return
+        }
 
         let screenScale = UIGraphicsImageRendererFormat.default().scale
         let outW = cropW * screenScale

@@ -1,6 +1,6 @@
 # Ohana iOS App 项目文档
 
-> 最后更新: 2026-04-03（全App产品审计优化批次）| Build: ✅ | Schema: ArkSchemaV32
+> 最后更新: 2026-04-05（Kawaii 剪影重设计 + 宠物卡图片修复 + Schema V33）| Build: ✅ | Schema: ArkSchemaV33
 
 ---
 
@@ -26,7 +26,7 @@ Ohana/
 │   ├── PetPhotoLog.swift / SymptomLog.swift / HeatCycleLog.swift
 │   ├── Human.swift / HumanWeightLog.swift / Plant.swift / PlantCareLog.swift
 │   ├── Event.swift / Reminder.swift / PetExpenseLog.swift
-│   ├── SharedModelContainer.swift   # Schema 迁移链，当前 ArkSchemaV31
+│   ├── SharedModelContainer.swift   # Schema 迁移链，当前 ArkSchemaV33
 │   ├── QuestManager.swift           # 椰子奖励系统
 │   └── OasisTreeManager.swift       # 生命之树等级
 ├── Views/
@@ -84,7 +84,8 @@ Ohana/
 | V29 | `SymptomLog` / `HeatCycleLog` |
 | V30 | `InsuranceClaim` / `PetInsurance.paymentFrequencyRaw` |
 | V31 | `PetInsurance.paymentDayOfMonth/showInCalendar/otherFeeAmount/otherFeeNote` |
-| V32 | `PetWalkLog.behaviorNotes` / `PetWalkLog.moodRating` |
+| V32 | `PetInsurance.firstPremiumPaymentDate`（按年/一次性首期缴费日） |
+| V33 | `PetWalkLog.behaviorNotes`（可选备注）/ `PetWalkLog.moodRating`（默认 0） |
 
 ### 关键模型字段
 **Pet**：`species`、`themeColorHex`、`personalityTagsRaw`、`currentStreak`、`foodTrackingMode`
@@ -409,3 +410,61 @@ Color.petThemeMagenta / Pink / Purple / Indigo / Violet / Navy / Blue / SkyBlue
 | 森谷 | `forest` |
 | 暖纸 | `warmPaper` |
 | 霓虹格 | `neonGrid` |
+
+---
+
+## 二十二、宠物剪影（PetSilhouetteView）— Kawaii 风格重设计
+
+**文件**：`Ohana/Views/Components/PetSilhouetteView.swift`
+
+全部5种动物剪影替换为 Kawaii 奶头乐风格，使用纯 SwiftUI 几何形状绘制（`Circle`/`Ellipse`/`Capsule`/`Path`），无 SVG 依赖。
+
+| 物种 | struct | 特征 |
+|------|--------|------|
+| 猫（猫） | `CatSilhouette` | 圆头 + 粉色三角耳内 + 胡须 + 径向渐变毛绒感 + 尾巴 |
+| 狗（狗） | `DogSilhouette` | 耷拉长耳 + 面部暗色斑 + 白色口鼻区 + 圆身 |
+| 兔子（兔子/兔） | `RabbitSilhouette` | 竖长耳（紫色内耳 `#C9A4D8`）+ 三点腮红 + Y型嘴 |
+| 仓鼠（仓鼠） | `HamsterSilhouette` | 橙色帽感头顶 + 白色椭圆脸 + 小圆耳 |
+| 鸟（鸟） | `BirdSilhouette` | 泪滴形身体 + 白肚 + 冠羽 + 橙黄喙 |
+
+**共享组件**：`PetEyeView(size:)` — 白色外圈 + 彩色虹膜 + 黑瞳 + 白色高光点
+
+**颜色来源**：`coatColor`（`WalletPetCardTheme.silhouetteCoatColor(for:)`）+ `eyeColor` + 物种固定 accent（粉耳内 `#FFB3C1`、紫耳内 `#C9A4D8`、橙帽 `#E67E22` 等）
+
+**使用场景**：`WalletPetCardFront`（首页卡正面无头像时）+ `WalletPetCardDraftFront`（添加向导预览卡）
+
+---
+
+## 二十三、宠物卡片正面（WalletPetCardFront / WalletPetCardDraftFront）
+
+**文件**：`Ohana/Views/Home/PetWalletStack.swift`
+
+### 布局规范
+卡片比例 **1.586:1**（横向），卡宽 = `ScreenWidth - 48`，高 = 宽 / 1.586。
+
+| 区域 | 宽度 | 内容 |
+|------|------|------|
+| 左半（头像区） | `w × 0.52` | 头像照片 / Kawaii 剪影 |
+| 右半（信息区） | 其余 | 连续打卡徽章 + Days Together + 脚注 + 条码 |
+
+### 头像照片显示（非抠图）
+`avatarLayer` / `draftAvatarLayer` 非透明分支：
+- `scaledToFill()` 填充 `w × 0.52` × `h` 的竖向区域
+- 右边缘用 `LinearGradient` mask 渐变淡出（0→65%→100% 不透明）
+- 上层叠加 `screen` 混合模式的主题色渐变光效
+
+### 头像照片显示（抠图/透明 PNG）
+- 双层叠加：白色轮廓影（`colorMultiply(.white)` + 多方向 shadow）+ 原图
+- `scaledToFit()` + 底对齐，适合宠物站立姿势的抠图
+
+### WalletPetCardTheme 工具方法
+| 方法 | 作用 |
+|------|------|
+| `gradientPair(for:)` | 从 `themeColorHex` 推导顶/底渐变色 |
+| `meshColors(for:)` | 生成 3×3 MeshGradient 色阵 |
+| `headlinePointSize(cardWidth:headlineCount:)` | 宠物名字号自适应（≤6字满幅，更长缩小） |
+| `silhouetteCoatColor(for:)` | 从 `pet.coatColor` 展示名解析为 `Color` |
+| `silhouetteEyeColor(for:)` | 从 `pet.eyeColor` 展示名解析为 `Color` |
+
+### Schema 迁移注意事项
+新增 `@Model` 非可选属性时**必须在属性声明处加 `= 默认值`**（仅在 `init()` 中赋值不够），否则 SwiftData 轻量迁移失败，数据库降级到内存库。

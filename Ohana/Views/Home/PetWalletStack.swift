@@ -420,7 +420,7 @@ struct WalletPetCardFront: View {
                                 )
                             )
                             .allowsHitTesting(false)
-                        
+
                         VStack(spacing: 8) {
                             Text("✨")
                                 .font(.system(size: 32))
@@ -487,11 +487,7 @@ struct WalletPetCardFront: View {
                     )
                     .overlay {
                         LinearGradient(
-                            colors: [
-                                .white.opacity(0.08),
-                                .clear,
-                                cardTop.opacity(0.35)
-                            ],
+                            colors: [.white.opacity(0.08), .clear, cardTop.opacity(0.35)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -694,6 +690,7 @@ struct WalletPetCardDraftFront: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .shadow(color: .black.opacity(0.28), radius: 18, x: 0, y: 12)
             } else {
+                // 非抠图：照片铺满左半区，右侧渐变淡出与卡面融合
                 Image(uiImage: img)
                     .resizable()
                     .scaledToFill()
@@ -714,16 +711,13 @@ struct WalletPetCardDraftFront: View {
                     )
                     .overlay {
                         LinearGradient(
-                            colors: [
-                                .white.opacity(0.08),
-                                .clear,
-                                cardGradientTop.opacity(0.35)
-                            ],
+                            colors: [.white.opacity(0.08), .clear, cardGradientTop.opacity(0.35)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                         .blendMode(.screen)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         } else {
             let sp = species.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
