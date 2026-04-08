@@ -1,5 +1,7 @@
+// MARKER_XYZ_2026
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { PetAvatar } from './PetAvatars';
 import OasisView from './OasisView';
 import AddPetFlow from './AddPetFlow';
 import FamilyOverview from './FamilyOverview';
@@ -49,13 +51,15 @@ import {
 
 // --- Mock Data ---
 const PETS = [
-  { 
-    id: '1', 
-    name: 'Luna', 
-    type: 'Cat', 
+  {
+    id: '1',
+    name: 'Luna',
+    type: 'cat',
     breed: 'British Shorthair',
     color: 'from-[#FF7A00] to-[#FF5A00]',
-    avatar: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=400&h=500&fit=crop',
+    furColor: '#7C2D12',
+    patternColor: '#431407',
+    eyeColor: '#FEF08A',
     data: {
       feeding: '2h ago',
       water: '1h ago',
@@ -67,13 +71,15 @@ const PETS = [
       walkGoal: '30 mins'
     }
   },
-  { 
-    id: '2', 
-    name: 'Max', 
-    type: 'Dog', 
+  {
+    id: '2',
+    name: 'Max',
+    type: 'dog',
     breed: 'Golden Retriever',
-    color: 'from-[#8A2BE2] to-[#6A0DAD]',
-    avatar: 'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?w=400&h=500&fit=crop',
+    color: 'from-[#7C3AED] to-[#4C1D95]',
+    furColor: '#3B1F6E',
+    patternColor: '#1E1040',
+    eyeColor: '#C4B5FD',
     data: {
       feeding: '1h ago',
       water: '30m ago',
@@ -85,22 +91,64 @@ const PETS = [
       walkGoal: '60 mins'
     }
   },
-  { 
-    id: '3', 
-    name: 'Bella', 
-    type: 'Cat', 
-    breed: 'Siamese',
-    color: 'from-[#00C6FF] to-[#0072FF]',
-    avatar: null,
+  {
+    id: '3',
+    name: 'Mochi',
+    type: 'rabbit',
+    breed: 'Holland Lop',
+    color: 'from-[#0891B2] to-[#0E7490]',
+    furColor: '#164E63',
+    patternColor: '#083344',
+    eyeColor: '#67E8F9',
     data: {
       feeding: '4h ago',
       water: '2h ago',
       litter: 'Clean',
-      weight: '3.8 kg',
+      weight: '2.1 kg',
       weightChange: '- 0.0kg',
       weightChangeType: 'neutral',
-      expenses: '$80',
+      expenses: '$60',
       walkGoal: '20 mins'
+    }
+  },
+  {
+    id: '4',
+    name: 'Nori',
+    type: 'hamster',
+    breed: 'Syrian',
+    color: 'from-[#D97706] to-[#B45309]',
+    furColor: '#78350F',
+    patternColor: '#451A03',
+    eyeColor: '#FDE68A',
+    data: {
+      feeding: '3h ago',
+      water: '1h ago',
+      litter: 'Clean',
+      weight: '0.14 kg',
+      weightChange: '↑ 0.01kg',
+      weightChangeType: 'up',
+      expenses: '$30',
+      walkGoal: '—'
+    }
+  },
+  {
+    id: '5',
+    name: 'Kiwi',
+    type: 'bird',
+    breed: 'Budgerigar',
+    color: 'from-[#059669] to-[#065F46]',
+    furColor: '#064E3B',
+    patternColor: '#022C22',
+    eyeColor: '#6EE7B7',
+    data: {
+      feeding: '1h ago',
+      water: '1h ago',
+      litter: 'Clean',
+      weight: '0.03 kg',
+      weightChange: '- 0.0kg',
+      weightChangeType: 'neutral',
+      expenses: '$45',
+      walkGoal: '—'
     }
   },
 ];
@@ -443,28 +491,18 @@ export default function PetDashboard() {
                   </div>
                 </div>
                 
-                {/* Pet Image or Default UI */}
-                <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                {pet.avatar ? (
-                  <>
-                    <img 
-                      src={pet.avatar} 
-                      alt={pet.name} 
-                      className="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-90"
-                    />
-                    <img 
-                      src={pet.avatar} 
-                      alt={pet.name} 
-                      className="absolute inset-0 w-full h-full object-cover z-0"
-                    />
-                  </>
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center z-0 overflow-hidden">
-                    <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/20 rounded-full blur-3xl" />
-                    <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-black/20 rounded-full blur-3xl" />
-                    <PawPrint size={160} className="text-white/20 -rotate-12" strokeWidth={1} />
-                  </div>
-                )}
+                {/* Pet Avatar SVG */}
+                <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                <div className="absolute inset-0 z-0 overflow-hidden">
+                  <div className="absolute inset-0 bg-white/5" />
+                  <PetAvatar
+                    species={pet.type}
+                    furColor={pet.furColor}
+                    patternColor={pet.patternColor}
+                    eyeColor={pet.eyeColor}
+                    className="absolute bottom-0 left-0 w-full h-full object-contain"
+                  />
+                </div>
               </motion.div>
             );
           })}
