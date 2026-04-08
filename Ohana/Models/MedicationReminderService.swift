@@ -56,6 +56,19 @@ extension PetMedicationFrequency {
     }
 }
 
+extension MedicationFrequency {
+    var dosesPerDay: Int {
+        switch self {
+        case .daily: return 1
+        case .twiceDaily: return 2
+        case .threeTimesDaily: return 3
+        case .weekly: return 1
+        case .asNeeded: return 0
+        case .custom: return 0
+        }
+    }
+}
+
 // MARK: - Reminder Service
 
 final class MedicationReminderService {
@@ -168,6 +181,87 @@ final class MedicationReminderService {
 
     func cancelMedicationReminders(for petId: UUID) {
         let prefix = "medreminder_\(petId.uuidString)"
+        center.getPendingNotificationRequests { requests in
+            let ids = requests.map { $0.identifier }.filter { $0.hasPrefix(prefix) }
+            self.center.removePendingNotificationRequests(withIdentifiers: ids)
+        }
+    }
+
+    // MARK: - 调度单个人的用药通知
+
+    func scheduleHumanMedicationReminders(for human: Human, meds: [HumanMedication]) {
+        let activeMeds = meds.filter { $0.isActiveToday }
+
+        let prefix = "humanmedreminder_\(human.id.uuidString)"
+        center.getPendingNotificationRequests { requests in
+            let ids = requests
+                .map { $0.identifier }
+                .filter { $0.hasPrefix(prefix) }
+            self.center.removePendingNotificationRequests(withIdentifiers: ids)
+
+            for med in activeMeds {
+                self.scheduleRemindersForHumanMedication(med, human: human)
+            }
+        }
+    }
+
+    private func scheduleRemindersForHumanMedication(_ med: HumanMedication, human: Human) {
+        let dosesPerDay = med.frequency.dosesPerDay
+        guard dosesPerDay > 0 else { return }
+
+        let intervalHours = 24.0 / Double(dosesPerDay)
+        let calendar = Calendar.current
+        let now = Date()
+
+        var baseComponents = calendar.dateComponents([.year, .month, .day], from: now)
+        let timeComponents = calendar.dateComponents([.hour, .minute], from: med.firstDoseTime)
+        baseComponents.hour = timeComponents.hour ?? 8
+        baseComponents.minute = timeComponents.minute ?? 0
+        baseComponents.second = 0
+        guard let baseTime = calendar.date(from: baseComponents) else { return }
+
+        var scheduled = 0
+        let maxNotifications = 14 * dosesPerDay
+
+        outerLoop: for day in 0..<14 {
+            guard let dayDate = calendar.date(byAdding: .day, value: day, to: baseTime) else { continue }
+
+            if med.frequency == .weekly {
+                let daysSinceStart = calendar.dateComponents([.day], from: med.startDate, to: dayDate).day ?? 0
+                if daysSinceStart % 7 != 0 { continue }
+            }
+
+            for doseIdx in 0..<dosesPerDay {
+                let fireDate = dayDate.addingTimeInterval(Double(doseIdx) * intervalHours * 3600)
+                guard fireDate > now else { continue }
+                if let endDate = med.endDate, fireDate > endDate { break outerLoop }
+
+                let content = UNMutableNotificationContent()
+                content.title = "💊 吃药提醒"
+                content.body = "\(med.name) · \(med.dosage)"
+                content.sound = .default
+                content.userInfo = [
+                    "humanMedicationId": med.id.uuidString,
+                    "humanId": human.id.uuidString
+                ]
+                content.categoryIdentifier = "HUMAN_MED_REMINDER"
+
+                let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+                let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+                let identifier = "humanmedreminder_\(human.id.uuidString)_\(med.id.uuidString)_d\(day)_i\(doseIdx)"
+                let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+
+                center.add(request) { _ in }
+                scheduled += 1
+                if scheduled >= maxNotifications { break outerLoop }
+            }
+        }
+    }
+
+    // MARK: - 取消某个人的所有用药通知
+
+    func cancelHumanMedicationReminders(for humanId: UUID) {
+        let prefix = "humanmedreminder_\(humanId.uuidString)"
         center.getPendingNotificationRequests { requests in
             let ids = requests.map { $0.identifier }.filter { $0.hasPrefix(prefix) }
             self.center.removePendingNotificationRequests(withIdentifiers: ids)

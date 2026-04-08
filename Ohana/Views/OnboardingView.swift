@@ -88,6 +88,11 @@ struct OnboardingView: View {
                 .padding(.bottom, 48)
             }
         }
+        .onAppear {
+            if hasOnboarded && currentActiveHumanId.isEmpty {
+                step = 1
+            }
+        }
     }
 
     // MARK: - Steps

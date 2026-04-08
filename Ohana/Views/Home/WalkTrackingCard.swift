@@ -21,6 +21,7 @@ struct WalkTrackingCard: View {
     @State private var showWalkDetail: PetWalkLog? = nil
     @State private var showSummarySheet = false
     @State private var showAlwaysBanner = false
+    @State private var cameraPosition: MapCameraPosition = .userLocation(fallback: .automatic)
 
     private var isActivePet: Bool {
         mgr.currentPet?.id == pet.id || mgr.phase == .idle
@@ -76,18 +77,22 @@ struct WalkTrackingCard: View {
     private var mapBackground: some View {
         if isWalking {
             // 活跃遛狗中：实时位置地图
-            ZStack {
-                Color(hex: "1A1F2E")
-                // Live route overlay indicator
-                VStack(spacing: 4) {
-                    Image(systemName: "location.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(Color.goPrimary)
-                        .shadow(color: Color.goPrimary.opacity(0.6), radius: 8)
-                    Text(distanceText)
-                        .font(OhanaFont.footnote(.bold))
-                        .foregroundStyle(.white.opacity(0.7))
-                }
+            Map(position: $cameraPosition) {
+                UserAnnotation()
+                MapPolyline(coordinates: locationMgr.collectedLocations.map(\.coordinate))
+                    .stroke(Color.goPrimary, style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round))
+            }
+            .mapStyle(.standard)
+            .mapControls {
+                MapCompass()
+            }
+            .overlay(alignment: .topTrailing) {
+                Text(distanceText)
+                    .font(OhanaFont.footnote(.bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10).padding(.vertical, 4)
+                    .background(Color.black.opacity(0.6), in: Capsule())
+                    .padding(8)
             }
         } else {
             // 待出发：显示上次遛狗地图快照

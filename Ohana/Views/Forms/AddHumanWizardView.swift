@@ -583,6 +583,7 @@ struct AddHumanWizardView: View {
         human.notes = noteParts.joined(separator: "｜")
         human.avatarImageData = avatarImageData
         human.themeColorHex = themeColorHex
+        human.shouldShowOnHome = true
         // FIX 1: 身体数据
         if let h = Double(heightText), h > 0 { human.heightCm = h }
         // FIX 1: 隐私字段

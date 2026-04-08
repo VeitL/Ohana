@@ -150,7 +150,7 @@ struct AddEntityView: View {
                 HStack(spacing: 8) {
                     Text(type.rawValue)
                         .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.arkInk.opacity(fgOpacity))
+                        .foregroundStyle(Color.primary.opacity(fgOpacity))
                     if !type.isAvailable {
                         Text("开发中")
                             .font(.system(size: 10, weight: .bold, design: .rounded))
@@ -161,7 +161,7 @@ struct AddEntityView: View {
                 }
                 Text(typeDescription(type))
                     .font(.system(size: 14))
-                    .foregroundStyle(Color.arkInk.opacity(type.isAvailable ? 0.55 : 0.3))
+                    .foregroundStyle(Color.primary.opacity(type.isAvailable ? 0.65 : 0.35))
             }
 
             Spacer()
@@ -169,7 +169,7 @@ struct AddEntityView: View {
             Image(systemName: type.isAvailable ? "chevron.right" : "lock.fill")
                 .font(.system(size: 14, weight: .semibold))
                 .symbolRenderingMode(.monochrome)
-                .foregroundStyle(Color.arkInk.opacity(type.isAvailable ? 0.4 : 0.2))
+                .foregroundStyle(Color.primary.opacity(type.isAvailable ? 0.45 : 0.28))
         }
         .padding(18)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))

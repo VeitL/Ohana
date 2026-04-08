@@ -596,6 +596,25 @@ enum ArkSchemaV33: VersionedSchema {
     }
 }
 
+// MARK: - Schema V34（新增 HumanMedicationLog，人类吃药打卡记录）
+enum ArkSchemaV34: VersionedSchema {
+    static var versionIdentifier = Schema.Version(34, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [
+            Pet.self, Human.self, Plant.self, Household.self, Event.self, Reminder.self,
+            PetPottyLog.self, PetWalkLog.self, PetHygieneLog.self, PetWeightLog.self,
+            PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
+            PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
+            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
+            PetDocumentAttachment.self, HumanMedication.self, HumanHealthReport.self,
+            PetMedication.self, PetInsurance.self, PetPhotoLog.self,
+            PlantCareLog.self, SymptomLog.self, HeatCycleLog.self,
+            InsuranceClaim.self, HumanMedicationLog.self,
+        ]
+    }
+}
+
 // MARK: - Migration Plan
 // NOTE: 只保留有真实 custom logic 的 stage。
 // SwiftData 的 lightweight migration 对于"只新增字段/模型"完全不需要显式 stage——
@@ -611,7 +630,7 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
          ArkSchemaV17.self, ArkSchemaV18.self, ArkSchemaV19.self, ArkSchemaV20.self,
          ArkSchemaV21.self, ArkSchemaV22.self, ArkSchemaV23.self, ArkSchemaV24.self,
          ArkSchemaV25.self, ArkSchemaV26.self, ArkSchemaV27.self, ArkSchemaV28.self, ArkSchemaV29.self,
-         ArkSchemaV30.self, ArkSchemaV31.self, ArkSchemaV32.self, ArkSchemaV33.self]
+         ArkSchemaV30.self, ArkSchemaV31.self, ArkSchemaV32.self, ArkSchemaV33.self, ArkSchemaV34.self]
     }
 
     static var stages: [MigrationStage] { [] }
@@ -641,7 +660,7 @@ struct SharedModelContainer {
     }
 
     private static func createPersistentContainer() -> ModelContainer {
-        let schema = Schema(ArkSchemaV33.models)
+        let schema = Schema(ArkSchemaV34.models)
         let defaultConfig = ModelConfiguration(
             isStoredInMemoryOnly: false,
             cloudKitDatabase: .none

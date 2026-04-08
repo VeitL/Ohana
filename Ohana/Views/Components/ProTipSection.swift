@@ -19,9 +19,7 @@ struct ProTipSection: View {
     }
     
     private var cardBorder: Color {
-        colorScheme == .light
-            ? Color(hex: "FF5A00").opacity(0.4)
-            : Color(hex: "FF8A4A").opacity(0.5)
+        Color.goPrimary.opacity(colorScheme == .light ? 0.42 : 0.55)
     }
     
     private var titleColor: Color {
@@ -35,12 +33,13 @@ struct ProTipSection: View {
                 // 魔法图标
                 ZStack {
                     Circle()
-                        .fill(Color(hex: "FF5A00").opacity(colorScheme == .light ? 0.12 : 0.25))
+                        .fill(Color.goPrimary.opacity(colorScheme == .light ? 0.14 : 0.28))
                         .frame(width: 36, height: 36)
                     
                     Image(systemName: "sparkles")
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Color(hex: "FF5A00"))
+                        .symbolRenderingMode(.monochrome)
+                        .foregroundStyle(Color.goPrimary)
                 }
                 
                 Text("解锁 3D 悬浮卡片")
@@ -52,10 +51,10 @@ struct ProTipSection: View {
                 // 新功能标签
                 Text("NEW")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(Color(hex: "FF5A00"), in: Capsule())
+                    .background(Color.goPrimary, in: Capsule())
             }
             
             // MARK: 步骤说明
@@ -65,7 +64,7 @@ struct ProTipSection: View {
                     text: "在系统相册中",
                     highlightText: "长按宠物主体",
                     suffix: "",
-                    highlightColor: Color(hex: "FF5A00")
+                    highlightColor: Color.goPrimary
                 )
                 
                 StepRow(
@@ -73,7 +72,7 @@ struct ProTipSection: View {
                     text: "点击",
                     highlightText: "拷贝",
                     suffix: "保存到剪贴板",
-                    highlightColor: Color(hex: "FF5A00")
+                    highlightColor: Color.goPrimary
                 )
                 
                 StepRow(
@@ -81,7 +80,7 @@ struct ProTipSection: View {
                     text: "返回 Ohana，点击下方",
                     highlightText: "粘贴按钮",
                     suffix: "",
-                    highlightColor: Color(hex: "FF5A00")
+                    highlightColor: Color.goPrimary
                 )
             }
         }

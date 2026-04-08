@@ -140,6 +140,7 @@ struct OverviewView: View {
     // 岛屿日报（每日首次弹窗）
     @AppStorage("lastIslandReportDate") private var lastIslandReportDate: String = ""
     @State private var showIslandDailyReport = false
+    @State private var homeScrollTarget: String? = nil
     // Phase 5: Bento 卡急迫发光动画
     @State private var bentoUrgentGlow = false
     // Quick Action 编辑模式（iOS 桌面风格）
@@ -481,7 +482,10 @@ struct OverviewView: View {
                 plants: plants,
                 events: allEvents,
                 onStartTasks: {
-                    // 自动滚动到委托区域（由 ScrollViewReader 处理）
+                    selectedDockTab = 0
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        homeScrollTarget = "quickActions"
+                    }
                 }
             )
             .presentationBackground(.clear)
@@ -523,8 +527,9 @@ struct OverviewView: View {
     //   Header → Wallet Stack → [⚠️紧急警告] → 快捷操作 → 今日任务 → 游戏化面板 → 记忆碎片 → 岛屿统计
     private var mainScrollView: some View {
         VStack(spacing: 0) {
-            ScrollView(.vertical, showsIndicators: false) {
-            // R6: 全局 header 占位
+            ScrollViewReader { proxy in
+                ScrollView(.vertical, showsIndicators: false) {
+                // R6: 全局 header 占位
             Spacer().frame(height: 70)
             VStack(spacing: 20) {
                 // ── 层2引导：有Human无Pet时显示添加宠物引导卡
@@ -576,6 +581,7 @@ struct OverviewView: View {
                     case "quickActions", "todayActions", "quickAccess", "todayTasks":
                         if !hiddenSections.contains("quickActions") && !hiddenSections.contains("todayActions") {
                             quickActionsOnlySection
+                                .id("quickActions")
                         }
                     case "batchCheckIn":
                         if !hiddenSections.contains("batchCheckIn") {
@@ -626,7 +632,18 @@ struct OverviewView: View {
 
                 Spacer(minLength: 120)
             }
+            .onChange(of: homeScrollTarget) { target in
+                if let t = target {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        proxy.scrollTo(t, anchor: .top)
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        homeScrollTarget = nil
+                    }
+                }
+            }
             } // end ScrollView
+            } // end ScrollViewReader
         } // end VStack
     }
 
@@ -638,7 +655,10 @@ struct OverviewView: View {
         for id in allIds where !result.contains(id) { result.append(id) }
         // Dedup (legacy todayActions might coexist with new quickActions)
         var seen = Set<String>()
-        return result.filter { seen.insert($0).inserted }
+        return result.compactMap { id -> String? in
+            let normalized = legacyIds.contains(id) ? "quickActions" : id
+            return seen.insert(normalized).inserted ? normalized : nil
+        }
     }
     
     // MARK: - Memory Drop Placeholder
@@ -731,6 +751,9 @@ struct OverviewView: View {
                             Button { showingAddEntity = true } label: {
                                 Label("添加成员", systemImage: "person.badge.plus")
                             }
+                            Button { showingCrewRoster = true } label: {
+                                Label(l.ohanaCrew, systemImage: "person.2.fill")
+                            }
                             Button { showingManageSheet = true } label: {
                                 Label("管理主页模块", systemImage: "slider.horizontal.3")
                             }
@@ -747,21 +770,31 @@ struct OverviewView: View {
                         .menuActionDismissBehavior(.automatic)
                         .buttonStyle(.plain)
 
+                        Button { showingCrewRoster = true } label: {
+                            Image(systemName: "person.2.fill")
+                                .font(OhanaFont.subheadline(.bold))
+                                .foregroundStyle(Color.goPrimary)
+                                .frame(width: 32, height: 28)
+                                .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+
                         Button { showStreakDetail = true } label: {
-                            Text("\(headerStreak)")
-                                .font(OhanaFont.headline(.black))
-                                .monospacedDigit()
-                                .contentTransition(.numericText())
-                                .minimumScaleFactor(0.65)
-                                .lineLimit(1)
-                                .foregroundStyle(headerStreak >= 7 ? Color.arkInk : Color.primary)
-                                .frame(minWidth: 26)
-                                .padding(.horizontal, 8).padding(.vertical, 4)
-                                .frame(height: 28)
-                                .background(
-                                    headerStreak >= 7 ? Color.orange : Color.primary.opacity(0.08),
-                                    in: Capsule()
-                                )
+                            HStack(spacing: 3) {
+                                Image(systemName: "flame.fill")
+                                    .font(OhanaFont.caption(.bold))
+                                Text("\(headerStreak)")
+                                    .font(OhanaFont.subheadline(.bold))
+                                    .monospacedDigit()
+                                    .contentTransition(.numericText())
+                            }
+                            .foregroundStyle(headerStreak >= 7 ? .white : Color.goPrimary)
+                            .padding(.horizontal, 8)
+                            .frame(height: 28)
+                            .background(
+                                headerStreak >= 7 ? Color.orange : Color.primary.opacity(0.08),
+                                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            )
                         }
                         .buttonStyle(.plain)
                     case 1:
@@ -1286,26 +1319,26 @@ struct OverviewView: View {
                 }
             }
         } label: {
-            VStack(spacing: 6) {
-                Image(systemName: action.type.sfIcon)
-                    .font(OhanaFont.metric(size: 26, .semibold))
-                    .foregroundStyle(isDone ? Color.goPrimary : .primary.opacity(0.75))
-                    .scaleEffect(isPressed ? 0.90 : 1.0)
-                    .frame(width: 44, height: 44)
+            LiquidGlassButton(isPressed: isPressed, isDone: isDone) {
+                VStack(spacing: 4) {
+                    Image(systemName: action.type.sfIcon)
+                        .font(OhanaFont.metric(size: 24, .semibold))
+                        .foregroundStyle(isDone ? Color.goPrimary : .primary.opacity(0.85))
+                        .frame(width: 40, height: 40)
 
-                VStack(spacing: 1) {
-                    Text(action.type.label)
-                        .font(OhanaFont.caption2(.semibold))
-                        .foregroundStyle(.primary.opacity(0.75))
-                        .lineLimit(1)
-                    Text(isDone ? "已完成" : "全家")
-                        .font(OhanaFont.caption2(.medium))
-                        .foregroundStyle(.primary.opacity(0.35))
-                        .lineLimit(1)
+                    VStack(spacing: 0) {
+                        Text(action.type.label)
+                            .font(OhanaFont.caption2(.bold))
+                            .foregroundStyle(.primary.opacity(0.85))
+                            .lineLimit(1)
+                        Text(isDone ? "已完成" : "全家")
+                            .font(OhanaFont.caption2(.medium))
+                            .foregroundStyle(.primary.opacity(0.45))
+                            .lineLimit(1)
+                    }
                 }
+                .padding(.vertical, 4)
             }
-            .scaleEffect(isPressed ? 0.88 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isPressed)
         }
         .buttonStyle(.plain)
     }
@@ -1428,9 +1461,10 @@ struct OverviewView: View {
                 .animation(.spring(response: 0.38, dampingFraction: 0.78),
                            value: activeQuickActionItems.map(\.id))
 
-            // Walk tracking card: shown for dog pets
-            if let walkPet = deckActivePet,
-               walkPet.species.lowercased().contains("dog") || walkPet.species.contains("狗") {
+            // Walk tracking card: shown for dog pets ONLY if actively walking
+            if let walkPet = PetWalkingManager.shared.currentPet ?? deckActivePet,
+               (walkPet.species.lowercased().contains("dog") || walkPet.species.contains("狗")),
+               PetWalkingManager.shared.phase != .idle {
                 WalkTrackingCard(pet: walkPet)
                     .frame(height: 160)
                     .padding(.horizontal, 16)
@@ -2415,47 +2449,58 @@ struct OverviewView: View {
     /// 岛屿委托轮播「完成打卡」：与 Bento 同路径，避免数据分叉
     @MainActor
     private func completeIslandQuest(_ quest: IslandQuest) {
-        switch quest.id {
-        case "q_walk":
+        if quest.id.hasPrefix("q_feed_") {
             if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) {
-                applyAction("walk", pet: p)
+                applyAction("feed", pet: p)
             }
-        case "q_potty":
+        } else if quest.id.hasPrefix("q_water_") && !quest.id.hasPrefix("q_water_plant") {
             if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) {
-                applyAction("potty", pet: p)
+                applyAction("water", pet: p)
             }
-        case "q_water_plant":
-            if let id = quest.targetPlantId, let pl = plants.first(where: { $0.id == id }) {
-                completePlantWatering(pl)
-            }
-        case "q_fertilize_plant":
-            if let id = quest.targetPlantId, let pl = plants.first(where: { $0.id == id }) {
-                completePlantFertilizing(pl)
-            }
-        case "q_visit":
-            IslandQuestEngine.markVisited()
-            if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) {
-                selectedPet = p
-            } else if let p = pets.first {
-                selectedPet = p
-            }
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-        case "q_reminder":
-            showingCalendar = true
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        default:
-            if let mid = IslandQuestEngine.medicationId(fromQuestId: quest.id) {
-                for p in pets {
-                    if let med = p.medications.first(where: { $0.id == mid }) {
-                        PetMedicationDoseLogging.recordDose(medication: med, pet: p, modelContext: modelContext)
-                        UINotificationFeedbackGenerator().notificationOccurred(.success)
-                        break
+        } else {
+            switch quest.id {
+            case "q_walk":
+                if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) {
+                    applyAction("walk", pet: p)
+                }
+            case "q_potty":
+                if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) {
+                    applyAction("potty", pet: p)
+                }
+            case "q_water_plant":
+                if let id = quest.targetPlantId, let pl = plants.first(where: { $0.id == id }) {
+                    completePlantWatering(pl)
+                }
+            case "q_fertilize_plant":
+                if let id = quest.targetPlantId, let pl = plants.first(where: { $0.id == id }) {
+                    completePlantFertilizing(pl)
+                }
+            case "q_visit":
+                IslandQuestEngine.markVisited()
+                if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) {
+                    selectedPet = p
+                } else if let p = pets.first {
+                    selectedPet = p
+                }
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            case "q_reminder":
+                showingCalendar = true
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            default:
+                if let mid = IslandQuestEngine.medicationId(fromQuestId: quest.id) {
+                    for p in pets {
+                        if let med = p.medications.first(where: { $0.id == mid }) {
+                            PetMedicationDoseLogging.recordDose(medication: med, pet: p, modelContext: modelContext)
+                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                            break
+                        }
                     }
                 }
             }
         }
         let amt = IslandQuestEngine.coconutReward(forQuestId: quest.id)
-        if amt > 0 {
+        if amt > 0 && quest.id != "q_walk" {
+            QuestManager.shared.addCoconuts(amt, title: "岛屿委托奖励")
             triggerCoconutReward(amount: amt, label: nil)
         }
     }

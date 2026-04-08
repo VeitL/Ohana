@@ -465,25 +465,7 @@ struct SettingsView: View {
                     .foregroundStyle(secondaryText)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
-                        // "未绑定" 选项
-                        Button {
-                            currentActiveHumanId = ""
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        } label: {
-                            VStack(spacing: 4) {
-                                ZStack {
-                                    Circle()
-                                        .fill(currentActiveHumanId.isEmpty ? Color.goPrimary.opacity(0.2) : Color.white.opacity(0.08))
-                                        .frame(width: 44, height: 44)
-                                        .overlay(Circle().strokeBorder(currentActiveHumanId.isEmpty ? Color.goPrimary : Color.clear, lineWidth: 2))
-                                    Text("👤").font(.system(size: 20))
-                                }
-                                Text("未绑定")
-                                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                                    .foregroundStyle(currentActiveHumanId.isEmpty ? Color.goPrimary : .white.opacity(0.4))
-                            }
-                        }
-                        .buttonStyle(.plain)
+                        /* Removing "Unbind" option to enforce mandatory identity */
 
                         ForEach(humans) { human in
                             let isSelected = currentActiveHumanId == human.id.uuidString
@@ -821,7 +803,11 @@ struct SettingsView: View {
             try modelContext.delete(model: Pet.self)
             try modelContext.delete(model: Event.self)
             try modelContext.delete(model: Reminder.self)
+            try modelContext.delete(model: Human.self)
             try modelContext.save()
+            // Reset onboarding and binding to force fresh setup
+            UserDefaults.standard.set(false, forKey: "ohana_has_onboarded")
+            UserDefaults.standard.set("", forKey: "currentActiveHumanId")
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         } catch {
             print("Clear data error: \(error)")

@@ -59,7 +59,7 @@ final class Human {
         self.nationality = nationality
         self.city = city
         self.coconutBalance = 0
-        self.shouldShowOnHome = false
+        self.shouldShowOnHome = true
         self.themeColorHex = "4338FF"
         self.privateFieldsRaw = ""
         self.heightCm = 0

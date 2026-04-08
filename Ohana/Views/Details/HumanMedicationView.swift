@@ -6,12 +6,21 @@
 import SwiftUI
 import SwiftData
 
+struct DailyDoseItem: Identifiable, Hashable {
+    let id = UUID()
+    let medication: HumanMedication
+    let scheduledTime: Date
+    let doseIndex: Int
+    var log: HumanMedicationLog?
+}
+
 // MARK: - Main View
 
 struct HumanMedicationView: View {
     let human: Human
     @Environment(\.modelContext) private var modelContext
     @Query private var allMeds: [HumanMedication]
+    @Query private var allLogs: [HumanMedicationLog]
 
     @State private var showAddSheet = false
     @State private var editingMed: HumanMedication? = nil
@@ -25,6 +34,47 @@ struct HumanMedicationView: View {
     private var activeMeds: [HumanMedication] { myMeds.filter { $0.isActive } }
     private var inactiveMeds: [HumanMedication] { myMeds.filter { !$0.isActive } }
 
+    private var todayLogs: [HumanMedicationLog] {
+        allLogs.filter { log in
+            Calendar.current.isDateInToday(log.scheduledTime) && log.humanId == human.id.uuidString
+        }
+    }
+    
+    private var todayScheduleItems: [DailyDoseItem] {
+        var items: [DailyDoseItem] = []
+        let now = Date()
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: now)
+
+        for med in activeMeds {
+            let dosesPerDay = med.frequency.dosesPerDay
+            guard dosesPerDay > 0 else { continue } // 按需不参与静态排表
+
+            if med.frequency == .weekly {
+                let daysSinceStart = calendar.dateComponents([.day], from: med.startDate, to: startOfToday).day ?? 0
+                if daysSinceStart % 7 != 0 { continue }
+            }
+            
+            let intervalHours = 24.0 / Double(dosesPerDay)
+            var baseComponents = calendar.dateComponents([.year, .month, .day], from: now)
+            let timeComponents = calendar.dateComponents([.hour, .minute], from: med.firstDoseTime)
+            baseComponents.hour = timeComponents.hour ?? 8
+            baseComponents.minute = timeComponents.minute ?? 0
+            baseComponents.second = 0
+            guard let baseTime = calendar.date(from: baseComponents) else { continue }
+            
+            for doseIdx in 0..<dosesPerDay {
+                let fireDate = baseTime.addingTimeInterval(Double(doseIdx) * intervalHours * 3600)
+                let existingLog = todayLogs.first(where: { 
+                    $0.medicationId == med.id.uuidString && 
+                    calendar.isDate($0.scheduledTime, equalTo: fireDate, toGranularity: .minute)
+                })
+                items.append(DailyDoseItem(medication: med, scheduledTime: fireDate, doseIndex: doseIdx, log: existingLog))
+            }
+        }
+        return items.sorted { $0.scheduledTime < $1.scheduledTime }
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             ArkBackgroundView().ignoresSafeArea()
@@ -35,6 +85,23 @@ struct HumanMedicationView: View {
                     summaryBento
                         .padding(.horizontal, 16)
                         .padding(.top, 16)
+
+                    // Today's Schedule Timeline
+                    if !todayScheduleItems.isEmpty {
+                        sectionLabel("今日时间表")
+                        UltimateGlassCard {
+                            VStack(spacing: 0) {
+                                ForEach(Array(todayScheduleItems.enumerated()), id: \.element.id) { index, item in
+                                    scheduleRow(item)
+                                    if index < todayScheduleItems.count - 1 {
+                                        Divider().background(Color.white.opacity(0.1)).padding(.leading, 64)
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 8)
+                        }
+                        .padding(.horizontal, 16)
+                    }
 
                     // Today's Doses
                     if !activeMeds.isEmpty {
@@ -168,6 +235,83 @@ struct HumanMedicationView: View {
                 .foregroundStyle(.white.opacity(0.5))
         }
         .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Schedule Timeline
+
+    private func scheduleRow(_ item: DailyDoseItem) -> some View {
+        let isTaken = item.log?.status == .taken
+        
+        return HStack(spacing: 16) {
+            // Time
+            VStack(alignment: .trailing) {
+                Text(item.scheduledTime, style: .time)
+                    .font(OhanaFont.callout(.bold))
+                    .foregroundStyle(isTaken ? .white.opacity(0.4) : .white)
+            }
+            .frame(width: 52, alignment: .trailing)
+            
+            // Interaction Checkmark
+            Button {
+                toggleDoseStatus(item)
+            } label: {
+                ZStack {
+                    Circle()
+                        .strokeBorder(isTaken ? Color.goTeal : .white.opacity(0.3), lineWidth: 2)
+                        .frame(width: 28, height: 28)
+                        .background(
+                            Circle().fill(isTaken ? Color.goTeal : Color.clear)
+                        )
+                    if isTaken {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.black)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            
+            // Info
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.medication.name)
+                    .font(OhanaFont.headline(.semibold))
+                    .foregroundStyle(isTaken ? .white.opacity(0.5) : .white)
+                    .strikethrough(isTaken, color: .white.opacity(0.5))
+                if !item.medication.dosage.isEmpty {
+                    Text(item.medication.dosage)
+                        .font(OhanaFont.caption())
+                        .foregroundStyle(.white.opacity(0.4))
+                }
+            }
+            
+            Spacer()
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+    }
+
+    private func toggleDoseStatus(_ item: DailyDoseItem) {
+        withAnimation(.spring(response: 0.3)) {
+            if let log = item.log {
+                if log.status == .taken {
+                    log.status = .pending
+                    log.recordedTime = nil
+                } else {
+                    log.status = .taken
+                    log.recordedTime = Date()
+                }
+            } else {
+                let newLog = HumanMedicationLog(
+                    humanId: human.id.uuidString,
+                    medicationId: item.medication.id.uuidString,
+                    scheduledTime: item.scheduledTime,
+                    status: .taken,
+                    recordedTime: Date()
+                )
+                modelContext.insert(newLog)
+            }
+            modelContext.safeSave()
+        }
     }
 
     // MARK: - Medication Row

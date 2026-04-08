@@ -10,13 +10,14 @@ import SwiftData
 
 struct RootView: View {
     @AppStorage("ohana_has_onboarded") private var hasOnboarded = false
+    @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
     // F3: 数据库降级警告
     @State private var showDBFallbackAlert = UserDefaults.standard.bool(forKey: "ohana_db_fallback_active")
     @Environment(\.modelContext) private var modelContext
 
     var body: some View {
         Group {
-            if hasOnboarded {
+            if hasOnboarded && !currentActiveHumanId.isEmpty {
                 ContentView()
             } else {
                 OnboardingView()

@@ -232,7 +232,11 @@ struct HomeHighlightDeck: View {
                     plants: plants,
                     onComplete: {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        pendingCompleteQuest = quest
+                        if quest.id == "q_walk" || quest.id.hasPrefix("q_feed_") {
+                            onCompleteQuest(quest)
+                        } else {
+                            pendingCompleteQuest = quest
+                        }
                     },
                     onSkip: {
                         let qid = quest.id
