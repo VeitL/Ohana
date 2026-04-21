@@ -2,28 +2,33 @@
 //  FocusStackHomeTestView.swift
 //  Ohana
 //
-//  实验页：playlist 堆叠卡片 + 全屏 Focus 展开。
+//  实验页：playlist 堆叠 + 单卡全屏 Focus。
 //  入口：设置 → 开发者工具 → Focus Stack 实验主页
 //
 
 import SwiftUI
 import SwiftData
 
-// MARK: - Data model
+// MARK: - Card model
 
 private struct FocusCard: Identifiable {
     let id: UUID
     let name: String
-    let species: String          // 宠物物种 / 人类角色
+    let kind: String          // species / role
     let emoji: String
     let color: Color
     let streak: Int
+    let coconutBalance: Int
     var avatarImageData: Data?
-    // 快捷动作标签（最多4个）
-    var actions: [FocusAction]
+    var petSpecies: String?
+    var coatColor: Color = Color(hex: "E8C49A")
+    var eyeColor: Color = Color(hex: "6B3A2A")
+    var patternName: String?
+    var isHuman: Bool = false
     var isDummy: Bool = false
+    var actions: [Action]
 
-    struct FocusAction: Identifiable {
+    struct Action: Identifiable {
         let id = UUID()
         let label: String
         let icon: String
@@ -31,334 +36,339 @@ private struct FocusCard: Identifiable {
 }
 
 private extension FocusCard {
+    // MARK: Pet factory
     static func from(_ pet: Pet) -> FocusCard {
-        let isDog = pet.species.localizedCaseInsensitiveContains("狗") || pet.species.localizedCaseInsensitiveContains("dog")
-        let isCat = pet.species.localizedCaseInsensitiveContains("猫") || pet.species.localizedCaseInsensitiveContains("cat")
-        let isFish = pet.species.localizedCaseInsensitiveContains("鱼") || pet.species.localizedCaseInsensitiveContains("fish")
-
-        var acts: [FocusCard.FocusAction] = [
-            .init(label: "FEED", icon: "fork.knife"),
-        ]
-        if isFish {
-            acts += [.init(label: "WATER", icon: "drop.circle.fill"), .init(label: "FILTER", icon: "wrench.and.screwdriver")]
-        } else if isDog {
-            acts += [.init(label: "WALK", icon: "figure.walk"), .init(label: "WATER", icon: "drop.fill"), .init(label: "POTTY", icon: "allergens")]
-        } else if isCat {
-            acts += [.init(label: "WATER", icon: "drop.fill"), .init(label: "LITTER", icon: "trash"), .init(label: "PLAY", icon: "sparkles")]
-        } else {
-            acts += [.init(label: "WATER", icon: "drop.fill"), .init(label: "PLAY", icon: "sparkles")]
-        }
-
-        let colorHex = pet.themeColorHex.isEmpty ? "5B6AFF" : pet.themeColorHex
+        let isDog  = pet.species.contains("狗")  || pet.species.lowercased().contains("dog")
+        let isCat  = pet.species.contains("猫")  || pet.species.lowercased().contains("cat")
+        let isFish = pet.species.contains("鱼")  || pet.species.lowercased().contains("fish")
+        var acts: [Action] = [.init(label: "FEED",  icon: "fork.knife")]
+        if isFish  { acts += [.init(label: "WATER",  icon: "drop.circle"),
+                               .init(label: "FILTER", icon: "wrench.and.screwdriver")] }
+        else if isDog { acts += [.init(label: "WALK",  icon: "figure.walk"),
+                                  .init(label: "WATER", icon: "drop"),
+                                  .init(label: "POTTY", icon: "allergens")] }
+        else if isCat { acts += [.init(label: "WATER", icon: "drop"),
+                                  .init(label: "LITTER",icon: "trash"),
+                                  .init(label: "PLAY",  icon: "sparkles")] }
+        else          { acts += [.init(label: "WATER", icon: "drop"),
+                                  .init(label: "PLAY",  icon: "sparkles")] }
+        let hex = pet.themeColorHex.isEmpty ? "FFB3C6" : pet.themeColorHex
         return FocusCard(
-            id: pet.id,
-            name: pet.name,
-            species: pet.species.isEmpty ? "PET" : pet.species,
+            id: pet.id, name: pet.name.isEmpty ? "Unnamed" : pet.name,
+            kind: pet.species.isEmpty ? "PET" : pet.species,
             emoji: pet.avatarEmoji.isEmpty ? "🐾" : pet.avatarEmoji,
-            color: Color(hex: colorHex),
-            streak: pet.currentStreak,
+            color: Color(hex: hex), streak: pet.currentStreak,
+            coconutBalance: pet.coconutBalance,
             avatarImageData: pet.avatarImageData,
+            petSpecies: pet.species,
+            coatColor: WalletPetCardTheme.silhouetteCoatColor(for: pet),
+            eyeColor:  WalletPetCardTheme.silhouetteEyeColor(for: pet),
+            patternName: WalletPetCardTheme.coatPatternName(for: pet),
             actions: Array(acts.prefix(4))
         )
     }
 
+    // MARK: Human factory
     static func from(_ human: Human) -> FocusCard {
-        let colorHex = human.themeColorHex.isEmpty ? "4338FF" : human.themeColorHex
+        let hex = human.themeColorHex.isEmpty ? "B9E8D2" : human.themeColorHex
         return FocusCard(
-            id: human.id,
-            name: human.name,
-            species: "HUMAN",
+            id: human.id, name: human.name.isEmpty ? "Human" : human.name,
+            kind: human.roleText.isEmpty ? "HUMAN" : human.roleText,
             emoji: human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji,
-            color: Color(hex: colorHex),
-            streak: 0,
+            color: Color(hex: hex), streak: 0,
+            coconutBalance: human.coconutBalance,
             avatarImageData: human.avatarImageData,
-            actions: [
-                .init(label: "WEIGHT", icon: "scalemass"),
-                .init(label: "WORKOUT", icon: "figure.run"),
-                .init(label: "NOTE", icon: "note.text"),
-            ]
+            isHuman: true,
+            actions: [.init(label: "WEIGHT",  icon: "scalemass"),
+                      .init(label: "WORKOUT", icon: "figure.run"),
+                      .init(label: "NOTE",    icon: "note.text")]
         )
     }
 
-    // MARK: Dummies (shown when no real data)
+    // MARK: Dummies
     static let dummies: [FocusCard] = [
-        FocusCard(id: UUID(), name: "Mochi", species: "DOG", emoji: "🐶",
-                  color: Color(hex: "FFB3C6"), streak: 7,
-                  actions: [.init(label: "FEED", icon: "fork.knife"),
-                             .init(label: "WALK", icon: "figure.walk"),
-                             .init(label: "WATER", icon: "drop.fill"),
-                             .init(label: "POTTY", icon: "allergens")], isDummy: true),
-        FocusCard(id: UUID(), name: "Luna", species: "CAT", emoji: "🐱",
-                  color: Color(hex: "C3B1E1"), streak: 12,
-                  actions: [.init(label: "FEED", icon: "fork.knife"),
-                             .init(label: "WATER", icon: "drop.fill"),
-                             .init(label: "LITTER", icon: "trash"),
-                             .init(label: "PLAY", icon: "sparkles")], isDummy: true),
-        FocusCard(id: UUID(), name: "Alex", species: "HUMAN", emoji: "🧑‍💻",
-                  color: Color(hex: "B5EAD7"), streak: 0,
-                  actions: [.init(label: "WEIGHT", icon: "scalemass"),
+        FocusCard(id: UUID(), name: "Mochi", kind: "DOG", emoji: "🐶",
+                  color: Color(hex: "F4A7B9"), streak: 7, coconutBalance: 42,
+                  petSpecies: "狗", coatColor: Color(hex: "D7A76D"), eyeColor: Color(hex: "57341E"),
+                  isDummy: true,
+                  actions: [.init(label: "FEED",  icon: "fork.knife"),
+                             .init(label: "WALK",  icon: "figure.walk"),
+                             .init(label: "WATER", icon: "drop"),
+                             .init(label: "POTTY", icon: "allergens")]),
+        FocusCard(id: UUID(), name: "Luna", kind: "CAT", emoji: "🐱",
+                  color: Color(hex: "C9B6E4"), streak: 12, coconutBalance: 66,
+                  petSpecies: "猫", coatColor: Color(hex: "9CA7B2"), eyeColor: Color(hex: "7A4E20"),
+                  isDummy: true,
+                  actions: [.init(label: "FEED",  icon: "fork.knife"),
+                             .init(label: "WATER", icon: "drop"),
+                             .init(label: "LITTER",icon: "trash"),
+                             .init(label: "PLAY",  icon: "sparkles")]),
+        FocusCard(id: UUID(), name: "Alex", kind: "HUMAN", emoji: "🧑‍💻",
+                  color: Color(hex: "B9E8D2"), streak: 3, coconutBalance: 18,
+                  isHuman: true, isDummy: true,
+                  actions: [.init(label: "WEIGHT",  icon: "scalemass"),
                              .init(label: "WORKOUT", icon: "figure.run"),
-                             .init(label: "NOTE", icon: "note.text")], isDummy: true),
-        FocusCard(id: UUID(), name: "Nemo", species: "FISH", emoji: "🐟",
-                  color: Color(hex: "AED9E0"), streak: 3,
-                  actions: [.init(label: "FEED", icon: "fork.knife"),
-                             .init(label: "WATER", icon: "drop.circle.fill"),
-                             .init(label: "FILTER", icon: "wrench.and.screwdriver")], isDummy: true),
+                             .init(label: "NOTE",    icon: "note.text")]),
+        FocusCard(id: UUID(), name: "Nemo", kind: "FISH", emoji: "🐟",
+                  color: Color(hex: "C7E7F1"), streak: 4, coconutBalance: 24,
+                  petSpecies: "鱼", isDummy: true,
+                  actions: [.init(label: "FEED",   icon: "fork.knife"),
+                             .init(label: "WATER",  icon: "drop.circle"),
+                             .init(label: "FILTER", icon: "wrench.and.screwdriver")]),
     ]
 }
 
-// MARK: - Layout constants
+// MARK: - Constants
 
-private enum FSLayout {
-    /// iPhone 全面屏圆角：取设备最短边 × 0.12，约 44–52pt
-    static func screenCornerRadius() -> CGFloat {
-        let m = min(ScreenCompat.width, ScreenCompat.height)
-        return max(40, m * 0.115)
+private enum K {
+    // Stack layout
+    /// Full height of each stack card
+    static let cardH: CGFloat = 200
+    /// How many pt of the BOTTOM of each card peek out below the card above it
+    static let peekH: CGFloat = 80
+    /// Horizontal padding around stack cards
+    static let hPad:  CGFloat = 0
+
+    // Colors
+    static let bg     = Color(hex: "F8D8DF")
+    static let ink    = Color(hex: "23181A")
+    static let muted  = Color(hex: "8B6E74")
+
+    /// Corner radius matching device screen (~44–52 pt on modern iPhones)
+    static func screenR(_ size: CGSize) -> CGFloat {
+        max(44, min(size.width, size.height) * 0.115)
     }
-    static let hMargin: CGFloat = 0        // 卡片左右贴边（距离屏幕边缘与系统圆角一致）
-    static let peekStep: CGFloat = 80      // 每张卡可见高度（叠放偏移量）
-    static let heroRatio: CGFloat = 0.55   // 展开后英雄卡占屏幕高度比例
-    static let topBarHeight: CGFloat = 36
 }
 
-// MARK: - Main view
+// MARK: - Main
 
 struct FocusStackHomeTestView: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable private var questMgr = QuestManager.shared
-    @Query(sort: \Pet.createdAt)   private var pets: [Pet]
+    @Query(sort: \Pet.createdAt)   private var pets:   [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
 
-    @Namespace private var heroNS
     @State private var expandedId: UUID?
     @State private var dragOffset: CGFloat = 0
 
-    // ── derived card list
     private var cards: [FocusCard] {
-        let realPets   = pets.filter { !$0.hasPassedAway }.map { FocusCard.from($0) }
-        let realHumans = humans.map { FocusCard.from($0) }
-        let real = realPets + realHumans
-        return real.isEmpty ? FocusCard.dummies : real
+        let r = pets.filter { !$0.hasPassedAway }.map { FocusCard.from($0) }
+              + humans.map { FocusCard.from($0) }
+        return r.isEmpty ? FocusCard.dummies : r
     }
+
+    // MARK: body
 
     var body: some View {
         GeometryReader { geo in
-            ZStack(alignment: .top) {
-                canvas.ignoresSafeArea()
+            ZStack {
+                // ── 1. Full-bleed background (always behind everything)
+                K.bg.ignoresSafeArea()
 
+                // ── 2. Stack layer — always rendered so geometry is stable
+                stackLayer(geo: geo)
+                    .opacity(expandedId == nil ? 1 : 0)
+                    .scaleEffect(expandedId == nil ? 1 : 0.94, anchor: .center)
+                    .allowsHitTesting(expandedId == nil)
+
+                // ── 3. Expanded overlay
                 if let id = expandedId, let card = cards.first(where: { $0.id == id }) {
-                    expandedScreen(card: card, geo: geo)
-                        .offset(y: max(0, dragOffset))
-                        .transition(.opacity)
-                } else {
-                    stackScreen(geo: geo)
-                        .transition(.opacity)
+                    expandedLayer(card: card, geo: geo)
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.92, anchor: UnitPoint(x: 0.5, y: 0.18))
+                                .combined(with: .opacity),
+                            removal:   .scale(scale: 0.92, anchor: UnitPoint(x: 0.5, y: 0.18))
+                                .combined(with: .opacity)
+                        ))
                 }
             }
-            .animation(.spring(response: 0.46, dampingFraction: 0.80), value: expandedId)
+            .animation(.spring(response: 0.44, dampingFraction: 0.82), value: expandedId)
         }
-        .navigationBarHidden(true)
         .ignoresSafeArea()
+        .navigationBarHidden(true)
     }
 
-    // MARK: – Canvas
+    // MARK: – Stack layer
 
-    private var canvas: some View {
-        Color(hex: "FAF0E8")   // warm off-white — looks great behind pastel cards
-    }
+    private func stackLayer(geo: GeometryProxy) -> some View {
+        let n      = cards.count
+        let totalH = K.cardH + CGFloat(max(n - 1, 0)) * K.peekH
+        let r      = K.screenR(geo.size)
+        let safeT  = geo.safeAreaInsets.top
 
-    // MARK: – Stack screen
-
-    private func stackScreen(geo: GeometryProxy) -> some View {
-        VStack(spacing: 0) {
-            // ── top bar
+        return VStack(spacing: 0) {
+            // top bar
             HStack {
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     dismiss()
                 } label: {
                     Text("(BACK)")
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .tracking(1.2)
-                        .foregroundStyle(Color(hex: "8B7355").opacity(0.55))
+                        .microCap()
+                        .foregroundStyle(K.muted)
                 }
                 .buttonStyle(.plain)
-
                 Spacer()
-
                 Text("OHANA CREW")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .tracking(2)
-                    .foregroundStyle(Color(hex: "8B7355").opacity(0.55))
-
+                    .microCap(weight: .bold)
+                    .foregroundStyle(K.ink.opacity(0.52))
                 Spacer()
-
-                HStack(spacing: 3) {
-                    Text("🥥")
-                    Text("\(questMgr.coconutCount)")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color(hex: "8B7355").opacity(0.65))
-                }
+                Text("(\(questMgr.coconutCount) 🥥)")
+                    .microCap()
+                    .foregroundStyle(K.muted)
             }
-            .padding(.horizontal, 20)
-            .frame(height: FSLayout.topBarHeight)
-            .padding(.top, geo.safeAreaInsets.top + 4)
+            .padding(.horizontal, 22)
+            .padding(.top, safeT + 14)
+            .frame(height: safeT + 50)
 
-            // ── stacked cards
-            ZStack(alignment: .topLeading) {
+            // card stack
+            ZStack(alignment: .top) {
                 ForEach(Array(cards.enumerated()), id: \.element.id) { idx, card in
-                    stackCard(card: card, index: idx, total: cards.count)
-                        .offset(y: CGFloat(idx) * FSLayout.peekStep)
-                        .zIndex(Double(cards.count - idx))
+                    stackCard(card: card, r: r)
+                        .offset(y: CGFloat(idx) * K.peekH)
+                        // ★ FIRST card has HIGHEST z — it covers all others except their peek
+                        .zIndex(Double(n - idx))
                         .onTapGesture {
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            withAnimation(.spring(response: 0.46, dampingFraction: 0.80)) {
+                            withAnimation(.spring(response: 0.44, dampingFraction: 0.82)) {
                                 expandedId = card.id
                             }
                         }
                 }
             }
-            .padding(.top, 24)
+            .frame(height: totalH, alignment: .top)
             .frame(maxWidth: .infinity)
 
             Spacer()
         }
     }
 
-    // MARK: – Single stack card (peek strip)
+    /// One card in the stack.
+    /// The card is `K.cardH` tall. Only the BOTTOM `K.peekH` is visible
+    /// for non-first cards (the card above covers the top portion).
+    /// → Name text sits within the bottom `K.peekH` zone.
+    private func stackCard(card: FocusCard, r: CGFloat) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            // background
+            RoundedRectangle(cornerRadius: r, style: .continuous)
+                .fill(card.color.opacity(0.88))
 
-    private func stackCard(card: FocusCard, index: Int, total: Int) -> some View {
-        // Height: last card is taller to show more; others show peekStep
-        let isLast = index == total - 1
-        let height: CGFloat = isLast
-            ? FSLayout.peekStep + 40   // last card shows extra
-            : FSLayout.peekStep
+            // subtle top-shine
+            LinearGradient(
+                colors: [Color.white.opacity(0.18), Color.clear],
+                startPoint: .top, endPoint: UnitPoint(x: 0.5, y: 0.28)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: r, style: .continuous))
 
-        return ZStack(alignment: .leading) {
-            // Background
-            RoundedRectangle(cornerRadius: FSLayout.screenCornerRadius(), style: .continuous)
-                .fill(card.color.opacity(0.82))
-                .frame(height: height)
+            // ── content row: always in bottom 80pt (the peek zone)
+            HStack(spacing: 0) {
+                // left tag
+                Text(card.kind.prefix(5).uppercased())
+                    .microCap(weight: .semibold)
+                    .foregroundStyle(K.ink.opacity(0.42))
+                    .frame(width: 52, alignment: .leading)
+                    .padding(.leading, 22)
 
-            // Content row
-            HStack(alignment: .center, spacing: 0) {
-                // Left tag
-                Text(card.species.prefix(5).uppercased())
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .tracking(1)
-                    .foregroundStyle(card.color.mix(with: .black, by: 0.45))
-                    .frame(width: 48, alignment: .leading)
-                    .padding(.leading, 20)
-
-                // Name — large & black
-                Text(card.name.uppercased())
-                    .font(.system(size: 26, weight: .black, design: .rounded))
-                    .foregroundStyle(Color(hex: "1A1208").opacity(0.85))
+                // name — big, dominant
+                Text(card.name)
+                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .foregroundStyle(K.ink.opacity(0.88))
                     .lineLimit(1)
                     .minimumScaleFactor(0.45)
 
-                Spacer(minLength: 12)
+                Spacer(minLength: 10)
 
-                // Streak badge (right)
-                if card.streak >= 3 {
-                    HStack(spacing: 2) {
-                        Text("🔥")
-                            .font(.system(size: 10))
-                        Text("\(card.streak)")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color(hex: "3D2B0F").opacity(0.7))
+                // right badge
+                Group {
+                    if card.streak > 0 {
+                        Text("🔥 \(card.streak)")
+                            .microCap(weight: .bold)
+                            .foregroundStyle(K.ink.opacity(0.55))
+                    } else {
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(K.ink.opacity(0.22))
                     }
-                    .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(Color.white.opacity(0.35), in: Capsule())
-                    .padding(.trailing, 18)
-                } else {
-                    // Chevron hint
-                    Image(systemName: "chevron.up")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color(hex: "5C4D3E").opacity(0.25))
-                        .padding(.trailing, 18)
                 }
+                .padding(.trailing, 22)
             }
-            .frame(height: min(FSLayout.peekStep, height))
-            .frame(maxHeight: .infinity, alignment: .top)
+            .frame(height: K.peekH)   // exactly the peek height
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: height)
-        // Subtle top divider except first
-        .overlay(alignment: .top) {
-            if index > 0 {
-                Color.white.opacity(0.2).frame(height: 1)
-                    .padding(.horizontal, 20)
-            }
-        }
+        .frame(height: K.cardH)
+        .clipShape(RoundedRectangle(cornerRadius: r, style: .continuous))
     }
 
-    // MARK: – Expanded full-screen
+    // MARK: – Expanded layer
 
-    private func expandedScreen(card: FocusCard, geo: GeometryProxy) -> some View {
-        let safeTop = geo.safeAreaInsets.top
-        let safeBot = geo.safeAreaInsets.bottom
-        let heroH = geo.size.height * FSLayout.heroRatio
+    private func expandedLayer(card: FocusCard, geo: GeometryProxy) -> some View {
+        let r      = K.screenR(geo.size)
+        let safeT  = geo.safeAreaInsets.top
+        let safeB  = geo.safeAreaInsets.bottom
+        let heroH  = geo.size.height * 0.55
 
         return ZStack(alignment: .top) {
-            // Tinted background matching card color
-            card.color.opacity(0.18).ignoresSafeArea()
+            // Tinted full-screen background
+            card.color.mix(with: K.bg, by: 0.55)
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // ── top bar
-                expandedTopBar(card: card)
-                    .padding(.horizontal, 20)
-                    .frame(height: FSLayout.topBarHeight)
-                    .padding(.top, safeTop + 4)
+                // ── Hero card (edge-to-edge, top/left/right margin = 0)
+                heroCardView(card: card, width: geo.size.width, height: heroH, r: r)
+                    .frame(width: geo.size.width, height: heroH)
+                    .padding(.top, 0)
 
-                // ── hero card (55% height)
-                heroCard(card: card, width: geo.size.width, height: heroH)
-                    .padding(.top, 14)
-
-                // ── name + subtitle (below card)
-                VStack(spacing: 5) {
+                // ── Name + subtitle
+                VStack(spacing: 6) {
                     Text(card.name)
-                        .font(.system(size: 26, weight: .black, design: .rounded))
-                        .foregroundStyle(Color(hex: "1A1208").opacity(0.88))
+                        .font(.system(size: 30, weight: .black, design: .rounded))
+                        .foregroundStyle(K.ink.opacity(0.90))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
 
-                    Text(card.species.uppercased() + (card.streak > 0 ? "  ·  \(card.streak) day streak" : ""))
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color(hex: "5C4D3E").opacity(0.55))
+                    Text(card.kind.uppercased())
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .tracking(1.5)
+                        .foregroundStyle(K.ink.opacity(0.30))
                 }
-                .padding(.top, 18)
+                .padding(.top, 20)
+                .padding(.horizontal, 28)
 
-                // ── quick action buttons
-                actionsBar(card: card)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 24)
+                // ── Quick action buttons
+                actionsRow(card: card)
+                    .padding(.horizontal, 22)
+                    .padding(.top, 22)
 
                 Spacer(minLength: 0)
 
-                // ── dummy data notice
                 if card.isDummy {
                     Text("DEMO DATA")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .tracking(1.5)
-                        .foregroundStyle(Color(hex: "8B7355").opacity(0.3))
-                        .padding(.bottom, safeBot + 6)
+                        .microCap()
+                        .foregroundStyle(K.ink.opacity(0.18))
+                        .padding(.bottom, safeB + 8)
                 }
             }
+            .frame(maxWidth: .infinity)
+
+            // ── Top bar overlaid ON the hero card
+            expandedTopBar(card: card)
+                .padding(.horizontal, 20)
+                .padding(.top, safeT + 6)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        // Swipe-down to collapse
+        .offset(y: max(0, dragOffset))
         .gesture(
             DragGesture()
                 .onChanged { v in
                     if v.translation.height > 0 { dragOffset = v.translation.height }
                 }
                 .onEnded { v in
-                    if v.translation.height > 90 {
+                    if v.translation.height > 80 {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         withAnimation(.spring(response: 0.40, dampingFraction: 0.82)) {
-                            expandedId = nil
-                            dragOffset = 0
+                            expandedId = nil; dragOffset = 0
                         }
                     } else {
-                        withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                        withAnimation(.spring(response: 0.30, dampingFraction: 0.80)) {
                             dragOffset = 0
                         }
                     }
@@ -366,138 +376,174 @@ struct FocusStackHomeTestView: View {
         )
     }
 
-    // MARK: – Top bar (expanded state)
+    // MARK: Top bar (overlaid on hero card)
 
     private func expandedTopBar(card: FocusCard) -> some View {
-        HStack(alignment: .center, spacing: 0) {
-            // Left: streak
+        HStack(spacing: 0) {
+            // Left: streak or back
             Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 withAnimation(.spring(response: 0.40, dampingFraction: 0.82)) {
-                    expandedId = nil
-                    dragOffset = 0
+                    expandedId = nil; dragOffset = 0
                 }
             } label: {
-                Text(card.streak > 0 ? "🔥 \(card.streak)" : "(BACK)")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .tracking(1)
-                    .foregroundStyle(Color(hex: "5C4D3E").opacity(0.6))
+                Text(card.streak > 0 ? "🔥 STREAK \(card.streak)" : "(BACK)")
+                    .microCap(weight: .bold)
+                    .foregroundStyle(Color.white.opacity(0.75))
             }
             .buttonStyle(.plain)
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Center: name · kind
-            Text("\(card.name.uppercased()) · \(card.species.prefix(3).uppercased())")
-                .font(.system(size: 10, weight: .bold, design: .rounded))
-                .tracking(1.2)
-                .foregroundStyle(Color(hex: "5C4D3E").opacity(0.55))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .frame(maxWidth: .infinity, alignment: .center)
+            // Center: coconuts
+            HStack(spacing: 3) {
+                Text("🥥")
+                Text("\(questMgr.coconutCount)")
+                    .microCap(weight: .bold)
+                    .foregroundStyle(Color.white.opacity(0.80))
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
 
-            // Right: coconuts + more
-            HStack(spacing: 10) {
-                HStack(spacing: 2) {
-                    Text("🥥")
-                        .font(.system(size: 11))
-                    Text("\(questMgr.coconutCount)")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color(hex: "5C4D3E").opacity(0.65))
-                }
-
-                Menu {
-                    Button("收起") {
-                        withAnimation(.spring(response: 0.40, dampingFraction: 0.82)) {
-                            expandedId = nil; dragOffset = 0
-                        }
+            // Right: more menu
+            Menu {
+                Button("收起") {
+                    withAnimation(.spring(response: 0.40, dampingFraction: 0.82)) {
+                        expandedId = nil; dragOffset = 0
                     }
-                    if card.isDummy {
-                        Button("说明") {}
-                    }
-                } label: {
-                    Text("···")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color(hex: "5C4D3E").opacity(0.4))
                 }
+            } label: {
+                Text("(MORE)")
+                    .microCap(weight: .bold)
+                    .foregroundStyle(Color.white.opacity(0.65))
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
     }
 
-    // MARK: – Hero card
+    // MARK: Hero card (full-width, edge-to-edge)
 
-    @ViewBuilder
-    private func heroCard(card: FocusCard, width: CGFloat, height: CGFloat) -> some View {
-        let r = FSLayout.screenCornerRadius()
-        // Left, right AND top margins are equal (= hMargin = 0 → edge-to-edge, matching device radius)
+    private func heroCardView(card: FocusCard, width: CGFloat, height: CGFloat, r: CGFloat) -> some View {
         ZStack {
+            // background gradient
             RoundedRectangle(cornerRadius: r, style: .continuous)
                 .fill(
                     LinearGradient(
                         colors: [
-                            card.color.opacity(0.95),
-                            card.color.mix(with: .black, by: 0.12)
+                            card.color.mix(with: .white, by: 0.28),
+                            card.color,
+                            card.color.mix(with: .black, by: 0.14)
                         ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+                        startPoint: .topLeading, endPoint: .bottomTrailing
                     )
                 )
 
-            // Avatar / photo
-            if let data = card.avatarImageData, let ui = UIImage(data: data) {
-                Image(uiImage: ui)
+            // avatar / illustration
+            if let data = card.avatarImageData, let img = UIImage(data: data) {
+                Image(uiImage: img)
                     .resizable()
                     .scaledToFill()
                     .frame(width: width, height: height)
                     .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: r, style: .continuous))
+            } else if card.isHuman {
+                FocusHumanIllustration(emoji: card.emoji, color: card.color)
+            } else if let species = card.petSpecies {
+                PetSilhouetteView(
+                    species: normalizeSpecies(species),
+                    coatColor: card.coatColor,
+                    eyeColor:  card.eyeColor,
+                    patternName: card.patternName,
+                    isAnimationEnabled: false
+                )
+                .scaleEffect(1.6)
+                .offset(y: 14)
+                .clipped()
             } else {
                 Text(card.emoji)
-                    .font(.system(size: height * 0.38))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .font(.system(size: height * 0.42))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 
-            // Name overlay (top-left)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(card.name.uppercased())
-                    .font(.system(size: 17, weight: .black, design: .rounded))
-                    .foregroundStyle(Color(hex: "1A1208").opacity(0.65))
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            // bottom fade for readability
+            LinearGradient(
+                colors: [.clear, card.color.mix(with: .black, by: 0.08).opacity(0.5)],
+                startPoint: UnitPoint(x: 0.5, y: 0.5), endPoint: .bottom
+            )
+            .clipShape(RoundedRectangle(cornerRadius: r, style: .continuous))
+            .allowsHitTesting(false)
         }
-        .frame(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: r, style: .continuous))
-        // No shadow — "少用阴影"
+        // ★ No shadow — "少用阴影"
     }
 
-    // MARK: – Actions bar
+    // MARK: Action buttons
 
-    private func actionsBar(card: FocusCard) -> some View {
+    private func actionsRow(card: FocusCard) -> some View {
         HStack(spacing: 10) {
             ForEach(card.actions) { action in
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 } label: {
                     Text(action.label)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
                         .tracking(1.1)
-                        .foregroundStyle(Color(hex: "4A3728").opacity(0.7))
+                        .foregroundStyle(K.ink.opacity(0.65))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 15)
-                        .background(
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .fill(Color.white.opacity(0.35))
-                        )
+                        .frame(height: 50)
+                        .background(Color.white.opacity(0.28),
+                                    in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .strokeBorder(Color(hex: "C4B5A0").opacity(0.4), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .strokeBorder(K.ink.opacity(0.07), lineWidth: 1)
                         )
                 }
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    private func normalizeSpecies(_ s: String) -> String {
+        if s.contains("猫") || s.lowercased().contains("cat")     { return "猫" }
+        if s.contains("狗") || s.lowercased().contains("dog")     { return "狗" }
+        if s.contains("兔") || s.lowercased().contains("rabbit")  { return "兔子" }
+        if s.contains("仓鼠") || s.lowercased().contains("hamster"){ return "仓鼠" }
+        if s.contains("鸟") || s.lowercased().contains("bird")    { return "鸟" }
+        return s
+    }
+}
+
+// MARK: - Human illustration (no shadow, flat)
+
+private struct FocusHumanIllustration: View {
+    let emoji: String
+    let color: Color
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                // soft blob
+                Circle()
+                    .fill(color.mix(with: .white, by: 0.48).opacity(0.38))
+                    .frame(width: geo.size.width * 0.7)
+                    .offset(x: -geo.size.width * 0.22, y: -geo.size.height * 0.18)
+
+                // emoji centered slightly above midpoint
+                Text(emoji)
+                    .font(.system(size: geo.size.height * 0.48))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .offset(y: -geo.size.height * 0.04)
+            }
+        }
+    }
+}
+
+// MARK: - Text modifier
+
+private extension Text {
+    func microCap(weight: Font.Weight = .medium) -> some View {
+        self
+            .font(.system(size: 10, weight: weight, design: .monospaced))
+            .tracking(1.0)
+            .textCase(.uppercase)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
     }
 }
