@@ -961,6 +961,7 @@ private struct GoFeatureItem {
     let title: String
     let subtitle: String
     let colorHex: String
+    var requiresPet: Bool = false
     let action: () -> Void
 }
 
@@ -980,13 +981,14 @@ private extension GoDashboardView {
                 Spacer()
             }
 
+            let hasPet = !pets.isEmpty
             let features: [GoFeatureItem] = [
-                GoFeatureItem(emoji: "🦮", title: "巡岛", subtitle: "遛宠", colorHex: "0EA5E9") {
+                GoFeatureItem(emoji: "🦮", title: "巡岛", subtitle: "遛宠", colorHex: "0EA5E9", requiresPet: true) {
                     if let pet = deckActivePet ?? pets.first(where: { !$0.hasPassedAway }) {
                         PetWalkingManager.shared.start(pet: pet)
                     }
                 },
-                GoFeatureItem(emoji: "❤️", title: "健康", subtitle: "医疗档案", colorHex: "EF4444") {
+                GoFeatureItem(emoji: "❤️", title: "健康", subtitle: "医疗档案", colorHex: "EF4444", requiresPet: true) {
                     if let pet = deckActivePet { cardBackHealthPet = pet }
                 },
                 GoFeatureItem(emoji: "📅", title: "日历", subtitle: "日程安排", colorHex: "8B5CF6") {
@@ -995,7 +997,7 @@ private extension GoDashboardView {
                 GoFeatureItem(emoji: "💰", title: "花费", subtitle: "支出统计", colorHex: "D97706") {
                     showIslandExpense = true
                 },
-                GoFeatureItem(emoji: "⚖️", title: "体重", subtitle: "成长曲线", colorHex: "16A34A") {
+                GoFeatureItem(emoji: "⚖️", title: "体重", subtitle: "成长曲线", colorHex: "16A34A", requiresPet: true) {
                     showIslandWeight = true
                 },
                 GoFeatureItem(emoji: "🌴", title: "绿洲", subtitle: "奖励中心", colorHex: "EA580C") {
@@ -1005,25 +1007,34 @@ private extension GoDashboardView {
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
                 ForEach(Array(features.enumerated()), id: \.offset) { _, feature in
-                    Button(action: feature.action) {
+                    let locked = feature.requiresPet && !hasPet
+                    Button(action: { if !locked { feature.action() } }) {
                         VStack(spacing: 6) {
                             Text(feature.emoji)
                                 .font(.system(size: 26))
+                                .opacity(locked ? 0.45 : 1)
                             Text(feature.title)
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-                            Text(feature.subtitle)
+                                .foregroundStyle(.white.opacity(locked ? 0.4 : 1))
+                            Text(locked ? "添加宠物" : feature.subtitle)
                                 .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.8))
+                                .foregroundStyle(.white.opacity(locked ? 0.3 : 0.8))
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                         .background(
-                            Color(hex: feature.colorHex),
+                            Color(hex: feature.colorHex).opacity(locked ? 0.25 : 1),
                             in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        )
+                        .overlay(
+                            locked ?
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+                            : nil
                         )
                     }
                     .buttonStyle(.plain)
+                    .allowsHitTesting(!locked)
                 }
             }
         }
