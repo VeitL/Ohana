@@ -672,7 +672,7 @@ private extension GoDashboardView {
                         }
                         .foregroundStyle(headerStreak >= 7 ? Color(hex: "0C1640") : .white)
                         .padding(.horizontal, 8).frame(height: 28)
-                        .background(headerStreak >= 7 ? Color.orange : .white.opacity(0.18), in: Capsule())
+                        .background(headerStreak >= 7 ? Color.goLime : .white.opacity(0.18), in: Capsule())
                     }
                     .buttonStyle(.plain)
                     // 菜单
@@ -803,7 +803,7 @@ private extension GoDashboardView {
             .overlay {
                 if !isQAEditMode && bentoCardState(for: item) == .urgentPending {
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .strokeBorder(Color.orange.opacity(bentoUrgentGlow ? 0.8 : 0.3), lineWidth: 1.5)
+                        .strokeBorder(Color.goRed.opacity(bentoUrgentGlow ? 0.8 : 0.3), lineWidth: 1.5)
                         .allowsHitTesting(false)
                 }
             }
@@ -962,6 +962,8 @@ private struct GoFeatureItem {
     let subtitle: String
     let colorHex: String
     var requiresPet: Bool = false
+    /// 背景色亮时需要深色文字（如石灰绿卡片）
+    var darkText: Bool = false
     let action: () -> Void
 }
 
@@ -1000,7 +1002,7 @@ private extension GoDashboardView {
                 GoFeatureItem(emoji: "⚖️", title: "体重", subtitle: "成长曲线", colorHex: "16A34A", requiresPet: true) {
                     showIslandWeight = true
                 },
-                GoFeatureItem(emoji: "🌴", title: "绿洲", subtitle: "奖励中心", colorHex: "EA580C") {
+                GoFeatureItem(emoji: "🌴", title: "绿洲", subtitle: "奖励中心", colorHex: "C8FF00", darkText: true) {
                     selectedDockTab = 3
                 },
             ]
@@ -1008,6 +1010,7 @@ private extension GoDashboardView {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
                 ForEach(Array(features.enumerated()), id: \.offset) { _, feature in
                     let locked = feature.requiresPet && !hasPet
+                    let fgColor: Color = feature.darkText ? Color(hex: "0C1640") : .white
                     Button(action: { if !locked { feature.action() } }) {
                         VStack(spacing: 6) {
                             Text(feature.emoji)
@@ -1015,10 +1018,10 @@ private extension GoDashboardView {
                                 .opacity(locked ? 0.45 : 1)
                             Text(feature.title)
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(locked ? 0.4 : 1))
+                                .foregroundStyle(fgColor.opacity(locked ? 0.4 : 1))
                             Text(locked ? "添加宠物" : feature.subtitle)
                                 .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.white.opacity(locked ? 0.3 : 0.8))
+                                .foregroundStyle(fgColor.opacity(locked ? 0.3 : 0.75))
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
@@ -1372,14 +1375,14 @@ private extension GoDashboardView {
         } else if isDog {
             items.append(QuickActionItem(label: "喂水", icon: "drop.fill", colorHex: "00D4AA", petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
             items.append(QuickActionItem(label: "遛狗", icon: "figure.walk", colorHex: "C8FF00", petId: pet.id, actionType: "walk", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "便便", icon: "allergens", colorHex: "FF8C42", petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "便便", icon: "allergens", colorHex: "A78BFA", petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
         } else if isCat {
             items.append(QuickActionItem(label: "喂水", icon: "drop.fill", colorHex: "00D4AA", petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
             items.append(QuickActionItem(label: "铲屎", icon: "trash.fill", colorHex: "5B6AFF", petId: pet.id, actionType: "litter", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "便便", icon: "allergens", colorHex: "FF8C42", petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "便便", icon: "allergens", colorHex: "A78BFA", petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
         } else {
             items.append(QuickActionItem(label: "喂水", icon: "drop.fill", colorHex: "00D4AA", petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "护理", icon: "scissors", colorHex: "FF8C42", petId: pet.id, actionType: "groom", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "护理", icon: "scissors", colorHex: "F472B6", petId: pet.id, actionType: "groom", entityId: pet.id, entityKind: .pet))
             items.append(QuickActionItem(label: "体重", icon: "scalemass.fill", colorHex: "80FFEA", petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet))
         }
         return Array(items.prefix(4))
