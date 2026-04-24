@@ -40,7 +40,7 @@ struct OasisRewardView: View {
     private let makeupPackKey = "inventory_backdate_1day_count" // 与椰子商店统一 key
     @State private var makeupDates: Set<String> = []       // 补签过的日期集合
     @AppStorage("checkIn_lastClaimedMilestone") private var lastClaimedMilestone: Int = 0
-    @AppStorage("appUIStyle") private var appUIStyle: String = "classic"
+    @AppStorage("appUIStyle") private var appUIStyle: String = "go"
     @Environment(\.colorScheme) private var colorScheme
 
     private var isMaterial: Bool { appUIStyle == "material" }
@@ -67,9 +67,17 @@ struct OasisRewardView: View {
         var opacity: Double  = 1.0
     }
 
+    // MARK: - Star positions (deterministic)
+    private let starPositions: [(CGFloat, CGFloat)] = (0..<24).map { i in
+        let x = CGFloat((i * 53) % 320) - 160
+        let y = CGFloat((i * 37) % 220) - 160
+        return (x, y)
+    }
+
     var body: some View {
         ZStack {
-            if isMaterial { matBg.ignoresSafeArea() } else { ArkBackgroundView() }
+            // ── Navy gradient background
+            navyBackground
 
             // task21: 粒子特效放在最外层 ZStack，不被 ScrollView 裁剪
             ForEach(energyParticles) { p in
@@ -93,7 +101,7 @@ struct OasisRewardView: View {
                             Button { showCoconutRules = true } label: {
                                 Image(systemName: "info.circle")
                                     .font(.system(size: 18, weight: .medium))
-                                    .foregroundStyle(.primary.opacity(0.45))
+                                    .foregroundStyle(.white.opacity(0.45))
                             }
                             .buttonStyle(.plain)
                             Button {
@@ -102,10 +110,10 @@ struct OasisRewardView: View {
                             } label: {
                                 Image(systemName: "shippingbox.fill")
                                     .font(.system(size: 15))
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(.white)
                                     .frame(width: 32, height: 32)
-                                    .background(Color.goPrimary.opacity(0.12), in: Circle())
-                                    .overlay(Circle().strokeBorder(Color.goPrimary.opacity(0.3), lineWidth: 1))
+                                    .background(Color.goPrimary.opacity(0.18), in: Circle())
+                                    .overlay(Circle().strokeBorder(Color.goPrimary.opacity(0.35), lineWidth: 1))
                             }
                             .buttonStyle(.plain)
                         }
@@ -119,22 +127,35 @@ struct OasisRewardView: View {
                             .transition(.move(edge: .top).combined(with: .opacity))
                     }
 
-                    // ── 生命之树核心区
-                    treeSection
-                        .padding(.top, 60)
+                    // ── 页面标题区
+                    oasisHeader
+                        .padding(.top, 16)
+                        .padding(.horizontal, 24)
 
-                    // ── 树等级说明
-                    treeLevelLabel
-                        .padding(.top, 20)
+                    // ── 生命之树核心卡片（夜空风格）
+                    treeSceneCard
+                        .padding(.horizontal, 16)
+                        .padding(.top, 18)
+
+                    // ── 成长进度卡
+                    progressCard
+                        .padding(.horizontal, 16)
+                        .padding(.top, 14)
 
                     // ── 注入能量按钮
                     injectEnergyButton
-                        .padding(.top, 18)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 14)
+
+                    // ── 下一里程碑卡
+                    milestoneCard
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
 
                     // ── Bento 功能区（紧凑小卡）
                     oasisBentoGrid
-                        .padding(.horizontal, 20)
-                        .padding(.top, 24)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
                         .padding(.bottom, 140)
                 }
             }
@@ -193,112 +214,237 @@ struct OasisRewardView: View {
         .onChange(of: inventoryTrigger) { _, _ in showInventory = true }
     }
 
-    // MARK: - Tree Section
+    // MARK: - Navy Background
 
-    private var treeSection: some View {
-        ZStack(alignment: .bottom) {
-            // 呈呆呹呢呢呢呢呢呢呢：呼吸圆形环境光晕
+    private var navyBackground: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(hex: "2D4ECC"), Color(hex: "1A2E8A"), Color(hex: "0C1640")],
+                startPoint: .top, endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            // Floating blob — lime
+            Ellipse()
+                .fill(Color.goPrimary.opacity(0.12))
+                .frame(width: 260, height: 200)
+                .blur(radius: 60)
+                .offset(x: -80, y: -160)
+
+            // Floating blob — blue
+            Ellipse()
+                .fill(Color(hex: "5B6AFF").opacity(0.18))
+                .frame(width: 220, height: 220)
+                .blur(radius: 70)
+                .offset(x: 100, y: 80)
+
+            // Floating blob — purple
+            Ellipse()
+                .fill(Color(hex: "A855F7").opacity(0.13))
+                .frame(width: 200, height: 180)
+                .blur(radius: 65)
+                .offset(x: -60, y: 340)
+        }
+    }
+
+    // MARK: - Header
+
+    private var oasisHeader: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("OASIS · 绿洲")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .kerning(1.2)
+                    .foregroundStyle(.white.opacity(0.45))
+                Text("生命之树")
+                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+            }
+            Spacer()
+            // Coconut balance pill
+            HStack(spacing: 5) {
+                Text("🥥")
+                    .font(.system(size: 15))
+                Text("\(QuestManager.shared.coconutCount)")
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .foregroundStyle(.black)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 7)
+            .background(Color.goPrimary, in: Capsule())
+        }
+    }
+
+    // MARK: - Tree Scene Card (Night Sky)
+
+    private var treeSceneCard: some View {
+        ZStack {
+            // Card background — dark radial night-sky gradient
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(
+                    RadialGradient(
+                        colors: [Color(hex: "0D1B4B"), Color(hex: "060E24")],
+                        center: .center, startRadius: 20, endRadius: 260
+                    )
+                )
+
+            // Stars
+            ZStack {
+                ForEach(0..<24, id: \.self) { i in
+                    let size = CGFloat([1.5, 2.0, 2.5, 1.8][i % 4])
+                    Circle()
+                        .fill(Color.white.opacity(Double([0.6, 0.8, 0.5, 0.9][i % 4])))
+                        .frame(width: size, height: size)
+                        .offset(x: starPositions[i].0, y: starPositions[i].1)
+                }
+            }
+
+            // Moon (top-right)
+            Circle()
+                .fill(Color.goYellow)
+                .frame(width: 28, height: 28)
+                .shadow(color: Color.goYellow.opacity(0.7), radius: 12, x: 0, y: 0)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .padding(.top, 22).padding(.trailing, 28)
+
+            // Sandy island (bottom ellipse)
+            Ellipse()
+                .fill(
+                    LinearGradient(
+                        colors: [Color(hex: "F59E0B"), Color(hex: "D97706")],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
+                .frame(width: 280, height: 52)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, -10)
+                .clipped()
+
+            // Decorative bottom elements
+            HStack(spacing: 20) {
+                Text("🌺").font(.system(size: 18))
+                Spacer()
+                Text("🐚").font(.system(size: 16))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .padding(.horizontal, 36).padding(.bottom, 14)
+
+            // Breathing glow ring behind tree
             Circle()
                 .fill(RadialGradient(
                     colors: [treeMgr.treeLevel.glowColor.opacity(glowBreathing ? 0.28 : 0.08), .clear],
                     center: .center, startRadius: 20, endRadius: 180
                 ))
-                .frame(width: 340, height: 340)
+                .frame(width: 320, height: 320)
                 .scaleEffect(glowBreathing ? 1.08 : 0.92)
                 .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: glowBreathing)
 
-            // 外圈发光輪廓（goLime shadow 呼吸）
             Circle()
                 .stroke(Color.goPrimary.opacity(glowBreathing ? 0.22 : 0.06), lineWidth: 2)
-                .frame(width: 260, height: 260)
+                .frame(width: 240, height: 240)
                 .blur(radius: glowBreathing ? 6 : 2)
                 .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: glowBreathing)
 
-            // 动态生长椰子树
-            BeautifulCoconutTree(
-                level: treeMgr.treeLevel.rawValue,
-                isInjecting: isInjecting,
-                harvestedCoconuts: harvestedCoconutIndices,
-                onHarvest: { idx in
-                    // 单椰子点击 → +1 椰子，标记该椰子为已采摘
-                    guard !harvestedCoconutIndices.contains(idx) else { return }
-                    harvestedCoconutIndices.insert(idx)
-                    QuestManager.shared.addCoconuts(1, emoji: "🥥", title: "摘下椰子 +1🥥")
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    flyCoconut = false
-                    flyOpacity = 1
-                    withAnimation(.spring(response: 0.55, dampingFraction: 0.6).delay(0.05)) {
-                        flyCoconut = true
-                    }
-                    withAnimation(.easeOut(duration: 0.3).delay(0.6)) {
-                        flyOpacity = 0
-                    }
-                }
-            )
-            .shadow(color: Color.goPrimary.opacity(glowBreathing ? 0.45 : 0.15), radius: glowBreathing ? 24 : 10, x: 0, y: 0)
-            .scaleEffect(levelUpPulse ? 1.12 : treeScale)
-            .animation(.spring(response: 0.4, dampingFraction: 0.5), value: levelUpPulse)
-            .animation(.spring(response: 0.4, dampingFraction: 0.5), value: treeScale)
-            .offset(y: -20)
-
-            // 采摘气泡（升级交互闭环）
-            if treeMgr.canHarvestToday && !justHarvested {
-                Button {
-                    guard treeMgr.harvestDailyPassiveIncome() else { return }
-                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                    withAnimation(.spring(response: 0.3)) { justHarvested = true }
-                    spawnEnergyParticles()
-                    // 椰子飞出动画
-                    flyCoconut = false
-                    flyOpacity = 1
-                    withAnimation(.spring(response: 0.55, dampingFraction: 0.6).delay(0.05)) {
-                        flyCoconut = true
-                    }
-                    withAnimation(.easeOut(duration: 0.3).delay(0.6)) {
-                        flyOpacity = 0
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Text("🥥").font(.system(size: 18))
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("点击采摘今日推落")
-                                .font(.system(size: 13, weight: .black, design: .rounded))
-                                .foregroundStyle(.black)
-                            Text("+\(treeMgr.passiveIncomeAmount) 椰子")
-                                .font(.system(size: 10, weight: .bold, design: .rounded))
-                                .foregroundStyle(.black.opacity(0.6))
+            // BeautifulCoconutTree
+            ZStack(alignment: .bottom) {
+                BeautifulCoconutTree(
+                    level: treeMgr.treeLevel.rawValue,
+                    isInjecting: isInjecting,
+                    harvestedCoconuts: harvestedCoconutIndices,
+                    onHarvest: { idx in
+                        guard !harvestedCoconutIndices.contains(idx) else { return }
+                        harvestedCoconutIndices.insert(idx)
+                        QuestManager.shared.addCoconuts(1, emoji: "🥥", title: "摘下椰子 +1🥥")
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        flyCoconut = false
+                        flyOpacity = 1
+                        withAnimation(.spring(response: 0.55, dampingFraction: 0.6).delay(0.05)) {
+                            flyCoconut = true
                         }
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.black.opacity(0.5))
+                        withAnimation(.easeOut(duration: 0.3).delay(0.6)) {
+                            flyOpacity = 0
+                        }
                     }
-                    .padding(.horizontal, 16).padding(.vertical, 10)
-                    .background(
-                        LinearGradient(colors: [Color.goYellow, Color(hex: "FFB800")],
-                                       startPoint: .topLeading, endPoint: .bottomTrailing),
-                        in: Capsule()
-                    )
-                    .shadow(color: Color.goYellow.opacity(harvestBubbleBounce ? 0.75 : 0.35),
-                            radius: harvestBubbleBounce ? 16 : 8, x: 0, y: 4)
-                    .scaleEffect(harvestBubbleBounce ? 1.06 : 1.0)
-                    .animation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true), value: harvestBubbleBounce)
+                )
+                .shadow(color: Color.goPrimary.opacity(glowBreathing ? 0.45 : 0.15), radius: glowBreathing ? 24 : 10, x: 0, y: 0)
+                .scaleEffect(levelUpPulse ? 1.12 : treeScale)
+                .animation(.spring(response: 0.4, dampingFraction: 0.5), value: levelUpPulse)
+                .animation(.spring(response: 0.4, dampingFraction: 0.5), value: treeScale)
+                .padding(.bottom, 28)
+
+                // Harvest bubble
+                if treeMgr.canHarvestToday && !justHarvested {
+                    Button {
+                        guard treeMgr.harvestDailyPassiveIncome() else { return }
+                        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                        withAnimation(.spring(response: 0.3)) { justHarvested = true }
+                        spawnEnergyParticles()
+                        flyCoconut = false
+                        flyOpacity = 1
+                        withAnimation(.spring(response: 0.55, dampingFraction: 0.6).delay(0.05)) {
+                            flyCoconut = true
+                        }
+                        withAnimation(.easeOut(duration: 0.3).delay(0.6)) {
+                            flyOpacity = 0
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text("🥥").font(.system(size: 18))
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("点击采摘今日推落")
+                                    .font(.system(size: 13, weight: .black, design: .rounded))
+                                    .foregroundStyle(.black)
+                                Text("+\(treeMgr.passiveIncomeAmount) 椰子")
+                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.black.opacity(0.6))
+                            }
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(.black.opacity(0.5))
+                        }
+                        .padding(.horizontal, 16).padding(.vertical, 10)
+                        .background(
+                            LinearGradient(colors: [Color.goYellow, Color(hex: "FFB800")],
+                                           startPoint: .topLeading, endPoint: .bottomTrailing),
+                            in: Capsule()
+                        )
+                        .shadow(color: Color.goYellow.opacity(harvestBubbleBounce ? 0.75 : 0.35),
+                                radius: harvestBubbleBounce ? 16 : 8, x: 0, y: 4)
+                        .scaleEffect(harvestBubbleBounce ? 1.06 : 1.0)
+                        .animation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true), value: harvestBubbleBounce)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.bottom, 10)
+                    .transition(.scale.combined(with: .opacity))
+                    .onAppear { harvestBubbleBounce = true }
                 }
-                .buttonStyle(.plain)
-                .offset(y: 42)
-                .transition(.scale.combined(with: .opacity))
-                .onAppear { harvestBubbleBounce = true }
             }
 
-            // 椰子飞入余额区动画层
+            // Fly coconut animation layer
             if flyOpacity > 0 {
                 Text("🥥")
                     .font(.system(size: 28))
-                    .offset(y: flyCoconut ? -280 : -60)
+                    .offset(y: flyCoconut ? -220 : -60)
                     .opacity(flyOpacity)
                     .allowsHitTesting(false)
             }
+
+            // Level badge pill (top-left)
+            HStack(spacing: 5) {
+                Text("Lv.\(treeMgr.treeLevel.rawValue) · \(treeMgr.treeLevel.displayName)")
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(.black)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .background(Color.goPrimary, in: Capsule())
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(.top, 16).padding(.leading, 16)
         }
-        .frame(height: 320)
+        .frame(height: 380)
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(Color.goPrimary.opacity(0.35), lineWidth: 1.5)
+        )
         .onAppear {
             justHarvested = !treeMgr.canHarvestToday
             withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
@@ -308,47 +454,86 @@ struct OasisRewardView: View {
         .onChange(of: treeMgr.treeLevel) { _, _ in justHarvested = !treeMgr.canHarvestToday }
     }
 
-    private var treeLevelLabel: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 6) {
-                Text("Lv.\(treeMgr.treeLevel.rawValue)")
-                    .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(treeMgr.treeLevel.glowColor)
-                Text(treeMgr.treeLevel.displayName)
-                    .font(.system(size: 20, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
-                Text("·  生命之树")
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.4))
+    // MARK: - Progress Card
+
+    private var progressCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // Title row
+            HStack {
+                Text("成长进度")
+                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                Spacer()
+                Text("能量 \(treeMgr.totalEnergy) · 下一级 \(treeMgr.nextLevelThreshold)")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.45))
             }
 
-            // 进度条
+            // Progress bar
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(.white.opacity(0.1))
-                        .frame(height: 6)
+                        .fill(Color.white.opacity(0.1))
+                        .frame(height: 8)
                     Capsule()
                         .fill(LinearGradient(
-                            colors: [treeMgr.treeLevel.glowColor, treeMgr.treeLevel.glowColor.opacity(0.5)],
+                            colors: [Color.goPrimary, Color.goTeal],
                             startPoint: .leading, endPoint: .trailing
                         ))
-                        .frame(width: geo.size.width * treeMgr.progressToNextLevel, height: 6)
+                        .frame(width: geo.size.width * treeMgr.progressToNextLevel, height: 8)
+                        .shadow(color: Color.goPrimary.opacity(0.5), radius: 6, x: 0, y: 0)
                         .animation(.spring(response: 0.6), value: treeMgr.progressToNextLevel)
                 }
             }
-            .frame(height: 6)
-            .padding(.horizontal, 60)
+            .frame(height: 8)
 
-            Text("能量 \(treeMgr.totalEnergy) · 下一级需 \(treeMgr.nextLevelThreshold)")
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.3))
+            // Stats row
+            HStack(spacing: 0) {
+                progressStatCell(
+                    value: treeMgr.passiveIncomeAmount > 0
+                        ? "+\(treeMgr.passiveIncomeAmount)🥥/日"
+                        : "Lv.5 解锁",
+                    label: "被动收入",
+                    color: treeMgr.passiveIncomeAmount > 0
+                        ? Color.goPrimary
+                        : Color.white.opacity(0.3)
+                )
+                progressStatCell(
+                    value: "\(humans.count + pets.count)成员",
+                    label: "家庭贡献",
+                    color: Color(hex: "5B6AFF")
+                )
+                progressStatCell(
+                    value: "\(treeMgr.totalEnergy)",
+                    label: "岛屿能量",
+                    color: Color(hex: "A855F7")
+                )
+            }
         }
+        .padding(18)
+        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+        )
     }
+
+    private func progressStatCell(value: String, label: String, color: Color) -> some View {
+        VStack(spacing: 4) {
+            Text(value)
+                .font(.system(size: 14, weight: .black, design: .rounded))
+                .foregroundStyle(color)
+            Text(label)
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.45))
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Inject Energy Button
 
     private var injectEnergyButton: some View {
         let canInject = QuestManager.shared.coconutCount >= 10
-        let btnColor  = isMaterial ? matAccent : Color.goPrimary
         return Button {
             let beforeLevel = treeMgr.treeLevel
             withAnimation { isInjecting = true }
@@ -368,27 +553,100 @@ struct OasisRewardView: View {
             }
         } label: {
             HStack(spacing: 8) {
-                Text("✨")
+                Text("⚡")
                 Text("注入能量")
                     .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(isMaterial ? .white : .black)
+                    .foregroundStyle(.black)
                 Text("(-10🥥)")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(isMaterial ? .white.opacity(0.7) : .black.opacity(0.5))
+                    .foregroundStyle(.black.opacity(0.5))
             }
-            .padding(.horizontal, 28).padding(.vertical, 14)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
             .background(
-                canInject ? btnColor : (isMaterial ? matSurface : Color.white.opacity(0.1)),
+                canInject ? Color.goPrimary : Color.white.opacity(0.1),
                 in: Capsule()
             )
             .overlay(Capsule().strokeBorder(
-                canInject ? Color.clear : (isMaterial ? btnColor.opacity(0.3) : Color.white.opacity(0.2)),
+                canInject ? Color.clear : Color.white.opacity(0.2),
                 lineWidth: 1
             ))
-            .shadow(color: canInject && isMaterial ? btnColor.opacity(0.3) : .clear, radius: 10, x: 0, y: 4)
         }
         .buttonStyle(.plain)
         .opacity(canInject ? 1 : 0.45)
+    }
+
+    // MARK: - Milestone Card
+
+    /// Passive income per day for each TreeLevel (lv1–lv10)
+    private func passiveIncomeForLevel(_ lv: TreeLevel) -> Int {
+        switch lv {
+        case .lv1:  return 1
+        case .lv2:  return 2
+        case .lv3:  return 3
+        case .lv4:  return 5
+        case .lv5:  return 7
+        case .lv6:  return 10
+        case .lv7:  return 14
+        case .lv8:  return 18
+        case .lv9:  return 24
+        case .lv10: return 30
+        }
+    }
+
+    private var milestoneCard: some View {
+        let currentLv = treeMgr.treeLevel.rawValue
+        let isMaxLevel = currentLv >= 10
+        let nextLv = min(currentLv + 1, 10)
+        let nextLevel = TreeLevel(rawValue: nextLv) ?? .lv10
+
+        return Button {
+            // No-op tap (informational)
+        } label: {
+            HStack(spacing: 14) {
+                // Icon square
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.goPrimary.opacity(0.15))
+                        .frame(width: 48, height: 48)
+                    Text("🏆")
+                        .font(.system(size: 22))
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    if isMaxLevel {
+                        Text("已达最高境界")
+                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text("生命之树已至巅峰，繁荣永续")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.5))
+                    } else {
+                        Text("Lv.\(nextLv) · \(nextLevel.displayName)")
+                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text("解锁被动收益 +\(passiveIncomeForLevel(nextLevel))🥥/日")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color.goPrimary.opacity(0.8))
+                    }
+                }
+
+                Spacer()
+
+                if !isMaxLevel {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.3))
+                }
+            }
+            .padding(16)
+            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - 模块六：打卡日历（完整月视图）
@@ -652,7 +910,6 @@ struct OasisRewardView: View {
                         )
                     if cell.isChecked {
                         if cell.isMakeup {
-                            // 补签：用不同图标区分
                             Image(systemName: "arrow.uturn.backward")
                                 .font(.system(size: 9, weight: .black))
                                 .foregroundStyle(.black.opacity(0.7))
@@ -678,9 +935,9 @@ struct OasisRewardView: View {
 
     private func cellFillColor(_ cell: CalendarCell) -> Color {
         if cell.isChecked && cell.isMakeup {
-            return Color.goYellow.opacity(0.85) // 补签用黄色
+            return Color.goYellow.opacity(0.85)
         } else if cell.isChecked {
-            return Color.goPrimary // 正常打卡用青柠
+            return Color.goPrimary
         } else if cell.isToday {
             return Color.goPrimary.opacity(0.22)
         } else {
@@ -766,7 +1023,6 @@ struct OasisRewardView: View {
         guard !checkedInDates.contains(today) else { return }
         checkedInDates.insert(today)
         UserDefaults.standard.set(Array(checkedInDates), forKey: checkedInKey)
-        // 奖励1椰子
         QuestManager.shared.addCoconuts(1, emoji: "📅", title: "每日打卡奖励")
     }
 
@@ -795,19 +1051,23 @@ struct OasisRewardView: View {
     }
 
     private var gachaSubtitle: String {
-        let raw = UserDefaults.standard.string(forKey: "gachaHistory") ?? ""
-        let count = raw.isEmpty ? 0 : raw.split(separator: ",").count
-        return count == 0 ? "30🥥/次 · 快来试试" : "30🥥/次 · 已抽\(min(count, 999))次"
+        "30🥥/次 · 试试手气"   // 操作导向，不显示历史抽卡统计
     }
 
     private var bountySubtitle: String {
-        guard let raw = UserDefaults.standard.string(forKey: "bountyTasks"),
-              let data = raw.data(using: .utf8),
-              let tasks = try? JSONDecoder().decode([BountyTask].self, from: data) else {
-            return "发布首个任务"
-        }
-        let active = tasks.filter { !$0.isCompleted }.count
-        return active == 0 ? "暂无进行中任务" : "\(active)个进行中"
+        let all = BountyTask.loadAll()
+        let active = all.filter { !$0.isCompleted }.count
+        let mine = BountyTask.pendingAssignedCount(
+            for: UserDefaults.standard.string(forKey: "currentActiveHumanId") ?? ""
+        )
+        if mine > 0 { return "@我 \(mine) 个待完成" }
+        return active == 0 ? "发布任务 / 接单" : "\(active)个进行中 · 去看看"
+    }
+
+    private var bountyAssignedBadge: Int {
+        BountyTask.pendingAssignedCount(
+            for: UserDefaults.standard.string(forKey: "currentActiveHumanId") ?? ""
+        )
     }
 
     // MARK: - Bento Grid
@@ -816,6 +1076,7 @@ struct OasisRewardView: View {
         let allAchievements = pets.flatMap { AchievementManager.compute(for: $0) }
         let unlockedCount   = allAchievements.filter { $0.isUnlocked }.count
         let totalCount      = allAchievements.count
+        let noPet           = pets.isEmpty  // 无宠物锁定判断
 
         return VStack(spacing: 8) {
             // 行一：椰子商店 + 成就解锁
@@ -824,8 +1085,10 @@ struct OasisRewardView: View {
                     subtitle: shopSubtitle, accent: Color.goYellow,
                     action: { showCoconutShop = true })
                 bentoMiniCard(emoji: "🏆", title: "成就解锁",
-                    subtitle: "\(unlockedCount)/\(totalCount)", accent: Color.goTeal,
-                    action: { showAchievements = true })
+                    subtitle: noPet ? "添加宠物后解锁 🐾" : "\(unlockedCount)/\(totalCount)",
+                    accent: noPet ? Color.white.opacity(0.35) : Color.goTeal,
+                    action: { if !noPet { showAchievements = true } })
+                    .opacity(noPet ? 0.55 : 1)
             }
             // 行二：扭蛋机 + 悬赏榜
             HStack(spacing: 8) {
@@ -835,6 +1098,18 @@ struct OasisRewardView: View {
                 bentoMiniCard(emoji: "📋", title: "家庭悬赏榜",
                     subtitle: bountySubtitle, accent: Color.goOrange,
                     action: { showBountyBoard = true })
+                    .overlay(alignment: .topTrailing) {
+                        if bountyAssignedBadge > 0 {
+                            Text("\(bountyAssignedBadge)")
+                                .font(.system(size: 10, weight: .black, design: .rounded))
+                                .foregroundStyle(.white)
+                                .frame(minWidth: 16, minHeight: 16)
+                                .padding(.horizontal, 4)
+                                .background(Color.goRed, in: Capsule())
+                                .overlay(Capsule().strokeBorder(Color.white, lineWidth: 1.5))
+                                .offset(x: -6, y: 6)
+                        }
+                    }
             }
             // 行三：打卡日历（全宽）
             bentoMiniCard(emoji: "📅", title: "打卡日历",
@@ -844,50 +1119,6 @@ struct OasisRewardView: View {
         }
     }
 
-    private func bentoBigCard(emoji: String, title: String, subtitle: String, accent: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(emoji).font(.system(size: 30))
-                Text(title)
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
-                Spacer()
-                Text(subtitle)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(accent.opacity(0.8))
-                    .lineLimit(2)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(16)
-            .frame(minHeight: 130)
-            .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(accent.opacity(0.2), lineWidth: 1))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func bentoSmallCard(emoji: String, title: String, subtitle: String, accent: Color, locked: Bool) -> some View {
-        HStack(spacing: 12) {
-            Text(emoji).font(.system(size: 22))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
-                Text(locked ? "即将上线" : subtitle)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(locked ? .white.opacity(0.25) : accent.opacity(0.8))
-            }
-            Spacer()
-        }
-        .padding(.horizontal, 16).padding(.vertical, 14)
-        .frame(maxWidth: .infinity)
-        .background(accent.opacity(locked ? 0.04 : 0.1), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .strokeBorder(accent.opacity(locked ? 0.08 : 0.2), lineWidth: 1))
-        .opacity(locked ? 0.6 : 1)
-    }
-
     private func bentoMiniCard(emoji: String, title: String, subtitle: String, accent: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 10) {
@@ -895,26 +1126,27 @@ struct OasisRewardView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(.white)
                     Text(subtitle)
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(isMaterial ? Color(hex: "8E8E93") : accent.opacity(0.75))
+                        .foregroundStyle(accent.opacity(0.75))
                         .lineLimit(1)
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.primary.opacity(0.2))
+                    .foregroundStyle(.white.opacity(0.2))
             }
             .padding(.horizontal, 14).padding(.vertical, 11)
             .frame(maxWidth: .infinity)
             .background(
-                isMaterial ? matSurface : accent.opacity(0.1),
-                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                Color.white.opacity(0.08),
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
             )
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(isMaterial ? Color(hex: "E5E5EA") : accent.opacity(0.2), lineWidth: 1))
-            .shadow(color: isMaterial ? .black.opacity(0.04) : .clear, radius: 6, x: 0, y: 2)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+            )
         }
         .buttonStyle(.plain)
     }
@@ -947,7 +1179,6 @@ private struct CoconutRulesSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var appeared = false
 
-    // 每条规则独立卡片数据
     private struct RuleCard: Identifiable {
         let id = UUID()
         let emoji: String
@@ -958,7 +1189,7 @@ private struct CoconutRulesSheet: View {
     }
 
     private let earnCards: [RuleCard] = [
-        RuleCard(emoji: "�", title: "遛狗", desc: "带毛孩子出门溜达", glowColor: Color(hex: "C8FF00"), reward: "每100m得1🥥"),
+        RuleCard(emoji: "🦮", title: "遛狗", desc: "带毛孩子出门溜达", glowColor: Color(hex: "C8FF00"), reward: "每100m得1🥥"),
         RuleCard(emoji: "🍗", title: "喂食·喂水", desc: "按时投喂，爱意满满", glowColor: Color(hex: "FF8C42"), reward: "每次2~3🥥"),
         RuleCard(emoji: "🧹", title: "铲屎官在线", desc: "勤劳铲屎，功德无量", glowColor: Color(hex: "A8E6CF"), reward: "每次5~8🥥"),
         RuleCard(emoji: "🪮", title: "护理·梳毛", desc: "精心打理，美美的", glowColor: Color(hex: "DDA0DD"), reward: "5~10🥥，洗澡15🥥"),
@@ -973,7 +1204,7 @@ private struct CoconutRulesSheet: View {
         RuleCard(emoji: "✨", title: "注入生命之树", desc: "让生命之树更旺盛", glowColor: Color(hex: "C8FF00"), reward: "每次10🥥"),
         RuleCard(emoji: "🛍️", title: "椰子商店", desc: "兑换特效/称号/加成", glowColor: Color(hex: "667eea"), reward: "各种道具"),
         RuleCard(emoji: "🎰", title: "欧气扭蛋机", desc: "测测你的运气！", glowColor: Color(hex: "FF6B9D"), reward: "每次30🥥"),
-        RuleCard(emoji: "�", title: "悬赏任务", desc: "发布·接单·奖励", glowColor: Color(hex: "FF8C42"), reward: "转给完成者"),
+        RuleCard(emoji: "🎯", title: "悬赏任务", desc: "发布·接单·奖励", glowColor: Color(hex: "FF8C42"), reward: "转给完成者"),
     ]
 
     var body: some View {
@@ -1095,7 +1326,6 @@ private struct CoconutRulesSheet: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(.white.opacity(0.04))
-                // 霓虹微光
                 RadialGradient(
                     colors: [card.glowColor.opacity(0.18), .clear],
                     center: .topLeading, startRadius: 0, endRadius: 80

@@ -22,9 +22,10 @@ struct GachaPrize: Identifiable {
         case epic     = "史诗"
         case legend   = "传说"
 
+        /// 标签文字色（深浅色均可读；普通档用 primary 透明度，不用固定白）
         var color: Color {
             switch self {
-            case .common: return .white.opacity(0.6)
+            case .common: return Color.primary.opacity(0.55)
             case .rare:   return Color.goTeal
             case .epic:   return Color.goPrimary
             case .legend: return Color.goYellow
@@ -33,7 +34,7 @@ struct GachaPrize: Identifiable {
 
         var glowColor: Color {
             switch self {
-            case .common: return .white.opacity(0.1)
+            case .common: return Color.primary.opacity(0.12)
             case .rare:   return Color.goTeal.opacity(0.4)
             case .epic:   return Color.goPrimary.opacity(0.5)
             case .legend: return Color.goYellow.opacity(0.6)
@@ -70,7 +71,7 @@ struct GachaPrize: Identifiable {
         GachaPrize(id: "r_rainbow",      emoji: "🌈", name: "彩虹光环",      rarity: .rare,   description: "打卡时环绕彩虹光"),
         GachaPrize(id: "r_moon",         emoji: "🌙", name: "月光守夜",      rarity: .rare,   description: "夜间打卡特效"),
         GachaPrize(id: "r_flower",       emoji: "🌸", name: "樱花飘落",      rarity: .rare,   description: "春季风格特效"),
-        GachaPrize(id: "r_backdate_1day",emoji: "�", name: "昨日补打卡券",   rarity: .rare,   description: "补录昨天任意 1 次打卡，正常获得椰子奖励"),
+        GachaPrize(id: "r_backdate_1day",emoji: "🎫", name: "昨日补打卡券",   rarity: .rare,   description: "补录昨天任意 1 次打卡，正常获得椰子奖励"),
         // Epic（概率合计 12%，含补打卡券 3%）
         GachaPrize(id: "e_diamond",      emoji: "💎", name: "钻石星光",      rarity: .epic,   description: "史诗级钻石光晕特效"),
         GachaPrize(id: "e_rocket",       emoji: "🚀", name: "星际漫游",      rarity: .epic,   description: "宇宙探索者称号"),
@@ -105,6 +106,7 @@ struct GachaPrize: Identifiable {
 // MARK: - 扭蛋机 View
 struct GachaView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @AppStorage("gachaHistory") private var historyRaw: String = ""
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
     @State private var questManager = QuestManager.shared
@@ -123,6 +125,10 @@ struct GachaView: View {
     @State private var showBackdateSheet = false
     @State private var backdatePrize: GachaPrize? = nil
 
+    private var primaryText: Color { colorScheme == .dark ? .white : .black }
+    private var secondaryText: Color { colorScheme == .dark ? .white.opacity(0.72) : .black.opacity(0.58) }
+    private var tertiaryText: Color { colorScheme == .dark ? .white.opacity(0.45) : .black.opacity(0.4) }
+
     private var canRoll: Bool { questManager.coconutCount >= cost && !isRolling }
 
     // 历史记录（最多显示12个）
@@ -135,7 +141,8 @@ struct GachaView: View {
         NavigationStack {
             GeometryReader { geo in
             ZStack {
-                Color(hex: "060E24").ignoresSafeArea()
+                ArkBackgroundView()
+                    .ignoresSafeArea()
 
                 // 背景光晕
                 Circle()
@@ -183,14 +190,20 @@ struct GachaView: View {
             }
             .navigationTitle("欧气扭蛋机")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("关闭") { dismiss() }
-                        .foregroundStyle(Color.goPrimary)
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text("关闭")
+                            .font(OhanaFont.body(.semibold))
+                            .foregroundStyle(Color.goPrimary)
+                    }
                 }
             }
         }
+        .tint(Color.goPrimary)
     }
 
     // MARK: - 余额行
@@ -199,19 +212,23 @@ struct GachaView: View {
             HStack(spacing: 6) {
                 Text("🥥")
                 Text("\(questManager.coconutCount)")
-                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.goYellow)
                     .contentTransition(.numericText())
                     .animation(.spring(response: 0.4), value: questManager.coconutCount)
             }
             .padding(.horizontal, 14).padding(.vertical, 8)
-            .background(.white.opacity(0.08), in: Capsule())
+            .background(
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                    .overlay(Capsule().strokeBorder(Color.goPrimary.opacity(0.28), lineWidth: 1))
+            )
 
             Spacer()
 
             Text("每次消耗 \(cost)🥥")
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.35))
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(tertiaryText)
         }
     }
 
@@ -248,13 +265,13 @@ struct GachaView: View {
 
                     // 分割线
                     Rectangle()
-                        .fill(.white.opacity(0.15))
+                        .fill(Color.primary.opacity(0.2))
                         .frame(width: 130, height: 2)
 
                     // 中心图标
                     Text(isRolling ? "❓" : (currentPrize?.emoji ?? "🎲"))
                         .font(.system(size: 48))
-                        .shadow(color: .white.opacity(0.5), radius: 8)
+                        .shadow(color: Color.primary.opacity(0.25), radius: 8)
                 }
                 .scaleEffect(capsuleScale)
                 .rotationEffect(.degrees(capsuleRotation))
@@ -268,24 +285,24 @@ struct GachaView: View {
                 HStack(spacing: 8) {
                     if isRolling {
                         ProgressView()
-                            .tint(.black)
+                            .tint(Color.arkInk)
                             .scaleEffect(0.8)
                     } else {
                         Text("🎰")
                     }
                     Text(isRolling ? "抽取中..." : "抽一次")
-                        .font(.system(size: 18, weight: .black, design: .rounded))
-                        .foregroundStyle(canRoll ? .black : .white.opacity(0.3))
+                        .font(OhanaFont.headline(.black))
+                        .foregroundStyle(canRoll ? Color.arkInk : tertiaryText)
                     if !isRolling {
                         Text("-\(cost)🥥")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(canRoll ? .black.opacity(0.5) : .white.opacity(0.2))
+                            .font(OhanaFont.callout(.bold))
+                            .foregroundStyle(canRoll ? Color.arkInk.opacity(0.55) : tertiaryText)
                     }
                 }
                 .frame(width: 200)
                 .padding(.vertical, 16)
                 .background(
-                    canRoll ? Color.goPrimary : Color.white.opacity(0.08),
+                    canRoll ? Color.goPrimary : Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.08),
                     in: RoundedRectangle(cornerRadius: 18, style: .continuous)
                 )
                 .shadow(color: canRoll ? Color.goPrimary.opacity(0.5) : .clear, radius: 20, x: 0, y: 6)
@@ -296,8 +313,8 @@ struct GachaView: View {
 
             if questManager.coconutCount < cost {
                 Text("椰子不足，快去打卡赚取吧 🥥")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.3))
+                    .font(OhanaFont.caption(.medium))
+                    .foregroundStyle(tertiaryText)
             }
         }
     }
@@ -306,8 +323,8 @@ struct GachaView: View {
     private func prizeResultCard(_ prize: GachaPrize) -> some View {
         VStack(spacing: 14) {
             Text("✨ 恭喜获得 ✨")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.5))
+                .font(OhanaFont.caption(.bold))
+                .foregroundStyle(secondaryText)
                 .tracking(2)
 
             Text(prize.emoji)
@@ -316,19 +333,19 @@ struct GachaView: View {
                 .animation(.spring(response: 0.4, dampingFraction: 0.5).repeatCount(3), value: prizeBounce)
 
             Text(prize.name)
-                .font(.system(size: 22, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .font(OhanaFont.title2(.black))
+                .foregroundStyle(primaryText)
 
             Text(prize.rarity.rawValue)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.caption(.bold))
                 .foregroundStyle(prize.rarity.color)
                 .padding(.horizontal, 12).padding(.vertical, 4)
                 .background(prize.rarity.color.opacity(0.15), in: Capsule())
                 .overlay(Capsule().strokeBorder(prize.rarity.color.opacity(0.4), lineWidth: 1))
 
             Text(prize.description)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.5))
+                .font(OhanaFont.callout(.medium))
+                .foregroundStyle(secondaryText)
                 .multilineTextAlignment(.center)
 
             // 补打卡券：立即使用 按钮
@@ -340,9 +357,9 @@ struct GachaView: View {
                     HStack(spacing: 6) {
                         Text("📅")
                         Text("立即使用补打卡券")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .font(OhanaFont.callout(.bold))
                     }
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 20).padding(.vertical, 10)
                     .background(Color.goPrimary, in: Capsule())
                 }
@@ -372,8 +389,8 @@ struct GachaView: View {
     private var historySection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("最近记录")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.4))
+                .font(OhanaFont.subheadline(.bold))
+                .foregroundStyle(tertiaryText)
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 10) {
                 ForEach(recentHistory) { prize in
@@ -383,7 +400,7 @@ struct GachaView: View {
                             .frame(width: 46, height: 46)
                             .background(prize.rarity.glowColor, in: RoundedRectangle(cornerRadius: 12))
                         Text(prize.rarity.rawValue)
-                            .font(.system(size: 8, weight: .bold))
+                            .font(OhanaFont.caption2(.bold))
                             .foregroundStyle(prize.rarity.color)
                     }
                 }
@@ -392,9 +409,11 @@ struct GachaView: View {
         .padding(.horizontal, 16).padding(.vertical, 14)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.white.opacity(0.04))
-                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(.white.opacity(0.07), lineWidth: 1))
+                .fill(Color.primary.opacity(colorScheme == .dark ? 0.06 : 0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.1), lineWidth: 1)
+                )
         )
     }
 

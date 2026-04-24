@@ -9,9 +9,9 @@ import SwiftUI
 import SwiftData
 
 enum EntityType: String, CaseIterable {
-    case pet = "宠物"
-    case human = "家庭成员"
-    case plant = "植物"
+    case pet
+    case human
+    case plant
     
     var icon: String {
         switch self {
@@ -31,9 +31,9 @@ enum EntityType: String, CaseIterable {
     
     var color: Color {
         switch self {
-        case .pet: return Color.arkCoral
-        case .human: return Color(hex: "667eea")
-        case .plant: return Color.arkMint
+        case .pet: return Color.goPrimary
+        case .human: return Color(hex: "7DA2FF")
+        case .plant: return Color.goLime
         }
     }
 
@@ -46,27 +46,24 @@ enum EntityType: String, CaseIterable {
 
 struct AddEntityView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var colorScheme
-    @AppStorage("appUIStyle") private var appUIStyle: String = "classic"
+    @AppStorage("appLanguage") private var appLanguage = "zh"
     @State private var selectedType: EntityType?
 
-    private var isMaterial: Bool { appUIStyle == "material" }
-    private var matBg:      Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
-    private var matSurface: Color { colorScheme == .light ? Color.white : Color(hex: "1C1C1E") }
-    private let accent = Color(hex: "FF5A00")
-    private var textSec: Color { colorScheme == .light ? Color(hex: "8E8E93") : Color(hex: "64748B") }
-    /// 添加宠物：深色模式图标纯白、无顶栏磨砂底；人类/植物保持系统顶栏
-    private var toolbarNavIconTint: Color {
-        if selectedType == .pet {
-            return colorScheme == .light ? .black : .white
+    private var l: L10n { L10n(appLanguage) }
+
+    private var navigationTitleText: String {
+        guard let t = selectedType else { return l.addEntityNavRoot }
+        switch t {
+        case .pet: return l.addEntityPetTitle
+        case .human: return l.addEntityHumanTitle
+        case .plant: return l.addEntityPlantTitle
         }
-        return .primary
     }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                if isMaterial { matBg.ignoresSafeArea() } else { ArkBackgroundView() }
+                GoIslandWizardBackdrop()
 
                 if let type = selectedType {
                     switch type {
@@ -82,42 +79,45 @@ struct AddEntityView: View {
                 }
             }
             .id(selectedType?.rawValue ?? "selector")
-            .navigationTitle(selectedType == nil ? "添加家人" : selectedType!.rawValue)
+            .navigationTitle(navigationTitleText)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(selectedType == .pet ? .hidden : .automatic, for: .navigationBar)
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     if selectedType != nil {
-                        Button("返回") {
+                        Button(l.addEntityBack) {
                             withAnimation(.easeInOut(duration: 0.22)) { selectedType = nil }
                         }
+                        .foregroundStyle(Color.goLime)
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("关闭") { dismiss() }
+                    Button(l.addEntityClose) { dismiss() }
+                        .foregroundStyle(Color.goLime)
                 }
             }
         }
+        .preferredColorScheme(.dark)
     }
     
     private var entitySelector: some View {
         VStack(spacing: 20) {
             Spacer()
 
-            // Header
             VStack(spacing: 6) {
-                Text("添加新成员")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
-                Text("选择要加入岛屿的类型")
-                    .font(.system(size: 15)).foregroundStyle(.primary.opacity(0.7))
+                Text(l.addEntityHeadline)
+                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                Text(l.addEntitySub)
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.55))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 24)
 
-            // Entity type cards
             VStack(spacing: 12) {
-                ForEach(EntityType.allCases, id: \.rawValue) { type in
+                ForEach(EntityType.allCases, id: \.self) { type in
                     Button {
                         guard type.isAvailable else { return }
                         withAnimation(.spring(response: 0.4)) { selectedType = type }
@@ -135,12 +135,15 @@ struct AddEntityView: View {
     }
 
     private func entityCard(_ type: EntityType) -> some View {
-        let iconBg = type.color.opacity(type.isAvailable ? 0.18 : 0.07)
+        let ring = type.color.opacity(type.isAvailable ? 0.55 : 0.2)
         let fgOpacity: Double = type.isAvailable ? 1 : 0.45
 
         return HStack(spacing: 16) {
             ZStack {
-                Circle().fill(iconBg).frame(width: 56, height: 56)
+                Circle()
+                    .fill(Color.white.opacity(type.isAvailable ? 0.1 : 0.05))
+                    .frame(width: 56, height: 56)
+                    .overlay(Circle().strokeBorder(ring, lineWidth: 1.5))
                 Text(type.emoji)
                     .font(.system(size: 28))
                     .opacity(fgOpacity)
@@ -148,20 +151,20 @@ struct AddEntityView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
-                    Text(type.rawValue)
+                    Text(entityTitle(type))
                         .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.primary.opacity(fgOpacity))
+                        .foregroundStyle(.white.opacity(fgOpacity))
                     if !type.isAvailable {
-                        Text("开发中")
+                        Text(l.addEntityWIP)
                             .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color(hex: "FF9500"))
+                            .foregroundStyle(Color.goLime)
                             .padding(.horizontal, 7).padding(.vertical, 3)
-                            .background(Color(hex: "FF9500").opacity(0.12), in: Capsule())
+                            .background(Color.goLime.opacity(0.15), in: Capsule())
                     }
                 }
-                Text(typeDescription(type))
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color.primary.opacity(type.isAvailable ? 0.65 : 0.35))
+                Text(entityBlurb(type))
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(type.isAvailable ? 0.62 : 0.32))
             }
 
             Spacer()
@@ -169,18 +172,26 @@ struct AddEntityView: View {
             Image(systemName: type.isAvailable ? "chevron.right" : "lock.fill")
                 .font(.system(size: 14, weight: .semibold))
                 .symbolRenderingMode(.monochrome)
-                .foregroundStyle(Color.primary.opacity(type.isAvailable ? 0.45 : 0.28))
+                .foregroundStyle(.white.opacity(type.isAvailable ? 0.5 : 0.28))
         }
         .padding(18)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .goTranslucentCard(cornerRadius: 28)
         .opacity(type.isAvailable ? 1 : 0.65)
     }
     
-    private func typeDescription(_ type: EntityType) -> String {
+    private func entityTitle(_ type: EntityType) -> String {
         switch type {
-        case .pet: return "添加你的毛孩子、小怪兽"
-        case .human: return "添加家庭成员"
-        case .plant: return "添加绿植花卉"
+        case .pet: return l.addEntityPetTitle
+        case .human: return l.addEntityHumanTitle
+        case .plant: return l.addEntityPlantTitle
+        }
+    }
+
+    private func entityBlurb(_ type: EntityType) -> String {
+        switch type {
+        case .pet: return l.addEntityPetBlurb
+        case .human: return l.addEntityHumanBlurb
+        case .plant: return l.addEntityPlantBlurb
         }
     }
 }

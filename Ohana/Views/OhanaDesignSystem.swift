@@ -6,30 +6,37 @@
 //
 
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 // MARK: - Global Coconut Balance Capsule
 struct CoconutBalanceCapsule: View {
     @State private var questManager = QuestManager.shared
     let onTap: () -> Void
-    
+
     init(onTap: @escaping () -> Void = {}) {
         self.onTap = onTap
     }
-    
+
+    private var capsuleCore: some View {
+        HStack(spacing: 3) {
+            Text("🥥").font(OhanaFont.metric(size: 9, .medium))
+            Text("\(questManager.coconutCount)")
+                .font(OhanaFont.caption2(.black))
+                .foregroundStyle(.black)
+                .contentTransition(.numericText())
+                .animation(.spring(response: 0.4), value: questManager.coconutCount)
+        }
+        .padding(.horizontal, 7).padding(.vertical, 4)
+        .frame(height: 26)
+        .fixedSize(horizontal: true, vertical: false)
+        .background(Color.goPrimary, in: Capsule())
+    }
+
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 3) {
-                Text("🥥").font(OhanaFont.metric(size: 9, .medium))
-                Text("\(questManager.coconutCount)")
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(.black)
-                    .contentTransition(.numericText())
-                    .animation(.spring(response: 0.4), value: questManager.coconutCount)
-            }
-            .padding(.horizontal, 7).padding(.vertical, 4)
-            .frame(height: 26)
-            .fixedSize(horizontal: true, vertical: false)
-            .background(Color.goPrimary, in: Capsule())
+            capsuleCore
         }
         .buttonStyle(.plain)
     }
@@ -51,6 +58,44 @@ struct ScreenCompat {
     }
     static var width: CGFloat { bounds.width }
     static var height: CGFloat { bounds.height }
+
+#if os(iOS)
+    /// 物理屏圆角半径（与 SpringBoard / 桌面玻璃一致）。优先 `_displayCornerRadius`； unavailable 时用短边比例估算。
+    /// - Note: 公开 SDK 暂无 `UIScreen.displayCornerRadius` 成员时依赖 runtime key；若未来系统提供公开 API 可替换。
+    static var displayCornerRadius: CGFloat {
+        let screen = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first?.screen ?? UIScreen.main
+        if let r = screen.value(forKey: "_displayCornerRadius") as? CGFloat, r > 1 {
+            return r
+        }
+        if let r = UIScreen.main.value(forKey: "_displayCornerRadius") as? CGFloat, r > 1 {
+            return r
+        }
+        let s = bounds.size
+        let m = min(s.width, s.height)
+        return max(46, m * 0.134)
+    }
+#else
+    static var displayCornerRadius: CGFloat {
+        let s = bounds.size
+        return max(46, min(s.width, s.height) * 0.134)
+    }
+#endif
+}
+
+// MARK: - Environment：屏幕圆角（Focus / 同心卡片等）
+
+enum OhanaDisplayCornerRadiusKey: EnvironmentKey {
+    static var defaultValue: CGFloat { ScreenCompat.displayCornerRadius }
+}
+
+extension EnvironmentValues {
+    /// 设备显示圆角半径；默认与 `ScreenCompat.displayCornerRadius` 一致，可在预览中覆盖。
+    var ohanaDisplayCornerRadius: CGFloat {
+        get { self[OhanaDisplayCornerRadiusKey.self] }
+        set { self[OhanaDisplayCornerRadiusKey.self] = newValue }
+    }
 }
 
 // MARK: - Ohana Glass Modifier
@@ -99,6 +144,24 @@ struct NeoWhiteCardModifier: ViewModifier {
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .shadow(color: .black.opacity(0.08), radius: 16, x: 0, y: 4)
+    }
+}
+
+/// 与 `GoDashboardView` 首页白底区块一致：靛青浅影；子视图使用浅色 `ColorScheme` 以保证深字对比度。
+struct GoIslandModuleCardModifier: ViewModifier {
+    var cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .environment(\.colorScheme, .light)
+            .background(Color.white, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .shadow(color: Color(hex: "0C1640").opacity(0.14), radius: 8, y: 3)
+    }
+}
+
+extension View {
+    func goIslandModuleCard(cornerRadius: CGFloat = 20) -> some View {
+        modifier(GoIslandModuleCardModifier(cornerRadius: cornerRadius))
     }
 }
 

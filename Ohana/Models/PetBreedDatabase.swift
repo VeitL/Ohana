@@ -52,12 +52,35 @@ enum PetBreedDatabase {
         CoatColor(name: "奶油色",   hex: "F5E6C8"),
         CoatColor(name: "红色",     hex: "B5451B"),
         CoatColor(name: "橙色",     hex: "C8622A"),
+        CoatColor(name: "黄色",     hex: "E8D44D"),
+        CoatColor(name: "橙黄色",   hex: "FFB300"),
         CoatColor(name: "杏色",     hex: "E8C49A"),
+        CoatColor(name: "蓝色",     hex: "3B6FB8"),
+        CoatColor(name: "绿色",     hex: "3D8C4A"),
         CoatColor(name: "蓝灰色",   hex: "7A9AAF"),
         CoatColor(name: "银色",     hex: "C0C0C0"),
         CoatColor(name: "巧克力色", hex: "4A2C1A"),
         CoatColor(name: "虎斑色",   hex: "7A5C3A"),
         CoatColor(name: "花斑色",   hex: "C8B4A0"),
+        // 兔/鸟/仓鼠等「coats([...])」引用名，须在此表内才有正确色块（否则退化为灰色占位）
+        CoatColor(name: "黑白",     hex: "2C2C2C"),
+        CoatColor(name: "蓝白",     hex: "8FA8BE"),
+        CoatColor(name: "棕白",     hex: "9A846E"),
+        CoatColor(name: "灰白",     hex: "C5C5C5"),
+        CoatColor(name: "花斑",     hex: "C8B4A0"),
+        CoatColor(name: "多色",     hex: "C4A882"),
+        CoatColor(name: "灰棕色",   hex: "8D7B68"),
+        CoatColor(name: "珍珠色",   hex: "E8DDD4"),
+        CoatColor(name: "蓝宝石色", hex: "6B8CBC"),
+        CoatColor(name: "白色（冬季）", hex: "F0F0EE"),
+        CoatColor(name: "沙棕色",   hex: "C4A574"),
+        CoatColor(name: "肉桂色",   hex: "C9A66B"),
+        CoatColor(name: "米色",     hex: "E5D9C8"),
+        CoatColor(name: "盐椒色",   hex: "8B8B82"),
+        CoatColor(name: "白腹深刺", hex: "3A3632"),
+        CoatColor(name: "黄化",     hex: "FFE566"),
+        CoatColor(name: "白面",     hex: "ECEAE4"),
+        CoatColor(name: "橙色脸颊灰色", hex: "9E9E9E"),
         CoatColor(name: "其他",     hex: "BDBDBD"),
     ]
 
@@ -85,8 +108,36 @@ enum PetBreedDatabase {
         EyeColor(name: "黑色",   hex: "1C1C1C"),
         EyeColor(name: "异瞳",   hex: "7A3A7A"),
         EyeColor(name: "红色",   hex: "CC2200"),
+        EyeColor(name: "粉色（白化）", hex: "E8A8C8"),
+        EyeColor(name: "红色（白化）", hex: "FF5533"),
+        EyeColor(name: "铜绿色", hex: "6B8C3A"),
         EyeColor(name: "其他",   hex: "BDBDBD"),
     ]
+
+    /// 在品种允许的瞳色集合内，按当前已选毛色做常见表型上的二次收敛（重点色猫多为蓝眼表型、白化/红眼与白毛、部分白兔等）；无法收窄时退回品种全集。
+    /// 参考：CFA/FCI 公开品种描述、家猫「重点色」温度敏感白化（cs/cb）与常见伴侣动物毛色-眼色表型归纳。
+    static func refinedEyeColors(breed: BreedInfo?, coatColor: String) -> [EyeColor] {
+        let base = breed?.eyeColors ?? genericEyeColors
+        let coat = coatColor.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !coat.isEmpty, coat != "自定义" else { return base }
+
+        if coat.contains("白化") || coat.contains("红眼") {
+            let narrowed = base.filter { $0.name.contains("红") || $0.name.contains("粉色") }
+            return narrowed.isEmpty ? base : narrowed
+        }
+
+        if coat.contains("重点"), let n = breed?.name, n == "暹罗猫" || n == "布偶猫" {
+            let narrowed = base.filter { $0.name.contains("蓝") }
+            return narrowed.isEmpty ? base : narrowed
+        }
+
+        if breed?.name == "新西兰兔", coat == "白色" {
+            let narrowed = base.filter { $0.name.contains("粉色") || $0.name.contains("红") }
+            return narrowed.isEmpty ? base : narrowed
+        }
+
+        return base
+    }
     
     // MARK: - Dog Breeds (A-Z)
     static let dogBreeds: [BreedInfo] = [
@@ -145,7 +196,7 @@ enum PetBreedDatabase {
                   coatColors: [CoatColor(name: "黑色", hex: "1A1A1A"), CoatColor(name: "金色", hex: "D4A017"), CoatColor(name: "巧克力色", hex: "4A2C1A"), CoatColor(name: "花斑", hex: "C8B4A0")],
                   eyeColors: [EyeColor(name: "棕色", hex: "6B3A2A"), EyeColor(name: "榛色", hex: "7A5A2A")], suggestedThemeHex: "8D6E63"),
         BreedInfo(name: "马尔济斯犬",
-                  coatColors: [CoatColor(name: "纯白", hex: "F5F5F0")],
+                  coatColors: [CoatColor(name: "纯白", hex: "F5F5F0"), CoatColor(name: "乳白", hex: "F8F4EC")],
                   eyeColors: [EyeColor(name: "深棕色", hex: "3D1F0D"), EyeColor(name: "黑色", hex: "1C1C1C")], suggestedThemeHex: "FAFAFA"),
         BreedInfo(name: "迷你雪纳瑞",
                   coatColors: [CoatColor(name: "椒盐色", hex: "9E9E9E"), CoatColor(name: "黑色", hex: "1A1A1A"), CoatColor(name: "黑银色", hex: "2A2A2A"), CoatColor(name: "白色", hex: "F5F5F0")],
@@ -189,8 +240,8 @@ enum PetBreedDatabase {
                   coatColors: [CoatColor(name: "蓝灰色", hex: "7A9AAF"), CoatColor(name: "白色", hex: "F5F5F0"), CoatColor(name: "黑色", hex: "1A1A1A"), CoatColor(name: "金色", hex: "D4A017"), CoatColor(name: "银色", hex: "C0C0C0"), CoatColor(name: "虎斑", hex: "7A5C3A"), CoatColor(name: "玳瑁", hex: "6E2C00")],
                   eyeColors: [EyeColor(name: "金色", hex: "D4A017"), EyeColor(name: "铜色", hex: "A05A1A"), EyeColor(name: "绿色", hex: "3D7A30"), EyeColor(name: "蓝色", hex: "2A5C9A")], suggestedThemeHex: "9E9E9E"),
         BreedInfo(name: "英国短毛猫",
-                  coatColors: [CoatColor(name: "蓝灰色", hex: "7A9AAF"), CoatColor(name: "白色", hex: "F5F5F0"), CoatColor(name: "黑色", hex: "1A1A1A"), CoatColor(name: "金渐层", hex: "D4A017"), CoatColor(name: "银渐层", hex: "C0C0C0"), CoatColor(name: "虎斑", hex: "7A5C3A"), CoatColor(name: "重点色", hex: "4A2A10")],
-                  eyeColors: [EyeColor(name: "铜色", hex: "A05A1A"), EyeColor(name: "橙色", hex: "C06010"), EyeColor(name: "绿色", hex: "3D7A30"), EyeColor(name: "蓝色", hex: "2A5C9A")], suggestedThemeHex: "90A4AE"),
+                  coatColors: [CoatColor(name: "蓝灰色", hex: "7A9AAF"), CoatColor(name: "白色", hex: "F5F5F0"), CoatColor(name: "黑色", hex: "1A1A1A"), CoatColor(name: "蓝白", hex: "A8B8CA"), CoatColor(name: "金渐层", hex: "D4A017"), CoatColor(name: "银渐层", hex: "C0C0C0"), CoatColor(name: "虎斑", hex: "7A5C3A"), CoatColor(name: "重点色", hex: "4A2A10")],
+                  eyeColors: [EyeColor(name: "铜色", hex: "A05A1A"), EyeColor(name: "橙色", hex: "C06010"), EyeColor(name: "绿色", hex: "3D7A30"), EyeColor(name: "蓝色", hex: "2A5C9A"), EyeColor(name: "异瞳", hex: "7A3A7A")], suggestedThemeHex: "90A4AE"),
         BreedInfo(name: "美国短毛猫",
                   coatColors: [CoatColor(name: "银虎斑", hex: "C0C0C0"), CoatColor(name: "棕虎斑", hex: "7A5C3A"), CoatColor(name: "红虎斑", hex: "B5451B"), CoatColor(name: "白色", hex: "F5F5F0"), CoatColor(name: "黑色", hex: "1A1A1A")],
                   eyeColors: [EyeColor(name: "金色", hex: "D4A017"), EyeColor(name: "绿色", hex: "3D7A30"), EyeColor(name: "蓝色", hex: "2A5C9A")], suggestedThemeHex: "9E9E9E"),
@@ -202,16 +253,27 @@ enum PetBreedDatabase {
                   eyeColors: [EyeColor(name: "绿色", hex: "3D7A30"), EyeColor(name: "金色", hex: "D4A017"), EyeColor(name: "铜色", hex: "A05A1A"), EyeColor(name: "蓝色", hex: "2A5C9A")], suggestedThemeHex: "795548"),
         BreedInfo(name: "缅甸猫",
                   coatColors: [CoatColor(name: "貂褐色", hex: "4A2A10"), CoatColor(name: "蓝色", hex: "7A9AAF"), CoatColor(name: "巧克力色", hex: "4A2C1A"), CoatColor(name: "丁香色", hex: "C0B0C0"), CoatColor(name: "红色", hex: "B5451B"), CoatColor(name: "奶油色", hex: "F5E6C8")],
-                  eyeColors: [EyeColor(name: "金色", hex: "D4A017"), EyeColor(name: "黄色", hex: "C8A800")], suggestedThemeHex: "795548"),
+                  eyeColors: [EyeColor(name: "金色", hex: "D4A017"), EyeColor(name: "黄色", hex: "C8A800"), EyeColor(name: "铜色", hex: "A05A1A"), EyeColor(name: "琥珀色", hex: "C68B1A")], suggestedThemeHex: "795548"),
         BreedInfo(name: "孟加拉猫",
                   coatColors: [CoatColor(name: "棕豹纹", hex: "7A5C3A"), CoatColor(name: "银豹纹", hex: "C0C0C0"), CoatColor(name: "雪色豹纹", hex: "F5E6C8"), CoatColor(name: "蓝豹纹", hex: "7A9AAF")],
                   eyeColors: [EyeColor(name: "金色", hex: "D4A017"), EyeColor(name: "绿色", hex: "3D7A30"), EyeColor(name: "蓝色", hex: "2A5C9A")], suggestedThemeHex: "FF8F00"),
         BreedInfo(name: "德文卷毛猫",
-                  coatColors: [CoatColor(name: "白色", hex: "F5F5F0"), CoatColor(name: "黑色", hex: "1A1A1A"), CoatColor(name: "蓝色", hex: "7A9AAF"), CoatColor(name: "奶油色", hex: "F5E6C8"), CoatColor(name: "红色", hex: "B5451B"), CoatColor(name: "银渐层", hex: "C0C0C0"), CoatColor(name: "玳瑁", hex: "6E2C00")],
-                  eyeColors: [EyeColor(name: "金色", hex: "D4A017"), EyeColor(name: "绿色", hex: "3D7A30"), EyeColor(name: "蓝色", hex: "2A5C9A"), EyeColor(name: "异瞳", hex: "7A3A7A")], suggestedThemeHex: "9E9E9E"),
+                  coatColors: [
+                    CoatColor(name: "白色", hex: "F5F5F0"), CoatColor(name: "黑色", hex: "1A1A1A"),
+                    CoatColor(name: "蓝色（灰蓝）", hex: "7A9AAF"), CoatColor(name: "巧克力色", hex: "4A2C1A"),
+                    CoatColor(name: "肉桂色", hex: "C9A66B"), CoatColor(name: "奶油色", hex: "F5E6C8"),
+                    CoatColor(name: "红色", hex: "B5451B"), CoatColor(name: "虎斑色", hex: "7A5C3A"),
+                    CoatColor(name: "玳瑁", hex: "6E2C00"), CoatColor(name: "重点色", hex: "4A2A10")
+                  ],
+                  eyeColors: [
+                    EyeColor(name: "绿色", hex: "3D7A30"), EyeColor(name: "翠绿色", hex: "1A8C3A"),
+                    EyeColor(name: "琥珀色", hex: "C68B1A"), EyeColor(name: "铜色", hex: "A05A1A"),
+                    EyeColor(name: "金色", hex: "D4A017"), EyeColor(name: "蓝色", hex: "2A5C9A"),
+                    EyeColor(name: "异瞳", hex: "7A3A7A")
+                  ], suggestedThemeHex: "9E9E9E"),
         BreedInfo(name: "俄罗斯蓝猫",
                   coatColors: [CoatColor(name: "蓝灰色", hex: "7A9AAF")],
-                  eyeColors: [EyeColor(name: "翠绿色", hex: "1A8C3A")], suggestedThemeHex: "90A4AE"),
+                  eyeColors: [EyeColor(name: "翠绿色", hex: "1A8C3A"), EyeColor(name: "绿色", hex: "3D7A30")], suggestedThemeHex: "90A4AE"),
         BreedInfo(name: "斯芬克斯无毛猫",
                   coatColors: [CoatColor(name: "桃色肤色", hex: "F0C8A0"), CoatColor(name: "黑色肤色", hex: "3A2A1A"), CoatColor(name: "蓝色肤色", hex: "7A9AAF"), CoatColor(name: "虎纹肤色", hex: "7A5C3A")],
                   eyeColors: [EyeColor(name: "绿色", hex: "3D7A30"), EyeColor(name: "金色", hex: "D4A017"), EyeColor(name: "蓝色", hex: "2A5C9A"), EyeColor(name: "异瞳", hex: "7A3A7A")], suggestedThemeHex: "FFCCBC"),

@@ -46,6 +46,8 @@ private struct PayerSummary: Identifiable {
 
 // MARK: - Main View
 struct IslandExpenseDashboard: View {
+    var standalone: Bool = true
+
     @Environment(\.dismiss)           private var dismiss
     @Query(sort: \Pet.name)           private var pets: [Pet]
     @Query(sort: \Human.createdAt)    private var humans: [Human]
@@ -140,20 +142,7 @@ struct IslandExpenseDashboard: View {
     }
 
     var body: some View {
-        ZStack {
-            ArkBackgroundView().ignoresSafeArea()
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    navBar
-                    expenseFloatingHeader
-                    funBentoRow
-                    petBarChartCard
-                    payerBreakdownCard
-                    ExpenseSplitterCard(filteredLogs: filteredLogs, humans: humans)
-                    Color.clear.frame(height: 40)
-                }
-                .padding(.horizontal, 16)
-            }
+        dashboardBody
             .onAppear {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     withAnimation(.spring(response: 0.6, dampingFraction: 0.8, blendDuration: 0)) {
@@ -167,8 +156,34 @@ struct IslandExpenseDashboard: View {
                     chartAnimationProgress = 1.0
                 }
             }
+    }
+
+    @ViewBuilder
+    private var dashboardBody: some View {
+        if standalone {
+            ZStack {
+                ArkBackgroundView().ignoresSafeArea()
+                scrollContent
+            }
+            .ignoresSafeArea(edges: .top)
+        } else {
+            scrollContent
         }
-        .ignoresSafeArea(edges: .top)
+    }
+
+    private var scrollContent: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 20) {
+                if standalone { navBar }
+                expenseFloatingHeader
+                funBentoRow
+                petBarChartCard
+                payerBreakdownCard
+                ExpenseSplitterCard(filteredLogs: filteredLogs, humans: humans)
+                Color.clear.frame(height: 40)
+            }
+            .padding(.horizontal, 16)
+        }
     }
 
     // MARK: - Nav Bar

@@ -829,6 +829,11 @@ struct QuickFeedSheet: View {
                 ArkBackgroundView()
                 VStack(spacing: 24) {
                     petHeader
+                    HStack {
+                        ExecutorPickerBar(tint: Color.goPrimary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 20)
                     if isCasual {
                         casualBody
                     } else {

@@ -41,6 +41,8 @@ private struct DailyStackPoint: Identifiable {
 // MARK: - Main View
 
 struct IslandExplorationDashboard: View {
+    var standalone: Bool = true
+
     @Environment(\.dismiss)       private var dismiss
     @Query(sort: \Pet.name)       private var pets: [Pet]
     @Query(sort: \Human.name)     private var humans: [Human]
@@ -152,25 +154,38 @@ struct IslandExplorationDashboard: View {
     // MARK: - Body
 
     var body: some View {
-        ZStack {
-            ArkBackgroundView().ignoresSafeArea()
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    navBar
-                    heroDisplay
-                    funBentoRow
-                    stackedBarChartCard
-                    leaderboardCard
-                    Color.clear.frame(height: 40)
-                }
-                .padding(.horizontal, 16)
+        dashboardBody
+            .onAppear { triggerAnimation() }
+            .onChange(of: timeRange) { _, _ in
+                animationProgress = 0
+                triggerAnimation()
             }
+    }
+
+    @ViewBuilder
+    private var dashboardBody: some View {
+        if standalone {
+            ZStack {
+                ArkBackgroundView().ignoresSafeArea()
+                scrollContent
+            }
+            .ignoresSafeArea(edges: .top)
+        } else {
+            scrollContent
         }
-        .ignoresSafeArea(edges: .top)
-        .onAppear { triggerAnimation() }
-        .onChange(of: timeRange) { _, _ in
-            animationProgress = 0
-            triggerAnimation()
+    }
+
+    private var scrollContent: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 20) {
+                if standalone { navBar }
+                heroDisplay
+                funBentoRow
+                stackedBarChartCard
+                leaderboardCard
+                Color.clear.frame(height: 40)
+            }
+            .padding(.horizontal, 16)
         }
     }
 

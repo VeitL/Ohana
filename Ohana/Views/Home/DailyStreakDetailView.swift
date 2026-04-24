@@ -474,14 +474,15 @@ struct DailyStreakDetailView: View {
 
     private var shortDateFormatter: DateFormatter {
         let f = DateFormatter()
-        f.dateFormat = "M月d日"
+        f.locale = AppLanguage.effectiveLocale
+        f.dateFormat = AppLanguage.isEnglish ? "MMM d" : "M月d日"
         return f
     }
 
     private var monthYearFormatter: DateFormatter {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "zh_CN")
-        f.dateFormat = "yyyy年 M月"
+        f.locale = AppLanguage.effectiveLocale
+        f.dateFormat = AppLanguage.isEnglish ? "MMMM yyyy" : "yyyy年 M月"
         return f
     }
 

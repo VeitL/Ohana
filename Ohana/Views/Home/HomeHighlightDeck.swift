@@ -13,6 +13,7 @@ import SwiftData
 
 private enum CardKind: Hashable {
     case petStatus
+    case humanStatus
     case streak
     case quest(String)   // quest.id
     case questDone
@@ -23,6 +24,7 @@ private enum CardKind: Hashable {
     var stableId: String {
         switch self {
         case .petStatus:     return "petStatus"
+        case .humanStatus:   return "humanStatus"
         case .streak:        return "streak"
         case .quest(let id): return "quest_\(id)"
         case .questDone:     return "questDone"
@@ -37,6 +39,7 @@ private enum CardKind: Hashable {
 
 struct HomeHighlightDeck: View {
     var activePet: Pet?
+    var activeHuman: Human? = nil
     let pets: [Pet]
     let plants: [Plant]
     let quests: [IslandQuest]
@@ -86,7 +89,8 @@ struct HomeHighlightDeck: View {
 
     private var cards: [CardKind] {
         var result: [CardKind] = []
-        if activePet != nil { result.append(.petStatus) }
+        if activeHuman != nil { result.append(.humanStatus) }
+        else if activePet != nil { result.append(.petStatus) }
         result.append(.streak)
         if !quests.isEmpty {
             if allQuestsDone && coconutClaimed {
@@ -99,7 +103,6 @@ struct HomeHighlightDeck: View {
                 for q in visibleQuests { result.append(.quest(q.id)) }
             }
         }
-        result.append(.level)
         return result
     }
 
@@ -222,6 +225,12 @@ struct HomeHighlightDeck: View {
             } else {
                 Color.clear
             }
+        case .humanStatus:
+            if let human = activeHuman {
+                DeckHumanStatusCard(human: human)
+            } else {
+                Color.clear
+            }
         case .streak:
             DeckCheckInStreakCard(streak: checkInStreak) { onStreakTap?() }
         case .quest(let id):
@@ -269,6 +278,107 @@ struct HomeHighlightDeck: View {
     }
 }
 
+// MARK: - DeckHumanStatusCard
+
+private struct DeckHumanStatusCard: View {
+    let human: Human
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var recentWorkoutCount: Int {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        return human.workoutLogs.filter { $0.date >= cutoff }.count
+    }
+
+    private var latestWeight: Double? {
+        human.weightLogs.max(by: { $0.date < $1.date })?.weight
+    }
+
+    private var themeColor: Color { Color(hex: human.themeColorHex.isEmpty ? "233BFF" : human.themeColorHex) }
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            ZStack {
+                // 背景
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(LinearGradient(
+                        colors: [themeColor, themeColor.opacity(0.7)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ))
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(.black.opacity(0.15))
+                    .blendMode(.multiply)
+
+                HStack(spacing: 16) {
+                    // 头像
+                    ZStack {
+                        Circle()
+                            .fill(.white.opacity(0.15))
+                            .frame(width: 60, height: 60)
+                        if let data = human.avatarImageData, let img = UIImage(data: data) {
+                            Image(uiImage: img)
+                                .resizable().scaledToFill()
+                                .frame(width: 60, height: 60)
+                                .clipShape(Circle())
+                        } else {
+                            Text(human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji)
+                                .font(.system(size: 30))
+                        }
+                    }
+
+                    // 信息
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 6) {
+                            Text(human.name.isEmpty ? "岛民" : human.name)
+                                .font(.system(size: 18, weight: .black, design: .rounded))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                            Text(human.roleText)
+                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.75))
+                                .padding(.horizontal, 7).padding(.vertical, 3)
+                                .background(.white.opacity(0.2), in: Capsule())
+                        }
+                        if let bday = human.birthday {
+                            let years = Calendar.current.dateComponents([.year], from: bday, to: Date()).year ?? 0
+                            Text("\(years) 岁")
+                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+
+                        Spacer(minLength: 6)
+
+                        // 数据行
+                        HStack(spacing: 14) {
+                            statPill(icon: "🥥", value: "\(human.coconutBalance)")
+                            statPill(icon: "💪", value: "\(recentWorkoutCount)次")
+                            if let w = latestWeight {
+                                statPill(icon: "⚖️", value: String(format: "%.1fkg", w))
+                            }
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+    }
+
+    @ViewBuilder
+    private func statPill(icon: String, value: String) -> some View {
+        HStack(spacing: 3) {
+            Text(icon).font(.system(size: 11))
+            Text(value)
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.9))
+        }
+        .padding(.horizontal, 8).padding(.vertical, 4)
+        .background(.white.opacity(0.15), in: Capsule())
+    }
+}
+
 // MARK: - DeckPetStatusCard
 
 private struct DeckPetStatusCard: View {
@@ -276,10 +386,10 @@ private struct DeckPetStatusCard: View {
     private let cal = Calendar.current
 
     private var todayFeedCount: Int {
-        pet.careLogs.filter { $0.type == "feeding" && cal.isDateInToday($0.date) }.count
+        pet.careLogs.filter { $0.careType == .feeding && cal.isDateInToday($0.date) }.count
     }
     private var todayWaterCount: Int {
-        pet.careLogs.filter { $0.type == "watering" && cal.isDateInToday($0.date) }.count
+        pet.careLogs.filter { $0.careType == .watering && cal.isDateInToday($0.date) }.count
     }
     private var todayWalkCount: Int {
         pet.walkLogs.filter { cal.isDateInToday($0.startDate) }.count

@@ -51,6 +51,8 @@ struct QuickWaterChangeDetailSheet: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
                         petHeader
+                        ExecutorPickerBar(tint: themeColor)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         waterChangeSection
                         filterSection
                         historySection

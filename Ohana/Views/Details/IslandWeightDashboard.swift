@@ -61,6 +61,9 @@ private struct AnimatedWeightSparkline: View {
 
 // MARK: - Main View
 struct IslandWeightDashboard: View {
+    /// When false, skips the outer NavigationStack and nav bar — for embedding inside FeatureAggregateView.
+    var standalone: Bool = true
+
     @Environment(\.dismiss)       private var dismiss
     @Environment(\.modelContext)  private var modelContext
     @Environment(\.colorScheme)   private var colorScheme
@@ -163,26 +166,39 @@ struct IslandWeightDashboard: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                ArkBackgroundView().ignoresSafeArea()
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 20) {
-                        navBar
-                        weightFloatingChart
-                        funBentoRow
-                        individualSparklineCard
-                        Color.clear.frame(height: 40)
-                    }
-                    .padding(.horizontal, 16)
+        dashboardBody
+            .onAppear { vm.load(modelContext: modelContext, pets: pets, humans: visibleHumans) }
+            .onChange(of: pets.count)   { _, _ in vm.load(modelContext: modelContext, pets: pets, humans: visibleHumans) }
+            .onChange(of: humans.count) { _, _ in vm.load(modelContext: modelContext, pets: pets, humans: visibleHumans) }
+    }
+
+    @ViewBuilder
+    private var dashboardBody: some View {
+        if standalone {
+            NavigationStack {
+                ZStack {
+                    ArkBackgroundView().ignoresSafeArea()
+                    scrollContent
                 }
+                .ignoresSafeArea(edges: .top)
+                .navigationBarHidden(true)
             }
-            .ignoresSafeArea(edges: .top)
-            .navigationBarHidden(true)
+        } else {
+            scrollContent
         }
-        .onAppear { vm.load(modelContext: modelContext, pets: pets, humans: visibleHumans) }
-        .onChange(of: pets.count)   { vm.load(modelContext: modelContext, pets: pets, humans: visibleHumans) }
-        .onChange(of: humans.count) { vm.load(modelContext: modelContext, pets: pets, humans: visibleHumans) }
+    }
+
+    private var scrollContent: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 20) {
+                if standalone { navBar }
+                weightFloatingChart
+                funBentoRow
+                individualSparklineCard
+                Color.clear.frame(height: 40)
+            }
+            .padding(.horizontal, 16)
+        }
     }
 
     // MARK: - Nav Bar

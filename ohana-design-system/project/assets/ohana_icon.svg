@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Ohana app icon">
+  <rect width="256" height="256" rx="56" ry="56" fill="#0C1640"></rect>
+  
+  <path d="M 60 140&#xA;           C 60 96, 108 96, 128 128&#xA;           C 148 160, 196 160, 196 116&#xA;           C 196 88, 168 80, 148 108" fill="none" stroke="#C8FF00" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"></path>
+  
+  <circle cx="128" cy="128" r="12" fill="#C8FF00"></circle>
+</svg>

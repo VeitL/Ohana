@@ -20,6 +20,9 @@ struct WalkSummarySheet: View {
     @State private var draftNotes: String = ""
     @State private var moodSaved = false
 
+    private let weeklyGoalStepKm: Double = 0.5
+    private let weeklyGoalMaxKm: Double = 100
+
     private var sortedWalks: [PetWalkLog] {
         pet.walkLogs.sorted(by: { $0.startDate > $1.startDate })
     }
@@ -227,43 +230,56 @@ struct WalkSummarySheet: View {
         .goTranslucentCard(cornerRadius: 20)
         .sheet(isPresented: $showingGoalSetter) {
             goalSetterSheet
-                .presentationDetents([.height(280)])
+                .presentationDetents([.height(320)])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(.regularMaterial)
         }
     }
 
     private var goalSetterSheet: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 20) {
             Text("设定每周步行目标")
                 .font(.system(size: 17, weight: .black, design: .rounded))
                 .padding(.top, 20)
 
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(String(format: "%.0f", goalDraft))
+                Text(weeklyGoalDisplay(goalDraft))
                     .font(.system(size: 52, weight: .black, design: .rounded))
                     .foregroundStyle(.primary)
+                    .contentTransition(.numericText())
                     .animation(.spring(duration: 0.2), value: goalDraft)
                 Text("km / 周")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundStyle(.secondary)
             }
 
-            // Stepper 控制
-            HStack(spacing: 20) {
-                ForEach([1.0, 3.0, 5.0, 7.0, 10.0], id: \.self) { preset in
-                    Button {
-                        goalDraft = preset
-                    } label: {
-                        Text(String(format: "%.0f", preset))
-                            .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(goalDraft == preset ? .black : .primary)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(goalDraft == preset ? Color.goPrimary : Color.primary.opacity(0.08), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
+            // 加减步进（0.5 km），替代固定档位
+            HStack(spacing: 28) {
+                Button {
+                    adjustWeeklyGoal(-weeklyGoalStepKm)
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                        .font(.system(size: 40, weight: .medium))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(goalDraft <= 0 ? Color.secondary.opacity(0.35) : Color.goPrimary, Color.primary.opacity(0.12))
                 }
+                .buttonStyle(.plain)
+                .disabled(goalDraft <= 0)
+
+                Text("每次 ±\(weeklyGoalStepKm == floor(weeklyGoalStepKm) ? String(format: "%.0f", weeklyGoalStepKm) : String(format: "%.1f", weeklyGoalStepKm)) km")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+
+                Button {
+                    adjustWeeklyGoal(weeklyGoalStepKm)
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 40, weight: .medium))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(goalDraft >= weeklyGoalMaxKm ? Color.secondary.opacity(0.35) : Color.goPrimary, Color.primary.opacity(0.12))
+                }
+                .buttonStyle(.plain)
+                .disabled(goalDraft >= weeklyGoalMaxKm)
             }
 
             Button {
@@ -282,8 +298,24 @@ struct WalkSummarySheet: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 24)
 
-            Spacer()
+            Spacer(minLength: 8)
         }
+    }
+
+    private func weeklyGoalDisplay(_ km: Double) -> String {
+        if km <= 0 { return "0" }
+        let rounded = (km * 2).rounded() / 2
+        if rounded.truncatingRemainder(dividingBy: 1) < 0.01 {
+            return String(format: "%.0f", rounded)
+        }
+        return String(format: "%.1f", rounded)
+    }
+
+    private func adjustWeeklyGoal(_ delta: Double) {
+        let next = min(weeklyGoalMaxKm, max(0, goalDraft + delta))
+        guard next != goalDraft else { return }
+        goalDraft = (next * 2).rounded() / 2
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     // MARK: - Summary Card

@@ -22,6 +22,8 @@ xcuserdata/
 # Tooling / local
 *.xcresult
 .claude/
+.venv-l10n/
+scripts/.l10n_en_cache.json
 
 # Accidental duplicate git metadata (do not track)
 .git 2/

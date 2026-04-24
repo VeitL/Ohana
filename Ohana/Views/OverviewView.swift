@@ -21,6 +21,8 @@ struct OverviewView: View {
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @Query(sort: \Plant.createdAt) private var plants: [Plant]
+    @Query private var allHumanMedications: [HumanMedication]
+    @Query private var allMedicationLogs: [HumanMedicationLog]
     @Query(sort: \Household.createdAt) private var households: [Household]
     @Query(filter: #Predicate<Reminder> { $0.status == "pending" },
            sort: \Reminder.scheduledAt) private var pendingReminders: [Reminder]
@@ -57,6 +59,10 @@ struct OverviewView: View {
     private var sectionOrder: [String] { sectionOrderRaw.split(separator: ",").map(String.init) }
     // Quick action 额外弹窗
     @State private var quickWeightPet: Pet? = nil   // 快速添加体重
+    @State private var quickHumanWeightHuman: Human? = nil      // 快速记录人类体重
+    @State private var quickHumanWorkoutHuman: Human? = nil     // 快速添加运动
+    @State private var quickHumanMedicationHuman: Human? = nil  // 快速查看用药
+    @State private var quickHumanNoteHuman: Human? = nil        // 快速备注
     @State private var quickWeightValue: String = ""
     @State private var quickWalkPet: Pet? = nil     // 快速开始遛狗
     @State private var actionToast: (pet: Pet, message: String, emoji: String)? = nil  // N6: 打卡反馈 toast
@@ -133,6 +139,15 @@ struct OverviewView: View {
     @State private var cardBackAchievementsPet: Pet? = nil
     // 全局椰子日志显示
     @State private var showingCoconutLog = false
+    // 首页简化：岛屿三层重构
+    @State private var showingIslandSummary = false
+    @State private var showingFamilyStripFull = false
+    // 巡岛前置全屏卡
+    @State private var showWalkFullScreen = false
+    @State private var walkMinimized = false
+    @State private var lastWalkPhase: WalkPhase = .idle
+    /// 首页 ScrollView 内容顶部在滚动坐标系中的 minY（上滑为负 → 用于顶栏渐隐）
+    @State private var homeScrollContentMinY: CGFloat = 0
     // 打卡连击详情（顶栏 / 横滑甲板共用）
     @State private var showOasisReward = false
     @State private var showStreakDetail = false
@@ -154,6 +169,12 @@ struct OverviewView: View {
     @State private var calendarAddEventTrigger = false
     @State private var oasisRulesTrigger = false
     @State private var oasisInventoryTrigger = false
+    @State private var isCardDragging = false
+    @State private var activeHumanId: UUID? = nil
+    private var activeHuman: Human? {
+        guard let id = activeHumanId else { return nil }
+        return humans.first(where: { $0.id == id })
+    }
     // Task2 / Bug10: 当前顶牌对应的 Pet ID（AppStorage 保证 NavigationStack 返回后不丢失）
     @AppStorage("overview_activeCritterId") private var activeCritterIdStr: String = ""
     private var activeCritterId: UUID? {
@@ -272,10 +293,10 @@ struct OverviewView: View {
 
                         if !coconutFlyOut {
                             VStack(spacing: 6) {
-                                Text("每日登录奖励 +1🥥")
+                                Text(l.homeDailyCoconutTitle)
                                     .font(OhanaFont.title2(.black))
                                     .foregroundStyle(.primary)
-                                Text("坚持照顾家人，收获更多椰子")
+                                Text(l.homeDailyCoconutSub)
                                     .font(OhanaFont.callout(.medium))
                                     .foregroundStyle(.primary.opacity(0.5))
                             }
@@ -284,7 +305,7 @@ struct OverviewView: View {
                             Button {
                                 dismissDailyCoconut()
                             } label: {
-                                Text("收下")
+                                Text(l.homeClaimCoconuts)
                                     .font(OhanaFont.body(.bold))
                                     .foregroundStyle(.black)
                                     .padding(.horizontal, 36).padding(.vertical, 12)
@@ -298,10 +319,14 @@ struct OverviewView: View {
                 .transition(.opacity)
             }
 
-            // R6: 全局固定前置层 — glass header，4 个 tab 保持不动
+            // R6: 全局固定前置层 — glass header；首页上滑时随滚动渐隐
             VStack(spacing: 0) {
                 globalFixedHeader
                     .padding(.top, 4)
+                    .opacity(selectedDockTab == 0 ? 1 - homeHeaderCollapseProgress * 0.98 : 1)
+                    .offset(y: selectedDockTab == 0 ? -54 * homeHeaderCollapseProgress : 0)
+                    .animation(.interactiveSpring(response: 0.28, dampingFraction: 0.88), value: homeScrollContentMinY)
+                    .allowsHitTesting(selectedDockTab != 0 || homeHeaderCollapseProgress < 0.92)
                 if selectedDockTab == 2 {
                     CalendarPetChipFilterBar()
                 }
@@ -345,7 +370,7 @@ struct OverviewView: View {
             if !checkedInSet.contains(checkInToday) {
                 checkedInSet.insert(checkInToday)
                 UserDefaults.standard.set(Array(checkedInSet), forKey: checkInKey)
-                QuestManager.shared.addCoconuts(1, emoji: "📅", title: "每日打卡奖励")
+                QuestManager.shared.addCoconuts(1, emoji: "📅", title: l.homeDailyCheckInRewardTitle)
                 refreshHeaderStreak()
             }
             // U5: 每日首次打开椰子收集
@@ -356,7 +381,7 @@ struct OverviewView: View {
                 // 今天已显示过
             } else if !pets.isEmpty || !humans.isEmpty || !plants.isEmpty {
                 UserDefaults.standard.set(today, forKey: dailyKey)
-                QuestManager.shared.addCoconuts(1, emoji: "🌅", title: "每日登录奖励")
+                QuestManager.shared.addCoconuts(1, emoji: "🌅", title: l.homeDailyLoginRewardTitle)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                     withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                         showDailyCoconut = true
@@ -365,7 +390,7 @@ struct OverviewView: View {
             }
             // 岛屿日报：每日首次打开时弹出
             if !pets.isEmpty || !plants.isEmpty {
-                let todayStr = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .none)
+                let todayStr = AppLanguage.calendarDayKeyToday
                 if lastIslandReportDate != todayStr {
                     lastIslandReportDate = todayStr
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -387,6 +412,20 @@ struct OverviewView: View {
             order = order.filter { managedIds.contains($0) }
             sectionOrderRaw = order.joined(separator: ",")
         }
+        .onChange(of: pets.count) { oldCount, newCount in
+            guard newCount > oldCount else { return }
+            // 新增宠物：确保快捷操作模块可见
+            var hidden = hiddenSections
+            hidden.remove("quickActions")
+            hiddenSectionsRaw = hidden.joined(separator: ",")
+            // 为新宠物添加默认 4 个快捷操作（跳过已有操作的宠物）
+            let existingPetIds = Set(savedQuickActionItems.compactMap(\.petId))
+            for pet in pets where !pet.hasPassedAway && !existingPetIds.contains(pet.id) {
+                for item in defaultActions(for: pet) {
+                    addQuickAction(item)
+                }
+            }
+        }
         .milestoneCheck(pets: pets)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingAddEntity) {
@@ -404,6 +443,27 @@ struct OverviewView: View {
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(.regularMaterial)
+        }
+        .sheet(item: $quickHumanWeightHuman) { human in
+            GenericWeightEntrySheet(target: .human(human))
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(.regularMaterial)
+        }
+        .sheet(item: $quickHumanWorkoutHuman) { human in
+            AddWorkoutSheet(human: human)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $quickHumanMedicationHuman) { human in
+            NavigationStack { HumanMedicationView(human: human) }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $quickHumanNoteHuman) { human in
+            QuickHumanNoteSheet(human: human)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
         }
         .fullScreenCover(isPresented: $showIslandWeight) {
             IslandWeightDashboard()
@@ -423,8 +483,69 @@ struct OverviewView: View {
         .sheet(isPresented: $showingCoconutLog) {
             CoconutLogView()
         }
+        // 岛屿顶图 → 详情抽屉
+        .sheet(isPresented: $showingIslandSummary) {
+            IslandSummarySheet(
+                pets: pets,
+                plants: plants,
+                pendingReminders: pendingReminders,
+                checkInStreak: headerStreak
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        // 家庭活动 mini → 完整活动 Sheet
+        .sheet(isPresented: $showingFamilyStripFull) {
+            if let topPet = deckActivePet {
+                NavigationStack {
+                    ScrollView {
+                        FamilyActivityStripView(pet: topPet, style: .full)
+                            .padding(.vertical, 20)
+                    }
+                    .navigationTitle(l.homeFamilyCareTitle(petName: topPet.name))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(l.done) { showingFamilyStripFull = false }
+                                .foregroundStyle(Color.goPrimary)
+                        }
+                    }
+                }
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+            }
+        }
         .fullScreenCover(isPresented: $showOasisReward) {
             OasisRewardView()
+        }
+        // 巡岛进行中：前置全屏卡（地图 + 实时轨迹 + 控制面板）
+        .fullScreenCover(
+            isPresented: $showWalkFullScreen,
+            onDismiss: {
+                // 任何方式关闭全屏卡时，若巡岛仍在进行，首页显示迷你胶囊
+                if PetWalkingManager.shared.phase != .idle {
+                    walkMinimized = true
+                }
+            }
+        ) {
+            if let walkPet = PetWalkingManager.shared.currentPet
+                ?? deckActivePet
+                ?? pets.first(where: { $0.species.lowercased().contains("dog") || $0.species.contains("狗") }) {
+                WalkTrackingFullScreen(
+                    pet: walkPet,
+                    onMinimize: { walkMinimized = true }
+                )
+            }
+        }
+        .onChange(of: PetWalkingManager.shared.phase) { _, newPhase in
+            if newPhase == .idle {
+                showWalkFullScreen = false
+                walkMinimized = false
+            }
+            lastWalkPhase = newPhase
+        }
+        .onAppear {
+            lastWalkPhase = PetWalkingManager.shared.phase
         }
         .fullScreenCover(isPresented: $showingCrewRoster) {
             NavigationStack {
@@ -463,11 +584,11 @@ struct OverviewView: View {
                         { removeQuickAction(found) }
                     }
                 )
-                .navigationTitle("记录时刻")
+                .navigationTitle(l.homeRecordMoment)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("关闭") { showMomentPet = nil }
+                        Button(l.addEntityClose) { showMomentPet = nil }
                     }
                 }
             }
@@ -491,11 +612,11 @@ struct OverviewView: View {
             .presentationBackground(.clear)
         }
         .alert(antiRepeatTitle, isPresented: $showingAntiRepeatAlert) {
-            Button("确定打卡", role: .destructive) {
+            Button(l.homeConfirmCheckIn, role: .destructive) {
                 pendingRepeatAction?()
                 pendingRepeatAction = nil
             }
-            Button("取消", role: .cancel) {
+            Button(l.cancel, role: .cancel) {
                 pendingRepeatAction = nil
             }
         } message: {
@@ -523,15 +644,29 @@ struct OverviewView: View {
     }
     
     // MARK: - Main Scroll View
-    // 信息层级（产品动线）：
-    //   Header → Wallet Stack → [⚠️紧急警告] → 快捷操作 → 今日任务 → 游戏化面板 → 记忆碎片 → 岛屿统计
+    // 简化信息架构（岛屿三层重构 P0）：
+    //   Header → [岛屿顶图胶囊] → Wallet Stack → [家庭活动 mini] → [紧急警告]
+    //   → 今日聚焦单卡 → 快捷操作 → 一键全家 → 更多区(折叠: 记忆/统计)
     private var mainScrollView: some View {
         VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 0) {
                 // R6: 全局 header 占位
             Spacer().frame(height: 70)
-            VStack(spacing: 20) {
+            VStack(spacing: 16) {
+                // ── 层1.5：岛屿天气 / 情绪 / 负反馈 汇总胶囊（60pt）
+                if !pets.isEmpty && !hiddenSections.contains("islandHeader") {
+                    IslandMoodHeaderStrip(
+                        pets: pets,
+                        plants: plants,
+                        pendingReminders: pendingReminders,
+                        activePet: deckActivePet,
+                        checkInStreak: headerStreak,
+                        onExpand: { showingIslandSummary = true }
+                    )
+                }
+
                 // ── 层2引导：有Human无Pet时显示添加宠物引导卡
                 if pets.isEmpty && !humans.isEmpty && !hiddenSections.contains("petCards") {
                     addFirstPetBanner
@@ -546,22 +681,16 @@ struct OverviewView: View {
                         onSelectPet: { selectedPetTab = .overview; selectedPet = $0 },
                         onSelectHuman: { selectedHuman = $0 },
                         onTopCardChanged: { item in
-                            if case .pet(let p) = item { activeCritterIdStr = p.id.uuidString }
-                            else { activeCritterIdStr = "" }
+                            switch item {
+                            case .pet(let p):
+                                activeCritterIdStr = p.id.uuidString
+                                activeHumanId = nil
+                            case .human(let h):
+                                activeCritterIdStr = ""
+                                activeHumanId = h.id
+                            }
                         },
-                        onShowBackSettings: { cardBackSettingsPet = $0 },
-                        onShowHealth:       { cardBackHealthPet = $0 },
-                        onShowMedications:  { cardBackMedicationsPet = $0 },
-                        onShowWeight:       { cardBackWeightPet = $0 },
-                        onShowFood:         { cardBackFoodPet = $0 },
-                        onShowHygiene:      { cardBackHygienePet = $0 },
-                        onShowWalks:        { cardBackWalksPet = $0 },
-                        onShowPotty:        { cardBackPottyPet = $0 },
-                        onShowExpenses:     { cardBackExpensesPet = $0 },
-                        onShowBasicInfo:    { cardBackBasicInfoPet = $0 },
-                        onShowDocuments:    { cardBackDocumentsPet = $0 },
-                        onShowMoments:      { cardBackMomentsPet = $0 },
-                        onShowAchievements: { cardBackAchievementsPet = $0 }
+                        onDraggingChanged: { isCardDragging = $0 }
                     )
                     .onAppear {
                         if activeCritterIdStr.isEmpty {
@@ -570,24 +699,61 @@ struct OverviewView: View {
                     }
                 }
 
+                // ── 层2.5：家庭协作活动 mini 胶囊（降级为 30pt，点击展开）
+                if let topPet = deckActivePet, !hiddenSections.contains("familyStripMini") {
+                    FamilyActivityStripView(
+                        pet: topPet,
+                        style: .compact,
+                        onExpand: { showingFamilyStripFull = true }
+                    )
+                }
+
                 // ── 层3：⚠️ 紧急健康警告拦截层（仅 urgent 级别时显示）
                 emergencyAlertBanner
 
-                // ── 宠物状态一览卡已整合进 HomeHighlightDeck（由 todayActionsSection 渲染）
+                // ── 层4：今日聚焦单卡（替换 HighlightDeck）
+                if !pets.isEmpty && !hiddenSections.contains("todayFocus") {
+                    TodayFocusCard(
+                        pets: pets,
+                        plants: plants,
+                        quests: IslandQuestEngine.todayQuests(
+                            pets: pets, reminders: pendingReminders,
+                            plants: plants, events: allEvents
+                        ),
+                        activePet: deckActivePet,
+                        onCompleteQuest: { completeIslandQuest($0) },
+                        onTapMemory: { /* 可扩展：弹出记忆详情 */ },
+                        onTapOasis: { selectedDockTab = 3 }
+                    )
+                    .id("todayFocus")
+                }
 
-                // ── 层4+：按 orderedSections 驱动渲染（严格绑定排序与显隐）
+                // ── 层5+：按 orderedSections 驱动渲染（严格绑定排序与显隐）
                 ForEach(orderedSections, id: \.self) { sectionId in
                     switch sectionId {
                     case "quickActions", "todayActions", "quickAccess", "todayTasks":
                         if !hiddenSections.contains("quickActions") && !hiddenSections.contains("todayActions") {
-                            quickActionsOnlySection
+                            quickActionsSection
+                                .animation(.spring(response: 0.38, dampingFraction: 0.78),
+                                           value: activeQuickActionItems.map(\.id))
                                 .id("quickActions")
                         }
                     case "batchCheckIn":
                         if !hiddenSections.contains("batchCheckIn") {
                             batchCheckInOnlySection
                         }
-                    case "memoryDrop":
+                    default:
+                        EmptyView()
+                    }
+                }
+
+                // GlobalWalkBanner (ContentView overlay) handles the minimized bubble
+
+                // ── 层 7：更多区（默认折叠：记忆碎片 + 岛屿统计）
+                HomeMoreSection(
+                    hasMemory: !memoryDismissed && (MemoryEngine.pickFragment(pets: pets, plants: plants) != nil || !pets.isEmpty),
+                    hasStats: (!pets.isEmpty || !plants.isEmpty) && !hiddenSections.contains("islandStats"),
+                    memory: {
                         if !memoryDismissed, let memory = MemoryEngine.pickFragment(pets: pets, plants: plants) {
                             MemoryDropCard(fragment: memory)
                                 .padding(.horizontal, 16)
@@ -607,30 +773,39 @@ struct OverviewView: View {
                                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                                                     memoryDismissed = true
                                                     memoryDragOffset = 0
-                                                    QuestManager.shared.addCoconuts(1, emoji: "💭", title: "珍惜记忆 +1🥥")
+                                                    QuestManager.shared.addCoconuts(1, emoji: "💭", title: l.homeMemoryCoconutTitle)
                                                 }
                                             } else {
                                                 withAnimation(.spring(response: 0.3)) { memoryDragOffset = 0 }
                                             }
                                         }
                                 )
-                                .transition(.asymmetric(
-                                    insertion: .opacity,
-                                    removal: .move(edge: .trailing).combined(with: .opacity)
-                                ))
                         } else if !memoryDismissed && !pets.isEmpty {
                             memoryDropPlaceholder
                         }
-                    case "islandStats":
+                    },
+                    stats: {
                         if (!pets.isEmpty || !plants.isEmpty) && !hiddenSections.contains("islandStats") {
                             islandStatsBento
                         }
-                    default:
-                        EmptyView()
                     }
-                }
+                )
 
                 Spacer(minLength: 120)
+            }
+                }
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: HomeScrollOffsetPreferenceKey.self,
+                            value: geo.frame(in: .named("ohanaHomeScroll")).minY
+                        )
+                    }
+                )
+            }
+            .coordinateSpace(name: "ohanaHomeScroll")
+            .onPreferenceChange(HomeScrollOffsetPreferenceKey.self) { minY in
+                homeScrollContentMinY = minY
             }
             .onChange(of: homeScrollTarget) { target in
                 if let t = target {
@@ -642,9 +817,16 @@ struct OverviewView: View {
                     }
                 }
             }
-            } // end ScrollView
+            .scrollDisabled(isCardDragging)
             } // end ScrollViewReader
         } // end VStack
+    }
+
+    /// 首页顶栏随内容上滑而收起（0 = 完全展开，1 ≈ 完全隐藏）
+    private var homeHeaderCollapseProgress: CGFloat {
+        guard selectedDockTab == 0 else { return 0 }
+        let y = homeScrollContentMinY
+        return min(1, max(0, -y / 72))
     }
 
     private var orderedSections: [String] {
@@ -670,10 +852,10 @@ struct OverviewView: View {
                 .frame(width: 44, height: 44)
                 .background(Color.goPrimary.opacity(0.1), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
-                Text("记忆碎片")
+                Text(l.homeMemoryShardsTitle)
                     .font(.system(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(.primary)
-                Text("继续记录喂食、散步或体重数据\n美好时刻会在这里浮现 ✨")
+                Text(l.homeMemoryShardsBody)
                     .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.leading)
@@ -749,16 +931,16 @@ struct OverviewView: View {
                         // 首页：更多（圆角矩形 ⋯）+ 连续打卡数字 + 椰子
                         Menu {
                             Button { showingAddEntity = true } label: {
-                                Label("添加成员", systemImage: "person.badge.plus")
+                                Label(l.addMember, systemImage: "person.badge.plus")
                             }
                             Button { showingCrewRoster = true } label: {
                                 Label(l.ohanaCrew, systemImage: "person.2.fill")
                             }
                             Button { showingManageSheet = true } label: {
-                                Label("管理主页模块", systemImage: "slider.horizontal.3")
+                                Label(l.manageHome, systemImage: "slider.horizontal.3")
                             }
                             Button { showingSettings = true } label: {
-                                Label("设置", systemImage: "gearshape")
+                                Label(l.settings, systemImage: "gearshape")
                             }
                         } label: {
                             Image(systemName: "ellipsis")
@@ -768,15 +950,6 @@ struct OverviewView: View {
                                 .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                         }
                         .menuActionDismissBehavior(.automatic)
-                        .buttonStyle(.plain)
-
-                        Button { showingCrewRoster = true } label: {
-                            Image(systemName: "person.2.fill")
-                                .font(OhanaFont.subheadline(.bold))
-                                .foregroundStyle(Color.goPrimary)
-                                .frame(width: 32, height: 28)
-                                .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        }
                         .buttonStyle(.plain)
 
                         Button { showStreakDetail = true } label: {
@@ -795,6 +968,14 @@ struct OverviewView: View {
                                 headerStreak >= 7 ? Color.orange : Color.primary.opacity(0.08),
                                 in: RoundedRectangle(cornerRadius: 8, style: .continuous)
                             )
+                            .overlay(alignment: .topTrailing) {
+                                // 连击 ≥ 7：在右上角喷一小片火苗粒子（可爱化）
+                                if headerStreak >= 7 {
+                                    StreakFlameParticles()
+                                        .offset(x: 6, y: -6)
+                                        .allowsHitTesting(false)
+                                }
+                            }
                         }
                         .buttonStyle(.plain)
                     case 1:
@@ -820,7 +1001,7 @@ struct OverviewView: View {
                         EmptyView()
                     }
                     // 椰子胶囊：始终在最右，切换 tab 不移位
-                    CoconutBalanceCapsule { showingCoconutLog = true }
+                    CoconutBalanceCapsule(onTap: { showingCoconutLog = true })
                 }
             }
             .frame(height: 32)
@@ -994,19 +1175,57 @@ struct OverviewView: View {
                             .tracking(2)
                     }
                     Spacer()
-                    HStack(spacing: 4) {
-                        Text("左滑查看更多")
-                            .font(OhanaFont.caption2())
-                            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.25) : Color.black.opacity(0.3))
-                        Image(systemName: "chevron.left.2")
-                            .font(OhanaFont.caption2(.bold))
-                            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.20) : Color.black.opacity(0.25))
+                    // 岛屿等级徽章 — 数据看板的核心状态锚点
+                    let treeLevel = OasisTreeManager.shared.treeLevel
+                    HStack(spacing: 5) {
+                        Text("🌴")
+                            .font(.system(size: 12))
+                        Text("Lv.\(treeLevel.rawValue) · \(treeLevel.displayName)")
+                            .font(.system(size: 11, weight: .black, design: .rounded))
+                            .foregroundStyle(treeLevel.glowColor)
                     }
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(treeLevel.glowColor.opacity(0.12), in: Capsule())
+                    .overlay(Capsule().strokeBorder(treeLevel.glowColor.opacity(0.25), lineWidth: 1))
                 }
                 .padding(.horizontal, 20)
 
                 ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 0) {
+                    // ── 无宠物引导卡（仅新用户首次看到）
+                    if pets.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("🐾")
+                                .font(.system(size: 32))
+                            Text("还没有宠物")
+                                .font(.system(size: 16, weight: .black, design: .rounded))
+                                .foregroundStyle(.primary)
+                            Text("添加你的第一只宠物\n开启家庭数据统计")
+                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .foregroundStyle(.primary.opacity(0.5))
+                                .lineSpacing(3)
+                            Spacer()
+                            Button { showingAddEntity = true } label: {
+                                Text("立即添加 →")
+                                    .font(.system(size: 13, weight: .black, design: .rounded))
+                                    .foregroundStyle(.black)
+                                    .padding(.horizontal, 16).padding(.vertical, 8)
+                                    .background(Color.goPrimary, in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .frame(width: 200, alignment: .leading)
+                        .padding(16)
+                        .frame(height: 212)
+                        .background(Color.goPrimary.opacity(0.08),
+                                    in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .strokeBorder(Color.goPrimary.opacity(0.2), lineWidth: 1))
+                        .padding(.leading, 20)
+
+                        verticalDashDivider
+                    }
+
                     // 1. 体重卡（所有宠物 分系列折线图）
                     let weightSeries = weightSeriesData
                     let totalWithWeight = weightSeries.count
@@ -1261,7 +1480,7 @@ struct OverviewView: View {
 
     private var batchCheckInBar: some View {
         let livePets = pets.filter { !$0.hasPassedAway }
-        let actions = customBatchActions.filter { !$0.targetPets(from: livePets).isEmpty }
+        let actions = customBatchActions.filter { $0.targetPets(from: livePets).count >= 2 }
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -1431,6 +1650,8 @@ struct OverviewView: View {
 
     // MARK: - Deck active pet helper
     private var deckActivePet: Pet? {
+        // Human 明确激活时不显示宠物状态卡
+        if activeHumanId != nil { return nil }
         if let id = activeCritterId {
             return pets.first(where: { $0.id == id && !$0.hasPassedAway })
         }
@@ -1443,6 +1664,7 @@ struct OverviewView: View {
         VStack(alignment: .leading, spacing: 16) {
             HomeHighlightDeck(
                 activePet: deckActivePet,
+                activeHuman: activeHuman,
                 pets: pets,
                 plants: plants,
                 quests: IslandQuestEngine.todayQuests(pets: pets, reminders: pendingReminders, plants: plants, events: allEvents),
@@ -1475,8 +1697,10 @@ struct OverviewView: View {
     // MARK: - Batch Check-in section
     @ViewBuilder
     private var batchCheckInOnlySection: some View {
-        let livePetCount = pets.filter { !$0.hasPassedAway }.count
-        if livePetCount > 1 {
+        let livePets = pets.filter { !$0.hasPassedAway }
+        // 至少一个物种（非人类）有 2+ 只宠物时才显示一键全家
+        let hasMultiSameSpecies = customBatchActions.contains { $0.targetPets(from: livePets).count >= 2 }
+        if hasMultiSameSpecies {
             if showBatchCheckIn {
                 batchCheckInBar
                     .padding(.horizontal, 16)
@@ -1492,7 +1716,7 @@ struct OverviewView: View {
         VStack(alignment: .leading, spacing: 12) {
             // 标题行
             HStack {
-                Text("快捷操作")
+                Text(activeHumanId != nil ? "全家快捷" : "快捷操作")
                     .font(OhanaFont.caption2(.bold))
                     .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.45) : Color.black.opacity(0.4))
                     .tracking(3)
@@ -1858,17 +2082,27 @@ struct OverviewView: View {
             }
     }
 
-    // Task2: 根据顶牌过滤 Quick Access items（顶牌是宠物时，过滤出该宠物 + 无宠物 items；顶牌是人时显示全部）
+    // Task2: 根据顶牌过滤 Quick Access items
     private var activeQuickActionItems: [QuickActionItem] {
         let all = savedQuickActionItems.map { item -> QuickActionItem in
-            // C2: 旧版存储的 actionType="care" 规范化为 "groom"
             var normalized = item
             if item.actionType == "care" { normalized.actionType = "groom" }
             return normalized
         }
-        guard let activeId = activeCritterId else { return all }
+        // 顶牌是 Human：只显示该 human 绑定的快捷操作
+        if let humanId = activeHumanId {
+            let humanItems = all.filter { $0.entityKind == .human && $0.entityId == humanId }
+            if humanItems.isEmpty, let human = activeHuman {
+                return defaultHumanActions(for: human)
+            }
+            return humanItems
+        }
+        // 顶牌是 Pet：显示该宠物 + 通用（无 petId 且非 human 绑定）
+        guard let activeId = activeCritterId else {
+            return all.filter { $0.entityKind != .human }
+        }
         return all.filter { item in
-            item.petId == nil || item.petId == activeId
+            item.petId == activeId || (item.petId == nil && item.entityKind != .human)
         }
     }
 
@@ -2265,39 +2499,56 @@ struct OverviewView: View {
 
     private var defaultQuickActionItems: [QuickActionItem] {
         guard let pet = pets.first(where: { !$0.hasPassedAway }) else { return [] }
+        return defaultActions(for: pet)
+    }
+
+    private func defaultHumanActions(for human: Human) -> [QuickActionItem] {
+        [
+            QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA",
+                            actionType: "humanWeight", entityId: human.id, entityKind: .human),
+            QuickActionItem(label: l.homeQASport, icon: "figure.run", colorHex: "C8FF00",
+                            actionType: "humanWorkout", entityId: human.id, entityKind: .human),
+            QuickActionItem(label: l.homeQAMeds, icon: "pill.fill", colorHex: "FF6B8A",
+                            actionType: "humanMedication", entityId: human.id, entityKind: .human),
+            QuickActionItem(label: l.homeQANote, icon: "note.text", colorHex: "A78BFA",
+                            actionType: "humanNote", entityId: human.id, entityKind: .human),
+        ]
+    }
+
+    private func defaultActions(for pet: Pet) -> [QuickActionItem] {
         let isDog = pet.species.contains("狗") || pet.species.lowercased().contains("dog")
         let isCat = pet.species.contains("猫") || pet.species.lowercased().contains("cat")
         let isFish = pet.species.contains("鱼") || pet.species.lowercased().contains("fish")
         var items: [QuickActionItem] = []
-        items.append(QuickActionItem(label: "喂食", icon: "fork.knife", colorHex: "FFDD44",
+        items.append(QuickActionItem(label: l.homeQAFeed, icon: "fork.knife", colorHex: "FFDD44",
                                      petId: pet.id, actionType: "feed", entityId: pet.id, entityKind: .pet))
         if isFish {
-            items.append(QuickActionItem(label: "换水", icon: "drop.circle.fill", colorHex: "4ECDC4",
+            items.append(QuickActionItem(label: l.homeQAWaterChange, icon: "drop.circle.fill", colorHex: "4ECDC4",
                                          petId: pet.id, actionType: "waterChange", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "清滤材", icon: "wrench.and.screwdriver.fill", colorHex: "A78BFA",
+            items.append(QuickActionItem(label: l.homeQAFilterClean, icon: "wrench.and.screwdriver.fill", colorHex: "A78BFA",
                                          petId: pet.id, actionType: "filterClean", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "体重", icon: "scalemass.fill", colorHex: "80FFEA",
+            items.append(QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA",
                                          petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet))
         } else if isDog {
-            items.append(QuickActionItem(label: "喂水", icon: "drop.fill", colorHex: "00D4AA",
+            items.append(QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA",
                                          petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "遛狗", icon: "figure.walk", colorHex: "C8FF00",
+            items.append(QuickActionItem(label: l.homeQAWalk, icon: "figure.walk", colorHex: "C8FF00",
                                          petId: pet.id, actionType: "walk", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "便便", icon: "allergens", colorHex: "FF8C42",
+            items.append(QuickActionItem(label: l.homeQAPotty, icon: "allergens", colorHex: "FF8C42",
                                          petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
         } else if isCat {
-            items.append(QuickActionItem(label: "喂水", icon: "drop.fill", colorHex: "00D4AA",
+            items.append(QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA",
                                          petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "铲屎", icon: "trash.fill", colorHex: "5B6AFF",
+            items.append(QuickActionItem(label: l.homeQALitter, icon: "trash.fill", colorHex: "5B6AFF",
                                          petId: pet.id, actionType: "litter", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "便便", icon: "allergens", colorHex: "FF8C42",
+            items.append(QuickActionItem(label: l.homeQAPotty, icon: "allergens", colorHex: "FF8C42",
                                          petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
         } else {
-            items.append(QuickActionItem(label: "喂水", icon: "drop.fill", colorHex: "00D4AA",
+            items.append(QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA",
                                          petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "护理", icon: "scissors", colorHex: "FF8C42",
+            items.append(QuickActionItem(label: l.homeQAGroom, icon: "scissors", colorHex: "FF8C42",
                                          petId: pet.id, actionType: "groom", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "体重", icon: "scalemass.fill", colorHex: "80FFEA",
+            items.append(QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA",
                                          petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet))
         }
         return Array(items.prefix(4))
@@ -2323,8 +2574,23 @@ struct OverviewView: View {
 
     // Task 2: 检查今日是否已打卡（改变 icon 为 goLime 主色）
     private func isCompletedToday(for item: QuickActionItem) -> Bool {
-        guard let pid = item.petId, let pet = pets.first(where: { $0.id == pid }) else { return false }
         let cal = Calendar.current
+        if item.entityKind == .human, let hid = item.entityId,
+           let human = humans.first(where: { $0.id == hid }) {
+            switch item.actionType {
+            case "humanWeight":  return human.weightLogs.contains { cal.isDateInToday($0.date) }
+            case "humanWorkout": return human.workoutLogs.contains { cal.isDateInToday($0.date) }
+            case "humanMedication":
+                let humanIdStr = hid.uuidString
+                return allMedicationLogs.contains {
+                    $0.humanId == humanIdStr &&
+                    cal.isDateInToday($0.scheduledTime) &&
+                    $0.status == .taken
+                }
+            default:             return false
+            }
+        }
+        guard let pid = item.petId, let pet = pets.first(where: { $0.id == pid }) else { return false }
         switch item.actionType {
         case "walk":
             return pet.walkLogs.contains { cal.isDateInToday($0.startDate) }
@@ -2354,8 +2620,36 @@ struct OverviewView: View {
 
     // task48: 走卡/喂食卡展示今日统计数
     private func countTextForAction(_ item: QuickActionItem) -> String? {
-        guard let pid = item.petId, let pet = pets.first(where: { $0.id == pid }) else { return nil }
         let cal = Calendar.current
+        if item.entityKind == .human, let hid = item.entityId,
+           let human = humans.first(where: { $0.id == hid }) {
+            switch item.actionType {
+            case "humanWeight":
+                if let last = human.weightLogs.max(by: { $0.date < $1.date }) {
+                    return String(format: "%.1fkg", last.weight)
+                }
+                return nil
+            case "humanWorkout":
+                let cutoff = cal.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+                let count = human.workoutLogs.filter { $0.date >= cutoff }.count
+                return count > 0 ? "近30天 \(count)次" : nil
+            case "humanMedication":
+                let humanIdStr = hid.uuidString
+                let activeMedCount = allHumanMedications.filter {
+                    $0.humanId == humanIdStr && $0.isActive && $0.isActiveToday
+                }.count
+                if activeMedCount == 0 { return nil }
+                let takenToday = allMedicationLogs.filter {
+                    $0.humanId == humanIdStr &&
+                    cal.isDateInToday($0.scheduledTime) &&
+                    $0.status == .taken
+                }.count
+                return "今日已服 \(takenToday)/\(activeMedCount)"
+            default:
+                return nil
+            }
+        }
+        guard let pid = item.petId, let pet = pets.first(where: { $0.id == pid }) else { return nil }
         switch item.actionType {
         case "walk":
             let count = pet.walkLogs.filter { cal.isDateInToday($0.startDate) }.count
@@ -2435,6 +2729,9 @@ struct OverviewView: View {
     }
 
     private func avatarForAction(_ item: QuickActionItem) -> UIImage? {
+        if item.entityKind == .human, let hid = item.entityId,
+           let human = humans.first(where: { $0.id == hid }),
+           let data = human.avatarImageData { return UIImage(data: data) }
         guard let pid = item.petId,
               let pet = pets.first(where: { $0.id == pid }),
               let data = pet.avatarImageData else { return nil }
@@ -2442,6 +2739,10 @@ struct OverviewView: View {
     }
 
     private func themeColorForAction(_ item: QuickActionItem) -> String? {
+        if item.entityKind == .human, let hid = item.entityId,
+           let human = humans.first(where: { $0.id == hid }) {
+            return human.themeColorHex.isEmpty ? "233BFF" : human.themeColorHex
+        }
         guard let pid = item.petId, let pet = pets.first(where: { $0.id == pid }) else { return nil }
         return pet.themeColorHex
     }
@@ -2500,7 +2801,7 @@ struct OverviewView: View {
         }
         let amt = IslandQuestEngine.coconutReward(forQuestId: quest.id)
         if amt > 0 && quest.id != "q_walk" {
-            QuestManager.shared.addCoconuts(amt, title: "岛屿委托奖励")
+            QuestManager.shared.addCoconuts(amt, title: l.homeIslandQuestRewardTitle)
             triggerCoconutReward(amount: amt, label: nil)
         }
     }
@@ -2544,6 +2845,18 @@ struct OverviewView: View {
     }
 
     private func handleAction(_ item: QuickActionItem) {
+        // 人类快捷操作
+        if item.entityKind == .human, let hid = item.entityId,
+           let human = humans.first(where: { $0.id == hid }) {
+            switch item.actionType {
+            case "humanWeight":     quickHumanWeightHuman = human
+            case "humanWorkout":    quickHumanWorkoutHuman = human
+            case "humanMedication": quickHumanMedicationHuman = human
+            case "humanNote":       quickHumanNoteHuman = human
+            default:                selectedHuman = human
+            }
+            return
+        }
         switch item.actionType {
         case "calendar": showingCalendar = true
         case "add":      showingAddEntity = true
@@ -2744,8 +3057,8 @@ struct OverviewView: View {
             }
             
             if let warning = AntiRepeatCareManager.checkRecentCareLog(for: pet, type: .feeding, thresholdMinutes: 120, currentUserId: currentUserId, in: humans) {
-                antiRepeatTitle = "重复喂食提醒"
-                antiRepeatMessage = "\(warning.executorName) 在 \(warning.minutesAgo) 分钟前刚喂过 \(pet.name) ，确定要再喂一次吗？"
+                antiRepeatTitle = l.homeAntiDupFeedTitle
+                antiRepeatMessage = l.homeAntiDupFeedMessage(executor: warning.executorName, minutes: warning.minutesAgo, petName: pet.name)
                 pendingRepeatAction = performFeed
                 showingAntiRepeatAlert = true
             } else {
@@ -2764,8 +3077,8 @@ struct OverviewView: View {
                 }
                 
                 if let warning = AntiRepeatCareManager.checkRecentCareLog(for: pet, type: .watering, thresholdMinutes: 60, currentUserId: currentUserId, in: humans) {
-                    antiRepeatTitle = "重复喂水提醒"
-                    antiRepeatMessage = "\(warning.executorName) 在 \(warning.minutesAgo) 分钟前刚喂过 \(pet.name) 水，确定要再记录一次吗？"
+                    antiRepeatTitle = l.homeAntiDupWaterTitle
+                    antiRepeatMessage = l.homeAntiDupWaterMessage(executor: warning.executorName, minutes: warning.minutesAgo, petName: pet.name)
                     pendingRepeatAction = performWater
                     showingAntiRepeatAlert = true
                 } else {
@@ -3123,7 +3436,7 @@ struct OverviewView: View {
 
 // MARK: - QADropDelegate（快捷操作拖拽排序）
 /// 编辑模式拖拽层：自定义预览仅图标+标题（无整张卡片矩形）
-private struct QAEditModeDragLayer: View {
+struct QAEditModeDragLayer: View {
     let item: QuickActionItem
     let themeHex: String?
 
@@ -3133,6 +3446,14 @@ private struct QAEditModeDragLayer: View {
             .draggable(item.id) {
                 QuickActionReorderDragPreview(item: item, themeHex: themeHex)
             }
+    }
+}
+
+// MARK: - Home scroll offset（顶栏渐隐）
+struct HomeScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

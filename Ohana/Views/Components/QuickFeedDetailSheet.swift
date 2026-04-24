@@ -145,6 +145,8 @@ struct QuickFeedDetailSheet: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
                         petHeader
+                        ExecutorPickerBar(tint: themeColor)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         feedModePicker
                         feedModeHint
                         if mode == .manual {
@@ -998,7 +1000,15 @@ struct QuickFeedDetailSheet: View {
     private func commitManualFeed() {
         let grams = Double(portionText) ?? pet.dailyPortionGrams
         let currentUserId = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        
+
+        // 质量判定：精准克数（用户显式输入且非默认）视为 precise；暂未支持备注/拍照
+        let isPrecise = !portionText.isEmpty && Double(portionText) != nil
+        let quality = QuestManager.QualityBonus.compose(
+            precise: isPrecise,
+            hasNote: false,
+            hasPhoto: false
+        )
+
         let performFeed = {
             let log = PetCareLog(
                 date: Date(),
@@ -1011,7 +1021,7 @@ struct QuickFeedDetailSheet: View {
             self.modelContext.insert(log)
             self.modelContext.safeSave()
             QuestManager.shared.recordFirstMeal()
-            _ = QuestManager.shared.awardAction(type: .feed, pet: self.pet, context: self.modelContext)
+            _ = QuestManager.shared.awardAction(type: .feed, pet: self.pet, context: self.modelContext, quality: quality)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             self.checkOverdoseManualTotal()
         }
@@ -1028,6 +1038,8 @@ struct QuickFeedDetailSheet: View {
 
     private func completeScheduledFeed(event: Event) {
         let currentUserId = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
+        // 按计划喂食 = 完整精准模式
+        let quality = QuestManager.QualityBonus.precise
         let performFeed = {
             let log = PetCareLog(
                 date: Date(),
@@ -1045,7 +1057,7 @@ struct QuickFeedDetailSheet: View {
             }
             self.modelContext.safeSave()
             QuestManager.shared.recordFirstMeal()
-            _ = QuestManager.shared.awardAction(type: .feed, pet: self.pet, context: self.modelContext)
+            _ = QuestManager.shared.awardAction(type: .feed, pet: self.pet, context: self.modelContext, quality: quality)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             self.checkOverdoseManualTotal()
         }
