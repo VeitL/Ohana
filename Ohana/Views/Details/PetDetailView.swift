@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import Charts
+import UniformTypeIdentifiers
 
 // MARK: - Tab 兼容保留（ContentView 仍引用此 enum）
 enum PetDetailTab: String, CaseIterable {
@@ -35,9 +36,6 @@ struct PetDetailView: View {
 
     @State private var showingEditSheet      = false
     @State private var showingCalendar       = false
-    @State private var showingDeleteConfirm  = false
-    @State private var deleteConfirmName     = ""
-    @State private var showingClearConfirm   = false
     @State private var showingWeightHistory  = false
     @State private var showingExpenseHistory = false
     @State private var showingPetInfo        = false
@@ -55,141 +53,91 @@ struct PetDetailView: View {
     @State private var showingQuickExpense     = false
     @State private var showingCoconutLog       = false
     @State private var showingMilestones       = false
-    @State private var showingRainbowBridgeAlert = false
-    @State private var showingUndoPassingAlert   = false
-    @State private var rainbowBridgeDate         = Date()
     @State private var showingMedications        = false
     @State private var showingMomentsHub         = false
-    
+    @State private var showingHygieneDetail      = false
+    @State private var showingAllFeatures        = false
+    @State private var pressedActionId: String?  = nil
+    // Quick-action detail sheets (long press)
+    @State private var showingQuickFeedDetail    = false
+    @State private var showingQuickWaterDetail   = false
+    @State private var showingQuickPlayDetail    = false
+    @State private var showingQuickPottyDetail   = false
+    @State private var showingQuickWeight        = false
+    @State private var showingMomentSheet        = false
+    // Edit mode for quick action grid
+    @AppStorage("quickActionItems_v2") private var quickActionItemsJSON: String = ""
+    @State private var isQAEditMode    = false
+    @State private var qaJiggle        = false
+    @State private var qaEditItems: [QuickActionItem] = []
+    @State private var showingQAQuickAdd = false
+
+    // Dynamic Island safe area
+    private var safeAreaTop: CGFloat {
+        (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
+            .keyWindow?.safeAreaInsets.top ?? 44
+    }
+
+    private var themeGradientTop: Color {
+        WalletPetCardTheme.gradientPair(for: pet.themeColorHex).0
+    }
+
+    private var themeGradientBottom: Color {
+        WalletPetCardTheme.gradientPair(for: pet.themeColorHex).1
+    }
+
+    // Outer bg card radius; pet card uses (bgCardRadius − innerMargin) for concentric corners
+    private let bgCardRadius: CGFloat = 32
+    private let innerMargin:  CGFloat = 12   // bg card → pet card gap
+
     var body: some View {
         ZStack {
+            // ① Dark base — visible in the Dynamic Island strip above bg card
             ArkBackgroundView()
 
+            // ② Pet-theme background card — top edge aligns with Dynamic Island bottom
+            VStack(spacing: 0) {
+                Spacer().frame(height: safeAreaTop)
+                LinearGradient(
+                    colors: [themeGradientTop, themeGradientBottom],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .clipShape(
+                    .rect(
+                        topLeadingRadius:     bgCardRadius,
+                        bottomLeadingRadius:  0,
+                        bottomTrailingRadius: 0,
+                        topTrailingRadius:    bgCardRadius
+                    )
+                )
+            }
+            .ignoresSafeArea(edges: .bottom)
+
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 20) {
+                petDetailHeroSection
+            }
+            .ignoresSafeArea(.container, edges: .top)
 
-                    // ── L0: 椰子余额（精简工具栏）────────────────────────
-                    HStack {
-                        Spacer()
-                        CoconutBalanceCapsule { showingCoconutLog = true }
-                    }
-                    .padding(.horizontal, 16)
-
-                    // ── L1: Hero 卡（与首页 Wallet 堆叠卡片同款，zoom 过渡目标）
-                    Button { showingPetInfo = true } label: {
-                        WalletPetCardFront(pet: pet, cornerRadius: 24)
-                            .frame(height: (ScreenCompat.width - 32) / 1.586)
+            // Back button (floats over Dynamic Island safe area)
+            VStack {
+                HStack {
+                    Button { dismiss() } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 34, height: 34)
+                            .background(.black.opacity(0.35), in: Circle())
                     }
                     .buttonStyle(.plain)
-                    .padding(.horizontal, 16)
-                    .shadow(color: .black.opacity(0.25), radius: 20, y: 8)
-
-                    // ── L2: 智能预警横滚区（有警告时才出现）──────────────
-                    PetAlertScrollSection(pet: pet)
-
-                    // ── L3: 图表仪表盘────────────────────────
-                    PetChartDashboard(
-                        pet: pet,
-                        onWeight:  { showingWeightHistory  = true },
-                        onWalk:    { showingWalkSummary    = true },
-                        onPotty:   { showingPottyOverview  = true },
-                        onExpense: { showingExpenseHistory = true },
-                        onFood:    { showingFoodManagement = true },
-                        showingAddWeight: $showingAddWeight,
-                        quickWeightInput: $quickWeightInput,
-                        modelContext: modelContext
-                    )
-                    .padding(16)
-                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                    .padding(.horizontal, 16)
-
-                    // ── L3.5 - L5: 卡片网格 ──────────────────────────────
-                    VStack(spacing: 12) {
-                        // 免疫健康中枢卡（全宽）
-                        VStack(spacing: 8) {
-                            PetHealthHubCard(pet: pet, onRecord: { type in
-                                healthRecordType = type
-                            }, onViewDetail: {
-                                showingHealthDetail = true
-                            })
-                            .padding(16)
-                        }
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-
-                        // 用药管理卡（有用药记录或点击进入）
-                        Button { showingMedications = true } label: {
-                            HStack(spacing: 12) {
-                                ZStack {
-                                    Circle().fill(Color(hex: "4ECDC4").opacity(0.2)).frame(width: 36, height: 36)
-                                    Image(systemName: "pills.fill")
-                                        .font(.system(size: 15, weight: .bold))
-                                        .foregroundStyle(Color(hex: "4ECDC4"))
-                                }
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("用药管理")
-                                        .font(.system(size: 14, weight: .black, design: .rounded))
-                                        .foregroundStyle(.primary)
-                                    let activeMeds = pet.medications.filter { $0.isActiveToday }
-                                    Text(activeMeds.isEmpty ? "暂无用药" : "当前 \(activeMeds.count) 种药物")
-                                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                if !pet.medications.filter({ $0.isActiveToday }).isEmpty {
-                                    Text("\(pet.medications.filter { $0.isActiveToday }.count)")
-                                        .font(.system(size: 13, weight: .black, design: .rounded))
-                                        .foregroundStyle(.black)
-                                        .padding(.horizontal, 10).padding(.vertical, 4)
-                                        .background(Color.goPrimary, in: Capsule())
-                                }
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(.secondary.opacity(0.5))
-                            }
-                            .padding(14)
-                        }
-                        .buttonStyle(.plain)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-
-                        // 护理卡 + 饮食卡（横排）
-                        HStack(spacing: 12) {
-                            VStack(spacing: 8) {
-                                PetHygieneCard(pet: pet).padding(16)
-                            }
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                            VStack(spacing: 8) {
-                                DietCardWithQuickActions(
-                                    pet: pet,
-                                    onOpenDetail: { showingFoodManagement = true }
-                                ).padding(16)
-                            }
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                        }
-
-                        // 狗狗专属活动卡
-                        if pet.species == "狗" {
-                            VStack(spacing: 8) {
-                                DogActivityCard(pet: pet).padding(16)
-                            }
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                        }
-
-                    }
-                    .padding(.horizontal, 16)
-
-                    // ── L7.5: Rainbow Bridge 离世操作区 ─────────────────
-                    rainbowBridgeSection
-                        .padding(.horizontal, 16)
-
-                    // ── L8: 危险区域 ──────────────────────────────────────
-                    deleteDangerZone
-                        .padding(.horizontal, 16)
-
-                    Spacer(minLength: 80)
+                    Spacer()
+                    CoconutBalanceCapsule { showingCoconutLog = true }
                 }
-                .padding(.top, 4)
+                .padding(.horizontal, 16)
+                .padding(.top, safeAreaTop + 8)
+                Spacer()
             }
-        }
+        } // ZStack
         .onAppear {
             IslandQuestEngine.markVisited()
             if openHealthOnAppear {
@@ -198,7 +146,8 @@ struct PetDetailView: View {
                 }
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarHidden(true)
+        .sheet(isPresented: $showingHygieneDetail)    { NavigationStack { PetHygieneDetailView(pet: pet) }.presentationDetents([.large]) }
         .sheet(isPresented: $showingEditSheet)        { EditPetSheet(pet: pet) }
         .sheet(isPresented: $showingCalendar)         { CalendarView(preselectedPetId: pet.id.uuidString) }
         .sheet(isPresented: $showingSitterCard)       { SitterCardPreviewSheet(pet: pet) }
@@ -213,6 +162,7 @@ struct PetDetailView: View {
         .sheet(isPresented: $showingQuickPotty)       { QuickPottySheet(pet: pet).presentationDetents([.height(320)]).presentationDragIndicator(.visible) }
         .sheet(isPresented: $showingQuickExpense)     { AddExpenseSheet(pet: pet) }
         .sheet(isPresented: $showingCoconutLog)       { CoconutLogView() }
+        .sheet(isPresented: $showingAllFeatures)      { PetAllFeaturesSheet(pet: pet).presentationDetents([.large]).presentationDragIndicator(.visible) }
         .sheet(item: $healthRecordType)               { AddHealthRecordSheet(pet: pet, type: $0) }
         .navigationDestination(isPresented: $showingWeightHistory)  { WeightHistoryView(pet: pet) }
         .navigationDestination(isPresented: $showingExpenseHistory) { ExpenseHistoryView(pet: pet) }
@@ -225,295 +175,473 @@ struct PetDetailView: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
-        .alert("确认删除", isPresented: $showingDeleteConfirm) {
-            TextField("输入宠物名字确认", text: $deleteConfirmName)
-            Button("取消", role: .cancel) { deleteConfirmName = "" }
-            Button("删除", role: .destructive) {
-                if deleteConfirmName == pet.name {
-                    deletePetWithCascade(pet)
-                    dismiss()
-                }
-            }
-        } message: { Text("请输入 \"\(pet.name)\" 确认删除。此操作不可撤销。") }
-        .alert("仅清空所有记录", isPresented: $showingClearConfirm) {
-            Button("取消", role: .cancel) {}
-            Button("清空记录", role: .destructive) { clearPetLogs() }
-        } message: {
-            Text("将删除 \(pet.name) 的护理、体重、花费、健康、散步、喂食、清洁、里程碑、用药与相册等记录，并移除日历中该宠物的计划；保留名字、头像、品种与证件/保险档案。此操作不可撤销。")
+        // Quick-action detail sheets (long press from grid)
+        .sheet(isPresented: $showingQuickFeedDetail) {
+            QuickFeedDetailSheet(pet: pet) { showingQuickFeedDetail = false }
+                .presentationDetents([.fraction(0.86), .large])
+                .presentationDragIndicator(.visible)
+                .presentationContentInteraction(.scrolls)
         }
-    }
-
-    private func deletePetWithCascade(_ p: Pet) {
-        let petIdStr = p.id.uuidString
-        if let allEvents = try? modelContext.fetch(FetchDescriptor<Event>()) {
-            for event in allEvents where event.relatedEntityId == petIdStr {
-                modelContext.delete(event)
-            }
+        .sheet(isPresented: $showingQuickWaterDetail) {
+            QuickWaterDetailSheet(pet: pet) { showingQuickWaterDetail = false }
+                .presentationDetents([.fraction(0.86), .large])
+                .presentationDragIndicator(.visible)
+                .presentationContentInteraction(.scrolls)
         }
-        removeQuickAccessItems(for: p.id)
-        modelContext.delete(p)
-        modelContext.safeSave()
-        deleteConfirmName = ""
-    }
-
-    private func removeQuickAccessItems(for petId: UUID) {
-        let key = "quickActionItems_v2"
-        guard let json = UserDefaults.standard.string(forKey: key),
-              let data = json.data(using: .utf8),
-              var items = try? JSONDecoder().decode([QuickActionItem].self, from: data) else { return }
-        items.removeAll { $0.petId == petId }
-        if let newData = try? JSONEncoder().encode(items),
-           let newJSON = String(data: newData, encoding: .utf8) {
-            UserDefaults.standard.set(newJSON, forKey: key)
+        .sheet(isPresented: $showingQuickPlayDetail) {
+            QuickPlayDetailSheet(pet: pet) { showingQuickPlayDetail = false }
+                .presentationDetents([.fraction(0.86), .large])
+                .presentationDragIndicator(.visible)
+                .presentationContentInteraction(.scrolls)
         }
-    }
-
-    private func clearPetLogs() {
-        pet.clearAllActivityRecords(in: modelContext)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-    }
-    
-    // MARK: - Vaccine Banner Row
-    private var vaccineBannerRow: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 14) {
-                Text("💉").font(.system(size: 28))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("疫苗本")
-                        .font(OhanaFont.headline(.black))
-                        .foregroundStyle(.primary)
-                    let count = pet.healthLogs.filter { $0.type == "疫苗" }.count
-                    Text(count == 0 ? "点击添加第一条疫苗记录" : "共 \(count) 条记录")
-                        .font(OhanaFont.caption(.medium))
-                        .foregroundStyle(.primary.opacity(0.45))
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.primary.opacity(0.3))
-            }
-            .padding(16)
+        .sheet(isPresented: $showingQuickPottyDetail) {
+            QuickPottyDetailSheet(pet: pet) { showingQuickPottyDetail = false }
+                .presentationDetents([.fraction(0.86), .large])
+                .presentationDragIndicator(.visible)
+                .presentationContentInteraction(.scrolls)
         }
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-    }
-
-    // MARK: - Achievement Banner Row
-    private var achievementBannerRow: some View {
-        let achievements = AchievementManager.compute(for: pet)
-        let unlocked = achievements.filter(\.isUnlocked).count
-        let total    = achievements.count
-        return VStack(spacing: 8) {
-            HStack(spacing: 14) {
-                ZStack {
-                    Circle().fill(Color.goYellow.opacity(0.15)).frame(width: 44, height: 44)
-                    Text("🏆").font(.system(size: 22))
-                }
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("成就墙")
-                        .font(OhanaFont.callout(.bold)).foregroundStyle(.primary)
-                    Text("\(unlocked) / \(total) 已解锁")
-                        .font(OhanaFont.caption(.medium)).foregroundStyle(.primary.opacity(0.5))
-                }
-                Spacer()
-                Text("\(total > 0 ? Int(Double(unlocked)/Double(total)*100) : 0)%")
-                    .font(OhanaFont.footnote(.heavy))
-                    .foregroundStyle(Color.goYellow)
-                    .padding(.horizontal, 10).padding(.vertical, 5)
-                    .background(Color.goYellow.opacity(0.15), in: Capsule())
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(.primary.opacity(0.3))
-            }
-            .padding(16)
+        .sheet(isPresented: $showingQuickWeight) {
+            GenericWeightEntrySheet(target: .pet(pet))
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(.regularMaterial)
         }
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-    }
-
-    // MARK: - Compact 三列卡（证件/里程碑/成就）
-
-    private var compactMemoriesCard: some View {
-        let latest = pet.milestones.sorted { $0.date > $1.date }.first
-        return NavigationLink(destination: PetMilestoneListView(pet: pet)) {
-            VStack(spacing: 8) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 4) {
-                        Text("📸")
-                            .font(.system(size: 11))
-                        Text("回忆录")
-                            .font(OhanaFont.footnote(.black))
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        Image(systemName: "plus")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(Color.goPrimary)
-                            .padding(4)
-                            .background(Color.goPrimary.opacity(0.15), in: Circle())
-                    }
-                    Text("\(pet.milestones.count)")
-                        .font(OhanaFont.metric(size: 26))
-                        .foregroundStyle(.primary)
-                    if let m = latest {
-                        Text(m.emoji + " " + m.title)
-                            .font(OhanaFont.caption2(.bold))
-                            .foregroundStyle(.primary.opacity(0.6))
-                            .lineLimit(1)
-                    } else {
-                        Text("暂无记录")
-                            .font(OhanaFont.caption2(.medium))
-                            .foregroundStyle(.primary.opacity(0.3))
-                    }
-                }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Rainbow Bridge Section
-    @ViewBuilder
-    private var rainbowBridgeSection: some View {
-        if pet.hasPassedAway {
-            // 已离世：显示纪念信息 + 撤销入口
-            VStack(spacing: 10) {
-                HStack(spacing: 8) {
-                    Text("🌈").font(.system(size: 14))
-                    Text("岁月史书 · 彩虹桥彼端")
-                        .font(.system(size: 11, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.5))
-                        .tracking(1)
-                    Spacer()
-                }
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        if let d = pet.passedAwayDate {
-                            Text("离世日期：\(d.formatted(.dateTime.year().month().day()))")
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.7))
+        .sheet(isPresented: $showingMomentSheet) {
+            NavigationStack {
+                QuickMomentSheet(pet: pet, onRemove: nil)
+                    .navigationTitle("记录时刻").navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("关闭") { showingMomentSheet = false }
                         }
-                        Text("相伴 \(pet.daysTogetherAtPassing) 天 · \(pet.ageAtPassingText)")
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.45))
                     }
+            }
+            .presentationDetents([.large]).presentationDragIndicator(.visible)
+        }
+    }
+
+    // MARK: - Hero Section (top of detail, below Dynamic Island)
+
+    private var petDetailHeroSection: some View {
+        // Concentric corner geometry:
+        //   bgCardRadius (32) − innerMargin (12) = petCardRadius (20)
+        let petR = bgCardRadius - innerMargin
+        let cardW = ScreenCompat.width - innerMargin * 2
+        let cardH = cardW * 1.1  // slightly portrait — fills ~55% of screen
+
+        return VStack(spacing: 0) {
+            // Land innerMargin below the bg card's top edge (which is at safeAreaTop)
+            Spacer().frame(height: safeAreaTop + innerMargin)
+
+            // ── Pet card ──
+            Button { showingPetInfo = true } label: {
+                WalletPetCardFront(pet: pet, cornerRadius: petR)
+                    .frame(width: cardW, height: cardH)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: petR, style: .continuous)
+                            .strokeBorder(.white.opacity(0.18), lineWidth: 1)
+                    )
+            }
+            .buttonStyle(.plain)
+            .shadow(color: .black.opacity(0.45), radius: 28, y: 14)
+            .shadow(color: themeGradientTop.opacity(0.25), radius: 10, y: -3)
+
+            // ── Name + species ──
+            ZStack {
+                VStack(spacing: 5) {
+                    Text(pet.name)
+                        .font(.system(size: 28, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text((pet.species.isEmpty ? "PET" : pet.species).uppercased())
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .tracking(2)
+                        .foregroundStyle(.white.opacity(0.40))
+                }
+                .frame(maxWidth: .infinity)
+
+                HStack {
                     Spacer()
-                    Button {
-                        showingUndoPassingAlert = true
-                    } label: {
-                        Text("撤销离世")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.goYellow)
-                            .padding(.horizontal, 12).padding(.vertical, 6)
-                            .background(Color.goYellow.opacity(0.1), in: Capsule())
-                            .overlay(Capsule().strokeBorder(Color.goYellow.opacity(0.3), lineWidth: 1))
+                    Button { showingAllFeatures = true } label: {
+                        Label("全部", systemImage: "square.grid.2x2")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.8))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(.white.opacity(0.15), in: Capsule())
                     }
                     .buttonStyle(.plain)
+                    .padding(.trailing, innerMargin)
                 }
-                .padding(14)
-                .background(Color.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color.purple.opacity(0.2), lineWidth: 1))
             }
-            .alert("撤销离世标记", isPresented: $showingUndoPassingAlert) {
-                Button("撤销", role: .destructive) {
-                    RainbowBridgeService.undoPassedAway(pet: pet, context: modelContext)
+            .padding(.top, 20)
+
+            // ── Quick actions grid ──
+            petQuickActionGrid
+                .padding(.horizontal, innerMargin)
+                .padding(.top, 20)
+                .padding(.bottom, 8)
+        }
+    }
+
+    private var petQuickActionGrid: some View {
+        let avatar   = pet.avatarImageData.flatMap { UIImage(data: $0) }
+        let themeHex = pet.themeColorHex.isEmpty ? nil : pet.themeColorHex
+        let displayItems = isQAEditMode ? qaEditItems : petQuickActionItems
+
+        return VStack(spacing: 12) {
+            // ── Header ──
+            HStack {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("快捷操作")
+                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text("QUICK ACTIONS")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.45))
+                        .tracking(2.5)
                 }
-                Button("取消", role: .cancel) {}
-            } message: {
-                Text("将清除 \(pet.name) 的离世记录，恢复为在世状态。")
-            }
-        } else {
-            // 在世：显示「标记离世」入口
-            VStack(spacing: 10) {
-                HStack {
-                    Image(systemName: "rainbow")
-                        .foregroundStyle(Color.purple.opacity(0.6))
-                        .font(.system(size: 12))
-                    Text("生命终章")
-                        .font(.system(size: 11, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.purple.opacity(0.6))
-                        .tracking(2)
-                    Spacer()
-                }
+                Spacer()
                 Button {
-                    rainbowBridgeDate = Date()
-                    showingRainbowBridgeAlert = true
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    if isQAEditMode { exitQAEditMode() } else { enterQAEditMode() }
                 } label: {
-                    HStack(spacing: 8) {
-                        Text("🌈")
-                        Text("标记 \(pet.name) 已离世")
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
-                    }
-                    .foregroundStyle(Color.purple.opacity(0.8))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Color.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .strokeBorder(Color.purple.opacity(0.25), lineWidth: 1))
+                    Image(systemName: isQAEditMode ? "checkmark.circle.fill" : "pencil")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(isQAEditMode ? Color.goLime : .white.opacity(0.7))
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.top, 8)
-            .alert("确认标记离世", isPresented: $showingRainbowBridgeAlert) {
-                Button("确认", role: .destructive) {
-                    RainbowBridgeService.markPassedAway(
-                        pet: pet, date: rainbowBridgeDate, context: modelContext)
+
+            // ── Grid ──
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4),
+                spacing: 10
+            ) {
+                ForEach(Array(displayItems.enumerated()), id: \.element.id) { idx, item in
+                    qaGridItem(idx: idx, item: item, avatar: avatar, themeHex: themeHex)
                 }
-                Button("取消", role: .cancel) {}
-            } message: {
-                Text("将标记 \(pet.name) 为离世，并删除所有未来的提醒和事件。此操作可撤销。")
+
+                if isQAEditMode {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        showingQAQuickAdd = true
+                    } label: {
+                        VStack(spacing: 6) {
+                            ZStack {
+                                Circle().fill(Color(hex: "E8EEFF")).frame(width: 44, height: 44)
+                                Image(systemName: "plus")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundStyle(Color(hex: "6B82C4"))
+                            }
+                            Text("添加").font(.system(size: 10, weight: .semibold)).foregroundStyle(Color(hex: "6B82C4"))
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 80)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .strokeBorder(Color(hex: "B8C8F0"), style: StrokeStyle(lineWidth: 1.5, dash: [5]))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $showingQAQuickAdd, attachmentAnchor: .point(.top), arrowEdge: .bottom) {
+                        QAQuickAddPopoverContent(pet: pet, existingItems: qaEditItems) { newItem in
+                            withAnimation(.spring(response: 0.3)) { qaEditItems.append(newItem) }
+                        }
+                    }
+                }
             }
+            .animation(.spring(response: 0.38, dampingFraction: 0.78), value: displayItems.map(\.id))
+            .environment(\.colorScheme, .light)
         }
     }
 
-    // MARK: - Delete Danger Zone
-    private var deleteDangerZone: some View {
-        VStack(spacing: 10) {
-            HStack {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(Color.goRed.opacity(0.7))
-                    .font(.system(size: 12))
-                Text("危险区域")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.goRed.opacity(0.7))
-                    .tracking(2)
-                Spacer()
+    @ViewBuilder
+    private func qaGridItem(idx: Int, item: QuickActionItem, avatar: UIImage?, themeHex: String?) -> some View {
+        ZStack {
+            GoQuickActionCard(
+                item: item,
+                isPressed: !isQAEditMode && pressedActionId == item.id,
+                petAvatar: avatar,
+                petThemeColorHex: themeHex,
+                countText: isQAEditMode ? nil : qaCountText(item.actionType),
+                isCompletedToday: !isQAEditMode && qaCompleted(item.actionType),
+                onTap: {
+                    guard !isQAEditMode else { return }
+                    pressedActionId = item.id
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                        pressedActionId = nil
+                        handleTapAction(item: item)
+                    }
+                },
+                onLongPress: isQAEditMode ? nil : { handleLongPressAction(item: item) },
+                onGroomCheckIn: (!isQAEditMode && item.actionType == "groom") ? { raw in applyGroomCheckIn(raw) } : nil,
+                onPottySelect:  (!isQAEditMode && item.actionType == "potty") ? { raw in applyPottyCheckIn(raw) } : nil,
+                onHealthSelect: (!isQAEditMode && item.actionType == "health") ? { raw in applyHealthCheckIn(raw) } : nil
+            )
+            .allowsHitTesting(!isQAEditMode)
+
+            if isQAEditMode {
+                QAEditModeDragLayer(item: item, themeHex: themeHex)
             }
-            // 按钮一：仅清空记录（次警告色）
-            Button { showingClearConfirm = true } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "eraser.fill")
-                        .font(.system(size: 14, weight: .bold))
-                    Text("仅清空所有记录")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                }
-                .foregroundStyle(Color.goOrange)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.goOrange.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(Color.goOrange.opacity(0.3), lineWidth: 1))
-            }
-            .buttonStyle(.plain)
-            // 按钮二：彻底删除（主危险色）
-            Button { showingDeleteConfirm = true } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "trash.fill")
-                        .font(.system(size: 14, weight: .bold))
-                    Text("彻底删除 \(pet.name)")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                }
-                .foregroundStyle(Color.goRed)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.goRed.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(Color.goRed.opacity(0.3), lineWidth: 1))
-            }
-            .buttonStyle(.plain)
         }
-        .padding(.top, 8)
+        .rotationEffect(.degrees(isQAEditMode ? (qaJiggle ? -2.5 : 2.5) : 0))
+        .animation(
+            isQAEditMode
+            ? .easeInOut(duration: 0.12 + Double(idx % 4) * 0.015).repeatForever(autoreverses: true)
+            : .easeOut(duration: 0.2),
+            value: qaJiggle
+        )
+        .overlay(alignment: .topLeading) {
+            if isQAEditMode {
+                Button {
+                    UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                    withAnimation(.spring(response: 0.3)) { qaEditItems.removeAll { $0.id == item.id } }
+                } label: {
+                    ZStack {
+                        Circle().fill(Color.goRed).frame(width: 20, height: 20)
+                        Image(systemName: "minus").font(.system(size: 10, weight: .black)).foregroundStyle(.white)
+                    }
+                }
+                .buttonStyle(.plain)
+                .offset(x: -4, y: -4)
+            }
+        }
+        .onDrop(of: [.plainText, .utf8PlainText], delegate: QADropDelegate(targetItem: item, items: $qaEditItems))
     }
 
+    private func handleTapAction(item: QuickActionItem) {
+        switch item.actionType {
+        case "feed":         applyDirectAction("feed")
+        case "walk":         applyDirectAction("walk")
+        case "water":        applyDirectAction("water")
+        case "waterChange":  applyDirectAction("waterChange")
+        case "play":         applyDirectAction("play")
+        case "litter":       applyDirectAction("litter")
+        case "filterClean":  applyDirectAction("filterClean")
+        case "weight":       showingQuickWeight  = true
+        case "expense":      showingQuickExpense  = true
+        case "moment":       showingMomentSheet   = true
+        case "medication":   showingMedications   = true
+        // groom/potty/health handled internally by GoQuickActionCard popovers
+        default: break
+        }
+    }
+
+    private func handleLongPressAction(item: QuickActionItem) {
+        switch item.actionType {
+        case "feed":         showingQuickFeedDetail   = true
+        case "walk":         showingWalkSummary        = true
+        case "water", "waterChange": showingQuickWaterDetail = true
+        case "play":         showingQuickPlayDetail    = true
+        case "potty":        showingQuickPottyDetail   = true
+        case "litter":       showingQuickPottyDetail   = true
+        case "groom":        showingHygieneDetail      = true
+        case "filterClean":  showingHygieneDetail      = true
+        case "health":       showingHealthDetail        = true
+        case "weight":       showingWeightHistory       = true
+        case "expense":      showingExpenseHistory      = true
+        case "moment":       showingMomentsHub          = true
+        case "medication":   showingMedications         = true
+        default: break
+        }
+    }
+
+    private func applyDirectAction(_ actionType: String) {
+        let uid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
+        switch actionType {
+        case "feed":
+            let log = PetCareLog(date: Date(), type: .feeding,
+                                 amountGrams: pet.dailyPortionGrams,
+                                 note: PetCareLog.manualFeedNoteMarker, pet: pet, executorId: uid)
+            modelContext.insert(log); modelContext.safeSave()
+            QuestManager.shared.recordFirstMeal()
+            QuestManager.shared.awardAction(type: .feed, pet: pet, context: modelContext)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        case "walk":
+            if case .idle = PetWalkingManager.shared.phase { PetWalkingManager.shared.start(pet: pet) }
+        case "water":
+            let log = PetCareLog(date: Date(), type: .watering, pet: pet, executorId: uid)
+            modelContext.insert(log); modelContext.safeSave()
+            QuestManager.shared.awardAction(type: .water, pet: pet, context: modelContext)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        case "waterChange":
+            let log = PetCareLog(date: Date(), type: .waterChange, pet: pet, executorId: uid)
+            modelContext.insert(log); modelContext.safeSave()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        case "play":
+            let log = PetCareLog(date: Date(), type: .play, pet: pet, executorId: uid)
+            modelContext.insert(log); modelContext.safeSave()
+            QuestManager.shared.awardAction(
+                type: .general(humanReward: 2, petReward: 3, emoji: "🎾", title: "\(pet.name) 玩耍"),
+                pet: pet, context: modelContext)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        case "litter":
+            let log = PetCareLog(date: Date(), type: .litter, pet: pet, executorId: uid)
+            modelContext.insert(log); modelContext.safeSave()
+            QuestManager.shared.awardAction(type: .potty(isLitter: true), pet: pet, context: modelContext)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        case "filterClean":
+            let log = PetCareLog(date: Date(), type: .filterClean, pet: pet, executorId: uid)
+            modelContext.insert(log); modelContext.safeSave()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        default:
+            break
+        }
+    }
+
+    private func qaCompleted(_ actionType: String) -> Bool {
+        let cal = Calendar.current
+        switch actionType {
+        case "feed":        return pet.careLogs.contains { $0.careType == .feeding && cal.isDateInToday($0.date) }
+        case "walk":        return pet.walkLogs.contains { cal.isDateInToday($0.startDate) }
+        case "potty":       return pet.pottyLogs.contains { cal.isDateInToday($0.date) }
+        case "groom":       return pet.hygieneLogs.contains { cal.isDateInToday($0.date) }
+        case "play":        return pet.careLogs.contains { $0.type == CareType.play.rawValue && cal.isDateInToday($0.date) }
+        case "water":       return pet.careLogs.contains { $0.type == CareType.watering.rawValue && cal.isDateInToday($0.date) }
+        case "waterChange": return pet.careLogs.contains { $0.type == CareType.waterChange.rawValue && cal.isDateInToday($0.date) }
+        case "litter":      return pet.careLogs.contains { $0.type == CareType.litter.rawValue && cal.isDateInToday($0.date) }
+        case "filterClean": return pet.careLogs.contains { $0.type == CareType.filterClean.rawValue && cal.isDateInToday($0.date) }
+        default:            return false
+        }
+    }
+
+    // MARK: - Edit Mode Persistence
+
+    private var savedQuickActionItems: [QuickActionItem] {
+        guard !quickActionItemsJSON.isEmpty,
+              let data = quickActionItemsJSON.data(using: .utf8),
+              let items = try? JSONDecoder().decode([QuickActionItem].self, from: data)
+        else { return defaultActionsForPet }
+        return items
+    }
+
+    private var petQuickActionItems: [QuickActionItem] {
+        let petItems = savedQuickActionItems.filter { $0.petId == pet.id && $0.entityKind != .human }
+        return petItems.isEmpty ? defaultActionsForPet : petItems
+    }
+
+    private var defaultActionsForPet: [QuickActionItem] {
+        let isDog  = pet.species.contains("狗") || pet.species.lowercased().contains("dog")
+        let isCat  = pet.species.contains("猫") || pet.species.lowercased().contains("cat")
+        let isFish = pet.species.contains("鱼") || pet.species.lowercased().contains("fish")
+        var items: [QuickActionItem] = []
+        items.append(QuickActionItem(label: "喂食", icon: "fork.knife", colorHex: "FF8C00", petId: pet.id, actionType: "feed", entityId: pet.id, entityKind: .pet))
+        if isFish {
+            items.append(QuickActionItem(label: "换水", icon: "drop.circle.fill", colorHex: "4ECDC4", petId: pet.id, actionType: "waterChange", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "清滤", icon: "wrench.and.screwdriver.fill", colorHex: "A78BFA", petId: pet.id, actionType: "filterClean", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "体重", icon: "scalemass.fill", colorHex: "16A34A", petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet))
+        } else if isDog {
+            items.append(QuickActionItem(label: "遛狗", icon: "figure.walk", colorHex: "0EA5E9", petId: pet.id, actionType: "walk", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "便便", icon: "allergens", colorHex: "D97706", petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "健康", icon: "cross.fill", colorHex: "EF4444", petId: pet.id, actionType: "health", entityId: pet.id, entityKind: .pet))
+        } else if isCat {
+            items.append(QuickActionItem(label: "铲屎", icon: "trash.fill", colorHex: "5B6AFF", petId: pet.id, actionType: "litter", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "便便", icon: "allergens", colorHex: "D97706", petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "健康", icon: "cross.fill", colorHex: "EF4444", petId: pet.id, actionType: "health", entityId: pet.id, entityKind: .pet))
+        } else {
+            items.append(QuickActionItem(label: "护理", icon: "bubbles.and.sparkles.fill", colorHex: "06B6D4", petId: pet.id, actionType: "groom", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "便便", icon: "allergens", colorHex: "D97706", petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: "体重", icon: "scalemass.fill", colorHex: "16A34A", petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet))
+        }
+        return items
+    }
+
+    private func enterQAEditMode() {
+        qaEditItems = petQuickActionItems
+        withAnimation(.spring(response: 0.3)) { isQAEditMode = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { withAnimation(nil) { qaJiggle = true } }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    private func exitQAEditMode() {
+        saveQAEditItems(qaEditItems)
+        withAnimation(.spring(response: 0.3)) { isQAEditMode = false }
+        withAnimation(nil) { qaJiggle = false }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    private func saveQAEditItems(_ edited: [QuickActionItem]) {
+        var saved = savedQuickActionItems
+        let petItemIds = Set(petQuickActionItems.map { $0.id })
+        let insertionIdx = saved.firstIndex(where: { petItemIds.contains($0.id) }) ?? saved.count
+        saved.removeAll { petItemIds.contains($0.id) }
+        saved.insert(contentsOf: edited, at: min(insertionIdx, saved.count))
+        if let data = try? JSONEncoder().encode(saved), let str = String(data: data, encoding: .utf8) {
+            quickActionItemsJSON = str
+        }
+    }
+
+    private func qaCountText(_ actionType: String) -> String? {
+        let cal = Calendar.current
+        switch actionType {
+        case "feed":
+            let n = pet.careLogs.filter { $0.careType == .feeding && cal.isDateInToday($0.date) }.count
+            return n > 0 ? "今日\(n)次" : nil
+        case "walk":
+            let n = pet.walkLogs.filter { cal.isDateInToday($0.startDate) }.count
+            return n > 0 ? "今日\(n)次" : nil
+        case "potty":
+            let n = pet.pottyLogs.filter { cal.isDateInToday($0.date) }.count
+            return n > 0 ? "今日\(n)次" : nil
+        case "weight":
+            if let last = pet.weightLogs.sorted(by: { $0.date < $1.date }).last {
+                return "\(last.weight)kg"
+            }
+            return nil
+        case "expense":
+            let total = pet.expenseLogs
+                .filter { cal.isDate($0.date, equalTo: Date(), toGranularity: .month) }
+                .reduce(0.0) { $0 + $1.amount }
+            return total > 0 ? "¥\(Int(total))" : nil
+        default:
+            return nil
+        }
+    }
+
+    private func applyGroomCheckIn(_ raw: String) {
+        let type: HygieneType
+        switch raw {
+        case "bath":     type = .bath
+        case "teeth":    type = .teeth
+        case "nails":    type = .nails
+        case "brushing": type = .brushing
+        case "ears":     type = .ears
+        default:         return
+        }
+        let log = PetHygieneLog(date: Date(), type: type, pet: pet)
+        modelContext.insert(log); modelContext.safeSave()
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        QuestManager.shared.awardAction(type: .care(type: type), pet: pet, context: modelContext)
+    }
+
+    private func applyPottyCheckIn(_ raw: String) {
+        let type = PottyType(rawValue: raw) ?? .perfectPoop
+        let uid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
+        let log = PetPottyLog(date: Date(), type: type, pet: pet, executorId: uid)
+        modelContext.insert(log); modelContext.safeSave()
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        QuestManager.shared.awardAction(type: .potty(isLitter: false), pet: pet, context: modelContext)
+    }
+
+    private func applyHealthCheckIn(_ raw: String) {
+        switch raw {
+        case "symptom":
+            healthRecordType = .general
+        case "vaccine":
+            modelContext.insert(PetHealthLog(date: Date(), type: .vaccine, note: "快速打卡", pet: pet))
+            modelContext.safeSave()
+        case "deworming":
+            modelContext.insert(PetHealthLog(date: Date(), type: .dewormingExternal, note: "快速打卡", pet: pet))
+            modelContext.safeSave()
+        case "visit":
+            modelContext.insert(PetHealthLog(date: Date(), type: .checkup, note: "快速打卡", pet: pet))
+            modelContext.safeSave()
+        case "heatCycle":
+            healthRecordType = .general
+        default:
+            break
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════

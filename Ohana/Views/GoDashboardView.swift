@@ -97,19 +97,7 @@ struct GoDashboardView: View {
     @State private var heatCycleSheetPet: Pet? = nil
     @State private var showingFamilyStripFull = false
     @State private var bentoUrgentGlow = false
-    @State private var cardBackSettingsPet: Pet? = nil
     @State private var cardBackHealthPet: Pet? = nil
-    @State private var cardBackMedicationsPet: Pet? = nil
-    @State private var cardBackWeightPet: Pet? = nil
-    @State private var cardBackFoodPet: Pet? = nil
-    @State private var cardBackHygienePet: Pet? = nil
-    @State private var cardBackWalksPet: Pet? = nil
-    @State private var cardBackPottyPet: Pet? = nil
-    @State private var cardBackExpensesPet: Pet? = nil
-    @State private var cardBackBasicInfoPet: Pet? = nil
-    @State private var cardBackDocumentsPet: Pet? = nil
-    @State private var cardBackMomentsPet: Pet? = nil
-    @State private var cardBackAchievementsPet: Pet? = nil
     @State private var calendarAddEventTrigger = false
     @State private var oasisRulesTrigger = false
     @State private var oasisInventoryTrigger = false
@@ -238,15 +226,15 @@ struct GoDashboardView: View {
         .sheet(item: $showMomentPet) { pet in
             NavigationStack {
                 QuickMomentSheet(pet: pet, onRemove: nil)
-                    .navigationTitle("记录时刻").navigationBarTitleDisplayMode(.inline)
-                    .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { showMomentPet = nil } } }
+                    .navigationTitle(l.homeRecordMoment).navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(l.addEntityClose) { showMomentPet = nil } } }
             }
             .presentationDetents([.large]).presentationDragIndicator(.visible)
         }
         .background(goSecondarySheets)
         .alert(antiRepeatTitle, isPresented: $showingAntiRepeatAlert) {
-            Button("确定打卡", role: .destructive) { pendingRepeatAction?(); pendingRepeatAction = nil }
-            Button("取消", role: .cancel) { pendingRepeatAction = nil }
+            Button(l.homeConfirmCheckIn, role: .destructive) { pendingRepeatAction?(); pendingRepeatAction = nil }
+            Button(l.cancel, role: .cancel) { pendingRepeatAction = nil }
         } message: { Text(antiRepeatMessage) }
         .islandToastOverlay()
         .onAppear { onAppearSetup() }
@@ -310,19 +298,6 @@ private extension GoDashboardView {
                                     activeCritterIdStr = ""; activeHumanId = h.id
                                 }
                             },
-                            onShowBackSettings: { cardBackSettingsPet = $0 },
-                            onShowHealth:       { cardBackHealthPet = $0 },
-                            onShowMedications:  { cardBackMedicationsPet = $0 },
-                            onShowWeight:       { cardBackWeightPet = $0 },
-                            onShowFood:         { cardBackFoodPet = $0 },
-                            onShowHygiene:      { cardBackHygienePet = $0 },
-                            onShowWalks:        { cardBackWalksPet = $0 },
-                            onShowPotty:        { cardBackPottyPet = $0 },
-                            onShowExpenses:     { cardBackExpensesPet = $0 },
-                            onShowBasicInfo:    { cardBackBasicInfoPet = $0 },
-                            onShowDocuments:    { cardBackDocumentsPet = $0 },
-                            onShowMoments:      { cardBackMomentsPet = $0 },
-                            onShowAchievements: { cardBackAchievementsPet = $0 },
                             onDraggingChanged:  { isCardDragging = $0 }
                         )
                         .onAppear {
@@ -338,7 +313,7 @@ private extension GoDashboardView {
 
                     // D. 今日委托（DailyQuestsCard 套 GO 卡片容器）
                     if !pets.isEmpty {
-                        goSectionCard(title: "🏝️ 今日委托", label: "ISLAND QUESTS") {
+                        goSectionCard(title: l.goSectionIslandQuests, label: l.goSectionIslandQuestsLabel) {
                             TodayFocusCard(
                                 pets: pets,
                                 plants: plants,
@@ -354,7 +329,7 @@ private extension GoDashboardView {
 
                     // E. 快捷操作网格
                     if !pets.isEmpty || !humans.isEmpty {
-                        goSectionCard(title: "⚡ 快捷打卡", label: "QUICK ACTIONS", trailingButton: {
+                        goSectionCard(title: l.goSectionQuickActions, label: l.goSectionQuickActionsLabel, trailingButton: {
                             AnyView(
                                 Button {
                                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -427,7 +402,7 @@ private extension GoDashboardView {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                         memoryDismissed = true
                         memoryDragOffset = 0
-                        QuestManager.shared.addCoconuts(1, emoji: "💭", title: "珍惜记忆 +1🥥")
+                        QuestManager.shared.addCoconuts(1, emoji: "💭", title: l.homeMemoryCoconutTitle)
                     }
                 } else {
                     withAnimation(.spring(response: 0.3)) { memoryDragOffset = 0 }
@@ -516,16 +491,16 @@ private extension GoDashboardView {
 
                 // Info column
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("生命之树 · \(level.displayName)")
+                    Text(l.goLifeTreeTitle(levelName: level.displayName))
                         .font(.system(size: 15, weight: .heavy, design: .rounded))
                         .foregroundStyle(Color(hex: "1E3A8A"))
 
                     if level < .lv10 {
-                        Text("还差 \(max(0, energyNeeded)) 🥥 能量升级")
+                        Text(l.goTreeNeedEnergy(max(0, energyNeeded)))
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(Color(hex: "6B82C4"))
                     } else {
-                        Text("已达最高等级 ✨")
+                        Text(l.goTreeMaxLevel)
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(Color.goLime)
                     }
@@ -555,7 +530,7 @@ private extension GoDashboardView {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     selectedDockTab = 3
                 } label: {
-                    Text("⚡ 注入能量")
+                    Text(l.goInjectEnergy)
                         .font(.system(size: 13, weight: .black, design: .rounded))
                         .foregroundStyle(Color(hex: "1A1A2E"))
                         .frame(maxWidth: .infinity, minHeight: 38)
@@ -565,7 +540,7 @@ private extension GoDashboardView {
                 .buttonStyle(.plain)
 
                 Button { selectedDockTab = 3 } label: {
-                    Text("前往绿洲")
+                    Text(l.goToOasis)
                         .font(.system(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color(hex: "6B82C4"))
                         .frame(maxWidth: .infinity, minHeight: 38)
@@ -582,10 +557,10 @@ private extension GoDashboardView {
     // MARK: Lime-style dock (设计规范: 活跃标签 = lime 胶囊 + 墨色文字)
     @ViewBuilder var goLimeDock: some View {
         let tabs: [(String, String, Int)] = [
-            ("house.fill", "首页", 0),
-            ("camera.macro", "植物", 1),
-            ("calendar", "日历", 2),
-            ("leaf.fill", "绿洲", 3),
+            ("house.fill", l.tabHome, 0),
+            ("camera.macro", l.tabPlant, 1),
+            ("calendar", l.tabCalendar, 2),
+            ("leaf.fill", l.tabOasis, 3),
         ]
         HStack(spacing: 4) {
             ForEach(tabs, id: \.2) { icon, label, idx in
@@ -664,7 +639,6 @@ private extension GoDashboardView {
             HStack(spacing: 8) {
                 switch selectedDockTab {
                 case 0:
-                    // 连击
                     Button { showStreakDetail = true } label: {
                         HStack(spacing: 3) {
                             Image(systemName: "flame.fill").font(.system(size: 11, weight: .bold))
@@ -675,12 +649,11 @@ private extension GoDashboardView {
                         .background(headerStreak >= 7 ? Color.goLime : .white.opacity(0.18), in: Capsule())
                     }
                     .buttonStyle(.plain)
-                    // 菜单
                     Menu {
-                        Button { showingAddEntity = true } label: { Label("添加成员", systemImage: "person.badge.plus") }
+                        Button { showingAddEntity = true } label: { Label(l.addMember, systemImage: "person.badge.plus") }
                         Button { showingCrewRoster = true } label: { Label(l.ohanaCrew, systemImage: "person.2.fill") }
-                        Button { showingManageSheet = true } label: { Label("管理主页模块", systemImage: "slider.horizontal.3") }
-                        Button { showingSettings = true } label: { Label("设置", systemImage: "gearshape") }
+                        Button { showingManageSheet = true } label: { Label(l.manageHomeModules, systemImage: "slider.horizontal.3") }
+                        Button { showingSettings = true } label: { Label(l.settings, systemImage: "gearshape") }
                     } label: {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 13, weight: .bold))
@@ -698,7 +671,6 @@ private extension GoDashboardView {
                     goHeaderIconButton(systemName: "shippingbox.fill") { oasisInventoryTrigger.toggle() }
                 default: EmptyView()
                 }
-                // 椰子胶囊（始终显示）
                 CoconutBalanceCapsule(onTap: { showingCoconutLog = true })
             }
         }
@@ -769,7 +741,7 @@ private extension GoDashboardView {
                 petAvatar: avatarForAction(item),
                 petThemeColorHex: themeColorForAction(item),
                 displayIcon: (!isQAEditMode && item.actionType == "water" && waterQuickDisplayUsesChangeMode(for: item.petId)) ? "drop.circle.fill" : nil,
-                titleLabelOverride: (!isQAEditMode && item.actionType == "water" && waterQuickDisplayUsesChangeMode(for: item.petId)) ? "换水" : nil,
+                titleLabelOverride: (!isQAEditMode && item.actionType == "water" && waterQuickDisplayUsesChangeMode(for: item.petId)) ? l.homeQAWaterChange : nil,
                 pendingReminder: isQAEditMode ? nil : reminderForAction(item),
                 countText: isQAEditMode ? nil : countTextForAction(item),
                 isCompletedToday: !isQAEditMode && isCompletedToday(for: item),
@@ -857,7 +829,7 @@ private extension GoDashboardView {
                                 Circle().fill(Color(hex: "E8EEFF")).frame(width: 44, height: 44)
                                 Image(systemName: "plus").font(.system(size: 18, weight: .bold)).foregroundStyle(Color(hex: "6B82C4"))
                             }
-                            Text("添加").font(.system(size: 10, weight: .semibold)).foregroundStyle(Color(hex: "6B82C4"))
+                            Text(l.goAddChip).font(.system(size: 10, weight: .semibold)).foregroundStyle(Color(hex: "6B82C4"))
                         }
                         .frame(maxWidth: .infinity, minHeight: 80)
                         .background(
@@ -938,19 +910,7 @@ private extension GoDashboardView {
 
     @ViewBuilder var cardBackSheets: some View {
         Color.clear
-            .sheet(item: $cardBackSettingsPet) { pet in PetCardBackSettingsSheet(pet: pet) }
             .sheet(item: $cardBackHealthPet) { pet in NavigationStack { PetHealthDetailView(pet: pet, isModal: true) } }
-            .sheet(item: $cardBackMedicationsPet) { pet in NavigationStack { PetMedicationView(pet: pet) } }
-            .sheet(item: $cardBackWeightPet) { pet in NavigationStack { WeightHistoryView(pet: pet) } }
-            .sheet(item: $cardBackFoodPet) { pet in PetFoodManagementView(pet: pet) }
-            .sheet(item: $cardBackHygienePet) { pet in NavigationStack { PetHygieneDetailView(pet: pet) } }
-            .sheet(item: $cardBackWalksPet) { pet in WalkSummarySheet(pet: pet) }
-            .sheet(item: $cardBackPottyPet) { pet in NavigationStack { PottyOverviewView(pet: pet) } }
-            .sheet(item: $cardBackExpensesPet) { pet in NavigationStack { ExpenseHistoryView(pet: pet) } }
-            .sheet(item: $cardBackBasicInfoPet) { pet in NavigationStack { PetBasicInfoDetailView(pet: pet) } }
-            .sheet(item: $cardBackDocumentsPet) { pet in NavigationStack { DocumentsListView(pet: pet) } }
-            .sheet(item: $cardBackMomentsPet) { pet in PetMomentsHubView(pet: pet) }
-            .sheet(item: $cardBackAchievementsPet) { pet in AchievementWallView(pet: pet) }
     }
 }
 
@@ -972,7 +932,7 @@ private extension GoDashboardView {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("🗺️ 岛屿功能")
+                    Text(l.goFeatureHubTitle)
                         .font(.system(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
                     Text("ISLAND FEATURES")
@@ -985,24 +945,24 @@ private extension GoDashboardView {
 
             let hasPet = !pets.isEmpty
             let features: [GoFeatureItem] = [
-                GoFeatureItem(emoji: "🦮", title: "巡岛", subtitle: "遛宠", colorHex: "0EA5E9", requiresPet: true) {
+                GoFeatureItem(emoji: "🦮", title: l.goFeatPatrol, subtitle: l.goFeatPatrolSub, colorHex: "0EA5E9", requiresPet: true) {
                     if let pet = deckActivePet ?? pets.first(where: { !$0.hasPassedAway }) {
                         PetWalkingManager.shared.start(pet: pet)
                     }
                 },
-                GoFeatureItem(emoji: "❤️", title: "健康", subtitle: "医疗档案", colorHex: "EF4444", requiresPet: true) {
+                GoFeatureItem(emoji: "❤️", title: l.goFeatHealth, subtitle: l.goFeatHealthSub, colorHex: "EF4444", requiresPet: true) {
                     if let pet = deckActivePet { cardBackHealthPet = pet }
                 },
-                GoFeatureItem(emoji: "📅", title: "日历", subtitle: "日程安排", colorHex: "8B5CF6") {
+                GoFeatureItem(emoji: "📅", title: l.goFeatCalendar, subtitle: l.goFeatCalendarSub, colorHex: "8B5CF6") {
                     selectedDockTab = 2
                 },
-                GoFeatureItem(emoji: "💰", title: "花费", subtitle: "支出统计", colorHex: "D97706") {
+                GoFeatureItem(emoji: "💰", title: l.goFeatExpense, subtitle: l.goFeatExpenseSub, colorHex: "D97706") {
                     showIslandExpense = true
                 },
-                GoFeatureItem(emoji: "⚖️", title: "体重", subtitle: "成长曲线", colorHex: "16A34A", requiresPet: true) {
+                GoFeatureItem(emoji: "⚖️", title: l.goFeatWeight, subtitle: l.goFeatWeightSub, colorHex: "16A34A", requiresPet: true) {
                     showIslandWeight = true
                 },
-                GoFeatureItem(emoji: "🌴", title: "绿洲", subtitle: "奖励中心", colorHex: "C8FF00", darkText: true) {
+                GoFeatureItem(emoji: "🌴", title: l.goFeatOasis, subtitle: l.goFeatOasisSub, colorHex: "C8FF00", darkText: true) {
                     selectedDockTab = 3
                 },
             ]
@@ -1019,7 +979,7 @@ private extension GoDashboardView {
                             Text(feature.title)
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
                                 .foregroundStyle(fgColor.opacity(locked ? 0.4 : 1))
-                            Text(locked ? "添加宠物" : feature.subtitle)
+                            Text(locked ? l.goAddPetLocked : feature.subtitle)
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundStyle(fgColor.opacity(locked ? 0.3 : 0.75))
                         }
@@ -1053,7 +1013,7 @@ private extension GoDashboardView {
     var goIslandStatsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("📊 岛屿统计")
+                Text(l.goStatsTitle)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                 Spacer()
@@ -1080,16 +1040,16 @@ private extension GoDashboardView {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("🐾")
                                 .font(.system(size: 28))
-                            Text("还没有宠物")
+                            Text(l.goEmptyPetsTitle)
                                 .font(.system(size: 14, weight: .black, design: .rounded))
                                 .foregroundStyle(.white)
-                            Text("添加你的第一只宠物\n开启家庭数据统计")
+                            Text(l.goEmptyPetsSub)
                                 .font(.system(size: 11, weight: .medium, design: .rounded))
                                 .foregroundStyle(.white.opacity(0.5))
                                 .lineSpacing(3)
                             Spacer()
                             Button { showingAddEntity = true } label: {
-                                Text("立即添加 →")
+                                Text(l.goEmptyPetsCTA)
                                     .font(.system(size: 12, weight: .black, design: .rounded))
                                     .foregroundStyle(.black)
                                     .padding(.horizontal, 14).padding(.vertical, 7)
@@ -1110,8 +1070,8 @@ private extension GoDashboardView {
                     let weekWalkTotal = weekWalk.reduce(0) { $0 + $1.1 }
                     goStatMiniCard(
                         icon: "figure.walk", iconColor: "22D3EE",
-                        value: "\(weekWalkTotal)", unit: "次",
-                        label: "本周散步", onTap: { showIslandExplore = true }
+                        value: "\(weekWalkTotal)", unit: l.times,
+                        label: l.goWeekWalks, onTap: { showIslandExplore = true }
                     )
 
                     // 体重（最近一次）
@@ -1121,7 +1081,7 @@ private extension GoDashboardView {
                     goStatMiniCard(
                         icon: "scalemass.fill", iconColor: "4ADE80",
                         value: lastWeight.map { String(format: "%.1f", $0.1) } ?? "--", unit: "kg",
-                        label: lastWeight.map { $0.0 } ?? "体重", onTap: { showIslandWeight = true }
+                        label: lastWeight.map { $0.0 } ?? l.homeQAWeight, onTap: { showIslandWeight = true }
                     )
 
                     // 本月花费
@@ -1131,15 +1091,15 @@ private extension GoDashboardView {
                     goStatMiniCard(
                         icon: "yensign.circle.fill", iconColor: "FFDD44",
                         value: "¥\(Int(monthExpense))", unit: "",
-                        label: "本月花费", onTap: { showIslandExpense = true }
+                        label: l.goThisMonthExpense, onTap: { showIslandExpense = true }
                     )
 
                     // 粮仓
                     if let urgentPet = pets.filter({ $0.remainingFoodDays > 0 }).min(by: { $0.remainingFoodDays < $1.remainingFoodDays }) {
                         goStatMiniCard(
                             icon: "bag.fill", iconColor: urgentPet.remainingFoodDays <= 7 ? "FF4757" : "FB923C",
-                            value: "\(urgentPet.remainingFoodDays)", unit: "天",
-                            label: "\(urgentPet.name)粮仓", onTap: { showingAllFoodManagement = true }
+                            value: "\(urgentPet.remainingFoodDays)", unit: l.petCardDayUnit,
+                            label: l.goPetFoodPantry(urgentPet.name), onTap: { showingAllFoodManagement = true }
                         )
                     }
                 }
@@ -1226,12 +1186,12 @@ private extension GoDashboardView {
                     .offset(x: coconutFlyOut ? 120 : 0, y: coconutFlyOut ? -300 : 0)
                 if !coconutFlyOut {
                     VStack(spacing: 6) {
-                        Text("每日登录奖励 +1🥥").font(.system(size: 18, weight: .black, design: .rounded)).foregroundStyle(Color(hex: "1E3A8A"))
-                        Text("坚持照顾家人，收获更多椰子").font(.system(size: 13)).foregroundStyle(Color(hex: "6B82C4"))
+                        Text(l.homeDailyCoconutTitle).font(.system(size: 18, weight: .black, design: .rounded)).foregroundStyle(Color(hex: "1E3A8A"))
+                        Text(l.homeDailyCoconutSub).font(.system(size: 13)).foregroundStyle(Color(hex: "6B82C4"))
                     }
                     .transition(.opacity)
                     Button { dismissDailyCoconut() } label: {
-                        Text("收下").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
+                        Text(l.homeClaimCoconuts).font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
                             .padding(.horizontal, 36).padding(.vertical, 12)
                             .background(Color(hex: "3B5BDB"), in: Capsule())
                     }
@@ -1274,7 +1234,7 @@ private extension GoDashboardView {
         if !set.contains(today) {
             set.insert(today)
             UserDefaults.standard.set(Array(set), forKey: key)
-            QuestManager.shared.addCoconuts(1, emoji: "📅", title: "每日打卡奖励")
+            QuestManager.shared.addCoconuts(1, emoji: "📅", title: l.homeDailyCheckInRewardTitle)
             refreshHeaderStreak()
         }
 
@@ -1286,7 +1246,7 @@ private extension GoDashboardView {
             // 已显示
         } else if !pets.isEmpty || !humans.isEmpty {
             UserDefaults.standard.set(startOfToday, forKey: dKey)
-            QuestManager.shared.addCoconuts(1, emoji: "🌅", title: "每日登录奖励")
+            QuestManager.shared.addCoconuts(1, emoji: "🌅", title: l.homeDailyLoginRewardTitle)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) { showDailyCoconut = true }
             }
@@ -1355,10 +1315,10 @@ private extension GoDashboardView {
 
     func defaultHumanActions(for human: Human) -> [QuickActionItem] {
         [
-            QuickActionItem(label: "体重", icon: "scalemass.fill", colorHex: "80FFEA", actionType: "humanWeight", entityId: human.id, entityKind: .human),
-            QuickActionItem(label: "运动", icon: "figure.run", colorHex: "C8FF00", actionType: "humanWorkout", entityId: human.id, entityKind: .human),
-            QuickActionItem(label: "吃药", icon: "pill.fill", colorHex: "FF6B8A", actionType: "humanMedication", entityId: human.id, entityKind: .human),
-            QuickActionItem(label: "记录", icon: "note.text", colorHex: "A78BFA", actionType: "humanNote", entityId: human.id, entityKind: .human),
+            QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA", actionType: "humanWeight", entityId: human.id, entityKind: .human),
+            QuickActionItem(label: l.homeQASport, icon: "figure.run", colorHex: "C8FF00", actionType: "humanWorkout", entityId: human.id, entityKind: .human),
+            QuickActionItem(label: l.homeQAMeds, icon: "pill.fill", colorHex: "FF6B8A", actionType: "humanMedication", entityId: human.id, entityKind: .human),
+            QuickActionItem(label: l.homeQANote, icon: "note.text", colorHex: "A78BFA", actionType: "humanNote", entityId: human.id, entityKind: .human),
         ]
     }
 
@@ -1367,23 +1327,23 @@ private extension GoDashboardView {
         let isCat = pet.species.contains("猫") || pet.species.lowercased().contains("cat")
         let isFish = pet.species.contains("鱼") || pet.species.lowercased().contains("fish")
         var items: [QuickActionItem] = []
-        items.append(QuickActionItem(label: "喂食", icon: "fork.knife", colorHex: "FFDD44", petId: pet.id, actionType: "feed", entityId: pet.id, entityKind: .pet))
+        items.append(QuickActionItem(label: l.homeQAFeed, icon: "fork.knife", colorHex: "FFDD44", petId: pet.id, actionType: "feed", entityId: pet.id, entityKind: .pet))
         if isFish {
-            items.append(QuickActionItem(label: "换水", icon: "drop.circle.fill", colorHex: "4ECDC4", petId: pet.id, actionType: "waterChange", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "清滤材", icon: "wrench.and.screwdriver.fill", colorHex: "A78BFA", petId: pet.id, actionType: "filterClean", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "体重", icon: "scalemass.fill", colorHex: "80FFEA", petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: l.homeQAWaterChange, icon: "drop.circle.fill", colorHex: "4ECDC4", petId: pet.id, actionType: "waterChange", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: l.homeQAFilterClean, icon: "wrench.and.screwdriver.fill", colorHex: "A78BFA", petId: pet.id, actionType: "filterClean", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA", petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet))
         } else if isDog {
-            items.append(QuickActionItem(label: "喂水", icon: "drop.fill", colorHex: "00D4AA", petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "遛狗", icon: "figure.walk", colorHex: "C8FF00", petId: pet.id, actionType: "walk", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "便便", icon: "allergens", colorHex: "A78BFA", petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA", petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: l.homeQAWalk, icon: "figure.walk", colorHex: "C8FF00", petId: pet.id, actionType: "walk", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: l.homeQAPotty, icon: "allergens", colorHex: "A78BFA", petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
         } else if isCat {
-            items.append(QuickActionItem(label: "喂水", icon: "drop.fill", colorHex: "00D4AA", petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "铲屎", icon: "trash.fill", colorHex: "5B6AFF", petId: pet.id, actionType: "litter", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "便便", icon: "allergens", colorHex: "A78BFA", petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA", petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: l.homeQALitter, icon: "trash.fill", colorHex: "5B6AFF", petId: pet.id, actionType: "litter", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: l.homeQAPotty, icon: "allergens", colorHex: "A78BFA", petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
         } else {
-            items.append(QuickActionItem(label: "喂水", icon: "drop.fill", colorHex: "00D4AA", petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "护理", icon: "scissors", colorHex: "F472B6", petId: pet.id, actionType: "groom", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "体重", icon: "scalemass.fill", colorHex: "80FFEA", petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA", petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: l.homeQAGroom, icon: "scissors", colorHex: "F472B6", petId: pet.id, actionType: "groom", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA", petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet))
         }
         return Array(items.prefix(4))
     }
@@ -1480,25 +1440,25 @@ private extension GoDashboardView {
         case "walk":
             let count = pet.walkLogs.filter { cal.isDateInToday($0.startDate) }.count
             let dist = pet.walkLogs.filter { cal.isDateInToday($0.startDate) }.reduce(0.0) { $0 + $1.distanceMeters }
-            if count == 0 { return "今日未遛" }
+            if count == 0 { return l.homeWalkNoneToday }
             let ds = dist >= 1000 ? String(format: "%.1fkm", dist/1000) : String(format: "%.0fm", dist)
-            return "今日\(count)次·\(ds)"
+            return l.homeWalkTodayBadge(count: count, dist: ds)
         case "feed":
             let goal = max(UserDefaults.standard.integer(forKey: "feedGoal_\(pet.id.uuidString)"), 3)
             let count = pet.careLogs.filter { $0.type == CareType.feeding.rawValue && cal.isDateInToday($0.date) && $0.isManualFeedLogEntry }.count
-            return "\(count)/\(goal)餐"
+            return l.homeFeedMealsProgress(current: count, goal: goal)
         case "water":
             let count = pet.careLogs.filter { $0.type == CareType.watering.rawValue && cal.isDateInToday($0.date) }.count
-            return count > 0 ? "今日\(count)次" : nil
+            return count > 0 ? l.homeTimesToday(count) : nil
         case "potty":
             let count = pet.pottyLogs.filter { cal.isDateInToday($0.date) }.count
-            return count > 0 ? "今日\(count)次" : nil
+            return count > 0 ? l.homeTimesToday(count) : nil
         case "expense":
             let total = pet.expenseLogs.filter { cal.isDate($0.date, equalTo: Date(), toGranularity: .month) }.reduce(0.0) { $0 + $1.amount }
-            return total > 0 ? "本月¥\(Int(total))" : nil
+            return total > 0 ? l.homeExpenseMonthCNY(Int(total)) : nil
         case "weight":
             if let last = pet.weightLogs.sorted(by: { $0.date < $1.date }).last {
-                return "上次\(String(format: "%.1f", last.weight))kg"
+                return l.homeLastWeightKg(last.weight)
             }
             return nil
         default: return nil
@@ -1608,7 +1568,7 @@ private extension GoDashboardView {
         case "walk":
             if case .idle = PetWalkingManager.shared.phase {
                 PetWalkingManager.shared.start(pet: pet)
-                showToast(pet, message: "开始遛 \(pet.name)！", emoji: "🦮", duration: 2.0)
+                showToast(pet, message: l.homeToastWalkStarted(pet.name), emoji: "🦮", duration: 2.0)
             }
         case "weight": quickWeightPet = pet
         case "hygiene","groom": quickAccessCarePet = pet
@@ -1616,12 +1576,12 @@ private extension GoDashboardView {
             let log = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet, executorId: uid)
             modelContext.insert(log)
             let got = QuestManager.shared.awardAction(type: .potty(isLitter: false), pet: pet, context: modelContext)
-            showToast(pet, message: "\(pet.name) 便便打卡 +\(got.petGot + got.humanGot)🥥", emoji: "💩")
+            showToast(pet, message: l.homeToastPotty(pet.name, points: got.petGot + got.humanGot), emoji: "💩")
         case "litter":
             let log = PetCareLog(date: Date(), type: .litter, pet: pet, executorId: uid)
             modelContext.insert(log)
             let got = QuestManager.shared.awardAction(type: .potty(isLitter: true), pet: pet, context: modelContext)
-            showToast(pet, message: "\(pet.name) 铲猫砂 +\(got.humanGot)🥥", emoji: "🧹")
+            showToast(pet, message: l.homeToastLitter(pet.name, points: got.humanGot), emoji: "🧹")
         case "feed":
             let performFeed = {
                 if HomeFeedRecordMode.isPlanned(for: pet.id) {
@@ -1633,12 +1593,12 @@ private extension GoDashboardView {
                     self.modelContext.safeSave()
                     QuestManager.shared.recordFirstMeal()
                     let got = QuestManager.shared.awardAction(type: .feed, pet: pet, context: self.modelContext)
-                    self.showToast(pet, message: "\(pet.name) 手动喂食 +\(got.petGot + got.humanGot)🥥", emoji: "🍗")
+                    self.showToast(pet, message: l.homeToastManualFeed(pet.name, points: got.petGot + got.humanGot), emoji: "🍗")
                 }
             }
             if let w = AntiRepeatCareManager.checkRecentCareLog(for: pet, type: .feeding, thresholdMinutes: 120, currentUserId: uid, in: humans) {
-                antiRepeatTitle = "重复喂食提醒"
-                antiRepeatMessage = "\(w.executorName) 在 \(w.minutesAgo) 分钟前刚喂过 \(pet.name) ，确定要再喂一次吗？"
+                antiRepeatTitle = l.homeAntiDupFeedTitle
+                antiRepeatMessage = l.homeAntiDupFeedMessage(executor: w.executorName, minutes: w.minutesAgo, petName: pet.name)
                 pendingRepeatAction = performFeed
                 showingAntiRepeatAlert = true
             } else { performFeed() }
@@ -1650,7 +1610,7 @@ private extension GoDashboardView {
                 modelContext.insert(log)
                 modelContext.safeSave()
                 let got = QuestManager.shared.awardAction(type: .water, pet: pet, context: modelContext)
-                showToast(pet, message: "\(pet.name) 喂水打卡 +\(got.petGot + got.humanGot)🥥", emoji: "💧")
+                showToast(pet, message: l.homeToastWater(pet.name, points: got.petGot + got.humanGot), emoji: "💧")
             }
         case "waterChange":
             applySpecialCareCheckIn(type: .waterChange, pet: pet)
@@ -1672,10 +1632,10 @@ private extension GoDashboardView {
                 humanReward: 2,
                 petReward: 3,
                 emoji: "🎾",
-                title: "\(pet.name) 逗玩打卡"
+                title: l.homePlayQuestTitle(pet.name)
             )
             let got = QuestManager.shared.awardAction(type: playReward, pet: pet, context: modelContext)
-            showToast(pet, message: "\(pet.name) 逗玩打卡 +\(got.petGot + got.humanGot)🥥", emoji: "🎾")
+            showToast(pet, message: l.homeToastPlay(pet.name, points: got.petGot + got.humanGot), emoji: "🎾")
         default:
             selectedPet = pet; selectedPetTab = .overview
         }
@@ -1685,10 +1645,11 @@ private extension GoDashboardView {
         let uid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
         let log = PetCareLog(date: Date(), type: type, pet: pet, executorId: uid)
         modelContext.insert(log); modelContext.safeSave()
-        let oat: QuestManager.OhanaActionType = .general(humanReward: 15, petReward: 20, emoji: type.emoji, title: "\(pet.name) \(type.label)")
+        let careLabel = l.careTypeUILabel(type)
+        let oat: QuestManager.OhanaActionType = .general(humanReward: 15, petReward: 20, emoji: type.emoji, title: "\(pet.name) \(careLabel)")
         let got = QuestManager.shared.awardAction(type: oat, pet: pet, context: modelContext)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        showToast(pet, message: "\(pet.name) \(type.label) +\(got.petGot + got.humanGot)🥥", emoji: type.emoji)
+        showToast(pet, message: "\(pet.name) \(careLabel) +\(got.petGot + got.humanGot)🥥", emoji: type.emoji)
     }
 
     func applyGroomCheckIn(_ raw: String, pet: Pet) {
@@ -1701,7 +1662,7 @@ private extension GoDashboardView {
         modelContext.insert(log); modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         let got = QuestManager.shared.awardAction(type: .care(type: type), pet: pet, context: modelContext)
-        showToast(pet, message: "\(pet.name) \(type.rawValue)打卡 +\(got.petGot + got.humanGot)🥥", emoji: type.emoji)
+        showToast(pet, message: l.homeToastGroomLine(petName: pet.name, type: type, points: got.petGot + got.humanGot), emoji: type.emoji)
     }
 
     func applyPottyCheckIn(_ raw: String, pet: Pet) {
@@ -1711,24 +1672,24 @@ private extension GoDashboardView {
         modelContext.insert(log); modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         let got = QuestManager.shared.awardAction(type: .potty(isLitter: false), pet: pet, context: modelContext)
-        showToast(pet, message: "\(pet.name) \(type.emoji)\(type.rawValue) +\(got.petGot + got.humanGot)🥥", emoji: type.emoji)
+        showToast(pet, message: l.homeToastPottyLine(petName: pet.name, type: type, points: got.petGot + got.humanGot), emoji: type.emoji)
     }
 
     func applyHealthCheckIn(_ raw: String, pet: Pet) {
         switch raw {
         case "symptom": showingAddSymptomSheet = true; symptomSheetPet = pet
         case "vaccine":
-            modelContext.insert(PetHealthLog(date: Date(), type: .vaccine, note: "快捷打卡", pet: pet))
+            modelContext.insert(PetHealthLog(date: Date(), type: .vaccine, note: l.homeQuickCheckInNote, pet: pet))
             modelContext.safeSave()
-            showToast(pet, message: "\(pet.name) 疫苗记录 ✅", emoji: "💉")
+            showToast(pet, message: l.homeToastHealthVaccine(pet.name), emoji: "💉")
         case "deworming":
-            modelContext.insert(PetHealthLog(date: Date(), type: .dewormingExternal, note: "快捷打卡", pet: pet))
+            modelContext.insert(PetHealthLog(date: Date(), type: .dewormingExternal, note: l.homeQuickCheckInNote, pet: pet))
             modelContext.safeSave()
-            showToast(pet, message: "\(pet.name) 驱虫记录 ✅", emoji: "💊")
+            showToast(pet, message: l.homeToastHealthDeworm(pet.name), emoji: "💊")
         case "visit":
-            modelContext.insert(PetHealthLog(date: Date(), type: .checkup, note: "快捷打卡", pet: pet))
+            modelContext.insert(PetHealthLog(date: Date(), type: .checkup, note: l.homeQuickCheckInNote, pet: pet))
             modelContext.safeSave()
-            showToast(pet, message: "\(pet.name) 就诊记录 ✅", emoji: "🏥")
+            showToast(pet, message: l.homeToastHealthVisit(pet.name), emoji: "🏥")
         case "heatCycle":
             if !pet.isNeutered { showingAddHeatCycleSheet = true; heatCycleSheetPet = pet }
         default: break
@@ -1747,7 +1708,7 @@ private extension GoDashboardView {
         modelContext.safeSave()
         QuestManager.shared.recordFirstMeal()
         let got = QuestManager.shared.awardAction(type: .feed, pet: pet, context: modelContext)
-        showToast(pet, message: "\(pet.name) 计划喂食打卡 +\(got.petGot + got.humanGot)🥥", emoji: "🍗")
+        showToast(pet, message: l.homeToastPlannedFeed(pet.name, points: got.petGot + got.humanGot), emoji: "🍗")
         return true
     }
 
@@ -1782,7 +1743,7 @@ private extension GoDashboardView {
         }
         let amt = IslandQuestEngine.coconutReward(forQuestId: quest.id)
         if amt > 0 && quest.id != "q_walk" {
-            QuestManager.shared.addCoconuts(amt, title: "岛屿委托奖励")
+            QuestManager.shared.addCoconuts(amt, title: l.homeIslandQuestRewardTitle)
             rewardCoconutAmount = amt; showRewardCoconut = true
         }
     }
@@ -1790,14 +1751,14 @@ private extension GoDashboardView {
     @MainActor func completePlantWatering(_ plant: Plant) {
         plant.lastWateredDate = Date()
         let log = PlantCareLog(date: Date(), careType: .watering); log.plant = plant; modelContext.insert(log)
-        modelContext.insert(Event(title: "💧 给 \(plant.name) 浇水", startDate: Date(), isAllDay: false, eventType: EventType.watering.rawValue, relatedEntityType: EntityKind.plant.rawValue, relatedEntityId: plant.id.uuidString))
+        modelContext.insert(Event(title: l.homePlantWaterEventTitle(plantName: plant.name), startDate: Date(), isAllDay: false, eventType: EventType.watering.rawValue, relatedEntityType: EntityKind.plant.rawValue, relatedEntityId: plant.id.uuidString))
         modelContext.safeSave()
     }
 
     @MainActor func completePlantFertilizing(_ plant: Plant) {
         plant.lastFertilizedDate = Date()
         let log = PlantCareLog(date: Date(), careType: .fertilizing); log.plant = plant; modelContext.insert(log)
-        modelContext.insert(Event(title: "🌿 给 \(plant.name) 施肥", startDate: Date(), isAllDay: false, eventType: EventType.fertilizing.rawValue, relatedEntityType: EntityKind.plant.rawValue, relatedEntityId: plant.id.uuidString))
+        modelContext.insert(Event(title: l.homePlantFertilizeEventTitle(plantName: plant.name), startDate: Date(), isAllDay: false, eventType: EventType.fertilizing.rawValue, relatedEntityType: EntityKind.plant.rawValue, relatedEntityId: plant.id.uuidString))
         modelContext.safeSave()
     }
 
@@ -1822,8 +1783,8 @@ private extension GoDashboardView {
                         ScrollView {
                             FamilyActivityStripView(pet: pet, style: .full).padding(.vertical, 20)
                         }
-                        .navigationTitle("今日 · 谁在照顾 \(pet.name)").navigationBarTitleDisplayMode(.inline)
-                        .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { showingFamilyStripFull = false }.foregroundStyle(Color.goPrimary) } }
+                        .navigationTitle(l.homeFamilyCareTitle(petName: pet.name)).navigationBarTitleDisplayMode(.inline)
+                        .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(l.done) { showingFamilyStripFull = false }.foregroundStyle(Color.goPrimary) } }
                     }
                     .presentationDetents([.medium]).presentationDragIndicator(.visible)
                 }

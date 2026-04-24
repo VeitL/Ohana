@@ -10,6 +10,8 @@ import SwiftUI
 // MARK: - 背景风格枚举
 enum AppBackgroundStyle: String, CaseIterable, Identifiable {
     case goDefault   = "go_default"
+    /// GO UI 首页同款：深蓝竖向渐变（与 `GoDashboardView` 底层一致，可在经典/各子页使用）
+    case goIsland    = "go_island"
     case deepAmbient = "deep_ambient"
     case aurora      = "aurora"
     case midnight    = "midnight"
@@ -24,6 +26,7 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .goDefault:   return "Go 经典"
+        case .goIsland:    return "GO 岛屿"
         case .deepAmbient: return "深邃光球"
         case .aurora:      return "极光"
         case .midnight:    return "午夜"
@@ -38,6 +41,7 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
     var previewColors: [Color] {
         switch self {
         case .goDefault:   return [Color(hex: "0A0A0C"), .goPrimary, .goBlue]
+        case .goIsland:    return [Color(hex: "2D4ECC"), Color(hex: "1A2E8A"), Color(hex: "0C1640")]
         case .deepAmbient: return [Color(hex: "030712"), Color(hex: "1D4ED8"), Color(hex: "6D28D9")]
         case .aurora:      return [Color(hex: "0A0A0C"), Color(hex: "00C9A7"), Color(hex: "845EC2")]
         case .midnight:    return [Color(hex: "0D1117"), Color(hex: "161B22"), Color(hex: "21262D")]
@@ -52,7 +56,7 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
 
 // MARK: - ArkBackgroundView（根据用户设置切换背景风格）
 struct ArkBackgroundView: View {
-    @AppStorage("appBackgroundStyle") private var styleRaw: String = AppBackgroundStyle.goDefault.rawValue
+    @AppStorage("appBackgroundStyle") private var styleRaw: String = AppBackgroundStyle.goIsland.rawValue
 
     private var style: AppBackgroundStyle {
         AppBackgroundStyle(rawValue: styleRaw) ?? .goDefault
@@ -61,6 +65,7 @@ struct ArkBackgroundView: View {
     var body: some View {
         switch style {
         case .goDefault:   GoDefaultBackground()
+        case .goIsland:   GoIslandBackground()
         case .deepAmbient: DeepAmbientBackground()
         case .aurora:      AuroraBackground()
         case .midnight:    MidnightBackground()
@@ -124,6 +129,26 @@ private struct GoDefaultBackground: View {
                 blob3Offset = CGSize(width: 30, height: -40)
             }
         }
+    }
+}
+
+// MARK: - 1b. GO 岛屿（GO UI 首页壁纸 — 仅渐变 + 轻噪点，避免全 App 重复跑天气粒子 Timer）
+private struct GoIslandBackground: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(hex: "2D4ECC"), Color(hex: "1A2E8A"), Color(hex: "0C1640")],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            NoiseTextureView()
+                .opacity(0.022)
+                .blendMode(.overlay)
+                .ignoresSafeArea()
+        }
+        .ignoresSafeArea()
     }
 }
 
@@ -491,6 +516,64 @@ private struct NeonGridBackground: View {
         .ignoresSafeArea()
         .onAppear {
             withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) { phase = 1 }
+        }
+    }
+}
+
+// MARK: - GO 岛屿向导底（与 `GoDashboardView` 渐变 + 浮动色球一致；`ArkBackgroundView` 默认「Go 经典」与此不同）
+/// 添加宠物 / 家庭成员等全屏向导使用，避免误用 `ArkBackgroundView` 的 `go_default` 浅色底。
+struct GoIslandWizardBackdrop: View {
+    @State private var blobPulse = false
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(hex: "2D4ECC"), Color(hex: "1A2E8A"), Color(hex: "0C1640")],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            GeometryReader { geo in
+                ZStack {
+                    Circle()
+                        .fill(Color.goLime)
+                        .frame(width: 260, height: 260)
+                        .blur(radius: 80)
+                        .opacity(0.22)
+                        .offset(x: blobPulse ? -50 : -70, y: blobPulse ? -70 : -90)
+
+                    Circle()
+                        .fill(Color(hex: "5B6AFF"))
+                        .frame(width: 300, height: 300)
+                        .blur(radius: 90)
+                        .opacity(0.40)
+                        .offset(x: blobPulse ? geo.size.width - 80 : geo.size.width - 100,
+                                y: blobPulse ? 180 : 220)
+
+                    Circle()
+                        .fill(Color(hex: "A855F7"))
+                        .frame(width: 240, height: 240)
+                        .blur(radius: 90)
+                        .opacity(0.30)
+                        .offset(x: blobPulse ? -40 : -60,
+                                y: blobPulse ? geo.size.height * 0.55 : geo.size.height * 0.5)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+
+            NoiseTextureView()
+                .opacity(0.022)
+                .blendMode(.overlay)
+                .ignoresSafeArea()
+        }
+        .ignoresSafeArea()
+        .onAppear {
+            withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) {
+                blobPulse = true
+            }
         }
     }
 }

@@ -14,6 +14,13 @@ struct PetBasicInfoDetailView: View {
 
     @State private var isEditing = false
 
+    @State private var showingDeleteConfirm    = false
+    @State private var deleteConfirmName       = ""
+    @State private var showingClearConfirm     = false
+    @State private var showingRainbowBridgeAlert = false
+    @State private var showingUndoPassingAlert   = false
+    @State private var rainbowBridgeDate         = Date()
+
     // Edit state mirrors
     @State private var eName = ""
     @State private var eSpecies = ""
@@ -68,6 +75,21 @@ struct PetBasicInfoDetailView: View {
         }
         .navigationTitle("\(pet.name) 的信息")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("确认删除", isPresented: $showingDeleteConfirm) {
+            TextField("输入宠物名字确认", text: $deleteConfirmName)
+            Button("取消", role: .cancel) { deleteConfirmName = "" }
+            Button("删除", role: .destructive) {
+                if deleteConfirmName == pet.name {
+                    deletePetWithCascade(pet)
+                }
+            }
+        } message: { Text("请输入 \"\(pet.name)\" 确认删除。此操作不可撤销。") }
+        .alert("仅清空所有记录", isPresented: $showingClearConfirm) {
+            Button("取消", role: .cancel) {}
+            Button("清空记录", role: .destructive) { clearPetLogs() }
+        } message: {
+            Text("将删除 \(pet.name) 的护理、体重、花费、健康、散步、喂食、清洁、里程碑、用药与相册等记录，并移除日历中该宠物的计划；保留名字、头像、品种与证件/保险档案。此操作不可撤销。")
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if isEditing {
@@ -174,6 +196,9 @@ struct PetBasicInfoDetailView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
+
+            rainbowBridgeSection
+            deleteDangerZone
         }
     }
 
@@ -423,6 +448,164 @@ struct PetBasicInfoDetailView: View {
                 .tint(Color.goPrimary)
                 .multilineTextAlignment(.trailing)
         }
+    }
+
+    // MARK: - Rainbow Bridge Section
+    @ViewBuilder
+    private var rainbowBridgeSection: some View {
+        if pet.hasPassedAway {
+            VStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    Text("🌈").font(.system(size: 14))
+                    Text("岁月史书 · 彩虹桥彼端")
+                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .foregroundStyle(.primary.opacity(0.5))
+                        .tracking(1)
+                    Spacer()
+                }
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        if let d = pet.passedAwayDate {
+                            Text("离世日期：\(d.formatted(.dateTime.year().month().day()))")
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundStyle(.primary.opacity(0.7))
+                        }
+                        Text("相伴 \(pet.daysTogetherAtPassing) 天 · \(pet.ageAtPassingText)")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(.primary.opacity(0.45))
+                    }
+                    Spacer()
+                    Button { showingUndoPassingAlert = true } label: {
+                        Text("撤销离世")
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.goYellow)
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .background(Color.goYellow.opacity(0.1), in: Capsule())
+                            .overlay(Capsule().strokeBorder(Color.goYellow.opacity(0.3), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(14)
+                .background(Color.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Color.purple.opacity(0.2), lineWidth: 1))
+            }
+            .alert("撤销离世标记", isPresented: $showingUndoPassingAlert) {
+                Button("撤销", role: .destructive) {
+                    RainbowBridgeService.undoPassedAway(pet: pet, context: modelContext)
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("将清除 \(pet.name) 的离世记录，恢复为在世状态。")
+            }
+        } else {
+            VStack(spacing: 10) {
+                HStack {
+                    Image(systemName: "rainbow").foregroundStyle(Color.purple.opacity(0.6)).font(.system(size: 12))
+                    Text("生命终章")
+                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.purple.opacity(0.6))
+                        .tracking(2)
+                    Spacer()
+                }
+                Button {
+                    rainbowBridgeDate = Date()
+                    showingRainbowBridgeAlert = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("🌈")
+                        Text("标记 \(pet.name) 已离世")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                    }
+                    .foregroundStyle(Color.purple.opacity(0.8))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(Color.purple.opacity(0.25), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
+            .alert("确认标记离世", isPresented: $showingRainbowBridgeAlert) {
+                Button("确认", role: .destructive) {
+                    RainbowBridgeService.markPassedAway(pet: pet, date: rainbowBridgeDate, context: modelContext)
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("将标记 \(pet.name) 为离世，并删除所有未来的提醒和事件。此操作可撤销。")
+            }
+        }
+    }
+
+    // MARK: - Danger Zone
+    private var deleteDangerZone: some View {
+        VStack(spacing: 10) {
+            HStack {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(Color.goRed.opacity(0.7)).font(.system(size: 12))
+                Text("危险区域")
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.goRed.opacity(0.7)).tracking(2)
+                Spacer()
+            }
+            Button { showingClearConfirm = true } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "eraser.fill").font(.system(size: 14, weight: .bold))
+                    Text("仅清空所有记录").font(.system(size: 15, weight: .bold, design: .rounded))
+                }
+                .foregroundStyle(Color.goOrange)
+                .frame(maxWidth: .infinity).padding(.vertical, 14)
+                .background(Color.goOrange.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.goOrange.opacity(0.3), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            Button { showingDeleteConfirm = true } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "trash.fill").font(.system(size: 14, weight: .bold))
+                    Text("彻底删除 \(pet.name)").font(.system(size: 15, weight: .bold, design: .rounded))
+                }
+                .foregroundStyle(Color.goRed)
+                .frame(maxWidth: .infinity).padding(.vertical, 14)
+                .background(Color.goRed.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.goRed.opacity(0.3), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.top, 8)
+    }
+
+    // MARK: - Delete Helpers
+    private func deletePetWithCascade(_ p: Pet) {
+        let petIdStr = p.id.uuidString
+        if let allEvents = try? modelContext.fetch(FetchDescriptor<Event>()) {
+            for event in allEvents where event.relatedEntityId == petIdStr {
+                modelContext.delete(event)
+            }
+        }
+        removeQuickAccessItems(for: p.id)
+        modelContext.delete(p)
+        modelContext.safeSave()
+        deleteConfirmName = ""
+        dismiss()
+    }
+
+    private func removeQuickAccessItems(for petId: UUID) {
+        let key = "quickActionItems_v2"
+        guard let json = UserDefaults.standard.string(forKey: key),
+              let data = json.data(using: .utf8),
+              var items = try? JSONDecoder().decode([QuickActionItem].self, from: data) else { return }
+        items.removeAll { $0.petId == petId }
+        if let newData = try? JSONEncoder().encode(items),
+           let newJSON = String(data: newData, encoding: .utf8) {
+            UserDefaults.standard.set(newJSON, forKey: key)
+        }
+    }
+
+    private func clearPetLogs() {
+        pet.clearAllActivityRecords(in: modelContext)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     // MARK: - Edit State

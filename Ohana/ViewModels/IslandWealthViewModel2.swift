@@ -69,43 +69,60 @@ final class IslandWealthViewModel {
     // MARK: - 图表数据（按时间桶聚合 log，仅用于趋势图）
     private var logs: [CoconutLogEntry] { QuestManager.shared.coconutLogs }
 
-    private var filtered: [CoconutLogEntry] {
-        let all = logs.filter { $0.amount > 0 }
+    // 按时间范围过滤（不区分正负）
+    private var filteredByTimeRange: [CoconutLogEntry] {
         let cal = Calendar.current
         let now = Date()
         switch timeRange {
         case .day:
             let start = cal.startOfDay(for: now)
-            return all.filter { $0.date >= start }
+            return logs.filter { $0.date >= start }
         case .week:
-            guard let start = cal.dateInterval(of: .weekOfYear, for: now)?.start else { return all }
-            return all.filter { $0.date >= start }
+            guard let start = cal.dateInterval(of: .weekOfYear, for: now)?.start else { return logs }
+            return logs.filter { $0.date >= start }
         case .month:
-            guard let start = cal.dateInterval(of: .month, for: now)?.start else { return all }
-            return all.filter { $0.date >= start }
+            guard let start = cal.dateInterval(of: .month, for: now)?.start else { return logs }
+            return logs.filter { $0.date >= start }
         case .all:
-            return all
+            return logs
         }
     }
 
+    // 收入（正数）
+    private var filteredIncome: [CoconutLogEntry] {
+        filteredByTimeRange.filter { $0.amount > 0 }
+    }
+
+    // 花费（负数）
+    private var filteredSpending: [CoconutLogEntry] {
+        filteredByTimeRange.filter { $0.amount < 0 }
+    }
+
+    // MARK: - 收支汇总
+    var periodIncome:   Int { filteredIncome.reduce(0)   { $0 + $1.amount } }
+    var periodSpending: Int { filteredSpending.reduce(0) { $0 + abs($1.amount) } }
+
     // 时间段内活跃实体名集合（用于图例）
     var activeEntityNames: [String] {
-        let names = Set(filtered.compactMap { $0.actorName })
+        let names = Set(filteredIncome.compactMap { $0.actorName })
         return Array(names).sorted()
+    }
+
+    // 共享桶化组件
+    private var bucketComponent: Calendar.Component {
+        switch timeRange {
+        case .day:   return .hour
+        case .week:  return .day
+        case .month: return .day
+        case .all:   return .month
+        }
     }
 
     var chartBars: [WealthBarData] {
         let cal = Calendar.current
-        let component: Calendar.Component = {
-            switch timeRange {
-            case .day:   return .hour
-            case .week:  return .day
-            case .month: return .day
-            case .all:   return .month
-            }
-        }()
+        let component = bucketComponent
         var dict: [String: (bucket: Date, entity: String, eid: String, sum: Int)] = [:]
-        for log in filtered {
+        for log in filteredIncome {
             let bucket = cal.dateInterval(of: component, for: log.date)?.start ?? log.date
             // 严格按 actorId 分桶；未知实体归入 system
             let rawId = log.actorId ?? ""
@@ -156,8 +173,21 @@ final class IslandWealthViewModel {
         }
     }
 
-    // 时间段内日志总额（图表标题用）
-    var periodLogTotal: Int { filtered.reduce(0) { $0 + $1.amount } }
+    // 花费柱状图数据（按时间桶聚合，单一"花费"系列，amount 取绝对值）
+    var spendingBars: [WealthBarData] {
+        let cal = Calendar.current
+        let component = bucketComponent
+        var dict: [Date: Int] = [:]
+        for log in filteredSpending {
+            let bucket = cal.dateInterval(of: component, for: log.date)?.start ?? log.date
+            dict[bucket, default: 0] += abs(log.amount)
+        }
+        return dict.map { WealthBarData(bucket: $0.key, entityName: "花费", entityId: "spending", amount: $0.value) }
+            .sorted { $0.bucket < $1.bucket }
+    }
+
+    // 时间段内收入总额（图表标题用）
+    var periodLogTotal: Int { periodIncome }
 
     // MARK: - 色板
     static let palette: [Color] = [

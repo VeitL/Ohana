@@ -23,19 +23,21 @@ struct IslandDailyReportSheet: View {
         Array(IslandQuestEngine.todayQuests(pets: pets, reminders: reminders, plants: plants, events: events).prefix(5))
     }
 
+    private var l10n: L10n { L10n(AppLanguage.code) }
+
     private var greetingText: String {
         let hour = Calendar.current.component(.hour, from: Date())
         switch hour {
-        case 5..<12:  return "早上好"
-        case 12..<18: return "下午好"
-        default:      return "晚上好"
+        case 5..<12:  return l10n.goodMorning
+        case 12..<18: return l10n.goodAfternoon
+        default:      return l10n.goodEvening
         }
     }
 
     private var dateText: String {
         let fmt = DateFormatter()
-        fmt.dateFormat = "M月d日 EEEE"
-        fmt.locale = Locale(identifier: "zh_CN")
+        fmt.locale = AppLanguage.effectiveLocale
+        fmt.dateFormat = AppLanguage.isEnglish ? "EEEE, MMM d" : "M月d日 EEEE"
         return fmt.string(from: Date())
     }
 

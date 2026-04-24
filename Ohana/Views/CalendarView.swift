@@ -18,7 +18,7 @@ struct CalendarPetChipFilterBar: View {
     @AppStorage("calendar_filterPetId") private var calendarFilterPetId: String = ""
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage("appUIStyle") private var appUIStyle: String = "classic"
+    @AppStorage("appUIStyle") private var appUIStyle: String = "go"
 
     private var isMaterial: Bool { appUIStyle == "material" }
     private var chipAccent: Color { isMaterial ? Color(hex: "FF5A00") : Color.goPrimary }
@@ -91,7 +91,7 @@ struct CalendarView: View {
     private var viewMode: CalendarViewMode { CalendarViewMode(rawValue: viewModeRaw) ?? .list }
     @State private var deletingEvent: Event? = nil
     @State private var showDeleteSeriesAlert = false
-    @AppStorage("appUIStyle") private var appUIStyle: String = "classic"
+    @AppStorage("appUIStyle") private var appUIStyle: String = "go"
     @Environment(\.colorScheme) private var colorScheme
     @State private var coconutCount: Int = QuestManager.shared.coconutCount
 
@@ -712,9 +712,13 @@ struct CalendarView: View {
         if Calendar.current.isDateInToday(date) { return "今天" }
         if Calendar.current.isDateInYesterday(date) { return "昨天" }
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
-        formatter.dateFormat = Calendar.current.isDate(date, equalTo: Date(), toGranularity: .year)
-            ? "M月d日 EEEE" : "yyyy年M月d日"
+        formatter.locale = AppLanguage.effectiveLocale
+        let sameYear = Calendar.current.isDate(date, equalTo: Date(), toGranularity: .year)
+        if AppLanguage.isEnglish {
+            formatter.dateFormat = sameYear ? "EEEE, MMM d" : "MMM d, yyyy"
+        } else {
+            formatter.dateFormat = sameYear ? "M月d日 EEEE" : "yyyy年M月d日"
+        }
         return formatter.string(from: date)
     }
     

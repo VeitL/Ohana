@@ -14,17 +14,12 @@ struct OhanaApp: App {
     let container: ModelContainer
     private static let bgTaskID = "com.guanchen.li.Ark.reminderRefill"
     @AppStorage("appThemePreference") private var appThemePreference: String = "system"
+    @AppStorage("appLanguage") private var appLanguage: String = "zh"
 
     init() {
         self.container = SharedModelContainer.make()
         OhanaApp.registerBGTasks()
-        // TODO: 测试完毕后移除
-        UserDefaults.standard.set(10000, forKey: "coconutCount")
-        // 强制同步到 QuestManager（解决初始化顺序问题）
-        DispatchQueue.main.async {
-            QuestManager.shared.coconutCount = 10000
-            QuestManager.shared.flushToDefaults()
-        }
+        FamilyWeeklyReportService.shared.scheduleWeeklyReminder()
     }
     
     private var preferredScheme: ColorScheme? {
@@ -41,6 +36,7 @@ struct OhanaApp: App {
                 .modelContainer(container)
                 .tint(Color.goPrimary)
                 .preferredColorScheme(preferredScheme)
+                .environment(\.locale, AppLanguage.swiftUIPreferredLocale)
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
                     OhanaApp.scheduleReminderRefill()
                 }

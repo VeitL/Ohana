@@ -143,78 +143,64 @@ struct HumanDetailView: View {
         }
     }
 
-    // MARK: - Hero Card (iOS 26 Liquid Glass)
+    // MARK: - Hero Card（GO 首页同款白底卡片，弱化大色块背景）
     private var heroCard: some View {
-        ZStack(alignment: .bottom) {
-            // 渐变背景
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(LinearGradient(
-                    colors: [themeColor, themeColor.mix(with: .black, by: 0.25), Color.goDarkBlue],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                ))
+        VStack(spacing: 20) {
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [themeColor, themeColor.opacity(0.65)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(height: 4)
+                .frame(maxWidth: .infinity)
 
-            // 装饰光球 — 模拟 Liquid Glass 折射感
-            Circle()
-                .fill(themeColor.opacity(0.35))
-                .frame(width: 200)
-                .blur(radius: 70)
-                .offset(x: -80, y: -60)
-            Circle()
-                .fill(.white.opacity(0.08))
-                .frame(width: 140)
-                .blur(radius: 50)
-                .offset(x: 90, y: 20)
-
-            VStack(spacing: 20) {
-                // Avatar
-                ZStack {
-                    if let imageData = human.avatarImageData, let uiImage = UIImage(data: imageData) {
-                        Image(uiImage: uiImage)
-                            .resizable().scaledToFill()
+            ZStack {
+                if let imageData = human.avatarImageData, let uiImage = UIImage(data: imageData) {
+                    Image(uiImage: uiImage)
+                        .resizable().scaledToFill()
+                        .frame(width: 100, height: 100)
+                        .clipShape(Circle())
+                        .overlay(Circle().strokeBorder(themeColor.opacity(0.35), lineWidth: 2.5))
+                        .shadow(color: Color(hex: "0C1640").opacity(0.12), radius: 12, y: 6)
+                } else {
+                    ZStack {
+                        Circle()
+                            .fill(Color(hex: "EEF2FF"))
                             .frame(width: 100, height: 100)
-                            .clipShape(Circle())
-                            .overlay(Circle().strokeBorder(.white.opacity(0.3), lineWidth: 2.5))
-                            .shadow(color: .black.opacity(0.35), radius: 20, y: 10)
-                    } else {
-                        ZStack {
-                            Circle()
-                                .fill(.ultraThinMaterial)
-                                .frame(width: 100, height: 100)
-                                .overlay(Circle().strokeBorder(.white.opacity(0.2), lineWidth: 1.5))
-                                .shadow(color: .black.opacity(0.2), radius: 16, y: 8)
-                            Text(human.avatarEmoji).font(.system(size: 50))
-                        }
-                    }
-                }
-
-                VStack(spacing: 10) {
-                    Text(human.name)
-                        .font(.system(size: 34, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                        .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            humanChip(human.roleText, color: themeColor)
-                            if human.birthday != nil { humanChip(human.ageText, color: .white.opacity(0.7)) }
-                            if !human.bloodType.isEmpty { humanChip("血型 \(human.bloodType)", color: Color.goRed.opacity(0.9)) }
-                            if !human.nationality.isEmpty { humanChip("🌍 \(human.nationality)", color: .white.opacity(0.7)) }
-                            if !human.city.isEmpty { humanChip("📍 \(human.city)", color: .white.opacity(0.7)) }
-                            if human.heightCm > 0 && human.heightCm.isFinite { humanChip(String(format: "%.0f cm", human.heightCm), color: Color.goTeal.opacity(0.9)) }
-                        }
-                        .padding(.horizontal, 4)
+                            .overlay(Circle().strokeBorder(themeColor.opacity(0.2), lineWidth: 1.5))
+                        Text(human.avatarEmoji).font(OhanaFont.metric(size: 50))
                     }
                 }
             }
-            .padding(.vertical, 28)
-            .frame(maxWidth: .infinity)
+
+            VStack(spacing: 10) {
+                Text(human.name)
+                    .font(OhanaFont.metric(size: 34))
+                    .foregroundStyle(Color(hex: "1E3A8A"))
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        humanChip(human.roleText, color: themeColor)
+                        if human.birthday != nil { humanChip(human.ageText, color: Color(hex: "6B82C4")) }
+                        if !human.bloodType.isEmpty { humanChip("血型 \(human.bloodType)", color: Color.goRed) }
+                        if !human.nationality.isEmpty { humanChip("🌍 \(human.nationality)", color: Color(hex: "6B82C4")) }
+                        if !human.city.isEmpty { humanChip("📍 \(human.city)", color: Color(hex: "6B82C4")) }
+                        if human.heightCm > 0 && human.heightCm.isFinite { humanChip(String(format: "%.0f cm", human.heightCm), color: Color.goTeal) }
+                    }
+                    .padding(.horizontal, 4)
+                }
+            }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .shadow(color: themeColor.opacity(0.2), radius: 16, y: 8)
+        .padding(.vertical, 26)
+        .padding(.horizontal, 16)
+        .goIslandModuleCard(cornerRadius: 28)
         .padding(.horizontal, 16)
     }
 
-    // MARK: - Stats Bento (iOS 26 Glass Capsules)
+    // MARK: - Stats Bento（与 GO「岛屿统计」小卡同款：白底 + 轻阴影）
     private var statsBento: some View {
         HStack(spacing: 8) {
             bentoStatMini(
@@ -256,19 +242,30 @@ struct HumanDetailView: View {
     private func bentoStatMini(icon: String, value: String, unit: String, label: String, color: Color) -> some View {
         VStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(color)
+                .frame(width: 36, height: 36)
+                .background(color.opacity(0.15), in: Circle())
             HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(value).font(OhanaFont.metric(size: 18)).foregroundStyle(.white)
+                Text(value)
+                    .font(OhanaFont.metric(size: 18))
+                    .foregroundStyle(Color(hex: "1E3A8A"))
                 if !unit.isEmpty {
-                    Text(unit).font(OhanaFont.caption2(.bold)).foregroundStyle(color.opacity(0.7))
+                    Text(unit)
+                        .font(OhanaFont.caption2(.bold))
+                        .foregroundStyle(Color(hex: "6B82C4"))
                 }
             }
-            Text(label).font(OhanaFont.caption2(.medium)).foregroundStyle(.white.opacity(0.5))
+            Text(label)
+                .font(OhanaFont.caption2(.medium))
+                .foregroundStyle(Color(hex: "6B82C4"))
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.vertical, 12)
+        .padding(.horizontal, 6)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .shadow(color: Color(hex: "0C1640").opacity(0.12), radius: 4, y: 2)
+        .environment(\.colorScheme, .light)
     }
 
     // MARK: - Badges Card
@@ -283,7 +280,7 @@ struct HumanDetailView: View {
                             .foregroundStyle(Color.goYellow)
                         Text("动态称号")
                             .font(OhanaFont.headline(.bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color(hex: "1E3A8A"))
                     }
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
@@ -302,7 +299,7 @@ struct HumanDetailView: View {
                     }
                 }
                 .padding(16)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .goIslandModuleCard(cornerRadius: 24)
                 .padding(.horizontal, 16)
             }
         }
@@ -321,11 +318,11 @@ struct HumanDetailView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("吃药提醒")
                         .font(OhanaFont.callout(.bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color(hex: "1E3A8A"))
                     if myMeds.isEmpty {
                         Text("暂无用药计划")
                             .font(OhanaFont.caption())
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(Color(hex: "6B82C4"))
                     } else {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {
@@ -336,7 +333,7 @@ struct HumanDetailView: View {
                                             .frame(width: 6, height: 6)
                                         Text(med.name)
                                             .font(OhanaFont.caption(.semibold))
-                                            .foregroundStyle(.white.opacity(0.7))
+                                            .foregroundStyle(Color(hex: "475569"))
                                     }
                                     .padding(.horizontal, 8).padding(.vertical, 3)
                                     .background(Color(hex: med.colorHex).opacity(0.15), in: Capsule())
@@ -344,7 +341,7 @@ struct HumanDetailView: View {
                                 if myMeds.count > 3 {
                                     Text("+\(myMeds.count - 3)")
                                         .font(OhanaFont.caption2(.bold))
-                                        .foregroundStyle(.white.opacity(0.4))
+                                        .foregroundStyle(Color(hex: "6B82C4"))
                                 }
                             }
                         }
@@ -361,10 +358,10 @@ struct HumanDetailView: View {
                 }
                 Image(systemName: "chevron.right")
                     .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
             }
             .padding(.horizontal, 16).padding(.vertical, 14)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .goIslandModuleCard(cornerRadius: 24)
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
@@ -383,17 +380,17 @@ struct HumanDetailView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("身体检测报告")
                         .font(OhanaFont.callout(.bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color(hex: "1E3A8A"))
                     if myReports.isEmpty {
                         Text("暂无检测报告")
                             .font(OhanaFont.caption())
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(Color(hex: "6B82C4"))
                     } else {
                         let abnormal = myReports.filter { $0.conclusion == .abnormal || $0.conclusion == .critical }.count
                         HStack(spacing: 6) {
                             Text("\(myReports.count) 份报告")
                                 .font(OhanaFont.caption(.semibold))
-                                .foregroundStyle(.white.opacity(0.6))
+                                .foregroundStyle(Color(hex: "6B82C4"))
                             if abnormal > 0 {
                                 Text("· \(abnormal) 项异常")
                                     .font(OhanaFont.caption(.semibold))
@@ -413,10 +410,10 @@ struct HumanDetailView: View {
                 }
                 Image(systemName: "chevron.right")
                     .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
             }
             .padding(.horizontal, 16).padding(.vertical, 14)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .goIslandModuleCard(cornerRadius: 24)
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
@@ -435,15 +432,15 @@ struct HumanDetailView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("体重记录")
                         .font(OhanaFont.callout(.bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color(hex: "1E3A8A"))
                     if let latest = human.weightLogs.sorted(by: { $0.date > $1.date }).first {
                         Text(latest.date, style: .date)
                             .font(OhanaFont.caption())
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(Color(hex: "6B82C4"))
                     } else {
                         Text("暂无记录")
                             .font(OhanaFont.caption())
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(Color(hex: "6B82C4"))
                     }
                 }
                 Spacer()
@@ -459,10 +456,10 @@ struct HumanDetailView: View {
                 }
                 Image(systemName: "chevron.right")
                     .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
             }
             .padding(.horizontal, 16).padding(.vertical, 14)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .goIslandModuleCard(cornerRadius: 24)
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
@@ -480,10 +477,10 @@ struct HumanDetailView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("在首页显示")
                     .font(OhanaFont.callout(.bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color(hex: "1E3A8A"))
                 Text(human.shouldShowOnHome ? "已加入首页卡堆与岛屿统计" : "不在首页卡堆与岛屿体重中显示")
                     .font(OhanaFont.caption())
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(Color(hex: "6B82C4"))
             }
             Spacer()
             Toggle("", isOn: Binding(
@@ -494,7 +491,7 @@ struct HumanDetailView: View {
             .labelsHidden()
         }
         .padding(.horizontal, 16).padding(.vertical, 14)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .goIslandModuleCard(cornerRadius: 24)
         .padding(.horizontal, 16)
     }
 
@@ -504,28 +501,28 @@ struct HumanDetailView: View {
             HStack(spacing: 14) {
                 ZStack {
                     Circle().fill(Color.goYellow.opacity(0.18)).frame(width: 48, height: 48)
-                    Text("🥥").font(.system(size: 26))
+                    Text("🥥").font(OhanaFont.title2())
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("椰子资产")
                         .font(OhanaFont.callout(.bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color(hex: "1E3A8A"))
                     HStack(spacing: 4) {
                         Text("\(human.coconutBalance) 个")
                             .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(Color.goYellow)
                         Text("· 兑换心愿")
                             .font(OhanaFont.caption())
-                            .foregroundStyle(.white.opacity(0.35))
+                            .foregroundStyle(Color(hex: "6B82C4"))
                     }
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
             }
             .padding(.horizontal, 16).padding(.vertical, 14)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .goIslandModuleCard(cornerRadius: 24)
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
@@ -544,18 +541,18 @@ struct HumanDetailView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("账单花费")
                         .font(OhanaFont.callout(.bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color(hex: "1E3A8A"))
                     Text("查看经手支出明细")
                         .font(OhanaFont.caption())
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(Color(hex: "6B82C4"))
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
             }
             .padding(.horizontal, 16).padding(.vertical, 14)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .goIslandModuleCard(cornerRadius: 24)
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
@@ -565,6 +562,7 @@ struct HumanDetailView: View {
     private var coHealthCard: some View {
         Button { showingCoHealth = true } label: {
             CoHealthDashboardView(human: human)
+                .goIslandModuleCard(cornerRadius: 24)
                 .padding(.horizontal, 16)
         }
         .buttonStyle(.plain)
@@ -575,14 +573,14 @@ struct HumanDetailView: View {
         HStack(spacing: 12) {
             Image(systemName: "lock.fill")
                 .font(OhanaFont.headline())
-                .foregroundStyle(.white.opacity(0.25))
+                .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
             Text("🔒 \(label) · 仅本人可见")
                 .font(OhanaFont.callout(.semibold))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(Color(hex: "6B82C4"))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16).padding(.vertical, 14)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .goIslandModuleCard(cornerRadius: 24)
         .padding(.horizontal, 16)
     }
 
@@ -595,7 +593,7 @@ struct HumanDetailView: View {
                     .foregroundStyle(Color.goOrange)
                 Text("待办提醒")
                     .font(OhanaFont.headline(.bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color(hex: "1E3A8A"))
                 Spacer()
                 if !humanReminders.isEmpty {
                     Text("\(humanReminders.count)")
@@ -610,8 +608,8 @@ struct HumanDetailView: View {
                 HStack {
                     Spacer()
                     VStack(spacing: 6) {
-                        Image(systemName: "checkmark.circle").font(.system(size: 28)).foregroundStyle(.white.opacity(0.15))
-                        Text("暂无待办提醒").font(OhanaFont.callout()).foregroundStyle(.white.opacity(0.3))
+                        Image(systemName: "checkmark.circle").font(OhanaFont.metric(size: 28)).foregroundStyle(Color(hex: "6B82C4").opacity(0.35))
+                        Text("暂无待办提醒").font(OhanaFont.callout()).foregroundStyle(Color(hex: "6B82C4"))
                     }
                     .padding(.vertical, 12)
                     Spacer()
@@ -619,27 +617,27 @@ struct HumanDetailView: View {
             } else {
                 ForEach(Array(humanReminders.enumerated()), id: \.element.id) { idx, reminder in
                     if idx > 0 {
-                        Rectangle().fill(Color.white.opacity(0.07)).frame(height: 1)
+                        Rectangle().fill(Color.black.opacity(0.06)).frame(height: 1)
                     }
                     reminderRow(reminder)
                 }
             }
         }
         .padding(16)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .goIslandModuleCard(cornerRadius: 24)
         .padding(.horizontal, 16)
     }
 
     private func reminderRow(_ reminder: Reminder) -> some View {
         HStack(spacing: 12) {
-            Text(reminder.event?.emoji ?? "📌").font(.system(size: 20))
+            Text(reminder.event?.emoji ?? "📌").font(OhanaFont.title3())
             VStack(alignment: .leading, spacing: 2) {
                 Text(reminder.event?.title ?? "提醒")
                     .font(OhanaFont.callout(.bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color(hex: "1E3A8A"))
                 Text(reminder.scheduledAt, style: .date)
                     .font(OhanaFont.caption())
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(Color(hex: "6B82C4"))
             }
             Spacer()
             if let assigneeId = reminder.event?.assigneeId,
@@ -671,15 +669,15 @@ struct HumanDetailView: View {
                             .foregroundStyle(Color.goPrimary)
                         Text("备注")
                             .font(OhanaFont.headline(.bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color(hex: "1E3A8A"))
                     }
                     Text(human.notes)
                         .font(OhanaFont.body())
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(Color(hex: "475569"))
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(16)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .goIslandModuleCard(cornerRadius: 24)
                 .padding(.horizontal, 16)
             }
         }
@@ -716,7 +714,7 @@ struct HumanDetailView: View {
                 .fill(Color.goPrimary)
                 .frame(width: 3, height: 16)
             Text(text)
-                .font(.system(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.footnote(.black))
                 .foregroundStyle(.white.opacity(0.5))
                 .textCase(.uppercase)
                 .tracking(1.2)
@@ -870,12 +868,12 @@ struct EditHumanSheet: View {
     private func editPrivacyRow(_ title: String, binding: Binding<Bool>) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .font(OhanaFont.callout())
                 .foregroundStyle(.primary)
             Spacer()
             Toggle("", isOn: binding).tint(Color.goPrimary).labelsHidden()
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 10))
+        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }

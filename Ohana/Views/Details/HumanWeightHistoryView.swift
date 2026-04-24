@@ -122,20 +122,21 @@ struct HumanWeightHistoryView: View {
     // MARK: - Record List
     private var recordListLayer: some View {
         ZStack(alignment: .top) {
+            // 深色玻璃面板，兼容深/浅色模式
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(Color.white)
+                .fill(.ultraThinMaterial)
                 .ignoresSafeArea(edges: .bottom)
 
             VStack(spacing: 0) {
                 Capsule()
-                    .fill(Color.black.opacity(0.12))
+                    .fill(Color.white.opacity(0.25))
                     .frame(width: 40, height: 4)
                     .padding(.top, 12).padding(.bottom, 8)
 
                 HStack {
                     Text("历史记录")
                         .font(OhanaFont.title3(.black))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(.primary)
                     Spacer()
                     Text("\(sortedLogs.count) 条")
                         .font(OhanaFont.footnote(.bold))
@@ -168,7 +169,7 @@ struct HumanWeightHistoryView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(log.date, format: .dateTime.year().month().day())
                     .font(OhanaFont.subheadline(.semibold))
-                    .foregroundStyle(.black.opacity(0.7))
+                    .foregroundStyle(.primary)
                 Text(log.date, format: .dateTime.weekday(.wide))
                     .font(OhanaFont.caption())
                     .foregroundStyle(.secondary)
@@ -177,7 +178,7 @@ struct HumanWeightHistoryView: View {
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(String(format: "%.1f", log.weight))
                     .font(OhanaFont.metric(size: 20))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(.primary)
                 Text("kg")
                     .font(OhanaFont.footnote(.bold))
                     .foregroundStyle(Color.goPrimary.opacity(0.7))
@@ -192,7 +193,7 @@ struct HumanWeightHistoryView: View {
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
-        .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 14))
+        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
 }

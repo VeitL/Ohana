@@ -1,6 +1,35 @@
 # Ohana 项目 AI 导航文件
 > 每次新对话开始时，将本文件内容贴入对话框，或在 Windsurf 中 @CONTEXT.md
-> 最后更新：2026-03-09 | Schema: ArkSchemaV19 | Phase 1-76 完成
+> 最后更新：2026-04-19 | Schema: ArkSchemaV19 | Phase 1-76 完成
+
+---
+
+## ⭐ 主设计规范（权威来源）
+
+> **所有 UI 工作必须以此为准，其他文档为补充参考。**
+
+| 文件 | 内容 |
+|------|------|
+| `ohana-design-system/project/README.md` | 品牌概述、语气、色彩、字体、组件解剖、图标规范 |
+| `ohana-design-system/project/tokens.json` | 全部设计 Token（颜色 / 间距 / 圆角 / 阴影 / 动效数值） |
+| `ohana-design-system/project/ui_kits/ohana_ios/` | 四屏高保真 UI Kit：首页 / 宠物详情 / 椰子商店 / 生命树绿洲 |
+| `UIRules.md` | Swift 实现层补充规则（当与设计系统冲突时，以设计系统为准） |
+
+### 设计系统关键决策速查
+
+| 决策 | 规范值 |
+|------|--------|
+| 主色（暗色） | `Color.goLime` = `#C8FF00` 荧光绿 |
+| 主色（浅色） | `Color.goPrimary` = `#FF7600` 橙色 |
+| 主色上的文字 | `#1A1A2E` = `Color.arkInk`（非纯黑） |
+| 背景 | 深蓝渐变 `#2D4ECC→#1A2E8A→#0C1640` + lime/indigo/purple 浮动色球 |
+| 卡片风格 | 玻璃卡片（UltimateGlassCard）/ 纯白实色卡片（用户明确要求时） |
+| 圆角 | 主卡片 24pt · 小卡片 20pt · Bento 14pt · 按钮/胶囊 full |
+| 字体 | `.system(design: .rounded)` 全局，Metric 数字最大 80pt Heavy |
+| 图标 | SF Symbols（功能）/ Emoji（货币🥥 / 身份🐕🐈 / 奖励🎉🔥） |
+| 底部 Dock | 玻璃胶囊，活跃 Tab = lime 背景 + 墨色文字 + label 展开 |
+| 生命之树 | 首页核心英雄卡，`OasisTreeManager.shared` 提供实时数据 |
+| 椰子余额 | 始终以 lime 胶囊展示，`QuestManager.shared` 管理 |
 
 ---
 
@@ -10,7 +39,7 @@
 - **平台**：iOS 17+，Swift 6，SwiftUI + SwiftData + Swift Charts
 - **定位**：家庭生命体综合管理（宠物 / 人类成员 / 植物统称 Critters）
 - **App Group**：`group.com.guanchen.li.Ark`
-- **设计语言**：Go UI — 青柠 `#C8FF00` 主色 + 深蓝渐变背景 + 毛玻璃卡片
+- **设计语言**：Go UI — 青柠 `#C8FF00` 主色 + 深蓝渐变背景 + 浮动色球 + 毛玻璃卡片
 
 ---
 

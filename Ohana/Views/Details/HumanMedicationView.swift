@@ -94,7 +94,7 @@ struct HumanMedicationView: View {
                                 ForEach(Array(todayScheduleItems.enumerated()), id: \.element.id) { index, item in
                                     scheduleRow(item)
                                     if index < todayScheduleItems.count - 1 {
-                                        Divider().background(Color.white.opacity(0.1)).padding(.leading, 64)
+                                        GoDashedDivider().padding(.leading, 64)
                                     }
                                 }
                             }
