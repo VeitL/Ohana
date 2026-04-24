@@ -1,0 +1,54 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/>
+<link rel="stylesheet" href="../colors_and_type.css"/>
+<style>
+  body { padding: 40px; background: linear-gradient(180deg,#2D4ECC,#0C1640); min-height: 100vh; margin: 0; color: #fff; display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+  .group { display: flex; flex-direction: column; gap: 14px; min-width: 300px; }
+  .g-label { font-family: ui-monospace, monospace; font-size: 10px; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.5px; }
+  .bento-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .bento { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 14px; }
+  .bento .k { font-family: Inter, sans-serif; font-size: 11px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.3px; font-weight: 600; }
+  .bento .v { font-family: Nunito, sans-serif; font-weight: 900; font-size: 28px; letter-spacing: -1px; line-height: 1; margin-top: 6px; }
+</style></head>
+<body>
+  <div class="group">
+    <div class="g-label">Buttons</div>
+    <button class="oh-btn oh-btn-primary oh-btn-neon">注入能量 +50 🥥</button>
+    <button class="oh-btn oh-btn-dark">前往绿洲</button>
+    <button class="oh-btn oh-btn-secondary">取消</button>
+    <button class="oh-btn oh-btn-danger">删除</button>
+  </div>
+
+  <div class="group">
+    <div class="g-label">Pills &amp; chips</div>
+    <div>
+      <span class="oh-chip oh-chip--selected">全部</span>
+      <span class="oh-chip">喂食</span>
+      <span class="oh-chip">遛狗</span>
+      <span class="oh-chip">铲屎</span>
+    </div>
+    <div>
+      <span class="oh-badge" style="background:#C8FF00;color:#1A1A2E">LV.5</span>
+      <span class="oh-badge" style="background:rgba(255,71,87,0.18);color:#FF4757">到期</span>
+      <span class="oh-badge" style="background:rgba(0,212,170,0.18);color:#00D4AA">健康</span>
+    </div>
+  </div>
+
+  <div class="group" style="min-width: 360px">
+    <div class="g-label">Bento tiles</div>
+    <div class="bento-grid">
+      <div class="bento"><div class="k">步数</div><div class="v" style="color:#C8FF00">6,812</div></div>
+      <div class="bento"><div class="k">喂食</div><div class="v" style="color:#FF8C42">2/3</div></div>
+      <div class="bento"><div class="k">饮水</div><div class="v" style="color:#00D4AA">380<span style="font-size:13px;opacity:0.7"> ml</span></div></div>
+      <div class="bento"><div class="k">今日 🥥</div><div class="v" style="color:#FFF44F">+42</div></div>
+    </div>
+  </div>
+
+  <div class="group" style="min-width: 300px">
+    <div class="g-label">Glass card</div>
+    <div class="oh-glass" style="padding:18px">
+      <div style="font-family:Nunito,sans-serif;font-weight:900;font-size:18px">UltimateGlassCard</div>
+      <div style="font-family:Inter,sans-serif;font-size:13px;color:rgba(255,255,255,0.7);margin-top:6px">radius 24 · stroke .22 · blur 24</div>
+    </div>
+  </div>
+</body></html>

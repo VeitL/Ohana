@@ -293,10 +293,10 @@ struct OverviewView: View {
 
                         if !coconutFlyOut {
                             VStack(spacing: 6) {
-                                Text("每日登录奖励 +1🥥")
+                                Text(l.homeDailyCoconutTitle)
                                     .font(OhanaFont.title2(.black))
                                     .foregroundStyle(.primary)
-                                Text("坚持照顾家人，收获更多椰子")
+                                Text(l.homeDailyCoconutSub)
                                     .font(OhanaFont.callout(.medium))
                                     .foregroundStyle(.primary.opacity(0.5))
                             }
@@ -305,7 +305,7 @@ struct OverviewView: View {
                             Button {
                                 dismissDailyCoconut()
                             } label: {
-                                Text("收下")
+                                Text(l.homeClaimCoconuts)
                                     .font(OhanaFont.body(.bold))
                                     .foregroundStyle(.black)
                                     .padding(.horizontal, 36).padding(.vertical, 12)
@@ -370,7 +370,7 @@ struct OverviewView: View {
             if !checkedInSet.contains(checkInToday) {
                 checkedInSet.insert(checkInToday)
                 UserDefaults.standard.set(Array(checkedInSet), forKey: checkInKey)
-                QuestManager.shared.addCoconuts(1, emoji: "📅", title: "每日打卡奖励")
+                QuestManager.shared.addCoconuts(1, emoji: "📅", title: l.homeDailyCheckInRewardTitle)
                 refreshHeaderStreak()
             }
             // U5: 每日首次打开椰子收集
@@ -381,7 +381,7 @@ struct OverviewView: View {
                 // 今天已显示过
             } else if !pets.isEmpty || !humans.isEmpty || !plants.isEmpty {
                 UserDefaults.standard.set(today, forKey: dailyKey)
-                QuestManager.shared.addCoconuts(1, emoji: "🌅", title: "每日登录奖励")
+                QuestManager.shared.addCoconuts(1, emoji: "🌅", title: l.homeDailyLoginRewardTitle)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                     withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                         showDailyCoconut = true
@@ -502,11 +502,11 @@ struct OverviewView: View {
                         FamilyActivityStripView(pet: topPet, style: .full)
                             .padding(.vertical, 20)
                     }
-                    .navigationTitle("今日 · 谁在照顾 \(topPet.name)")
+                    .navigationTitle(l.homeFamilyCareTitle(petName: topPet.name))
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
-                            Button("完成") { showingFamilyStripFull = false }
+                            Button(l.done) { showingFamilyStripFull = false }
                                 .foregroundStyle(Color.goPrimary)
                         }
                     }
@@ -584,11 +584,11 @@ struct OverviewView: View {
                         { removeQuickAction(found) }
                     }
                 )
-                .navigationTitle("记录时刻")
+                .navigationTitle(l.homeRecordMoment)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("关闭") { showMomentPet = nil }
+                        Button(l.addEntityClose) { showMomentPet = nil }
                     }
                 }
             }
@@ -612,11 +612,11 @@ struct OverviewView: View {
             .presentationBackground(.clear)
         }
         .alert(antiRepeatTitle, isPresented: $showingAntiRepeatAlert) {
-            Button("确定打卡", role: .destructive) {
+            Button(l.homeConfirmCheckIn, role: .destructive) {
                 pendingRepeatAction?()
                 pendingRepeatAction = nil
             }
-            Button("取消", role: .cancel) {
+            Button(l.cancel, role: .cancel) {
                 pendingRepeatAction = nil
             }
         } message: {
@@ -690,19 +690,6 @@ struct OverviewView: View {
                                 activeHumanId = h.id
                             }
                         },
-                        onShowBackSettings: { cardBackSettingsPet = $0 },
-                        onShowHealth:       { cardBackHealthPet = $0 },
-                        onShowMedications:  { cardBackMedicationsPet = $0 },
-                        onShowWeight:       { cardBackWeightPet = $0 },
-                        onShowFood:         { cardBackFoodPet = $0 },
-                        onShowHygiene:      { cardBackHygienePet = $0 },
-                        onShowWalks:        { cardBackWalksPet = $0 },
-                        onShowPotty:        { cardBackPottyPet = $0 },
-                        onShowExpenses:     { cardBackExpensesPet = $0 },
-                        onShowBasicInfo:    { cardBackBasicInfoPet = $0 },
-                        onShowDocuments:    { cardBackDocumentsPet = $0 },
-                        onShowMoments:      { cardBackMomentsPet = $0 },
-                        onShowAchievements: { cardBackAchievementsPet = $0 },
                         onDraggingChanged: { isCardDragging = $0 }
                     )
                     .onAppear {
@@ -786,7 +773,7 @@ struct OverviewView: View {
                                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                                                     memoryDismissed = true
                                                     memoryDragOffset = 0
-                                                    QuestManager.shared.addCoconuts(1, emoji: "💭", title: "珍惜记忆 +1🥥")
+                                                    QuestManager.shared.addCoconuts(1, emoji: "💭", title: l.homeMemoryCoconutTitle)
                                                 }
                                             } else {
                                                 withAnimation(.spring(response: 0.3)) { memoryDragOffset = 0 }
@@ -865,10 +852,10 @@ struct OverviewView: View {
                 .frame(width: 44, height: 44)
                 .background(Color.goPrimary.opacity(0.1), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
-                Text("记忆碎片")
+                Text(l.homeMemoryShardsTitle)
                     .font(.system(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(.primary)
-                Text("继续记录喂食、散步或体重数据\n美好时刻会在这里浮现 ✨")
+                Text(l.homeMemoryShardsBody)
                     .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.leading)
@@ -944,16 +931,16 @@ struct OverviewView: View {
                         // 首页：更多（圆角矩形 ⋯）+ 连续打卡数字 + 椰子
                         Menu {
                             Button { showingAddEntity = true } label: {
-                                Label("添加成员", systemImage: "person.badge.plus")
+                                Label(l.addMember, systemImage: "person.badge.plus")
                             }
                             Button { showingCrewRoster = true } label: {
                                 Label(l.ohanaCrew, systemImage: "person.2.fill")
                             }
                             Button { showingManageSheet = true } label: {
-                                Label("管理主页模块", systemImage: "slider.horizontal.3")
+                                Label(l.manageHome, systemImage: "slider.horizontal.3")
                             }
                             Button { showingSettings = true } label: {
-                                Label("设置", systemImage: "gearshape")
+                                Label(l.settings, systemImage: "gearshape")
                             }
                         } label: {
                             Image(systemName: "ellipsis")
@@ -2517,13 +2504,13 @@ struct OverviewView: View {
 
     private func defaultHumanActions(for human: Human) -> [QuickActionItem] {
         [
-            QuickActionItem(label: "体重", icon: "scalemass.fill", colorHex: "80FFEA",
+            QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA",
                             actionType: "humanWeight", entityId: human.id, entityKind: .human),
-            QuickActionItem(label: "运动", icon: "figure.run", colorHex: "C8FF00",
+            QuickActionItem(label: l.homeQASport, icon: "figure.run", colorHex: "C8FF00",
                             actionType: "humanWorkout", entityId: human.id, entityKind: .human),
-            QuickActionItem(label: "吃药", icon: "pill.fill", colorHex: "FF6B8A",
+            QuickActionItem(label: l.homeQAMeds, icon: "pill.fill", colorHex: "FF6B8A",
                             actionType: "humanMedication", entityId: human.id, entityKind: .human),
-            QuickActionItem(label: "记录", icon: "note.text", colorHex: "A78BFA",
+            QuickActionItem(label: l.homeQANote, icon: "note.text", colorHex: "A78BFA",
                             actionType: "humanNote", entityId: human.id, entityKind: .human),
         ]
     }
@@ -2533,35 +2520,35 @@ struct OverviewView: View {
         let isCat = pet.species.contains("猫") || pet.species.lowercased().contains("cat")
         let isFish = pet.species.contains("鱼") || pet.species.lowercased().contains("fish")
         var items: [QuickActionItem] = []
-        items.append(QuickActionItem(label: "喂食", icon: "fork.knife", colorHex: "FFDD44",
+        items.append(QuickActionItem(label: l.homeQAFeed, icon: "fork.knife", colorHex: "FFDD44",
                                      petId: pet.id, actionType: "feed", entityId: pet.id, entityKind: .pet))
         if isFish {
-            items.append(QuickActionItem(label: "换水", icon: "drop.circle.fill", colorHex: "4ECDC4",
+            items.append(QuickActionItem(label: l.homeQAWaterChange, icon: "drop.circle.fill", colorHex: "4ECDC4",
                                          petId: pet.id, actionType: "waterChange", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "清滤材", icon: "wrench.and.screwdriver.fill", colorHex: "A78BFA",
+            items.append(QuickActionItem(label: l.homeQAFilterClean, icon: "wrench.and.screwdriver.fill", colorHex: "A78BFA",
                                          petId: pet.id, actionType: "filterClean", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "体重", icon: "scalemass.fill", colorHex: "80FFEA",
+            items.append(QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA",
                                          petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet))
         } else if isDog {
-            items.append(QuickActionItem(label: "喂水", icon: "drop.fill", colorHex: "00D4AA",
+            items.append(QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA",
                                          petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "遛狗", icon: "figure.walk", colorHex: "C8FF00",
+            items.append(QuickActionItem(label: l.homeQAWalk, icon: "figure.walk", colorHex: "C8FF00",
                                          petId: pet.id, actionType: "walk", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "便便", icon: "allergens", colorHex: "FF8C42",
+            items.append(QuickActionItem(label: l.homeQAPotty, icon: "allergens", colorHex: "FF8C42",
                                          petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
         } else if isCat {
-            items.append(QuickActionItem(label: "喂水", icon: "drop.fill", colorHex: "00D4AA",
+            items.append(QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA",
                                          petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "铲屎", icon: "trash.fill", colorHex: "5B6AFF",
+            items.append(QuickActionItem(label: l.homeQALitter, icon: "trash.fill", colorHex: "5B6AFF",
                                          petId: pet.id, actionType: "litter", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "便便", icon: "allergens", colorHex: "FF8C42",
+            items.append(QuickActionItem(label: l.homeQAPotty, icon: "allergens", colorHex: "FF8C42",
                                          petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
         } else {
-            items.append(QuickActionItem(label: "喂水", icon: "drop.fill", colorHex: "00D4AA",
+            items.append(QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA",
                                          petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "护理", icon: "scissors", colorHex: "FF8C42",
+            items.append(QuickActionItem(label: l.homeQAGroom, icon: "scissors", colorHex: "FF8C42",
                                          petId: pet.id, actionType: "groom", entityId: pet.id, entityKind: .pet))
-            items.append(QuickActionItem(label: "体重", icon: "scalemass.fill", colorHex: "80FFEA",
+            items.append(QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA",
                                          petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet))
         }
         return Array(items.prefix(4))
@@ -2814,7 +2801,7 @@ struct OverviewView: View {
         }
         let amt = IslandQuestEngine.coconutReward(forQuestId: quest.id)
         if amt > 0 && quest.id != "q_walk" {
-            QuestManager.shared.addCoconuts(amt, title: "岛屿委托奖励")
+            QuestManager.shared.addCoconuts(amt, title: l.homeIslandQuestRewardTitle)
             triggerCoconutReward(amount: amt, label: nil)
         }
     }
@@ -3070,8 +3057,8 @@ struct OverviewView: View {
             }
             
             if let warning = AntiRepeatCareManager.checkRecentCareLog(for: pet, type: .feeding, thresholdMinutes: 120, currentUserId: currentUserId, in: humans) {
-                antiRepeatTitle = "重复喂食提醒"
-                antiRepeatMessage = "\(warning.executorName) 在 \(warning.minutesAgo) 分钟前刚喂过 \(pet.name) ，确定要再喂一次吗？"
+                antiRepeatTitle = l.homeAntiDupFeedTitle
+                antiRepeatMessage = l.homeAntiDupFeedMessage(executor: warning.executorName, minutes: warning.minutesAgo, petName: pet.name)
                 pendingRepeatAction = performFeed
                 showingAntiRepeatAlert = true
             } else {
@@ -3090,8 +3077,8 @@ struct OverviewView: View {
                 }
                 
                 if let warning = AntiRepeatCareManager.checkRecentCareLog(for: pet, type: .watering, thresholdMinutes: 60, currentUserId: currentUserId, in: humans) {
-                    antiRepeatTitle = "重复喂水提醒"
-                    antiRepeatMessage = "\(warning.executorName) 在 \(warning.minutesAgo) 分钟前刚喂过 \(pet.name) 水，确定要再记录一次吗？"
+                    antiRepeatTitle = l.homeAntiDupWaterTitle
+                    antiRepeatMessage = l.homeAntiDupWaterMessage(executor: warning.executorName, minutes: warning.minutesAgo, petName: pet.name)
                     pendingRepeatAction = performWater
                     showingAntiRepeatAlert = true
                 } else {

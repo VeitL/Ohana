@@ -105,28 +105,13 @@ struct PetWalletStack: View {
     var onSelectHuman: ((Human) -> Void)? = nil
     var onTopCardChanged: ((DeckItem) -> Void)? = nil
 
-    var onShowBackSettings: ((Pet) -> Void)? = nil
-    // 健康管理
-    var onShowHealth: ((Pet) -> Void)? = nil
-    var onShowMedications: ((Pet) -> Void)? = nil
-    var onShowWeight: ((Pet) -> Void)? = nil
-    // 日常生活
-    var onShowFood: ((Pet) -> Void)? = nil
-    var onShowHygiene: ((Pet) -> Void)? = nil
-    var onShowWalks: ((Pet) -> Void)? = nil
-    var onShowPotty: ((Pet) -> Void)? = nil
-    var onShowExpenses: ((Pet) -> Void)? = nil
-    // 档案证件
-    var onShowBasicInfo: ((Pet) -> Void)? = nil
-    var onShowDocuments: ((Pet) -> Void)? = nil
-    // 记忆成长
-    var onShowMoments: ((Pet) -> Void)? = nil
-    var onShowAchievements: ((Pet) -> Void)? = nil
+    var onDraggingChanged: ((Bool) -> Void)? = nil
 
     @State private var dragOffset: CGFloat = 0
     @State private var activeIndex: Int = 0
     @State private var isDragging = false
-    @State private var flippedPetIds: Set<UUID> = []
+    /// 顶部卡片空闲时微漂浮（首页简化 · 可爱化）
+    @State private var idleBreath: CGFloat = 0
 
     private var items: [DeckItem] {
         let petItems = pets.map { DeckItem.pet($0) }
@@ -134,32 +119,30 @@ struct PetWalletStack: View {
         return petItems + humanItems
     }
 
-    private let maxVisible = 4
-    private let stackPeek: CGFloat = 56
+    private let maxVisible = 3
+    private let stackPeek: CGFloat = 30
     private let cardCorner: CGFloat = 24
 
     private var stackCardHeight: CGFloat {
         (ScreenCompat.width - 48) / 1.586
     }
 
-    // visibleItems[0] = active card (front, bottom)
-    // visibleItems[1..n] = behind cards (back, peeking from top)
-    private var visibleItems: [DeckItem] {
-        guard !items.isEmpty else { return [] }
-        var result: [DeckItem] = []
-        for i in 0..<min(items.count, maxVisible) {
-            let idx = (activeIndex + i) % items.count
-            result.append(items[idx])
-        }
-        return result
+    /// 最多显示 maxVisible 张，超出部分在栈上方（off-screen）待命
+    private var visibleCount: Int { min(items.count, maxVisible) }
+
+    /// 相对深度：0 = 最前，maxVisible-1 = 最后可见，>= maxVisible = 隐藏于栈上方
+    private func relativeDepth(for index: Int) -> Int {
+        guard !items.isEmpty else { return 0 }
+        return (index - activeIndex + items.count) % items.count
     }
 
-    private var visibleCount: Int { visibleItems.count }
-
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 0) {
             ZStack(alignment: .top) {
-                ForEach(Array(visibleItems.enumerated()), id: \.element.id) { depth, item in
+                // 所有卡片始终在 ZStack 中，depth >= maxVisible 的卡片位于栈上方待命
+                // 当 activeIndex 变化时，各卡片通过 relativeDepth 平滑动画到新位置
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    let depth = relativeDepth(for: index)
                     walletCard(item: item, depth: depth)
                 }
             }
@@ -167,9 +150,9 @@ struct PetWalletStack: View {
                 height: stackCardHeight + CGFloat(max(0, visibleCount - 1)) * stackPeek
             )
             .contentShape(Rectangle())
-            .highPriorityGesture(flippedPetIds.isEmpty ? stackDragGesture : nil)
+            .highPriorityGesture(stackDragGesture)
 
-            // 分页指示器
+            // 分页指示器：位于最前方卡片正下方
             if items.count > 1 {
                 HStack(spacing: 6) {
                     ForEach(0..<min(items.count, 6), id: \.self) { idx in
@@ -179,6 +162,7 @@ struct PetWalletStack: View {
                     }
                 }
                 .animation(.spring(response: 0.35, dampingFraction: 0.7), value: activeIndex)
+                .padding(.top, 22)
             }
         }
         .padding(.horizontal, 24)
@@ -186,10 +170,12 @@ struct PetWalletStack: View {
             if items.indices.contains(activeIndex) {
                 onTopCardChanged?(items[activeIndex])
             }
+            withAnimation(.easeInOut(duration: 3.5).repeatForever(autoreverses: true)) {
+                idleBreath = 1
+            }
         }
         .onChange(of: activeIndex) { _, newValue in
             guard items.indices.contains(newValue) else { return }
-            flippedPetIds.removeAll()
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             onTopCardChanged?(items[newValue])
         }
@@ -199,62 +185,33 @@ struct PetWalletStack: View {
     //
     // 布局：下边的卡片在最前面（zIndex 最高），上边在最后面
     // depth=0 (active) → 最下方 (y最大), zIndex最高, 可交互
-    // depth=n (furthest behind) → 最上方 (y=0), zIndex最低, 仅露出名字
+    // depth=maxVisible-1 (最后可见) → 最上方 (y=0), zIndex最低
+    // depth>=maxVisible → 栈上方隐藏区（y<0），opacity=0，动画时充当"飞出"路径
     @ViewBuilder
     private func walletCard(item: DeckItem, depth: Int) -> some View {
         let isActive = depth == 0
-        // active 在底部，behind 卡片依次在上方
+        let isVisible = depth < maxVisible
+        // active 在底部，behind 卡片依次在上方；超出可见区的卡片继续上移（负 y）
         let yBase = CGFloat(visibleCount - 1 - depth) * stackPeek
-        let yOffset = yBase + (isActive ? dragOffset : 0)
-        let scale = isActive ? 1.0 : (1.0 - CGFloat(depth) * 0.02)
-        let brightness = isActive ? 0.0 : -Double(depth) * 0.05
+        // 顶部卡片在未拖拽时做轻微呼吸漂浮（±3pt, 6s 往返）
+        let idleFloat: CGFloat = (isActive && !isDragging) ? idleBreath * 3 : 0
+        let yOffset = yBase + (isActive ? dragOffset : 0) + idleFloat
+        let scale = isActive ? 1.0 : max(0.85, 1.0 - CGFloat(min(depth, maxVisible)) * 0.02)
+        let brightness = isActive ? 0.0 : -Double(min(depth, maxVisible)) * 0.05
 
         Group {
             switch item {
             case .pet(let pet):
-                let isFlipped = flippedPetIds.contains(pet.id)
-                ZStack {
-                    WalletPetCardFront(pet: pet, cornerRadius: cardCorner)
-                        .frame(height: stackCardHeight)
-                        .opacity(isFlipped ? 0 : 1)
-                        .rotation3DEffect(.degrees(isFlipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
-
-                    WalletPetCardBack(
-                        pet: pet,
-                        cornerRadius: cardCorner,
-                        onShowSettings:     { onShowBackSettings?(pet) },
-                        onFlipBack:         { withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { _ = flippedPetIds.remove(pet.id) } },
-                        onShowHealth:       { onShowHealth?(pet) },
-                        onShowMedications:  { onShowMedications?(pet) },
-                        onShowWeight:       { onShowWeight?(pet) },
-                        onShowFood:         { onShowFood?(pet) },
-                        onShowHygiene:      { onShowHygiene?(pet) },
-                        onShowWalks:        { onShowWalks?(pet) },
-                        onShowPotty:        { onShowPotty?(pet) },
-                        onShowExpenses:     { onShowExpenses?(pet) },
-                        onShowBasicInfo:    { onShowBasicInfo?(pet) },
-                        onShowDocuments:    { onShowDocuments?(pet) },
-                        onShowMoments:      { onShowMoments?(pet) },
-                        onShowAchievements: { onShowAchievements?(pet) }
-                    )
+                WalletPetCardFront(pet: pet, cornerRadius: cardCorner)
                     .frame(height: stackCardHeight)
-                    .rotation3DEffect(.degrees(isFlipped ? 0 : -180), axis: (x: 0, y: 1, z: 0))
-                    .opacity(isFlipped ? 1 : 0)
-                }
-                .onTapGesture {
-                    guard isActive else { return }
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                        if isFlipped {
-                            _ = flippedPetIds.remove(pet.id)
-                        } else {
-                            flippedPetIds.insert(pet.id)
-                        }
+                    .onTapGesture {
+                        guard isActive else { return }
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        onSelectPet(pet)
                     }
-                }
-                .matchedTransitionSource(id: pet.id as UUID, in: heroNS) { cfg in
-                    cfg.clipShape(RoundedRectangle(cornerRadius: cardCorner, style: .continuous))
-                }
+                    .matchedTransitionSource(id: pet.id as UUID, in: heroNS) { cfg in
+                        cfg.clipShape(RoundedRectangle(cornerRadius: cardCorner, style: .continuous))
+                    }
 
             case .human(let human):
                 Button {
@@ -267,11 +224,12 @@ struct PetWalletStack: View {
                 .buttonStyle(.plain)
             }
         }
-        // active 卡片 zIndex 最高（在最前面）
-        .zIndex(Double(visibleCount - depth))
+        // depth=0 的卡片 zIndex 最高，depth>=maxVisible 的卡片在最底层（不遮挡可见卡）
+        .zIndex(Double(items.count - depth))
         .offset(y: yOffset)
         .scaleEffect(scale, anchor: .bottom)
         .brightness(brightness)
+        .opacity(isVisible ? 1 : 0)
         .compositingGroup()
         .shadow(color: .black.opacity(isActive ? 0.35 : 0.15), radius: isActive ? 24 : 12, y: isActive ? 8 : 4)
         .allowsHitTesting(isActive)
@@ -283,6 +241,7 @@ struct PetWalletStack: View {
         DragGesture(minimumDistance: 12)
             .onChanged { value in
                 isDragging = true
+                onDraggingChanged?(true)
                 let clamped = max(-120, min(120, value.translation.height))
                 withAnimation(.interactiveSpring()) {
                     dragOffset = clamped
@@ -290,6 +249,7 @@ struct PetWalletStack: View {
             }
             .onEnded { value in
                 isDragging = false
+                onDraggingChanged?(false)
                 let threshold: CGFloat = 50
                 if (value.translation.height < -threshold || value.translation.height > threshold) && items.count > 1 {
                     // 上滑 / 下滑 → 当前卡放到最后，显示下一张
@@ -303,6 +263,61 @@ struct PetWalletStack: View {
                     }
                 }
             }
+    }
+}
+
+// MARK: - 钱包卡右侧可读性叠层（材质模糊 + 压暗；全幅绘制 + 软 mask，避免中间竖向硬分界）
+private struct WalletCardTrailingReadabilityOverlay: View {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    let width: CGFloat
+    let height: CGFloat
+
+    /// 控制叠层从左到右逐渐显现，与照片做长距离柔和过渡（非矩形裁切左缘）
+    private var edgeSoftMask: LinearGradient {
+        LinearGradient(
+            stops: [
+                .init(color: .clear, location: 0),
+                .init(color: .white.opacity(0.06), location: 0.34),
+                .init(color: .white.opacity(0.42), location: 0.48),
+                .init(color: .white.opacity(0.88), location: 0.66),
+                .init(color: .white, location: 1)
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
+
+    /// 压暗随横向连续加深，最暗在右缘（文案区），左侧与照片自然衔接
+    private var darkenGradient: LinearGradient {
+        LinearGradient(
+            stops: [
+                .init(color: .black.opacity(0), location: 0),
+                .init(color: .black.opacity(reduceTransparency ? 0.12 : 0.06), location: 0.38),
+                .init(color: .black.opacity(reduceTransparency ? 0.52 : 0.28), location: 0.72),
+                .init(color: .black.opacity(reduceTransparency ? 0.82 : 0.58), location: 1)
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
+
+    var body: some View {
+        ZStack {
+            if reduceTransparency {
+                Rectangle()
+                    .fill(Color(UIColor.systemBackground).opacity(0.94))
+            } else {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+            }
+            Rectangle()
+                .fill(darkenGradient)
+                .allowsHitTesting(false)
+        }
+        .frame(width: width, height: height)
+        .mask(edgeSoftMask)
+        .allowsHitTesting(false)
     }
 }
 
@@ -336,6 +351,7 @@ struct WalletPetCardFront: View {
             let avatarImage: UIImage? = pet.avatarImageData.flatMap { UIImage(data: $0) }
             let isTransparent = pet.avatarImageData.map { ImageCutoutService.isTransparentPNG($0) } ?? false
             let hasPopout = isTransparent && avatarImage != nil
+            let usesFullBleedPhoto = avatarImage != nil && !isTransparent
 
             ZStack {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -349,11 +365,25 @@ struct WalletPetCardFront: View {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(
                         LinearGradient(
-                            colors: [.clear, .black.opacity(0.22)],
+                            colors: [.clear, .black.opacity(usesFullBleedPhoto ? 0.12 : 0.22)],
                             startPoint: .top,
                             endPoint: .bottom
                         )
                     )
+
+                if let img = avatarImage, !isTransparent {
+                    ZStack {
+                        Image(uiImage: img)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: w, height: h)
+                            .clipped()
+                            .saturation(1.02)
+                            .contrast(1.03)
+                        WalletCardTrailingReadabilityOverlay(width: w, height: h)
+                    }
+                    .allowsHitTesting(false)
+                }
 
                 Text(headlineText)
                     .font(.system(size: WalletPetCardTheme.headlinePointSize(cardWidth: w, headlineCount: headlineText.count), weight: .black, design: .rounded))
@@ -366,11 +396,13 @@ struct WalletPetCardFront: View {
                     .frame(maxHeight: .infinity, alignment: .top)
                     .allowsHitTesting(false)
 
-                avatarLayer(avatarImage: avatarImage, isTransparent: hasPopout, w: w, h: h, cardTop: cardTop)
-                    .frame(width: w * 0.52, height: h)
-                    .clipped()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                    .allowsHitTesting(false)
+                if avatarImage == nil || hasPopout {
+                    avatarLayer(avatarImage: avatarImage, isTransparent: hasPopout, w: w, h: h, cardTop: cardTop)
+                        .frame(width: w * 0.52, height: h)
+                        .clipped()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                        .allowsHitTesting(false)
+                }
 
                 // ── 右半：信息列
                 VStack(alignment: .trailing, spacing: 5) {
@@ -467,32 +499,7 @@ struct WalletPetCardFront: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .shadow(color: .black.opacity(0.28), radius: 18, x: 0, y: 12)
             } else {
-                Image(uiImage: img)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: w * 0.52, height: h)
-                    .clipped()
-                    .saturation(1.02)
-                    .contrast(1.03)
-                    .mask(
-                        LinearGradient(
-                            stops: [
-                                .init(color: .black, location: 0.0),
-                                .init(color: .black, location: 0.65),
-                                .init(color: .clear, location: 1.0)
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .overlay {
-                        LinearGradient(
-                            colors: [.white.opacity(0.08), .clear, cardTop.opacity(0.35)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                        .blendMode(.screen)
-                    }
+                EmptyView()
             }
         } else {
             let species = pet.species.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -597,6 +604,7 @@ struct WalletPetCardDraftFront: View {
                 return avatarImageData.map { ImageCutoutService.isTransparentPNG($0) } ?? false
             }()
             let hasPopout = isTransparent && avatarImage != nil
+            let usesFullBleedPhoto = avatarImage != nil && !isTransparent
 
             ZStack {
                 MeshGradient(
@@ -612,11 +620,25 @@ struct WalletPetCardDraftFront: View {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(
                         LinearGradient(
-                            colors: [.clear, .black.opacity(0.22)],
+                            colors: [.clear, .black.opacity(usesFullBleedPhoto ? 0.12 : 0.22)],
                             startPoint: .top,
                             endPoint: .bottom
                         )
                     )
+
+                if let img = avatarImage, !isTransparent {
+                    ZStack {
+                        Image(uiImage: img)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: w, height: h)
+                            .clipped()
+                            .saturation(1.02)
+                            .contrast(1.03)
+                        WalletCardTrailingReadabilityOverlay(width: w, height: h)
+                    }
+                    .allowsHitTesting(false)
+                }
 
                 Text(headlineText)
                     .font(.system(size: WalletPetCardTheme.headlinePointSize(cardWidth: w, headlineCount: headlineText.count), weight: .black, design: .rounded))
@@ -629,11 +651,13 @@ struct WalletPetCardDraftFront: View {
                     .frame(maxHeight: .infinity, alignment: .top)
                     .allowsHitTesting(false)
 
-                draftAvatarLayer(avatarImage: avatarImage, isTransparent: hasPopout, w: w, h: h)
-                    .frame(width: w * 0.52, height: h)
-                    .clipped()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                    .allowsHitTesting(false)
+                if avatarImage == nil || hasPopout {
+                    draftAvatarLayer(avatarImage: avatarImage, isTransparent: hasPopout, w: w, h: h)
+                        .frame(width: w * 0.52, height: h)
+                        .clipped()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                        .allowsHitTesting(false)
+                }
 
                 VStack(alignment: .trailing, spacing: 5) {
                     Spacer()
@@ -690,34 +714,7 @@ struct WalletPetCardDraftFront: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .shadow(color: .black.opacity(0.28), radius: 18, x: 0, y: 12)
             } else {
-                // 非抠图：照片铺满左半区，右侧渐变淡出与卡面融合
-                Image(uiImage: img)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: w * 0.52, height: h)
-                    .clipped()
-                    .saturation(1.02)
-                    .contrast(1.03)
-                    .mask(
-                        LinearGradient(
-                            stops: [
-                                .init(color: .black, location: 0.0),
-                                .init(color: .black, location: 0.65),
-                                .init(color: .clear, location: 1.0)
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .overlay {
-                        LinearGradient(
-                            colors: [.white.opacity(0.08), .clear, cardGradientTop.opacity(0.35)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                        .blendMode(.screen)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                EmptyView()
             }
         } else {
             let sp = species.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -797,25 +794,17 @@ struct WalletHumanCardFront: View {
                     .padding(.top, 6)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-                // 头像
+                // 头像：非抠图时全幅铺满，右侧材质+压暗保证文案可读
                 if let data = human.avatarImageData, let img = UIImage(data: data) {
-                    Image(uiImage: img)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: w * 0.48, height: h)
-                        .clipped()
-                        .mask(
-                            LinearGradient(
-                                stops: [
-                                    .init(color: .black, location: 0.0),
-                                    .init(color: .black, location: 0.6),
-                                    .init(color: .clear, location: 1.0)
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    ZStack {
+                        Image(uiImage: img)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: w, height: h)
+                            .clipped()
+                        WalletCardTrailingReadabilityOverlay(width: w, height: h)
+                    }
+                    .allowsHitTesting(false)
                 } else {
                     Image(systemName: "person.fill")
                         .font(.system(size: 44, weight: .bold))
@@ -832,9 +821,38 @@ struct WalletHumanCardFront: View {
                         .foregroundStyle(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
-                    Text("岛民")
+                    Text(L10n.current.humanWalletResident)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(.white.opacity(0.6))
+                    let mbtiTrim = human.mbti.trimmingCharacters(in: .whitespaces)
+                    let isEn = AppLanguage.isEnglish
+                    let hasAgeOrZodiac = human.walletAgeChip(isEnglish: isEn) != nil || human.birthday != nil
+                    let hasMbti = !mbtiTrim.isEmpty
+                    if hasAgeOrZodiac || hasMbti {
+                        HStack(spacing: 6) {
+                            if let age = human.walletAgeChip(isEnglish: isEn) {
+                                Text(age)
+                                    .font(.system(size: 11, weight: .black, design: .rounded))
+                                    .foregroundStyle(.white.opacity(0.95))
+                                    .padding(.horizontal, 10).padding(.vertical, 4)
+                                    .background(Capsule().fill(.white.opacity(0.22)))
+                            }
+                            if let b = human.birthday {
+                                Text(Human.westernZodiacDisplay(for: b, isEnglish: isEn))
+                                    .font(.system(size: 11, weight: .black, design: .rounded))
+                                    .foregroundStyle(.white.opacity(0.95))
+                                    .padding(.horizontal, 10).padding(.vertical, 4)
+                                    .background(Capsule().fill(.white.opacity(0.22)))
+                            }
+                            if hasMbti {
+                                Text(mbtiTrim.uppercased())
+                                    .font(.system(size: 11, weight: .black, design: .rounded))
+                                    .foregroundStyle(.white.opacity(0.95))
+                                    .padding(.horizontal, 10).padding(.vertical, 4)
+                                    .background(Capsule().fill(.white.opacity(0.22)))
+                            }
+                        }
+                    }
                     // 条码
                     HStack(alignment: .bottom, spacing: 2) {
                         ForEach([14, 8, 12, 6, 10, 16, 5, 11, 9, 13], id: \.self) { bh in
@@ -854,6 +872,170 @@ struct WalletHumanCardFront: View {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
             )
+        }
+    }
+}
+
+// MARK: - Human Card Front (Wizard Draft — 与 `WalletHumanCardFront` 同构)
+/// 添加家庭成员向导顶部固定预览：与宠物 `WalletPetCardDraftFront` 相同比例与层次。
+struct WalletHumanCardDraftFront: View {
+    var name: String
+    var avatarEmoji: String
+    var avatarImageData: Data?
+    var decodedAvatar: UIImage?
+    var decodedAvatarTransparent: Bool
+    var themeColorHex: String
+    /// 阳历星座（有生日时由父视图传入）
+    var zodiacText: String? = nil
+    /// MBTI（可选，由父视图传入）
+    var mbtiText: String? = nil
+    /// 卡面底部一句摘要（关系 / 国籍 / 现居地 / 年龄等，由父视图拼好）
+    var subtitle: String
+    let cornerRadius: CGFloat
+
+    private var gradientTop: Color { WalletPetCardTheme.gradientPair(for: themeColorHex).0 }
+    private var gradientBottom: Color { WalletPetCardTheme.gradientPair(for: themeColorHex).1 }
+
+    private var headline: String {
+        let t = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.isEmpty { return "OHANA" }
+        return t.uppercased()
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let avatarImage: UIImage? = decodedAvatar ?? avatarImageData.flatMap { UIImage(data: $0) }
+            let isTransparent: Bool = {
+                if decodedAvatar != nil { return decodedAvatarTransparent }
+                return avatarImageData.map { ImageCutoutService.isTransparentPNG($0) } ?? false
+            }()
+            let hasPopout = isTransparent && avatarImage != nil
+            let usesFullBleedPhoto = avatarImage != nil && !isTransparent
+
+            ZStack {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [gradientTop, gradientBottom],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(Color.goTeal.opacity(0.12))
+                    .blendMode(.plusLighter)
+
+                Text(String(name.prefix(4)).uppercased())
+                    .font(.system(size: w * 0.2, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.white.opacity(0.22))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.2)
+                    .padding(.top, 6)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+                if let img = avatarImage, usesFullBleedPhoto {
+                    ZStack {
+                        Image(uiImage: img)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: w, height: h)
+                            .clipped()
+                        WalletCardTrailingReadabilityOverlay(width: w, height: h)
+                    }
+                    .allowsHitTesting(false)
+                }
+
+                if avatarImage == nil || hasPopout {
+                    draftHumanAvatar(avatarImage: avatarImage, isTransparent: hasPopout, w: w, h: h)
+                        .frame(width: w * 0.48, height: h)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                        .allowsHitTesting(false)
+                }
+
+                VStack(alignment: .trailing, spacing: 6) {
+                    Spacer()
+                    Text(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? L10n.current.humanWalletNewMember : name)
+                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                    Text(L10n.current.humanWalletResident)
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.62))
+                    if (zodiacText?.isEmpty == false) || (mbtiText?.isEmpty == false) {
+                        HStack(spacing: 6) {
+                            if let zodiacText, !zodiacText.isEmpty {
+                                Text(zodiacText)
+                                    .font(.system(size: 11, weight: .black, design: .rounded))
+                                    .foregroundStyle(.white.opacity(0.95))
+                                    .padding(.horizontal, 10).padding(.vertical, 4)
+                                    .background(Capsule().fill(.white.opacity(0.22)))
+                            }
+                            if let mbtiText, !mbtiText.isEmpty {
+                                Text(mbtiText.uppercased())
+                                    .font(.system(size: 11, weight: .black, design: .rounded))
+                                    .foregroundStyle(.white.opacity(0.95))
+                                    .padding(.horizontal, 10).padding(.vertical, 4)
+                                    .background(Capsule().fill(.white.opacity(0.22)))
+                            }
+                        }
+                    }
+                    Text(subtitle.isEmpty ? L10n.current.humanWalletSubtitlePlaceholder : subtitle)
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.72))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.trailing)
+                        .minimumScaleFactor(0.75)
+                    HStack(alignment: .bottom, spacing: 2) {
+                        ForEach([14, 8, 12, 6, 10, 16, 5, 11, 9, 13], id: \.self) { bh in
+                            RoundedRectangle(cornerRadius: 1.2)
+                                .fill(.white.opacity(0.85))
+                                .frame(width: 2, height: CGFloat(bh))
+                        }
+                    }
+                    .padding(.top, 6)
+                }
+                .padding(.trailing, 16)
+                .padding(.bottom, 16)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func draftHumanAvatar(avatarImage: UIImage?, isTransparent: Bool, w: CGFloat, h: CGFloat) -> some View {
+        if let img = avatarImage {
+            if isTransparent {
+                ZStack(alignment: .bottom) {
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFit()
+                        .scaleEffect(0.88)
+                        .colorMultiply(.white)
+                        .shadow(color: .white, radius: 0, x: 2, y: 0)
+                        .shadow(color: .white, radius: 0, x: -2, y: 0)
+                        .shadow(color: .white, radius: 0, x: 0, y: -2)
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFit()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .shadow(color: .black.opacity(0.28), radius: 18, x: 0, y: 12)
+            } else {
+                EmptyView()
+            }
+        } else {
+            Text(avatarEmoji)
+                .font(.system(size: 52))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                .padding(.leading, w * 0.06)
         }
     }
 }

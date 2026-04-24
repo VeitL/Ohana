@@ -27,6 +27,9 @@ struct ArkCrewIDCardView: View {
     @State private var cardScale: CGFloat = 1.0
     @State private var cardRotation: Double = 0
 
+    @AppStorage("appLanguage") private var appLanguage = "zh"
+    private var l: L10n { L10n(appLanguage) }
+
     private var flipped: Bool {
         isFlipped?.wrappedValue ?? _isFlipped
     }
@@ -147,7 +150,7 @@ struct ArkCrewIDCardView: View {
             // 右半：文字信息列
             VStack(alignment: .trailing, spacing: 5) {
                 if pet.currentStreak > 1 {
-                    Text("🔥 \(pet.currentStreak)天连续")
+                    Text(l.petCardStreak(pet.currentStreak))
                         .font(.system(size: 10, weight: .black, design: .rounded))
                         .foregroundStyle(.black)
                         .padding(.horizontal, 9)
@@ -163,7 +166,7 @@ struct ArkCrewIDCardView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
 
-                Text("Days Together")
+                Text(l.petCardDaysTogetherCaption)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.92))
 
@@ -290,7 +293,7 @@ struct ArkCrewIDCardView: View {
     private var posterDetailButton: some View {
         Button(action: onDetail) {
             HStack(spacing: 4) {
-                Text("详情")
+                Text(l.petCardDetail)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                 Image(systemName: "arrow.up.right")
                     .font(.system(size: 9, weight: .bold))
@@ -389,7 +392,7 @@ struct ArkCrewIDCardView: View {
                             Text("\(pet.daysTogether)")
                                 .font(.system(size: 28, weight: .black, design: .rounded))
                                 .foregroundStyle(tc)
-                            Text("天")
+                            Text(l.petCardDayUnit)
                                 .font(.system(size: 10, weight: .bold, design: .rounded))
                                 .foregroundStyle(tc.opacity(0.6))
                         }
@@ -672,7 +675,7 @@ struct ArkCrewIDCardView: View {
             // 相伴天数 — "一起度过了xx天"
             if pet.daysTogether > 0 {
                 VStack(alignment: .trailing, spacing: 0) {
-                    Text("一起度过了")
+                    Text(l.petCardTogetherPrefix)
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(tc.opacity(0.55))
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
@@ -680,7 +683,7 @@ struct ArkCrewIDCardView: View {
                             .font(.system(size: 38, weight: .black, design: .rounded))
                             .foregroundStyle(tc)
                             .lineLimit(1).minimumScaleFactor(0.5)
-                        Text("天")
+                        Text(l.petCardDayUnit)
                             .font(.system(size: 12, weight: .bold, design: .rounded))
                             .foregroundStyle(tc.opacity(0.6))
                     }
@@ -707,7 +710,7 @@ struct ArkCrewIDCardView: View {
 
             // 连续打卡 streak
             if pet.currentStreak > 1 {
-                Text("🔥 \(pet.currentStreak)天连续")
+                Text(l.petCardStreak(pet.currentStreak))
                     .font(.system(size: 9, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goPrimary)
                     .padding(.horizontal, 8).padding(.vertical, 3)
@@ -724,7 +727,7 @@ struct ArkCrewIDCardView: View {
     private var detailButton: some View {
         Button(action: onDetail) {
             HStack(spacing: 4) {
-                Text("详情").font(.system(size: 11, weight: .bold, design: .rounded))
+                Text(l.petCardDetail).font(.system(size: 11, weight: .bold, design: .rounded))
                 Image(systemName: "arrow.up.right").font(.system(size: 9, weight: .bold))
             }
             .foregroundStyle(cardTextColor.opacity(0.85))
@@ -766,7 +769,7 @@ struct ArkCrewIDCardView: View {
                 Text("✨")
                     .font(.system(size: 36))
                     .shadow(color: .white.opacity(0.8), radius: 10, x: 0, y: 0)
-                Text("化作星星，守护着你")
+                Text(l.petCardRainbowTitle)
                     .font(.system(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(.white.opacity(0.95))
                 if let d = pet.passedAwayDate {
@@ -774,7 +777,7 @@ struct ArkCrewIDCardView: View {
                     Text(d.formatted(.dateTime.year().month().day()))
                         .font(.system(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(.white.opacity(0.55))
-                    Text("相伴 \(pet.daysTogetherAtPassing) 天" + (years > 0 ? " · 离开 \(years) 年" : ""))
+                    Text(l.petCardRainbowTogether(days: pet.daysTogetherAtPassing, yearsApart: years))
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(.white.opacity(0.8))
                 }
@@ -812,28 +815,7 @@ struct ArkCrewIDCardView: View {
         let petAge = pet.ageText  // e.g. "1岁" / "3岁"
         let isFemale = pet.gender == "female"
         let prefix = petAge.isEmpty ? "" : "\(petAge) | "
-        let title: String
-        switch humanAge {
-        case 0..<3:
-            title = "👶 相当于人类宝宝 \(humanAge) 岁"
-        case 3..<8:
-            title = "🎠 相当于 \(humanAge) 岁的\(isFemale ? "小公主" : "小男孩")"
-        case 8..<13:
-            title = "🎒 相当于 \(humanAge) 岁的\(isFemale ? "萌妹" : "小大人")"
-        case 13..<18:
-            title = "🌱 相当于 \(humanAge) 岁的\(isFemale ? "少女" : "少男")"
-        case 18..<25:
-            title = "🔥 相当于 \(humanAge) 岁的\(isFemale ? "活力少女" : "鲜肉小哥")"
-        case 25..<35:
-            title = "💼 相当于 \(humanAge) 岁的\(isFemale ? "独立美女" : "稳重帅哥")"
-        case 35..<50:
-            title = "🌟 相当于 \(humanAge) 岁的\(isFemale ? "优雅女士" : "成熟大叔")"
-        case 50..<65:
-            title = "👑 相当于 \(humanAge) 岁的\(isFemale ? "典雅长辈" : "稳重前辈")"
-        default:
-            title = "🧓 相当于人类 \(humanAge) 岁的长者"
-        }
-        return prefix + title
+        return prefix + l.petCardHumanEquivBody(humanAge: humanAge, isFemale: isFemale)
     }
     
     private func goStatPill(value: String, label: String) -> some View {
@@ -875,7 +857,7 @@ struct ArkCrewIDCardView: View {
                     Image(systemName: "figure.walk")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(Color.goPrimary)
-                    Text("巡岛中")
+                    Text(l.petCardWalkPatrolling)
                         .font(.system(size: 11, weight: .black, design: .rounded))
                         .tracking(1)
                         .foregroundStyle(.white.opacity(0.6))
@@ -896,11 +878,11 @@ struct ArkCrewIDCardView: View {
             HStack(spacing: 0) {
                 walkStatCell(
                     value: String(format: "%.2f", LocationManager.shared.totalDistance / 1000),
-                    unit: "km", label: "巡岛距离", accent: .goTeal)
+                    unit: "km", label: l.petCardWalkDistanceLabel, accent: .goTeal)
                 Divider().frame(height: 36).opacity(0.15)
                 walkStatCell(
                     value: "\(mgr.poopCount)",
-                    unit: "💩", label: "便便次数", accent: .goYellow)
+                    unit: "💩", label: l.petCardWalkPoopLabel, accent: .goYellow)
             }
             .padding(.horizontal, 20).padding(.vertical, 10)
 
@@ -914,7 +896,7 @@ struct ArkCrewIDCardView: View {
                         mgr.pause()
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
-                        Label("暂停", systemImage: "pause.fill")
+                        Label(l.petCardPause, systemImage: "pause.fill")
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(.black)
                             .frame(maxWidth: .infinity).padding(.vertical, 12)
@@ -925,7 +907,7 @@ struct ArkCrewIDCardView: View {
                         mgr.resume()
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
-                        Label("继续", systemImage: "play.fill")
+                        Label(l.petCardResume, systemImage: "play.fill")
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(.black)
                             .frame(maxWidth: .infinity).padding(.vertical, 12)
@@ -938,7 +920,7 @@ struct ArkCrewIDCardView: View {
                     mgr.stop(modelContext: modelContext, household: cardHouseholds.first)
                     UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                 } label: {
-                    Label("结束", systemImage: "stop.fill")
+                    Label(l.petCardEndWalk, systemImage: "stop.fill")
                         .font(.system(size: 14, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity).padding(.vertical, 12)
@@ -1049,7 +1031,7 @@ struct ArkCrewIDCardView: View {
                         Spacer()
                         Button(action: onDetail) {
                             HStack(spacing: 4) {
-                                Text("详情")
+                                Text(l.petCardDetail)
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundStyle(.primary.opacity(0.75))
                                 Image(systemName: "arrow.up.right")
@@ -1580,15 +1562,7 @@ struct ArkCrewIDCardView: View {
         guard let last = lastVaccine,
               let due = Calendar.current.date(byAdding: .year, value: 1, to: last.date) else { return "--" }
         let days = Calendar.current.dateComponents([.day], from: Date(), to: due).day ?? 0
-        if days < 0 {
-            let overdue = abs(days)
-            if overdue >= 30 { return "逾期\(overdue / 30)月" }
-            return "逾期\(overdue)天"
-        }
-        if days == 0 { return "今天" }
-        if days < 30  { return "\(days)天后" }
-        if days < 365 { return "\(days / 30)个月后" }
-        return "\(days / 365)年后"
+        return l.petCardVaccineCountdown(daysUntilDue: days)
     }
     
     private var nextVaccineDaysColor: Color {

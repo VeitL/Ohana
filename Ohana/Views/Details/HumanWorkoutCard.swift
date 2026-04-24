@@ -101,30 +101,22 @@ struct HumanWorkoutCard: View {
 
             GoDashedDivider().padding(.horizontal, 16)
 
-            // 🚧 占位 UI：Apple Health 同步待开发
-            VStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    Image(systemName: "hammer.fill")
-                        .font(OhanaFont.callout())
-                        .foregroundStyle(.primary.opacity(0.4))
-                    Text("🚧 Apple Health 接入中")
-                        .font(OhanaFont.subheadline(.medium))
-                        .foregroundStyle(.primary.opacity(0.5))
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(
-                    Color.white.opacity(0.03),
-                    in: RoundedRectangle(cornerRadius: 12)
-                )
-                .padding(.horizontal, 16)
-                
-                Text("手动记录功能正常使用")
-                    .font(OhanaFont.caption())
-                    .foregroundStyle(.primary.opacity(0.3))
-                    .padding(.horizontal, 16)
+            // 本月运动统计
+            let monthStart = Calendar.current.date(
+                from: Calendar.current.dateComponents([.year, .month], from: Date())) ?? Date()
+            let monthLogs = human.workoutLogs.filter { $0.date >= monthStart }
+            let totalMinutes = monthLogs.reduce(0) { $0 + $1.durationMinutes }
+            let totalKm = monthLogs.reduce(0.0) { $0 + $1.distanceKm }
+
+            HStack(spacing: 0) {
+                workoutStatCell(value: "\(monthLogs.count)", label: "本月次数", color: .goPrimary)
+                Rectangle().fill(Color.black.opacity(0.06)).frame(width: 1, height: 32)
+                workoutStatCell(value: "\(totalMinutes)", label: "总分钟", color: .goCardCyan)
+                Rectangle().fill(Color.black.opacity(0.06)).frame(width: 1, height: 32)
+                workoutStatCell(value: String(format: "%.1f", totalKm), label: "总公里", color: .goOrange)
             }
-            .padding(.vertical, 8)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
 
             GoDashedDivider().padding(.horizontal, 16)
 
@@ -135,7 +127,7 @@ struct HumanWorkoutCard: View {
                 recentLogsSection
             }
         }
-        .ohanaStandardCard(cornerRadius: 20)
+        .goIslandModuleCard(cornerRadius: 20)
         .overlay(alignment: .top) {
             if toastVisible {
                 rewardToastBanner
@@ -251,6 +243,18 @@ struct HumanWorkoutCard: View {
         .padding(.horizontal, 16).padding(.vertical, 10)
     }
 
+    private func workoutStatCell(value: String, label: String, color: Color) -> some View {
+        VStack(spacing: 3) {
+            Text(value)
+                .font(OhanaFont.title3(.black))
+                .foregroundStyle(color)
+            Text(label)
+                .font(OhanaFont.caption2())
+                .foregroundStyle(.primary.opacity(0.45))
+        }
+        .frame(maxWidth: .infinity)
+    }
+
     private var emptyState: some View {
         VStack(spacing: 8) {
             Image(systemName: "figure.run.circle")
@@ -318,7 +322,7 @@ struct AddWorkoutSheet: View {
                                 }
                             }
                         }
-                        .padding(16).ohanaStandardCard(cornerRadius: 20)
+                        .padding(16).goIslandModuleCard(cornerRadius: 20)
 
                         // 时长/距离/卡路里
                         VStack(spacing: 12) {
@@ -326,7 +330,7 @@ struct AddWorkoutSheet: View {
                             workoutField(icon: "map", label: "距离（公里，可选）", placeholder: "0.0", text: $distanceStr, color: .goCardCyan)
                             workoutField(icon: "flame", label: "卡路里（可选）", placeholder: "0", text: $caloriesStr, color: .goOrange)
                         }
-                        .padding(16).ohanaStandardCard(cornerRadius: 20)
+                        .padding(16).goIslandModuleCard(cornerRadius: 20)
 
                         // 日期
                         HStack {
@@ -342,7 +346,7 @@ struct AddWorkoutSheet: View {
                                 .tint(Color.goPrimary)
                                 .labelsHidden()
                         }
-                        .padding(16).ohanaStandardCard(cornerRadius: 20)
+                        .padding(16).goIslandModuleCard(cornerRadius: 20)
                     }
                     .padding(.horizontal, 16).padding(.vertical, 8)
                 }
@@ -480,7 +484,7 @@ struct HumanWorkoutHistoryView: View {
             summaryCell(value: String(format: "%.1f", sortedLogs.reduce(0) { $0 + $1.distanceKm }), label: "总公里", color: .goOrange)
         }
         .padding(.vertical, 14)
-        .ohanaStandardCard(cornerRadius: 20)
+        .goIslandModuleCard(cornerRadius: 20)
     }
 
     private func summaryCell(value: String, label: String, color: Color) -> some View {
@@ -544,7 +548,7 @@ struct HumanWorkoutHistoryView: View {
                     }
                 }
             }
-            .ohanaStandardCard(cornerRadius: 20)
+            .goIslandModuleCard(cornerRadius: 20)
             .padding(.horizontal, 16)
         }
     }

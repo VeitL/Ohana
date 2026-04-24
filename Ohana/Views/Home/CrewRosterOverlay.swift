@@ -26,7 +26,7 @@ struct CrewRosterOverlay: View {
     @State private var isSearchActive = false
     @State private var showingAddEntity = false
     @State private var showingCoconutLog = false
-    @AppStorage("appUIStyle") private var appUIStyle: String = "classic"
+    @AppStorage("appUIStyle") private var appUIStyle: String = "go"
     @Environment(\.colorScheme) private var colorScheme
 
     private var isMaterial: Bool { appUIStyle == "material" }

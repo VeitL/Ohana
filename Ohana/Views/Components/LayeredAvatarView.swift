@@ -250,6 +250,7 @@ private struct PetSilhouetteIcon: View {
         case "狗":   return "dog.fill"
         case "猫":   return "cat.fill"
         case "兔子": return "hare.fill"
+        case "仓鼠": return "circle.fill"
         case "鸟":   return "bird.fill"
         default:     return "pawprint.fill"
         }

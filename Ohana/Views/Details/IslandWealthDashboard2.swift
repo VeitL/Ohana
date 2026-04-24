@@ -2,7 +2,7 @@
 //  IslandWealthDashboard2.swift
 //  Ohana
 //
-//  欧哈纳财富中心 — 沉浸式深色背景 + 底部 #F2F0F5 悬浮卡片
+//  欧哈纳财富中心 — 全页可滚动，收支分开展示
 //
 
 import SwiftUI
@@ -17,156 +17,228 @@ struct IslandWealthDashboardView: View {
     @Query(sort: \Pet.name) private var pets: [Pet]
     @Query(sort: \Human.name) private var humans: [Human]
 
-    // 宠物 id → 主题色 映射（传给 ViewModel）
     private var petColorMap: [String: Color] {
         Dictionary(uniqueKeysWithValues: pets.map { ($0.id.uuidString, Color(hex: $0.themeColorHex)) })
     }
 
+    private var safeTop: CGFloat {
+        (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
+            .keyWindow?.safeAreaInsets.top ?? 52
+    }
+    private var navBarHeight: CGFloat { safeTop + 56 }
+
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // ── L0: 全屏深色背景 ──────────────────────────────────────
-            ArkBackgroundView()
-                .ignoresSafeArea()
+        ZStack {
+            ArkBackgroundView().ignoresSafeArea()
 
-            // ── L1: 图表区（上半屏） ──────────────────────────────────
-            VStack(spacing: 0) {
-                chartArea
-                    .padding(.top, 120)
-                Spacer()
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 16) {
+                    // 顶部 navBar 占位
+                    Spacer().frame(height: navBarHeight)
+
+                    // 全岛总资产
+                    totalAssetsRow
+
+                    // 时间筛选
+                    timePicker
+
+                    // 收支汇总两格
+                    incomeVsSpendingRow
+
+                    // 图表
+                    if vm.chartBars.isEmpty && vm.spendingBars.isEmpty {
+                        emptyChart
+                    } else {
+                        chartSection
+                    }
+
+                    // 排行榜
+                    leaderboardSection
+
+                    Spacer().frame(height: 40)
+                }
+                .padding(.horizontal, 20)
             }
-
-            // ── L2: 底部悬浮卡片（左右下布满屏幕，无边距）──────────────────────────
-            bottomCard
-                .ignoresSafeArea(edges: .bottom)
-                .onAppear {
-                    vm.pets = pets; vm.humans = humans
-                    vm.petColorMap = petColorMap
-                }
-                .onChange(of: pets.count) {
-                    vm.pets = pets; vm.humans = humans
-                    vm.petColorMap = petColorMap
-                }
-                .onChange(of: humans.count) {
-                    vm.pets = pets; vm.humans = humans
-                    vm.petColorMap = petColorMap
-                }
         }
         .navigationBarHidden(true)
-        .overlay(alignment: .topLeading) { navBar }
+        .overlay(alignment: .top) { navBar }
         .sheet(isPresented: $showingCoconutLog) { CoconutLogView() }
+        .onAppear   { syncVM() }
+        .onChange(of: pets.count)   { syncVM() }
+        .onChange(of: humans.count) { syncVM() }
     }
 
-    // MARK: - Floating Nav Bar
+    private func syncVM() {
+        vm.pets = pets; vm.humans = humans; vm.petColorMap = petColorMap
+    }
+
+    // MARK: - Nav Bar
+
     private var navBar: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 36, height: 36)
-                        .background(.white.opacity(0.12), in: Circle())
-                }
-                Spacer()
-                Text("Ohana财富")
-                    .font(.system(size: 17, weight: .black, design: .rounded))
+        HStack {
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.primary)
-                Spacer()
-                // 系统椰子过滤开关
-                Button {
-                    withAnimation(.spring(response: 0.3)) {
-                        vm.showSystemCoconuts.toggle()
-                    }
-                } label: {
-                    Image(systemName: vm.showSystemCoconuts ? "gearshape.fill" : "gearshape")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(vm.showSystemCoconuts ? Color.goPrimary : .primary.opacity(0.4))
-                        .frame(width: 36, height: 36)
-                        .background(.white.opacity(0.12), in: Circle())
-                }
-                .buttonStyle(.plain)
-                CoconutBalanceCapsule { showingCoconutLog = true }
+                    .frame(width: 36, height: 36)
+                    .background(.white.opacity(0.12), in: Circle())
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 56)
-            .padding(.bottom, 12)
+            Spacer()
+            Text("Ohana财富")
+                .font(.system(size: 17, weight: .black, design: .rounded))
+                .foregroundStyle(.primary)
+            Spacer()
+            Button {
+                withAnimation(.spring(response: 0.3)) { vm.showSystemCoconuts.toggle() }
+            } label: {
+                Image(systemName: vm.showSystemCoconuts ? "gearshape.fill" : "gearshape")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(vm.showSystemCoconuts ? Color.goPrimary : .primary.opacity(0.4))
+                    .frame(width: 36, height: 36)
+                    .background(.white.opacity(0.12), in: Circle())
+            }
+            .buttonStyle(.plain)
+            CoconutBalanceCapsule { showingCoconutLog = true }
         }
+        .padding(.horizontal, 20)
+        .padding(.top, safeTop + 8)
+        .padding(.bottom, 12)
         .background(.ultraThinMaterial.opacity(0.01))
     }
 
-    // MARK: - Chart Area
-    private var chartArea: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // 时间 filter
-            Picker("", selection: $vm.timeRange) {
-                ForEach(WealthTimeRange.allCases) { r in
-                    Text(r.rawValue).tag(r)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 4)
+    // MARK: - Total Assets
 
-            if vm.chartBars.isEmpty {
-                emptyChart
-            } else {
-                stackedBarChart
-            }
+    private var totalAssetsRow: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text("全岛")
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.goPrimary.opacity(0.7))
+            Text("\(vm.totalAssets)")
+                .font(.system(size: 52, weight: .black, design: .rounded))
+                .foregroundStyle(.primary)
+                .contentTransition(.numericText())
+                .animation(.spring(response: 0.4), value: vm.totalAssets)
+            Text("🥥")
+                .font(.system(size: 30))
         }
-        .frame(height: 260)
-        .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 4)
     }
 
-    // 堆叠柱状图（根据 timeRange 静态选择 unit，防止动态传入 Calendar.Component 导致 fatal error）
-    @ViewBuilder
-    private var stackedBarChart: some View {
-        switch vm.timeRange {
-        case .day:
-            barChart(unit: .hour, format: .dateTime.hour())
-        case .week:
-            barChart(unit: .day,  format: .dateTime.weekday(.abbreviated))
-        case .month:
-            barChart(unit: .day,  format: .dateTime.day())
-        case .all:
-            barChart(unit: .month, format: .dateTime.month(.abbreviated))
+    // MARK: - Time Picker
+
+    private var timePicker: some View {
+        Picker("", selection: $vm.timeRange) {
+            ForEach(WealthTimeRange.allCases) { r in
+                Text(r.rawValue).tag(r)
+            }
         }
+        .pickerStyle(.segmented)
+    }
+
+    // MARK: - Income vs Spending Row
+
+    private var incomeVsSpendingRow: some View {
+        HStack(spacing: 12) {
+            summaryCell(
+                label: "本期收入",
+                value: "+\(vm.periodIncome)",
+                valueColor: Color.goLime,
+                icon: "arrow.down.circle.fill"
+            )
+            summaryCell(
+                label: "本期花费",
+                value: vm.periodSpending > 0 ? "-\(vm.periodSpending)" : "本期无花费",
+                valueColor: vm.periodSpending > 0 ? Color.goRed : .primary.opacity(0.35),
+                icon: "arrow.up.circle.fill"
+            )
+        }
+    }
+
+    private func summaryCell(label: String, value: String, valueColor: Color, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(valueColor.opacity(0.7))
+                Text(label)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.primary.opacity(0.5))
+            }
+            Text(value)
+                .font(.system(size: 22, weight: .black, design: .rounded))
+                .foregroundStyle(valueColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text("🥥")
+                .font(.system(size: 16))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: - Chart
+
+    private var chartSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            switch vm.timeRange {
+            case .day:   barChart(unit: .hour,  format: .dateTime.hour())
+            case .week:  barChart(unit: .day,   format: .dateTime.weekday(.abbreviated))
+            case .month: barChart(unit: .day,   format: .dateTime.day())
+            case .all:   barChart(unit: .month, format: .dateTime.month(.abbreviated))
+            }
+        }
+        .padding(16)
+        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func barChart(unit: Calendar.Component, format: Date.FormatStyle) -> some View {
-        let stridedUnit: Calendar.Component = unit
         let names  = vm.chartEntityNames
         let colors = vm.chartEntityColors
-        return Chart(vm.chartBars) { bar in
-            BarMark(
-                x: .value("时间", bar.bucket, unit: stridedUnit),
-                y: .value("椰子", bar.amount),
-                width: .ratio(0.55)
-            )
-            .foregroundStyle(by: .value("成员", bar.entityName))
-            .cornerRadius(5)
-        }
-        .chartForegroundStyleScale(
-            domain: names,
-            range: colors
-        )
-        .padding(.horizontal, 24)
-        .padding(.top, 20)
-        .chartXAxis {
-            AxisMarks(preset: .aligned, values: .stride(by: stridedUnit)) { _ in
-                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
-                    .foregroundStyle(.primary.opacity(0.1))
-                AxisValueLabel(format: format)
-                    .foregroundStyle(.primary.opacity(0.55))
-                    .font(.system(size: 10))
+        return VStack(alignment: .leading, spacing: 8) {
+            Chart {
+                ForEach(vm.chartBars) { bar in
+                    BarMark(
+                        x: .value("时间", bar.bucket, unit: unit),
+                        y: .value("椰子", bar.amount),
+                        width: .ratio(0.45)
+                    )
+                    .foregroundStyle(by: .value("成员", bar.entityName))
+                    .cornerRadius(4)
+                }
+                ForEach(vm.spendingBars) { bar in
+                    BarMark(
+                        x: .value("时间", bar.bucket, unit: unit),
+                        y: .value("椰子", bar.amount),
+                        width: .ratio(0.2)
+                    )
+                    .foregroundStyle(Color.goRed.opacity(0.75))
+                    .cornerRadius(4)
+                }
             }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { _ in
-                AxisGridLine().foregroundStyle(.primary.opacity(0.07))
-                AxisValueLabel().foregroundStyle(.primary.opacity(0.5))
-                    .font(.system(size: 10))
+            .chartForegroundStyleScale(domain: names, range: colors)
+            .frame(height: 200)
+            .chartXAxis {
+                AxisMarks(preset: .aligned, values: .stride(by: unit)) { _ in
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
+                        .foregroundStyle(.primary.opacity(0.1))
+                    AxisValueLabel(format: format)
+                        .foregroundStyle(.primary.opacity(0.55))
+                        .font(.system(size: 10))
+                }
             }
-        }
-        .chartLegend(position: .bottom, alignment: .leading, spacing: 6) {
+            .chartYAxis {
+                AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { _ in
+                    AxisGridLine().foregroundStyle(.primary.opacity(0.07))
+                    AxisValueLabel().foregroundStyle(.primary.opacity(0.5))
+                        .font(.system(size: 10))
+                }
+            }
+            .chartLegend(.hidden)
+
+            // 图例（收入成员 + 花费）
             legendView
         }
     }
@@ -183,10 +255,19 @@ struct IslandWealthDashboardView: View {
                         .lineLimit(1)
                 }
             }
+            if !vm.spendingBars.isEmpty {
+                HStack(spacing: 4) {
+                    Circle().fill(Color.goRed.opacity(0.75)).frame(width: 7, height: 7)
+                    Text("花费")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.primary.opacity(0.6))
+                }
+            }
+            Spacer()
         }
     }
 
-    // 空状态
+    // 空图表
     private var emptyChart: some View {
         VStack(spacing: 12) {
             Text("🥥")
@@ -196,37 +277,14 @@ struct IslandWealthDashboardView: View {
                 .foregroundStyle(.primary.opacity(0.5))
         }
         .frame(maxWidth: .infinity)
+        .padding(.vertical, 32)
+        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    // MARK: - Bottom Card
-    private var bottomCard: some View {
+    // MARK: - Leaderboard
+
+    private var leaderboardSection: some View {
         VStack(spacing: 0) {
-            // 拖拽条
-            Capsule()
-                .fill(Color.black.opacity(0.15))
-                .frame(width: 36, height: 4)
-                .padding(.top, 12)
-
-            // 全岛总资产（大数字）
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("全岛")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.goPrimary.opacity(0.7))
-                Text("\(vm.totalAssets)")
-                    .font(.system(size: 52, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
-                    .contentTransition(.numericText())
-                    .animation(.spring(response: 0.4), value: vm.totalAssets)
-                Text("🥥")
-                    .font(.system(size: 30))
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 24)
-            .padding(.bottom, 16)
-
-            Divider().padding(.horizontal, 24)
-
-            // 排行榜
             if vm.leaderboard.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "trophy")
@@ -236,27 +294,28 @@ struct IslandWealthDashboardView: View {
                         .font(.system(size: 13, weight: .medium, design: .rounded))
                         .foregroundStyle(.primary.opacity(0.5))
                 }
+                .frame(maxWidth: .infinity)
                 .padding(.vertical, 32)
+                .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             } else {
-                ScrollView(showsIndicators: false) {
+                VStack(spacing: 10) {
+                    HStack {
+                        Text("财富榜")
+                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .foregroundStyle(.primary.opacity(0.5))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.bottom, 2)
+
                     LazyVStack(spacing: 10) {
                         ForEach(Array(vm.leaderboard.enumerated()), id: \.element.id) { idx, row in
                             leaderRow(rank: idx + 1, row: row)
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 14)
                 }
-                .frame(maxHeight: 280)
             }
-
-                Spacer(minLength: 0).frame(height: 40)
         }
-        .background(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(.white.opacity(0.09))
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 
     // MARK: - Leader Row
@@ -264,7 +323,6 @@ struct IslandWealthDashboardView: View {
         let accent = vm.color(for: row.entityId)
         let isFirst = rank == 1
         return HStack(spacing: 12) {
-            // Rank badge
             ZStack {
                 Circle()
                     .fill(rank == 1 ? Color.goPrimary :
@@ -277,7 +335,6 @@ struct IslandWealthDashboardView: View {
                     .foregroundStyle(rank <= 3 ? Color.arkInk : .white.opacity(0.6))
             }
 
-            // Avatar (第一名加发光边框)
             ZStack {
                 if isFirst {
                     Circle()
@@ -295,7 +352,6 @@ struct IslandWealthDashboardView: View {
             }
             .frame(width: 44, height: 44)
 
-            // Name + 进度条
             VStack(alignment: .leading, spacing: 4) {
                 Text(row.name)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
@@ -314,7 +370,6 @@ struct IslandWealthDashboardView: View {
 
             Spacer(minLength: 8)
 
-            // Amount
             Text("\(row.amount)🥥")
                 .font(.system(size: 13, weight: .black, design: .rounded))
                 .foregroundStyle(.primary)
@@ -325,7 +380,6 @@ struct IslandWealthDashboardView: View {
         .padding(.vertical, 10)
         .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
-
 }
 
 #Preview {

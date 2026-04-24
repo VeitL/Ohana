@@ -31,6 +31,7 @@ struct ShopItem: Identifiable {
 struct CoconutShopView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @AppStorage("purchasedShopItems") private var purchasedRaw: String = ""
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
@@ -45,6 +46,11 @@ struct CoconutShopView: View {
     @State private var showEquipPopout = false
     @State private var showPetPickerForPopout = false
     @State private var equipPopoutPet: Pet? = nil
+
+    // MARK: - 深浅色文字（UIRules）
+    private var primaryText: Color { colorScheme == .dark ? .white : .black }
+    private var secondaryText: Color { colorScheme == .dark ? .white.opacity(0.72) : .black.opacity(0.58) }
+    private var tertiaryText: Color { colorScheme == .dark ? .white.opacity(0.45) : .black.opacity(0.4) }
 
     private struct ConfettiDrop: Identifiable {
         let id = UUID()
@@ -68,7 +74,7 @@ struct CoconutShopView: View {
             ShopItem(id: "title_pioneer",  emoji: "🚀", name: "先行者",     description: "称号 · 解锁岛屿探索徽章",                  cost: 150, category: .title_),
             ShopItem(id: "title_chef",     emoji: "👨‍🍳", name: "首席厨师",   description: "称号 · 喂食打卡额外 +1🥥",               cost: 200, category: .title_),
             ShopItem(id: "boost_double",        emoji: "⚡️", name: "双倍椰子券",   description: "下次打卡奖励 ×2（单次有效）",          cost: 30,  category: .boost, isConsumable: true),
-            ShopItem(id: "boost_streak",        emoji: "�️", name: "Streak 保护盾", description: "漏打卡 1 天不断 Streak（24 小时有效）",  cost: 50,  category: .boost, isConsumable: true),
+            ShopItem(id: "boost_streak",        emoji: "🛡️", name: "Streak 保护盾", description: "漏打卡 1 天不断 Streak（24 小时有效）",  cost: 50,  category: .boost, isConsumable: true),
             ShopItem(id: "boost_tree",          emoji: "🌳", name: "生命树加速",   description: "立即为生命之树注入 30 点额外能量",        cost: 25,  category: .boost, isConsumable: true),
             ShopItem(id: "boost_backdate_pack", emoji: "📅", name: "补打卡包",     description: "获得 3 张昨日补打卡券，放入物品栏",      cost: 120, category: .boost, isConsumable: true),
             ShopItem(id: "boost_cooldown_reset",emoji: "⏱️", name: "冷却重置券",   description: "立即重置指定宠物所有打卡冷却（单次有效）", cost: 80,  category: .boost, isConsumable: true),
@@ -88,7 +94,8 @@ struct CoconutShopView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(hex: "060E24").ignoresSafeArea()
+                ArkBackgroundView()
+                    .ignoresSafeArea()
 
                 // 庆典粒子
                 ForEach(confettiItems) { c in
@@ -124,13 +131,20 @@ struct CoconutShopView: View {
             }
             .navigationTitle("椰子商店")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("关闭") { dismiss() }
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text("关闭")
+                            .font(OhanaFont.body(.semibold))
+                            .foregroundStyle(Color.goPrimary)
+                    }
                 }
             }
         }
+        .tint(Color.goPrimary)
         .alert("确认兑换", isPresented: $showPurchaseAlert, presenting: pendingItem) { item in
             Button("兑换 \(item.cost)🥥", role: .none) { purchase(item) }
             Button("取消", role: .cancel) {}
@@ -165,13 +179,13 @@ struct CoconutShopView: View {
         HStack {
             VStack(alignment: .leading, spacing: 3) {
                 Text("我的余额")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.4))
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(tertiaryText)
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("🥥")
                         .font(.system(size: 24))
                     Text("\(questManager.coconutCount)")
-                        .font(.system(size: 36, weight: .black, design: .rounded))
+                        .font(OhanaFont.metric(size: 36, .black))
                         .foregroundStyle(Color.goYellow)
                         .contentTransition(.numericText())
                         .animation(.spring(response: 0.4), value: questManager.coconutCount)
@@ -180,20 +194,24 @@ struct CoconutShopView: View {
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
                 Text("已兑换")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.3))
+                    .font(OhanaFont.caption2(.medium))
+                    .foregroundStyle(tertiaryText)
                 Text("\(purchasedSet.count) 件")
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.goTeal)
             }
         }
         .padding(.horizontal, 20).padding(.vertical, 16)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(.white.opacity(0.06))
-                .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(Color.goYellow.opacity(0.2), lineWidth: 1))
-        )
+        .background(balanceHeaderBackground)
+    }
+
+    private var balanceHeaderBackground: some View {
+        RoundedRectangle(cornerRadius: 20, style: .continuous)
+            .fill(.ultraThinMaterial)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(Color.goPrimary.opacity(colorScheme == .dark ? 0.38 : 0.32), lineWidth: 1)
+            )
     }
 
     // MARK: - 分类 Chip
@@ -206,12 +224,21 @@ struct CoconutShopView: View {
                     }
                 } label: {
                     Text(cat.rawValue)
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(selectedCategory == cat ? .black : .white.opacity(0.6))
+                        .font(OhanaFont.subheadline(.bold))
+                        .foregroundStyle(selectedCategory == cat ? Color.arkInk : secondaryText)
                         .padding(.horizontal, 14).padding(.vertical, 7)
                         .background(
-                            selectedCategory == cat ? Color.goPrimary : Color.white.opacity(0.08),
+                            selectedCategory == cat
+                                ? Color.goPrimary
+                                : Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.08),
                             in: Capsule()
+                        )
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(
+                                    selectedCategory == cat ? Color.clear : Color.primary.opacity(0.12),
+                                    lineWidth: 1
+                                )
                         )
                 }
                 .buttonStyle(.plain)
@@ -247,13 +274,13 @@ struct CoconutShopView: View {
                 }
 
                 Text(item.name)
-                    .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .font(OhanaFont.subheadline(.black))
+                    .foregroundStyle(primaryText)
                     .lineLimit(1)
 
                 Text(item.description)
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.45))
+                    .font(OhanaFont.caption2(.medium))
+                    .foregroundStyle(tertiaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -262,22 +289,22 @@ struct CoconutShopView: View {
                 HStack {
                     if purchased {
                         Text("已兑换")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(OhanaFont.caption(.bold))
                             .foregroundStyle(Color.goPrimary)
                     } else {
                         HStack(spacing: 3) {
                             Text("🥥")
                                 .font(.system(size: 12))
                             Text("\(item.cost)")
-                                .font(.system(size: 14, weight: .black, design: .rounded))
-                                .foregroundStyle(canAfford ? Color.goYellow : Color.white.opacity(0.3))
+                                .font(OhanaFont.subheadline(.black))
+                                .foregroundStyle(canAfford ? Color.goYellow : tertiaryText)
                         }
                     }
                     Spacer()
                     if !purchased && !canAfford {
                         Text("不足")
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.25))
+                            .font(OhanaFont.caption2(.semibold))
+                            .foregroundStyle(tertiaryText)
                     }
                 }
             }
@@ -291,11 +318,15 @@ struct CoconutShopView: View {
 
     private func shopCardBackground(purchased: Bool, canAfford: Bool) -> some View {
         let fillColor: Color = purchased
-            ? Color.goPrimary.opacity(0.08)
-            : (canAfford ? Color.white.opacity(0.07) : Color.white.opacity(0.03))
+            ? Color.goPrimary.opacity(colorScheme == .dark ? 0.12 : 0.1)
+            : (canAfford
+                ? Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.06)
+                : Color.primary.opacity(colorScheme == .dark ? 0.04 : 0.035))
         let strokeColor: Color = purchased
-            ? Color.goPrimary.opacity(0.3)
-            : (canAfford ? Color.white.opacity(0.12) : Color.white.opacity(0.04))
+            ? Color.goPrimary.opacity(0.35)
+            : (canAfford
+                ? Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.12)
+                : Color.primary.opacity(colorScheme == .dark ? 0.06 : 0.08))
         return RoundedRectangle(cornerRadius: 18, style: .continuous)
             .fill(fillColor)
             .overlay(
@@ -311,17 +342,17 @@ struct CoconutShopView: View {
                 Text(item.emoji).font(.system(size: 22))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("兑换成功！")
-                        .font(.system(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(.black)
+                        .font(OhanaFont.subheadline(.black))
+                        .foregroundStyle(Color.arkInk)
                     Text("「\(item.name)」已加入你的收藏")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.black.opacity(0.6))
+                        .font(OhanaFont.caption2(.medium))
+                        .foregroundStyle(Color.arkInk.opacity(0.72))
                 }
                 Spacer()
             }
             .padding(.horizontal, 16).padding(.vertical, 12)
             .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .shadow(color: Color.goPrimary.opacity(0.5), radius: 16, x: 0, y: 4)
+            .shadow(color: Color.goPrimary.opacity(0.45), radius: 16, x: 0, y: 4)
             .padding(.horizontal, 24)
             .padding(.top, 60)
             Spacer()

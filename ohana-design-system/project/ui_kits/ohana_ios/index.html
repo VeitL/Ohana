@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=1200"/>
+  <title>Ohana — iOS UI Kit</title>
+  <link rel="stylesheet" href="../../colors_and_type.css"/>
+  <style>
+    html, body { margin: 0; background: #0c0f1a; }
+    .sub-note { color: rgba(60,50,40,0.75); font-size: 13px; }
+  </style>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" src="ios-frame.jsx"></script>
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="oh-primitives.jsx"></script>
+  <script type="text/babel" src="screen-home.jsx"></script>
+  <script type="text/babel" src="screen-pet-detail.jsx"></script>
+  <script type="text/babel" src="screen-shop-oasis.jsx"></script>
+  <script type="text/babel">
+    function Frame({ title, children }) {
+      return (
+        <IOSDevice dark width={390} height={844}>
+          {children}
+        </IOSDevice>
+      );
+    }
+
+    function Swatch({ name, hex, ink = '#fff' }) {
+      return (
+        <div style={{ width: 150 }}>
+          <div style={{ width: '100%', height: 110, borderRadius: 16, background: hex, boxShadow: '0 4px 10px rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.06)' }}/>
+          <div style={{ marginTop: 10, fontFamily: 'Nunito, sans-serif', fontWeight: 800, fontSize: 13, color: '#2a2218' }}>{name}</div>
+          <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: 'rgba(60,50,40,0.65)', marginTop: 2 }}>{hex}</div>
+        </div>
+      );
+    }
+
+    function TypeRow({ label, className, text, size }) {
+      return (
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 24, borderBottom: '1px dashed rgba(0,0,0,0.1)', padding: '16px 0' }}>
+          <div style={{ width: 130, fontFamily: 'ui-monospace, monospace', fontSize: 11, color: 'rgba(60,50,40,0.7)' }}>
+            {label}<br/><span style={{ color: 'rgba(60,50,40,0.5)' }}>{size}</span>
+          </div>
+          <div className={className} style={{ color: '#1A1A2E' }}>{text}</div>
+        </div>
+      );
+    }
+
+    function App() {
+      return (
+        <DesignCanvas>
+          {/* Title */}
+          <div style={{ padding: '0 60px 50px' }}>
+            <div style={{ fontSize: 44, fontWeight: 800, color: '#1A1A2E', letterSpacing: -1.5, fontFamily: 'Nunito, sans-serif' }}>Ohana · iOS UI Kit</div>
+            <div style={{ fontSize: 16, color: 'rgba(60,50,40,0.7)', marginTop: 6, maxWidth: 680 }}>
+              A portable recreation of the Ohana app's visual language — <b>iOS 26 Liquid Glass</b>, dark navy background with floating blobs, lime / orange punches, rounded metrics, emoji-as-UI. Screens mocked with React in 390×844 iPhone frames; substitutes: Nunito & Inter for SF Pro Rounded, Lucide-style SVGs for SF Symbols.
+            </div>
+          </div>
+
+          {/* Screens */}
+          <DCSection title="Core screens" subtitle="Home · Pet Detail · Coconut Shop · Oasis (Life Tree)" gap={64}>
+            <DCArtboard label="01 — Home Dashboard · 首页" width={390} height={844} style={{ borderRadius: 48, background: 'transparent' }}>
+              <Frame><OhanaHomeScreen/></Frame>
+            </DCArtboard>
+            <DCArtboard label="02 — Pet Detail · Mochi" width={390} height={844} style={{ borderRadius: 48, background: 'transparent' }}>
+              <Frame><OhanaPetDetailScreen/></Frame>
+            </DCArtboard>
+            <DCArtboard label="03 — Coconut Shop · 椰子商店" width={390} height={844} style={{ borderRadius: 48, background: 'transparent' }}>
+              <Frame><OhanaShopScreen/></Frame>
+            </DCArtboard>
+            <DCArtboard label="04 — Oasis / Life Tree · 绿洲" width={390} height={844} style={{ borderRadius: 48, background: 'transparent' }}>
+              <Frame><OhanaOasisScreen/></Frame>
+            </DCArtboard>
+          </DCSection>
+
+          {/* Color */}
+          <DCSection title="Color system" subtitle="Dark-mode primary, lime accent, navy gradient backdrop">
+            <DCArtboard label="Primary + brand" width={540} height={320}>
+              <div style={{ padding: 24, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, background: '#fff' }}>
+                <Swatch name="Primary / Dark" hex="#C8FF00"/>
+                <Swatch name="Primary / Light" hex="#FF7600"/>
+                <Swatch name="Ink" hex="#1A1A2E"/>
+                <Swatch name="Yellow" hex="#FFF44F"/>
+                <Swatch name="Orange" hex="#FF8C42"/>
+                <Swatch name="Teal" hex="#00D4AA"/>
+              </div>
+            </DCArtboard>
+            <DCArtboard label="Navy backdrop gradient" width={380} height={320}>
+              <div style={{ height: '100%', background: 'linear-gradient(180deg, #2D4ECC 0%, #1A2E8A 50%, #0C1640 100%)', padding: 20, color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div style={{ fontFamily: 'Nunito, sans-serif', fontSize: 18, fontWeight: 900 }}>goIsland</div>
+                <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, opacity: 0.85, lineHeight: 1.6 }}>
+                  top · #2D4ECC<br/>mid · #1A2E8A<br/>bot · #0C1640
+                </div>
+              </div>
+            </DCArtboard>
+            <DCArtboard label="Pet palette · 16 non-green hues" width={540} height={320}>
+              <div style={{ padding: 20, display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 8, background: '#fff', height: '100%' }}>
+                {['#FF5252','#FF793F','#FF9F43','#FDCB6E','#FFEAA7','#A1887F','#E67E22','#B33771','#FF66CC','#FD79A8','#D980FA','#575FCF','#686DE0','#273C75','#4DA1FF','#48DBFB'].map(c => (
+                  <div key={c} style={{ aspectRatio: '1', borderRadius: 10, background: c }}/>
+                ))}
+              </div>
+            </DCArtboard>
+          </DCSection>
+
+          {/* Type */}
+          <DCSection title="Typography" subtitle="SF Pro Rounded (iOS) · Nunito fallback on web · Inter for dense body text">
+            <DCArtboard label="Hierarchy" width={720} height={620}>
+              <div style={{ padding: '24px 32px', background: '#fff', height: '100%', overflow: 'hidden' }}>
+                <TypeRow label="oh-metric-hero"  className="oh-metric-hero"  size="80 / 900" text="1,284"/>
+                <TypeRow label="oh-metric-giant" className="oh-metric-giant" size="60 / 800" text="48,206"/>
+                <TypeRow label="oh-large-title" className="oh-large-title" size="34 / 800" text="生命之树"/>
+                <TypeRow label="oh-h1"           className="oh-h1"           size="24 / 700" text="Mei's 岛屿"/>
+                <TypeRow label="oh-h3"           className="oh-h3"           size="17 / 600" text="今日 · Mochi"/>
+                <TypeRow label="oh-body"         className="oh-body"         size="15 / 500" text="连续打卡 42 天,岛屿繁荣 +12%"/>
+                <TypeRow label="oh-caption"      className="oh-caption"      size="11 / 500" text="STEPS · 步数"/>
+              </div>
+            </DCArtboard>
+            <DCPostIt top={-20} left={-30} rotate={-4} width={220}>
+              SF Pro Rounded isn't licensable off-Apple → Nunito is the closest rounded-sans match for headings/metrics.
+            </DCPostIt>
+          </DCSection>
+
+          {/* Components */}
+          <DCSection title="Components" subtitle="Glass cards · Pills · Buttons · Bento tiles">
+            <DCArtboard label="Glass card" width={360} height={280} style={{ background: 'linear-gradient(180deg, #2D4ECC, #0C1640)' }}>
+              <div style={{ padding: 22, height: '100%' }}>
+                <OhGlass padding={18}>
+                  <div style={{ fontFamily: 'Nunito, sans-serif', fontWeight: 900, fontSize: 18, color: '#fff' }}>UltimateGlassCard</div>
+                  <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, color: 'rgba(255,255,255,0.7)', marginTop: 6 }}>radius 24 · stroke .22 · blur 24</div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                    <OhPill><span>🥥</span><span>+42</span></OhPill>
+                    <OhGlassPill><span>🔥</span><span>42 天</span></OhGlassPill>
+                  </div>
+                </OhGlass>
+              </div>
+            </DCArtboard>
+
+            <DCArtboard label="Buttons" width={360} height={280}>
+              <div style={{ padding: 22, background: '#fff', height: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <button className="oh-btn oh-btn-primary oh-btn-neon" style={{ width: '100%' }}>注入能量 +50 🥥</button>
+                <button className="oh-btn oh-btn-dark" style={{ width: '100%' }}>前往绿洲</button>
+                <button className="oh-btn oh-btn-secondary" style={{ width: '100%', color: '#1A1A2E' }}>取消</button>
+                <button className="oh-btn oh-btn-danger" style={{ width: '100%' }}>删除</button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <span className="oh-chip oh-chip--selected">全部</span>
+                  <span className="oh-chip">喂食</span>
+                  <span className="oh-chip">遛狗</span>
+                </div>
+              </div>
+            </DCArtboard>
+
+            <DCArtboard label="Bento tiles" width={380} height={280} style={{ background: 'linear-gradient(180deg, #2D4ECC, #0C1640)' }}>
+              <div style={{ padding: 22 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <OhBento label="步数" value="6,812" sub="目标 8,000" accent="#C8FF00" icon={<OhIcon name="walk" size={12} color="#C8FF00"/>}/>
+                  <OhBento label="今日🥥" value="+42" sub="暴击 × 2" accent="#FFF44F" icon={<OhIcon name="bolt" size={12} color="#FFF44F"/>}/>
+                  <OhBento label="饮水" value="380" unit="ml" accent="#00D4AA" icon={<OhIcon name="drop" size={12} color="#00D4AA"/>}/>
+                  <OhBento label="睡眠" value="8.4" unit="h" accent="#A855F7" icon={<OhIcon name="star" size={12} color="#A855F7"/>}/>
+                </div>
+              </div>
+            </DCArtboard>
+          </DCSection>
+
+          <DCPostIt top={180} right={40} rotate={4} width={220}>
+            <b>Signature move:</b> cards are <i>translucent glass over a blurred pet-photo wallpaper</i>. Image first, content on top — never inverse.
+          </DCPostIt>
+        </DesignCanvas>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>

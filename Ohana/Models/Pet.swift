@@ -359,6 +359,8 @@ final class Pet {
         case "狗": return "🐕"
         case "猫": return "🐈"
         case "兔子": return "🐇"
+        case "仓鼠": return "🐹"
+        case "鸟": return "🦜"
         default: return "🐾"
         }
     }

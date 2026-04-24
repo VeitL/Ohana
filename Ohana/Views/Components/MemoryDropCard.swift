@@ -25,6 +25,13 @@ struct MemoryEngine {
     static func pickFragment(pets: [Pet], plants: [Plant]) -> MemoryFragment? {
         let cal = Calendar.current
         let today = Date()
+
+        // 最高优先：多人协作温馨卡 — 今日有 ≥ 2 位家庭成员打卡
+        // 这是家庭共养产品的核心情感价值，直接覆盖其他候选
+        if let familyFragment = detectMultiPersonDay(pets: pets, calendar: cal, today: today) {
+            return familyFragment
+        }
+
         var candidates: [MemoryFragment] = []
 
         for pet in pets {
@@ -122,6 +129,52 @@ struct MemoryEngine {
         // 用今日日期做种子，同一天始终显示同一条（稳定性 > 随机性）
         let seed = cal.ordinality(of: .day, in: .year, for: today) ?? 1
         return candidates[seed % candidates.count]
+    }
+
+    /// 检测"今日多人协作"——同一只宠物当天有 ≥ 2 位家庭成员执行过护理动作
+    /// 扫描 careLogs / pottyLogs / walkLogs / expenseLogs 的 executorId 去重
+    private static func detectMultiPersonDay(
+        pets: [Pet],
+        calendar cal: Calendar,
+        today: Date
+    ) -> MemoryFragment? {
+        for pet in pets where !pet.hasPassedAway {
+            var executorIds = Set<String>()
+
+            for log in pet.careLogs where cal.isDate(log.date, inSameDayAs: today) {
+                if let id = log.executorId, !id.isEmpty { executorIds.insert(id) }
+            }
+            for log in pet.pottyLogs where cal.isDate(log.date, inSameDayAs: today) {
+                if let id = log.executorId, !id.isEmpty { executorIds.insert(id) }
+            }
+            for log in pet.walkLogs where cal.isDate(log.startDate, inSameDayAs: today) {
+                if let id = log.executorId, !id.isEmpty { executorIds.insert(id) }
+            }
+            for log in pet.expenseLogs where cal.isDate(log.date, inSameDayAs: today) {
+                if let id = log.executorId, !id.isEmpty { executorIds.insert(id) }
+            }
+
+            if executorIds.count >= 2 {
+                let n = executorIds.count
+                let subline: String = {
+                    switch n {
+                    case 2: return "两位家人一起为 \(pet.name) 奔波，这就是 Ohana 的意义"
+                    case 3: return "三位家人齐上阵，\(pet.name) 今天被满满的爱包围"
+                    default: return "\(n) 位家人一起给了 \(pet.name) 最好的一天"
+                    }
+                }()
+                return MemoryFragment(
+                    emoji: "🫂",
+                    headline: "全家都在爱 \(pet.name)",
+                    subline: subline,
+                    mapSnapshotData: nil,
+                    accentColor: Color.goPrimary,
+                    rewardCoconuts: 5,
+                    petName: pet.name
+                )
+            }
+        }
+        return nil
     }
 }
 

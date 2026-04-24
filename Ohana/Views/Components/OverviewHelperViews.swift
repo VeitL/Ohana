@@ -457,10 +457,13 @@ struct HomeSectionEntry: Identifiable {
     var isVisible: Bool = true
 
     static let defaults: [HomeSectionEntry] = [
-        HomeSectionEntry(id: "quickActions",  title: "快捷操作",   subtitle: "按宠物物种自定义的快捷打卡卡片网格",     icon: "bolt.fill",              colorHex: "FF8C42"),
-        HomeSectionEntry(id: "batchCheckIn",  title: "一键打卡",   subtitle: "多宠物同时喂食/喂水，一键全员打卡",     icon: "checkmark.circle.fill",  colorHex: "34C759"),
-        HomeSectionEntry(id: "memoryDrop",    title: "记忆碎片",   subtitle: "随机浮现历史记录中的温馨时刻（需有记录数据）", icon: "heart.text.square.fill", colorHex: "FF6B9D"),
-        HomeSectionEntry(id: "islandStats",   title: "岛屿统计",   subtitle: "体重/步数/花费/粮仓",           icon: "chart.bar.fill",         colorHex: "00D4AA"),
+        HomeSectionEntry(id: "islandHeader",    title: "岛屿天气胶囊",  subtitle: "首页顶部 60pt 天气/情绪/负反馈汇总",       icon: "cloud.sun.fill",         colorHex: "FFD93D"),
+        HomeSectionEntry(id: "familyStripMini", title: "家庭活动胶囊",  subtitle: "宠物卡下方 Mini 家人活动条，点击展开",     icon: "person.2.fill",          colorHex: "8E6DFF"),
+        HomeSectionEntry(id: "todayFocus",      title: "今日聚焦",     subtitle: "智能推送当前最该做的事情（单卡）",          icon: "sparkles",               colorHex: "FF8C42"),
+        HomeSectionEntry(id: "quickActions",    title: "快捷操作",     subtitle: "按宠物物种自定义的快捷打卡卡片网格",        icon: "bolt.fill",              colorHex: "FF8C42"),
+        HomeSectionEntry(id: "batchCheckIn",    title: "一键打卡",     subtitle: "多宠物同时喂食/喂水，一键全员打卡",         icon: "checkmark.circle.fill",  colorHex: "34C759"),
+        HomeSectionEntry(id: "memoryDrop",      title: "记忆碎片",     subtitle: "折叠到更多区 · 回忆片段",                icon: "heart.text.square.fill", colorHex: "FF6B9D"),
+        HomeSectionEntry(id: "islandStats",     title: "岛屿统计",     subtitle: "折叠到更多区 · 体重/步数/花费/粮仓",      icon: "chart.bar.fill",         colorHex: "00D4AA"),
     ]
 }
 

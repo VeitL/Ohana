@@ -72,6 +72,8 @@ struct HumanBackup: Codable {
     var avatarEmoji: String; var role: String; var appleUserIdentifier: String
     var notes: String; var createdAt: String; var nationality: String; var city: String
     var coconutBalance: Int; var shouldShowOnHome: Bool
+    /// ArkSchemaV35：旧备份缺省为 nil
+    var mbti: String?
 }
 
 struct EventBackup: Codable {
@@ -519,6 +521,7 @@ final class DataBackupManager {
         h.createdAt = parseDate(dto.createdAt) ?? Date()
         h.coconutBalance = dto.coconutBalance
         h.shouldShowOnHome = dto.shouldShowOnHome
+        h.mbti = dto.mbti ?? ""
         return h
     }
 

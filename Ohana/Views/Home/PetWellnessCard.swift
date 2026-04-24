@@ -17,10 +17,10 @@ struct PetWellnessCard: View {
     // MARK: - Today's stats
 
     private var todayFeedCount: Int {
-        (pet.careLogs ?? []).filter { $0.type == "feeding" && cal.isDateInToday($0.date) }.count
+        (pet.careLogs ?? []).filter { $0.careType == .feeding && cal.isDateInToday($0.date) }.count
     }
     private var todayWaterCount: Int {
-        (pet.careLogs ?? []).filter { $0.type == "watering" && cal.isDateInToday($0.date) }.count
+        (pet.careLogs ?? []).filter { $0.careType == .watering && cal.isDateInToday($0.date) }.count
     }
     private var todayWalkCount: Int {
         (pet.walkLogs ?? []).filter { cal.isDateInToday($0.startDate) }.count
@@ -205,7 +205,7 @@ struct FamilyWellnessCard: View {
 
     private var totalCheckins: Int {
         livePets.reduce(0) { acc, pet in
-            let feeds = (pet.careLogs ?? []).filter { $0.type == "feeding" && cal.isDateInToday($0.date) }.count
+            let feeds = (pet.careLogs ?? []).filter { $0.careType == .feeding && cal.isDateInToday($0.date) }.count
             let walks = (pet.walkLogs ?? []).filter { cal.isDateInToday($0.startDate) }.count
             let potty = (pet.pottyLogs ?? []).filter { cal.isDateInToday($0.date) }.count
             return acc + feeds + walks + potty

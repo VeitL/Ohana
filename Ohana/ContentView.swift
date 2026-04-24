@@ -14,7 +14,7 @@ struct ContentView: View {
     @State private var selectedPlant: Plant?
     @State private var selectedPetTab: PetDetailTab = .overview
     @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
-    @AppStorage("appUIStyle") private var appUIStyle: String = "classic"
+    @AppStorage("appUIStyle") private var appUIStyle: String = "go"
     @Namespace private var heroNS
     
     var body: some View {
@@ -28,6 +28,14 @@ struct ContentView: View {
                 Group {
                     if appUIStyle == "material" {
                         MaterialDashboardView(
+                            selectedPet: $selectedPet,
+                            selectedHuman: $selectedHuman,
+                            selectedPlant: $selectedPlant,
+                            selectedPetTab: $selectedPetTab,
+                            heroNS: heroNS
+                        )
+                    } else if appUIStyle == "go" {
+                        FocusStackHomeTestView(
                             selectedPet: $selectedPet,
                             selectedHuman: $selectedHuman,
                             selectedPlant: $selectedPlant,

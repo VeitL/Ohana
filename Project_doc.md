@@ -1,6 +1,6 @@
 # Ohana iOS App 项目文档
 
-> 最后更新: 2026-04-05（Kawaii 剪影重设计 + 宠物卡图片修复 + Schema V33）| Build: ✅ | Schema: ArkSchemaV33
+> 最后更新: 2026-04-16（英文本地化：en.lproj + 生成脚本）| Build: ✅ | Schema: ArkSchemaV33
 
 ---
 
@@ -14,12 +14,23 @@
 - **全局主色**：`Color.goPrimary` — 浅色 `#FF7600` / 深色 `#C8FF00`，`OhanaApp` 根视图 `.tint(Color.goPrimary)`
 - **UI 规范**：见 `UIRules.md`，所有新页面必须符合规范
 
+### 本地化（简体中文 / English）
+
+- **策略**：Swift 源码中的用户可见**中文整句**作为 `LocalizedStringKey`；`Ohana/en.lproj/Localizable.strings` 以相同中文为 key、英文为 value。系统语言为 **English** 时使用英文，为 **简体中文** 时显示源码中文（无需 `zh-Hans` 副本）。
+- **隐私文案**：`Ohana/en.lproj/InfoPlist.strings` 覆盖相机/定位说明；`Info.plist` 内保留中文作开发默认值。
+- **工程**：`CFBundleLocalizations` = `en` + `zh-Hans`；Xcode `knownRegions` 含 `zh-Hans`。
+- **批量生成**：`scripts/generate_en_localizable.py`（依赖 `deep-translator`，建议使用仓库内 `.venv-l10n`）扫描含汉字的字符串字面量并机翻；进度缓存在 `scripts/.l10n_en_cache.json`（已 `.gitignore`），中断后可续跑。
+- **注意**：带 `\(variable)` 的**插值字符串**、部分 `String(format:)` 与通知正文等可能不会出现在字面量扫描结果中，需后续改为 `String(localized:)` / `LocalizedStringResource` 等并补条目；机翻建议按模块在 Xcode 或 diff 中人工润色。
+
 ---
 
 ## 二、项目结构
 
 ```
 Ohana/
+├── en.lproj/
+│   ├── Localizable.strings   # 英文 UI（key = 源码中的中文）
+│   └── InfoPlist.strings     # 英文隐私描述
 ├── Models/
 │   ├── Pet.swift / PetWeightLog.swift / PetCareLog.swift
 │   ├── PetMedication.swift / PetInsurance.swift / InsuranceClaim.swift
@@ -361,6 +372,8 @@ Color.petThemeMagenta / Pink / Purple / Indigo / Violet / Navy / Blue / SkyBlue
 - **近7天完成**：正常透明度显示
 - **历史归档**（> 7天前）：折叠在「历史归档 (N)」按钮后，透明度 0.7，可点击展开/收起
 
+**UI 规范对齐（2026-04-16）**：`BountyBoardView` / `AddBountyTaskSheet` 与椰子商店一致：`ArkBackgroundView()`、导航栏 `.toolbarBackground(.ultraThinMaterial)`、`OhanaFont` + `primaryText` / `secondaryText` / `tertiaryText`；统计与周报卡片使用材质 + `Color.primary` 描边；主色胶囊上文案用 `Color.arkInk`。同次迭代中 **`GachaView`（欧气扭蛋机）** 已按同一套背景、导航与语义色刷新。
+
 ---
 
 ## 十八、通知分类管理（SettingsView）
@@ -468,3 +481,184 @@ Color.petThemeMagenta / Pink / Purple / Indigo / Violet / Navy / Blue / SkyBlue
 
 ### Schema 迁移注意事项
 新增 `@Model` 非可选属性时**必须在属性声明处加 `= 默认值`**（仅在 `init()` 中赋值不够），否则 SwiftData 轻量迁移失败，数据库降级到内存库。
+
+---
+
+## 二十三 · A. 首页简化 · 岛屿三层重构（2026-04-16）
+
+解决"信息大爆炸"问题，把原先 11 层首页压缩为 3 层核心 + 1 层可折叠。
+
+### 新结构（自上而下）
+
+| 层级 | 组件 | 高度 | 职能 |
+|:-:|:-|:-:|:-|
+| 1 | `globalFixedHeader` | 52pt | 问候/Menu/家人/连击 🔥/椰子胶囊 |
+| 1.5 | **`IslandMoodHeaderStrip`** | 60pt | 天气+情绪+负反馈+问候，1 行搞定；点击展开 `IslandSummarySheet` |
+| 2 | `PetWalletStack` | ~300pt | 宠物卡牌转盘（顶卡微漂浮动画 ±3pt / 6s） |
+| 2.5 | **`FamilyActivityStripView.compact`** | 30pt | 家人头像堆叠 + "今天 X 次" 微胶囊，点击弹完整 Sheet |
+| 3 | `emergencyAlertBanner` | 按需 | 仅 `.urgent` 健康警告时显示 |
+| 4 | **`TodayFocusCard`** | 130pt | 按优先级智能推送 1 件事（委托/负反馈/回忆/庆祝） |
+| 5 | `quickActionsSection` | 网格 | 保持原样，4 列 SF Symbols |
+| 6 | `batchCheckInOnlySection` | 按需 | 多宠一键全家 |
+| 7 | **`HomeMoreSection`** | 折叠 | 「更多 · 岛屿近况 ⌄」默认折叠，展开显示记忆碎片 + 岛屿统计 |
+
+### 新组件
+
+- **`Ohana/Views/Home/IslandMoodHeaderStrip.swift`**
+  - Emoji 映射 `IslandMood`：☀️晴朗 / 🌤微风 / ⛅阴天 / ⛈风暴 / 🎉庆祝 / 🌿植物风
+  - 消息优先级：紧急负反馈 > 庆祝里程碑 > 连击 ≥ 7 → ≥ 3 > 轻度警告 > 问候
+  - 红点：`negativeSignals.count`
+  - 轻度动画：两片浮云 `offset` 往返 + 圆圈呼吸
+
+- **`Ohana/Views/Home/IslandSummarySheet.swift`**
+  - 顶部天气主图 + 连击卡 + 负反馈列表（红黄双色） + "一切安好"态
+
+- **`Ohana/Views/Home/TodayFocusCard.swift`**
+  - `FocusContent` 枚举：`.quest / .negative / .memory / .celebrate / .welcome`
+  - 图标呼吸、完成按钮、Reward Chip（椰子数）
+  - `IslandQuestEngine.todayQuests().first(unfinished)` → 最高优先级
+
+- **`Ohana/Views/Home/HomeMoreSection.swift`**
+  - 通用折叠容器：`AppStorage("home_more_expanded")` 持久记忆状态
+  - 标题带"回忆 · 统计"提示，弹簧动画展开
+
+- **`Ohana/Views/Home/StreakFlameParticles.swift`**
+  - 连击 ≥ 7 时在连击胶囊右上角喷出 3 颗 ✨🔥✨ 循环粒子
+
+### 修改点
+
+- `OverviewView.mainScrollView` — 完全重构为新 8 层结构，旧 `quickActionsOnlySection`（包含 HighlightDeck）变为死代码保留不删除
+- `FamilyActivityStripView` — 新增 `Style` 枚举与 `compact` 模式，胶囊态显示家人头像堆叠 + 总次数
+- `PetWalletStack` — 顶卡新增 `idleBreath` 呼吸漂浮（仅 `isActive && !isDragging && !isFlipped` 时触发）
+- `HomeSectionManageSheet` — `HomeSectionEntry.defaults` 增加 `islandHeader / familyStripMini / todayFocus` 三个新 ID
+
+### 落地效果
+
+- 首屏可见模块：7+ → 3（岛屿胶囊 + 宠物卡 + 聚焦卡）
+- 纵向滚动：2 屏 → 1 屏
+- 可爱度：顶卡微漂浮 + 浮云 + 火苗粒子 + 呼吸光晕
+- 所有功能入口保留：快捷操作网格保留、宠物卡片背面 8 格功能枢纽不动、记忆/统计收进可折叠区
+
+---
+
+## 二十四、产品迭代待办（Product Roadmap）
+
+> 由 PM 诊断整理，按优先级执行。**当前焦点：P0 增长/留存 + P0 家庭协作**。
+
+### P0 · 增长 / 留存机制（游戏化服务真实养宠）
+
+目标：让椰子/生命之树/岛屿与现实养宠质量**强耦合**，形成正反馈 + 适度副作用。
+
+- [x] **椰子奖励按质量加成**（2026-04-16 落地）
+  - `QuestManager.QualityBonus` 枚举定义 7 种组合（精准 / 备注 / 照片及交叉），倍率 1.0~1.5
+  - `compose(precise: hasNote: hasPhoto:)` 智能聚合，`awardAction(quality:)` 统一入参 + 日志标签
+  - 接入点：`QuickFeedDetailSheet.commitManualFeed`（克数输入 → `.precise`）、`completeScheduledFeed` 直接 `.precise`、`PetFoodManagementView.quickFeed`（速喂 `.precise`）
+  - 椰子日志标题自动拼接质量徽章（"精准 +20%"/"记录 +20%"/"精细带图 +50%"），用户可见加成理由
+- [x] **岛屿负反馈系统（适度焦虑）**（2026-04-16 落地)
+  - 新增 `IslandMood.cloudy` 阴天态，`IslandMoodWeatherView` 对应粒子 (🌥️/☁️/🌫/💭)
+  - `IslandNegativeFeedback.signals(pets:plants:)`：连击断裂、用药晚 22 点未打卡、喂食超 72h、植物超 7 天未浇水
+  - 新组件 `IslandNegativeFeedbackBanner`（`Ohana/Views/Components/IslandNegativeFeedbackBanner.swift`）：胶囊横幅 + 多信号翻页 + 当日可关闭 (`AppStorage` 持久)
+  - 接入点：`OverviewView` 家庭活动条与紧急警告条之间，优先级低于紧急但高于常规提示
+  - 严重度：`.critical`（红）/ `.warning`（黄）双色，自动按严重度排序
+- [x] **椰子余额可预期化**（2026-04-16 落地）
+  - `CoconutBalanceCapsule` 新增 `onShopTap` / `showPredictionHint` 参数
+  - 长按胶囊 → `contextMenu`：椰子明细 / 椰子商店 双入口
+  - 胶囊下方显示"距 🍖 再 18🥥"微提示（`CoconutPredictionHelper.nextHint` 自动找到最便宜买不起的商品）
+  - 接入点：`OverviewView.globalFixedHeader`，仅在首页 Tab 上显示提示
+- [x] **首日承诺（D0 留存钩子）**（2026-04-16 落地）
+  - 新文件 `Ohana/Views/Forms/Day0PromiseSheet.swift`：向导保存成功后弹出
+  - 承诺菜单按物种差异化（狗 +散步、猫 +梳毛）+ 通用（拍照/陪玩/记录/称重）
+  - 勾选 → 自动转成 `BountyTask` 插入 `AppStorage("bountyTasks")`，由当前 activeHuman 作为发布人，任何家人可接
+  - 接入点：`AddPetWizardView.savePet()` 替换原 `onComplete` 时机，经 AHA → Day0 → `onComplete`
+- [x] **AHA 破壳动画**（2026-04-16 落地）
+  - `AddPetWizardView.AhaHatchOverlay`：3 秒分阶段动画（光晕 → 蛋壳震动淡出 → 宠物 emoji 破壳跳出 → 标题"{name} 加入 Ohana"）
+  - 8 方向星芒持续旋转、辐射光晕由主题色 → 椰子黄
+  - 保存后立即触发，3 秒自动收起 → 推出 Day0 承诺 Sheet
+
+### P0 · 家庭协作（差异点显性化）
+
+目标：让「这是共养软件」成为用户一眼可见的事实，促成家庭行为。
+
+- [x] **宠物卡下方「今日谁做了什么」活动条**（2026-04-16 落地）
+  - 组件 `FamilyActivityStripView`（`Ohana/Views/Components/FamilyActivityStripView.swift`）
+  - 数据源：`PetCareLog` / `PetPottyLog` / `PetWalkLog` / `PetExpenseLog` 当日记录
+  - 去重规则：同一 `(humanId, 动作类别)` 取最新一条，最多 8 条
+  - 每条 chip：家庭成员头像圆 + 右下角动作徽章（SF Symbol + 类型主色），底下 11pt 姓名
+  - 空态自动隐藏（当日无记录 → `EmptyView`），避免首页冗余
+  - 接入点：`OverviewView.swift` 第二层卡转盘与紧急警告条之间，仅顶牌为宠物时渲染
+- [x] **打卡 Sheet 默认执行人 + 一键切换**（2026-04-16 落地）
+  - 共用组件 `ExecutorPickerBar`（`Ohana/Views/Components/ExecutorPickerBar.swift`）
+  - 胶囊：`.ultraThinMaterial` + 主题色描边 + 头像 + 姓名 + 上下箭头，点击弹 `Menu` 切换家庭成员
+  - 读写 `@AppStorage("currentActiveHumanId")`，切换立即生效并持久化
+  - Menu 末尾支持「不指定执行人」（清空 activeHumanId）
+  - 已接入：QuickFeedDetailSheet / QuickWaterDetailSheet / QuickWaterChangeDetailSheet / QuickPottyDetailSheet / QuickPottySheet / QuickLitterDetailSheet / QuickPlayDetailSheet / OverviewQuickActions（喂食/喂水快捷 Popover）
+  - AddExpenseSheet 已有自建支付人选择器，保持原状（已读取同一个 `currentActiveHumanId` 作为默认）
+- [x] **家庭周报**（悬赏榜升级）（2026-04-16 落地）
+  - `BountyBoardView` 新增第 3 个 Tab「周报」：柱图展示本周每位家人的打卡次数（🍖 喂食 / 🦮 遛 / 💩 厕所 / 💰 花费）
+  - `HumanWeekStat` 聚合周起点到今日的所有 `careLogs/pottyLogs/walkLogs/expenseLogs`
+  - 周报头部：本周总打卡 + 「本周最勤快」徽章
+  - 新服务 `FamilyWeeklyReportService`（`Ohana/Models/FamilyWeeklyReportService.swift`）：周日 20:00 `UNCalendarNotificationTrigger` 本地推送「📊 本周 Ohana 家庭周报」，OhanaApp.init 注册幂等调度
+- [x] **多人打卡温馨卡**（2026-04-16 落地）
+  - `MemoryEngine.detectMultiPersonDay`：扫描当日 4 种日志，若 `executorId` 去重数 ≥ 2，优先生成「全家都在爱 {petName}」碎片
+  - 在 `MemoryEngine.pickFragment` 最前置，压过其他候选，确保家庭协作优先可见
+  - 涉及文件：`Ohana/Views/Components/MemoryDropCard.swift`
+- [x] **家庭悬赏榜 → 任务指派**（2026-04-16 落地）
+  - `BountyTask` 新增 `assignedToId/Name/Emoji` 三可选字段（向前兼容老数据解码）
+  - `AddBountyTaskSheet` 插入「指派给」横向滚动选择器：所有人可接 / 每位家人
+  - `BountyBoardView.taskCard` 显示 `@Name` 徽章，指派给当前用户时高亮；完成权限：无指派→非创建者均可，有指派→仅被指派者
+  - `OasisRewardView.bountyAssignedBadge`：首页「家庭悬赏榜」右上角红圆点显示 `@我 X 个待完成`
+  - 辅助方法 `BountyTask.loadAll()` / `pendingAssignedCount(for:)`
+
+---
+
+### P1 · 专业深度（宠物行业信任感）
+
+- [ ] **疫苗对照表 & 一键批量添加**
+  - 按物种 × 年龄推荐标准方案（幼犬 6/9/12 周 DHPP + 狂犬等）
+  - `AddHealthRecordSheet` 新增「按标准方案一键生成」入口
+- [ ] **粮量计算器**
+  - 输入：物种/体重/活动量/是否绝育 → 输出推荐 g/天
+  - 嵌入 `PetFoodManagementView` 顶部卡
+- [ ] **换粮过渡计划**
+  - 选择新粮 → 自动生成 7/14 天梯度换粮日历 `Event`
+- [ ] **症状百科 + 就医阈值提示**
+  - `SymptomLog` 选择症状时展开「出现以下情况立即就医」短指引
+  - 建立 `SymptomKnowledgeBase.swift` 静态库
+- [ ] **BCS 5/9 分对照图**
+  - `WeightHistoryView` / 体重录入 Sheet 增加可视化对照
+- [ ] **驱虫季节性预警**
+  - 雨季/出游期自动发提醒推送（复用 `MedicationReminderService`）
+
+### P1 · 信息架构精简
+
+- [ ] **入口审计表**：汇总所有 sheet 可达路径，每个目标保留 1 主入口 + ≤ 1 浅入口
+- [ ] **快捷操作网格上限 6 个**，超过强制进入编辑模式
+- [ ] **卡背面降到 8 格**（合并花费/体重到仪表盘钻取）
+- [ ] **首页默认只开 2 个 section**（快捷操作 + 一键打卡），其余引导发现
+- [ ] **情绪化头图**
+  - 宠物生日当天卡片飘金粉
+  - 到家纪念日加横幅
+  - 涉及文件：`WalletPetCardFront.swift`
+
+### P2 · 数据安全与云
+
+- [ ] **iCloud Drive 自动备份**（无账号即可启用，零成本落地）
+- [ ] **UserDefaults → SwiftData 迁移**
+  - 用药今日进度（`med_doses_*`）
+  - 清洁护理自定义周期（`hygiene_cycle_*`）
+  - 打卡连击（`oasis_checkedIn_dates`）
+  - 防抖记录（`AntiRepeatCareManager`）
+- [ ] **数据导出版本号校验**：`DataBackupManager` 写入 Schema 版本，导入时兼容处理
+
+### P2 · 商业化预埋
+
+- [ ] **PDF 兽医病历导出**：前 3 次免费，后续订阅触发点
+- [ ] **保险推荐静态对比**：`PetInsuranceView` 新增「找一家适合 TA 的保险」入口（静态表，未来接联盟 API）
+- [ ] **椰子商城**：打通椰子 → 实物优惠券（粮/用品/体检）
+
+### P3 · 细节体验
+
+- [ ] **毛色照片自动取色**：上传照片 → 采样主色写入 `coatColor`
+- [ ] **性格标签精简到 20 个 + 自定义**
+- [ ] **头像裁剪 30s 说明动图**：首次进入 Step 2 时展示「为什么要抠图」
+- [ ] **暗色模式全页回归**：全局截图比对一遍

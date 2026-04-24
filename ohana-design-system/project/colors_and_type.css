@@ -1,0 +1,470 @@
+/* ============================================================
+   Ohana Design System — Tokens & Semantic Styles
+   Source: Ohana/Ohana/Utilities/ColorExtensions.swift
+           Ohana/Ohana/Views/OhanaDesignSystem.swift
+           Ohana/UIRules.md
+   ============================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap");
+
+:root {
+  /* =========================================================
+     CORE BRAND — "Go UI"
+     Primary flips between orange (light) and lime (dark).
+     ========================================================= */
+  --ohana-primary-light: #FF7600;
+  --ohana-primary-dark: #C8FF00;   /* goLime */
+  --ohana-primary: var(--ohana-primary-dark); /* default to dark; overridden at html[data-theme="light"] */
+
+  --ohana-primary-hover: #D96500;  /* light-mode press */
+  --ohana-primary-dark-hover: #B3E500;
+  --ohana-ink: #1A1A2E;            /* arkInk — text on primary */
+  --ohana-lime: #C8FF00;
+  --ohana-lime-bright: #E0FF00;    /* neon CTA */
+  --ohana-lime-light: #E8FFB0;
+  --ohana-yellow: #FFF44F;         /* goYellow — highlight/reward */
+  --ohana-yellow-bright: #FFEB3B;
+  --ohana-mint: #B8FFD0;
+  --ohana-teal: #00D4AA;           /* success / healthy */
+  --ohana-orange: #FF8C42;         /* goOrange — secondary emphasis */
+  --ohana-red: #FF4757;            /* error / destructive */
+  --ohana-blue: #3B82F6;           /* info / link */
+  --ohana-purple: #A855F7;
+  --ohana-card-blue: #5B6AFF;
+  --ohana-card-green: #BFFF80;
+  --ohana-card-cyan: #80FFEA;
+  --ohana-card-white: #FFFFFF;
+  --ohana-card-light: #F0F0FF;
+
+  /* Navy + deep backgrounds */
+  --ohana-background-blue: #4338FF;  /* goBackground */
+  --ohana-dark-blue: #1A0E4B;
+  --ohana-deep-navy: #0D0638;
+  --ohana-navy-gradient-top: #2D4ECC;
+  --ohana-navy-gradient-mid: #1A2E8A;
+  --ohana-navy-gradient-bottom: #0C1640;
+  --ohana-base-dark: #0A0A0C;
+  --ohana-base-light: #F0F4FF;
+
+  /* =========================================================
+     NEUTRALS — dark-mode first
+     ========================================================= */
+  --ohana-bg: #0A0A0C;            /* app background */
+  --ohana-bg-elevated: #14141A;   /* sheet / elevated surface */
+  --ohana-card-glass: rgba(255, 255, 255, 0.06);
+  --ohana-card-glass-stroke: rgba(255, 255, 255, 0.18);
+  --ohana-card-inset: rgba(255, 255, 255, 0.08);
+  --ohana-divider: rgba(255, 255, 255, 0.10);
+  --ohana-divider-dashed: rgba(255, 255, 255, 0.25);
+
+  /* Foreground (adaptive — these get overridden in light theme) */
+  --ohana-fg: #FFFFFF;
+  --ohana-fg-secondary: rgba(255, 255, 255, 0.70);
+  --ohana-fg-tertiary: rgba(255, 255, 255, 0.45);
+  --ohana-fg-disabled: rgba(255, 255, 255, 0.30);
+
+  /* =========================================================
+     SEMANTIC — Alerts
+     ========================================================= */
+  --ohana-success-bg:     rgb(5, 46, 22);
+  --ohana-success-border: rgb(52, 211, 153);
+  --ohana-success-text:   rgb(110, 231, 183);
+
+  --ohana-warning-bg:     rgb(120, 53, 15);
+  --ohana-warning-border: rgb(251, 191, 36);
+  --ohana-warning-text:   rgb(253, 230, 138);
+
+  --ohana-error-bg:       rgb(127, 29, 29);
+  --ohana-error-border:   rgb(248, 113, 113);
+  --ohana-error-text:     rgb(252, 165, 165);
+
+  --ohana-info-bg:        rgb(30, 58, 138);
+  --ohana-info-border:    rgb(96, 165, 250);
+  --ohana-info-text:      rgb(147, 197, 253);
+
+  /* =========================================================
+     PET THEME PALETTE (16 colors, non-green, high contrast)
+     From Color.petTheme* in ColorExtensions.swift
+     ========================================================= */
+  --pet-crimson:    #FF5252;
+  --pet-vermilion:  #FF793F;
+  --pet-orange:     #FF9F43;
+  --pet-amber:      #FDCB6E;
+  --pet-yellow:     #FFEAA7;
+  --pet-brown:      #A1887F;
+  --pet-rust:       #E67E22;
+  --pet-burgundy:   #B33771;
+  --pet-magenta:    #FF66CC;
+  --pet-pink:       #FD79A8;
+  --pet-purple:     #D980FA;
+  --pet-indigo:     #575FCF;
+  --pet-violet:     #686DE0;
+  --pet-navy:       #273C75;
+  --pet-blue:       #4DA1FF;
+  --pet-sky:        #48DBFB;
+
+  /* =========================================================
+     SPACING — 8pt grid
+     ========================================================= */
+  --space-xs:  4px;
+  --space-sm:  8px;
+  --space-md:  12px;
+  --space-lg:  16px;
+  --space-xl:  20px;
+  --space-2xl: 24px;
+  --space-3xl: 32px;
+  --space-4xl: 48px;
+  --space-5xl: 64px;
+
+  /* Layout tokens */
+  --page-padding-x: 24px;
+  --card-padding: 16px;
+  --bento-padding: 14px;
+  --card-gap: 20px;
+
+  /* =========================================================
+     RADIUS
+     ========================================================= */
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   20px;
+  --radius-2xl:  24px;   /* standard card */
+  --radius-dock: 22px;
+  --radius-3xl:  32px;   /* ohanaGlassStyle default */
+  --radius-full: 9999px;
+
+  /* =========================================================
+     SHADOWS
+     ========================================================= */
+  --shadow-glass:  0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-white:  0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-dark:   0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-glow-lime: 0 4px 12px rgba(224, 255, 0, 0.30);
+  --shadow-glow-primary: 0 4px 12px rgba(200, 255, 0, 0.30);
+  --shadow-press:  0 1px 2px rgba(0, 0, 0, 0.10);
+
+  /* =========================================================
+     TYPOGRAPHY
+     Base: SF Pro Rounded (iOS).
+     Fallback: Nunito (rounded-sans match) + Inter for body.
+     Every heading/metric uses the rounded stack.
+     ========================================================= */
+  --font-rounded: "SF Pro Rounded", "Nunito", -apple-system, BlinkMacSystemFont,
+                  "Segoe UI", system-ui, sans-serif;
+  --font-body:    "SF Pro Text", "Inter", -apple-system, BlinkMacSystemFont,
+                  "Segoe UI", system-ui, sans-serif;
+  --font-mono:    "SF Mono", ui-monospace, "Menlo", monospace;
+
+  /* Weights used across the app */
+  --fw-regular:  400;
+  --fw-medium:   500;
+  --fw-semibold: 600;
+  --fw-bold:     700;
+  --fw-heavy:    800;
+  --fw-black:    900;
+
+  /* Size scale — derived from OhanaFont enum */
+  --fs-metric-hero:   80px;  /* arkMetric — main dashboard number */
+  --fs-metric-giant:  60px;  /* giantMetricStyle default */
+  --fs-metric-lg:     48px;  /* display */
+  --fs-metric-md:     40px;  /* arkMetricSM */
+  --fs-metric-sm:     28px;  /* reward +amount */
+  --fs-large-title:   34px;  /* largeTitle */
+  --fs-title:         24px;  /* title */
+  --fs-title2:        20px;  /* title2 */
+  --fs-title3:        17px;  /* title3 */
+  --fs-headline:      16px;  /* headline / body button */
+  --fs-body:          15px;  /* body */
+  --fs-callout:       14px;  /* callout */
+  --fs-subheadline:   13px;  /* subheadline */
+  --fs-footnote:      12px;  /* footnote */
+  --fs-caption:       11px;  /* caption */
+  --fs-caption2:      10px;  /* caption2 */
+
+  /* Line heights */
+  --lh-tight: 1.1;
+  --lh-snug:  1.2;
+  --lh-normal: 1.4;
+  --lh-relaxed: 1.5;
+
+  /* Letter-spacing: rounded type generally uses default tracking */
+  --tracking-tight: -0.01em;
+  --tracking-normal: 0;
+
+  /* =========================================================
+     MOTION
+     ========================================================= */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* spring-ish */
+  --ease-out:    cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-inout:  cubic-bezier(0.42, 0, 0.58, 1);
+  --dur-press:   100ms;
+  --dur-fast:    200ms;
+  --dur-med:     300ms;
+  --dur-slow:    600ms;
+  --dur-breathe: 9s;    /* background blob cycle */
+}
+
+/* =========================================================
+   LIGHT THEME OVERRIDE
+   Flip primary to orange; backgrounds to soft off-white.
+   Apply with <html data-theme="light">.
+   ========================================================= */
+html[data-theme="light"] {
+  --ohana-primary: var(--ohana-primary-light);
+  --ohana-bg: #F0F4FF;
+  --ohana-bg-elevated: #FFFFFF;
+  --ohana-card-glass: rgba(255, 255, 255, 0.70);
+  --ohana-card-glass-stroke: rgba(255, 255, 255, 0.90);
+  --ohana-card-inset: rgba(0, 0, 0, 0.04);
+  --ohana-divider: rgba(0, 0, 0, 0.08);
+  --ohana-divider-dashed: rgba(0, 0, 0, 0.20);
+  --ohana-fg: #1A1A2E;
+  --ohana-fg-secondary: rgba(26, 26, 46, 0.70);
+  --ohana-fg-tertiary:  rgba(26, 26, 46, 0.45);
+  --ohana-fg-disabled:  rgba(26, 26, 46, 0.30);
+
+  --ohana-success-bg:     rgb(240, 253, 244);
+  --ohana-success-border: rgb(16, 185, 129);
+  --ohana-success-text:   rgb(6, 78, 59);
+  --ohana-warning-bg:     rgb(255, 251, 235);
+  --ohana-warning-border: rgb(245, 158, 11);
+  --ohana-warning-text:   rgb(146, 64, 14);
+  --ohana-error-bg:       rgb(254, 242, 242);
+  --ohana-error-border:   rgb(239, 68, 68);
+  --ohana-error-text:     rgb(153, 27, 27);
+  --ohana-info-bg:        rgb(239, 246, 255);
+  --ohana-info-border:    rgb(59, 130, 246);
+  --ohana-info-text:      rgb(30, 58, 138);
+}
+
+/* =========================================================
+   SEMANTIC TEXT STYLES
+   Use classes (.oh-h1, .oh-metric, .oh-body) when you need
+   the canonical hierarchy, OR cascade from a root with .oh-*.
+   ========================================================= */
+
+.oh-metric-hero,
+.oh-metric-giant,
+.oh-metric-lg,
+.oh-metric-md,
+.oh-large-title,
+.oh-h1, .oh-h2, .oh-h3, .oh-h4,
+.oh-headline,
+.oh-body, .oh-callout,
+.oh-subheadline, .oh-footnote,
+.oh-caption, .oh-caption-2 {
+  font-family: var(--font-rounded);
+  color: var(--ohana-fg);
+  letter-spacing: var(--tracking-tight);
+  margin: 0;
+}
+
+.oh-metric-hero  { font-size: var(--fs-metric-hero);  font-weight: var(--fw-black);    line-height: var(--lh-tight); letter-spacing: -0.03em; }
+.oh-metric-giant { font-size: var(--fs-metric-giant); font-weight: var(--fw-heavy);    line-height: var(--lh-tight); letter-spacing: -0.02em; }
+.oh-metric-lg    { font-size: var(--fs-metric-lg);    font-weight: var(--fw-heavy);    line-height: var(--lh-tight); letter-spacing: -0.02em; }
+.oh-metric-md    { font-size: var(--fs-metric-md);    font-weight: var(--fw-heavy);    line-height: var(--lh-tight); }
+.oh-metric-sm    { font-size: var(--fs-metric-sm);    font-weight: var(--fw-black);    line-height: var(--lh-snug); font-family: var(--font-rounded); color: var(--ohana-fg); margin: 0; }
+
+.oh-large-title  { font-size: var(--fs-large-title);  font-weight: var(--fw-heavy);    line-height: var(--lh-snug); }
+.oh-h1           { font-size: var(--fs-title);        font-weight: var(--fw-bold);     line-height: var(--lh-snug); }
+.oh-h2           { font-size: var(--fs-title2);       font-weight: var(--fw-bold);     line-height: var(--lh-snug); }
+.oh-h3           { font-size: var(--fs-title3);       font-weight: var(--fw-semibold); line-height: var(--lh-normal); }
+.oh-headline     { font-size: var(--fs-headline);     font-weight: var(--fw-bold);     line-height: var(--lh-normal); }
+
+.oh-body         { font-size: var(--fs-body);         font-weight: var(--fw-medium);   line-height: var(--lh-relaxed); font-family: var(--font-body); color: var(--ohana-fg); }
+.oh-callout      { font-size: var(--fs-callout);      font-weight: var(--fw-medium);   line-height: var(--lh-normal); font-family: var(--font-body); color: var(--ohana-fg); }
+.oh-subheadline  { font-size: var(--fs-subheadline);  font-weight: var(--fw-medium);   line-height: var(--lh-normal); font-family: var(--font-body); color: var(--ohana-fg-secondary); }
+.oh-footnote     { font-size: var(--fs-footnote);     font-weight: var(--fw-medium);   line-height: var(--lh-normal); color: var(--ohana-fg-secondary); }
+.oh-caption      { font-size: var(--fs-caption);      font-weight: var(--fw-medium);   line-height: var(--lh-normal); color: var(--ohana-fg-tertiary); letter-spacing: 0.01em; text-transform: uppercase; }
+.oh-caption-2    { font-size: var(--fs-caption2);     font-weight: var(--fw-bold);     line-height: var(--lh-normal); color: var(--ohana-fg-tertiary); letter-spacing: 0.02em; text-transform: uppercase; }
+
+/* =========================================================
+   UTILITY — Glass card primitive
+   Matches OhanaGlassModifier / UltimateGlassCard
+   ========================================================= */
+.oh-glass {
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.20),
+    rgba(255, 255, 255, 0.04) 50%,
+    rgba(255, 255, 255, 0.10)
+  );
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid var(--ohana-card-glass-stroke);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-glass);
+}
+
+.oh-card-white {
+  background: #FFFFFF;
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-white);
+  color: var(--ohana-ink);
+}
+
+.oh-card-dark {
+  background: #2D2D3A; /* arkCardDark */
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-dark);
+  color: #FFFFFF;
+}
+
+.oh-card-inset {
+  background: var(--ohana-card-inset);
+  border-radius: var(--radius-lg);
+}
+
+/* =========================================================
+   UTILITY — Buttons
+   ========================================================= */
+.oh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  font-family: var(--font-rounded);
+  font-size: var(--fs-headline);
+  font-weight: var(--fw-bold);
+  padding: 14px 20px;
+  border: 0;
+  cursor: pointer;
+  transition: transform var(--dur-press) linear, box-shadow var(--dur-fast), background-color var(--dur-fast);
+  user-select: none;
+}
+.oh-btn:active { transform: scale(0.96); }
+
+.oh-btn-primary {
+  background: var(--ohana-primary);
+  color: var(--ohana-ink);
+  border-radius: var(--radius-full);
+}
+.oh-btn-primary.oh-btn-neon { box-shadow: var(--shadow-glow-lime); }
+
+.oh-btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ohana-fg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-full);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.oh-btn-dark {
+  background: var(--ohana-ink);
+  color: #FFFFFF;
+  border-radius: var(--radius-full);
+}
+
+.oh-btn-danger {
+  background: rgba(255, 71, 87, 0.12);
+  color: var(--ohana-red);
+  border: 1px solid rgba(255, 71, 87, 0.30);
+  border-radius: var(--radius-full);
+}
+
+.oh-btn-icon {
+  width: 44px; height: 44px; padding: 0;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.04));
+  color: var(--ohana-primary);
+}
+
+/* =========================================================
+   UTILITY — Chips / badges
+   ========================================================= */
+.oh-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px;
+  font-family: var(--font-rounded);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-bold);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ohana-fg-secondary);
+}
+.oh-chip--selected {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--ohana-fg);
+}
+.oh-chip .oh-chip-dot {
+  width: 6px; height: 6px; border-radius: 999px;
+  background: currentColor;
+}
+
+.oh-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px;
+  font-family: var(--font-rounded);
+  font-size: var(--fs-caption2);
+  font-weight: var(--fw-bold);
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: rgba(255, 255, 255, 0.10);
+  color: var(--ohana-fg);
+}
+
+/* =========================================================
+   BACKGROUND — goIsland (primary production background)
+   ========================================================= */
+.oh-bg-island {
+  background: linear-gradient(
+    180deg,
+    var(--ohana-navy-gradient-top) 0%,
+    var(--ohana-navy-gradient-mid) 50%,
+    var(--ohana-navy-gradient-bottom) 100%
+  );
+  color: var(--ohana-fg);
+  position: relative;
+  isolation: isolate;
+}
+
+.oh-bg-default {
+  background: var(--ohana-base-dark);
+  color: var(--ohana-fg);
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.oh-bg-default::before,
+.oh-bg-default::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  pointer-events: none;
+  z-index: -1;
+}
+.oh-bg-default::before {
+  width: 260px; height: 260px;
+  background: var(--ohana-primary-dark);
+  opacity: 0.55;
+  top: -160px; left: -80px;
+  animation: oh-blob-a 8s var(--ease-inout) infinite alternate;
+}
+.oh-bg-default::after {
+  width: 300px; height: 300px;
+  background: var(--ohana-blue);
+  opacity: 0.45;
+  top: 60px; right: -120px;
+  animation: oh-blob-b 10s var(--ease-inout) infinite alternate;
+}
+
+@keyframes oh-blob-a { to { transform: translate(40px, -30px); } }
+@keyframes oh-blob-b { to { transform: translate(-50px, 35px); } }
+
+/* =========================================================
+   RESETS
+   ========================================================= */
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--ohana-bg);
+  color: var(--ohana-fg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
