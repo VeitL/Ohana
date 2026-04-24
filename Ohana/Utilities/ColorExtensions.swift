@@ -67,10 +67,10 @@ extension Color {
     
     // MARK: - Go UI Color Palette
     static let goLime = Color(hex: "C8FF00")
-    /// 全局主强调：浅色 FF7600，深色荧光绿（与 `OhanaApp` `.tint` 一致）
-    static let goPrimary = Color(light: Color(hex: "FF7600"), dark: goLime)
-    static let goPrimaryLight = Color(hex: "FF9A4D")
-    static let goPrimaryDark = Color(hex: "CC5E00")
+    /// GO UI 主强调色：始终为荧光绿（GO UI 永远是深色背景，无需光/暗自适应）
+    static let goPrimary = goLime
+    static let goPrimaryLight = Color(hex: "E0FF80")  // 浅色高亮变体
+    static let goPrimaryDark = Color(hex: "9ECC00")   // 深色按压变体
     static let goBackground = Color(hex: "4338FF")
     static let goLimeLight = Color(hex: "E8FFB0")
     static let goMint = Color(hex: "B8FFD0")

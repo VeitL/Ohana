@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 140" width="520" height="140" role="img" aria-label="Ohana wordmark">
+  <defs>
+    <linearGradient id="oh-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#C8FF00"></stop>
+      <stop offset="100%" stop-color="#E0FF00"></stop>
+    </linearGradient>
+    <filter id="oh-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="b"></feGaussianBlur>
+      <feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+    </filter>
+  </defs>
+  
+  <g filter="url(#oh-glow)">
+    <text x="0" y="105" font-family="SF Pro Rounded, Nunito, system-ui, sans-serif" font-weight="900" font-size="120" letter-spacing="-4" fill="url(#oh-grad)">ohana</text>
+  </g>
+  
+  <circle cx="225" cy="40" r="7" fill="#C8FF00"></circle>
+  
+  <path d="M 430 32 Q 445 14 470 20 Q 460 36 448 38 Z" fill="#C8FF00" opacity="0.9"></path>
+</svg>

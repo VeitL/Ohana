@@ -167,7 +167,7 @@ struct CoHealthDashboardFullView: View {
         let allLogs: [PetWalkLog] = associatedPets.flatMap { $0.walkLogs }
         let fmt = DateFormatter()
         fmt.dateFormat = "E"
-        fmt.locale = Locale(identifier: "zh_CN")
+        fmt.locale = AppLanguage.effectiveLocale
         return (0..<7).map { offset in
             let day = Calendar.current.date(byAdding: .day, value: -(6 - offset), to: Date())!
             let dayLogs = allLogs.filter { log in
@@ -177,7 +177,8 @@ struct CoHealthDashboardFullView: View {
             let totalMeters = dayLogs.reduce(0.0) { acc, log in acc + log.distanceMeters }
             let km = totalMeters / 1000
             let isToday = Calendar.current.isDateInToday(day)
-            return DayWalkPoint(label: isToday ? "今" : fmt.string(from: day), km: km, isToday: isToday)
+            let todayLabel = AppLanguage.isEnglish ? "Today" : "今"
+            return DayWalkPoint(label: isToday ? todayLabel : fmt.string(from: day), km: km, isToday: isToday)
         }
     }
 

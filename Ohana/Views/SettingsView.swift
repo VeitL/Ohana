@@ -16,8 +16,8 @@ struct SettingsView: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @AppStorage("appLanguage") private var appLanguage = "zh"
     @AppStorage("appThemePreference") private var appThemePreference: String = "system"
-    @AppStorage("appBackgroundStyle") private var appBackgroundStyle: String = AppBackgroundStyle.goDefault.rawValue
-    @AppStorage("appUIStyle") private var appUIStyle: String = "classic"
+    @AppStorage("appBackgroundStyle") private var appBackgroundStyle: String = AppBackgroundStyle.goIsland.rawValue
+    @AppStorage("appUIStyle") private var appUIStyle: String = "go"
     @AppStorage("userNickname") private var userNickname = ""
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
     @State private var showingNicknameEdit = false
@@ -36,6 +36,7 @@ struct SettingsView: View {
     @State private var importError: String? = nil
     @State private var showingImportSuccess = false
     @State private var showingImportErrorAlert = false
+    @State private var showingFocusStackTest = false
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
     
@@ -172,6 +173,15 @@ struct SettingsView: View {
                                         bgColors: [Color(hex: "F5F5F7"), Color(hex: "FF7600").opacity(0.18)],
                                         isSelected: appUIStyle == "material",
                                         onTap: { appUIStyle = "material" }
+                                    )
+                                    UIStyleCard(
+                                        title: "GO UI",
+                                        subtitle: "蓝色步数运动风",
+                                        icon: "figure.walk",
+                                        accentColor: Color(hex: "22D3EE"),
+                                        bgColors: [Color(hex: "3B5BDB"), Color(hex: "0F1640")],
+                                        isSelected: appUIStyle == "go",
+                                        onTap: { appUIStyle = "go" }
                                     )
                                 }
                             }
@@ -396,6 +406,37 @@ struct SettingsView: View {
                                 .padding(.vertical, 8)
                             }
                             .buttonStyle(.plain)
+
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+
+                            Button {
+                                showingFocusStackTest = true
+                            } label: {
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .fill(Color.goPrimary.opacity(0.12))
+                                            .frame(width: 32, height: 32)
+                                        Image(systemName: "rectangle.stack.fill")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundStyle(Color.goPrimary)
+                                    }
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("GO Focus 堆叠测试页")
+                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                            .foregroundStyle(primaryText)
+                                        Text("截图风格堆叠 · 单体页 · 快捷打卡")
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(tertiaryText)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(tertiaryText.opacity(0.6))
+                                }
+                                .padding(.vertical, 8)
+                            }
+                            .buttonStyle(.plain)
                         }
 
                         // 数据
@@ -454,6 +495,10 @@ struct SettingsView: View {
             }
         }
         .preferredColorScheme(preferredScheme)
+        .fullScreenCover(isPresented: $showingFocusStackTest) {
+            FocusStackHomeTestViewPreviewWrapper()
+                .preferredColorScheme(preferredScheme)
+        }
     }
     
     // MARK: - 设备身份绑定卡

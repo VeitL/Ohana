@@ -13,6 +13,7 @@ enum IslandMood: Equatable {
     case storm
     case celebrate   // 解锁成就 / 今日遛狗 >5km / 里程碑日
     case plantBreeze // 植物浇水后的生态联动特效
+    case cloudy      // 适度焦虑：连断打卡 / 漏药 / 多日未护理
 }
 
 struct WeatherParticle: Identifiable {
@@ -85,6 +86,7 @@ struct IslandMoodWeatherView: View {
         case .storm:       emojis = ["⚡️", "🌩️", "💧"]
         case .celebrate:   emojis = ["🎉", "🌟", "✨", "🎊", "⭐️", "💫"]
         case .plantBreeze: emojis = ["🍃", "🌿", "🌱", "🍀", "🌸", "💚"]
+        case .cloudy:      emojis = ["🌥️", "🌫", "☁️", "💭"]
         }
         
         let particle = WeatherParticle(
@@ -190,6 +192,118 @@ struct IslandMoodCalculator {
             return .breezy
         }
 
+        // 负反馈：漏药 / 连断 / 长期无护理 → cloudy（适度焦虑）
+        if IslandNegativeFeedback.hasAnyNegativeSignal(pets: pets, plants: plants) {
+            return .cloudy
+        }
+
         return .calm
+    }
+}
+
+// MARK: - Island Negative Feedback（岛屿负反馈系统）
+//
+// P0 留存：连断天气变阴 / 护理超期 / 用药遗漏叶发黄
+// 统一作为 mood/banner 的数据源，避免到处散落的零散判断
+//
+struct IslandNegativeSignal: Identifiable {
+    let id = UUID()
+    let iconName: String      // SF Symbol
+    let emoji: String         // fallback emoji
+    let title: String
+    let detail: String
+    let severity: Severity
+
+    enum Severity {
+        case warning       // 黄色 - 可缓冲
+        case critical      // 红色 - 紧急
+    }
+}
+
+struct IslandNegativeFeedback {
+    /// 返回所有负反馈信号，按严重程度排序（critical 在前）
+    static func signals(pets: [Pet], plants: [Plant] = []) -> [IslandNegativeSignal] {
+        var result: [IslandNegativeSignal] = []
+        let cal = Calendar.current
+        let now = Date()
+
+        // 1. 连断打卡（streak=0 且今天还没打卡，说明昨日之前就断了）
+        let brokenStreakPets = pets.filter { pet in
+            pet.currentStreak == 0
+                && !cal.isDateInToday(pet.lastCheckInDate ?? .distantPast)
+        }
+        if !brokenStreakPets.isEmpty {
+            let names = brokenStreakPets.prefix(2).map(\.name).joined(separator: "、")
+            result.append(IslandNegativeSignal(
+                iconName: "cloud.fill",
+                emoji: "🌥",
+                title: "今日还未打卡",
+                detail: "\(names) 需要你关心一下",
+                severity: .warning
+            ))
+        }
+
+        // 2. 用药遗漏（最近 3 天有用药计划但今日未服用）
+        for pet in pets {
+            for med in pet.medications where med.isActiveToday {
+                let need = med.frequency.dosesPerDay
+                guard need > 0 else { continue }
+                let taken = MedicationReminderService.dosesTakenToday(for: med.id)
+                let hour = cal.component(.hour, from: now)
+                // 过了晚上 22:00 还未吃完 → 视为今日漏药
+                if hour >= 22 && taken < need {
+                    result.append(IslandNegativeSignal(
+                        iconName: "pills.fill",
+                        emoji: "💊",
+                        title: "\(pet.name) 今日漏药",
+                        detail: "\(med.name) 还差 \(need - taken) 次",
+                        severity: .critical
+                    ))
+                    break
+                }
+            }
+        }
+
+        // 3. 护理超期（超过 72 小时未喂食）
+        for pet in pets where !pet.hasPassedAway {
+            let lastFeed = pet.careLogs
+                .filter { $0.type == CareType.feeding.rawValue }
+                .map(\.date)
+                .max()
+            if let last = lastFeed, now.timeIntervalSince(last) > 72 * 3600 {
+                let hours = Int(now.timeIntervalSince(last) / 3600)
+                result.append(IslandNegativeSignal(
+                    iconName: "fork.knife",
+                    emoji: "🍗",
+                    title: "\(pet.name) 喂食超期",
+                    detail: "距离上次已 \(hours) 小时",
+                    severity: .warning
+                ))
+                break
+            }
+        }
+
+        // 4. 植物缺水（7 天没浇水）
+        for plant in plants {
+            if let last = plant.lastWateredDate, now.timeIntervalSince(last) > 7 * 86400 {
+                result.append(IslandNegativeSignal(
+                    iconName: "drop.triangle.fill",
+                    emoji: "🥀",
+                    title: "\(plant.name) 叶子发黄",
+                    detail: "已 \(Int(now.timeIntervalSince(last) / 86400)) 天未浇水",
+                    severity: .warning
+                ))
+                break
+            }
+        }
+
+        return result.sorted {
+            if $0.severity == $1.severity { return false }
+            return $0.severity == .critical
+        }
+    }
+
+    static func hasAnyNegativeSignal(pets: [Pet], plants: [Plant] = []) -> Bool {
+        !signals(pets: pets, plants: plants).isEmpty
     }
 }

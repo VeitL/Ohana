@@ -296,6 +296,55 @@ final class QuestManager {
         }
     }
 
+    // MARK: - 质量加成（精准模式、拍照、备注等越完整，椰子奖励越高）
+    /// 调用方按照用户提交的信息丰富度传入相应 bonus，默认 .none
+    enum QualityBonus {
+        case none                  // ×1.0 佛系/默认
+        case precise               // ×1.2 精准录入（如准确克数、GPS、重量）
+        case withNote              // ×1.2 填写了备注
+        case withPhoto             // ×1.3 附带照片
+        case preciseAndNote        // ×1.35
+        case preciseAndPhoto       // ×1.4
+        case preciseNotePhoto      // ×1.5 三项全齐
+
+        var multiplier: Double {
+            switch self {
+            case .none:              return 1.0
+            case .precise:           return 1.2
+            case .withNote:          return 1.2
+            case .withPhoto:         return 1.3
+            case .preciseAndNote:    return 1.35
+            case .preciseAndPhoto:   return 1.4
+            case .preciseNotePhoto:  return 1.5
+            }
+        }
+
+        var badgeLabel: String? {
+            switch self {
+            case .none:              return nil
+            case .precise:           return "🎯 精准+20%"
+            case .withNote:          return "📝 备注+20%"
+            case .withPhoto:         return "📷 照片+30%"
+            case .preciseAndNote:    return "🎯📝 加成+35%"
+            case .preciseAndPhoto:   return "🎯📷 加成+40%"
+            case .preciseNotePhoto:  return "✨ 完美记录+50%"
+            }
+        }
+
+        /// 根据 3 个维度布尔值智能组合
+        static func compose(precise: Bool, hasNote: Bool, hasPhoto: Bool) -> QualityBonus {
+            switch (precise, hasNote, hasPhoto) {
+            case (true,  true,  true):  return .preciseNotePhoto
+            case (true,  false, true):  return .preciseAndPhoto
+            case (true,  true,  false): return .preciseAndNote
+            case (false, false, true):  return .withPhoto
+            case (false, true,  false): return .withNote
+            case (true,  false, false): return .precise
+            default:                    return .none
+            }
+        }
+    }
+
     // MARK: - 暴击引擎（内部）
     private struct CritResult {
         let multiplier: Int   // 1 / 2 / 5
@@ -329,7 +378,8 @@ final class QuestManager {
     func awardAction(
         type: OhanaActionType,
         pet: Pet?,
-        context: ModelContext
+        context: ModelContext,
+        quality: QualityBonus = .none
     ) -> (humanGot: Int, petGot: Int) {
         // ── 冷却检查：冷却期内返回 (0,0)，数据层已在上层写入
         if isOnCooldown(petId: pet?.id, type: type) {
@@ -341,6 +391,13 @@ final class QuestManager {
 
         var finalHuman = base.human * crit.multiplier
         var finalPet   = base.pet   * crit.multiplier
+
+        // 质量加成：信息越丰富，奖励越高（上限 ×1.5）
+        let qMul = quality.multiplier
+        if qMul > 1.0 {
+            finalHuman = Int(ceil(Double(finalHuman) * qMul))
+            finalPet   = Int(ceil(Double(finalPet)   * qMul))
+        }
 
         // title_chef: CEO/Chef bonus
         if case .feed = type, UserDefaults.standard.string(forKey: "shop_equipped_title") == "title_chef" {
@@ -369,7 +426,11 @@ final class QuestManager {
 
         // ── 4. 日志（拆分：宠物和人类各生成独立条目）
         let logEmoji = crit.isCrit && crit.multiplier == 5 ? "🎁" : type.emoji
-        let baseTitle = crit.isCrit ? crit.title : type.title(pet: pet)
+        var baseTitle = crit.isCrit ? crit.title : type.title(pet: pet)
+        // 非暴击时，将质量加成 badge 附到标题末尾
+        if !crit.isCrit, let badge = quality.badgeLabel {
+            baseTitle += " · \(badge)"
+        }
 
         if let p = pet, finalPet > 0 {
             appendLog(CoconutLogEntry(

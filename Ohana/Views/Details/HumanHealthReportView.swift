@@ -12,14 +12,19 @@ import SwiftData
 struct HumanHealthReportView: View {
     let human: Human
     @Environment(\.modelContext) private var modelContext
-    @Query private var allReports: [HumanHealthReport]
+    @Query private var myReports: [HumanHealthReport]
 
     @State private var showAddSheet = false
     @State private var editingReport: HumanHealthReport? = nil
 
-    private var myReports: [HumanHealthReport] {
-        allReports.filter { $0.humanId == human.id.uuidString }
-            .sorted { $0.reportDate > $1.reportDate }
+    init(human: Human) {
+        self.human = human
+        let humanId = human.id.uuidString
+        _myReports = Query(
+            filter: #Predicate<HumanHealthReport> { $0.humanId == humanId },
+            sort: \HumanHealthReport.reportDate,
+            order: .reverse
+        )
     }
 
     private var upcomingCheckCount: Int {

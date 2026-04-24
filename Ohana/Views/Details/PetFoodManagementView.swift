@@ -1091,7 +1091,8 @@ struct PetFoodManagementView: View {
         if !QuestManager.shared.isFirstMealRecorded {
             QuestManager.shared.recordFirstMeal()
         }
-        QuestManager.shared.awardAction(type: .feed, pet: pet, context: modelContext)
+        // 精准喂食：精确克数视为 precise，+20% 椰子奖励
+        QuestManager.shared.awardAction(type: .feed, pet: pet, context: modelContext, quality: .precise)
         // 超量提示（仍然允许喂食，仅显示警告）
         let newTotal = todayFeedGrams + grams
         if pet.dailyPortionGrams > 0 && newTotal > pet.dailyPortionGrams * 1.1 {

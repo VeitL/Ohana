@@ -48,6 +48,8 @@ struct QuickPlayDetailSheet: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
                         petHeader
+                        ExecutorPickerBar(tint: themeColor)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         playMonthStripCard
                         checkInButton
                         logList

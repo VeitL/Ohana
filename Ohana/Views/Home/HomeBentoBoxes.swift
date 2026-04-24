@@ -4,6 +4,12 @@
 //
 //  Created by Guanchenulous on 10.03.26.
 //
+// DEPRECATED: 此组件已废弃，未被任何地方调用。
+// 相关数据已在以下位置展示：
+//   - 椰子余额：OasisRewardView header pill
+//   - 打卡连击：OasisRewardView → oasisBentoGrid → 打卡日历卡
+// 若需重启，需在 OverviewView 中手动调用。
+//
 
 import SwiftUI
 

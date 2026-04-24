@@ -1,7 +1,32 @@
 # Ohana UI 设计规范
 
+> **主设计规范已升级** — 以 Claude Design 导出的设计系统为准：
+> 📁 `ohana-design-system/project/README.md` — 品牌概述、色彩、字体、组件、图标规范（权威）
+> 📐 `ohana-design-system/project/tokens.json` — 所有设计 Token（颜色 / 间距 / 圆角 / 阴影 / 动效）
+> 🎨 `ohana-design-system/project/ui_kits/ohana_ios/` — 四屏高保真 UI Kit（首页 / 宠物详情 / 商店 / 绿洲）
+>
+> **所有新建/修改页面必须优先参考上述设计系统，本文件作为 Swift 实现层补充说明。**
+> 如本文件与设计系统存在矛盾，以设计系统为准。
+
+---
+
+## 设计系统速查
+
+| 项目 | 规范 |
+|------|------|
+| 主色（暗色模式） | `Color.goLime` = `#C8FF00`（荧光绿） |
+| 主色（浅色模式） | `Color.goPrimary` = `#FF7600`（橙） |
+| 墨色（主色上的文字） | `#1A1A2E`（`Color.arkInk`） |
+| 背景 | 深海军蓝渐变 `#2D4ECC → #1A2E8A → #0C1640` + 三色浮动色球 |
+| 卡片默认风格 | 玻璃质感（`UltimateGlassCard`）或纯白实色卡片 |
+| 字体 | SF Pro Rounded（`.system(design: .rounded)`），全系列 |
+| 图标 | SF Symbols（功能图标）+ Emoji（货币/身份/奖励） |
+| 椰子货币 | `🥥` 始终用 Lime 胶囊显示，`QuestManager.shared` 管理 |
+| 生命之树 | 首页核心元素，`OasisTreeManager.shared` 提供数据 |
+
+---
+
 > 基于 iOS 26 Liquid Glass 原生 API，适用于 Ohana App 所有页面。
-> **所有新建/修改页面必须遵循此规范。**
 
 ---
 

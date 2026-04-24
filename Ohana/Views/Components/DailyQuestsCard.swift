@@ -70,8 +70,9 @@ struct IslandQuestEngine {
         }
 
         // ── 喂食（今日未喂任何一只宠物）
+        // 注意：`PetCareLog.type` 存的是 `CareType.rawValue`（中文，如「喂食」），不能用英文 "feeding"
         if quests.count < 3, let pet = activePets.first(where: { p in
-            !p.careLogs.contains { $0.type == "feeding" && cal.isDateInToday($0.date) }
+            !p.careLogs.contains { $0.careType == .feeding && cal.isDateInToday($0.date) }
         }) {
             quests.append(IslandQuest(
                 id: "q_feed_\(pet.id.uuidString)",
@@ -84,9 +85,9 @@ struct IslandQuestEngine {
             ))
         }
 
-        // ── 饮水（今日未喂水）
+        // ── 喂水 / 换水（.watering 或 .waterChange 均视为完成）
         if quests.count < 3, let pet = activePets.first(where: { p in
-            !p.careLogs.contains { $0.type == "watering" && cal.isDateInToday($0.date) }
+            !p.careLogs.contains { ($0.careType == .watering || $0.careType == .waterChange) && cal.isDateInToday($0.date) }
         }) {
             quests.append(IslandQuest(
                 id: "q_water_\(pet.id.uuidString)",

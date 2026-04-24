@@ -117,11 +117,7 @@ struct CoHealthDashboardView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 20)
         }
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(.white.opacity(0.05))
-                .overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(.white.opacity(0.1), lineWidth: 1))
-        )
+        // 外层由 HumanDetailView 等页面套「首页同款」白底卡片；此处不再叠半透明底避免发灰。
     }
 
     // MARK: - Stats Row

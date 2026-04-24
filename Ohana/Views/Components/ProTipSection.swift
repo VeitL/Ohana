@@ -10,7 +10,9 @@ import SwiftUI
 
 struct ProTipSection: View {
     @Environment(\.colorScheme) private var colorScheme
-    
+    @AppStorage("appLanguage") private var appLanguage = "zh"
+    private var l: L10n { L10n(appLanguage) }
+
     // MARK: - 配色方案（深浅模式自适应）
     private var cardBg: Color {
         colorScheme == .light 
@@ -42,7 +44,7 @@ struct ProTipSection: View {
                         .foregroundStyle(Color.goPrimary)
                 }
                 
-                Text("解锁 3D 悬浮卡片")
+                Text(l.petProTipTitle)
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundStyle(titleColor)
                 
@@ -61,24 +63,24 @@ struct ProTipSection: View {
             VStack(alignment: .leading, spacing: 8) {
                 StepRow(
                     icon: "1.circle.fill",
-                    text: "在系统相册中",
-                    highlightText: "长按宠物主体",
+                    text: l.petProTipStep1Prefix,
+                    highlightText: l.petProTipStep1Highlight,
                     suffix: "",
                     highlightColor: Color.goPrimary
                 )
                 
                 StepRow(
                     icon: "2.circle.fill",
-                    text: "点击",
-                    highlightText: "拷贝",
-                    suffix: "保存到剪贴板",
+                    text: l.petProTipStep2Prefix,
+                    highlightText: l.petProTipStep2Highlight,
+                    suffix: l.petProTipStep2Suffix,
                     highlightColor: Color.goPrimary
                 )
                 
                 StepRow(
                     icon: "3.circle.fill",
-                    text: "返回 Ohana，点击下方",
-                    highlightText: "粘贴按钮",
+                    text: l.petProTipStep3Prefix,
+                    highlightText: l.petProTipStep3Highlight,
                     suffix: "",
                     highlightColor: Color.goPrimary
                 )

@@ -36,17 +36,24 @@ struct PetPhotoAlbumView: View {
     private var grouped: [(String, [PetPhotoLog])] {
         var dict: [String: [PetPhotoLog]] = [:]
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy 年 M 月"
+        formatter.locale = AppLanguage.effectiveLocale
+        formatter.dateFormat = AppLanguage.isEnglish ? "MMMM yyyy" : "yyyy 年 M 月"
         for log in sortedPhotos {
             let key = formatter.string(from: log.date)
             dict[key, default: []].append(log)
         }
         return dict.sorted { a, b in
-            let df = DateFormatter(); df.dateFormat = "yyyy 年 M 月"
+            let df = DateFormatter()
+            df.locale = AppLanguage.effectiveLocale
+            df.dateFormat = AppLanguage.isEnglish ? "MMMM yyyy" : "yyyy 年 M 月"
             let da = df.date(from: a.key) ?? .distantPast
             let db = df.date(from: b.key) ?? .distantPast
             return da > db
         }
+    }
+
+    private var albumNavigationTitle: String {
+        AppLanguage.isEnglish ? "\(pet.name)'s Album" : "\(pet.name)的相册"
     }
 
     var body: some View {
@@ -56,7 +63,7 @@ struct PetPhotoAlbumView: View {
             } else {
                 NavigationStack {
                     albumCore
-                        .navigationTitle("\(pet.name)的相册")
+                        .navigationTitle(albumNavigationTitle)
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
                             ToolbarItem(placement: .topBarLeading) {

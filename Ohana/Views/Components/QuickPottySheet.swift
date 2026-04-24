@@ -35,6 +35,13 @@ struct QuickPottySheet: View {
                 }
                 .padding(.horizontal, 20).padding(.top, 20)
 
+                // 执行人胶囊
+                HStack {
+                    ExecutorPickerBar(tint: Color.goYellow)
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+
                 // 类型选择
                 HStack(spacing: 12) {
                     ForEach(PottyType.allCases, id: \.rawValue) { type in
