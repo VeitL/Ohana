@@ -413,6 +413,7 @@ struct AddVaccineSheet: View {
         }
 
         // 到期提醒
+        var reminderToSchedule: Reminder?
         if hasExpiry && enableReminder {
             let reminderDate = Calendar.current.date(
                 byAdding: .day, value: -reminderDaysBefore, to: expiryDate
@@ -429,11 +430,16 @@ struct AddVaccineSheet: View {
                 let reminder = Reminder(event: event, scheduledAt: reminderDate)
                 reminder.status = "pending"
                 modelContext.insert(reminder)
-                NotificationManager.shared.schedule(reminder: reminder)
+                reminderToSchedule = reminder
             }
         }
 
         modelContext.safeSave()
+        if let reminderToSchedule {
+            Task { @MainActor in
+                await ReminderSchedulingService.scheduleIfNeeded(reminder: reminderToSchedule, context: modelContext, source: .detail)
+            }
+        }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         dismiss()
     }

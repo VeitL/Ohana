@@ -340,7 +340,6 @@ private struct AllCardsSheet: View {
             }
             .navigationTitle("全部成员")
             .navigationBarTitleDisplayMode(.large)
-            .toolbarColorScheme(.dark, for: .navigationBar)
         }
     }
 
@@ -986,8 +985,10 @@ struct HumanIDCardView: View {
 struct HumanQuickAccessGrid: View {
     let human: Human
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @State private var showWeightSheet = false
     @State private var showWishSheet = false
+    @State private var showPrivacyAlert = false
     @State private var waterCheckedIn = false
 
     private struct HumanQAAction: Identifiable {
@@ -1020,6 +1021,11 @@ struct HumanQuickAccessGrid: View {
             HumanWishlistView(human: human)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+        }
+        .alert("仅本人可见", isPresented: $showPrivacyAlert) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text("该成员已将此功能设为仅自己可见。")
         }
     }
 
@@ -1054,6 +1060,10 @@ struct HumanQuickAccessGrid: View {
     private func handleHumanAction(_ id: String) {
         switch id {
         case "weight":
+            guard !isPrivate(.weight) else {
+                showPrivacyAlert = true
+                return
+            }
             showWeightSheet = true
         case "water":
             let log = WaterLog(date: Date(), amountMl: 250)
@@ -1073,9 +1083,17 @@ struct HumanQuickAccessGrid: View {
             // 此处因为 HumanIDCardView 已有 onDetail，仅做视觉反馈
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
         case "wish":
+            guard !isPrivate(.wishlist) else {
+                showPrivacyAlert = true
+                return
+            }
             showWishSheet = true
         default:
             break
         }
+    }
+
+    private func isPrivate(_ field: HumanPrivateField) -> Bool {
+        PrivacyService.isLocked(field, for: human, viewedBy: UUID(uuidString: activeHumanIdStr))
     }
 }

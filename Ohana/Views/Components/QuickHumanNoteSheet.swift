@@ -28,7 +28,7 @@ struct QuickHumanNoteSheet: View {
                     Spacer()
                     Text("快速备注")
                         .font(OhanaFont.headline(.bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     Spacer()
                     Button("保存") { save() }
                         .font(OhanaFont.callout(.bold))
@@ -49,11 +49,11 @@ struct QuickHumanNoteSheet: View {
                                 .foregroundStyle(Color.goPrimary)
                             Text(human.name)
                                 .font(OhanaFont.subheadline(.bold))
-                                .foregroundStyle(.white.opacity(0.8))
+                                .foregroundStyle(.primary.opacity(0.8))
                         }
                         TextEditor(text: $noteText)
                             .font(OhanaFont.body())
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                             .scrollContentBackground(.hidden)
                             .frame(minHeight: 120)
                     }
@@ -66,12 +66,11 @@ struct QuickHumanNoteSheet: View {
                     HStack {
                         Label("日期", systemImage: "calendar")
                             .font(OhanaFont.callout(.semibold))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(.primary.opacity(0.7))
                         Spacer()
                         DatePicker("", selection: $date, displayedComponents: .date)
                             .labelsHidden()
                             .tint(Color.goPrimary)
-                            .colorScheme(.dark)
                     }
                     .padding(16)
                 }

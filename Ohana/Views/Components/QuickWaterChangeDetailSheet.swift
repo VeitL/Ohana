@@ -294,17 +294,25 @@ struct QuickWaterChangeDetailSheet: View {
 
     private func doWaterChange() {
         let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        let log = PetCareLog(date: Date(), type: .waterChange, pet: pet, executorId: eid)
-        modelContext.insert(log)
-        modelContext.safeSave()
+        CareEventService.recordCare(
+            pet: pet,
+            type: .waterChange,
+            context: modelContext,
+            executorId: eid,
+            reward: .general(humanReward: 15, petReward: 20, emoji: CareType.waterChange.emoji, title: "\(pet.name) 换水奖励")
+        )
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     private func doFilterClean() {
         let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        let log = PetCareLog(date: Date(), type: .filterClean, pet: pet, executorId: eid)
-        modelContext.insert(log)
-        modelContext.safeSave()
+        CareEventService.recordCare(
+            pet: pet,
+            type: .filterClean,
+            context: modelContext,
+            executorId: eid,
+            reward: .general(humanReward: 25, petReward: 40, emoji: CareType.filterClean.emoji, title: "\(pet.name) 清理滤材报酬")
+        )
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 }

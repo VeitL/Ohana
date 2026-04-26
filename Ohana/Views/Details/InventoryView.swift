@@ -21,7 +21,8 @@ struct InventoryView: View {
     
     // Inventory states
     @AppStorage("inventory_backdate_1day_count") private var backdatePacks: Int = 0
-    @AppStorage("shop_streakShieldExpiry") private var streakShieldExpiry: Double = 0
+    @AppStorage("shop_boostDoubleActive") private var doubleBoostActive: Bool = false
+    @State private var streakShieldExpiry: Date? = nil
     
     // All items reference (mirrors CoconutShopView)
     private var allEffectsAndTitles: [ShopItem] {
@@ -76,9 +77,12 @@ struct InventoryView: View {
                         }
                         
                         // 3. 消耗区
-                        let isShieldActive = Date().timeIntervalSince1970 < streakShieldExpiry
-                        if backdatePacks > 0 || isShieldActive {
+                        let isShieldActive = streakShieldExpiry.map { Date() < $0 } ?? false
+                        if backdatePacks > 0 || isShieldActive || doubleBoostActive {
                             inventorySection(title: "消耗品状态", icon: "bag") {
+                                if doubleBoostActive {
+                                    consumableRow(emoji: "⚡️", name: "双倍椰子券", count: 1, suffix: "下次打卡生效")
+                                }
                                 if backdatePacks > 0 {
                                     consumableRow(emoji: "📅", name: "昨日补签卡", count: backdatePacks)
                                 }
@@ -88,7 +92,7 @@ struct InventoryView: View {
                             }
                         }
                         
-                        if myTitles.isEmpty && myEffects.isEmpty && backdatePacks == 0 && !isShieldActive {
+                        if myTitles.isEmpty && myEffects.isEmpty && backdatePacks == 0 && !isShieldActive && !doubleBoostActive {
                             VStack(spacing: 12) {
                                 Image(systemName: "shippingbox")
                                     .font(.system(size: 40))
@@ -114,6 +118,7 @@ struct InventoryView: View {
                 }
             }
         }
+        .onAppear { loadStreakShieldExpiry() }
     }
     
     // MARK: - Section Helper
@@ -215,7 +220,7 @@ struct InventoryView: View {
             Spacer()
             
             if item.id == "fx_popout_card" {
-                Text("已绑定")
+                Text("去商店绑定")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(.primary.opacity(0.3))
             } else {
@@ -253,5 +258,9 @@ struct InventoryView: View {
         .overlay(alignment: .bottom) {
             Divider().background(.white.opacity(0.1)).padding(.leading, 60)
         }
+    }
+
+    private func loadStreakShieldExpiry() {
+        streakShieldExpiry = UserDefaults.standard.object(forKey: "shop_streakShieldExpiry") as? Date
     }
 }

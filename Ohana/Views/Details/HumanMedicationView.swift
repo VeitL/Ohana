@@ -5,6 +5,7 @@
 
 import SwiftUI
 import SwiftData
+import Charts
 
 struct DailyDoseItem: Identifiable, Hashable {
     let id = UUID()
@@ -14,11 +15,30 @@ struct DailyDoseItem: Identifiable, Hashable {
     var log: HumanMedicationLog?
 }
 
+private struct MedicationAdherenceDay: Identifiable {
+    let id = UUID()
+    let date: Date
+    let dayLabel: String
+    let planned: Int
+    let taken: Int
+
+    var completion: Double {
+        guard planned > 0 else { return 0 }
+        return min(1, Double(taken) / Double(planned))
+    }
+}
+
 // MARK: - Main View
 
 struct HumanMedicationView: View {
     let human: Human
+    var showsDoneButton: Bool = false
+    var onDoseTaken: (() -> Void)? = nil
+
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @Query private var allMeds: [HumanMedication]
     @Query private var allLogs: [HumanMedicationLog]
 
@@ -34,10 +54,50 @@ struct HumanMedicationView: View {
     private var activeMeds: [HumanMedication] { myMeds.filter { $0.isActive } }
     private var inactiveMeds: [HumanMedication] { myMeds.filter { !$0.isActive } }
 
+    private var primaryText: Color { Color.ohanaPrimaryText }
+    private var secondaryText: Color { Color.ohanaSecondaryText }
+    private var tertiaryText: Color { Color.ohanaTertiaryText }
+    private var dividerColor: Color { Color.ohanaDivider }
+    private var controlFill: Color { Color.ohanaControlFill }
+    private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
+    private var isPrivacyLocked: Bool { human.isPrivate(.medication, viewedBy: activeHumanId) }
+
     private var todayLogs: [HumanMedicationLog] {
         allLogs.filter { log in
             Calendar.current.isDateInToday(log.scheduledTime) && log.humanId == human.id.uuidString
         }
+    }
+
+    private var adherenceDays: [MedicationAdherenceDay] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let weekdayFormatter = DateFormatter()
+        weekdayFormatter.locale = AppLanguage.effectiveLocale
+        weekdayFormatter.dateFormat = "E"
+
+        return (0..<7).reversed().compactMap { offset in
+            guard let day = calendar.date(byAdding: .day, value: -offset, to: today) else { return nil }
+            let planned = plannedDoseCount(on: day)
+            let taken = allLogs.filter {
+                $0.humanId == human.id.uuidString &&
+                $0.status == .taken &&
+                calendar.isDate($0.scheduledTime, inSameDayAs: day)
+            }.count
+
+            return MedicationAdherenceDay(
+                date: day,
+                dayLabel: weekdayFormatter.string(from: day),
+                planned: planned,
+                taken: min(taken, max(planned, taken))
+            )
+        }
+    }
+
+    private var sevenDayCompletionRate: Int {
+        let planned = adherenceDays.reduce(0) { $0 + $1.planned }
+        guard planned > 0 else { return 0 }
+        let taken = adherenceDays.reduce(0) { $0 + $1.taken }
+        return Int((Double(taken) / Double(planned) * 100).rounded())
     }
     
     private var todayScheduleItems: [DailyDoseItem] {
@@ -76,6 +136,37 @@ struct HumanMedicationView: View {
     }
 
     var body: some View {
+        Group {
+            if isPrivacyLocked {
+                privacyLockedView
+            } else {
+                medicationContent
+            }
+        }
+        .navigationTitle("💊 吃药提醒")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if showsDoneButton {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { dismiss() }
+                        .font(OhanaFont.callout(.semibold))
+                        .foregroundStyle(Color.goPrimary)
+                }
+            }
+        }
+        .sheet(isPresented: $showAddSheet) {
+            AddMedicationSheet(human: human)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $editingMed) { med in
+            AddMedicationSheet(human: human, editing: med)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+    }
+
+    private var medicationContent: some View {
         ZStack(alignment: .bottom) {
             ArkBackgroundView().ignoresSafeArea()
 
@@ -85,6 +176,11 @@ struct HumanMedicationView: View {
                     summaryBento
                         .padding(.horizontal, 16)
                         .padding(.top, 16)
+
+                    if !myMeds.isEmpty {
+                        adherenceChartCard
+                            .padding(.horizontal, 16)
+                    }
 
                     // Today's Schedule Timeline
                     if !todayScheduleItems.isEmpty {
@@ -161,17 +257,26 @@ struct HumanMedicationView: View {
                 .padding(.bottom, 28)
             }
         }
-        .navigationTitle("💊 吃药提醒")
-        .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showAddSheet) {
-            AddMedicationSheet(human: human)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-        }
-        .sheet(item: $editingMed) { med in
-            AddMedicationSheet(human: human, editing: med)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
+    }
+
+    private var privacyLockedView: some View {
+        ZStack {
+            ArkBackgroundView().ignoresSafeArea()
+            VStack(spacing: 12) {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 34, weight: .bold))
+                    .foregroundStyle(Color.goYellow)
+                Text("吃药提醒仅本人可见")
+                    .font(OhanaFont.title3(.black))
+                    .foregroundStyle(primaryText)
+                Text("当前家庭成员无权查看用药计划、剂量和服药记录。")
+                    .font(OhanaFont.callout())
+                    .foregroundStyle(secondaryText)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(24)
+            .ohanaStandardCard(cornerRadius: 24)
+            .padding(.horizontal, 24)
         }
     }
 
@@ -216,9 +321,115 @@ struct HumanMedicationView: View {
         activeMeds.filter { $0.endDate == nil }.count
     }
 
+    private func plannedDoseCount(on day: Date) -> Int {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: day)
+
+        return myMeds.reduce(0) { total, med in
+            let medStart = calendar.startOfDay(for: med.startDate)
+            guard startOfDay >= medStart else { return total }
+            if let endDate = med.endDate,
+               startOfDay > calendar.startOfDay(for: endDate) {
+                return total
+            }
+
+            let dosesPerDay = med.frequency.dosesPerDay
+            guard dosesPerDay > 0 else { return total }
+
+            if med.frequency == .weekly {
+                let daysSinceStart = calendar.dateComponents([.day], from: medStart, to: startOfDay).day ?? 0
+                return daysSinceStart % 7 == 0 ? total + dosesPerDay : total
+            }
+
+            return total + dosesPerDay
+        }
+    }
+
+    private var adherenceChartCard: some View {
+        UltimateGlassCard {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("近 7 天服药趋势")
+                            .font(OhanaFont.headline(.bold))
+                            .foregroundStyle(primaryText)
+                        Text("计划剂量与已完成剂量对比")
+                            .font(OhanaFont.caption())
+                            .foregroundStyle(secondaryText)
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("\(sevenDayCompletionRate)%")
+                            .font(OhanaFont.metric(size: 24))
+                            .foregroundStyle(Color.goPrimary)
+                        Text("完成率")
+                            .font(OhanaFont.caption2(.bold))
+                            .foregroundStyle(secondaryText)
+                    }
+                }
+
+                Chart {
+                    ForEach(adherenceDays) { item in
+                        BarMark(
+                            x: .value("日期", item.dayLabel),
+                            y: .value("剂量", item.planned)
+                        )
+                        .foregroundStyle(controlFill)
+                        .position(by: .value("类型", "计划"))
+                        .cornerRadius(5)
+
+                        BarMark(
+                            x: .value("日期", item.dayLabel),
+                            y: .value("剂量", item.taken)
+                        )
+                        .foregroundStyle(Color.goPrimary.gradient)
+                        .position(by: .value("类型", "已服"))
+                        .cornerRadius(5)
+                    }
+                }
+                .frame(height: 150)
+                .chartLegend(.hidden)
+                .chartYAxis {
+                    AxisMarks(position: .leading) { _ in
+                        AxisGridLine().foregroundStyle(dividerColor)
+                        AxisValueLabel().foregroundStyle(secondaryText)
+                    }
+                }
+                .chartXAxis {
+                    AxisMarks { _ in
+                        AxisValueLabel().foregroundStyle(secondaryText)
+                    }
+                }
+
+                HStack(spacing: 14) {
+                    chartLegendDot(color: secondaryText.opacity(0.55), label: "计划")
+                    chartLegendDot(color: .goPrimary, label: "已服")
+                    Spacer()
+                    Text("按每日频率自动估算计划剂量")
+                        .font(OhanaFont.caption2())
+                        .foregroundStyle(tertiaryText)
+                }
+            }
+            .padding(16)
+        }
+    }
+
+    private func chartLegendDot(color: Color, label: String) -> some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(color)
+                .frame(width: 7, height: 7)
+            Text(label)
+                .font(OhanaFont.caption2(.bold))
+                .foregroundStyle(secondaryText)
+        }
+    }
+
     private var divider: some View {
         Rectangle()
-            .fill(Color.white.opacity(0.1))
+            .fill(dividerColor)
             .frame(width: 1, height: 40)
     }
 
@@ -229,10 +440,10 @@ struct HumanMedicationView: View {
                 .foregroundStyle(color)
             Text(value)
                 .font(OhanaFont.metric(size: 24))
-                .foregroundStyle(.white)
+                .foregroundStyle(primaryText)
             Text(label)
                 .font(OhanaFont.caption())
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(secondaryText)
         }
         .frame(maxWidth: .infinity)
     }
@@ -247,7 +458,7 @@ struct HumanMedicationView: View {
             VStack(alignment: .trailing) {
                 Text(item.scheduledTime, style: .time)
                     .font(OhanaFont.callout(.bold))
-                    .foregroundStyle(isTaken ? .white.opacity(0.4) : .white)
+                    .foregroundStyle(isTaken ? tertiaryText : primaryText)
             }
             .frame(width: 52, alignment: .trailing)
             
@@ -257,7 +468,7 @@ struct HumanMedicationView: View {
             } label: {
                 ZStack {
                     Circle()
-                        .strokeBorder(isTaken ? Color.goTeal : .white.opacity(0.3), lineWidth: 2)
+                        .strokeBorder(isTaken ? Color.goTeal : dividerColor.opacity(0.9), lineWidth: 2)
                         .frame(width: 28, height: 28)
                         .background(
                             Circle().fill(isTaken ? Color.goTeal : Color.clear)
@@ -275,12 +486,12 @@ struct HumanMedicationView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.medication.name)
                     .font(OhanaFont.headline(.semibold))
-                    .foregroundStyle(isTaken ? .white.opacity(0.5) : .white)
-                    .strikethrough(isTaken, color: .white.opacity(0.5))
+                    .foregroundStyle(isTaken ? secondaryText : primaryText)
+                    .strikethrough(isTaken, color: secondaryText)
                 if !item.medication.dosage.isEmpty {
                     Text(item.medication.dosage)
                         .font(OhanaFont.caption())
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(tertiaryText)
                 }
             }
             
@@ -299,6 +510,22 @@ struct HumanMedicationView: View {
                 } else {
                     log.status = .taken
                     log.recordedTime = Date()
+                    CareLedgerService.record(
+                        occurredAt: log.recordedTime ?? Date(),
+                        actorKind: .human,
+                        actorId: human.id.uuidString,
+                        subjectKind: .human,
+                        subjectId: human.id.uuidString,
+                        eventKind: .medication,
+                        actionType: "humanMedicationTaken",
+                        source: .detail,
+                        legacyModelName: "HumanMedicationLog",
+                        legacyModelId: log.id.uuidString,
+                        metadataJSON: "{\"medicationId\":\"\(item.medication.id.uuidString)\"}",
+                        context: modelContext,
+                        save: false
+                    )
+                    onDoseTaken?()
                 }
             } else {
                 let newLog = HumanMedicationLog(
@@ -309,9 +536,30 @@ struct HumanMedicationView: View {
                     recordedTime: Date()
                 )
                 modelContext.insert(newLog)
+                CareLedgerService.record(
+                    occurredAt: newLog.recordedTime ?? Date(),
+                    actorKind: .human,
+                    actorId: human.id.uuidString,
+                    subjectKind: .human,
+                    subjectId: human.id.uuidString,
+                    eventKind: .medication,
+                    actionType: "humanMedicationTaken",
+                    source: .detail,
+                    legacyModelName: "HumanMedicationLog",
+                    legacyModelId: newLog.id.uuidString,
+                    metadataJSON: "{\"medicationId\":\"\(item.medication.id.uuidString)\"}",
+                    context: modelContext,
+                    save: false
+                )
+                onDoseTaken?()
             }
             modelContext.safeSave()
         }
+    }
+
+    private func scheduleHumanMedicationReminders(overrideMeds: [HumanMedication]?) {
+        let meds = overrideMeds ?? myMeds
+        MedicationReminderService.shared.scheduleHumanMedicationReminders(for: human, meds: meds, context: modelContext)
     }
 
     // MARK: - Medication Row
@@ -334,7 +582,7 @@ struct HumanMedicationView: View {
                         HStack(spacing: 6) {
                             Text(med.name.isEmpty ? "未命名药物" : med.name)
                                 .font(OhanaFont.callout(.bold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(primaryText)
                             if !med.isActive {
                                 Text("已停")
                                     .font(OhanaFont.caption2(.bold))
@@ -346,31 +594,31 @@ struct HumanMedicationView: View {
                         HStack(spacing: 6) {
                             Text(med.frequency.emoji + " " + med.frequency.rawValue)
                                 .font(OhanaFont.caption())
-                                .foregroundStyle(.white.opacity(0.6))
+                                .foregroundStyle(secondaryText)
                             if !med.dosage.isEmpty {
                                 Text("·")
-                                    .foregroundStyle(.white.opacity(0.3))
+                                    .foregroundStyle(tertiaryText)
                                 Text(med.dosage)
                                     .font(OhanaFont.caption())
-                                    .foregroundStyle(.white.opacity(0.6))
+                                    .foregroundStyle(secondaryText)
                             }
                         }
                         // 服药时间
                         HStack(spacing: 4) {
                             Image(systemName: "clock")
                                 .font(OhanaFont.caption2())
-                                .foregroundStyle(.white.opacity(0.4))
+                                .foregroundStyle(tertiaryText)
                             Text(med.firstDoseTime, style: .time)
                                 .font(OhanaFont.caption(.semibold))
                                 .foregroundStyle(Color(hex: med.colorHex))
                             if let days = med.daysRemaining {
                                 Text("· 剩 \(days) 天")
                                     .font(OhanaFont.caption())
-                                    .foregroundStyle(days <= 3 ? Color.goRed : .white.opacity(0.4))
+                                    .foregroundStyle(days <= 3 ? Color.goRed : tertiaryText)
                             } else {
                                 Text("· 长期")
                                     .font(OhanaFont.caption())
-                                    .foregroundStyle(.white.opacity(0.4))
+                                    .foregroundStyle(tertiaryText)
                             }
                         }
                     }
@@ -382,6 +630,7 @@ struct HumanMedicationView: View {
                         withAnimation(.spring(response: 0.3)) {
                             med.isActive.toggle()
                             modelContext.safeSave()
+                            scheduleHumanMedicationReminders(overrideMeds: nil)
                             toastMessage = med.isActive ? "✅ \(med.name) 已恢复" : "⏸ \(med.name) 已停药"
                             showToast = true
                             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
@@ -410,8 +659,8 @@ struct HumanMedicationView: View {
                     Circle().fill(Color.goRed.opacity(0.12)).frame(width: 72, height: 72)
                     Image(systemName: "pills").font(.system(size: 32)).foregroundStyle(Color.goRed)
                 }
-                Text("还没有添加药物").font(OhanaFont.title3(.bold)).foregroundStyle(.white)
-                Text("点击下方按钮添加第一个服药提醒").font(OhanaFont.callout()).foregroundStyle(.white.opacity(0.5))
+                Text("还没有添加药物").font(OhanaFont.title3(.bold)).foregroundStyle(primaryText)
+                Text("点击下方按钮添加第一个服药提醒").font(OhanaFont.callout()).foregroundStyle(secondaryText)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 32)
@@ -421,7 +670,7 @@ struct HumanMedicationView: View {
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
             .font(OhanaFont.caption(.black))
-            .foregroundStyle(.white.opacity(0.4))
+            .foregroundStyle(tertiaryText)
             .textCase(.uppercase)
             .tracking(1.0)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -437,6 +686,8 @@ struct AddMedicationSheet: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @Query private var allMeds: [HumanMedication]
 
     @State private var name = ""
     @State private var dosage = ""
@@ -460,6 +711,12 @@ struct AddMedicationSheet: View {
         ("goPrimary", "4338FF"),
     ]
 
+    private var primaryText: Color { Color.ohanaPrimaryText }
+    private var secondaryText: Color { Color.ohanaSecondaryText }
+    private var tertiaryText: Color { Color.ohanaTertiaryText }
+    private var controlFill: Color { Color.ohanaControlFill }
+    private var controlStroke: Color { Color.ohanaCardStroke }
+
     var body: some View {
         ZStack {
             ArkBackgroundView().ignoresSafeArea()
@@ -470,12 +727,12 @@ struct AddMedicationSheet: View {
                     HStack {
                         Text(editing == nil ? "添加药物提醒" : "编辑药物")
                             .font(OhanaFont.title2(.bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(primaryText)
                         Spacer()
                         Button { dismiss() } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .font(OhanaFont.title2())
-                                .foregroundStyle(.white.opacity(0.4))
+                                .foregroundStyle(tertiaryText)
                         }
                     }
                     .padding(.horizontal, 20)
@@ -488,12 +745,12 @@ struct AddMedicationSheet: View {
                             fieldRow(icon: "textformat", label: "药品名称") {
                                 TextField("如：阿莫西林、维生素C", text: $name)
                                     .font(OhanaFont.body())
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(primaryText)
                             }
                             fieldRow(icon: "scalemass", label: "剂量") {
                                 TextField("如：1片、500mg", text: $dosage)
                                     .font(OhanaFont.body())
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(primaryText)
                             }
                         }
                         .padding(16)
@@ -509,7 +766,7 @@ struct AddMedicationSheet: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Label("频率", systemImage: "repeat")
                                     .font(OhanaFont.caption(.bold))
-                                    .foregroundStyle(.white.opacity(0.5))
+                                    .foregroundStyle(secondaryText)
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 8) {
                                         ForEach(MedicationFrequency.allCases) { freq in
@@ -521,9 +778,9 @@ struct AddMedicationSheet: View {
                                                     Text(freq.rawValue)
                                                         .font(OhanaFont.caption(.bold))
                                                 }
-                                                .foregroundStyle(frequency == freq ? Color.arkInk : .white)
+                                                .foregroundStyle(frequency == freq ? Color.arkInk : primaryText)
                                                 .padding(.horizontal, 12).padding(.vertical, 7)
-                                                .background(frequency == freq ? Color.goTeal : Color.white.opacity(0.1), in: Capsule())
+                                                .background(frequency == freq ? Color.goTeal : controlFill, in: Capsule())
                                             }
                                             .buttonStyle(.plain)
                                         }
@@ -535,7 +792,7 @@ struct AddMedicationSheet: View {
                                 fieldRow(icon: "text.bubble", label: "自定义说明") {
                                     TextField("说明服药频率", text: $customNote)
                                         .font(OhanaFont.body())
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(primaryText)
                                 }
                             }
 
@@ -543,28 +800,26 @@ struct AddMedicationSheet: View {
                             HStack {
                                 Label("第一次服药时间", systemImage: "clock")
                                     .font(OhanaFont.caption(.bold))
-                                    .foregroundStyle(.white.opacity(0.5))
+                                    .foregroundStyle(secondaryText)
                                 Spacer()
                                 DatePicker("", selection: $firstDoseTime, displayedComponents: .hourAndMinute)
                                     .labelsHidden()
-                                    .colorScheme(.dark)
                             }
 
                             // Date range
                             HStack {
                                 Label("开始日期", systemImage: "calendar")
                                     .font(OhanaFont.caption(.bold))
-                                    .foregroundStyle(.white.opacity(0.5))
+                                    .foregroundStyle(secondaryText)
                                 Spacer()
                                 DatePicker("", selection: $startDate, displayedComponents: .date)
                                     .labelsHidden()
-                                    .colorScheme(.dark)
                             }
 
                             Toggle(isOn: $hasEndDate) {
                                 Label("设置结束日期", systemImage: "calendar.badge.checkmark")
                                     .font(OhanaFont.callout(.bold))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(primaryText)
                             }
                             .tint(Color.goTeal)
 
@@ -572,11 +827,10 @@ struct AddMedicationSheet: View {
                                 HStack {
                                     Label("结束日期", systemImage: "calendar.badge.minus")
                                         .font(OhanaFont.caption(.bold))
-                                        .foregroundStyle(.white.opacity(0.5))
+                                        .foregroundStyle(secondaryText)
                                     Spacer()
                                     DatePicker("", selection: $endDate, in: startDate..., displayedComponents: .date)
                                         .labelsHidden()
-                                        .colorScheme(.dark)
                                 }
                             }
                         }
@@ -593,7 +847,7 @@ struct AddMedicationSheet: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("标签颜色")
                                     .font(OhanaFont.caption(.bold))
-                                    .foregroundStyle(.white.opacity(0.5))
+                                    .foregroundStyle(secondaryText)
                                 HStack(spacing: 10) {
                                     ForEach(colorOptions, id: \.1) { option in
                                         Button {
@@ -603,7 +857,7 @@ struct AddMedicationSheet: View {
                                                 .fill(Color(hex: option.1))
                                                 .frame(width: 30, height: 30)
                                                 .overlay(
-                                                    Circle().strokeBorder(.white, lineWidth: colorHex == option.1 ? 2.5 : 0)
+                                                    Circle().strokeBorder(primaryText, lineWidth: colorHex == option.1 ? 2.5 : 0)
                                                 )
                                                 .scaleEffect(colorHex == option.1 ? 1.15 : 1.0)
                                         }
@@ -617,14 +871,15 @@ struct AddMedicationSheet: View {
                             VStack(alignment: .leading, spacing: 6) {
                                 Label("备注", systemImage: "note.text")
                                     .font(OhanaFont.caption(.bold))
-                                    .foregroundStyle(.white.opacity(0.5))
+                                    .foregroundStyle(secondaryText)
                                 TextEditor(text: $notes)
                                     .font(OhanaFont.body())
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(primaryText)
                                     .scrollContentBackground(.hidden)
                                     .frame(height: 60)
                                     .padding(10)
-                                    .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                                    .background(controlFill, in: RoundedRectangle(cornerRadius: 10))
+                                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(controlStroke, lineWidth: 1))
                             }
                         }
                         .padding(16)
@@ -636,6 +891,9 @@ struct AddMedicationSheet: View {
                         Button {
                             modelContext.delete(med)
                             modelContext.safeSave()
+                            scheduleHumanMedicationReminders(overrideMeds: allMeds.filter {
+                                $0.humanId == human.id.uuidString && $0.id != med.id
+                            })
                             dismiss()
                         } label: {
                             Label("删除这条药物记录", systemImage: "trash")
@@ -675,7 +933,7 @@ struct AddMedicationSheet: View {
                 Circle().fill(color.opacity(0.2)).frame(width: 36, height: 36)
                 Image(systemName: icon).font(OhanaFont.callout(.bold)).foregroundStyle(color)
             }
-            Text(title).font(OhanaFont.headline(.bold)).foregroundStyle(.white)
+            Text(title).font(OhanaFont.headline(.bold)).foregroundStyle(primaryText)
             Spacer()
         }
     }
@@ -684,12 +942,13 @@ struct AddMedicationSheet: View {
         VStack(alignment: .leading, spacing: 6) {
             Label(label, systemImage: icon)
                 .font(OhanaFont.caption(.bold))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(secondaryText)
             HStack {
                 content()
             }
             .padding(12)
-            .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+            .background(controlFill, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(controlStroke, lineWidth: 1))
         }
     }
 
@@ -708,6 +967,7 @@ struct AddMedicationSheet: View {
     }
 
     private func save() {
+        let savedMed: HumanMedication
         if let med = editing {
             med.name = name
             med.dosage = dosage
@@ -718,6 +978,7 @@ struct AddMedicationSheet: View {
             med.endDate = hasEndDate ? endDate : nil
             med.colorHex = colorHex
             med.notes = notes
+            savedMed = med
         } else {
             let med = HumanMedication(
                 humanId: human.id.uuidString,
@@ -732,8 +993,20 @@ struct AddMedicationSheet: View {
             )
             med.customFrequencyNote = customNote
             modelContext.insert(med)
+            savedMed = med
         }
         modelContext.safeSave()
+        scheduleHumanMedicationReminders(overrideMeds: mergedMeds(including: savedMed))
         dismiss()
+    }
+
+    private func mergedMeds(including savedMed: HumanMedication) -> [HumanMedication] {
+        var meds = allMeds.filter { $0.humanId == human.id.uuidString && $0.id != savedMed.id }
+        meds.append(savedMed)
+        return meds
+    }
+
+    private func scheduleHumanMedicationReminders(overrideMeds: [HumanMedication]) {
+        MedicationReminderService.shared.scheduleHumanMedicationReminders(for: human, meds: overrideMeds, context: modelContext)
     }
 }

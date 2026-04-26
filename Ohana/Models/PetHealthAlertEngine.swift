@@ -196,13 +196,17 @@ final class PetHealthAlertEngine {
     // MARK: - 打卡检测（喂食 / 喂水）
 
     private func checkCheckIn(pet: Pet, now: Date, cal: Calendar) -> [HealthAlert] {
-        let careLogs = pet.careLogs.filter { $0.careType == .feeding || $0.careType == .watering }
+        let careLogs = pet.careLogs.filter {
+            $0.careType == .feeding ||
+            $0.careType == .watering ||
+            $0.careType == .waterChange
+        }
         guard let last = careLogs.map(\.date).max() else {
             return [HealthAlert(
                 id: UUID(), petId: pet.id, petName: pet.name, petEmoji: pet.avatarEmoji,
                 type: .noCheckIn,
                 title: "未记录喂食/喂水",
-                detail: "尚未记录任何喂食或喂水，请养成每日打卡习惯。",
+                detail: "尚未记录任何喂食、喂水或换水，请养成每日打卡习惯。",
                 severity: .info,
                 generatedAt: now
             )]
@@ -213,7 +217,7 @@ final class PetHealthAlertEngine {
                 id: UUID(), petId: pet.id, petName: pet.name, petEmoji: pet.avatarEmoji,
                 type: .noCheckIn,
                 title: "已 \(days) 天未打卡",
-                detail: "距上次喂食/喂水记录已超过 \(days) 天，请保持日常照料记录。",
+                detail: "距上次喂食、喂水或换水记录已超过 \(days) 天，请保持日常照料记录。",
                 severity: days >= 5 ? .warning : .info,
                 generatedAt: now
             )]
@@ -228,11 +232,12 @@ final class PetHealthAlertEngine {
         guard let last = pet.pottyLogs.map(\.date).max() else { return [] }
         let hours = cal.dateComponents([.hour], from: last, to: now).hour ?? 0
         if hours >= 36 {
+            let elapsedText = hours < 48 ? "\(hours) 小时" : "\(max(1, hours / 24)) 天"
             return [HealthAlert(
                 id: UUID(), petId: pet.id, petName: pet.name, petEmoji: pet.avatarEmoji,
                 type: .noPotty,
                 title: "长时间未记录便便",
-                detail: "距上次便便记录已超过 \(hours / 24) 天，注意观察宠物排便状况。",
+                detail: "距上次便便记录已超过 \(elapsedText)，注意观察宠物排便状况。",
                 severity: hours >= 72 ? .urgent : .warning,
                 generatedAt: now
             )]

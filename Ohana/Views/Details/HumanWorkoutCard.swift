@@ -278,6 +278,7 @@ struct HumanWorkoutCard: View {
 // MARK: - Add Workout Sheet
 struct AddWorkoutSheet: View {
     let human: Human
+    var onSaved: (() -> Void)? = nil
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
@@ -288,12 +289,19 @@ struct AddWorkoutSheet: View {
     @State private var date = Date()
     @State private var notes = ""
 
+    private var duration: Int { Int(durationStr) ?? 0 }
+    private var distance: Double { Double(distanceStr.replacingOccurrences(of: ",", with: ".")) ?? 0 }
+    private var calories: Int { Int(caloriesStr) ?? 0 }
+    private var canSave: Bool { duration > 0 }
+
     var body: some View {
         NavigationStack {
             ZStack {
                 ArkBackgroundView()
                 ScrollView {
                     VStack(spacing: 16) {
+                        workoutPreview
+
                         // 运动类型选择
                         VStack(alignment: .leading, spacing: 8) {
                             Text("运动类型")
@@ -301,24 +309,7 @@ struct AddWorkoutSheet: View {
                                 .foregroundStyle(.primary.opacity(0.6))
                             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 10) {
                                 ForEach(WorkoutType.allCases, id: \.self) { type in
-                                    Button { selectedType = type } label: {
-                                        VStack(spacing: 6) {
-                                            Image(systemName: type.icon)
-                                                .font(OhanaFont.title3())
-                                                .foregroundStyle(selectedType == type ? Color(hex: type.colorHex) : .white.opacity(0.4))
-                                            Text(type.rawValue)
-                                                .font(OhanaFont.caption2(.bold))
-                                                .foregroundStyle(selectedType == type ? .white : .white.opacity(0.4))
-                                        }
-                                        .frame(maxWidth: .infinity).padding(.vertical, 12)
-                                        .background(
-                                            selectedType == type
-                                                ? Color(hex: type.colorHex).opacity(0.2)
-                                                : Color.white.opacity(0.06),
-                                            in: RoundedRectangle(cornerRadius: 14)
-                                        )
-                                    }
-                                    .buttonStyle(.plain)
+                                    workoutTypeButton(for: type)
                                 }
                             }
                         }
@@ -341,10 +332,25 @@ struct AddWorkoutSheet: View {
                                 .font(OhanaFont.callout(.semibold))
                                 .foregroundStyle(.primary)
                             Spacer()
-                            DatePicker("", selection: $date, displayedComponents: .date)
+                            DatePicker("", selection: $date, displayedComponents: [.date, .hourAndMinute])
                                 .datePickerStyle(.compact)
                                 .tint(Color.goPrimary)
                                 .labelsHidden()
+                        }
+                        .padding(16).goIslandModuleCard(cornerRadius: 20)
+
+                        // 备注
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("备注（可选）", systemImage: "note.text")
+                                .font(OhanaFont.callout(.semibold))
+                                .foregroundStyle(.primary)
+                            TextEditor(text: $notes)
+                                .font(OhanaFont.body())
+                                .foregroundStyle(.primary)
+                                .scrollContentBackground(.hidden)
+                                .frame(minHeight: 80)
+                                .padding(10)
+                                .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         }
                         .padding(16).goIslandModuleCard(cornerRadius: 20)
                     }
@@ -360,11 +366,68 @@ struct AddWorkoutSheet: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("保存") { save() }
                         .font(OhanaFont.callout(.bold))
-                        .foregroundStyle(Color.goPrimary)
-                        .disabled(durationStr.isEmpty)
+                        .foregroundStyle(canSave ? Color.goPrimary : .secondary)
+                        .disabled(!canSave)
                 }
             }
         }
+    }
+
+    private func workoutTypeButton(for type: WorkoutType) -> some View {
+        let isSelected = selectedType == type
+        let color = Color(hex: type.colorHex)
+
+        return Button { selectedType = type } label: {
+            VStack(spacing: 6) {
+                Image(systemName: type.icon)
+                    .font(OhanaFont.title3())
+                    .foregroundStyle(isSelected ? color : .primary.opacity(0.45))
+                Text(type.rawValue)
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(isSelected ? Color.primary : Color.primary.opacity(0.45))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(
+                isSelected ? color.opacity(0.2) : Color.primary.opacity(0.06),
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(isSelected ? color.opacity(0.45) : .clear, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var workoutPreview: some View {
+        HStack(spacing: 14) {
+            Image(systemName: selectedType.icon)
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(Color(hex: selectedType.colorHex))
+                .frame(width: 56, height: 56)
+                .background(Color(hex: selectedType.colorHex).opacity(0.16), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text("\(human.name) 的\(selectedType.rawValue)")
+                    .font(OhanaFont.headline(.bold))
+                    .foregroundStyle(.primary)
+                Text(previewSubtitle)
+                    .font(OhanaFont.caption(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(16)
+        .goIslandModuleCard(cornerRadius: 22)
+    }
+
+    private var previewSubtitle: String {
+        var parts: [String] = []
+        if duration > 0 { parts.append("\(duration) 分钟") }
+        if distance > 0 { parts.append(String(format: "%.1f 公里", distance)) }
+        if calories > 0 { parts.append("\(calories) kcal") }
+        return parts.isEmpty ? "填写时长后即可保存" : parts.joined(separator: " · ")
     }
 
     private func workoutField(icon: String, label: String, placeholder: String, text: Binding<String>, color: Color) -> some View {
@@ -387,9 +450,7 @@ struct AddWorkoutSheet: View {
     }
 
     private func save() {
-        let duration = Int(durationStr) ?? 0
-        let distance = Double(distanceStr.replacingOccurrences(of: ",", with: ".")) ?? 0
-        let calories = Int(caloriesStr) ?? 0
+        guard canSave else { return }
         let log = HumanWorkoutLog(
             date: date,
             type: selectedType,
@@ -403,6 +464,24 @@ struct AddWorkoutSheet: View {
         )
         modelContext.insert(log)
         modelContext.safeSave()
+        CareLedgerService.record(
+            occurredAt: log.date,
+            actorKind: .human,
+            actorId: human.id.uuidString,
+            subjectKind: .human,
+            subjectId: human.id.uuidString,
+            eventKind: .workout,
+            actionType: log.typeRaw,
+            amountValue: Double(log.durationMinutes),
+            amountUnit: "min",
+            note: log.notes,
+            source: .detail,
+            legacyModelName: "HumanWorkoutLog",
+            legacyModelId: log.id.uuidString,
+            metadataJSON: "{\"distanceKm\":\(log.distanceKm),\"calories\":\(log.calories),\"steps\":\(log.steps)}",
+            context: modelContext
+        )
+        onSaved?()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         dismiss()
     }

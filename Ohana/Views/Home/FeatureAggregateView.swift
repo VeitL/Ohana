@@ -44,7 +44,6 @@ struct FeatureAggregateView: View {
         }
         .navigationTitle(feature.title)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarColorScheme(.dark, for: .navigationBar)
     }
 
     // MARK: - Chip Row
@@ -173,6 +172,7 @@ struct FeatureAggregateView: View {
         case .documents:     return .petDocuments(pet.persistentModelID)
         case .moments:       return .petMoments(pet.persistentModelID)
         case .achievements:  return .petAchievements(pet.persistentModelID)
+        case .retention:     return .petRetention(pet.persistentModelID)
         case .weight:        return .petWeight(pet.persistentModelID)
         case .expense:       return .petExpense(pet.persistentModelID)
         }
@@ -213,6 +213,15 @@ struct FeatureAggregateView: View {
             return "\(pet.photoLogs.count)个时刻"
         case .achievements:
             return "\(pet.milestones.count)个里程碑"
+        case .retention:
+            let score = [
+                !pet.weightLogs.isEmpty || !pet.healthLogs.isEmpty,
+                !pet.photoLogs.isEmpty || !pet.milestones.isEmpty,
+                !pet.expenseLogs.isEmpty,
+                !pet.documents.isEmpty || !pet.insurances.isEmpty || !pet.medications.isEmpty,
+                pet.currentStreak > 0
+            ].filter { $0 }.count
+            return "已完善 \(score)/5 个长期模块"
         default:
             return ""
         }

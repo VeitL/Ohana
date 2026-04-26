@@ -37,7 +37,7 @@ struct PetPhotoAlbumView: View {
         var dict: [String: [PetPhotoLog]] = [:]
         let formatter = DateFormatter()
         formatter.locale = AppLanguage.effectiveLocale
-        formatter.dateFormat = AppLanguage.isEnglish ? "MMMM yyyy" : "yyyy 年 M 月"
+        formatter.dateFormat = AppLanguage.fullMonthYearFormat
         for log in sortedPhotos {
             let key = formatter.string(from: log.date)
             dict[key, default: []].append(log)
@@ -45,7 +45,7 @@ struct PetPhotoAlbumView: View {
         return dict.sorted { a, b in
             let df = DateFormatter()
             df.locale = AppLanguage.effectiveLocale
-            df.dateFormat = AppLanguage.isEnglish ? "MMMM yyyy" : "yyyy 年 M 月"
+            df.dateFormat = AppLanguage.fullMonthYearFormat
             let da = df.date(from: a.key) ?? .distantPast
             let db = df.date(from: b.key) ?? .distantPast
             return da > db

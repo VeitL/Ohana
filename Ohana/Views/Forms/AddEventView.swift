@@ -29,6 +29,7 @@ struct AddEventView: View {
     @State private var hasRecurrenceEnd = false
     @State private var reminderAdvanceDays = 0
     @State private var hasReminder = true
+    @State private var assigneeId: String? = nil
     
     var body: some View {
         OhanaSheetWrapper(title: "添加事件", onDismiss: { dismiss() }) {
@@ -243,6 +244,8 @@ struct AddEventView: View {
                 }
                 
                 // 提醒
+                AssigneePickerRow(assigneeId: $assigneeId, allHumans: humans)
+
                 Toggle("创建提醒", isOn: $hasReminder)
                     .tint(.arkCoral)
                 
@@ -276,7 +279,9 @@ struct AddEventView: View {
         )
         event.recurrenceDays = hasRecurrence ? recurrenceDays : 0
         event.recurrenceEndDate = hasRecurrenceEnd ? recurrenceEndDate : nil
+        event.assigneeId = assigneeId
         modelContext.insert(event)
+        var createdReminders: [Reminder] = []
 
         if hasReminder {
             let cal = Calendar.current
@@ -294,6 +299,7 @@ struct AddEventView: View {
                     let scheduled = cal.date(byAdding: .day, value: -reminderAdvanceDays, to: cursor) ?? cursor
                     let r = Reminder(event: event, scheduledAt: scheduled)
                     modelContext.insert(r)
+                    createdReminders.append(r)
                     guard let next = cal.date(byAdding: .day, value: recurrenceDays, to: cursor),
                           next > cursor else { break }   // 步进必须向前，否则中止
                     cursor = next
@@ -304,10 +310,16 @@ struct AddEventView: View {
                 let scheduled = cal.date(byAdding: .day, value: -reminderAdvanceDays, to: startDate) ?? startDate
                 let r = Reminder(event: event, scheduledAt: scheduled)
                 modelContext.insert(r)
+                createdReminders.append(r)
             }
         }
 
         modelContext.safeSave()
+        if !createdReminders.isEmpty {
+            Task { @MainActor in
+                await ReminderSchedulingService.scheduleManyIfNeeded(reminders: createdReminders, context: modelContext, source: .calendar)
+            }
+        }
         dismiss()
     }
 }

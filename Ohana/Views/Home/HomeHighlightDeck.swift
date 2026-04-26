@@ -241,7 +241,11 @@ struct HomeHighlightDeck: View {
                     plants: plants,
                     onComplete: {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        if quest.id == "q_walk" || quest.id.hasPrefix("q_feed_") {
+                        if quest.id == "q_walk"
+                            || quest.id.hasPrefix("q_feed_")
+                            || quest.id.hasPrefix("q_play_")
+                            || quest.id.hasPrefix("q_weight_")
+                            || quest.id.hasPrefix("q_moment_") {
                             onCompleteQuest(quest)
                         } else {
                             pendingCompleteQuest = quest
@@ -638,7 +642,11 @@ private struct DeckQuestCard: View {
         case "q_fertilize_plant": return "施肥"
         case "q_visit": return "探望"
         case "q_reminder": return "提醒"
-        default: return "委托"
+        default:
+            if quest.id.hasPrefix("q_play_") { return "陪玩" }
+            if quest.id.hasPrefix("q_weight_") { return "体重" }
+            if quest.id.hasPrefix("q_moment_") { return "日常" }
+            return "委托"
         }
     }
     private var reward: Int { IslandQuestEngine.coconutReward(forQuestId: quest.id) }

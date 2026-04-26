@@ -41,6 +41,8 @@ enum QuickActionPickerCatalog {
     static func allowedActionTypeIds(forSpecies species: String) -> Set<String> {
         var allowed = Set(QACardType.available(for: species).map(\.rawValue))
         if allowed.contains("care") { allowed.insert("groom") }
+        allowed.insert("water")
+        allowed.insert("waterChange")
         allowed.insert("moment")
         return allowed
     }
@@ -78,6 +80,16 @@ struct QuickActionItem: Identifiable, Codable, Hashable {
     }
 }
 
+enum QuickActionLimit {
+    static let maxItemsPerEntity = 8
+    static let title = "快捷操作已达上限"
+    static let message = "快捷操作区最多只能添加 8 个。更多功能可以在「全部功能」里查看和使用。"
+
+    static func count(for pet: Pet, in items: [QuickActionItem]) -> Int {
+        items.filter { $0.petId == pet.id && $0.entityKind != .human }.count
+    }
+}
+
 // MARK: - Go Quick Action Card (毛玻璃正方形)
 struct GoQuickActionCard: View {
     let item: QuickActionItem
@@ -90,7 +102,10 @@ struct GoQuickActionCard: View {
     var titleLabelOverride: String? = nil
     var pendingReminder: Reminder? = nil
     var countText: String? = nil
+    var privacyBadgeText: String? = nil
+    var isPrivacyLocked: Bool = false
     var isCompletedToday: Bool = false
+    var prefersLightForeground: Bool = false
     let onTap: () -> Void
     var onLongPress: (() -> Void)? = nil
     var onDoubleTap: (() -> Void)? = nil
@@ -131,16 +146,19 @@ struct GoQuickActionCard: View {
     private let premiumShape = RoundedRectangle(cornerRadius: 20, style: .continuous)
 
     private var cardBgColor: Color {
+        if isCompletedToday { return Color.goLime.opacity(0.18) }
         let base = petThemeColorHex.map { Color(hex: $0) } ?? Color(hex: item.colorHex)
         return pendingReminder != nil ? base.opacity(0.22) : base.opacity(0.14)
     }
     private var cardBorderColor: Color {
+        if isCompletedToday { return Color.goLime.opacity(0.68) }
         let base = petThemeColorHex.map { Color(hex: $0) } ?? Color(hex: item.colorHex)
         return pendingReminder != nil ? base.opacity(0.7) : base.opacity(0.3)
     }
 
     /// 今日已打卡时图标/水浪用色：优先宠物主题色，否则快捷项自带色
     private var checkInAccentColor: Color {
+        if isCompletedToday { return Color.goLime }
         if let hex = petThemeColorHex { return Color(hex: hex) }
         return Color(hex: item.colorHex)
     }
@@ -148,15 +166,24 @@ struct GoQuickActionCard: View {
     private var isWaterAction: Bool { item.actionType == "water" }
     private var isFeedAction: Bool { item.actionType == "feed" }
 
-    /// 喂食：未打卡灰色；已打卡主题色。其余快捷项保持原样。
+    /// 深色背景上优先保证可读性；浅色模式保留原来的完成态主题色反馈。
     private var quickActionIconForeground: Color {
-        if isCompletedToday { return checkInAccentColor }
+        if isCompletedToday { return Color.goLime }
+        if usesLightForeground { return .white.opacity(isFeedAction && !isCompletedToday ? 0.72 : 0.92) }
         if isFeedAction { return Color.secondary }
         return Color.primary.opacity(0.75)
     }
 
     @Environment(\.colorScheme) private var colorScheme
     private var isDarkMode: Bool { colorScheme == .dark }
+    private var usesLightForeground: Bool { prefersLightForeground || isDarkMode }
+    private var titleForeground: Color {
+        if isCompletedToday { return Color.goLime }
+        return usesLightForeground ? Color.white.opacity(0.9) : Color.primary.opacity(0.75)
+    }
+    private var subtitleForeground: Color {
+        usesLightForeground ? Color.white.opacity(0.62) : Color.primary.opacity(0.35)
+    }
     
     @State private var animateGlow = false
     @State private var pendingSingleTapWorkItem: DispatchWorkItem? = nil
@@ -217,9 +244,8 @@ struct GoQuickActionCard: View {
                 core.contextMenu {
                     if let reminder = pendingReminder {
                         Button {
-                            reminder.statusEnum = .completed
-                            reminder.completedAt = Date()
-                            modelContext.safeSave()
+                            let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+                            ReminderCompletionService.complete(reminder, by: activeHumanId, context: modelContext)
                             UINotificationFeedbackGenerator().notificationOccurred(.success)
                         } label: {
                             Label("完成待办", systemImage: "checkmark.circle.fill")
@@ -253,7 +279,10 @@ struct GoQuickActionCard: View {
             // Icon — 喂水已打卡：水浪仅在水滴形下半部；喂食与其它项共用 SF Symbol（无动画）
             ZStack {
                 if isWaterAction && isCompletedToday {
-                    QuickActionWaterDropWithWaves(accent: checkInAccentColor, isPressed: isPressed)
+                    QuickActionWaterDropWithWaves(
+                        accent: checkInAccentColor,
+                        isPressed: isPressed
+                    )
                 } else {
                     Image(systemName: resolvedIcon)
                         .font(.system(size: 26, weight: .semibold))
@@ -293,13 +322,19 @@ struct GoQuickActionCard: View {
             VStack(spacing: 1) {
                 Text(titleLabelOverride ?? cleanLabel)
                     .font(OhanaFont.caption2(.semibold))
-                    .foregroundStyle(.primary.opacity(0.75))
+                    .foregroundStyle(titleForeground)
                     .lineLimit(1)
 
-                if let subtitle = countText ?? pendingReminder?.event?.title {
+                if let badge = privacyBadgeText {
+                    Label(badge, systemImage: isPrivacyLocked ? "lock.fill" : "globe.asia.australia.fill")
+                        .font(.system(size: 8, weight: .black, design: .rounded))
+                        .foregroundStyle(isPrivacyLocked ? Color.goYellow : subtitleForeground)
+                        .lineLimit(1)
+                        .labelStyle(.titleAndIcon)
+                } else if let subtitle = countText ?? pendingReminder?.event?.title {
                     Text(subtitle)
                         .font(OhanaFont.caption2(.medium))
-                        .foregroundStyle(.primary.opacity(0.35))
+                        .foregroundStyle(subtitleForeground)
                         .lineLimit(1)
                 } else {
                     Text(" ")
@@ -564,6 +599,11 @@ struct QAManageSheet: View {
                     defaultPetId: defaultPetId,
                     existingItems: savedItems
                 ) { newItem in
+                    if let petId = newItem.petId,
+                       let pet = pets.first(where: { $0.id == petId }),
+                       QuickActionLimit.count(for: pet, in: savedItems) >= QuickActionLimit.maxItemsPerEntity {
+                        return
+                    }
                     savedItems.append(newItem)
                 }
             }
@@ -579,9 +619,11 @@ struct AddQuickActionSheet: View {
     let onAdd: (QuickActionItem) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @AppStorage("quickActionItems_v2") private var quickActionItemsJSON: String = ""
     @State private var step: Int = 1
     @State private var selectedPet: Pet? = nil
+    @State private var showLimitAlert = false
 
     /// F3: 实时读取 AppStorage 中的 item 数量（而非快照）
     private var liveItems: [QuickActionItem] {
@@ -589,7 +631,7 @@ struct AddQuickActionSheet: View {
     }
     private var selectedPetItemCount: Int {
         guard let pet = selectedPet else { return 0 }
-        return liveItems.filter { $0.petId == pet.id }.count
+        return QuickActionLimit.count(for: pet, in: liveItems)
     }
 
     private func availableActions(for pet: Pet) -> [QuickActionPickerCatalog.Option] {
@@ -626,6 +668,11 @@ struct AddQuickActionSheet: View {
                 selectedPet = pet
                 step = 2
             }
+        }
+        .alert(QuickActionLimit.title, isPresented: $showLimitAlert) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text(QuickActionLimit.message)
         }
     }
 
@@ -753,7 +800,18 @@ struct AddQuickActionSheet: View {
                         spacing: 12
                     ) {
                         let available = availableActions(for: pet)
-                        if available.isEmpty {
+                        if selectedPetItemCount >= QuickActionLimit.maxItemsPerEntity {
+                            VStack(spacing: 8) {
+                                Text("最多 8 个快捷操作")
+                                    .font(.system(size: 15, weight: .black, design: .rounded))
+                                    .foregroundStyle(.primary)
+                                Text("更多功能可以去「全部功能」里查看。")
+                                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 40)
+                        } else if available.isEmpty {
                             Text("所有快捷入口已添加")
                                 .font(.system(size: 14, weight: .medium, design: .rounded))
                                 .foregroundStyle(.secondary)
@@ -765,6 +823,10 @@ struct AddQuickActionSheet: View {
                             let isPressed = pressedActionId == action.id
                             Button {
                                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                guard selectedPetItemCount < QuickActionLimit.maxItemsPerEntity else {
+                                    showLimitAlert = true
+                                    return
+                                }
                                 onAdd(QuickActionItem(
                                     label: action.label,
                                     icon: action.icon, colorHex: action.colorHex,
@@ -792,6 +854,7 @@ struct AddQuickActionSheet: View {
                                 .animation(.spring(response: 0.22, dampingFraction: 0.6), value: isPressed)
                             }
                             .buttonStyle(.plain)
+                            .disabled(selectedPetItemCount >= QuickActionLimit.maxItemsPerEntity)
                             .simultaneousGesture(
                                 DragGesture(minimumDistance: 0)
                                     .onChanged { _ in pressedActionId = action.id }
@@ -994,15 +1057,12 @@ struct QuickFeedSheet: View {
             $0.isEmpty ? nil : $0
         }
         if isWater {
-            let log = PetCareLog(date: Date(), type: .watering, amountGrams: 0, pet: pet, executorId: executorId)
-            modelContext.insert(log)
+            let waterAmount = amount > 0 ? amount : defaultAmount
+            CareEventService.recordCare(pet: pet, type: .watering, amountMl: waterAmount, context: modelContext, executorId: executorId, reward: .water)
         } else {
-            let log = PetCareLog(date: Date(), type: .feeding, amountGrams: amount, pet: pet, executorId: executorId)
             if !isCasual && setAsDefault && amount > 0 { pet.dailyPortionGrams = amount }
-            modelContext.insert(log)
+            CareEventService.recordManualFeed(pet: pet, amountGrams: amount, context: modelContext, executorId: executorId)
         }
-        modelContext.safeSave()
-        QuestManager.shared.awardAction(type: isWater ? .water : .feed, pet: pet, context: modelContext)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         dismiss()
     }
@@ -1081,6 +1141,16 @@ struct QAQuickAddPopoverContent: View {
     let onAdd: (QuickActionItem) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var qaColorScheme
+    @State private var showLimitAlert = false
+
+    private var petItemCount: Int {
+        QuickActionLimit.count(for: pet, in: existingItems)
+    }
+
+    private var isAtLimit: Bool {
+        petItemCount >= QuickActionLimit.maxItemsPerEntity
+    }
 
     private var options: [QuickActionPickerCatalog.Option] {
         let existing = Set(existingItems.filter { $0.petId == pet.id }.map(\.actionType))
@@ -1089,13 +1159,26 @@ struct QAQuickAddPopoverContent: View {
 
     /// 与 `GoQuickActionCard.quickActionIconForeground` 一致（添加面板无「今日已打卡」态）
     private func pickerIconForeground(actionType: String) -> Color {
+        if qaColorScheme == .dark { return .white.opacity(actionType == "feed" ? 0.72 : 0.92) }
         if actionType == "feed" { return Color.secondary }
         return Color.primary.opacity(0.75)
     }
 
     var body: some View {
         Group {
-            if options.isEmpty {
+            if isAtLimit {
+                VStack(spacing: 8) {
+                    Text("8/8").font(.system(size: 24, weight: .black, design: .rounded))
+                    Text("快捷操作已满")
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(.primary)
+                    Text("更多功能请去「全部功能」查看")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+            } else if options.isEmpty {
                 VStack(spacing: 8) {
                     Text("✅").font(.system(size: 26))
                     Text("已全部添加")
@@ -1111,6 +1194,10 @@ struct QAQuickAddPopoverContent: View {
                             let accent = Color(hex: opt.colorHex)
                             Button {
                                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                guard !isAtLimit else {
+                                    showLimitAlert = true
+                                    return
+                                }
                                 onAdd(QuickActionItem(
                                     label: opt.label,
                                     icon: opt.icon,
@@ -1133,8 +1220,8 @@ struct QAQuickAddPopoverContent: View {
                                             .foregroundStyle(pickerIconForeground(actionType: opt.id))
                                     }
                                     Text(opt.label)
-                                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                                        .foregroundStyle(.primary)
+                                        .font(OhanaFont.caption2(.bold))
+                                        .foregroundStyle(qaColorScheme == .dark ? .white.opacity(0.9) : .primary)
                                 }
                             }
                             .buttonStyle(.plain)
@@ -1146,6 +1233,11 @@ struct QAQuickAddPopoverContent: View {
             }
         }
         .presentationCompactAdaptation(.popover)
+        .alert(QuickActionLimit.title, isPresented: $showLimitAlert) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text(QuickActionLimit.message)
+        }
     }
 }
 

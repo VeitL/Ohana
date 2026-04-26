@@ -16,6 +16,7 @@ struct GenericWeightEntrySheet: View {
 
     let target: Target
     var onSaved: (() -> Void)? = nil
+    var onRewarded: ((Int) -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -115,10 +116,9 @@ struct GenericWeightEntrySheet: View {
                         .datePickerStyle(.compact)
                         .tint(accentColor)
                         .labelsHidden()
-                        .colorScheme(.dark)
                 }
                 .padding(.horizontal, 14).padding(.vertical, 10)
-                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                .background(.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
                 .padding(.horizontal, 20)
 
                 // 记录对象行
@@ -133,7 +133,7 @@ struct GenericWeightEntrySheet: View {
                     avatarView
                 }
                 .padding(.horizontal, 14).padding(.vertical, 10)
-                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                .background(.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
                 .padding(.horizontal, 20)
 
                 // BCS：按物种/品种/年龄与本次体重自动估算（非诊断）
@@ -258,6 +258,7 @@ struct GenericWeightEntrySheet: View {
 
     private func save() {
         guard let w = parsedWeight, w > 0 else { return }
+        let coconutBefore = QuestManager.shared.coconutCount
         switch target {
         case .pet(let p):
             let bcs = autoBcsForPet ?? 0
@@ -271,6 +272,8 @@ struct GenericWeightEntrySheet: View {
         }
         modelContext.safeSave()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        let coconutDelta = max(0, QuestManager.shared.coconutCount - coconutBefore)
+        onRewarded?(coconutDelta)
         onSaved?()
         dismiss()
     }

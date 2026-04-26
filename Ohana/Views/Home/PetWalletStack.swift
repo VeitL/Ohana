@@ -267,7 +267,7 @@ struct PetWalletStack: View {
 }
 
 // MARK: - 钱包卡右侧可读性叠层（材质模糊 + 压暗；全幅绘制 + 软 mask，避免中间竖向硬分界）
-private struct WalletCardTrailingReadabilityOverlay: View {
+struct WalletCardTrailingReadabilityOverlay: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     let width: CGFloat

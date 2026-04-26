@@ -10,8 +10,11 @@ import SwiftData
 struct HumanWeightHistoryView: View {
     let human: Human
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
     @State private var showAddSheet = false
+    private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
+    private var isPrivacyLocked: Bool { human.isPrivate(.weight, viewedBy: activeHumanId) }
 
     private var sortedLogs: [HumanWeightLog] {
         human.weightLogs.sorted { $0.date > $1.date }
@@ -24,20 +27,26 @@ struct HumanWeightHistoryView: View {
         ZStack(alignment: .bottom) {
             ArkBackgroundView()
 
-            VStack(spacing: 0) {
-                chartSection.frame(maxHeight: .infinity)
-                recordListLayer.frame(height: 320)
+            if isPrivacyLocked {
+                privacyLockedView
+            } else {
+                VStack(spacing: 0) {
+                    chartSection.frame(maxHeight: .infinity)
+                    recordListLayer.frame(height: 320)
+                }
+                .ignoresSafeArea(edges: .bottom)
             }
-            .ignoresSafeArea(edges: .bottom)
         }
         .navigationTitle("体重追踪")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            if !isPrivacyLocked {
+                ToolbarItem(placement: .topBarTrailing) {
                 Button { showAddSheet = true } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(OhanaFont.title3(.bold))
                         .foregroundStyle(Color.goPrimary)
+                }
                 }
             }
         }
@@ -46,6 +55,23 @@ struct HumanWeightHistoryView: View {
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
         }
+    }
+
+    private var privacyLockedView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 34, weight: .bold))
+                .foregroundStyle(Color.goYellow)
+            Text("体重记录仅本人可见")
+                .font(OhanaFont.title3(.black))
+                .foregroundStyle(.primary)
+            Text("当前家庭成员无权查看这些数据。")
+                .font(OhanaFont.callout())
+                .foregroundStyle(.secondary)
+        }
+        .padding(24)
+        .ohanaStandardCard(cornerRadius: 24)
+        .padding(.horizontal, 24)
     }
 
     // MARK: - Chart

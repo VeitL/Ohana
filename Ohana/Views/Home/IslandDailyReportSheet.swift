@@ -37,20 +37,12 @@ struct IslandDailyReportSheet: View {
     private var dateText: String {
         let fmt = DateFormatter()
         fmt.locale = AppLanguage.effectiveLocale
-        fmt.dateFormat = AppLanguage.isEnglish ? "EEEE, MMM d" : "M月d日 EEEE"
+        fmt.dateFormat = AppLanguage.dailyReportDateFormat
         return fmt.string(from: Date())
     }
 
     private func coconutReward(for quest: IslandQuest) -> Int {
-        switch quest.id {
-        case "q_walk":            return 3
-        case "q_potty":           return 1
-        case "q_water_plant":     return 1
-        case "q_fertilize_plant": return 1
-        case "q_visit":           return 2
-        case "q_reminder":        return 2
-        default:                  return 1
-        }
+        IslandQuestEngine.coconutReward(forQuestId: quest.id)
     }
 
     var body: some View {

@@ -435,7 +435,6 @@ struct ExpenseHistoryView: View {
                             .datePickerStyle(.compact)
                             .tint(Color.goYellow)
                             .labelsHidden()
-                            .colorScheme(.dark)
                     }
                     .padding(.horizontal, 24)
 

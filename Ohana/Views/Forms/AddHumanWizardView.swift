@@ -65,6 +65,7 @@ struct AddHumanWizardView: View {
     @State private var weightText      = ""
     @State private var privateWeight   = false
     @State private var privateWorkout  = false
+    @State private var privateMedication = false
     @State private var privateWishlist = false
     @State private var privateExpense  = false
 
@@ -819,6 +820,7 @@ struct AddHumanWizardView: View {
                     VStack(spacing: 8) {
                         privacyRow(l.humanWizPrivacyWeight, emoji: "⚖️", binding: $privateWeight)
                         privacyRow(l.humanWizPrivacyWorkout, emoji: "🏋️", binding: $privateWorkout)
+                        privacyRow(l.medication, emoji: "💊", binding: $privateMedication)
                         privacyRow(l.humanWizPrivacyWishlist, emoji: "🎁", binding: $privateWishlist)
                         privacyRow(l.humanWizPrivacyExpense, emoji: "💸", binding: $privateExpense)
                     }
@@ -1167,12 +1169,11 @@ struct AddHumanWizardView: View {
         human.mbti = mbti.trimmingCharacters(in: .whitespaces).uppercased()
         if let h = Double(heightText), h > 0 { human.heightCm = h }
 
-        var priv: Set<String> = []
-        if privateWeight   { priv.insert("weight") }
-        if privateWorkout  { priv.insert("workout") }
-        if privateWishlist { priv.insert("wishlist") }
-        if privateExpense  { priv.insert("expense") }
-        human.privateFields = priv
+        human.setPrivate(.weight, privateWeight)
+        human.setPrivate(.workout, privateWorkout)
+        human.setPrivate(.medication, privateMedication)
+        human.setPrivate(.wishlist, privateWishlist)
+        human.setPrivate(.expense, privateExpense)
 
         modelContext.insert(human)
 

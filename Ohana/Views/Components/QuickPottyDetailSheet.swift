@@ -313,10 +313,7 @@ struct QuickPottyDetailSheet: View {
     // MARK: - Actions
     private func logPotty(type: PottyType) {
         let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        let log = PetPottyLog(date: Date(), type: type, pet: pet, executorId: eid)
-        modelContext.insert(log)
-        modelContext.safeSave()
-        QuestManager.shared.awardAction(type: .potty(isLitter: false), pet: pet, context: modelContext)
+        CareEventService.recordPotty(pet: pet, type: type, context: modelContext, executorId: eid)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 }

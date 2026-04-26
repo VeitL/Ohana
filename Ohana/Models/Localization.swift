@@ -11,7 +11,7 @@ struct L10n {
     let lang: String
 
     init(_ lang: String = UserDefaults.standard.string(forKey: "appLanguage") ?? "zh") {
-        self.lang = lang
+        self.lang = AppLanguage.normalize(lang)
     }
 
     var isEn: Bool { lang == "en" }
@@ -825,21 +825,72 @@ struct L10n {
 // MARK: - App language (与设置页 `appLanguage` / `@AppStorage` 同步)
 
 enum AppLanguage {
-    /// `zh` 或 `en`，与 `SettingsView` 中 Picker 的 tag 一致。
+    struct Option: Identifiable, Hashable {
+        let code: String
+        let displayName: String
+        let localeIdentifier: String
+        let swiftUILocaleIdentifier: String
+        let lprojName: String
+
+        var id: String { code }
+    }
+
+    /// 以后新增语言时只需要在这里追加一项，并添加对应 `.lproj/Localizable.strings`。
+    static let supported: [Option] = [
+        Option(
+            code: "zh",
+            displayName: "中文",
+            localeIdentifier: "zh_CN",
+            swiftUILocaleIdentifier: "zh-Hans",
+            lprojName: "zh-Hans"
+        ),
+        Option(
+            code: "en",
+            displayName: "English",
+            localeIdentifier: "en_US",
+            swiftUILocaleIdentifier: "en",
+            lprojName: "en"
+        )
+    ]
+
+    static let fallbackCode = "zh"
+
+    /// 与 `SettingsView` 中 Picker 的 tag 一致。
     static var code: String {
-        UserDefaults.standard.string(forKey: "appLanguage") ?? "zh"
+        normalize(UserDefaults.standard.string(forKey: "appLanguage") ?? fallbackCode)
     }
 
     static var isEnglish: Bool { code == "en" }
+    static var usesChineseDateFormat: Bool { code == "zh" }
+
+    static func normalize(_ raw: String) -> String {
+        supported.contains { $0.code == raw } ? raw : fallbackCode
+    }
+
+    static var currentOption: Option {
+        supported.first { $0.code == code } ?? supported[0]
+    }
 
     /// `DateFormatter` / `NumberFormatter` 等使用。
     static var effectiveLocale: Locale {
-        isEnglish ? Locale(identifier: "en_US") : Locale(identifier: "zh_CN")
+        Locale(identifier: currentOption.localeIdentifier)
+    }
+
+    static var compactMonthDayFormat: String {
+        usesChineseDateFormat ? "M月d日" : "MMM d"
+    }
+
+    static var fullMonthYearFormat: String {
+        usesChineseDateFormat ? "yyyy年 M月" : "MMMM yyyy"
+    }
+
+    static var dailyReportDateFormat: String {
+        usesChineseDateFormat ? "M月d日 EEEE" : "EEEE, MMM d"
     }
 
     /// SwiftUI `Text` 等查 `Localizable.strings` 时使用，与 `en.lproj` / `zh-Hans` 资源一致。
     static var swiftUIPreferredLocale: Locale {
-        isEnglish ? Locale(identifier: "en") : Locale(identifier: "zh-Hans")
+        Locale(identifier: currentOption.swiftUILocaleIdentifier)
     }
 
     /// 例：`2026-04-19`，用于「每日只弹一次」等与展示语言无关的键。

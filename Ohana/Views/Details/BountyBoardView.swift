@@ -485,7 +485,13 @@ struct BountyBoardView: View {
         saveTasks(current)
 
         // 奖励椰子
-        questManager.coconutCount += reward
+        questManager.addCoconuts(
+            reward,
+            emoji: "📋",
+            title: "完成家庭任务",
+            actorId: activeHumanId.isEmpty ? nil : activeHumanId,
+            actorName: currentHuman?.name
+        )
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -631,7 +637,7 @@ struct BountyBoardView: View {
         let end = Calendar.current.date(byAdding: .day, value: 6, to: start) ?? start
         let fmt = DateFormatter()
         fmt.locale = AppLanguage.effectiveLocale
-        fmt.dateFormat = AppLanguage.isEnglish ? "MMM d" : "M月d日"
+        fmt.dateFormat = AppLanguage.compactMonthDayFormat
         return "\(fmt.string(from: start)) - \(fmt.string(from: end))"
     }
 

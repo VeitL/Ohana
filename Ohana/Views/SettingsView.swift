@@ -37,6 +37,7 @@ struct SettingsView: View {
     @State private var showingImportSuccess = false
     @State private var showingImportErrorAlert = false
     @State private var showingFocusStackTest = false
+    @State private var showingOnboardingReplay = false
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
     
@@ -66,15 +67,12 @@ struct SettingsView: View {
         colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.08)
     }
     
-    private var isMaterial: Bool { appUIStyle == "material" }
+    private var isMaterial: Bool { false }
     private var matBg:      Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
     private var matSurface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
     private var matAccent: Color { Color(hex: "FF7600") }
 
-    private var accentColor: Color {
-        if isMaterial { return matAccent }
-        return Color.goPrimary
-    }
+    private var accentColor: Color { Color.goPrimary }
 
     var body: some View {
         NavigationStack {
@@ -118,8 +116,9 @@ struct SettingsView: View {
                                     .font(.system(size: 15, weight: .medium))
                                 Spacer()
                                 Picker("", selection: $appLanguage) {
-                                    Text("中文").tag("zh")
-                                    Text("English").tag("en")
+                                    ForEach(AppLanguage.supported) { language in
+                                        Text(language.displayName).tag(language.code)
+                                    }
                                 }
                                 .pickerStyle(.menu)
                             }
@@ -166,15 +165,6 @@ struct SettingsView: View {
                                         onTap: { appUIStyle = "classic" }
                                     )
                                     UIStyleCard(
-                                        title: "Material",
-                                        subtitle: "橙色主题卡片式",
-                                        icon: "square.grid.2x2.fill",
-                                        accentColor: Color.goPrimary,
-                                        bgColors: [Color(hex: "F5F5F7"), Color(hex: "FF7600").opacity(0.18)],
-                                        isSelected: appUIStyle == "material",
-                                        onTap: { appUIStyle = "material" }
-                                    )
-                                    UIStyleCard(
                                         title: "GO UI",
                                         subtitle: "蓝色步数运动风",
                                         icon: "figure.walk",
@@ -213,6 +203,11 @@ struct SettingsView: View {
                                 }
                             }
                             .padding(.top, 8)
+
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+                            settingsRow(icon: "sparkles.tv", title: "查看引导页", subtitle: "重新播放首次启动引导，方便测试") {
+                                showingOnboardingReplay = true
+                            }
                         }
                         
                         // 通知
@@ -498,6 +493,25 @@ struct SettingsView: View {
         .fullScreenCover(isPresented: $showingFocusStackTest) {
             FocusStackHomeTestViewPreviewWrapper()
                 .preferredColorScheme(preferredScheme)
+        }
+        .fullScreenCover(isPresented: $showingOnboardingReplay) {
+            ZStack(alignment: .topTrailing) {
+                OnboardingView(isReplay: true) {
+                    showingOnboardingReplay = false
+                }
+                .preferredColorScheme(preferredScheme)
+
+                Button {
+                    showingOnboardingReplay = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 30, weight: .semibold))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.white.opacity(0.78))
+                        .padding(20)
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
     

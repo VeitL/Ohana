@@ -227,10 +227,11 @@ struct IslandNegativeFeedback {
         let cal = Calendar.current
         let now = Date()
 
-        // 1. 连断打卡（streak=0 且今天还没打卡，说明昨日之前就断了）
+        // 1. 连断打卡：以真实照护日志为准，避免派生 streak 字段未同步时误报。
         let brokenStreakPets = pets.filter { pet in
-            pet.currentStreak == 0
-                && !cal.isDateInToday(pet.lastCheckInDate ?? .distantPast)
+            !pet.hasPassedAway
+                && pet.currentStreak == 0
+                && !hasAnyPetCheckInToday(pet, calendar: cal)
         }
         if !brokenStreakPets.isEmpty {
             let names = brokenStreakPets.prefix(2).map(\.name).joined(separator: "、")
@@ -238,7 +239,7 @@ struct IslandNegativeFeedback {
                 iconName: "cloud.fill",
                 emoji: "🌥",
                 title: "今日还未打卡",
-                detail: "\(names) 需要你关心一下",
+                detail: "给 \(names) 完成一次喂食、喂水或遛狗打卡即可",
                 severity: .warning
             ))
         }
@@ -276,7 +277,7 @@ struct IslandNegativeFeedback {
                     iconName: "fork.knife",
                     emoji: "🍗",
                     title: "\(pet.name) 喂食超期",
-                    detail: "距离上次已 \(hours) 小时",
+                    detail: "距离上次已 \(hours) 小时，建议先记录一次喂食",
                     severity: .warning
                 ))
                 break
@@ -305,5 +306,26 @@ struct IslandNegativeFeedback {
 
     static func hasAnyNegativeSignal(pets: [Pet], plants: [Plant] = []) -> Bool {
         !signals(pets: pets, plants: plants).isEmpty
+    }
+
+    private static func hasAnyPetCheckInToday(_ pet: Pet, calendar: Calendar) -> Bool {
+        if let lastCheckInDate = pet.lastCheckInDate, calendar.isDateInToday(lastCheckInDate) {
+            return true
+        }
+
+        if pet.careLogs.contains(where: { calendar.isDateInToday($0.date) }) {
+            return true
+        }
+        if pet.walkLogs.contains(where: { calendar.isDateInToday($0.startDate) }) {
+            return true
+        }
+        if pet.pottyLogs.contains(where: { calendar.isDateInToday($0.date) }) {
+            return true
+        }
+        if pet.hygieneLogs.contains(where: { calendar.isDateInToday($0.date) }) {
+            return true
+        }
+
+        return false
     }
 }

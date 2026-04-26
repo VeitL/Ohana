@@ -26,15 +26,7 @@ struct ContentView: View {
             }
             NavigationStack {
                 Group {
-                    if appUIStyle == "material" {
-                        MaterialDashboardView(
-                            selectedPet: $selectedPet,
-                            selectedHuman: $selectedHuman,
-                            selectedPlant: $selectedPlant,
-                            selectedPetTab: $selectedPetTab,
-                            heroNS: heroNS
-                        )
-                    } else if appUIStyle == "go" {
+                    if appUIStyle == "go" {
                         FocusStackHomeTestView(
                             selectedPet: $selectedPet,
                             selectedHuman: $selectedHuman,
@@ -68,9 +60,6 @@ struct ContentView: View {
                 }
             }
 
-            // 全局遛狗悬浮卡（底部，任何页面均可见）
-            GlobalWalkBanner()
-                .ignoresSafeArea(edges: .bottom)
         }
     }
 }

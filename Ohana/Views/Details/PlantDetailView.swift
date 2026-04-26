@@ -307,6 +307,21 @@ struct PlantDetailView: View {
         )
         modelContext.insert(event)
         modelContext.safeSave()
+        CareLedgerService.record(
+            occurredAt: log.date,
+            actorKind: log.executorId == nil ? .unknown : .human,
+            actorId: log.executorId,
+            subjectKind: .plant,
+            subjectId: plant.id.uuidString,
+            eventKind: .plantCare,
+            actionType: PlantCareType.watering.rawValue,
+            note: log.note,
+            source: .detail,
+            sourceEventId: event.id.uuidString,
+            legacyModelName: "PlantCareLog",
+            legacyModelId: log.id.uuidString,
+            context: modelContext
+        )
     }
 
     private func fertilizePlant() {
@@ -328,6 +343,21 @@ struct PlantDetailView: View {
         )
         modelContext.insert(event)
         modelContext.safeSave()
+        CareLedgerService.record(
+            occurredAt: log.date,
+            actorKind: log.executorId == nil ? .unknown : .human,
+            actorId: log.executorId,
+            subjectKind: .plant,
+            subjectId: plant.id.uuidString,
+            eventKind: .plantCare,
+            actionType: PlantCareType.fertilizing.rawValue,
+            note: log.note,
+            source: .detail,
+            sourceEventId: event.id.uuidString,
+            legacyModelName: "PlantCareLog",
+            legacyModelId: log.id.uuidString,
+            context: modelContext
+        )
     }
 }
 

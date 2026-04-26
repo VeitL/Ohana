@@ -1,6 +1,8 @@
 # Ohana iOS App 项目文档
 
-> 最后更新: 2026-04-16（英文本地化：en.lproj + 生成脚本）| Build: ✅ | Schema: ArkSchemaV33
+> 最后更新: 2026-04-26（全家庭周报 / 账本分析 / 成长档案深化 / 提醒健康面板）| Build: ✅ | Tests: ✅ `OhanaTests` | Schema: ArkSchemaV37
+>
+> **当前默认首页**：GO UI（`FocusStackHomeTestView`）。仅保留 GO UI + 经典 `OverviewView`；Material UI 已于 2026-04-24 移除。通过 `@AppStorage("appUIStyle")` 切换。
 
 ---
 
@@ -17,9 +19,10 @@
 ### 本地化（简体中文 / English）
 
 - **策略**：Swift 源码中的用户可见**中文整句**作为 `LocalizedStringKey`；`Ohana/en.lproj/Localizable.strings` 以相同中文为 key、英文为 value。系统语言为 **English** 时使用英文，为 **简体中文** 时显示源码中文（无需 `zh-Hans` 副本）。
+- **语言入口**：`AppLanguage.supported` 是设置页、SwiftUI `Locale`、`DateFormatter` / `NumberFormatter` 的唯一语言清单；新增语言时追加 `Option` 并创建对应 `<lang>.lproj/Localizable.strings`。
 - **隐私文案**：`Ohana/en.lproj/InfoPlist.strings` 覆盖相机/定位说明；`Info.plist` 内保留中文作开发默认值。
 - **工程**：`CFBundleLocalizations` = `en` + `zh-Hans`；Xcode `knownRegions` 含 `zh-Hans`。
-- **批量生成**：`scripts/generate_en_localizable.py`（依赖 `deep-translator`，建议使用仓库内 `.venv-l10n`）扫描含汉字的字符串字面量并机翻；进度缓存在 `scripts/.l10n_en_cache.json`（已 `.gitignore`），中断后可续跑。
+- **批量生成**：`scripts/generate_en_localizable.py --target en --lproj en`（依赖 `deep-translator`，建议使用仓库内 `.venv-l10n`）扫描含汉字的字符串字面量并机翻；新增语言可改 `--target ja --lproj ja` 等参数；进度缓存在 `scripts/.l10n_<target>_cache.json`（已 `.gitignore`），中断后可续跑。
 - **注意**：带 `\(variable)` 的**插值字符串**、部分 `String(format:)` 与通知正文等可能不会出现在字面量扫描结果中，需后续改为 `String(localized:)` / `LocalizedStringResource` 等并补条目；机翻建议按模块在 Xcode 或 diff 中人工润色。
 
 ---
@@ -37,21 +40,32 @@ Ohana/
 │   ├── PetPhotoLog.swift / SymptomLog.swift / HeatCycleLog.swift
 │   ├── Human.swift / HumanWeightLog.swift / Plant.swift / PlantCareLog.swift
 │   ├── Event.swift / Reminder.swift / PetExpenseLog.swift
-│   ├── SharedModelContainer.swift   # Schema 迁移链，当前 ArkSchemaV33
+│   ├── SharedModelContainer.swift   # Schema 迁移链，当前 ArkSchemaV37
+│   ├── CareLedgerEvent.swift        # 统一照护事件账本
+│   ├── CareLedgerService.swift / CareLedgerBackfillService.swift
+│   ├── ReminderSchedulingService.swift # 提醒调度、去重、补偿
+│   ├── PrivacyService.swift         # 人类隐私权限统一入口
 │   ├── QuestManager.swift           # 椰子奖励系统
 │   └── OasisTreeManager.swift       # 生命之树等级
 ├── Views/
 │   ├── OverviewView.swift           # 首页主视图（经典 UI）
-│   ├── MaterialDashboardView.swift  # Material UI 主视图
 │   ├── CalendarView.swift
 │   ├── OhanaDesignSystem.swift      # CoconutBalanceCapsule + OhanaFont + goTranslucentCard 等
 │   ├── ArkBackgroundView.swift      # AppBackgroundStyle 全局背景
 │   ├── Home/
-│   │   ├── PetWalletStack.swift     # 首页宠物钱包卡转盘
+│   │   ├── FocusStackHomeTestView.swift # GO UI 默认首页：Wallet 卡片堆 + Today Focus + 家庭协作 + FAB
+│   │   ├── FocusMoodQuestStrip.swift    # 旧 GO UI 心情 + 任务白卡组件，部分路径仍可复用
+│   │   ├── EmptyStateWelcomeCard.swift  # GO UI 空态欢迎卡
+│   │   ├── FunctionMenuSheet.swift      # GO UI 全部功能 sheet
+│   │   ├── PetWalletStack.swift     # 经典首页宠物钱包卡转盘
 │   │   ├── HomeHighlightDeck.swift  # 宠物卡下方横滑甲板（130pt）
 │   │   ├── CritterDeckCarousel.swift
 │   │   └── DailyStreakDetailView.swift
 │   ├── Details/
+│   │   ├── PetRetentionHubView.swift     # 长期留存：成长档案总览
+│   │   ├── FamilyWeeklyReportDashboardView.swift # 全家庭多宠周报
+│   │   ├── CareLedgerAnalysisView.swift  # 统一照护账本分析页
+│   │   ├── ReminderObservabilityView.swift # 提醒健康可观测面板
 │   │   ├── IslandWeightDashboard.swift   # 全岛体重（按 UUID seriesID 分线）
 │   │   ├── IslandExpenseDashboard.swift
 │   │   ├── IslandExplorationDashboard.swift
@@ -59,6 +73,8 @@ Ohana/
 │   │   ├── PetInsuranceView.swift        # 保单列表 + AddPetInsuranceSheet
 │   │   └── iOS26UITestView.swift         # iOS 26 UI 规范测试页
 │   ├── Components/
+│   │   ├── FamilyActivityStripView.swift # 今日谁做了什么
+│   │   ├── DutyNudgeComponents.swift     # 指派成员 chip + 催办按钮
 │   │   ├── QuickFeedDetailSheet.swift    # 喂食详情（手动/计划模式）
 │   │   ├── QuickWaterDetailSheet.swift   # 喂水/换水
 │   │   ├── QuickLitterDetailSheet.swift  # 铲屎/换砂
@@ -97,17 +113,96 @@ Ohana/
 | V31 | `PetInsurance.paymentDayOfMonth/showInCalendar/otherFeeAmount/otherFeeNote` |
 | V32 | `PetInsurance.firstPremiumPaymentDate`（按年/一次性首期缴费日） |
 | V33 | `PetWalkLog.behaviorNotes`（可选备注）/ `PetWalkLog.moodRating`（默认 0） |
+| V34 | `HumanMedicationLog`（人类吃药打卡记录） |
+| V35 | `Human.mbti` |
+| V36 | `Pet.foodReminderEnabled` / `Pet.foodReminderAdvanceDays`（粮仓断粮提醒偏好） |
+| V37 | `CareLedgerEvent`（统一照护事件账本，additive schema） |
 
 ### 关键模型字段
 **Pet**：`species`、`themeColorHex`、`personalityTagsRaw`、`currentStreak`、`foodTrackingMode`
 **PetInsurance**：`annualPremium`、`paymentFrequency`、`paymentDayOfMonth`、`showInCalendar`、`otherFeeAmount`
 **PetWeightLog**：`weight`、`weightUnit`（"kg"/"g"）、`weightInKg`（计算属性）、`bcsScore`
 **PetWalkLog**：`distanceMeters`、`coconutsEarned`、`mapSnapshotData`、`routeLocationsData`、`behaviorNotes`（可选文字备注）、`moodRating`（0=未评 / 1-5星）
-**Event**：`relatedEntityType`（`EntityKind.rawValue`）、`relatedEntityId`  
+**Event**：`relatedEntityType`（`EntityKind.rawValue`）、`relatedEntityId`、`assigneeId`（任务指派）  
+**Reminder**：`scheduledAt`、`status`、`completedAt`、`completedBy`、`notificationId`  
+**CareLedgerEvent**：`actorKind/actorId`、`subjectKind/subjectId`、`eventKind/actionType`、`source/sourceId`、`occurredAt`、`metadataJSON`，用于统一记录喂食/喂水/吃药/运动/花费/提醒/椰子奖励等行为。
 
 ---
 
-## 四、首页（OverviewView）架构
+## 三·A、统一照护事件账本与提醒产品化
+
+### 统一照护事件账本（ArkSchemaV37）
+
+当前采用**增量双写**策略：保留既有 `PetCareLog` / `PetWalkLog` / `PetExpenseLog` / `Reminder` / 椰子日志等模型，同时将关键行为写入 `CareLedgerEvent`，为后续统计、同步、撤销、权限与审计提供统一事件层。
+
+关键文件：
+- `CareLedgerEvent.swift`：统一账本 SwiftData 模型与 `CareLedgerActorKind` / `CareLedgerSubjectKind` / `CareLedgerEventKind` / `CareLedgerSource`
+- `CareLedgerService.swift`：统一记录入口
+- `CareLedgerBackfillService.swift`：历史数据幂等回填服务
+- `CareEventService.swift` / `CoconutEconomyService` 相关路径：逐步集中写逻辑，减少 View 直接改模型
+- `DataBackupManager.swift`：已补充账本、提醒、食粮记录、expense executor 等导出/导入字段
+
+已接入范围：
+- 宠物照护：喂食、喂水、换水、便便、遛狗、护理、健康、体重、花费
+- 人类照护：体重、运动、吃药、备注/健康相关入口
+- 植物照护：浇水、施肥等 `PlantCareLog`
+- 提醒生命周期：调度、重复跳过、补注册、失败、过期补偿、完成、snooze、reopen
+- 椰子奖励与消费：用于后续账本审计和财富面板
+
+### 提醒系统产品化
+
+`ReminderSchedulingService.swift` 是新的提醒调度门面：
+- `scheduleIfNeeded` / `scheduleManyIfNeeded`：调度前处理缺事件 / 过期提醒，随后读取 pending notification IDs，抑制重复通知
+- `deduplicate`：按 `eventId + scheduledAt minute` 合并重复 `Reminder`
+- `refillMissingPendingNotifications`：App 启动 / BGTask 时补注册未来窗口内缺失通知
+- `compensate`：过期未完成提醒自动标记 `failed` / `skipped`，取消通知并写账本
+- `cancelAndReschedule`：用于 snooze / reopen 后的统一重排
+
+`NotificationManager.schedule` 已返回 `ReminderNotificationScheduleResult`，成功、失败、跳过、重复等结果都会进入 `CareLedgerEvent`。
+
+**`ReminderObservabilityView.swift`** 是用户可见的提醒健康面板：
+- 通知权限状态：`UNUserNotificationCenter.notificationSettings()`
+- 系统待发队列：`NotificationManager.pendingNotificationIds()`
+- App 内提醒状态：未来待办 / 已过期 / 失败 / 本周完成 / 总提醒
+- 调度账本：从 `CareLedgerEvent.eventKind == .reminder` 汇总 `schedule/refill/dedupe/compensate` 类 action
+- 风险列表：集中展示过期与失败提醒，便于后续补做重试 / 重新调度入口
+
+---
+
+## 三·B、统一账本分析
+
+**`CareLedgerAnalysisView.swift`** 是 `CareLedgerEvent` 的第一版分析入口，定位为“谁、给谁、做了什么”的可视化审计页。
+
+入口：`FunctionMenuSheet` → “家庭岛屿” → **照护账本分析**。
+
+能力：
+- 时间范围筛选：本周 / 本月 / 全部
+- 事件类型筛选：照护、便便、遛狗、护理、健康、体重、吃药、运动、花费、提醒、植物、椰子、里程碑等
+- 汇总卡：事件数、奖励椰子数、事件类型数
+- 类型分布：按 `CareLedgerEventKind` 统计
+- 成员排行：按 `actorId + actorKind` 聚合
+- 最近流水：展示事件类型、actionType、actor → subject、发生时间
+
+当前不提供编辑 / 撤销，只作为只读分析面板；后续 TODO 是账本浏览器、撤销/更正和旧模型差异审计。
+
+---
+
+## 四、首页架构总览
+
+**`ContentView.swift`** 读 `@AppStorage("appUIStyle")` 决定首页：
+
+| 值 | 首页 | 状态 |
+|---|---|---|
+| `"go"`（默认） | `FocusStackHomeTestView` | **当前主路径**，详见第二十三·B 节 |
+| `""` 或其它 | `OverviewView` | 经典 UI，详情如下；大量组件仍在 GO UI 外被复用 |
+
+> Material UI 已于 2026-04-24 删除（`MaterialDashboardView.swift`、`isMaterial` 分支清理为 `false`、Settings 选项卡移除）。`MaterialDesignTestView.swift` 作为设计系统展示页保留。
+
+两者接收相同的 bindings：`selectedPet` / `selectedHuman` / `selectedPlant` / `selectedPetTab` / `heroNS`；`NavigationStack` + `.navigationDestination(item: $selectedPet)` + `.navigationTransition(.zoom(sourceID:in:))` 在 `ContentView` 层统一管理。
+
+---
+
+## 四·A、经典首页（OverviewView）架构
 
 ### 顶栏（globalFixedHeader）
 - 右侧行高固定 **32pt**（与 `CoconutBalanceCapsule` 齐平）
@@ -215,6 +310,27 @@ ForEach(orderedSections)     // 受 HomeSectionManageSheet 控制（顺序 + 显
 
 ---
 
+## 六·A、长期留存：成长档案总览
+
+**`PetRetentionHubView.swift`** 是单宠物长期留存聚合页，目标是把“长期价值”从分散页面收敛为一个清晰入口。
+
+入口：
+- `FunctionMenuSheet` → “档案与记忆” → **成长档案**
+- `FeatureAggregateView(.retention)` → 选择宠物进入单宠物成长档案
+- `PetAllFeaturesSheet` → 单宠物全部功能 → **成长档案**
+
+聚合模块：
+- **健康趋势**：最新体重、体重累计变化、近 90 天急诊/手术风险解释、健康记录数量 → `PetHealthDetailView`
+- **成长相册**：照片数量、今年新增照片、重要时刻数量、时间线入口 → `PetMomentsHubView`
+- **花费统计**：本月支出、本月预测支出、花费记录数量 → `ExpenseHistoryView`
+- **保险 / 医疗记录**：医疗/用药/证件/保单摘要、即将到期/已过期保障提醒 → `DocumentsListView`
+- **生命树成就**：成就解锁进度、连续打卡摘要、下一枚成就提示 → `AchievementWallView`
+- **本周建议**：保障风险 + 近照提醒，用于把长期留存数据转成下一步行动
+
+当前版本不新增底层模型，直接复用已有 `PetWeightLog` / `PetHealthLog` / `PetPhotoLog` / `PetMilestone` / `PetExpenseLog` / `PetDocument` / `PetInsurance` / `PetMedication` / `AchievementManager`，避免迁移风险。
+
+---
+
 ## 七、全岛统计
 
 **`IslandUnifiedStatsViewModel`**：
@@ -252,7 +368,7 @@ ForEach(orderedSections)     // 受 HomeSectionManageSheet 控制（顺序 + 显
 - **椰子**：`QuestManager.shared.addCoconuts(_:emoji:title:)`，打卡/委托/打卡连续均发放
 - **生命之树**：`OasisTreeManager.shared`，lv1-10，能量来自各类 Event
 - **岛屿委托**：`IslandQuestEngine.todayQuests(pets:reminders:plants:events:)`，含用药委托 `q_med_<UUID>`
-- **打卡连击**：`oasis_checkedIn_dates` UserDefaults，首页顶栏与 `DeckCheckInStreakCard` 同步
+- **打卡连击**：`oasis_checkedIn_dates` UserDefaults 用于 `DailyStreakDetailView` / `OasisRewardView` 的每日打开 App 连胜；GO UI 顶部 `🔥` 当前显示 `pets.map(\.currentStreak).max()`（所有宠物护理 streak 最大值），两者不是同一数据源。
 
 ### 成就系统（AchievementManager，15枚）
 `static func compute(for pet: Pet) -> [Achievement]` 纯计算，无副作用
@@ -276,6 +392,26 @@ ForEach(orderedSections)     // 受 HomeSectionManageSheet 控制（顺序 + 显
 | 15 | `weight_manager` | 体重记录 ≥ 7条 |
 
 另有2枚人宠联动成就（需 HealthKit）：`bonded_walk` / `step_champion`，通过 `computeBonded(for:humanDistanceKm:)` 计算。
+
+---
+
+## 十·A、家庭周报升级
+
+**`FamilyWeeklyReportDashboardView.swift`** 是全家庭多宠周报入口，替代单宠周报作为 GO 首页家庭协作卡的主周报页面。
+
+入口：
+- `FocusStackHomeTestView.familyCollaborationCard` → “周报”
+- `FunctionMenuSheet` → “家庭岛屿” → **家庭周报**
+
+能力：
+- 全家庭本周总览：照护次数、参与成员数、椰子奖励数
+- 成员贡献排行：按 `executorId` 聚合 `PetCareLog` / `PetPottyLog` / `PetWalkLog` / `PetExpenseLog`
+- 宠物照护覆盖：显示每只在世宠物本周记录数和“待关注”状态
+- 最近动态：展示最近 8 条家庭照护事件
+- 近 4 周趋势：按周统计全家庭照护数量
+- 分享：`ShareLink` 输出轻量文本周报
+
+仍保留 `WeeklyReportCard(pet:)` 作为单宠物周报卡，可在其它详情路径继续使用。
 
 ---
 
@@ -541,6 +677,295 @@ Color.petThemeMagenta / Pink / Purple / Indigo / Violet / Navy / Blue / SkyBlue
 
 ---
 
+## 二十三 · B. GO UI 首页（2026-04-26，**当前默认主页**）
+
+`FocusStackHomeTestView` 是 `@AppStorage("appUIStyle") == "go"`（默认值）时的主界面。当前版本以 Apple Wallet 式宠物/家人卡片堆为核心：折叠态显示底部完整前卡，点选态将 active card 上移到顶部按钮下方，其它卡片压缩到底部，同时在 active card 下方显示快捷模块。
+
+### 页面结构（自上而下）
+
+```
+ZStack
+├── ArkBackgroundView()                         // 跟随 Settings 背景设置
+├── stackLayer                                  // 未展开时：header + 任务白卡 + 卡片堆/空态
+│   ├── goFocusHeader(safeT: safeAreaTop)
+│   ├── TodayFocusCard                          // 今天谁需要照顾 / 什么最紧急 / 一点完成
+│   ├── firstSuccessCheckInCard                 // 新用户首次快捷打卡闭环（按需）
+│   ├── familyCollaborationCard                 // 家庭协作：谁做了什么 / 指派待办 / 催办 / 周报
+│   └── walletCardStack(cards:)                 // 仅 collapsed 显示，底部锚定
+├── expandedWalletLayer(cards:geo:)             // isExpanded == true 时根层绝对定位
+│   ├── active FocusWalletCardView              // safeAreaTop + 76pt
+│   ├── expandedQuickModules                    // active card 下方
+│   └── inactive cards                          // 底部压缩，只露出顶部文字条
+└── FAB / scrim                                 // 仅 collapsed 显示
+```
+
+### Header — `goFocusHeader`
+
+顶部按钮统一为和 `CoconutBalanceCapsule` 一致的绿色胶囊样式（`Color.goPrimary`、26pt 高、黑色文字/图标）。
+
+- **中间**：`🔥 + headerStreak` 胶囊 + `CoconutBalanceCapsule(onTap:)`
+  - `headerStreak = pets.map { $0.currentStreak }.max() ?? 0`
+  - 注意：这不是 `oasis_checkedIn_dates` 的每日打开 App 连胜，而是所有宠物护理 streak 的最大值。
+  - 椰子胶囊点击 → `IslandWealthDashboardView`
+- **右侧**：`...` 胶囊 Menu
+  - 添加成员 → `AddEntityView()`
+  - OHANA 成员 → `CrewRosterOverlay`
+  - 设置 → `SettingsView`
+- 高度 = `safeT + 56`；`safeT` 用 UIKit keyWindow safe area，避免 `.ignoresSafeArea(.all)` 下 GeometryReader 返回 0。
+
+### Apple-Wallet 卡片堆状态
+
+当前状态由两个变量驱动：
+
+| 状态 | `isExpanded` | `activeCardId` | 行为 |
+|---|---:|---|---|
+| 折叠态 | `false` | 可为空/默认第一张 | `walletCardStack` 在剩余空间底部锚定；底部卡 `zIndex` 最高且完整显示；其它卡只露出顶部文字条 |
+| 点选态 | `true` | 被点卡片 id | `expandedWalletLayer` 根层绝对定位；active card 顶部移动到顶部胶囊下方；inactive cards 向下压缩到底部 |
+| 收起 | `false` | 保留上次 active | 再点 active card 或向下拖拽 > 80pt，使用同一弹簧动画恢复折叠态 |
+
+**关键实现**：
+- 折叠态只在 `stackLayer` 中渲染 `walletCardStack`。
+- 展开态隐藏 `FocusMoodQuestStrip`、隐藏原卡堆、隐藏 FAB，改由根 ZStack 渲染 `expandedWalletLayer`，避免受 VStack 布局影响。
+- 点击 inactive card 时切换 `activeCardId`，不会立即收起。
+- 所有 wallet 状态动画使用 `HeroAnim.walletSpring = .spring(response: 0.4, dampingFraction: 0.85)`。
+
+### 布局常量 — `K`
+
+| 常量 | 当前值 | 含义 |
+|---|---:|---|
+| `hPad` | 20 | header 水平 padding |
+| `cardMargin` | 7 | 卡片到屏幕边缘的间距 |
+| `cardH` | 200 | 折叠态卡片高度 |
+| `expandedCardH` | 360 | 点选态 active card 高度（竖向放大） |
+| `stackPeekH` | 38 | 折叠/压缩态每张卡露出的顶部文字条高度 |
+| `cardTitleH` | 76 | 折叠卡底部标题条高度 |
+| `stackBottomGap` | 220 | 折叠态前卡底部到 GeometryReader 底部的可见间距 |
+| `expandedStackBottomGap` | 12 | 展开态底部压缩卡堆到安全区底部的间距 |
+| `expandedCardGlobalTopOffset` | 76 | active card 顶部 = safeAreaTop + 76，保持在顶部按钮下方 |
+| `expandedQuickModuleH` | 112 | active card 下方快捷模块高度 |
+| `expandedQuickModuleEditH` | 206 | 展开态快捷模块编辑模式高度（含添加入口） |
+| `HeroAnim.stackCardCorner` | 24 | 卡片圆角 |
+
+### 卡片数据 — `FocusCard`
+
+`FocusCard` 从 `Pet` / `Human` 组装，用同一个结构喂给卡片堆、展开卡、快捷模块。
+
+- `FocusCard.from(Pet)`：
+  - 狗：FEED / WALK / WATER / POTTY
+  - 猫：FEED / WATER / LITTER / PLAY
+  - 鱼：FEED / WATER / FILTER
+  - 其它：FEED / WATER / PLAY
+  - 额外携带：`daysTogetherText`、`ageText`、`zodiacText`、`genderText`、`avatarImageData`、`petSpecies`、`coatColor`、`eyeColor`、`patternName`、`themeColorHex`、`breed`
+- `FocusCard.from(Human)`：
+  - WEIGHT / WORKOUT / NOTE
+  - `isHuman = true`
+- `FocusCard.dummies` 仅在 `@AppStorage("debugShowDummyCards") == true` 且真实数据为空时显示。
+
+### 卡片渲染 — `FocusWalletCardView`
+
+`FocusWalletCardView` 复用 `WalletPetCardFront` 的视觉语言，并在展开态切换到更接近身份卡的竖向布局；折叠卡片左下角不再重复显示名字，识别信息集中在顶部身份条。
+
+- 背景：真实实体使用 `WalletPetCardTheme.meshColors(for:)` 的 3×3 `MeshGradient`；dummy 使用 `card.color` 派生渐变。
+- 宠物图像：
+  - 非透明照片：全幅 `scaledToFill` + 右侧可读性遮罩。
+  - 透明 PNG：白色轮廓影 + 原图 popout。
+  - 无头像：`PetSilhouetteView` Kawaii 剪影。
+- 展开态：
+  - 宠物名大号显示在顶部，物种字幕在其下。
+  - 左侧显示宠物剪影/照片。
+  - 右下显示 Days Together、年龄/品种/物种脚注、`O H A N A   P E T` 条码。
+  - 紧凑态顶部显示 `topIdentityBar`，保证卡片被压缩时仍可识别名字和属性。
+
+### 展开态快捷模块 — `expandedQuickModules`
+
+active 宠物 / 人类卡下方复用经典 UI 的 `GoQuickActionCard` 网格样式，读取同一份 `@AppStorage("quickActionItems_v2")`。宠物若没有自定义项，则按物种生成默认前 4 项；人类默认项为体重 / 运动 / 用药 / 备注。短按执行快捷打卡 / 打开快速 sheet；长按进入对应详情。护理、健康、便便复用经典 UI 的 Popover 分流；dummy 卡继续使用原轻量入口。
+
+编辑模式：标题行右侧铅笔进入编辑；编辑态同样最多显示 4 个快捷项，少于 4 个时显示“添加”占位格；支持抖动、减号删除、拖拽排序；点击完成后写回 `quickActionItems_v2`，与经典 UI / 宠物详情共享同一份配置。
+
+椰子增长动画：`CoconutBalanceCapsule` 监听 `QuestManager.shared.coconutCount`，只在数值增加时触发轻微 pulse、`+N` 浮标和 haptic；减少椰子时只更新数字，不播放奖励动画。
+
+默认项：
+- 狗：喂食 / 喂水 / 遛狗 / 便便
+- 猫：喂食 / 喂水 / 铲屎 / 便便
+- 鱼：喂食 / 换水 / 清滤材 / 体重
+- 其它：喂食 / 喂水 / 护理 / 体重
+
+### Today Focus 与家庭协作入口
+
+GO UI 折叠态首屏已收敛为 Today Focus：优先回答“今天谁需要照顾、什么最紧急、我点一下能完成什么”。展开卡片时隐藏，避免与 active card 下方快捷模块争抢空间。
+
+**`TodayFocusCard`**：
+- 数据来自 `IslandQuestEngine.todayQuests(pets:reminders:plants:events:)`
+- 传入 `activePet: todayFocusActivePet`
+- 完成回调走 `completeQuestInFocusStack(_:)`，继续发放椰子奖励并写入现有照护日志/账本路径
+- 右侧绿洲入口 `onTapOasis` 打开 `OasisRewardView`
+
+**新用户 3 分钟成功体验**：
+- `OnboardingView.finishOnboarding()` 设置 `ohana_show_first_success_card = true`
+- 首页显示 `firstSuccessCheckInCard(pet:)`，引导完成第一次“喂食 +🥥”
+- 成功后写入喂食记录、触发椰子奖励动画，并设置 `ohana_first_quick_checkin_completed = true`
+
+**家庭协作卡**：
+- `familyCollaborationCard(pet:)` 显示在 Today Focus 下方
+- `FamilyActivityStripView(style: .compact)`：今日谁照顾了当前宠物
+- `assignedPendingReminders(for:)`：读取当前宠物今日内已指派 `Event.assigneeId` 的 pending reminders
+- `AssigneeChip` + `NudgeButton`：展示负责人并提供本地催办反馈
+- 周报入口打开 `WeeklyReportCard(pet:)`
+
+**任务完成处理**（`completeQuestInFocusStack`）：
+- `q_feed_*` → `.feeding` PetCareLog（`dailyPortionGrams` + `manualFeedNoteMarker`）
+- `q_water_*`（非植物）→ `.waterChange` PetCareLog
+- `q_walk` → `PetWalkingManager.shared.start(pet:)`
+- `q_potty` → `.perfectPoop` PetPottyLog
+- `q_water_plant` / `q_fertilize_plant` → 更新植物日期 + `PlantCareLog`
+- `q_reminder` → `showingCalendar = true`
+- 用药任务 → `PetMedicationDoseLogging.recordDose`
+- 除 `q_walk` 外，完成后均 `QuestManager.shared.addCoconuts(amt, title: "岛屿任务")`
+
+### FAB（右下角悬浮按钮）— `fabOverlay`
+
+主按钮是 56pt 深蓝圆（`#1A2E8A`），展开后向上堆出 4 项：
+
+1. **全部功能** → `FunctionMenuSheet`
+2. **日历** → `CalendarView`
+3. **绿洲** → `OasisRewardView`（`fullScreenCover`，右上角有关闭按钮）
+4. **植物** → 淡化占位，标记“待开发”，点击只给 light haptic，不打开功能
+
+细节：
+- 展开时有 `Color.black.opacity(0.25)` scrim，点击 scrim 收回。
+- `expandedId == nil && !isExpanded` 才显示；卡片展开态隐藏 FAB，避免遮挡 active card 和快捷模块。
+- 子项 stagger 动画：展开 55ms × 反向 idx，收起 40ms × idx。
+
+### 空状态 — `EmptyStateWelcomeCard.swift`
+
+`pets.allSatisfy { $0.hasPassedAway } && humans.isEmpty && !showDummyCards` 时渲染，替代卡片堆。按钮：
+- 添加宠物 → `showingAddEntity = true`
+- 添加家人 → `showingAddEntity = true`
+
+### 长按 contextMenu — `cardContextMenu(card:)`
+
+真实宠物卡长按弹出：
+- 喂食 `<name>`（写入 `.feeding` PetCareLog）
+- 换水（写入 `.waterChange` PetCareLog）
+- 便便记录（写入 `.perfectPoop` PetPottyLog）
+- 查看详情 → `selectedPet = pet`
+
+### Bloom 展开层（遗留 dummy / demo 路径）
+
+`expandedLayer(card:geo:outerCornerRadius:windowSize:)` 仍保留，用于 `expandedId` 的旧 bloom 展开路径：
+- 全屏放大 `RoundedRectangle(cornerRadius: outerCornerRadius)`
+- Hero 卡占顶部区域，`matchedGeometryEffect` 双 ID（Shell + Art）同步过渡
+- Footer 140ms 后淡入（`detailFooterVisible`）
+- 左上角向下 chevron 关闭；垂直下滑 > 80pt 关闭
+- `expandedId` 进入时 `stackLayer` 透明并禁用 hit testing
+
+### 导航架构（两条路径）
+
+**Path 1 — 首页 → 聚合页 → 单宠物**
+
+```
+FAB "全部功能"
+  └── FunctionMenuSheet（sheet, large，5 分组）
+        └── 功能行 → FeatureAggregateView(feature:, parentPath:)
+              ├── 顶部宠物横滑 chip → 单宠物视图
+              └── 汇总列表行       → 单宠物视图
+```
+
+- `FunctionMenuSheet.swift` —— 5 分区：健康管理 / 日常生活 / 植物与绿洲 / 档案与记忆 / 家庭岛屿
+- “家庭岛屿”分区已接入 **家庭周报** / **照护账本分析** / **提醒健康**
+- `FeatureAggregateView.swift` —— `.weight` 走 `IslandWeightDashboard`，`.expense` 走 `IslandExpenseDashboard`，其它走单宠物汇总列表
+
+**Path 2 — 宠物详情 → 单宠物全部功能**
+
+```
+PetDetailView
+  └── [全部] 胶囊 → PetAllFeaturesSheet（sheet, large，独立 NavigationStack）
+        └── 功能行 → 单宠物视图（直接，不经聚合）
+```
+
+`FMDest.featureAggregate` / `.humanWeight` / `.humanExpense` 在 `PetAllFeaturesSheet` 场景下是死路径：switch 分支走 `assertionFailure`（debug 崩溃，release `EmptyView` fallback）。
+
+**共享类型**（均在 `FunctionMenuSheet.swift`）：
+- `FMDest` 枚举：`.featureAggregate(PetFeature)` / `.petHealth` / `.petMedications` / `.petFood` / `.petHygiene` / `.petWalks` / `.petPotty` / `.petBasicInfo` / `.petDocuments` / `.petMoments` / `.petAchievements` / `.petRetention` / `.petWeight` / `.petExpense` / `.familyWeeklyReport` / `.careLedgerAnalysis` / `.reminderObservability`
+- `PetFeature` 枚举：health / medications / food / hygiene / walks / potty / retention / basicInfo / documents / moments / achievements / weight / expense
+- `FMPetAvatar` —— 共享小型宠物头像 chip
+
+---
+
+### 宠物详情页（PetDetailView，GO UI 版）
+
+Zoom 目标页。背景 = 宠物主题渐变（与卡片正面无缝转场）。
+
+**同心圆角布局**：
+- `bgCardRadius = 32`（背景卡，仅顶部圆角，底部延伸至屏幕边缘）
+- `innerMargin = 12`
+- `petCardRadius = bgCardRadius − innerMargin = 20`（宠物卡，对齐 Dynamic Island 安全区）
+
+**内容**（有意简化，去掉仪表盘）：
+1. 宠物卡（`WalletPetCardFront`）—— 点击 → `PetBasicInfoDetailView`
+2. 名字 + 物种（居中）+ `全部` 胶囊（尾随）→ `PetAllFeaturesSheet`
+3. 快捷操作网格（4 列，按物种过滤，**可编辑**）
+
+**快捷操作编辑态**（与 `GoDashboardView` 共用机制）：
+- 共享持久化：`@AppStorage("quickActionItems_v2")`（JSON `[QuickActionItem]`）
+- 切换：`快捷操作` 标题栏的铅笔 ↔ 对勾按钮
+- 抖动：`rotationEffect(±2.5°) .easeInOut.repeatForever`，按 `idx % 4 * 0.015` 错峰
+- 拖动重排：`QADropDelegate`（源自 OverviewView）
+- 删除：`.topLeading` 的减号圆
+- 新增：`+` 格 → `QAQuickAddPopoverContent`（复用 GoDashboard popover）
+- 退出编辑：将编辑过的项合并回完整存储数组，保留其它宠物/家人的项
+
+**安全区**：`(UIApplication.shared.connectedScenes.first as? UIWindowScene)?.keyWindow?.safeAreaInsets.top ?? 44` —— 不用 GeometryReader（`.ignoresSafeArea(.all)` 下返回 0）。
+
+---
+
+### 财富 dashboard（IslandWealthDashboard2）
+
+入口：首页 header 的 `CoconutBalanceCapsule` 点击 → `fullScreenCover` 打开 `IslandWealthDashboardView`。
+
+**布局**（2026-04-24 从 ZStack 两区重构为整页可滚动）：
+```
+  navBar（顶部 overlay，不随滚动）
+  timePicker（日/周/月/全部 —— WealthTimeRange）
+  incomeVsSpendingRow（两格：本期收入 / 本期花费）
+  chartSection（收入按实体堆叠柱 + 花费单色红柱叠加）
+  leaderboardSection（按 coconutBalance 降序，无高度限制）
+```
+
+**ViewModel 关键属性**（`IslandWealthViewModel2.swift`）：
+- `totalAssets` = `QuestManager.shared.coconutCount`（唯一真相源）
+- `leaderboard` —— 直接读 `pet.coconutBalance` / `human.coconutBalance`（不是从 log 聚合）
+- `filteredByTimeRange` / `filteredIncome` / `filteredSpending` —— 按符号拆分
+- `chartBars` —— 收入，按 actor（宠物/家人/system）分桶堆叠
+- `spendingBars` —— 花费，单"花费"系列，按时间分桶
+- `periodIncome` / `periodSpending` —— 汇总格数字
+- `chartEntityNames` / `chartEntityColors` —— `.chartForegroundStyleScale(domain:range:)` 成对；`petColorMap` 由 View 注入
+
+**分桶粒度**：`.day → .hour`，`.week / .month → .day`，`.all → .month`。
+
+**空状态**：`periodSpending == 0` 时右格显示"本期无花费"灰字；无收入时图表空态。
+
+---
+
+### GO UI 关键文件清单
+
+| 文件 | 角色 |
+|---|---|
+| `Views/Home/FocusStackHomeTestView.swift` | GO 首页：Wallet 卡片堆 / Today Focus / 家庭协作卡 / 展开态快捷模块 / header / FAB / 空状态 / 遗留 bloom 路径 |
+| `Views/Home/FocusMoodQuestStrip.swift` | 心情 + 任务 TabView pager 白卡 |
+| `Views/Home/EmptyStateWelcomeCard.swift` | 冷启动欢迎卡 |
+| `Views/Home/FunctionMenuSheet.swift` | 全部功能 sheet + `FMDest` / `PetFeature` / `FMPetAvatar` |
+| `Views/Home/FeatureAggregateView.swift` | 按功能聚合页 + 宠物 chip |
+| `Views/Home/PetAllFeaturesSheet.swift` | 单宠物全部功能 sheet（从 PetDetailView） |
+| `Views/Details/PetRetentionHubView.swift` | 单宠物长期留存成长档案总览 + 洞察建议 |
+| `Views/Details/FamilyWeeklyReportDashboardView.swift` | 全家庭多宠周报、成员贡献排行、分享文本 |
+| `Views/Details/CareLedgerAnalysisView.swift` | 统一照护账本分析、事件/成员/时间筛选 |
+| `Views/Details/ReminderObservabilityView.swift` | 提醒健康面板、权限/待发/失败/过期诊断 |
+| `Views/Details/IslandWealthDashboard2.swift` | 财富 dashboard（可滚动 + 收支分离） |
+| `ViewModels/IslandWealthViewModel2.swift` | 财富 VM（`@Observable`，注入 `pets`/`humans`/`petColorMap`） |
+
+---
+
 ## 二十四、产品迭代待办（Product Roadmap）
 
 > 由 PM 诊断整理，按优先级执行。**当前焦点：P0 增长/留存 + P0 家庭协作**。
@@ -574,6 +999,18 @@ Color.petThemeMagenta / Pink / Purple / Indigo / Violet / Navy / Blue / SkyBlue
   - `AddPetWizardView.AhaHatchOverlay`：3 秒分阶段动画（光晕 → 蛋壳震动淡出 → 宠物 emoji 破壳跳出 → 标题"{name} 加入 Ohana"）
   - 8 方向星芒持续旋转、辐射光晕由主题色 → 椰子黄
   - 保存后立即触发，3 秒自动收起 → 推出 Day0 承诺 Sheet
+- [x] **新用户 3 分钟成功体验闭环**（2026-04-26 落地）
+  - `OnboardingView.finishOnboarding()` 完成后打开首页首次成功卡
+  - `FocusStackHomeTestView.firstSuccessCheckInCard` 引导完成第一次“喂食 +🥥”
+  - 完成后写入喂食记录、播放椰子奖励动画、隐藏成功卡
+- [x] **长期留存成长档案总览**（2026-04-26 落地）
+  - 新增 `PetRetentionHubView`
+  - 聚合健康趋势 / 成长相册 / 花费统计 / 保险医疗 / 生命树成就
+  - 已接入 `FunctionMenuSheet`、`FeatureAggregateView`、`PetAllFeaturesSheet`
+- [x] **成长档案深度化**（2026-04-26 落地）
+  - `PetRetentionHubView` 增加健康解释、本月花费预测、今年相册计数、下一成就提示
+  - 新增本周建议条：保障风险、近照提醒等长期留存 action
+  - 保持复用已有模型，不引入新的 SwiftData 迁移
 
 ### P0 · 家庭协作（差异点显性化）
 
@@ -608,6 +1045,47 @@ Color.petThemeMagenta / Pink / Purple / Indigo / Violet / Navy / Blue / SkyBlue
   - `BountyBoardView.taskCard` 显示 `@Name` 徽章，指派给当前用户时高亮；完成权限：无指派→非创建者均可，有指派→仅被指派者
   - `OasisRewardView.bountyAssignedBadge`：首页「家庭悬赏榜」右上角红圆点显示 `@我 X 个待完成`
   - 辅助方法 `BountyTask.loadAll()` / `pendingAssignedCount(for:)`
+- [x] **日历任务指派 + 首页协作卡**（2026-04-26 落地）
+  - `AddEventView` 新增 `AssigneePickerRow`，保存时写入 `Event.assigneeId`
+  - `FocusStackHomeTestView.familyCollaborationCard` 在 GO 首页展示家庭协作摘要
+  - 已指派、今日内的 pending reminders 展示负责人 `AssigneeChip`
+  - `NudgeButton` 提供本地催办反馈；周报入口打开 `FamilyWeeklyReportDashboardView`
+- [x] **家庭周报系统化升级**（2026-04-26 落地）
+  - 新增 `FamilyWeeklyReportDashboardView`
+  - 全家庭多宠总览、成员贡献排行、宠物照护覆盖、最近动态、近 4 周趋势
+  - 支持 `ShareLink` 分享轻量文本周报
+- [x] **统一账本分析页**（2026-04-26 落地）
+  - 新增 `CareLedgerAnalysisView`
+  - 按本周 / 本月 / 全部、事件类型筛选 `CareLedgerEvent`
+  - 展示事件分布、成员排行、最近流水
+- [x] **提醒系统可观测面板**（2026-04-26 落地）
+  - 新增 `ReminderObservabilityView`
+  - 展示通知权限、系统待发数量、App 内 pending / overdue / failed / completed 统计
+  - 汇总提醒调度账本，并列出高风险提醒
+
+### 当前未完成 TODO（按最新状态补充）
+
+- [ ] **家庭协作云同步 / 多设备一致性**
+  - 当前家庭协作仍是本地优先；真正多人家庭共享需要 CloudKit / iCloud 共享或自建同步方案
+  - 需要设计冲突处理、成员身份、离线写入合并与设备间提醒归属
+- [ ] **跨设备 nudges**
+  - 当前 `NudgeButton` 是本地反馈与 alert；尚未发送给对方设备
+  - 后续应接入本地家庭成员通知、CloudKit push 或共享提醒队列
+- [ ] **角色权限模型**
+  - `PrivacyService` 已集中隐私判断，但还没有完整角色体系
+  - TODO：本人 / 管理员 / 普通成员 / 访客，覆盖体重、用药、花费、医疗记录等敏感数据
+- [ ] **家庭周报历史归档 / 海报化分享**
+  - 当前已有全家庭多宠周报与文本分享；尚未持久化每周快照
+  - TODO：周报历史列表、海报图片导出、跨设备共享
+- [ ] **账本更正与差异审计**
+  - 当前 `CareLedgerAnalysisView` 是只读分析页
+  - TODO：撤销/更正入口、账本与旧模型差异审计、异常流水修复建议
+- [ ] **成长档案年度回顾**
+  - 当前已完成成长档案洞察深化
+  - TODO：相册标签、年度回顾、保险推荐对比、成就与生命树联动视觉化
+- [ ] **提醒失败重试闭环**
+  - 当前已有提醒健康面板、去重、补偿、调度结果写账本
+  - TODO：失败通知一键重试、权限异常引导、重新授权后的自动补注册
 
 ---
 

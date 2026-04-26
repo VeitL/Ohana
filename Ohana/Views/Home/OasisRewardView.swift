@@ -43,7 +43,7 @@ struct OasisRewardView: View {
     @AppStorage("appUIStyle") private var appUIStyle: String = "go"
     @Environment(\.colorScheme) private var colorScheme
 
-    private var isMaterial: Bool { appUIStyle == "material" }
+    private var isMaterial: Bool { false }
     private var matBg:      Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
     private var matSurface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
     private var matAccent:  Color { Color(hex: "FF5A00") }
@@ -97,13 +97,25 @@ struct OasisRewardView: View {
                     if !hideToolbar {
                         // 绿洲工具栏（独立使用时显示，嵌入 tab 时由全局 header 提供）
                         HStack(spacing: 8) {
-                            Spacer()
+                            Button {
+                                dismiss()
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 24, weight: .semibold))
+                                    .symbolRenderingMode(.hierarchical)
+                                    .foregroundStyle(.white.opacity(0.9))
+                            }
+                            .buttonStyle(.plain)
+
                             Button { showCoconutRules = true } label: {
                                 Image(systemName: "info.circle")
                                     .font(.system(size: 18, weight: .medium))
                                     .foregroundStyle(.white.opacity(0.45))
                             }
                             .buttonStyle(.plain)
+
+                            Spacer()
+
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 showInventory = true
@@ -1268,7 +1280,6 @@ private struct CoconutRulesSheet: View {
             }
             .navigationTitle("椰子指南 🥥")
             .navigationBarTitleDisplayMode(.large)
-            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("关闭") { dismiss() }

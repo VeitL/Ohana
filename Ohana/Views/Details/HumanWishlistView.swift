@@ -10,6 +10,7 @@ import SwiftData
 struct HumanWishlistView: View {
     let human: Human
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @Query(sort: \WishlistItem.createdAt, order: .reverse) private var allItems: [WishlistItem]
     @Query(sort: \Human.createdAt) private var allHumans: [Human]
 
@@ -23,91 +24,125 @@ struct HumanWishlistView: View {
     }
     private var pendingItems: [WishlistItem] { myItems.filter { !$0.isRedeemed } }
     private var redeemedItems: [WishlistItem] { myItems.filter { $0.isRedeemed } }
+    private var isPrivacyLocked: Bool {
+        human.isPrivate(.wishlist, viewedBy: UUID(uuidString: activeHumanIdStr))
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
             ArkBackgroundView().ignoresSafeArea()
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    // 头部余额卡
-                    UltimateGlassCard {
-                        HStack(spacing: 0) {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("我的椰子余额")
-                                    .font(OhanaFont.caption(.bold))
-                                    .foregroundStyle(.primary.opacity(0.5))
-                                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                                    Text("🥥")
-                                        .font(OhanaFont.title2())
-                                    Text("\(human.coconutBalance)")
-                                        .font(OhanaFont.metric(size: 44))
-                                        .foregroundStyle(Color.goPrimary)
-                                        .contentTransition(.numericText())
-                                }
-                                Text("许愿消耗椰子，需攒够才能兑换")
-                                    .font(OhanaFont.caption())
-                                    .foregroundStyle(.primary.opacity(0.35))
-                            }
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 6) {
-                                Text("\(pendingItems.count)")
-                                    .font(OhanaFont.metric(size: 32))
-                                    .foregroundStyle(.primary)
-                                Text("个待兑换")
-                                    .font(OhanaFont.caption())
-                                    .foregroundStyle(.primary.opacity(0.4))
-                            }
-                        }
-                        .padding(20)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
-
-                    if pendingItems.isEmpty && redeemedItems.isEmpty {
-                        emptyState.padding(.top, 60)
-                    } else {
-                        if !pendingItems.isEmpty {
-                            sectionHeader("🎁 待兑换心愿")
-                                .padding(.horizontal, 20)
-                            ForEach(pendingItems) { item in
-                                wishCard(item: item, redeemed: false)
-                                    .padding(.horizontal, 20)
-                            }
-                        }
-                        if !redeemedItems.isEmpty {
-                            sectionHeader("✅ 已兑换")
-                                .padding(.horizontal, 20)
-                            ForEach(redeemedItems) { item in
-                                wishCard(item: item, redeemed: true)
-                                    .padding(.horizontal, 20)
-                            }
-                        }
-                    }
-                    Spacer(minLength: 100)
-                }
+            if isPrivacyLocked {
+                privacyLockedView
+            } else {
+                wishlistContent
             }
 
             // FAB — iOS 26 Primary CTA
-            Button { showAddSheet = true } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "plus")
-                        .font(OhanaFont.callout(.black))
-                    Text("许一个愿")
-                        .font(OhanaFont.callout(.black))
+            if !isPrivacyLocked {
+                Button { showAddSheet = true } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus")
+                            .font(OhanaFont.callout(.black))
+                        Text("许一个愿")
+                            .font(OhanaFont.callout(.black))
+                    }
+                    .foregroundStyle(Color.arkInk)
+                    .padding(.horizontal, 24).padding(.vertical, 14)
+                    .background(Color.goPrimary, in: Capsule())
+                    .shadow(color: Color.goPrimary.opacity(0.45), radius: 14, y: 5)
                 }
-                .foregroundStyle(Color.arkInk)
-                .padding(.horizontal, 24).padding(.vertical, 14)
-                .background(Color.goPrimary, in: Capsule())
-                .shadow(color: Color.goPrimary.opacity(0.45), radius: 14, y: 5)
+                .buttonStyle(.plain)
+                .padding(.bottom, 28)
             }
-            .buttonStyle(.plain)
-            .padding(.bottom, 28)
         }
         .confettiOverlay(isShowing: $showConfetti)
         .navigationTitle("🎁 心愿单")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showAddSheet) { addWishSheet }
+    }
+
+    private var wishlistContent: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 20) {
+                balanceCard
+
+                if pendingItems.isEmpty && redeemedItems.isEmpty {
+                    emptyState.padding(.top, 60)
+                } else {
+                    if !pendingItems.isEmpty {
+                        sectionHeader("🎁 待兑换心愿")
+                            .padding(.horizontal, 20)
+                        ForEach(pendingItems) { item in
+                            wishCard(item: item, redeemed: false)
+                                .padding(.horizontal, 20)
+                        }
+                    }
+                    if !redeemedItems.isEmpty {
+                        sectionHeader("✅ 已兑换")
+                            .padding(.horizontal, 20)
+                        ForEach(redeemedItems) { item in
+                            wishCard(item: item, redeemed: true)
+                                .padding(.horizontal, 20)
+                        }
+                    }
+                }
+                Spacer(minLength: 100)
+            }
+        }
+    }
+
+    private var balanceCard: some View {
+        UltimateGlassCard {
+            HStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("我的椰子余额")
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(.primary.opacity(0.5))
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text("🥥")
+                            .font(OhanaFont.title2())
+                        Text("\(human.coconutBalance)")
+                            .font(OhanaFont.metric(size: 44))
+                            .foregroundStyle(Color.goPrimary)
+                            .contentTransition(.numericText())
+                    }
+                    Text("许愿消耗椰子，需攒够才能兑换")
+                        .font(OhanaFont.caption())
+                        .foregroundStyle(.primary.opacity(0.35))
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 6) {
+                    Text("\(pendingItems.count)")
+                        .font(OhanaFont.metric(size: 32))
+                        .foregroundStyle(.primary)
+                    Text("个待兑换")
+                        .font(OhanaFont.caption())
+                        .foregroundStyle(.primary.opacity(0.4))
+                }
+            }
+            .padding(20)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+    }
+
+    private var privacyLockedView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 34, weight: .bold))
+                .foregroundStyle(Color.goYellow)
+            Text("椰子资产仅本人可见")
+                .font(OhanaFont.title3(.black))
+                .foregroundStyle(.primary)
+            Text("当前家庭成员无权查看余额、心愿和兑换记录。")
+                .font(OhanaFont.callout())
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(24)
+        .ohanaStandardCard(cornerRadius: 24)
+        .padding(.horizontal, 24)
     }
 
     // MARK: - Balance Card (inner)

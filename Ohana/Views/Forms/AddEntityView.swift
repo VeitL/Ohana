@@ -51,6 +51,10 @@ struct AddEntityView: View {
 
     private var l: L10n { L10n(appLanguage) }
 
+    init(initialType: EntityType? = nil) {
+        _selectedType = State(initialValue: initialType)
+    }
+
     private var navigationTitleText: String {
         guard let t = selectedType else { return l.addEntityNavRoot }
         switch t {
@@ -82,7 +86,6 @@ struct AddEntityView: View {
             .navigationTitle(navigationTitleText)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     if selectedType != nil {
@@ -98,7 +101,6 @@ struct AddEntityView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
     }
     
     private var entitySelector: some View {

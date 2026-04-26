@@ -10,9 +10,10 @@ import SwiftData
 
 struct HumanDetailView: View {
     let human: Human
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("activeHumanId") private var activeHumanIdStr = ""
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
 
@@ -41,7 +42,8 @@ struct HumanDetailView: View {
     }
 
     private var myMeds: [HumanMedication] {
-        allMeds.filter { $0.humanId == human.id.uuidString && $0.isActive && $0.isActiveToday }
+        guard !human.isPrivate(.medication, viewedBy: activeHumanId) else { return [] }
+        return allMeds.filter { $0.humanId == human.id.uuidString && $0.isActive && $0.isActiveToday }
     }
 
     private var myReports: [HumanHealthReport] {
@@ -63,32 +65,41 @@ struct HumanDetailView: View {
 
                     sectionHeader("健康 & 身体")
 
-                    if human.isPrivate("weight", viewedBy: activeHumanId) {
+                    if human.isPrivate(.weight, viewedBy: activeHumanId) {
                         privacyPlaceholderCard(label: "体重记录")
                     } else {
                         weightCard
                     }
-                    medicationCard
+                    if human.isPrivate(.medication, viewedBy: activeHumanId) {
+                        privacyPlaceholderCard(label: "吃药提醒")
+                    } else {
+                        medicationCard
+                    }
                     healthReportCard
 
                     sectionHeader("活动 & 记录")
 
-                    if human.isPrivate("workout", viewedBy: activeHumanId) {
+                    if human.isPrivate(.workout, viewedBy: activeHumanId) {
                         privacyPlaceholderCard(label: "运动记录")
                     } else {
                         HumanWorkoutCard(human: human, pets: allPets)
                             .padding(.horizontal, 16)
                     }
-                    coHealthCard
+                    if human.isPrivate(.weight, viewedBy: activeHumanId) ||
+                        human.isPrivate(.workout, viewedBy: activeHumanId) {
+                        privacyPlaceholderCard(label: "共健数据")
+                    } else {
+                        coHealthCard
+                    }
 
                     sectionHeader("财务")
 
-                    if human.isPrivate("expense", viewedBy: activeHumanId) {
+                    if human.isPrivate(.expense, viewedBy: activeHumanId) {
                         privacyPlaceholderCard(label: "花费记录")
                     } else {
                         humanExpenseCard
                     }
-                    if human.isPrivate("wishlist", viewedBy: activeHumanId) {
+                    if human.isPrivate(.wishlist, viewedBy: activeHumanId) {
                         privacyPlaceholderCard(label: "椰子资产")
                     } else {
                         humanAssetCard
@@ -206,18 +217,19 @@ struct HumanDetailView: View {
             bentoStatMini(
                 icon: "scalemass.fill",
                 value: {
+                    guard !human.isPrivate(.weight, viewedBy: activeHumanId) else { return "—" }
                     guard let latest = human.weightLogs.sorted(by: { $0.date > $1.date }).first,
                           latest.weight.isFinite else { return "—" }
                     return String(format: "%.1f", latest.weight)
                 }(),
-                unit: human.weightLogs.isEmpty ? "" : "kg",
+                unit: human.isPrivate(.weight, viewedBy: activeHumanId) || human.weightLogs.isEmpty ? "" : "kg",
                 label: "体重",
                 color: Color.goPrimary
             )
             bentoStatMini(
                 icon: "pills.fill",
-                value: "\(myMeds.count)",
-                unit: "种",
+                value: human.isPrivate(.medication, viewedBy: activeHumanId) ? "—" : "\(myMeds.count)",
+                unit: human.isPrivate(.medication, viewedBy: activeHumanId) ? "" : "种",
                 label: "用药",
                 color: Color.goRed
             )
@@ -230,8 +242,8 @@ struct HumanDetailView: View {
             )
             bentoStatMini(
                 icon: "leaf.fill",
-                value: "\(human.coconutBalance)",
-                unit: "🥥",
+                value: human.isPrivate(.wishlist, viewedBy: activeHumanId) ? "—" : "\(human.coconutBalance)",
+                unit: human.isPrivate(.wishlist, viewedBy: activeHumanId) ? "" : "🥥",
                 label: "椰子",
                 color: Color.goYellow
             )
@@ -249,23 +261,29 @@ struct HumanDetailView: View {
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value)
                     .font(OhanaFont.metric(size: 18))
-                    .foregroundStyle(Color(hex: "1E3A8A"))
+                    .foregroundStyle(Color(light: Color(hex: "1E3A8A"), dark: .primary))
                 if !unit.isEmpty {
                     Text(unit)
                         .font(OhanaFont.caption2(.bold))
-                        .foregroundStyle(Color(hex: "6B82C4"))
+                        .foregroundStyle(Color(light: Color(hex: "6B82C4"), dark: .secondary))
                 }
             }
             Text(label)
                 .font(OhanaFont.caption2(.medium))
-                .foregroundStyle(Color(hex: "6B82C4"))
+                .foregroundStyle(Color(light: Color(hex: "6B82C4"), dark: .secondary))
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
         .padding(.horizontal, 6)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .shadow(color: Color(hex: "0C1640").opacity(0.12), radius: 4, y: 2)
-        .environment(\.colorScheme, .light)
+        .background(
+            Color(light: .white, dark: Color.white.opacity(0.08)),
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.04), lineWidth: 1)
+        )
+        .shadow(color: (colorScheme == .dark ? Color.black.opacity(0.18) : Color(hex: "0C1640").opacity(0.12)), radius: 4, y: 2)
     }
 
     // MARK: - Badges Card
@@ -728,15 +746,12 @@ struct HumanDetailView: View {
     // MARK: - Actions
     private func completeReminder(_ reminder: Reminder) {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        reminder.statusEnum = .completed
-        reminder.completedAt = Date()
-        modelContext.safeSave()
+        ReminderCompletionService.complete(reminder, by: human.id.uuidString, context: modelContext)
     }
 
     private func skipReminder(_ reminder: Reminder) {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        reminder.statusEnum = .skipped
-        modelContext.safeSave()
+        ReminderCompletionService.skip(reminder, by: human.id.uuidString, context: modelContext)
     }
 }
 
@@ -758,6 +773,7 @@ struct EditHumanSheet: View {
     // FIX 1: 隐私设置
     @State private var privateWeight = false
     @State private var privateWorkout = false
+    @State private var privateMedication = false
     @State private var privateWishlist = false
     @State private var privateExpense = false
     
@@ -802,6 +818,7 @@ struct EditHumanSheet: View {
                         .foregroundStyle(.secondary)
                     editPrivacyRow("体重记录", binding: $privateWeight)
                     editPrivacyRow("运动记录", binding: $privateWorkout)
+                    editPrivacyRow("吃药提醒", binding: $privateMedication)
                     editPrivacyRow("心愿单", binding: $privateWishlist)
                     editPrivacyRow("花费记录", binding: $privateExpense)
                 }
@@ -828,10 +845,11 @@ struct EditHumanSheet: View {
             city = human.city
             // FIX 1: 加载隐私设置
             let fields = human.privateFields
-            privateWeight   = fields.contains("weight")
-            privateWorkout  = fields.contains("workout")
-            privateWishlist = fields.contains("wishlist")
-            privateExpense  = fields.contains("expense")
+            privateWeight   = fields.contains(HumanPrivateField.weight.rawValue)
+            privateWorkout  = fields.contains(HumanPrivateField.workout.rawValue)
+            privateMedication = fields.contains(HumanPrivateField.medication.rawValue)
+            privateWishlist = fields.contains(HumanPrivateField.wishlist.rawValue)
+            privateExpense  = fields.contains(HumanPrivateField.expense.rawValue)
         }
     }
     
@@ -855,12 +873,11 @@ struct EditHumanSheet: View {
         human.nationality = nationality
         human.city = city
         // FIX 1: 保存隐私设置
-        var privFields: Set<String> = []
-        if privateWeight   { privFields.insert("weight") }
-        if privateWorkout  { privFields.insert("workout") }
-        if privateWishlist { privFields.insert("wishlist") }
-        if privateExpense  { privFields.insert("expense") }
-        human.privateFields = privFields
+        human.setPrivate(.weight, privateWeight)
+        human.setPrivate(.workout, privateWorkout)
+        human.setPrivate(.medication, privateMedication)
+        human.setPrivate(.wishlist, privateWishlist)
+        human.setPrivate(.expense, privateExpense)
         modelContext.safeSave()
         dismiss()
     }

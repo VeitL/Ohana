@@ -341,7 +341,24 @@ struct AddExpenseSheet: View {
         modelContext.insert(log)
         modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        QuestManager.shared.awardAction(type: .expense, pet: pet, context: modelContext)
+        let reward = QuestManager.shared.awardAction(type: .expense, pet: pet, context: modelContext)
+        CareLedgerService.record(
+            occurredAt: log.date,
+            actorKind: payerId == nil ? .unknown : .human,
+            actorId: payerId,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .expense,
+            actionType: selectedCategory.rawValue,
+            amountValue: amount,
+            amountUnit: "currency",
+            note: noteInput,
+            source: .detail,
+            legacyModelName: "PetExpenseLog",
+            legacyModelId: log.id.uuidString,
+            coconutDelta: CareLedgerService.rewardDelta(reward),
+            context: modelContext
+        )
 
         // 若是医疗类且宠物有活跃保险，显示报销快捷入口 Toast（3 秒后自动隐藏）
         if selectedCategory == .medical && !activeInsurances.isEmpty {

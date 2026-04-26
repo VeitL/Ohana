@@ -484,6 +484,7 @@ struct QuickMomentSheet: View {
         let lat = locationModel.latitude
         let lon = locationModel.longitude
         let hasCoords = lat != 0 || lon != 0
+        var savedLog: PetPhotoLog?
 
         if let img = selectedImage, let data = img.jpegData(compressionQuality: 0.82) {
             let log = PetPhotoLog(
@@ -493,6 +494,7 @@ struct QuickMomentSheet: View {
                 locationPlacename: placeName
             )
             modelContext.insert(log)
+            savedLog = log
         } else if !note.isEmpty {
             let placeholder = UIImage()
             let data = placeholder.pngData() ?? Data(count: 1)
@@ -503,11 +505,28 @@ struct QuickMomentSheet: View {
                 locationPlacename: placeName
             )
             modelContext.insert(log)
+            savedLog = log
         }
 
         modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         QuestManager.shared.addCoconuts(1, emoji: "📸", title: "记录时刻 +1🥥")
+        if let savedLog {
+            CareLedgerService.record(
+                occurredAt: savedLog.date,
+                actorKind: .unknown,
+                subjectKind: pet == nil ? .system : .pet,
+                subjectId: pet?.id.uuidString,
+                eventKind: .milestone,
+                actionType: "petMoment",
+                note: savedLog.note,
+                source: .quickAction,
+                legacyModelName: "PetPhotoLog",
+                legacyModelId: savedLog.id.uuidString,
+                coconutDelta: 1,
+                context: modelContext
+            )
+        }
 
         withAnimation(.spring(response: 0.3)) { savedSuccess = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {

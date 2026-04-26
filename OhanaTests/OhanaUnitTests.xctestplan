@@ -1,0 +1,28 @@
+{
+  "configurations" : [
+    {
+      "id" : "0F3BFC3D-3B7D-47E5-9E2B-6F08D7085B50",
+      "name" : "Unit Tests",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Ohana.xcodeproj",
+      "identifier" : "4FDA02302F54E0D4004B725F",
+      "name" : "Ohana"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:Ohana.xcodeproj",
+        "identifier" : "4FDA023D2F54E0D6004B725F",
+        "name" : "OhanaTests"
+      }
+    }
+  ],
+  "version" : 1
+}

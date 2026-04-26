@@ -154,6 +154,14 @@ struct PetMedicationDetailSheet: View {
         Button {
             PetMedicationDoseLogging.recordDose(medication: medication, pet: pet, modelContext: modelContext)
             QuestManager.shared.addCoconuts(1, emoji: "💊", title: "记录喂药 +1🥥")
+            CareLedgerService.recordCoconut(
+                delta: 1,
+                title: "记录喂药",
+                actorId: UserDefaults.standard.string(forKey: "currentActiveHumanId"),
+                actorName: nil,
+                source: .economy,
+                context: modelContext
+            )
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         } label: {
             HStack {

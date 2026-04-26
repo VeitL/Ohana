@@ -64,18 +64,13 @@ struct OhanaApp: App {
         scheduleReminderRefill() // 立即再排队下次
 
         // 与 `OhanaApp` 主容器共用单例，避免再 new 一个 ModelContainer 争用 SQLite
-        let refill: () -> Void = {
+        Task { @MainActor in
             let modelContext = ModelContext(SharedModelContainer.make())
             let reminders = (try? modelContext.fetch(FetchDescriptor<Reminder>())) ?? []
-            NotificationManager.shared.refillWindowIfNeeded(allReminders: reminders)
-            NotificationManager.shared.compensate(reminders: reminders)
+            await ReminderSchedulingService.refillMissingPendingNotifications(reminders: reminders, context: modelContext)
+            ReminderSchedulingService.compensate(reminders: reminders, context: modelContext)
             try? modelContext.save()
+            task.setTaskCompleted(success: true)
         }
-        if Thread.isMainThread {
-            refill()
-        } else {
-            DispatchQueue.main.sync(execute: refill)
-        }
-        task.setTaskCompleted(success: true)
     }
 }

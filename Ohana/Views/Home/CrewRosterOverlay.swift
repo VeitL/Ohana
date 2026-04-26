@@ -29,7 +29,7 @@ struct CrewRosterOverlay: View {
     @AppStorage("appUIStyle") private var appUIStyle: String = "go"
     @Environment(\.colorScheme) private var colorScheme
 
-    private var isMaterial: Bool { appUIStyle == "material" }
+    private var isMaterial: Bool { false }
     private var matBg:      Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
     private var matSurface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
     private var matAccent:  Color { Color(hex: "FF5A00") }

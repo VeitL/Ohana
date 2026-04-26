@@ -89,6 +89,16 @@ extension Color {
     static let goDarkBlue = Color(hex: "1A0E4B")
     static let goDeepNavy = Color(hex: "0D0638")
 
+    // MARK: - Theme Semantic Colors
+    static let ohanaCardSurface = Color(light: Color.white, dark: Color.white.opacity(0.08))
+    static let ohanaCardSurfaceElevated = Color(light: Color.white, dark: Color(hex: "171B2A"))
+    static let ohanaPrimaryText = Color(light: Color.arkInk, dark: Color(hex: "F8FAFC"))
+    static let ohanaSecondaryText = Color(light: Color.arkInk.opacity(0.62), dark: Color.white.opacity(0.62))
+    static let ohanaTertiaryText = Color(light: Color.arkInk.opacity(0.42), dark: Color.white.opacity(0.42))
+    static let ohanaDivider = Color(light: Color.black.opacity(0.08), dark: Color.white.opacity(0.12))
+    static let ohanaControlFill = Color(light: Color.black.opacity(0.05), dark: Color.white.opacity(0.09))
+    static let ohanaCardStroke = Color(light: Color.black.opacity(0.06), dark: Color.white.opacity(0.14))
+
     // MARK: - Alert Semantic Colors (from Figma Tokens, Light/Dark adaptive)
     // Alert/Success
     static let alertSuccessBg = Color(light:

@@ -101,15 +101,11 @@ struct QuickPottySheet: View {
         let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
         let isLitter = ["猫","兔子","仓鼠","龙猫","豚鼠"].contains(pet.species)
         if isLitter {
-            let log = PetCareLog(date: date, type: .litter, pet: pet, executorId: eid)
-            modelContext.insert(log)
+            CareEventService.recordCare(pet: pet, type: .litter, context: modelContext, executorId: eid, reward: .potty(isLitter: true), date: date)
         } else {
-            let log = PetPottyLog(date: date, type: selectedType, pet: pet, executorId: eid)
-            modelContext.insert(log)
+            CareEventService.recordPotty(pet: pet, type: selectedType, context: modelContext, executorId: eid, date: date)
         }
-        modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        QuestManager.shared.awardAction(type: .potty(isLitter: isLitter), pet: pet, context: modelContext)
         dismiss()
     }
 }

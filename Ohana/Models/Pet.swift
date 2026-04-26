@@ -138,6 +138,8 @@ final class Pet {
     var foodTrackingModeRaw: String
     var casualOpenDate: Date?      // 佛系：开包日期
     var casualDurationDays: Int    // 佛系：预估能吃多少天（30/60/90/180）
+    var foodReminderEnabled: Bool  // 粮仓：是否提醒补粮
+    var foodReminderAdvanceDays: Int // 粮仓：断粮前几天提醒
     // ArkSchemaV11 独立椰子账户
     var coconutBalance: Int        // 该宠物的椰子余额
     // ArkSchemaV14 生命周期 — Rainbow Bridge
@@ -216,6 +218,8 @@ final class Pet {
         self.foodTrackingModeRaw = FoodTrackingMode.casual.rawValue
         self.casualOpenDate = nil
         self.casualDurationDays = 0
+        self.foodReminderEnabled = false
+        self.foodReminderAdvanceDays = 7
         self.coconutBalance = 0
         self.passedAwayDate = nil
         self.cardStyleRaw = "classic"
@@ -324,11 +328,18 @@ final class Pet {
 
     var remainingFoodGrams: Double {
         guard foodTrackingMode == .precise else { return 0 }
-        guard dailyPortionGrams > 0, restockWeight > 0 else { return 0 }
+        guard restockWeight > 0 else { return 0 }
         guard let restockDate else { return restockWeight * 1000 }
-        let daysSinceRestock = Calendar.current.dateComponents([.day], from: restockDate, to: Date()).day ?? 0
-        let consumed = Double(daysSinceRestock) * dailyPortionGrams
-        return max(0, (restockWeight * 1000) - consumed)
+        return max(0, (restockWeight * 1000) - foodConsumedSinceRestock)
+    }
+
+    var foodConsumedSinceRestock: Double {
+        guard let restockDate else { return 0 }
+        return careLogs
+            .filter { $0.careType == .feeding && $0.date >= restockDate }
+            .reduce(0) { total, log in
+                total + (log.amountGrams > 0 ? log.amountGrams : dailyPortionGrams)
+            }
     }
     
     var remainingFoodDays: Int {

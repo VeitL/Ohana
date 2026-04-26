@@ -10,8 +10,17 @@ struct HumanExpenseDetailView: View {
     let human: Human
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
     @Query(sort: \PetExpenseLog.date, order: .reverse) private var allExpenses: [PetExpenseLog]
+
+    private var activeHumanId: UUID? {
+        UUID(uuidString: activeHumanIdStr)
+    }
+
+    private var isPrivacyLocked: Bool {
+        PrivacyService.isLocked(.expense, for: human, viewedBy: activeHumanId)
+    }
 
     private var myExpenses: [PetExpenseLog] {
         allExpenses.filter { $0.executorId == human.id.uuidString }
@@ -25,7 +34,18 @@ struct HumanExpenseDetailView: View {
         ZStack {
             ArkBackgroundView()
 
-            VStack(spacing: 0) {
+            if isPrivacyLocked {
+                privacyLockedView
+            } else {
+                expenseContent
+            }
+        }
+        .navigationTitle("\(human.name) 的花费")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var expenseContent: some View {
+        VStack(spacing: 0) {
                 // 累计花费 Hero
                 VStack(spacing: 6) {
                     Text("累计花费")
@@ -68,9 +88,23 @@ struct HumanExpenseDetailView: View {
                     }
                 }
             }
+    }
+
+    private var privacyLockedView: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "lock.shield.fill")
+                .font(OhanaFont.metric(size: 44))
+                .foregroundStyle(Color.goYellow)
+            Text(PrivacyService.lockedMessage(for: .expense))
+                .font(OhanaFont.headline(.bold))
+                .foregroundStyle(.primary)
+            Text("请切换到本人档案后再查看。")
+                .font(OhanaFont.callout())
+                .foregroundStyle(.secondary)
         }
-        .navigationTitle("\(human.name) 的花费")
-        .navigationBarTitleDisplayMode(.inline)
+        .multilineTextAlignment(.center)
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func expenseRow(_ log: PetExpenseLog) -> some View {

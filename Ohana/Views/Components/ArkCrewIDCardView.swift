@@ -2679,7 +2679,8 @@ struct SpeciesCheckInGrid: View {
                                label: type == .feeding ? "喂食" : "喂水",
                                insertedID: log.persistentModelID)
         if type == .feeding { QuestManager.shared.recordFirstMeal() }
-        QuestManager.shared.awardAction(type: type == .feeding ? .feed : .water, pet: pet, context: modelContext)
+        let reward = QuestManager.shared.awardAction(type: type == .feeding ? .feed : .water, pet: pet, context: modelContext)
+        CareLedgerService.recordPetCare(log: log, pet: pet, source: .quickAction, coconutDelta: CareLedgerService.rewardDelta(reward), context: modelContext)
     }
 
     private func performPottyCheckIn() {
@@ -2691,7 +2692,8 @@ struct SpeciesCheckInGrid: View {
         let label = isLitter ? "铲屎" : "便便"
         let emoji = isLitter ? "🪣" : "💩"
         insertEventAndReminder(emoji: emoji, label: label, insertedID: log.persistentModelID)
-        QuestManager.shared.awardAction(type: .potty(isLitter: isLitter), pet: pet, context: modelContext)
+        let reward = QuestManager.shared.awardAction(type: .potty(isLitter: isLitter), pet: pet, context: modelContext)
+        CareLedgerService.recordPetPotty(log: log, pet: pet, source: .quickAction, coconutDelta: CareLedgerService.rewardDelta(reward), context: modelContext)
     }
 
     private func performLitterCheckIn() {
@@ -2700,7 +2702,8 @@ struct SpeciesCheckInGrid: View {
         let log = PetCareLog(date: now, type: .litter, pet: pet, executorId: eid)
         modelContext.insert(log)
         insertEventAndReminder(emoji: "🧹", label: "铲屎", insertedID: log.persistentModelID)
-        QuestManager.shared.awardAction(type: .potty(isLitter: true), pet: pet, context: modelContext)
+        let reward = QuestManager.shared.awardAction(type: .potty(isLitter: true), pet: pet, context: modelContext)
+        CareLedgerService.recordPetCare(log: log, pet: pet, source: .quickAction, coconutDelta: CareLedgerService.rewardDelta(reward), context: modelContext)
     }
 
     private func performSpecialCareCheckIn(type: CareType) {
@@ -2720,7 +2723,8 @@ struct SpeciesCheckInGrid: View {
         case .substrateChange: oat = .general(humanReward: 15, petReward: 22, emoji: type.emoji, title: "\(pet.name) 换垫材报酬")
         default:               oat = .general(humanReward: 3, petReward: 3, emoji: type.emoji, title: "\(pet.name) 打卡奖励")
         }
-        QuestManager.shared.awardAction(type: oat, pet: pet, context: modelContext)
+        let reward = QuestManager.shared.awardAction(type: oat, pet: pet, context: modelContext)
+        CareLedgerService.recordPetCare(log: log, pet: pet, source: .quickAction, coconutDelta: CareLedgerService.rewardDelta(reward), context: modelContext)
     }
 
     private func performHygieneCheckIn(_ type: HygieneType) {
@@ -2738,7 +2742,19 @@ struct SpeciesCheckInGrid: View {
         case .ears:     emoji = "👂"; label = "清耳"
         }
         insertEventAndReminder(emoji: emoji, label: label, insertedID: log.persistentModelID)
-        QuestManager.shared.awardAction(type: .care(type: type), pet: pet, context: modelContext)
+        let reward = QuestManager.shared.awardAction(type: .care(type: type), pet: pet, context: modelContext)
+        CareLedgerService.record(
+            occurredAt: log.date,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .hygiene,
+            actionType: type.rawValue,
+            source: .quickAction,
+            legacyModelName: "PetHygieneLog",
+            legacyModelId: log.id.uuidString,
+            coconutDelta: CareLedgerService.rewardDelta(reward),
+            context: modelContext
+        )
     }
 
     private func insertEventAndReminder(emoji: String, label: String, insertedID: PersistentIdentifier) {
