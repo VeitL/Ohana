@@ -363,10 +363,8 @@ private struct GoldenRewardRow: View {
     }
 
     private func completeMilestone() {
-        // 1. 标记完成
-        reminder.statusEnum = .completed
-        reminder.completedAt = Date()
-        modelContext.safeSave()
+        let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+        ReminderCompletionService.complete(reminder, by: activeHumanId, context: modelContext)
 
         // 2. 强触觉反馈 × 2（多巴胺闭环）
         let gen = UIImpactFeedbackGenerator(style: .heavy)

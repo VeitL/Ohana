@@ -18,15 +18,26 @@ enum FMDest: Hashable {
     case petDocuments(PersistentIdentifier)
     case petMoments(PersistentIdentifier)
     case petAchievements(PersistentIdentifier)
+    case petRetention(PersistentIdentifier)
     case petWeight(PersistentIdentifier)
     case petExpense(PersistentIdentifier)
     case humanWeight(PersistentIdentifier)
     case humanExpense(PersistentIdentifier)
+    // Island-wide destinations (not per-pet)
+    case plantsDashboard
+    case wealthDashboard
+    case bountyBoard
+    case familyWeeklyReport
+    case careLedgerAnalysis
+    case reminderObservability
+    case coconutShop
+    case gacha
+    case calendar
 }
 
 enum PetFeature: String, Hashable, CaseIterable {
     case health, medications, food, hygiene, walks, potty
-    case basicInfo, documents, moments, achievements
+    case retention, basicInfo, documents, moments, achievements
     case weight, expense
 
     var title: String {
@@ -37,6 +48,7 @@ enum PetFeature: String, Hashable, CaseIterable {
         case .hygiene:       return "清洁护理"
         case .walks:         return "遛狗记录"
         case .potty:         return "便便记录"
+        case .retention:     return "成长档案"
         case .basicInfo:     return "基本信息"
         case .documents:     return "证件保障"
         case .moments:       return "重要时刻"
@@ -53,6 +65,7 @@ enum PetFeature: String, Hashable, CaseIterable {
         case .hygiene:       return "bubbles.and.sparkles.fill"
         case .walks:         return "figure.walk"
         case .potty:         return "drop.fill"
+        case .retention:     return "sparkles.rectangle.stack.fill"
         case .basicInfo:     return "person.fill"
         case .documents:     return "doc.fill"
         case .moments:       return "sparkles"
@@ -70,8 +83,12 @@ struct FunctionMenuSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.name) private var allHumans: [Human]
+    @Query(sort: \Plant.createdAt) private var plants: [Plant]
+    @Bindable private var questMgr = QuestManager.shared
 
     @State private var path = NavigationPath()
+    // Stub binding for PlantDashboardView (full navigation into plant detail happens via its own sheet)
+    @State private var plantRouteStub: Plant?
 
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
 
@@ -133,8 +150,23 @@ struct FunctionMenuSheet: View {
                     }
                     .listRowBackground(rowBackground)
 
-                    // ── Section 3: 档案与记忆 ──
+                    // ── Section 3: 植物与绿洲 ──
                     Section {
+                        fmRow(icon: "leaf.fill", iconColor: Color(hex: "22C55E"),
+                              title: "植物管理", subtitle: plantsSubtitle) {
+                            path.append(FMDest.plantsDashboard)
+                        }
+                    } header: {
+                        fmSectionHeader(icon: "leaf.fill", title: "植物与绿洲", label: "GARDEN")
+                    }
+                    .listRowBackground(rowBackground)
+
+                    // ── Section 4: 档案与记忆 ──
+                    Section {
+                        fmRow(icon: PetFeature.retention.icon, iconColor: Color(hex: "C8FF00"),
+                              title: PetFeature.retention.title, subtitle: retentionSubtitle) {
+                            path.append(FMDest.featureAggregate(.retention))
+                        }
                         fmRow(icon: PetFeature.basicInfo.icon, iconColor: Color(hex: "6B82C4"),
                               title: PetFeature.basicInfo.title, subtitle: "\(activePets.count)只宠物") {
                             path.append(FMDest.featureAggregate(.basicInfo))
@@ -155,13 +187,51 @@ struct FunctionMenuSheet: View {
                         fmSectionHeader(icon: "folder.fill", title: "档案与记忆", label: "ARCHIVE")
                     }
                     .listRowBackground(rowBackground)
+
+                    // ── Section 5: 家庭岛屿 ──
+                    Section {
+                        fmRow(icon: "chart.pie.fill", iconColor: Color(hex: "EAB308"),
+                              title: "岛屿财富", subtitle: wealthSubtitle) {
+                            path.append(FMDest.wealthDashboard)
+                        }
+                        fmRow(icon: "megaphone.fill", iconColor: Color(hex: "EF4444"),
+                              title: "家庭悬赏榜", subtitle: bountySubtitle) {
+                            path.append(FMDest.bountyBoard)
+                        }
+                        fmRow(icon: "chart.bar.doc.horizontal", iconColor: Color(hex: "38BDF8"),
+                              title: "家庭周报", subtitle: weeklyReportSubtitle) {
+                            path.append(FMDest.familyWeeklyReport)
+                        }
+                        fmRow(icon: "list.bullet.rectangle.portrait.fill", iconColor: Color(hex: "C8FF00"),
+                              title: "照护账本分析", subtitle: ledgerSubtitle) {
+                            path.append(FMDest.careLedgerAnalysis)
+                        }
+                        fmRow(icon: "bell.badge.fill", iconColor: Color(hex: "F59E0B"),
+                              title: "提醒健康", subtitle: "权限 · 队列 · 失败补偿") {
+                            path.append(FMDest.reminderObservability)
+                        }
+                        fmRow(icon: "bag.fill", iconColor: Color(hex: "F472B6"),
+                              title: "椰子商店", subtitle: shopSubtitle) {
+                            path.append(FMDest.coconutShop)
+                        }
+                        fmRow(icon: "sparkles", iconColor: Color(hex: "A78BFA"),
+                              title: "欧气扭蛋机", subtitle: "30🥥 / 次 · 随机奖励") {
+                            path.append(FMDest.gacha)
+                        }
+                        fmRow(icon: "calendar", iconColor: Color(hex: "38BDF8"),
+                              title: "岛屿日历", subtitle: "行程 · 提醒 · 纪念日") {
+                            path.append(FMDest.calendar)
+                        }
+                    } header: {
+                        fmSectionHeader(icon: "globe.asia.australia.fill", title: "家庭岛屿", label: "ISLAND")
+                    }
+                    .listRowBackground(rowBackground)
                 }
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
             }
             .navigationTitle("所有功能")
             .navigationBarTitleDisplayMode(.large)
-            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("完成") { dismiss() }
@@ -202,6 +272,8 @@ struct FunctionMenuSheet: View {
             if let p = pet(for: id) { PetMomentsHubView(pet: p) }
         case .petAchievements(let id):
             if let p = pet(for: id) { AchievementWallView(pet: p) }
+        case .petRetention(let id):
+            if let p = pet(for: id) { PetRetentionHubView(pet: p) }
         case .petWeight(let id):
             if let p = pet(for: id) { WeightHistoryView(pet: p) }
         case .petExpense(let id):
@@ -210,6 +282,24 @@ struct FunctionMenuSheet: View {
             if let h = human(for: id) { HumanWeightHistoryView(human: h) }
         case .humanExpense(let id):
             if let h = human(for: id) { HumanExpenseDetailView(human: h) }
+        case .plantsDashboard:
+            PlantDashboardView(selectedPlant: $plantRouteStub)
+        case .wealthDashboard:
+            IslandWealthDashboardView()
+        case .bountyBoard:
+            BountyBoardView()
+        case .familyWeeklyReport:
+            FamilyWeeklyReportDashboardView()
+        case .careLedgerAnalysis:
+            CareLedgerAnalysisView()
+        case .reminderObservability:
+            ReminderObservabilityView()
+        case .coconutShop:
+            CoconutShopView()
+        case .gacha:
+            GachaView()
+        case .calendar:
+            CalendarView()
         }
     }
 
@@ -255,8 +345,38 @@ struct FunctionMenuSheet: View {
         let total = activePets.map { $0.photoLogs.count }.reduce(0, +)
         return total > 0 ? "\(total)个时刻" : "\(activePets.count)只宠物"
     }
+    private var retentionSubtitle: String {
+        let petsWithArchive = activePets.filter {
+            !$0.weightLogs.isEmpty || !$0.photoLogs.isEmpty || !$0.expenseLogs.isEmpty || !$0.documents.isEmpty || !$0.insurances.isEmpty
+        }.count
+        return petsWithArchive > 0 ? "\(petsWithArchive)只宠物已有成长档案" : "健康 · 相册 · 花费 · 保障 · 成就"
+    }
     private var hasDogs: Bool {
         activePets.contains { $0.species.lowercased().contains("狗") || $0.species.lowercased().contains("dog") }
+    }
+    private var plantsSubtitle: String {
+        if plants.isEmpty { return "暂无植物 · 点击添加" }
+        let thirsty = plants.filter { $0.needsWatering }.count
+        if thirsty > 0 { return "\(plants.count)种 · \(thirsty)种需浇水" }
+        return "\(plants.count)种植物"
+    }
+    private var wealthSubtitle: String {
+        "总资产 \(QuestManager.shared.coconutCount)🥥"
+    }
+    private var bountySubtitle: String {
+        let all = BountyTask.loadAll()
+        let pending = all.filter { !$0.isCompleted }.count
+        if pending > 0 { return "\(pending) 个待完成任务" }
+        return "暂无悬赏 · 发布或接单"
+    }
+    private var shopSubtitle: String {
+        "消耗椰子 · 特效 / 称号 / 加成"
+    }
+    private var weeklyReportSubtitle: String {
+        "全家庭 · 多宠物 · 成员排行"
+    }
+    private var ledgerSubtitle: String {
+        "谁做了什么 · 提醒与奖励流水"
     }
 
     // MARK: - Row / Header Builders

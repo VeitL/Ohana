@@ -11,6 +11,8 @@ import Charts
 
 struct QuickWaterDetailSheet: View {
     let pet: Pet
+    var initialModeRaw: String? = nil
+    var lockedModeRaw: String? = nil
     let onRemove: () -> Void
 
     @Environment(\.modelContext) private var modelContext
@@ -94,7 +96,9 @@ struct QuickWaterDetailSheet: View {
                         petHeader
                         ExecutorPickerBar(tint: themeColor)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        modeToggle
+                        if lockedModeRaw == nil {
+                            modeToggle
+                        }
 
                         if currentMode == .drink {
                             drinkContent
@@ -125,6 +129,12 @@ struct QuickWaterDetailSheet: View {
         }
         .onAppear {
             migrateLegacyWaterModeIfNeeded()
+            if let lockedModeRaw {
+                waterModeRaw = lockedModeRaw
+            } else if let initialModeRaw {
+                waterModeRaw = initialModeRaw
+                UserDefaults.standard.set(initialModeRaw, forKey: waterModeStorageKey)
+            }
             loadChangeSettings()
         }
     }
@@ -562,26 +572,31 @@ struct QuickWaterDetailSheet: View {
     // MARK: - Actions
     private func commitWater() {
         let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        let log = PetCareLog(date: Date(), type: .watering, amountGrams: 0, pet: pet, executorId: eid)
-        modelContext.insert(log)
-        modelContext.safeSave()
-        QuestManager.shared.awardAction(type: .water, pet: pet, context: modelContext)
+        CareEventService.recordCare(pet: pet, type: .watering, amountMl: 250, context: modelContext, executorId: eid, reward: .water)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     private func doWaterChange() {
         let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        let log = PetCareLog(date: Date(), type: .waterChange, pet: pet, executorId: eid)
-        modelContext.insert(log)
-        modelContext.safeSave()
+        CareEventService.recordCare(
+            pet: pet,
+            type: .waterChange,
+            context: modelContext,
+            executorId: eid,
+            reward: .general(humanReward: 15, petReward: 20, emoji: CareType.waterChange.emoji, title: "\(pet.name) 换水奖励")
+        )
         saveWaterChangePlanToCalendar()
     }
 
     private func doFilterClean() {
         let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        let log = PetCareLog(date: Date(), type: .filterClean, pet: pet, executorId: eid)
-        modelContext.insert(log)
-        modelContext.safeSave()
+        CareEventService.recordCare(
+            pet: pet,
+            type: .filterClean,
+            context: modelContext,
+            executorId: eid,
+            reward: .general(humanReward: 25, petReward: 40, emoji: CareType.filterClean.emoji, title: "\(pet.name) 清理滤材报酬")
+        )
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 }

@@ -426,10 +426,7 @@ struct QuickLitterDetailSheet: View {
     // MARK: - Actions
     private func doScoop() {
         let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        let log = PetCareLog(date: Date(), type: .litter, pet: pet, executorId: eid)
-        modelContext.insert(log)
-        modelContext.safeSave()
-        QuestManager.shared.awardAction(type: .potty(isLitter: true), pet: pet, context: modelContext)
+        CareEventService.recordCare(pet: pet, type: .litter, context: modelContext, executorId: eid, reward: .potty(isLitter: true))
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 

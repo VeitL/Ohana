@@ -634,6 +634,24 @@ enum ArkSchemaV35: VersionedSchema {
     }
 }
 
+// MARK: - Schema V36（Pet 新增粮仓断粮提醒偏好）
+enum ArkSchemaV36: VersionedSchema {
+    static var versionIdentifier = Schema.Version(36, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV35.models
+    }
+}
+
+// MARK: - Schema V37（新增统一照护事件账本 CareLedgerEvent）
+enum ArkSchemaV37: VersionedSchema {
+    static var versionIdentifier = Schema.Version(37, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV36.models + [CareLedgerEvent.self]
+    }
+}
+
 // MARK: - Migration Plan
 // NOTE: 只保留有真实 custom logic 的 stage。
 // SwiftData 的 lightweight migration 对于"只新增字段/模型"完全不需要显式 stage——
@@ -650,7 +668,7 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
          ArkSchemaV21.self, ArkSchemaV22.self, ArkSchemaV23.self, ArkSchemaV24.self,
          ArkSchemaV25.self, ArkSchemaV26.self, ArkSchemaV27.self, ArkSchemaV28.self, ArkSchemaV29.self,
          ArkSchemaV30.self, ArkSchemaV31.self, ArkSchemaV32.self, ArkSchemaV33.self, ArkSchemaV34.self,
-         ArkSchemaV35.self]
+         ArkSchemaV35.self, ArkSchemaV36.self, ArkSchemaV37.self]
     }
 
     static var stages: [MigrationStage] { [] }
@@ -680,7 +698,7 @@ struct SharedModelContainer {
     }
 
     private static func createPersistentContainer() -> ModelContainer {
-        let schema = Schema(ArkSchemaV35.models)
+        let schema = Schema(ArkSchemaV37.models)
         let defaultConfig = ModelConfiguration(
             isStoredInMemoryOnly: false,
             cloudKitDatabase: .none

@@ -126,6 +126,20 @@ struct PetChartDashboard: View {
                             let log = PetWeightLog(date: Date(), weight: w, pet: pet)
                             modelContext.insert(log)
                             modelContext.safeSave()
+                            CareLedgerService.record(
+                                occurredAt: log.date,
+                                actorKind: .unknown,
+                                subjectKind: .pet,
+                                subjectId: pet.id.uuidString,
+                                eventKind: .weight,
+                                actionType: "petWeight",
+                                amountValue: log.weightInKg,
+                                amountUnit: "kg",
+                                source: .detail,
+                                legacyModelName: "PetWeightLog",
+                                legacyModelId: log.id.uuidString,
+                                context: modelContext
+                            )
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         }
                         quickWeightInput = ""; showingAddWeight = false

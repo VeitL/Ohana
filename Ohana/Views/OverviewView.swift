@@ -63,6 +63,8 @@ struct OverviewView: View {
     @State private var quickHumanWorkoutHuman: Human? = nil     // 快速添加运动
     @State private var quickHumanMedicationHuman: Human? = nil  // 快速查看用药
     @State private var quickHumanNoteHuman: Human? = nil        // 快速备注
+    @State private var quickHumanWeightDetailHuman: Human? = nil
+    @State private var quickHumanWorkoutDetailHuman: Human? = nil
     @State private var quickWeightValue: String = ""
     @State private var quickWalkPet: Pet? = nil     // 快速开始遛狗
     @State private var actionToast: (pet: Pet, message: String, emoji: String)? = nil  // N6: 打卡反馈 toast
@@ -80,6 +82,7 @@ struct OverviewView: View {
     // 快捷操作详情 sheet
     @State private var feedDetailPet: Pet? = nil
     @State private var waterDetailPet: Pet? = nil
+    @State private var waterDetailModeRaw: String? = nil
     @State private var playDetailPet: Pet? = nil
     @State private var pottyDetailPet: Pet? = nil
     @State private var litterDetailPet: Pet? = nil
@@ -224,6 +227,7 @@ struct OverviewView: View {
     @State private var pendingRepeatAction: (() -> Void)? = nil
     @State private var antiRepeatTitle = ""
     @State private var antiRepeatMessage = ""
+    @State private var showingHumanPrivacyAlert = false
     // 健康快捷操作 popover sheets
     @State private var showingAddSymptomSheet = false
     @State private var symptomSheetPet: Pet? = nil
@@ -360,8 +364,7 @@ struct OverviewView: View {
             for pet in pets {
                 StreakManager.refreshStreak(for: pet, context: modelContext)
             }
-            NotificationManager.shared.compensate(reminders: Array(pendingReminders))
-            modelContext.safeSave()
+            ReminderSchedulingService.compensate(reminders: Array(pendingReminders), context: modelContext)
             // 每日首次打开自动打卡（oasis_checkedIn_dates）
             let checkInFmt: DateFormatter = { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f }()
             let checkInKey = "oasis_checkedIn_dates"
@@ -463,6 +466,16 @@ struct OverviewView: View {
         .sheet(item: $quickHumanNoteHuman) { human in
             QuickHumanNoteSheet(human: human)
                 .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $quickHumanWeightDetailHuman) { human in
+            NavigationStack { HumanWeightHistoryView(human: human) }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $quickHumanWorkoutDetailHuman) { human in
+            HumanWorkoutHistoryView(human: human)
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
         .fullScreenCover(isPresented: $showIslandWeight) {
@@ -621,6 +634,11 @@ struct OverviewView: View {
             }
         } message: {
             Text(antiRepeatMessage)
+        }
+        .alert("仅本人可见", isPresented: $showingHumanPrivacyAlert) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text("该成员已将此功能设为仅自己可见。")
         }
         .islandToastOverlay()
         .sheet(isPresented: $showingAddSymptomSheet) {
@@ -1779,12 +1797,10 @@ struct OverviewView: View {
                             isPressed: !isQAEditMode && pressedActionId == item.id,
                             petAvatar: avatarForAction(item),
                             petThemeColorHex: themeColorForAction(item),
-                            displayIcon: (!isQAEditMode && item.actionType == "water" && waterQuickDisplayUsesChangeMode(for: item.petId))
-                                ? "drop.circle.fill" : nil,
-                            titleLabelOverride: (!isQAEditMode && item.actionType == "water" && waterQuickDisplayUsesChangeMode(for: item.petId))
-                                ? "换水" : nil,
                             pendingReminder: isQAEditMode ? nil : reminderForAction(item),
                             countText: isQAEditMode ? nil : countTextForAction(item),
+                            privacyBadgeText: isQAEditMode ? nil : privacyBadgeText(for: item),
+                            isPrivacyLocked: !isQAEditMode && isHumanQuickActionPrivate(item),
                             isCompletedToday: !isQAEditMode && isCompletedToday(for: item),
                             onTap: onTapAction,
                             onLongPress: onLongPressAction,
@@ -1885,7 +1901,9 @@ struct OverviewView: View {
                         if let pet = pets.first(where: { $0.id == activeCritterId }) {
                             QAQuickAddPopoverContent(pet: pet, existingItems: qaEditItems) { newItem in
                                 withAnimation(.spring(response: 0.3)) {
-                                    qaEditItems.append(newItem)
+                                    if QuickActionLimit.count(for: pet, in: qaEditItems) < QuickActionLimit.maxItemsPerEntity {
+                                        qaEditItems.append(newItem)
+                                    }
                                 }
                             }
                         }
@@ -1950,7 +1968,7 @@ struct OverviewView: View {
             }
             .sheet(item: $quickWalkDetailPet) { pet in
                 NavigationStack {
-                    DogActivityCard(pet: pet)
+                    WalkSummarySheet(pet: pet)
                 }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
@@ -1982,16 +2000,31 @@ struct OverviewView: View {
                 .presentationContentInteraction(.scrolls)
             }
             .sheet(item: $waterDetailPet) { pet in
-                QuickWaterDetailSheet(pet: pet) {
+                QuickWaterDetailSheet(
+                    pet: pet,
+                    initialModeRaw: waterDetailModeRaw,
+                    lockedModeRaw: waterDetailModeRaw
+                ) {
                     waterDetailPet = nil
-                    if let found = savedQuickActionItems.first(where: { $0.petId == pet.id && ($0.actionType == "water" || $0.actionType == "waterChange" || $0.actionType == "filterClean") }) {
+                    let removableTypes: Set<String>
+                    switch QuickWaterDetailSheet.WaterMode(rawValue: waterDetailModeRaw ?? "") {
+                    case .drink:
+                        removableTypes = ["water"]
+                    case .change:
+                        removableTypes = ["waterChange"]
+                    default:
+                        removableTypes = ["water", "waterChange", "filterClean"]
+                    }
+                    if let found = savedQuickActionItems.first(where: { $0.petId == pet.id && removableTypes.contains($0.actionType) }) {
                         removeQuickAction(found)
                     }
+                    waterDetailModeRaw = nil
                 }
                 .onAppear { quickActionDetailSheetDetent = .large }
                 .presentationDetents([.fraction(0.86), .large], selection: $quickActionDetailSheetDetent)
                 .presentationDragIndicator(.visible)
                 .presentationContentInteraction(.scrolls)
+                .onDisappear { waterDetailModeRaw = nil }
             }
             .sheet(item: $playDetailPet) { pet in
                 QuickPlayDetailSheet(pet: pet) {
@@ -2101,9 +2134,36 @@ struct OverviewView: View {
         guard let activeId = activeCritterId else {
             return all.filter { $0.entityKind != .human }
         }
-        return all.filter { item in
+        let items = all.filter { item in
             item.petId == activeId || (item.petId == nil && item.entityKind != .human)
         }
+        guard let pet = pets.first(where: { $0.id == activeId }) else { return items }
+        return ensureIndependentWaterChangeAction(in: items, for: pet)
+    }
+
+    private func ensureIndependentWaterChangeAction(in items: [QuickActionItem], for pet: Pet) -> [QuickActionItem] {
+        let actionTypes = Set(items.map(\.actionType))
+        guard actionTypes.contains("water"),
+              !actionTypes.contains("waterChange"),
+              QuickActionLimit.count(for: pet, in: items) < QuickActionLimit.maxItemsPerEntity
+        else { return items }
+
+        var result = items
+        let waterChange = QuickActionItem(
+            label: l.homeQAWaterChange,
+            icon: "drop.circle.fill",
+            colorHex: "4ECDC4",
+            petId: pet.id,
+            actionType: "waterChange",
+            entityId: pet.id,
+            entityKind: .pet
+        )
+        if let waterIndex = result.firstIndex(where: { $0.actionType == "water" }) {
+            result.insert(waterChange, at: min(waterIndex + 1, result.count))
+        } else {
+            result.append(waterChange)
+        }
+        return result
     }
 
     /// 是否存在「按计划喂食」日历事件（用于计划模式下判断卡片状态）
@@ -2148,14 +2208,6 @@ struct OverviewView: View {
             $0.scheduledAt > now && isPlannedFeedReminder($0, petIdStr: petIdStr)
         }
         return candidates.map(\.scheduledAt).min()
-    }
-
-    /// 首页喂水卡是否处于「换水」展示模式（按宠物独立存储）
-    private func waterQuickDisplayUsesChangeMode(for petId: UUID?) -> Bool {
-        guard let petId else { return false }
-        let key = "waterSheetMode_\(petId.uuidString)"
-        let mode = UserDefaults.standard.string(forKey: key) ?? UserDefaults.standard.string(forKey: "waterSheetMode") ?? "drink"
-        return mode == "change"
     }
 
     /// 换水卡副标题：上次 / 下次换水（取与「今天」更近的一侧）
@@ -2314,19 +2366,15 @@ struct OverviewView: View {
 
     @discardableResult
     private func completePlannedFeedFromHome(pet: Pet) -> Bool {
-        guard let reminder = pendingFeedReminderForPlannedMode(pet: pet),
-              let event = reminder.event else { return false }
-        let amount = Double(event.title.components(separatedBy: CharacterSet.decimalDigits.inverted).joined())
-            ?? pet.dailyPortionGrams
+        guard let reminder = pendingFeedReminderForPlannedMode(pet: pet) else { return false }
         let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        let planNote = "\(PetCareLog.plannedFeedNotePrefix)\(event.id.uuidString)"
-        let log = PetCareLog(date: Date(), type: .feeding, amountGrams: amount, note: planNote, pet: pet, executorId: eid)
-        modelContext.insert(log)
-        reminder.statusEnum = .completed
-        reminder.completedAt = Date()
-        modelContext.safeSave()
-        QuestManager.shared.recordFirstMeal()
-        let feedGot = QuestManager.shared.awardAction(type: .feed, pet: pet, context: modelContext)
+        let feedGot = CareEventService.completePlannedFeed(
+            pet: pet,
+            reminder: reminder,
+            context: modelContext,
+            quality: .precise,
+            executorId: eid
+        ) ?? (humanGot: 0, petGot: 0)
         showToast(pet, message: "\(pet.name) 计划喂食打卡 +\(feedGot.petGot + feedGot.humanGot)🥥", emoji: "🍗")
         return true
     }
@@ -2415,7 +2463,7 @@ struct OverviewView: View {
         saved.removeAll { activeIds.contains($0.id) }
         // 在原位置插回编辑后的条目
         let clamped = min(insertionIdx, saved.count)
-        saved.insert(contentsOf: edited, at: clamped)
+        saved.insert(contentsOf: Array(edited.prefix(QuickActionLimit.maxItemsPerEntity)), at: clamped)
         if let data = try? JSONEncoder().encode(saved),
            let str = String(data: data, encoding: .utf8) {
             quickActionItemsJSON = str
@@ -2454,6 +2502,22 @@ struct OverviewView: View {
 
     // Task31 / task46-48: 长按导航到对应详情页
     private func handleLongPressAction(_ item: QuickActionItem) {
+        if item.entityKind == .human, let hid = item.entityId,
+           let human = humans.first(where: { $0.id == hid }) {
+            if isHumanQuickActionPrivate(item, human: human) {
+                showingHumanPrivacyAlert = true
+                return
+            }
+            switch item.actionType {
+            case "humanWeight":     quickHumanWeightDetailHuman = human
+            case "humanWorkout":    quickHumanWorkoutDetailHuman = human
+            case "humanMedication": quickHumanMedicationHuman = human
+            case "humanNote":       selectedHuman = human
+            default:                selectedHuman = human
+            }
+            return
+        }
+
         let pet: Pet?
         if let pid = item.petId {
             pet = pets.first(where: { $0.id == pid })
@@ -2464,7 +2528,14 @@ struct OverviewView: View {
         switch item.actionType {
         case "feed":
             feedDetailPet = p
-        case "water", "waterChange", "filterClean":
+        case "water":
+            waterDetailModeRaw = QuickWaterDetailSheet.WaterMode.drink.rawValue
+            waterDetailPet = p
+        case "waterChange":
+            waterDetailModeRaw = QuickWaterDetailSheet.WaterMode.change.rawValue
+            waterDetailPet = p
+        case "filterClean":
+            waterDetailModeRaw = nil
             waterDetailPet = p
         case "play":
             playDetailPet = p
@@ -2532,6 +2603,8 @@ struct OverviewView: View {
         } else if isDog {
             items.append(QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA",
                                          petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: l.homeQAWaterChange, icon: "drop.circle.fill", colorHex: "4ECDC4",
+                                         petId: pet.id, actionType: "waterChange", entityId: pet.id, entityKind: .pet))
             items.append(QuickActionItem(label: l.homeQAWalk, icon: "figure.walk", colorHex: "C8FF00",
                                          petId: pet.id, actionType: "walk", entityId: pet.id, entityKind: .pet))
             items.append(QuickActionItem(label: l.homeQAPotty, icon: "allergens", colorHex: "FF8C42",
@@ -2539,6 +2612,8 @@ struct OverviewView: View {
         } else if isCat {
             items.append(QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA",
                                          petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: l.homeQAWaterChange, icon: "drop.circle.fill", colorHex: "4ECDC4",
+                                         petId: pet.id, actionType: "waterChange", entityId: pet.id, entityKind: .pet))
             items.append(QuickActionItem(label: l.homeQALitter, icon: "trash.fill", colorHex: "5B6AFF",
                                          petId: pet.id, actionType: "litter", entityId: pet.id, entityKind: .pet))
             items.append(QuickActionItem(label: l.homeQAPotty, icon: "allergens", colorHex: "FF8C42",
@@ -2546,6 +2621,8 @@ struct OverviewView: View {
         } else {
             items.append(QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA",
                                          petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: l.homeQAWaterChange, icon: "drop.circle.fill", colorHex: "4ECDC4",
+                                         petId: pet.id, actionType: "waterChange", entityId: pet.id, entityKind: .pet))
             items.append(QuickActionItem(label: l.homeQAGroom, icon: "scissors", colorHex: "FF8C42",
                                          petId: pet.id, actionType: "groom", entityId: pet.id, entityKind: .pet))
             items.append(QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA",
@@ -2556,6 +2633,11 @@ struct OverviewView: View {
 
     private func addQuickAction(_ item: QuickActionItem) {
         var current = savedQuickActionItems
+        if let petId = item.petId,
+           let pet = pets.first(where: { $0.id == petId }),
+           QuickActionLimit.count(for: pet, in: current) >= QuickActionLimit.maxItemsPerEntity {
+            return
+        }
         current.append(item)
         if let data = try? JSONEncoder().encode(current),
            let str = String(data: data, encoding: .utf8) {
@@ -2577,6 +2659,7 @@ struct OverviewView: View {
         let cal = Calendar.current
         if item.entityKind == .human, let hid = item.entityId,
            let human = humans.first(where: { $0.id == hid }) {
+            guard !isHumanQuickActionPrivate(item, human: human) else { return false }
             switch item.actionType {
             case "humanWeight":  return human.weightLogs.contains { cal.isDateInToday($0.date) }
             case "humanWorkout": return human.workoutLogs.contains { cal.isDateInToday($0.date) }
@@ -2597,10 +2680,9 @@ struct OverviewView: View {
         case "feed":
             return feedQuickActionAppearsComplete(for: pet)
         case "water":
-            if waterQuickDisplayUsesChangeMode(for: pet.id) {
-                return pet.careLogs.contains { $0.type == CareType.waterChange.rawValue && cal.isDateInToday($0.date) }
-            }
             return pet.careLogs.contains { $0.type == CareType.watering.rawValue && cal.isDateInToday($0.date) }
+        case "waterChange":
+            return pet.careLogs.contains { $0.type == CareType.waterChange.rawValue && cal.isDateInToday($0.date) }
         case "litter":
             return pet.careLogs.contains { $0.type == CareType.litter.rawValue && cal.isDateInToday($0.date) }
         case "potty":
@@ -2623,6 +2705,7 @@ struct OverviewView: View {
         let cal = Calendar.current
         if item.entityKind == .human, let hid = item.entityId,
            let human = humans.first(where: { $0.id == hid }) {
+            guard !isHumanQuickActionPrivate(item, human: human) else { return nil }
             switch item.actionType {
             case "humanWeight":
                 if let last = human.weightLogs.max(by: { $0.date < $1.date }) {
@@ -2679,9 +2762,6 @@ struct OverviewView: View {
             }.count
             return "手动 \(manualCount)/\(goal)餐"
         case "water":
-            if waterQuickDisplayUsesChangeMode(for: pid) {
-                return waterChangeSubtitle(for: pet)
-            }
             let count = pet.careLogs.filter { $0.type == CareType.watering.rawValue && cal.isDateInToday($0.date) }.count
             return count > 0 ? "今日 \(count)次" : nil
         case "litter":
@@ -2712,11 +2792,7 @@ struct OverviewView: View {
             }
             return nil
         case "waterChange":
-            if let last = pet.careLogs.filter({ $0.type == CareType.waterChange.rawValue }).sorted(by: { $0.date < $1.date }).last {
-                let days = cal.dateComponents([.day], from: last.date, to: Date()).day ?? 0
-                return days == 0 ? "今天已换" : "\(days)天前换水"
-            }
-            return nil
+            return waterChangeSubtitle(for: pet)
         case "filterClean":
             if let last = pet.careLogs.filter({ $0.type == CareType.filterClean.rawValue }).sorted(by: { $0.date < $1.date }).last {
                 let days = cal.dateComponents([.day], from: last.date, to: Date()).day ?? 0
@@ -2767,6 +2843,20 @@ struct OverviewView: View {
             case "q_potty":
                 if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) {
                     applyAction("potty", pet: p)
+                }
+            case let id where id.hasPrefix("q_play_"):
+                if let petId = quest.targetPetId, let p = pets.first(where: { $0.id == petId }) {
+                    applyAction("play", pet: p)
+                }
+            case let id where id.hasPrefix("q_weight_"):
+                if let petId = quest.targetPetId, let p = pets.first(where: { $0.id == petId }) {
+                    quickWeightPet = p
+                    return
+                }
+            case let id where id.hasPrefix("q_moment_"):
+                if let petId = quest.targetPetId, let p = pets.first(where: { $0.id == petId }) {
+                    showMomentPet = p
+                    return
                 }
             case "q_water_plant":
                 if let id = quest.targetPlantId, let pl = plants.first(where: { $0.id == id }) {
@@ -2848,6 +2938,10 @@ struct OverviewView: View {
         // 人类快捷操作
         if item.entityKind == .human, let hid = item.entityId,
            let human = humans.first(where: { $0.id == hid }) {
+            if isHumanQuickActionPrivate(item, human: human) {
+                showingHumanPrivacyAlert = true
+                return
+            }
             switch item.actionType {
             case "humanWeight":     quickHumanWeightHuman = human
             case "humanWorkout":    quickHumanWorkoutHuman = human
@@ -2895,6 +2989,22 @@ struct OverviewView: View {
         }
     }
 
+    private func privacyField(forHumanAction actionType: String) -> HumanPrivateField? {
+        PrivacyService.field(forHumanAction: actionType)
+    }
+
+    private func isHumanQuickActionPrivate(_ item: QuickActionItem, human: Human? = nil) -> Bool {
+        let target = human ?? item.entityId.flatMap { id in humans.first(where: { $0.id == id }) }
+        return PrivacyService.isHumanQuickActionLocked(item, human: target, viewedBy: activeHumanId)
+    }
+
+    private func privacyBadgeText(for item: QuickActionItem) -> String? {
+        guard item.entityKind == .human,
+              let field = privacyField(forHumanAction: item.actionType),
+              let human = item.entityId.flatMap({ id in humans.first(where: { $0.id == id }) }) else { return nil }
+        return PrivacyService.badgeText(for: field, human: human, viewedBy: activeHumanId)
+    }
+
     private func applyGroomCheckIn(_ raw: String, pet: Pet) {
         let type: HygieneType
         switch raw {
@@ -2916,11 +3026,8 @@ struct OverviewView: View {
     private func applyPottyCheckIn(_ raw: String, pet: Pet) {
         let type = PottyType(rawValue: raw) ?? .perfectPoop
         let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        let log = PetPottyLog(date: Date(), type: type, pet: pet, executorId: eid)
-        modelContext.insert(log)
-        modelContext.safeSave()
+        let got = CareEventService.recordPotty(pet: pet, type: type, context: modelContext, executorId: eid)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        let got = QuestManager.shared.awardAction(type: .potty(isLitter: false), pet: pet, context: modelContext)
         showToast(pet, message: "\(pet.name) \(type.emoji)\(type.rawValue) +\(got.petGot + got.humanGot)🥥", emoji: type.emoji)
     }
 
@@ -2981,9 +3088,6 @@ struct OverviewView: View {
     /// 与 `ArkCrewIDCardView.performSpecialCareCheckIn` 奖励一致；首页快捷操作单击打卡
     private func applySpecialCareCheckIn(type: CareType, pet: Pet) {
         let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        let log = PetCareLog(date: Date(), type: type, pet: pet, executorId: eid)
-        modelContext.insert(log)
-        modelContext.safeSave()
         let oat: QuestManager.OhanaActionType
         switch type {
         case .waterChange:
@@ -3001,7 +3105,7 @@ struct OverviewView: View {
         default:
             oat = .general(humanReward: 3, petReward: 3, emoji: type.emoji, title: "\(pet.name) 打卡奖励")
         }
-        let got = QuestManager.shared.awardAction(type: oat, pet: pet, context: modelContext)
+        let got = CareEventService.recordCare(pet: pet, type: type, context: modelContext, executorId: eid, reward: oat)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         showToast(pet, message: "\(pet.name) \(type.label) +\(got.petGot + got.humanGot)🥥", emoji: type.emoji)
     }
@@ -3027,14 +3131,10 @@ struct OverviewView: View {
             // groom 单击由 GoQuickActionCard.isGroom 内部弹 GroomMenuSheet 处理；此处兜底
             quickAccessCarePet = pet
         case "potty":
-            let log = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet, executorId: currentUserId)
-            modelContext.insert(log)
-            let pottyGot = QuestManager.shared.awardAction(type: .potty(isLitter: false), pet: pet, context: modelContext)
+            let pottyGot = CareEventService.recordPotty(pet: pet, context: modelContext, executorId: currentUserId)
             showToast(pet, message: "\(pet.name) 便便打卡 +\(pottyGot.petGot + pottyGot.humanGot)🥥", emoji: "💩")
         case "litter":
-            let litterLog = PetCareLog(date: Date(), type: .litter, pet: pet, executorId: currentUserId)
-            modelContext.insert(litterLog)
-            let litterGot = QuestManager.shared.awardAction(type: .potty(isLitter: true), pet: pet, context: modelContext)
+            let litterGot = CareEventService.recordCare(pet: pet, type: .litter, context: modelContext, executorId: currentUserId, reward: .potty(isLitter: true))
             showToast(pet, message: "\(pet.name) 铲猫砂 +\(litterGot.humanGot)🥥", emoji: "🧹")
         case "feed":
             let performFeed = {
@@ -3046,12 +3146,7 @@ struct OverviewView: View {
                         self.showToast(pet, message: "\(pet.name) 今日计划暂无待打卡", emoji: "🍗")
                     }
                 } else {
-                    let grams = pet.dailyPortionGrams
-                    let log = PetCareLog(date: Date(), type: .feeding, amountGrams: grams, note: PetCareLog.manualFeedNoteMarker, pet: pet, executorId: currentUserId)
-                    self.modelContext.insert(log)
-                    self.modelContext.safeSave()
-                    QuestManager.shared.recordFirstMeal()
-                    let feedGot = QuestManager.shared.awardAction(type: .feed, pet: pet, context: self.modelContext)
+                    let feedGot = CareEventService.recordManualFeed(pet: pet, amountGrams: pet.dailyPortionGrams, context: self.modelContext, executorId: currentUserId)
                     self.showToast(pet, message: "\(pet.name) 手动喂食 +\(feedGot.petGot + feedGot.humanGot)🥥", emoji: "🍗")
                 }
             }
@@ -3066,24 +3161,18 @@ struct OverviewView: View {
             }
             
         case "water":
-            if waterQuickDisplayUsesChangeMode(for: pet.id) {
-                applySpecialCareCheckIn(type: .waterChange, pet: pet)
+            let performWater = {
+                let waterGot = CareEventService.recordCare(pet: pet, type: .watering, amountMl: 250, context: self.modelContext, executorId: currentUserId, reward: .water)
+                self.showToast(pet, message: "\(pet.name) 喂水打卡 +\(waterGot.petGot + waterGot.humanGot)🥥", emoji: "💧")
+            }
+            
+            if let warning = AntiRepeatCareManager.checkRecentCareLog(for: pet, type: .watering, thresholdMinutes: 60, currentUserId: currentUserId, in: humans) {
+                antiRepeatTitle = l.homeAntiDupWaterTitle
+                antiRepeatMessage = l.homeAntiDupWaterMessage(executor: warning.executorName, minutes: warning.minutesAgo, petName: pet.name)
+                pendingRepeatAction = performWater
+                showingAntiRepeatAlert = true
             } else {
-                let performWater = {
-                    let log = PetCareLog(date: Date(), type: .watering, amountGrams: 0, pet: pet, executorId: currentUserId)
-                    self.modelContext.insert(log)
-                    let waterGot = QuestManager.shared.awardAction(type: .water, pet: pet, context: self.modelContext)
-                    self.showToast(pet, message: "\(pet.name) 喂水打卡 +\(waterGot.petGot + waterGot.humanGot)🥥", emoji: "💧")
-                }
-                
-                if let warning = AntiRepeatCareManager.checkRecentCareLog(for: pet, type: .watering, thresholdMinutes: 60, currentUserId: currentUserId, in: humans) {
-                    antiRepeatTitle = l.homeAntiDupWaterTitle
-                    antiRepeatMessage = l.homeAntiDupWaterMessage(executor: warning.executorName, minutes: warning.minutesAgo, petName: pet.name)
-                    pendingRepeatAction = performWater
-                    showingAntiRepeatAlert = true
-                } else {
-                    performWater()
-                }
+                performWater()
             }
         case "bath":
             let log = PetHygieneLog(date: Date(), type: .bath, pet: pet)
@@ -3092,10 +3181,8 @@ struct OverviewView: View {
             showToast(pet, message: "\(pet.name) 洗澡打卡 +\(bathGot.petGot + bathGot.humanGot)🥥", emoji: "🛁")
         case "play":
             let eidP = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-            let playLog = PetCareLog(date: Date(), type: .play, pet: pet, executorId: eidP)
-            modelContext.insert(playLog)
             let oat = QuestManager.OhanaActionType.general(humanReward: 10, petReward: 12, emoji: "🎾", title: "\(pet.name) 互动奖励")
-            let playGot = QuestManager.shared.awardAction(type: oat, pet: pet, context: modelContext)
+            let playGot = CareEventService.recordCare(pet: pet, type: .play, context: modelContext, executorId: eidP, reward: oat)
             showToast(pet, message: "\(pet.name) 逗玩打卡 +\(playGot.petGot + playGot.humanGot)🥥", emoji: "🎾")
         case "waterChange":
             applySpecialCareCheckIn(type: .waterChange, pet: pet)

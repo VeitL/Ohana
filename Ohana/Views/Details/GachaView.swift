@@ -109,6 +109,7 @@ struct GachaView: View {
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("gachaHistory") private var historyRaw: String = ""
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
+    @Query(sort: \Human.createdAt) private var humans: [Human]
     @State private var questManager = QuestManager.shared
 
     private let cost = 30
@@ -422,7 +423,13 @@ struct GachaView: View {
         guard canRoll else { return }
         isRolling = true
         showResult = false
-        questManager.coconutCount -= cost
+        questManager.addCoconuts(
+            -cost,
+            emoji: "🎰",
+            title: "欧气扭蛋机",
+            actorId: activeHumanId.isEmpty ? nil : activeHumanId,
+            actorName: humans.first(where: { $0.id.uuidString == activeHumanId })?.name
+        )
 
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
 

@@ -50,46 +50,19 @@ struct TodayFocusCard: View {
 
     @Environment(\.colorScheme) private var colorScheme
 
-    // MARK: - Focus Decision
-
-    private enum FocusContent {
-        case quest(IslandQuest)
-        case negative(IslandNegativeSignal)
-        case memory(MemoryFragment)
-        case celebrate(pets: [Pet])
-        case welcome
+    private var content: TodayFocusService.Content {
+        TodayFocusService.decide(
+            pets: pets,
+            plants: plants,
+            quests: quests,
+            careLogs: liveCare,
+            walkLogs: liveWalks,
+            pottyLogs: livePotty
+        )
     }
 
-    /// Recomputes `isCompleted` for each quest using live @Query arrays so it
-    /// updates immediately after a check-in without waiting for relationship propagation.
-    private var refreshedQuests: [IslandQuest] {
-        let cal = Calendar.current
-        return quests.map { q in
-            if q.isCompleted { return q }   // already marked done upstream
-            var done = false
-            if q.id.hasPrefix("q_feed_"), let pid = q.targetPetId {
-                done = liveCare.contains { $0.careType == .feeding && $0.pet?.id == pid && cal.isDateInToday($0.date) }
-            } else if q.id.hasPrefix("q_water_") && !q.id.hasPrefix("q_water_plant"), let pid = q.targetPetId {
-                done = liveCare.contains { $0.careType == .watering && $0.pet?.id == pid && cal.isDateInToday($0.date) }
-            } else if q.id == "q_walk", let pid = q.targetPetId {
-                done = liveWalks.contains { $0.pet?.id == pid && cal.isDateInToday($0.startDate) }
-            } else if q.id == "q_potty", let pid = q.targetPetId {
-                done = livePotty.contains { $0.pet?.id == pid && cal.isDateInToday($0.date) }
-            }
-            guard done else { return q }
-            return IslandQuest(id: q.id, emoji: "✅", title: q.title, subtitle: q.subtitle,
-                               isCompleted: true, targetPetId: q.targetPetId, targetPlantId: q.targetPlantId)
-        }
-    }
-
-    private var content: FocusContent {
-        let pending = refreshedQuests.filter { !$0.isCompleted }
-        if let first = pending.first { return .quest(first) }
-        let signals = IslandNegativeFeedback.signals(pets: pets, plants: plants)
-        if let sig = signals.first(where: { $0.severity == .critical }) ?? signals.first { return .negative(sig) }
-        if let memory = MemoryEngine.pickFragment(pets: pets, plants: plants) { return .memory(memory) }
-        if !refreshedQuests.isEmpty { return .celebrate(pets: pets) }
-        return .welcome
+    private var focusStatusText: String {
+        TodayFocusService.statusText(for: content)
     }
 
     // MARK: - Body
@@ -98,11 +71,22 @@ struct TodayFocusCard: View {
         ZStack {
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
-                    Text("今日聚焦")
-                        .font(.system(size: 11, weight: .black, design: .rounded))
-                        .tracking(2.5)
-                        .foregroundStyle(.primary.opacity(0.42))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("TODAY FOCUS")
+                            .font(.system(size: 10, weight: .black, design: .rounded))
+                            .tracking(2.2)
+                            .foregroundStyle(.primary.opacity(0.36))
+                        Text("今天要做什么")
+                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .foregroundStyle(.primary.opacity(0.9))
+                    }
                     Spacer()
+                    Text(focusStatusText)
+                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .foregroundStyle(.primary.opacity(0.7))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.primary.opacity(0.07), in: Capsule())
                     if case .quest(let q) = content {
                         rewardChip(IslandQuestEngine.coconutReward(forQuestId: q.id))
                     }
@@ -214,6 +198,13 @@ struct TodayFocusCard: View {
             }
 
             Spacer(minLength: 6)
+
+            Text(s.severity == .critical ? "立即处理" : "去快捷打卡")
+                .font(.system(size: 12, weight: .black, design: .rounded))
+                .foregroundStyle(Color.arkInk)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(accent, in: Capsule())
         }
         .padding(14)
         .background(cardBackground(accent))

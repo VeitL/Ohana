@@ -43,6 +43,38 @@ struct CoconutLogEntry: Codable, Identifiable {
     }
 }
 
+struct CoconutLedgerAudit: Equatable {
+    let islandCount: Int
+    let rollingLogDelta: Int
+    let petAccountTotal: Int
+    let humanAccountTotal: Int
+    let rollingLogReconciles: Bool?
+    let hasNegativeAccount: Bool
+
+    var isHealthy: Bool {
+        islandCount >= 0 && !hasNegativeAccount && (rollingLogReconciles ?? true)
+    }
+
+    static func evaluate(
+        islandCount: Int,
+        logs: [CoconutLogEntry],
+        petBalances: [Int],
+        humanBalances: [Int],
+        maxRollingLogCount: Int = 200
+    ) -> CoconutLedgerAudit {
+        let logDelta = logs.reduce(0) { $0 + $1.amount }
+        let canUseRollingLogs = logs.count < maxRollingLogCount
+        return CoconutLedgerAudit(
+            islandCount: islandCount,
+            rollingLogDelta: logDelta,
+            petAccountTotal: petBalances.reduce(0, +),
+            humanAccountTotal: humanBalances.reduce(0, +),
+            rollingLogReconciles: canUseRollingLogs ? logDelta == islandCount : nil,
+            hasNegativeAccount: petBalances.contains(where: { $0 < 0 }) || humanBalances.contains(where: { $0 < 0 })
+        )
+    }
+}
+
 @Observable
 final class QuestManager {
 
@@ -404,6 +436,12 @@ final class QuestManager {
             finalHuman += 1
         }
 
+        if UserDefaults.standard.bool(forKey: "shop_boostDoubleActive") {
+            finalHuman *= 2
+            finalPet *= 2
+            UserDefaults.standard.removeObject(forKey: "shop_boostDoubleActive")
+        }
+
         // ── 1. 宠物账户
         if finalPet > 0 { pet?.coconutBalance += finalPet }
 
@@ -582,11 +620,17 @@ final class QuestManager {
         let base = type.baseRewards
         let crit = rollCrit()
         var finalHuman = base.human * crit.multiplier   // 人只发一次
-        let finalPetEach = base.pet * crit.multiplier   // 每只宠物各发一次
+        var finalPetEach = base.pet * crit.multiplier   // 每只宠物各发一次
 
         // title_chef: CEO/Chef bonus
         if case .feed = type, UserDefaults.standard.string(forKey: "shop_equipped_title") == "title_chef" {
             finalHuman += 1
+        }
+
+        if UserDefaults.standard.bool(forKey: "shop_boostDoubleActive") {
+            finalHuman *= 2
+            finalPetEach *= 2
+            UserDefaults.standard.removeObject(forKey: "shop_boostDoubleActive")
         }
 
         // ── 1. 写 PetCareLog（每只宠物独立一条）
@@ -664,6 +708,15 @@ final class QuestManager {
         coconutLogs.insert(entry, at: 0)
         if coconutLogs.count > 200 { coconutLogs = Array(coconutLogs.prefix(200)) }
         // 日志写入延迟到 flushToDefaults() 中一并执行
+    }
+
+    func makeLedgerAudit(pets: [Pet], humans: [Human]) -> CoconutLedgerAudit {
+        CoconutLedgerAudit.evaluate(
+            islandCount: coconutCount,
+            logs: coconutLogs,
+            petBalances: pets.map(\.coconutBalance),
+            humanBalances: humans.map(\.coconutBalance)
+        )
     }
 
     /// 完成喂食任务时调用（第一次记录喂食）

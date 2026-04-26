@@ -206,7 +206,7 @@ struct PetMedicationView: View {
         .onAppear {
             // 首次出现时调度通知
             if med.isActiveToday {
-                MedicationReminderService.shared.scheduleMedicationReminders(for: pet)
+                MedicationReminderService.shared.scheduleMedicationReminders(for: pet, context: modelContext)
             }
         }
         .contextMenu {

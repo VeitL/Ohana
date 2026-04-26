@@ -102,16 +102,21 @@ struct CompactTaskRow: View {
             Spacer()
             Button {
                 withAnimation(.spring(response: 0.3)) { isDone.toggle() }
+                let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
                 if isDone {
-                    reminder.status = "completed"
-                    reminder.completedAt = Date()
-                    modelContext.safeSave()
+                    ReminderCompletionService.complete(reminder, by: activeHumanId, context: modelContext)
                     QuestManager.shared.addCoconuts(2, emoji: "✅", reason: reminder.event?.title ?? "完成待办")
+                    CareLedgerService.recordCoconut(
+                        delta: 2,
+                        title: reminder.event?.title ?? "完成待办",
+                        actorId: activeHumanId,
+                        actorName: nil,
+                        source: .economy,
+                        context: modelContext
+                    )
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 } else {
-                    reminder.status = "pending"
-                    reminder.completedAt = nil
-                    modelContext.safeSave()
+                    ReminderCompletionService.reopen(reminder, by: activeHumanId, context: modelContext)
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }
             } label: {
@@ -242,17 +247,16 @@ struct SwipeableReminderCard: View {
     private func completeReminder() {
         isDismissed = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            reminder.status = "completed"
-            reminder.completedAt = Date()
-            modelContext.safeSave()
+            let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            ReminderCompletionService.complete(reminder, by: activeHumanId, context: modelContext)
         }
     }
 
     private func dismissReminder() {
         isDismissed = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            reminder.status = "dismissed"
-            modelContext.safeSave()
+            let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            ReminderCompletionService.skip(reminder, by: activeHumanId, context: modelContext)
         }
     }
 }
@@ -320,6 +324,17 @@ struct PlantGardenCard: View {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         plant.lastWateredDate = Date()
         modelContext.safeSave()
+        CareLedgerService.record(
+            occurredAt: plant.lastWateredDate ?? Date(),
+            actorKind: .human,
+            actorId: UserDefaults.standard.string(forKey: "currentActiveHumanId"),
+            subjectKind: .plant,
+            subjectId: plant.id.uuidString,
+            eventKind: .plantCare,
+            actionType: PlantCareType.watering.rawValue,
+            source: .quickAction,
+            context: modelContext
+        )
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             isWatering = false
         }

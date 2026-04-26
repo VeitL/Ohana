@@ -396,14 +396,20 @@ private struct CareTypeRow: View {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
         let log = PetCareLog(date: Date(), type: type, pet: pet, executorId: eid)
+        var pottyLog: PetPottyLog?
         modelContext.insert(log)
 
         if type == .litter {
-            let pottyLog = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet, executorId: eid)
-            modelContext.insert(pottyLog)
+            let log = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet, executorId: eid)
+            pottyLog = log
+            modelContext.insert(log)
         }
 
         modelContext.safeSave()
+        CareLedgerService.recordPetCare(log: log, pet: pet, source: .detail, context: modelContext)
+        if let pottyLog {
+            CareLedgerService.recordPetPotty(log: pottyLog, pet: pet, source: .detail, context: modelContext)
+        }
         withAnimation(.spring(response: 0.3)) { justChecked = type }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             withAnimation { if justChecked == type { justChecked = nil } }

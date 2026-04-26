@@ -134,18 +134,26 @@ private struct GoDefaultBackground: View {
 
 // MARK: - 1b. GO 岛屿（GO UI 首页壁纸 — 仅渐变 + 轻噪点，避免全 App 重复跑天气粒子 Timer）
 private struct GoIslandBackground: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var gradientColors: [Color] {
+        colorScheme == .dark
+            ? [Color(hex: "2D4ECC"), Color(hex: "1A2E8A"), Color(hex: "0C1640")]
+            : [Color(hex: "F4F7FF"), Color(hex: "EAF0FF"), Color(hex: "DDE8FF")]
+    }
+
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: [Color(hex: "2D4ECC"), Color(hex: "1A2E8A"), Color(hex: "0C1640")],
+                colors: gradientColors,
                 startPoint: .top,
                 endPoint: .bottom
             )
             .ignoresSafeArea()
 
             NoiseTextureView()
-                .opacity(0.022)
-                .blendMode(.overlay)
+                .opacity(colorScheme == .dark ? 0.022 : 0.010)
+                .blendMode(colorScheme == .dark ? .overlay : .multiply)
                 .ignoresSafeArea()
         }
         .ignoresSafeArea()

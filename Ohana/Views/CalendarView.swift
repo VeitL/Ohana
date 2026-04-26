@@ -20,9 +20,9 @@ struct CalendarPetChipFilterBar: View {
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("appUIStyle") private var appUIStyle: String = "go"
 
-    private var isMaterial: Bool { appUIStyle == "material" }
-    private var chipAccent: Color { isMaterial ? Color(hex: "FF5A00") : Color.goPrimary }
-    private var chipSelFg: Color { isMaterial ? .white : Color.arkInk }
+    private var isMaterial: Bool { false }
+    private var chipAccent: Color { Color.goPrimary }
+    private var chipSelFg: Color { Color.arkInk }
     private var matSurface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
     private var selectedId: String? { calendarFilterPetId.isEmpty ? nil : calendarFilterPetId }
 
@@ -95,11 +95,11 @@ struct CalendarView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var coconutCount: Int = QuestManager.shared.coconutCount
 
-    private var isMaterial: Bool { appUIStyle == "material" }
+    private var isMaterial: Bool { false }
     private var matBg:      Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
     private var matSurface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
-    private var chipAccent: Color { isMaterial ? Color(hex: "FF5A00") : Color.goPrimary }
-    private var chipSelFg:  Color { isMaterial ? .white : Color.arkInk }
+    private var chipAccent: Color { Color.goPrimary }
+    private var chipSelFg:  Color { Color.arkInk }
     // 经典模式下自适应 light/dark 的文字颜色辅助
     private var classicSoftText: Color { colorScheme == .dark ? .white.opacity(0.4) : .secondary }
     private var classicPrimaryText: Color { colorScheme == .dark ? .white.opacity(0.85) : .primary }
@@ -743,12 +743,17 @@ struct CalendarView: View {
                     if event.recurrenceDays == 0 {
                         for reminder in event.reminders {
                             if reminder.scheduledAt >= today && reminder.scheduledAt < tomorrow {
-                                reminder.status = event.isCompleted ? "completed" : "pending"
-                                reminder.completedAt = event.isCompleted ? now : nil
+                                let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+                                if event.isCompleted {
+                                    ReminderCompletionService.complete(reminder, by: activeHumanId, context: modelContext)
+                                } else {
+                                    ReminderCompletionService.reopen(reminder, by: activeHumanId, context: modelContext)
+                                }
                             }
                         }
+                    } else {
+                        modelContext.safeSave()
                     }
-                    modelContext.safeSave()
                 }
             },
             onDelete: { /* F2: 删除逻辑已在 SwipeableEventRow 内处理 */ }

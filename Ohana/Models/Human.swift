@@ -9,6 +9,26 @@ import SwiftUI
 import SwiftData
 import Foundation
 
+enum HumanPrivateField: String, CaseIterable, Identifiable {
+    case weight
+    case workout
+    case medication
+    case wishlist
+    case expense
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .weight: return "体重"
+        case .workout: return "运动"
+        case .medication: return "吃药提醒"
+        case .wishlist: return "椰子资产与心愿"
+        case .expense: return "花费"
+        }
+    }
+}
+
 @Model
 final class Human {
     var id: UUID
@@ -150,7 +170,25 @@ final class Human {
     /// 判断某字段是否对非本人隐藏
     /// - Parameter currentActiveHumanId: 当前查看者的 Human.id（来自 @AppStorage）
     func isPrivate(_ field: String, viewedBy currentId: UUID?) -> Bool {
+        guard let privateField = HumanPrivateField(rawValue: field) else {
+            guard currentId != self.id else { return false }
+            return privateFields.contains(field)
+        }
+        return isPrivate(privateField, viewedBy: currentId)
+    }
+
+    func isPrivate(_ field: HumanPrivateField, viewedBy currentId: UUID?) -> Bool {
         guard currentId != self.id else { return false }
-        return privateFields.contains(field)
+        return privateFields.contains(field.rawValue)
+    }
+
+    func setPrivate(_ field: HumanPrivateField, _ isPrivate: Bool) {
+        var fields = privateFields
+        if isPrivate {
+            fields.insert(field.rawValue)
+        } else {
+            fields.remove(field.rawValue)
+        }
+        privateFields = fields
     }
 }

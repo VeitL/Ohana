@@ -60,7 +60,6 @@ struct BackdateCheckInSheet: View {
             }
             .navigationTitle("使用补打卡券 📅")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("取消") { dismiss() }

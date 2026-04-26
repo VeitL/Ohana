@@ -1,6 +1,6 @@
 # Ohana 功能完成清单
 
-> 最后更新: 2026-04-16（英文本地化 en.lproj）| Build: ✅ | Schema: ArkSchemaV33
+> 最后更新: 2026-04-26（GO UI 宠物/人类卡展开态快捷操作与粮仓管理更新）| Build: ✅ | Schema: ArkSchemaV36
 >
 > **规则**：仅在完成新的功能模块或重大 UI 重构时更新本文档，小 bug 修复不记录。
 
@@ -16,7 +16,12 @@
 - [x] `EntityKind` 枚举统一 `relatedEntityType` 字符串（向下兼容旧数据）
 - [x] 数据备份/恢复（`DataBackupManager`）
 
-### 首页（OverviewView / MaterialDashboardView）
+### 首页（GO UI / OverviewView）
+- [x] **GO UI 展开态快捷模块**（2026-04-26）：`FocusStackHomeTestView` 的宠物卡展开后复用经典 UI `GoQuickActionCard` 网格样式，读取同一份 `quickActionItems_v2`，短按/长按/Popover 行为与经典快捷操作保持一致
+- [x] **GO UI 展开态快捷编辑**（2026-04-26）：宠物卡展开后的快捷操作支持铅笔编辑、删除、拖拽排序和添加入口，编辑态保持最多 4 个，保存回 `quickActionItems_v2`
+- [x] **GO UI 人类卡快捷操作同步**（2026-04-26）：人类卡展开后使用同款 `GoQuickActionCard` 网格，支持体重 / 运动 / 用药 / 备注和编辑保存
+- [x] **椰子增长动画**（2026-04-26）：`CoconutBalanceCapsule` 在椰子数增加时 pulse + `+N` 浮标，减少时不触发奖励动效
+- [x] **GO UI 细节可读性**（2026-04-26）：顶部打卡/椰子胶囊左移，展开宠物卡高度降低，卡片堆左下角重复名字移除，快捷操作卡在深色模式使用高对比文字与 SF Symbol
 - [x] 全局固定顶栏（`globalFixedHeader`），右侧统一 32pt 行高，无 Tab 切换跳动
 - [x] 宠物钱包卡转盘（`PetWalletStack`）：正面 MeshGradient（随主题色动态）+ 背面翻转动画
   - 背面重设计为 **2×4 功能枢纽**（8 格，SF Symbols 纯色剪影）：编辑信息 / 日历 / 健康档案 / 证件保障 / 重要时刻 / 成就 / 饮食管理 / 用药管理（鱼类隐藏）

@@ -55,60 +55,44 @@ struct IslandQuestEngine {
             }
         }
 
-        // ── 遛狗（仅限狗 & 今日未遛）
-        if quests.count < 3, let dog = activePets.first(where: { $0.species == "狗" }) {
-            let done = dog.walkLogs.contains { cal.isDateInToday($0.startDate) }
-            quests.append(IslandQuest(
-                id: "q_walk",
-                emoji: done ? "✅" : "🐾",
-                title: "带 \(dog.name) 出门巡岛",
-                subtitle: done ? "今日已遛，辛苦了！" : "今日未遛狗，出门走走吧",
-                isCompleted: done,
-                targetPetId: dog.id,
-                targetPlantId: nil
-            ))
-        }
-
-        // ── 喂食（今日未喂任何一只宠物）
-        // 注意：`PetCareLog.type` 存的是 `CareType.rawValue`（中文，如「喂食」），不能用英文 "feeding"
+        // ── 轻量引导：默认不安排喂食 / 换水等计划型照护任务。
+        // 这些应由用户创建日历提醒后，通过 q_reminder 进入 Today Focus。
         if quests.count < 3, let pet = activePets.first(where: { p in
-            !p.careLogs.contains { $0.careType == .feeding && cal.isDateInToday($0.date) }
+            !p.careLogs.contains { $0.careType == .play && cal.isDateInToday($0.date) }
         }) {
             quests.append(IslandQuest(
-                id: "q_feed_\(pet.id.uuidString)",
-                emoji: "🍖",
-                title: "给 \(pet.name) 喂食",
-                subtitle: "今日还未记录喂食，记得填肚子",
+                id: "q_play_\(pet.id.uuidString)",
+                emoji: "🎾",
+                title: "陪 \(pet.name) 玩一会儿",
+                subtitle: "轻松互动，不是固定照护计划",
                 isCompleted: false,
                 targetPetId: pet.id,
                 targetPlantId: nil
             ))
         }
 
-        // ── 喂水 / 换水（.watering 或 .waterChange 均视为完成）
         if quests.count < 3, let pet = activePets.first(where: { p in
-            !p.careLogs.contains { ($0.careType == .watering || $0.careType == .waterChange) && cal.isDateInToday($0.date) }
+            !p.weightLogs.contains { cal.isDateInToday($0.date) }
         }) {
             quests.append(IslandQuest(
-                id: "q_water_\(pet.id.uuidString)",
-                emoji: "💧",
-                title: "给 \(pet.name) 换水",
-                subtitle: "新鲜饮水很重要，今日还未记录",
+                id: "q_weight_\(pet.id.uuidString)",
+                emoji: "⚖️",
+                title: "记录 \(pet.name) 的体重",
+                subtitle: "建立健康趋势，从第一条数据开始",
                 isCompleted: false,
                 targetPetId: pet.id,
                 targetPlantId: nil
             ))
         }
 
-        // ── 便便打卡（今日未记录）
         if quests.count < 3, let pet = activePets.first(where: { p in
-            !p.pottyLogs.contains { cal.isDateInToday($0.date) }
+            !p.photoLogs.contains { cal.isDateInToday($0.date) }
         }) {
             quests.append(IslandQuest(
-                id: "q_potty",
-                emoji: "💩",
-                title: "记录 \(pet.name) 今日如厕",
-                subtitle: "如厕健康监测，今日尚未记录",
+                id: "q_moment_\(pet.id.uuidString)",
+                emoji: "📝",
+                title: "记录 \(pet.name) 的日常",
+                subtitle: "写一句话或加一张照片，留下今天",
                 isCompleted: false,
                 targetPetId: pet.id,
                 targetPlantId: nil
@@ -174,8 +158,6 @@ struct IslandQuestEngine {
     /// 委托完成时椰子粒子数量
     static func coconutReward(forQuestId id: String) -> Int {
         switch id {
-        case "q_walk":            return 3
-        case "q_potty":           return 1
         case "q_water_plant":     return 1
         case "q_fertilize_plant": return 1
         case "q_reminder":        return 2
@@ -183,6 +165,9 @@ struct IslandQuestEngine {
             if id.hasPrefix("q_med_")   { return 2 }
             if id.hasPrefix("q_feed_")  { return 2 }
             if id.hasPrefix("q_water_") { return 1 }
+            if id.hasPrefix("q_play_")  { return 2 }
+            if id.hasPrefix("q_weight_") { return 2 }
+            if id.hasPrefix("q_moment_") { return 1 }
             return 1
         }
     }

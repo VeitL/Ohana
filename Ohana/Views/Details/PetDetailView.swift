@@ -61,6 +61,7 @@ struct PetDetailView: View {
     // Quick-action detail sheets (long press)
     @State private var showingQuickFeedDetail    = false
     @State private var showingQuickWaterDetail   = false
+    @State private var quickWaterDetailModeRaw: String? = nil
     @State private var showingQuickPlayDetail    = false
     @State private var showingQuickPottyDetail   = false
     @State private var showingQuickWeight        = false
@@ -183,10 +184,18 @@ struct PetDetailView: View {
                 .presentationContentInteraction(.scrolls)
         }
         .sheet(isPresented: $showingQuickWaterDetail) {
-            QuickWaterDetailSheet(pet: pet) { showingQuickWaterDetail = false }
+            QuickWaterDetailSheet(
+                pet: pet,
+                initialModeRaw: quickWaterDetailModeRaw,
+                lockedModeRaw: quickWaterDetailModeRaw
+            ) {
+                showingQuickWaterDetail = false
+                quickWaterDetailModeRaw = nil
+            }
                 .presentationDetents([.fraction(0.86), .large])
                 .presentationDragIndicator(.visible)
                 .presentationContentInteraction(.scrolls)
+                .onDisappear { quickWaterDetailModeRaw = nil }
         }
         .sheet(isPresented: $showingQuickPlayDetail) {
             QuickPlayDetailSheet(pet: pet) { showingQuickPlayDetail = false }
@@ -344,13 +353,16 @@ struct PetDetailView: View {
                     .buttonStyle(.plain)
                     .popover(isPresented: $showingQAQuickAdd, attachmentAnchor: .point(.top), arrowEdge: .bottom) {
                         QAQuickAddPopoverContent(pet: pet, existingItems: qaEditItems) { newItem in
-                            withAnimation(.spring(response: 0.3)) { qaEditItems.append(newItem) }
+                            withAnimation(.spring(response: 0.3)) {
+                                if QuickActionLimit.count(for: pet, in: qaEditItems) < QuickActionLimit.maxItemsPerEntity {
+                                    qaEditItems.append(newItem)
+                                }
+                            }
                         }
                     }
                 }
             }
             .animation(.spring(response: 0.38, dampingFraction: 0.78), value: displayItems.map(\.id))
-            .environment(\.colorScheme, .light)
         }
     }
 
@@ -364,6 +376,7 @@ struct PetDetailView: View {
                 petThemeColorHex: themeHex,
                 countText: isQAEditMode ? nil : qaCountText(item.actionType),
                 isCompletedToday: !isQAEditMode && qaCompleted(item.actionType),
+                prefersLightForeground: true,
                 onTap: {
                     guard !isQAEditMode else { return }
                     pressedActionId = item.id
@@ -431,7 +444,12 @@ struct PetDetailView: View {
         switch item.actionType {
         case "feed":         showingQuickFeedDetail   = true
         case "walk":         showingWalkSummary        = true
-        case "water", "waterChange": showingQuickWaterDetail = true
+        case "water":
+            quickWaterDetailModeRaw = QuickWaterDetailSheet.WaterMode.drink.rawValue
+            showingQuickWaterDetail = true
+        case "waterChange":
+            quickWaterDetailModeRaw = QuickWaterDetailSheet.WaterMode.change.rawValue
+            showingQuickWaterDetail = true
         case "play":         showingQuickPlayDetail    = true
         case "potty":        showingQuickPottyDetail   = true
         case "litter":       showingQuickPottyDetail   = true
@@ -450,39 +468,24 @@ struct PetDetailView: View {
         let uid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
         switch actionType {
         case "feed":
-            let log = PetCareLog(date: Date(), type: .feeding,
-                                 amountGrams: pet.dailyPortionGrams,
-                                 note: PetCareLog.manualFeedNoteMarker, pet: pet, executorId: uid)
-            modelContext.insert(log); modelContext.safeSave()
-            QuestManager.shared.recordFirstMeal()
-            QuestManager.shared.awardAction(type: .feed, pet: pet, context: modelContext)
+            CareEventService.recordManualFeed(pet: pet, amountGrams: pet.dailyPortionGrams, context: modelContext, executorId: uid)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         case "walk":
             if case .idle = PetWalkingManager.shared.phase { PetWalkingManager.shared.start(pet: pet) }
         case "water":
-            let log = PetCareLog(date: Date(), type: .watering, pet: pet, executorId: uid)
-            modelContext.insert(log); modelContext.safeSave()
-            QuestManager.shared.awardAction(type: .water, pet: pet, context: modelContext)
+            CareEventService.recordCare(pet: pet, type: .watering, amountMl: 250, context: modelContext, executorId: uid, reward: .water)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         case "waterChange":
-            let log = PetCareLog(date: Date(), type: .waterChange, pet: pet, executorId: uid)
-            modelContext.insert(log); modelContext.safeSave()
+            CareEventService.recordCare(pet: pet, type: .waterChange, context: modelContext, executorId: uid, reward: .general(humanReward: 15, petReward: 20, emoji: CareType.waterChange.emoji, title: "\(pet.name) 换水奖励"))
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         case "play":
-            let log = PetCareLog(date: Date(), type: .play, pet: pet, executorId: uid)
-            modelContext.insert(log); modelContext.safeSave()
-            QuestManager.shared.awardAction(
-                type: .general(humanReward: 2, petReward: 3, emoji: "🎾", title: "\(pet.name) 玩耍"),
-                pet: pet, context: modelContext)
+            CareEventService.recordCare(pet: pet, type: .play, context: modelContext, executorId: uid, reward: .general(humanReward: 2, petReward: 3, emoji: "🎾", title: "\(pet.name) 玩耍"))
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         case "litter":
-            let log = PetCareLog(date: Date(), type: .litter, pet: pet, executorId: uid)
-            modelContext.insert(log); modelContext.safeSave()
-            QuestManager.shared.awardAction(type: .potty(isLitter: true), pet: pet, context: modelContext)
+            CareEventService.recordCare(pet: pet, type: .litter, context: modelContext, executorId: uid, reward: .potty(isLitter: true))
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         case "filterClean":
-            let log = PetCareLog(date: Date(), type: .filterClean, pet: pet, executorId: uid)
-            modelContext.insert(log); modelContext.safeSave()
+            CareEventService.recordCare(pet: pet, type: .filterClean, context: modelContext, executorId: uid, reward: .general(humanReward: 25, petReward: 40, emoji: CareType.filterClean.emoji, title: "\(pet.name) 清理滤材报酬"))
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         default:
             break
@@ -565,7 +568,7 @@ struct PetDetailView: View {
         let petItemIds = Set(petQuickActionItems.map { $0.id })
         let insertionIdx = saved.firstIndex(where: { petItemIds.contains($0.id) }) ?? saved.count
         saved.removeAll { petItemIds.contains($0.id) }
-        saved.insert(contentsOf: edited, at: min(insertionIdx, saved.count))
+        saved.insert(contentsOf: Array(edited.prefix(QuickActionLimit.maxItemsPerEntity)), at: min(insertionIdx, saved.count))
         if let data = try? JSONEncoder().encode(saved), let str = String(data: data, encoding: .utf8) {
             quickActionItemsJSON = str
         }
@@ -617,10 +620,8 @@ struct PetDetailView: View {
     private func applyPottyCheckIn(_ raw: String) {
         let type = PottyType(rawValue: raw) ?? .perfectPoop
         let uid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        let log = PetPottyLog(date: Date(), type: type, pet: pet, executorId: uid)
-        modelContext.insert(log); modelContext.safeSave()
+        CareEventService.recordPotty(pet: pet, type: type, context: modelContext, executorId: uid)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        QuestManager.shared.awardAction(type: .potty(isLitter: false), pet: pet, context: modelContext)
     }
 
     private func applyHealthCheckIn(_ raw: String) {
@@ -1333,11 +1334,7 @@ private struct DietCardWithQuickActions: View {
 
             VStack(spacing: 8) {
                 Button {
-                    let log = PetCareLog(date: Date(), type: .feeding, pet: pet)
-                    modelContext.insert(log)
-                    modelContext.safeSave()
-                    QuestManager.shared.recordFirstMeal()
-                    QuestManager.shared.awardAction(type: .feed, pet: pet, context: modelContext)
+                    CareEventService.recordManualFeed(pet: pet, amountGrams: pet.dailyPortionGrams, context: modelContext)
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 } label: {
                     dietActionCell(
@@ -1348,10 +1345,7 @@ private struct DietCardWithQuickActions: View {
                 .buttonStyle(.plain)
 
                 Button {
-                    let log = PetCareLog(date: Date(), type: .watering, pet: pet)
-                    modelContext.insert(log)
-                    modelContext.safeSave()
-                    QuestManager.shared.awardAction(type: .water, pet: pet, context: modelContext)
+                    CareEventService.recordCare(pet: pet, type: .watering, amountMl: 250, context: modelContext, reward: .water)
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 } label: {
                     dietActionCell(
@@ -1364,15 +1358,10 @@ private struct DietCardWithQuickActions: View {
                 Button {
                     let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
                     if isCatLike {
-                        let log = PetCareLog(date: Date(), type: .litter, pet: pet, executorId: eid)
-                        modelContext.insert(log)
-                        QuestManager.shared.awardAction(type: .potty(isLitter: true), pet: pet, context: modelContext)
+                        CareEventService.recordCare(pet: pet, type: .litter, context: modelContext, executorId: eid, reward: .potty(isLitter: true))
                     } else {
-                        let log = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet, executorId: eid)
-                        modelContext.insert(log)
-                        QuestManager.shared.awardAction(type: .potty(isLitter: false), pet: pet, context: modelContext)
+                        CareEventService.recordPotty(pet: pet, context: modelContext, executorId: eid)
                     }
-                    modelContext.safeSave()
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 } label: {
                     dietActionCell(

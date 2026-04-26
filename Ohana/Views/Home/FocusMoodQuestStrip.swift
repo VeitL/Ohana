@@ -15,8 +15,21 @@ struct FocusMoodQuestStrip: View {
     var onCompleteQuest: (IslandQuest) -> Void = { _ in }
     var onExpand: () -> Void = {}
 
+    @Environment(\.colorScheme) private var colorScheme
     @State private var currentPage  = 0
     @State private var completingId: String? = nil  // 正在完成动画的任务 id
+
+    private var cardSurface: Color {
+        colorScheme == .dark ? Color.white.opacity(0.08) : Color.white
+    }
+
+    private var primaryInk: Color {
+        Color(light: Color(hex: "23181A"), dark: .primary)
+    }
+
+    private var secondaryInk: Color {
+        Color(light: Color(hex: "23181A").opacity(0.55), dark: .secondary)
+    }
 
     // MARK: - Mood
 
@@ -91,7 +104,7 @@ struct FocusMoodQuestStrip: View {
                         .font(.system(size: 17))
                     Text(moodText)
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color(hex: "23181A").opacity(0.82))
+                        .foregroundStyle(primaryInk.opacity(0.82))
                         .lineLimit(1)
                     Spacer()
                     if badgeCount > 0 {
@@ -103,7 +116,7 @@ struct FocusMoodQuestStrip: View {
                     }
                     Image(systemName: "chevron.right")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Color(hex: "23181A").opacity(0.25))
+                        .foregroundStyle(primaryInk.opacity(0.25))
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
@@ -115,7 +128,7 @@ struct FocusMoodQuestStrip: View {
             // Divider only when quest row exists below
             if !pendingQuests.isEmpty || allDone {
                 Rectangle()
-                    .fill(Color(hex: "23181A").opacity(0.07))
+                    .fill(primaryInk.opacity(0.07))
                     .frame(height: 1)
                     .padding(.horizontal, 12)
             }
@@ -158,7 +171,7 @@ struct FocusMoodQuestStrip: View {
                         VStack(alignment: .leading, spacing: 1) {
                             Text("今日任务全部完成")
                                 .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundStyle(Color(hex: "23181A").opacity(0.7))
+                                .foregroundStyle(primaryInk.opacity(0.7))
                             if let pet = activePet ?? pets.first(where: { !$0.hasPassedAway }) {
                                 Text("去看看 \(pet.name) 今天的状态 →")
                                     .font(.system(size: 11, weight: .medium, design: .rounded))
@@ -173,8 +186,12 @@ struct FocusMoodQuestStrip: View {
                 .buttonStyle(.plain)
             }
         }
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: Color(hex: "23181A").opacity(0.09), radius: 12, y: 4)
+        .background(cardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.04), lineWidth: 1)
+        )
+        .shadow(color: (colorScheme == .dark ? Color.black.opacity(0.2) : Color(hex: "23181A").opacity(0.09)), radius: 12, y: 4)
         .onChange(of: pendingQuests.count) { _, newCount in
             if currentPage >= newCount && newCount > 0 {
                 currentPage = newCount - 1
@@ -200,12 +217,12 @@ struct FocusMoodQuestStrip: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(q.title)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(hex: "23181A"))
+                    .foregroundStyle(primaryInk)
                     .lineLimit(1)
                 if !q.subtitle.isEmpty {
                     Text(q.subtitle)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Color(hex: "23181A").opacity(0.45))
+                        .foregroundStyle(secondaryInk)
                         .lineLimit(1)
                 }
             }

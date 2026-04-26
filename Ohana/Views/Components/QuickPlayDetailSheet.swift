@@ -179,11 +179,8 @@ struct QuickPlayDetailSheet: View {
 
     private func commitPlay() {
         let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        let log = PetCareLog(date: Date(), type: .play, pet: pet, executorId: eid)
-        modelContext.insert(log)
-        modelContext.safeSave()
         let oat = QuestManager.OhanaActionType.general(humanReward: 10, petReward: 12, emoji: "🎾", title: "\(pet.name) 互动奖励")
-        QuestManager.shared.awardAction(type: oat, pet: pet, context: modelContext)
+        CareEventService.recordCare(pet: pet, type: .play, context: modelContext, executorId: eid, reward: oat)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 }

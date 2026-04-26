@@ -341,7 +341,6 @@ struct AddHumanHealthReportSheet: View {
                                 Spacer()
                                 DatePicker("", selection: $reportDate, displayedComponents: .date)
                                     .labelsHidden()
-                                    .colorScheme(.dark)
                             }
 
                             Toggle(isOn: $hasNextCheck) {
@@ -359,7 +358,6 @@ struct AddHumanHealthReportSheet: View {
                                     Spacer()
                                     DatePicker("", selection: $nextCheckDate, in: reportDate..., displayedComponents: .date)
                                         .labelsHidden()
-                                        .colorScheme(.dark)
                                 }
                             }
                         }

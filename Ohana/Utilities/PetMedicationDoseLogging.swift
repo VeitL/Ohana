@@ -66,6 +66,22 @@ enum PetMedicationDoseLogging {
         }
         modelContext.insert(event)
         modelContext.safeSave()
+        CareLedgerService.record(
+            occurredAt: event.startDate,
+            actorKind: event.assigneeId == nil ? .unknown : .human,
+            actorId: event.assigneeId,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .medication,
+            actionType: "petMedicationDose",
+            note: event.title,
+            source: .detail,
+            sourceEventId: event.id.uuidString,
+            legacyModelName: "Event",
+            legacyModelId: event.id.uuidString,
+            metadataJSON: "{\"medicationId\":\"\(medication.id.uuidString)\"}",
+            context: modelContext
+        )
 
         if decrementRemaining {
             let key = "medication_remaining_\(medication.id.uuidString)"

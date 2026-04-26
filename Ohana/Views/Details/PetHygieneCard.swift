@@ -705,9 +705,11 @@ struct HygieneTodoSheet: View {
         let reminder = Reminder(event: event, scheduledAt: eventStart)
         reminder.status = "pending"
         modelContext.insert(reminder)
-        NotificationManager.shared.schedule(reminder: reminder)
 
         modelContext.safeSave()
+        Task { @MainActor in
+            await ReminderSchedulingService.scheduleIfNeeded(reminder: reminder, context: modelContext, source: .detail)
+        }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         dismiss()
     }

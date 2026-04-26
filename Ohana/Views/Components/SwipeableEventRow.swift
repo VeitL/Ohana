@@ -378,7 +378,7 @@ struct SwipeableEventRow: View {
         let isFeeding  = title.contains("喂") || title.contains("feed") || title.contains("吃")
         let isWatering = title.contains("水") || title.contains("喝")
         let isPotty    = title.contains("便") || title.contains("铲") || title.contains("potty")
-        let isWalk     = title.contains("遗") || title.contains("巡岛") || title.contains("walk")
+        let isWalk     = title.contains("遛") || title.contains("散步") || title.contains("巡岛") || title.contains("walk")
         guard isFeeding || isWatering || isPotty || isWalk else { return false }
         let today = Calendar.current.startOfDay(for: Date())
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: today)!
@@ -391,7 +391,16 @@ struct SwipeableEventRow: View {
             guard let logs = try? modelContext.fetch(desc) else { return false }
             return logs.contains { $0.pet?.id.uuidString == petIdStr }
         }
-        let careType: String = isFeeding ? "feeding" : isWatering ? "watering" : "walking"
+        if isWalk {
+            let desc = FetchDescriptor<PetWalkLog>(
+                predicate: #Predicate { log in
+                    log.startDate >= today && log.startDate < tomorrow
+                }
+            )
+            guard let logs = try? modelContext.fetch(desc) else { return false }
+            return logs.contains { $0.pet?.id.uuidString == petIdStr }
+        }
+        let careType: String = isFeeding ? CareType.feeding.rawValue : CareType.watering.rawValue
         let desc = FetchDescriptor<PetCareLog>(
             predicate: #Predicate { log in
                 log.date >= today && log.date < tomorrow

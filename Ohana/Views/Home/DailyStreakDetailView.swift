@@ -29,62 +29,87 @@ struct DailyStreakDetailView: View {
     private let makeupDatesKey = "oasis_makeup_dates"
     private let makeupPackKey = "inventory_backdate_1day_count"
 
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                ArkBackgroundView()
+    private var safeTop: CGFloat {
+        (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
+            .keyWindow?.safeAreaInsets.top ?? 52
+    }
+    private var navBarHeight: CGFloat { safeTop + 56 }
 
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 20) {
-                        myStreakCard
-                        checkInCalendarSection
-                        Spacer(minLength: 40)
-                    }
-                    .padding(.top, 8)
-                    .padding(.horizontal, 16)
+    var body: some View {
+        ZStack {
+            ArkBackgroundView().ignoresSafeArea()
+
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 16) {
+                    Spacer().frame(height: navBarHeight)
+                    myStreakCard
+                    checkInCalendarSection
+                    Spacer(minLength: 40)
                 }
-            }
-            .onAppear {
-                selectedMonth = Date()
-                loadCheckInData()
-                triggerTodayCheckIn()
-            }
-            .alert(
-                "补签确认",
-                isPresented: Binding(get: { showMakeupConfirm != nil }, set: { if !$0 { showMakeupConfirm = nil } })
-            ) {
-                Button("消耗1个补签包确认") {
-                    if let date = showMakeupConfirm {
-                        applyMakeup(date: date)
-                    }
-                    showMakeupConfirm = nil
-                }
-                Button("取消", role: .cancel) { showMakeupConfirm = nil }
-            } message: {
-                Text("补签 \(showMakeupConfirm ?? "")，将消耗1个补签包")
-            }
-            .sheet(isPresented: $showCoconutShop) {
-                CoconutShopView()
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-            }
-            .sheet(isPresented: $showingCoconutLog) {
-                CoconutLogView()
-            }
-            .onChange(of: showCoconutShop) { _, isShowing in
-                if !isShowing { loadCheckInData() }
-            }
-            .navigationTitle("打卡连击")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 8) {
-                        CoconutBalanceCapsule { showingCoconutLog = true }
-                        Button("关闭") { dismiss() }
-                    }
-                }
+                .padding(.horizontal, 16)
             }
         }
+        .navigationBarHidden(true)
+        .overlay(alignment: .top) { navBar }
+        .onAppear {
+            selectedMonth = Date()
+            loadCheckInData()
+            triggerTodayCheckIn()
+        }
+        .alert(
+            "补签确认",
+            isPresented: Binding(get: { showMakeupConfirm != nil }, set: { if !$0 { showMakeupConfirm = nil } })
+        ) {
+            Button("消耗1个补签包确认") {
+                if let date = showMakeupConfirm {
+                    applyMakeup(date: date)
+                }
+                showMakeupConfirm = nil
+            }
+            Button("取消", role: .cancel) { showMakeupConfirm = nil }
+        } message: {
+            Text("补签 \(showMakeupConfirm ?? "")，将消耗1个补签包")
+        }
+        .sheet(isPresented: $showCoconutShop) {
+            CoconutShopView()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingCoconutLog) {
+            CoconutLogView()
+        }
+        .onChange(of: showCoconutShop) { _, isShowing in
+            if !isShowing { loadCheckInData() }
+        }
+    }
+
+    // MARK: - Nav Bar (matches IslandWealthDashboardView)
+
+    private var navBar: some View {
+        HStack {
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 36, height: 36)
+                    .background(.white.opacity(0.12), in: Circle())
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            Text("打卡连击")
+                .font(.system(size: 17, weight: .black, design: .rounded))
+                .foregroundStyle(.primary)
+
+            Spacer()
+
+            CoconutBalanceCapsule { showingCoconutLog = true }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, safeTop + 8)
+        .padding(.bottom, 12)
+        .background(.ultraThinMaterial.opacity(0.01))
     }
 
     // MARK: - 我的连击卡片
@@ -475,14 +500,14 @@ struct DailyStreakDetailView: View {
     private var shortDateFormatter: DateFormatter {
         let f = DateFormatter()
         f.locale = AppLanguage.effectiveLocale
-        f.dateFormat = AppLanguage.isEnglish ? "MMM d" : "M月d日"
+        f.dateFormat = AppLanguage.compactMonthDayFormat
         return f
     }
 
     private var monthYearFormatter: DateFormatter {
         let f = DateFormatter()
         f.locale = AppLanguage.effectiveLocale
-        f.dateFormat = AppLanguage.isEnglish ? "MMMM yyyy" : "yyyy年 M月"
+        f.dateFormat = AppLanguage.fullMonthYearFormat
         return f
     }
 

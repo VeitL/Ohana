@@ -13,6 +13,9 @@ import UIKit
 // MARK: - Global Coconut Balance Capsule
 struct CoconutBalanceCapsule: View {
     @State private var questManager = QuestManager.shared
+    @State private var previousCount: Int = QuestManager.shared.coconutCount
+    @State private var pulse = false
+    @State private var floatingDelta: Int? = nil
     let onTap: () -> Void
 
     init(onTap: @escaping () -> Void = {}) {
@@ -32,6 +35,22 @@ struct CoconutBalanceCapsule: View {
         .frame(height: 26)
         .fixedSize(horizontal: true, vertical: false)
         .background(Color.goPrimary, in: Capsule())
+        .scaleEffect(pulse ? 1.12 : 1.0)
+        .overlay(alignment: .topTrailing) {
+            if let delta = floatingDelta, delta > 0 {
+                Text("+\(delta)")
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(Color.goLime)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.arkInk.opacity(0.82), in: Capsule())
+                    .offset(x: 8, y: -18)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .allowsHitTesting(false)
+            }
+        }
+        .animation(.spring(response: 0.28, dampingFraction: 0.62), value: pulse)
+        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: floatingDelta)
     }
 
     var body: some View {
@@ -39,6 +58,30 @@ struct CoconutBalanceCapsule: View {
             capsuleCore
         }
         .buttonStyle(.plain)
+        .onAppear {
+            previousCount = questManager.coconutCount
+        }
+        .onChange(of: questManager.coconutCount) { oldValue, newValue in
+            let baseline = max(previousCount, oldValue)
+            let delta = newValue - baseline
+            previousCount = newValue
+            guard delta > 0 else { return }
+            floatingDelta = delta
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            withAnimation(.spring(response: 0.24, dampingFraction: 0.55)) {
+                pulse = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.72)) {
+                    pulse = false
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.05) {
+                withAnimation(.easeOut(duration: 0.18)) {
+                    floatingDelta = nil
+                }
+            }
+        }
     }
 }
 
@@ -134,28 +177,50 @@ struct OhanaGlassModifier: ViewModifier {
 
 // MARK: - Card Modifiers
 struct NeoWhiteCardModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
     var cornerRadius: CGFloat
+
+    private var shadowColor: Color {
+        colorScheme == .dark ? Color.black.opacity(0.28) : Color.black.opacity(0.08)
+    }
     
     func body(content: Content) -> some View {
         content
+            .foregroundStyle(Color.ohanaPrimaryText)
             .background {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(.white)
+                    .fill(Color.ohanaCardSurface)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .shadow(color: .black.opacity(0.08), radius: 16, x: 0, y: 4)
+            .shadow(color: shadowColor, radius: 16, x: 0, y: 4)
     }
 }
 
-/// 与 `GoDashboardView` 首页白底区块一致：靛青浅影；子视图使用浅色 `ColorScheme` 以保证深字对比度。
+/// 与 `GoDashboardView` 首页区块一致；表面色跟随全局浅/深色偏好。
 struct GoIslandModuleCardModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
     var cornerRadius: CGFloat
+
+    private var surface: Color {
+        colorScheme == .dark ? Color.white.opacity(0.08) : Color.white
+    }
+
+    private var shadowColor: Color {
+        colorScheme == .dark ? Color.black.opacity(0.24) : Color(hex: "0C1640").opacity(0.14)
+    }
 
     func body(content: Content) -> some View {
         content
-            .environment(\.colorScheme, .light)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .shadow(color: Color(hex: "0C1640").opacity(0.14), radius: 8, y: 3)
+            .background(surface, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.04), lineWidth: 1)
+            )
+            .shadow(color: shadowColor, radius: 8, y: 3)
     }
 }
 
@@ -179,14 +244,21 @@ struct NeoDarkCardModifier: ViewModifier {
 
 // MARK: - Button Modifiers
 struct CapsuleButtonModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var shadowColor: Color {
+        colorScheme == .dark ? Color.black.opacity(0.24) : Color.black.opacity(0.08)
+    }
+
     func body(content: Content) -> some View {
         content
             .font(OhanaFont.headline(.semibold))
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(Color.ohanaPrimaryText)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(.white, in: Capsule())
-            .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+            .background(Color.ohanaCardSurface, in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.ohanaCardStroke, lineWidth: 1))
+            .shadow(color: shadowColor, radius: 8, x: 0, y: 2)
     }
 }
 

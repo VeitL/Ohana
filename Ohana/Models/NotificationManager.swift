@@ -9,6 +9,33 @@ import Foundation
 import UserNotifications
 import SwiftData
 
+enum ReminderNotificationScheduleResult: Equatable {
+    case scheduled
+    case skippedDuplicate
+    case skippedPastDue
+    case missingEvent
+    case failed(String)
+
+    var ledgerActionType: String {
+        switch self {
+        case .scheduled: return "scheduleSuccess"
+        case .skippedDuplicate: return "scheduleDuplicate"
+        case .skippedPastDue: return "scheduleSkippedPastDue"
+        case .missingEvent: return "scheduleMissingEvent"
+        case .failed: return "scheduleFailed"
+        }
+    }
+
+    var metadataJSON: String {
+        switch self {
+        case .failed(let message):
+            return "{\"error\":\"\(message.replacingOccurrences(of: "\"", with: "\\\""))\"}"
+        default:
+            return ""
+        }
+    }
+}
+
 final class NotificationManager: NSObject, @unchecked Sendable {
     // F10: 保持 @unchecked Sendable 但确保内部状态不可变
     // center 和 categoryID 均为 let，init 后不再变化，线程安全
@@ -67,9 +94,27 @@ final class NotificationManager: NSObject, @unchecked Sendable {
 
     // MARK: - Schedule（单条，原有接口保持不变）
     func schedule(reminder: Reminder) {
-        guard let event = reminder.event else { return }
-        guard reminder.scheduledAt > Date() else { return } // 过去的不注册
-        
+        schedule(reminder: reminder, existingNotificationIds: nil, completion: nil)
+    }
+
+    func schedule(
+        reminder: Reminder,
+        existingNotificationIds: Set<String>? = nil,
+        completion: ((ReminderNotificationScheduleResult) -> Void)? = nil
+    ) {
+        guard let event = reminder.event else {
+            completion?(.missingEvent)
+            return
+        }
+        guard reminder.scheduledAt > Date() else {
+            completion?(.skippedPastDue)
+            return
+        }
+        if existingNotificationIds?.contains(reminder.notificationId) == true {
+            completion?(.skippedDuplicate)
+            return
+        }
+
         let content = makeContent(event: event, reminder: reminder)
         let components = Calendar.current.dateComponents(
             [.year, .month, .day, .hour, .minute],
@@ -81,7 +126,21 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             content: content,
             trigger: trigger
         )
-        center.add(request)
+        center.add(request) { error in
+            if let error {
+                completion?(.failed(error.localizedDescription))
+            } else {
+                completion?(.scheduled)
+            }
+        }
+    }
+
+    func pendingNotificationIds() async -> Set<String> {
+        await withCheckedContinuation { continuation in
+            center.getPendingNotificationRequests { requests in
+                continuation.resume(returning: Set(requests.map(\.identifier)))
+            }
+        }
     }
 
     // MARK: - scheduleRollingWindow
@@ -145,7 +204,7 @@ final class NotificationManager: NSObject, @unchecked Sendable {
         center.removePendingNotificationRequests(withIdentifiers: ids)
     }
 
-    // MARK: - Compensate（过期 pending：普通待办标完成；计划喂食标为打卡失败）
+    // MARK: - Compensate（过期 pending：计划喂食标失败；其它待办标跳过，避免误报已完成）
     func compensate(reminders: [Reminder]) {
         let now = Date()
         for reminder in reminders {
@@ -154,8 +213,8 @@ final class NotificationManager: NSObject, @unchecked Sendable {
                 reminder.statusEnum = .failed
                 reminder.completedAt = nil
             } else {
-                reminder.statusEnum = .completed
-                reminder.completedAt = now
+                reminder.statusEnum = .skipped
+                reminder.completedAt = nil
             }
             cancel(notificationId: reminder.notificationId)
         }
@@ -168,7 +227,11 @@ final class NotificationManager: NSObject, @unchecked Sendable {
         content.body = "\(event.emoji) \(event.title)"
         content.sound = .default
         content.categoryIdentifier = categoryID
-        content.userInfo = ["reminderCreatedAt": reminder.createdAt.timeIntervalSince1970]
+        content.userInfo = [
+            "reminderId": reminder.id.uuidString,
+            "notificationId": reminder.notificationId,
+            "reminderCreatedAt": reminder.createdAt.timeIntervalSince1970
+        ]
         return content
     }
 }
@@ -185,6 +248,12 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         // F8: 记录用户操作，通过 NotificationCenter 广播到 App 层处理 ModelContext
         let notifName = Notification.Name("OhanaReminderAction")
         var payload: [String: Any] = ["action": action]
+        if let reminderId = userInfo["reminderId"] as? String {
+            payload["reminderId"] = reminderId
+        }
+        if let notificationId = userInfo["notificationId"] as? String {
+            payload["notificationId"] = notificationId
+        }
         if let createdAt = userInfo["reminderCreatedAt"] as? TimeInterval {
             payload["reminderCreatedAt"] = createdAt
         }

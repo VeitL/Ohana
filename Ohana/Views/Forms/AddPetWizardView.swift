@@ -1634,7 +1634,7 @@ struct AddPetWizardView: View {
                 .tint(Color.goPrimary)
                 if hasBirthday {
                     DatePicker("", selection: $birthday, in: ...Date(), displayedComponents: .date)
-                        .datePickerStyle(.graphical).colorScheme(.dark).tint(accentColor)
+                        .datePickerStyle(.graphical).tint(accentColor)
                     if !humanAgeText.isEmpty {
                         Label(humanAgeText, systemImage: "person.fill")
                             .font(.system(size: 13, weight: .bold, design: .rounded))
@@ -1657,7 +1657,7 @@ struct AddPetWizardView: View {
                 if hasHomeDate {
                     let homeLower: Date = hasBirthday ? birthday : .distantPast
                     DatePicker("", selection: $homeDate, in: homeLower...Date(), displayedComponents: .date)
-                        .datePickerStyle(.graphical).colorScheme(.dark).tint(accentColor)
+                        .datePickerStyle(.graphical).tint(accentColor)
                         .onChange(of: birthday) { _, newBirthday in
                             if homeDate < newBirthday { homeDate = newBirthday }
                         }

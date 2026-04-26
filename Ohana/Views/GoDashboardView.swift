@@ -47,6 +47,8 @@ struct GoDashboardView: View {
     @State private var quickHumanWorkoutHuman: Human? = nil
     @State private var quickHumanMedicationHuman: Human? = nil
     @State private var quickHumanNoteHuman: Human? = nil
+    @State private var quickHumanWeightDetailHuman: Human? = nil
+    @State private var quickHumanWorkoutDetailHuman: Human? = nil
     @State private var quickWeightValue: String = ""
     @State private var quickWalkPet: Pet? = nil
     @State private var actionToast: (pet: Pet, message: String, emoji: String)? = nil
@@ -60,6 +62,7 @@ struct GoDashboardView: View {
     @State private var feedSheetItem: (pet: Pet, actionType: String)? = nil
     @State private var feedDetailPet: Pet? = nil
     @State private var waterDetailPet: Pet? = nil
+    @State private var waterDetailModeRaw: String? = nil
     @State private var playDetailPet: Pet? = nil
     @State private var pottyDetailPet: Pet? = nil
     @State private var litterDetailPet: Pet? = nil
@@ -91,6 +94,7 @@ struct GoDashboardView: View {
     @State private var pendingRepeatAction: (() -> Void)? = nil
     @State private var antiRepeatTitle = ""
     @State private var antiRepeatMessage = ""
+    @State private var showingHumanPrivacyAlert = false
     @State private var showingAddSymptomSheet = false
     @State private var symptomSheetPet: Pet? = nil
     @State private var showingAddHeatCycleSheet = false
@@ -109,6 +113,7 @@ struct GoDashboardView: View {
 
     @AppStorage("quickActionItems_v2") private var quickActionItemsJSON: String = ""
     @AppStorage("appLanguage") private var appLanguage = "zh"
+    @AppStorage("currentActiveHumanId") private var activeViewerHumanIdStr: String = ""
     @AppStorage("overview_activeCritterId") private var activeCritterIdStr: String = ""
     @AppStorage("lastIslandReportDate") private var lastIslandReportDate: String = ""
     @AppStorage("customBatchActions") private var customBatchActionsJSON: String = ""
@@ -116,6 +121,7 @@ struct GoDashboardView: View {
     @AppStorage("calendar_viewMode") private var calendarViewModeRaw: String = CalendarViewMode.list.rawValue
 
     private var l: L10n { L10n(appLanguage) }
+    private var activeViewerHumanId: UUID? { UUID(uuidString: activeViewerHumanIdStr) }
     private var activeCritterId: UUID? {
         get { UUID(uuidString: activeCritterIdStr) }
         nonmutating set { activeCritterIdStr = newValue?.uuidString ?? "" }
@@ -223,6 +229,14 @@ struct GoDashboardView: View {
             QuickHumanNoteSheet(human: human)
                 .presentationDetents([.medium]).presentationDragIndicator(.visible)
         }
+        .sheet(item: $quickHumanWeightDetailHuman) { human in
+            NavigationStack { HumanWeightHistoryView(human: human) }
+                .presentationDetents([.large]).presentationDragIndicator(.visible)
+        }
+        .sheet(item: $quickHumanWorkoutDetailHuman) { human in
+            HumanWorkoutHistoryView(human: human)
+                .presentationDetents([.large]).presentationDragIndicator(.visible)
+        }
         .sheet(item: $showMomentPet) { pet in
             NavigationStack {
                 QuickMomentSheet(pet: pet, onRemove: nil)
@@ -236,6 +250,11 @@ struct GoDashboardView: View {
             Button(l.homeConfirmCheckIn, role: .destructive) { pendingRepeatAction?(); pendingRepeatAction = nil }
             Button(l.cancel, role: .cancel) { pendingRepeatAction = nil }
         } message: { Text(antiRepeatMessage) }
+        .alert("仅本人可见", isPresented: $showingHumanPrivacyAlert) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text("该成员已将此功能设为仅自己可见。")
+        }
         .islandToastOverlay()
         .onAppear { onAppearSetup() }
         .onChange(of: PetWalkingManager.shared.phase) { _, newPhase in
@@ -493,12 +512,12 @@ private extension GoDashboardView {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(l.goLifeTreeTitle(levelName: level.displayName))
                         .font(.system(size: 15, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color(hex: "1E3A8A"))
+                        .foregroundStyle(Color(light: Color(hex: "1E3A8A"), dark: .primary))
 
                     if level < .lv10 {
                         Text(l.goTreeNeedEnergy(max(0, energyNeeded)))
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Color(hex: "6B82C4"))
+                            .foregroundStyle(Color(light: Color(hex: "6B82C4"), dark: .secondary))
                     } else {
                         Text(l.goTreeMaxLevel)
                             .font(.system(size: 11, weight: .medium))
@@ -508,7 +527,7 @@ private extension GoDashboardView {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             Capsule()
-                                .fill(Color(hex: "E8EEFF"))
+                                .fill(Color(light: Color(hex: "E8EEFF"), dark: Color.white.opacity(0.12)))
                                 .frame(height: 6)
                             Capsule()
                                 .fill(
@@ -550,8 +569,15 @@ private extension GoDashboardView {
             }
         }
         .padding(16)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: Color(hex: "0C1640").opacity(0.2), radius: 8, y: 3)
+        .background(
+            Color(light: .white, dark: Color.white.opacity(0.08)),
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.04), lineWidth: 1)
+        )
+        .shadow(color: (colorScheme == .dark ? Color.black.opacity(0.24) : Color(hex: "0C1640").opacity(0.2)), radius: 8, y: 3)
     }
 
     // MARK: Lime-style dock (设计规范: 活跃标签 = lime 胶囊 + 墨色文字)
@@ -711,7 +737,7 @@ private extension GoDashboardView {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
                         .font(.system(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(Color(hex: "1E3A8A"))
+                        .foregroundStyle(Color(light: Color(hex: "1E3A8A"), dark: .primary))
                     Text(label)
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(Color.goLime.opacity(0.7))
@@ -721,11 +747,17 @@ private extension GoDashboardView {
                 trailingButton?()
             }
             content()
-                .environment(\.colorScheme, .light)
         }
         .padding(16)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: Color(hex: "0C1640").opacity(0.18), radius: 8, y: 3)
+        .background(
+            Color(light: .white, dark: Color.white.opacity(0.08)),
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.04), lineWidth: 1)
+        )
+        .shadow(color: (colorScheme == .dark ? Color.black.opacity(0.24) : Color(hex: "0C1640").opacity(0.18)), radius: 8, y: 3)
     }
 }
 
@@ -740,10 +772,10 @@ private extension GoDashboardView {
                 isPressed: !isQAEditMode && pressedActionId == item.id,
                 petAvatar: avatarForAction(item),
                 petThemeColorHex: themeColorForAction(item),
-                displayIcon: (!isQAEditMode && item.actionType == "water" && waterQuickDisplayUsesChangeMode(for: item.petId)) ? "drop.circle.fill" : nil,
-                titleLabelOverride: (!isQAEditMode && item.actionType == "water" && waterQuickDisplayUsesChangeMode(for: item.petId)) ? l.homeQAWaterChange : nil,
                 pendingReminder: isQAEditMode ? nil : reminderForAction(item),
                 countText: isQAEditMode ? nil : countTextForAction(item),
+                privacyBadgeText: isQAEditMode ? nil : privacyBadgeText(for: item),
+                isPrivacyLocked: !isQAEditMode && isHumanQuickActionPrivate(item),
                 isCompletedToday: !isQAEditMode && isCompletedToday(for: item),
                 onTap: {
                     guard !isQAEditMode else { return }
@@ -841,7 +873,11 @@ private extension GoDashboardView {
                     .popover(isPresented: $showingQAQuickAdd, attachmentAnchor: .point(.top), arrowEdge: .bottom) {
                         if let pet = pets.first(where: { $0.id == activeCritterId }) {
                             QAQuickAddPopoverContent(pet: pet, existingItems: qaEditItems) { newItem in
-                                withAnimation(.spring(response: 0.3)) { qaEditItems.append(newItem) }
+                                withAnimation(.spring(response: 0.3)) {
+                                    if QuickActionLimit.count(for: pet, in: qaEditItems) < QuickActionLimit.maxItemsPerEntity {
+                                        qaEditItems.append(newItem)
+                                    }
+                                }
                             }
                         }
                     }
@@ -866,9 +902,17 @@ private extension GoDashboardView {
                 .presentationDragIndicator(.visible).presentationContentInteraction(.scrolls)
         }
         .sheet(item: $waterDetailPet) { pet in
-            QuickWaterDetailSheet(pet: pet) { waterDetailPet = nil }
+            QuickWaterDetailSheet(
+                pet: pet,
+                initialModeRaw: waterDetailModeRaw,
+                lockedModeRaw: waterDetailModeRaw
+            ) {
+                waterDetailPet = nil
+                waterDetailModeRaw = nil
+            }
                 .presentationDetents([.fraction(0.86), .large], selection: $quickActionDetailSheetDetent)
                 .presentationDragIndicator(.visible).presentationContentInteraction(.scrolls)
+                .onDisappear { waterDetailModeRaw = nil }
         }
         .sheet(item: $playDetailPet) { pet in
             QuickPlayDetailSheet(pet: pet) { playDetailPet = nil }
@@ -894,7 +938,7 @@ private extension GoDashboardView {
                 .presentationDetents([.large]).presentationDragIndicator(.visible)
         }
         .sheet(item: $quickWalkDetailPet) { pet in
-            NavigationStack { DogActivityCard(pet: pet) }
+            NavigationStack { WalkSummarySheet(pet: pet) }
                 .presentationDetents([.large]).presentationDragIndicator(.visible)
         }
         .sheet(item: $quickHealthDetailPet) { pet in
@@ -1122,22 +1166,29 @@ private extension GoDashboardView {
                     HStack(alignment: .lastTextBaseline, spacing: 2) {
                         Text(value)
                             .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color(hex: "1E3A8A"))
+                            .foregroundStyle(Color(light: Color(hex: "1E3A8A"), dark: .primary))
                         if !unit.isEmpty {
                             Text(unit)
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(Color(hex: "6B82C4"))
+                                .foregroundStyle(Color(light: Color(hex: "6B82C4"), dark: .secondary))
                         }
                     }
                     Text(label)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Color(hex: "6B82C4"))
+                        .foregroundStyle(Color(light: Color(hex: "6B82C4"), dark: .secondary))
                 }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .shadow(color: Color(hex: "0C1640").opacity(0.12), radius: 4, y: 2)
+            .background(
+                Color(light: .white, dark: Color.white.opacity(0.08)),
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.04), lineWidth: 1)
+            )
+            .shadow(color: (colorScheme == .dark ? Color.black.opacity(0.18) : Color(hex: "0C1640").opacity(0.12)), radius: 4, y: 2)
         }
         .buttonStyle(.plain)
     }
@@ -1186,8 +1237,8 @@ private extension GoDashboardView {
                     .offset(x: coconutFlyOut ? 120 : 0, y: coconutFlyOut ? -300 : 0)
                 if !coconutFlyOut {
                     VStack(spacing: 6) {
-                        Text(l.homeDailyCoconutTitle).font(.system(size: 18, weight: .black, design: .rounded)).foregroundStyle(Color(hex: "1E3A8A"))
-                        Text(l.homeDailyCoconutSub).font(.system(size: 13)).foregroundStyle(Color(hex: "6B82C4"))
+                        Text(l.homeDailyCoconutTitle).font(.system(size: 18, weight: .black, design: .rounded)).foregroundStyle(Color(light: Color(hex: "1E3A8A"), dark: .primary))
+                        Text(l.homeDailyCoconutSub).font(.system(size: 13)).foregroundStyle(Color(light: Color(hex: "6B82C4"), dark: .secondary))
                     }
                     .transition(.opacity)
                     Button { dismissDailyCoconut() } label: {
@@ -1199,8 +1250,11 @@ private extension GoDashboardView {
                 }
             }
             .padding(32)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .shadow(color: Color(hex: "0C1640").opacity(0.3), radius: 24, y: 8)
+            .background(
+                Color(light: .white, dark: Color(hex: "141628")),
+                in: RoundedRectangle(cornerRadius: 28, style: .continuous)
+            )
+            .shadow(color: (colorScheme == .dark ? Color.black.opacity(0.35) : Color(hex: "0C1640").opacity(0.3)), radius: 24, y: 8)
         }
         .zIndex(9999)
         .transition(.opacity)
@@ -1223,8 +1277,7 @@ private extension GoDashboardView {
         // 浮动色球呼吸动画
         withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) { blobPulse = true }
         for pet in pets { StreakManager.refreshStreak(for: pet, context: modelContext) }
-        NotificationManager.shared.compensate(reminders: Array(pendingReminders))
-        modelContext.safeSave()
+        ReminderSchedulingService.compensate(reminders: Array(pendingReminders), context: modelContext)
 
         // 每日打卡
         let fmt: DateFormatter = { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f }()
@@ -1297,7 +1350,34 @@ private extension GoDashboardView {
             return humanItems
         }
         guard let activeId = activeCritterId else { return all.filter { $0.entityKind != .human } }
-        return all.filter { $0.petId == activeId || ($0.petId == nil && $0.entityKind != .human) }
+        let items = all.filter { $0.petId == activeId || ($0.petId == nil && $0.entityKind != .human) }
+        guard let pet = pets.first(where: { $0.id == activeId }) else { return items }
+        return ensureIndependentWaterChangeAction(in: items, for: pet)
+    }
+
+    func ensureIndependentWaterChangeAction(in items: [QuickActionItem], for pet: Pet) -> [QuickActionItem] {
+        let actionTypes = Set(items.map(\.actionType))
+        guard actionTypes.contains("water"),
+              !actionTypes.contains("waterChange"),
+              QuickActionLimit.count(for: pet, in: items) < QuickActionLimit.maxItemsPerEntity
+        else { return items }
+
+        var result = items
+        let waterChange = QuickActionItem(
+            label: l.homeQAWaterChange,
+            icon: "drop.circle.fill",
+            colorHex: "4ECDC4",
+            petId: pet.id,
+            actionType: "waterChange",
+            entityId: pet.id,
+            entityKind: .pet
+        )
+        if let waterIndex = result.firstIndex(where: { $0.actionType == "water" }) {
+            result.insert(waterChange, at: min(waterIndex + 1, result.count))
+        } else {
+            result.append(waterChange)
+        }
+        return result
     }
 
     var savedQuickActionItems: [QuickActionItem] {
@@ -1334,14 +1414,17 @@ private extension GoDashboardView {
             items.append(QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA", petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet))
         } else if isDog {
             items.append(QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA", petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: l.homeQAWaterChange, icon: "drop.circle.fill", colorHex: "4ECDC4", petId: pet.id, actionType: "waterChange", entityId: pet.id, entityKind: .pet))
             items.append(QuickActionItem(label: l.homeQAWalk, icon: "figure.walk", colorHex: "C8FF00", petId: pet.id, actionType: "walk", entityId: pet.id, entityKind: .pet))
             items.append(QuickActionItem(label: l.homeQAPotty, icon: "allergens", colorHex: "A78BFA", petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
         } else if isCat {
             items.append(QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA", petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: l.homeQAWaterChange, icon: "drop.circle.fill", colorHex: "4ECDC4", petId: pet.id, actionType: "waterChange", entityId: pet.id, entityKind: .pet))
             items.append(QuickActionItem(label: l.homeQALitter, icon: "trash.fill", colorHex: "5B6AFF", petId: pet.id, actionType: "litter", entityId: pet.id, entityKind: .pet))
             items.append(QuickActionItem(label: l.homeQAPotty, icon: "allergens", colorHex: "A78BFA", petId: pet.id, actionType: "potty", entityId: pet.id, entityKind: .pet))
         } else {
             items.append(QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA", petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet))
+            items.append(QuickActionItem(label: l.homeQAWaterChange, icon: "drop.circle.fill", colorHex: "4ECDC4", petId: pet.id, actionType: "waterChange", entityId: pet.id, entityKind: .pet))
             items.append(QuickActionItem(label: l.homeQAGroom, icon: "scissors", colorHex: "F472B6", petId: pet.id, actionType: "groom", entityId: pet.id, entityKind: .pet))
             items.append(QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA", petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet))
         }
@@ -1349,7 +1432,13 @@ private extension GoDashboardView {
     }
 
     func addQuickAction(_ item: QuickActionItem) {
-        var current = savedQuickActionItems; current.append(item)
+        var current = savedQuickActionItems
+        if let petId = item.petId,
+           let pet = pets.first(where: { $0.id == petId }),
+           QuickActionLimit.count(for: pet, in: current) >= QuickActionLimit.maxItemsPerEntity {
+            return
+        }
+        current.append(item)
         if let data = try? JSONEncoder().encode(current), let str = String(data: data, encoding: .utf8) { quickActionItemsJSON = str }
     }
 
@@ -1377,16 +1466,19 @@ private extension GoDashboardView {
         let activeIds = Set(activeQuickActionItems.map { $0.id })
         let insertionIdx = saved.firstIndex(where: { activeIds.contains($0.id) }) ?? saved.count
         saved.removeAll { activeIds.contains($0.id) }
-        saved.insert(contentsOf: edited, at: min(insertionIdx, saved.count))
+        saved.insert(contentsOf: Array(edited.prefix(QuickActionLimit.maxItemsPerEntity)), at: min(insertionIdx, saved.count))
         if let data = try? JSONEncoder().encode(saved), let str = String(data: data, encoding: .utf8) { quickActionItemsJSON = str }
     }
 
     func isCompletedToday(for item: QuickActionItem) -> Bool {
         let cal = Calendar.current
         if item.entityKind == .human, let hid = item.entityId, let human = humans.first(where: { $0.id == hid }) {
+            guard !isHumanQuickActionPrivate(item, human: human) else { return false }
             switch item.actionType {
             case "humanWeight":  return human.weightLogs.contains { cal.isDateInToday($0.date) }
             case "humanWorkout": return human.workoutLogs.contains { cal.isDateInToday($0.date) }
+            case "humanMedication":
+                return false
             default:             return false
             }
         }
@@ -1395,10 +1487,9 @@ private extension GoDashboardView {
         case "walk":    return pet.walkLogs.contains { cal.isDateInToday($0.startDate) }
         case "feed":    return feedQuickActionAppearsComplete(for: pet)
         case "water":
-            if waterQuickDisplayUsesChangeMode(for: pet.id) {
-                return pet.careLogs.contains { $0.type == CareType.waterChange.rawValue && cal.isDateInToday($0.date) }
-            }
             return pet.careLogs.contains { $0.type == CareType.watering.rawValue && cal.isDateInToday($0.date) }
+        case "waterChange":
+            return pet.careLogs.contains { $0.type == CareType.waterChange.rawValue && cal.isDateInToday($0.date) }
         case "litter":  return pet.careLogs.contains { $0.type == CareType.litter.rawValue && cal.isDateInToday($0.date) }
         case "potty":   return pet.pottyLogs.contains { cal.isDateInToday($0.date) }
         case "play":    return pet.careLogs.contains { $0.type == CareType.play.rawValue && cal.isDateInToday($0.date) }
@@ -1450,6 +1541,12 @@ private extension GoDashboardView {
         case "water":
             let count = pet.careLogs.filter { $0.type == CareType.watering.rawValue && cal.isDateInToday($0.date) }.count
             return count > 0 ? l.homeTimesToday(count) : nil
+        case "waterChange":
+            if let last = pet.careLogs.filter({ $0.type == CareType.waterChange.rawValue }).max(by: { $0.date < $1.date }) {
+                let days = cal.dateComponents([.day], from: last.date, to: Date()).day ?? 0
+                return days == 0 ? "今天已换" : "\(days)天前"
+            }
+            return nil
         case "potty":
             let count = pet.pottyLogs.filter { cal.isDateInToday($0.date) }.count
             return count > 0 ? l.homeTimesToday(count) : nil
@@ -1483,13 +1580,6 @@ private extension GoDashboardView {
         ["feed","water","waterChange","filterClean","play","potty","litter","weight","expense","health"].contains(actionType)
     }
 
-    func waterQuickDisplayUsesChangeMode(for petId: UUID?) -> Bool {
-        guard let petId else { return false }
-        let key = "waterSheetMode_\(petId.uuidString)"
-        let mode = UserDefaults.standard.string(forKey: key) ?? UserDefaults.standard.string(forKey: "waterSheetMode") ?? "drink"
-        return mode == "change"
-    }
-
     func feedQuickActionAppearsComplete(for pet: Pet) -> Bool {
         let cal = Calendar.current
         if HomeFeedRecordMode.isPlanned(for: pet.id) {
@@ -1518,6 +1608,10 @@ private extension GoDashboardView {
 private extension GoDashboardView {
     func handleAction(_ item: QuickActionItem) {
         if item.entityKind == .human, let hid = item.entityId, let human = humans.first(where: { $0.id == hid }) {
+            if isHumanQuickActionPrivate(item, human: human) {
+                showingHumanPrivacyAlert = true
+                return
+            }
             switch item.actionType {
             case "humanWeight":     quickHumanWeightHuman = human
             case "humanWorkout":    quickHumanWorkoutHuman = human
@@ -1544,12 +1638,51 @@ private extension GoDashboardView {
         }
     }
 
+    func privacyField(forHumanAction actionType: String) -> HumanPrivateField? {
+        PrivacyService.field(forHumanAction: actionType)
+    }
+
+    func isHumanQuickActionPrivate(_ item: QuickActionItem, human: Human? = nil) -> Bool {
+        let target = human ?? item.entityId.flatMap { id in humans.first(where: { $0.id == id }) }
+        return PrivacyService.isHumanQuickActionLocked(item, human: target, viewedBy: activeViewerHumanId)
+    }
+
+    func privacyBadgeText(for item: QuickActionItem) -> String? {
+        guard item.entityKind == .human,
+              let field = privacyField(forHumanAction: item.actionType),
+              let human = item.entityId.flatMap({ id in humans.first(where: { $0.id == id }) }) else { return nil }
+        return PrivacyService.badgeText(for: field, human: human, viewedBy: activeViewerHumanId)
+    }
+
     func handleLongPressAction(_ item: QuickActionItem) {
+        if item.entityKind == .human, let hid = item.entityId, let human = humans.first(where: { $0.id == hid }) {
+            if isHumanQuickActionPrivate(item, human: human) {
+                showingHumanPrivacyAlert = true
+                return
+            }
+            switch item.actionType {
+            case "humanWeight":     quickHumanWeightDetailHuman = human
+            case "humanWorkout":    quickHumanWorkoutDetailHuman = human
+            case "humanMedication": quickHumanMedicationHuman = human
+            case "humanNote":       selectedHuman = human
+            default:                selectedHuman = human
+            }
+            return
+        }
+
         let pet = item.petId.flatMap { pid in pets.first(where: { $0.id == pid }) } ?? pets.first
         guard let p = pet else { return }
         switch item.actionType {
         case "feed":                feedDetailPet = p
-        case "water","waterChange","filterClean": waterDetailPet = p
+        case "water":
+            waterDetailModeRaw = QuickWaterDetailSheet.WaterMode.drink.rawValue
+            waterDetailPet = p
+        case "waterChange":
+            waterDetailModeRaw = QuickWaterDetailSheet.WaterMode.change.rawValue
+            waterDetailPet = p
+        case "filterClean":
+            waterDetailModeRaw = nil
+            waterDetailPet = p
         case "play":                playDetailPet = p
         case "potty":               pottyDetailPet = p
         case "litter":              litterDetailPet = p
@@ -1573,14 +1706,10 @@ private extension GoDashboardView {
         case "weight": quickWeightPet = pet
         case "hygiene","groom": quickAccessCarePet = pet
         case "potty":
-            let log = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet, executorId: uid)
-            modelContext.insert(log)
-            let got = QuestManager.shared.awardAction(type: .potty(isLitter: false), pet: pet, context: modelContext)
+            let got = CareEventService.recordPotty(pet: pet, context: modelContext, executorId: uid)
             showToast(pet, message: l.homeToastPotty(pet.name, points: got.petGot + got.humanGot), emoji: "💩")
         case "litter":
-            let log = PetCareLog(date: Date(), type: .litter, pet: pet, executorId: uid)
-            modelContext.insert(log)
-            let got = QuestManager.shared.awardAction(type: .potty(isLitter: true), pet: pet, context: modelContext)
+            let got = CareEventService.recordCare(pet: pet, type: .litter, context: modelContext, executorId: uid, reward: .potty(isLitter: true))
             showToast(pet, message: l.homeToastLitter(pet.name, points: got.humanGot), emoji: "🧹")
         case "feed":
             let performFeed = {
@@ -1588,11 +1717,7 @@ private extension GoDashboardView {
                     if self.completePlannedFeedFromHome(pet: pet) { return }
                     self.feedDetailPet = pet
                 } else {
-                    let log = PetCareLog(date: Date(), type: .feeding, amountGrams: pet.dailyPortionGrams, note: PetCareLog.manualFeedNoteMarker, pet: pet, executorId: uid)
-                    self.modelContext.insert(log)
-                    self.modelContext.safeSave()
-                    QuestManager.shared.recordFirstMeal()
-                    let got = QuestManager.shared.awardAction(type: .feed, pet: pet, context: self.modelContext)
+                    let got = CareEventService.recordManualFeed(pet: pet, amountGrams: pet.dailyPortionGrams, context: self.modelContext, executorId: uid)
                     self.showToast(pet, message: l.homeToastManualFeed(pet.name, points: got.petGot + got.humanGot), emoji: "🍗")
                 }
             }
@@ -1603,15 +1728,8 @@ private extension GoDashboardView {
                 showingAntiRepeatAlert = true
             } else { performFeed() }
         case "water":
-            if waterQuickDisplayUsesChangeMode(for: pet.id) {
-                applySpecialCareCheckIn(type: .waterChange, pet: pet)
-            } else {
-                let log = PetCareLog(date: Date(), type: .watering, pet: pet, executorId: uid)
-                modelContext.insert(log)
-                modelContext.safeSave()
-                let got = QuestManager.shared.awardAction(type: .water, pet: pet, context: modelContext)
-                showToast(pet, message: l.homeToastWater(pet.name, points: got.petGot + got.humanGot), emoji: "💧")
-            }
+            let got = CareEventService.recordCare(pet: pet, type: .watering, amountMl: 250, context: modelContext, executorId: uid, reward: .water)
+            showToast(pet, message: l.homeToastWater(pet.name, points: got.petGot + got.humanGot), emoji: "💧")
         case "waterChange":
             applySpecialCareCheckIn(type: .waterChange, pet: pet)
         case "filterClean":
@@ -1625,16 +1743,13 @@ private extension GoDashboardView {
         case "substrateChange":
             applySpecialCareCheckIn(type: .substrateChange, pet: pet)
         case "play":
-            let log = PetCareLog(date: Date(), type: .play, pet: pet, executorId: uid)
-            modelContext.insert(log)
-            modelContext.safeSave()
             let playReward = QuestManager.OhanaActionType.general(
                 humanReward: 2,
                 petReward: 3,
                 emoji: "🎾",
                 title: l.homePlayQuestTitle(pet.name)
             )
-            let got = QuestManager.shared.awardAction(type: playReward, pet: pet, context: modelContext)
+            let got = CareEventService.recordCare(pet: pet, type: .play, context: modelContext, executorId: uid, reward: playReward)
             showToast(pet, message: l.homeToastPlay(pet.name, points: got.petGot + got.humanGot), emoji: "🎾")
         default:
             selectedPet = pet; selectedPetTab = .overview
@@ -1643,11 +1758,9 @@ private extension GoDashboardView {
 
     func applySpecialCareCheckIn(type: CareType, pet: Pet) {
         let uid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        let log = PetCareLog(date: Date(), type: type, pet: pet, executorId: uid)
-        modelContext.insert(log); modelContext.safeSave()
         let careLabel = l.careTypeUILabel(type)
         let oat: QuestManager.OhanaActionType = .general(humanReward: 15, petReward: 20, emoji: type.emoji, title: "\(pet.name) \(careLabel)")
-        let got = QuestManager.shared.awardAction(type: oat, pet: pet, context: modelContext)
+        let got = CareEventService.recordCare(pet: pet, type: type, context: modelContext, executorId: uid, reward: oat)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         showToast(pet, message: "\(pet.name) \(careLabel) +\(got.petGot + got.humanGot)🥥", emoji: type.emoji)
     }
@@ -1668,10 +1781,8 @@ private extension GoDashboardView {
     func applyPottyCheckIn(_ raw: String, pet: Pet) {
         let type = PottyType(rawValue: raw) ?? .perfectPoop
         let uid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        let log = PetPottyLog(date: Date(), type: type, pet: pet, executorId: uid)
-        modelContext.insert(log); modelContext.safeSave()
+        let got = CareEventService.recordPotty(pet: pet, type: type, context: modelContext, executorId: uid)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        let got = QuestManager.shared.awardAction(type: .potty(isLitter: false), pet: pet, context: modelContext)
         showToast(pet, message: l.homeToastPottyLine(petName: pet.name, type: type, points: got.petGot + got.humanGot), emoji: type.emoji)
     }
 
@@ -1698,16 +1809,15 @@ private extension GoDashboardView {
 
     @discardableResult
     func completePlannedFeedFromHome(pet: Pet) -> Bool {
-        guard let reminder = pendingFeedReminderForPlannedMode(pet: pet), let event = reminder.event else { return false }
-        let amount = Double(event.title.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) ?? pet.dailyPortionGrams
+        guard let reminder = pendingFeedReminderForPlannedMode(pet: pet) else { return false }
         let uid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        let note = "\(PetCareLog.plannedFeedNotePrefix)\(event.id.uuidString)"
-        let log = PetCareLog(date: Date(), type: .feeding, amountGrams: amount, note: note, pet: pet, executorId: uid)
-        modelContext.insert(log)
-        reminder.statusEnum = .completed; reminder.completedAt = Date()
-        modelContext.safeSave()
-        QuestManager.shared.recordFirstMeal()
-        let got = QuestManager.shared.awardAction(type: .feed, pet: pet, context: modelContext)
+        let got = CareEventService.completePlannedFeed(
+            pet: pet,
+            reminder: reminder,
+            context: modelContext,
+            quality: .precise,
+            executorId: uid
+        ) ?? (humanGot: 0, petGot: 0)
         showToast(pet, message: l.homeToastPlannedFeed(pet.name, points: got.petGot + got.humanGot), emoji: "🍗")
         return true
     }
@@ -1724,6 +1834,18 @@ private extension GoDashboardView {
                 if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) { applyAction("walk", pet: p) }
             case "q_potty":
                 if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) { applyAction("potty", pet: p) }
+            case let id where id.hasPrefix("q_play_"):
+                if let petId = quest.targetPetId, let p = pets.first(where: { $0.id == petId }) { applyAction("play", pet: p) }
+            case let id where id.hasPrefix("q_weight_"):
+                if let petId = quest.targetPetId, let p = pets.first(where: { $0.id == petId }) {
+                    quickWeightPet = p
+                    return
+                }
+            case let id where id.hasPrefix("q_moment_"):
+                if let petId = quest.targetPetId, let p = pets.first(where: { $0.id == petId }) {
+                    showMomentPet = p
+                    return
+                }
             case "q_water_plant":
                 if let id = quest.targetPlantId, let pl = plants.first(where: { $0.id == id }) { completePlantWatering(pl) }
             case "q_fertilize_plant":

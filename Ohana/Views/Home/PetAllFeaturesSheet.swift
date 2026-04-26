@@ -49,6 +49,7 @@ struct PetAllFeaturesSheet: View {
 
                     // ── Section 3: 档案与记忆 ──
                     Section {
+                        row(icon: "sparkles.rectangle.stack.fill", color: "C8FF00", title: "成长档案", subtitle: retentionSub) { path.append(FMDest.petRetention(pet.persistentModelID)) }
                         row(icon: "person.fill",       color: "6B82C4", title: "基本信息",  subtitle: pet.breed.isEmpty ? pet.species : pet.breed) { path.append(FMDest.petBasicInfo(pet.persistentModelID)) }
                         row(icon: "doc.fill",          color: "6B7280", title: "证件保障",  subtitle: "\(pet.documents.count)份证件")               { path.append(FMDest.petDocuments(pet.persistentModelID)) }
                         row(icon: "sparkles",          color: "C8FF00", title: "重要时刻",  subtitle: momentsSub)  { path.append(FMDest.petMoments(pet.persistentModelID)) }
@@ -63,7 +64,6 @@ struct PetAllFeaturesSheet: View {
             }
             .navigationTitle("\(pet.name) 的功能")
             .navigationBarTitleDisplayMode(.large)
-            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("完成") { dismiss() }
@@ -92,6 +92,7 @@ struct PetAllFeaturesSheet: View {
         case .petDocuments(_):     DocumentsListView(pet: pet)
         case .petMoments(_):       PetMomentsHubView(pet: pet)
         case .petAchievements(_):  AchievementWallView(pet: pet)
+        case .petRetention(_):     PetRetentionHubView(pet: pet)
         case .petWeight(_):        WeightHistoryView(pet: pet)
         case .petExpense(_):       ExpenseHistoryView(pet: pet)
         // The following FMDest cases are cross-entity / aggregate routes; they
@@ -105,6 +106,9 @@ struct PetAllFeaturesSheet: View {
             EmptyView()
         case .humanExpense(_):
             let _ = { assertionFailure("PetAllFeaturesSheet: humanExpense route is unreachable from single-pet sheet") }()
+            EmptyView()
+        case .plantsDashboard, .wealthDashboard, .bountyBoard, .familyWeeklyReport, .careLedgerAnalysis, .reminderObservability, .coconutShop, .gacha, .calendar:
+            let _ = { assertionFailure("PetAllFeaturesSheet: island-wide route is unreachable from single-pet sheet") }()
             EmptyView()
         }
     }
@@ -141,6 +145,16 @@ struct PetAllFeaturesSheet: View {
     }
     private var momentsSub: String {
         let n = pet.photoLogs.count; return n > 0 ? "\(n)个时刻" : "暂无时刻"
+    }
+    private var retentionSub: String {
+        let score = [
+            !pet.weightLogs.isEmpty || !pet.healthLogs.isEmpty,
+            !pet.photoLogs.isEmpty || !pet.milestones.isEmpty,
+            !pet.expenseLogs.isEmpty,
+            !pet.documents.isEmpty || !pet.insurances.isEmpty || !pet.medications.isEmpty,
+            pet.currentStreak > 0
+        ].filter { $0 }.count
+        return "长期模块 \(score)/5"
     }
 
     // MARK: - Row / Header Builders

@@ -31,8 +31,6 @@ struct QuickFeedDetailSheet: View {
     @State private var newScheduleTime = Date()
     @State private var newScheduleAmount = ""
     @State private var showAddSchedule = false
-    @State private var newScheduleTitle = "早餐"
-    @State private var newScheduleGrams = ""
 
     // Stock tracking mode
     @State private var selectedStockMode: FoodTrackingMode = .casual
@@ -41,6 +39,7 @@ struct QuickFeedDetailSheet: View {
     private let durationOptions: [(String, Int)] = [
         ("1个月", 30), ("2个月", 60), ("3个月", 90), ("半年", 180)
     ]
+    private let foodReminderAdvanceOptions: [Int] = [1, 3, 7, 14]
 
     // MARK: - State: Anti-repeat check
     @State private var showingAntiRepeatAlert = false
@@ -57,6 +56,7 @@ struct QuickFeedDetailSheet: View {
     @State private var dailyGramsInput: String = ""
     @State private var stockPriceInput: String = ""
     @State private var stockPayerId: String = ""
+    @State private var showingFoodUsageRecords = false
 
     // Calculator
     @State private var showingCalculator = false
@@ -73,8 +73,8 @@ struct QuickFeedDetailSheet: View {
     @AppStorage("defaultFeedGrams") private var defaultFeedGrams: Double = 0
 
     enum FeedMode: String, CaseIterable {
-        case manual = "手动记录"
-        case planned = "按计划"
+        case manual = "按手动餐数"
+        case planned = "按计划提醒"
     }
 
     private var themeColor: Color { Color(hex: pet.themeColorHex) }
@@ -147,7 +147,7 @@ struct QuickFeedDetailSheet: View {
                         petHeader
                         ExecutorPickerBar(tint: themeColor)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        feedModePicker
+                        feedCompletionModeSection
                         feedModeHint
                         if mode == .manual {
                             manualSection
@@ -265,6 +265,15 @@ struct QuickFeedDetailSheet: View {
     }
 
     // MARK: - Feed Mode Picker
+    private var feedCompletionModeSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("首页完成判定方式")
+                .font(.system(size: 13, weight: .black, design: .rounded))
+                .foregroundStyle(.secondary)
+            feedModePicker
+        }
+    }
+
     private var feedModePicker: some View {
         HStack(spacing: 0) {
             ForEach(FeedMode.allCases, id: \.rawValue) { m in
@@ -290,8 +299,8 @@ struct QuickFeedDetailSheet: View {
 
     private var feedModeHint: some View {
         Text(mode == .manual
-             ? "手动模式：圆环与「打卡喂食」只统计手动记录；首页喂食按钮按餐数目标打卡。"
-             : "计划模式：在下方计划行打卡；首页红点仅提示计划待办，点击会完成对应一餐。")
+             ? "手动记录和计划提醒可以同时存在；当前首页喂食完成态只按每日目标餐数判断。"
+             : "手动记录和计划提醒可以同时存在；当前首页喂食完成态只按今日计划提醒判断。")
             .font(.system(size: 11, weight: .medium, design: .rounded))
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -300,6 +309,14 @@ struct QuickFeedDetailSheet: View {
     // MARK: - Manual Mode
     private var manualSection: some View {
         VStack(spacing: 16) {
+            if !feedScheduleEvents.isEmpty {
+                feedModeSideNote(
+                    icon: "bell.badge",
+                    title: "已保留 \(feedScheduleEvents.count) 个喂食计划",
+                    message: "这些计划仍会按时提醒，但不会影响手动模式下的首页完成状态。"
+                )
+            }
+
             VStack(spacing: 10) {
                 ZStack {
                     Circle()
@@ -385,13 +402,64 @@ struct QuickFeedDetailSheet: View {
         return Double(digits) ?? 0
     }
 
+    private func mealName(for date: Date) -> String {
+        let hour = Calendar.current.component(.hour, from: date)
+        switch hour {
+        case 5..<10: return "早餐"
+        case 10..<14: return "午餐"
+        case 14..<17: return "下午餐"
+        case 17..<21: return "晚餐"
+        default: return "夜宵"
+        }
+    }
+
+    private func scheduleDisplayTitle(for event: Event) -> String {
+        let grams = parseScheduleGrams(from: event)
+        let name = mealName(for: event.startDate)
+        return grams > 0 ? "\(name) \(Int(grams))g" : name
+    }
+
     private var plannedSchedulesDailyTotalGrams: Double {
         feedScheduleEvents.reduce(0) { $0 + parseScheduleGrams(from: $1) }
+    }
+
+    private var currentFoodRunOutDate: Date? {
+        selectedStockMode == .casual ? pet.casualEstimatedRunOutDate : pet.estimatedRunOutDate
+    }
+
+    private var hasSavedCasualStockInfo: Bool {
+        pet.foodTrackingMode == .casual && pet.casualOpenDate != nil && pet.casualDurationDays > 0
+    }
+
+    private var sortedFoodRecords: [PetFoodRecord] {
+        pet.foodRecords.sorted { $0.startDate > $1.startDate }
+    }
+
+    private var foodStockReminderEvents: [Event] {
+        allEvents.filter {
+            $0.relatedEntityType == "pet_food_stock" &&
+            $0.relatedEntityId == pet.id.uuidString
+        }
+    }
+
+    private var currentFoodReminderDate: Date? {
+        guard pet.foodReminderEnabled,
+              let runOut = currentFoodRunOutDate else { return nil }
+        let raw = Calendar.current.date(byAdding: .day, value: -pet.foodReminderAdvanceDays, to: runOut) ?? runOut
+        return Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: raw) ?? raw
     }
 
     // MARK: - Planned Mode
     private var plannedSection: some View {
         VStack(alignment: .leading, spacing: 14) {
+            if !manualTodayFeedLogs.isEmpty {
+                feedModeSideNote(
+                    icon: "fork.knife.circle",
+                    title: "今日已有 \(manualTodayFeedLogs.count) 条手动记录",
+                    message: "手动记录会保留为加餐或补记，但不会自动完成计划提醒。"
+                )
+            }
+
             HStack {
                 Text("喂食计划")
                     .font(.system(size: 15, weight: .black, design: .rounded))
@@ -439,12 +507,33 @@ struct QuickFeedDetailSheet: View {
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
+    private func feedModeSideNote(icon: String, title: String, message: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(themeColor)
+                .frame(width: 20, height: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary.opacity(0.75))
+                Text(message)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(themeColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
     private func scheduleRow(_ event: Event) -> some View {
         let todayReminders = event.reminders.filter { Calendar.current.isDateInToday($0.scheduledAt) }
         let isDone = todayReminders.contains { $0.isCompleted }
         return HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(event.title)
+                Text(scheduleDisplayTitle(for: event))
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(isDone ? .secondary : .primary)
                     .strikethrough(isDone)
@@ -544,10 +633,11 @@ struct QuickFeedDetailSheet: View {
             .onChange(of: selectedStockMode) { _, newMode in
                 pet.foodTrackingMode = newMode
                 modelContext.safeSave()
+                rebuildFoodStockReminder()
             }
             Text(selectedStockMode == .casual
-                 ? "只记录大概吃多久，喂食打卡不扣克数 🐾"
-                 : "精确追踪库存克数，动态计算剩余天数 📊")
+                 ? "忽略每日喂食量，用开包日期和预估时长计算断粮日 🐾"
+                 : "按实际喂食克数扣减库存，实时计算剩余天数 📊")
                 .font(.system(size: 11, weight: .medium, design: .rounded))
                 .foregroundStyle(.primary.opacity(0.35))
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -575,6 +665,7 @@ struct QuickFeedDetailSheet: View {
                     .onChange(of: casualOpenDate) { _, d in
                         pet.casualOpenDate = d
                         modelContext.safeSave()
+                        rebuildFoodStockReminder()
                     }
             }
 
@@ -589,6 +680,7 @@ struct QuickFeedDetailSheet: View {
                                 casualDurationDays = days
                                 pet.casualDurationDays = days
                                 modelContext.safeSave()
+                                rebuildFoodStockReminder()
                             } label: {
                                 Text(label)
                                     .font(.system(size: 13, weight: .bold, design: .rounded))
@@ -602,6 +694,14 @@ struct QuickFeedDetailSheet: View {
                     }
                 }
             }
+
+            GoDashedDivider()
+            if hasSavedCasualStockInfo {
+                casualStockSummary
+            }
+            stockEditForm(includeDailyPortion: false)
+            foodReminderSection
+            foodUsageRecordSection
 
             GoDashedDivider()
             if let runOut = pet.casualEstimatedRunOutDate {
@@ -651,16 +751,38 @@ struct QuickFeedDetailSheet: View {
             }
 
             if editingStock {
-                stockEditForm
+                stockEditForm(includeDailyPortion: true)
             } else {
                 stockReadOnlyView
             }
+            foodReminderSection
+            foodUsageRecordSection
         }
         .padding(16)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
-    private var stockEditForm: some View {
+    private var casualStockSummary: some View {
+        HStack(spacing: 0) {
+            stockStatCell(
+                label: "开包日期",
+                value: pet.casualOpenDate.map { $0.formatted(.dateTime.month().day()) } ?? "--",
+                accent: themeColor
+            )
+            Divider().frame(height: 40)
+            stockStatCell(label: "预估时长", value: "\(pet.casualDurationDays)天", accent: .goYellow)
+            Divider().frame(height: 40)
+            stockStatCell(
+                label: "品牌",
+                value: pet.foodBrand.isEmpty ? "未设置" : pet.foodBrand,
+                accent: .goOrange
+            )
+        }
+        .padding(.vertical, 10)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func stockEditForm(includeDailyPortion: Bool) -> some View {
         VStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("粮食品牌")
@@ -685,7 +807,9 @@ struct QuickFeedDetailSheet: View {
             }
 
             stockInputRow(icon: "scalemass.fill", label: "规格(kg)", color: .goTeal, placeholder: pet.restockWeight > 0 ? String(format: "%.1f", pet.restockWeight) : "10.0", text: $stockKgInput)
-            stockInputRow(icon: "fork.knife", label: "每日份量(g)", color: .goYellow, placeholder: pet.dailyPortionGrams > 0 ? String(format: "%.0f", pet.dailyPortionGrams) : "200", text: $dailyGramsInput)
+            if includeDailyPortion {
+                stockInputRow(icon: "fork.knife", label: "每日份量(g)", color: .goYellow, placeholder: pet.dailyPortionGrams > 0 ? String(format: "%.0f", pet.dailyPortionGrams) : "200", text: $dailyGramsInput)
+            }
             stockInputRow(icon: "yensign.circle.fill", label: "购买价格(¥)", color: themeColor, placeholder: "选填", text: $stockPriceInput)
 
             if !stockPriceInput.isEmpty, let _ = Double(stockPriceInput.replacingOccurrences(of: ",", with: ".")) {
@@ -714,7 +838,7 @@ struct QuickFeedDetailSheet: View {
                 }
             }
             Button { saveStock() } label: {
-                Text("保存库存信息")
+                Text(includeDailyPortion ? "保存库存信息" : (hasSavedCasualStockInfo ? "更新开包信息" : "保存开包信息"))
                     .font(.system(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity).padding(.vertical, 12)
@@ -732,7 +856,7 @@ struct QuickFeedDetailSheet: View {
                 stockStatCell(label: "剩余天数", value: pet.remainingFoodDays > 0 ? "\(pet.remainingFoodDays)天" : "--",
                               accent: pet.remainingFoodDays <= 7 && pet.remainingFoodDays > 0 ? .goRed : .primary)
                 Divider().frame(height: 40)
-                stockStatCell(label: "每日份量", value: pet.dailyPortionGrams > 0 ? "\(Int(pet.dailyPortionGrams))g" : "--", accent: .goYellow)
+                stockStatCell(label: "实际消耗", value: pet.foodConsumedSinceRestock > 0 ? "\(Int(pet.foodConsumedSinceRestock))g" : "--", accent: .goYellow)
             }
             .padding(.vertical, 10)
             .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -749,12 +873,156 @@ struct QuickFeedDetailSheet: View {
                                 .foregroundStyle(pet.remainingFoodDays <= 7 ? Color.goRed : .primary.opacity(0.4))
                         }
                     }
+                    if pet.dailyPortionGrams > 0 {
+                        Text("剩余天数按当前每日份量 \(Int(pet.dailyPortionGrams))g 估算；库存扣减按实际喂食记录计算。")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                     ProgressView(value: pet.remainingFoodPercent)
                         .tint(pet.remainingFoodDays <= 7 ? Color.goRed : Color.goTeal)
                         .scaleEffect(y: 1.4)
                 }
             }
         }
+    }
+
+    private var foodReminderSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Toggle(isOn: Binding(
+                get: { pet.foodReminderEnabled },
+                set: { enabled in
+                    pet.foodReminderEnabled = enabled
+                    modelContext.safeSave()
+                    rebuildFoodStockReminder()
+                }
+            )) {
+                Label("断粮提醒", systemImage: "bell.badge.fill")
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+            }
+            .tint(themeColor)
+
+            if pet.foodReminderEnabled {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(foodReminderAdvanceOptions, id: \.self) { days in
+                            Button {
+                                pet.foodReminderAdvanceDays = days
+                                modelContext.safeSave()
+                                rebuildFoodStockReminder()
+                            } label: {
+                                Text("提前 \(days) 天")
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .foregroundStyle(pet.foodReminderAdvanceDays == days ? Color.arkInk : .primary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 7)
+                                    .background(pet.foodReminderAdvanceDays == days ? themeColor : .clear, in: Capsule())
+                                    .glassEffect(pet.foodReminderAdvanceDays == days ? .regular.tint(themeColor.opacity(0.2)) : .regular, in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                if let date = currentFoodReminderDate {
+                    Text(date > Date()
+                         ? "将在 \(date, format: .dateTime.month().day().hour().minute()) 提醒补粮"
+                         : "提醒日期已过，请调整开包信息或提前天数")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(date > Date() ? .secondary : Color.goRed)
+                } else {
+                    Text("设置断粮日期后才能创建提醒")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(12)
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private var foodUsageRecordSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                    showingFoodUsageRecords.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Label("用粮记录", systemImage: "clock.arrow.circlepath")
+                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Text(sortedFoodRecords.isEmpty ? "暂无" : "\(sortedFoodRecords.count)条")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                    Image(systemName: showingFoodUsageRecords ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+
+            if let latest = sortedFoodRecords.first, !showingFoodUsageRecords {
+                foodUsageRecordRow(latest, isLatest: true)
+                    .transition(.opacity)
+            }
+
+            if showingFoodUsageRecords {
+                if sortedFoodRecords.isEmpty {
+                    Text("保存一次开包或库存信息后，这里会显示所有历史用粮记录。")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 4)
+                } else {
+                    VStack(spacing: 8) {
+                        ForEach(sortedFoodRecords) { record in
+                            foodUsageRecordRow(record, isLatest: record.id == sortedFoodRecords.first?.id)
+                        }
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+            }
+        }
+        .padding(12)
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func foodUsageRecordRow(_ record: PetFoodRecord, isLatest: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 8) {
+                Text(record.brand.isEmpty ? "未命名粮食" : record.brand)
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                if isLatest {
+                    Text("当前")
+                        .font(.system(size: 9, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.arkInk)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(themeColor, in: Capsule())
+                }
+                Spacer()
+                Text(record.startDate, format: .dateTime.year().month().day())
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+            HStack(spacing: 8) {
+                if record.dailyGrams > 0 {
+                    Label("\(Int(record.dailyGrams))g/天", systemImage: "fork.knife")
+                }
+                if !record.notes.isEmpty {
+                    Text(record.notes)
+                        .lineLimit(1)
+                }
+            }
+            .font(.system(size: 10, weight: .medium, design: .rounded))
+            .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 6)
     }
 
     // MARK: - Calculator
@@ -897,6 +1165,7 @@ struct QuickFeedDetailSheet: View {
                         Button {
                             modelContext.delete(log)
                             modelContext.safeSave()
+                            rebuildFoodStockReminder()
                         } label: {
                             Image(systemName: "trash")
                                 .font(.system(size: 11))
@@ -1010,18 +1279,14 @@ struct QuickFeedDetailSheet: View {
         )
 
         let performFeed = {
-            let log = PetCareLog(
-                date: Date(),
-                type: .feeding,
-                amountGrams: grams,
-                note: PetCareLog.manualFeedNoteMarker,
+            _ = CareEventService.recordManualFeed(
                 pet: self.pet,
-                executorId: currentUserId
+                amountGrams: grams,
+                context: self.modelContext,
+                executorId: currentUserId,
+                quality: quality
             )
-            self.modelContext.insert(log)
-            self.modelContext.safeSave()
-            QuestManager.shared.recordFirstMeal()
-            _ = QuestManager.shared.awardAction(type: .feed, pet: self.pet, context: self.modelContext, quality: quality)
+            self.rebuildFoodStockReminder()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             self.checkOverdoseManualTotal()
         }
@@ -1041,23 +1306,16 @@ struct QuickFeedDetailSheet: View {
         // 按计划喂食 = 完整精准模式
         let quality = QuestManager.QualityBonus.precise
         let performFeed = {
-            let log = PetCareLog(
-                date: Date(),
-                type: .feeding,
-                amountGrams: self.parseScheduleGrams(from: event),
-                note: "\(PetCareLog.plannedFeedNotePrefix)\(event.id.uuidString)",
+            guard let reminder = event.reminders.first(where: { Calendar.current.isDateInToday($0.scheduledAt) && $0.isPending })
+                    ?? event.reminders.first(where: { Calendar.current.isDateInToday($0.scheduledAt) }) else { return }
+            _ = CareEventService.completePlannedFeed(
                 pet: self.pet,
+                reminder: reminder,
+                context: self.modelContext,
+                quality: quality,
                 executorId: currentUserId
             )
-            self.modelContext.insert(log)
-            
-            for reminder in event.reminders where Calendar.current.isDateInToday(reminder.scheduledAt) {
-                reminder.statusEnum = .completed
-                NotificationManager.shared.cancel(notificationId: reminder.notificationId)
-            }
-            self.modelContext.safeSave()
-            QuestManager.shared.recordFirstMeal()
-            _ = QuestManager.shared.awardAction(type: .feed, pet: self.pet, context: self.modelContext, quality: quality)
+            self.rebuildFoodStockReminder()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             self.checkOverdoseManualTotal()
         }
@@ -1073,7 +1331,8 @@ struct QuickFeedDetailSheet: View {
     }
 
     private func saveSchedule() {
-        let title = newScheduleGrams.isEmpty ? newScheduleTitle : "\(newScheduleTitle) \(newScheduleGrams)g"
+        let amount = newScheduleAmount.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = amount.isEmpty ? mealName(for: newScheduleTime) : "\(mealName(for: newScheduleTime)) \(amount)g"
         let event = Event(
             title: title, startDate: newScheduleTime,
             eventType: EventType.foodChange.rawValue,
@@ -1085,18 +1344,58 @@ struct QuickFeedDetailSheet: View {
         let reminder = Reminder(event: event, scheduledAt: newScheduleTime)
         modelContext.insert(reminder)
         modelContext.safeSave()
-        NotificationManager.shared.schedule(reminder: reminder)
+        Task { @MainActor in
+            await ReminderSchedulingService.scheduleIfNeeded(reminder: reminder, context: modelContext, source: .detail)
+        }
         showAddSchedule = false
         newScheduleAmount = ""
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
+    private func rebuildFoodStockReminder() {
+        for event in foodStockReminderEvents {
+            for reminder in event.reminders {
+                NotificationManager.shared.cancel(notificationId: reminder.notificationId)
+                modelContext.delete(reminder)
+            }
+            modelContext.delete(event)
+        }
+
+        guard pet.foodReminderEnabled,
+              let reminderDate = currentFoodReminderDate,
+              reminderDate > Date() else {
+            modelContext.safeSave()
+            return
+        }
+
+        let event = Event(
+            title: "\(pet.name) 快要断粮了，记得补充粮仓",
+            startDate: reminderDate,
+            isAllDay: false,
+            eventType: EventType.shoppingList.rawValue,
+            relatedEntityType: "pet_food_stock",
+            relatedEntityId: pet.id.uuidString
+        )
+        modelContext.insert(event)
+        let reminder = Reminder(event: event, scheduledAt: reminderDate)
+        modelContext.insert(reminder)
+        modelContext.safeSave()
+        Task { @MainActor in
+            await ReminderSchedulingService.scheduleIfNeeded(reminder: reminder, context: modelContext, source: .detail)
+        }
+    }
+
     private func saveStock() {
         let finalBrand = selectedBrand == "自定义品牌" ? customBrandInput : selectedBrand
+        pet.foodTrackingMode = selectedStockMode
+        if selectedStockMode == .casual {
+            pet.casualOpenDate = casualOpenDate
+            pet.casualDurationDays = casualDurationDays
+        }
         if !finalBrand.isEmpty { pet.foodBrand = finalBrand }
         if let kg = Double(stockKgInput.replacingOccurrences(of: ",", with: ".")) { pet.restockWeight = kg }
         if let g = Double(dailyGramsInput.replacingOccurrences(of: ",", with: ".")) { pet.dailyPortionGrams = g }
-        pet.restockDate = Date()
+        pet.restockDate = selectedStockMode == .casual ? casualOpenDate : Date()
         if let price = Double(stockPriceInput.replacingOccurrences(of: ",", with: ".")), price > 0 {
             let payerId = stockPayerId.isEmpty
                 ? UserDefaults.standard.string(forKey: "currentActiveHumanId")
@@ -1108,13 +1407,38 @@ struct QuickFeedDetailSheet: View {
             )
             modelContext.insert(expenseLog)
         }
+        insertFoodUsageRecord(brand: finalBrand)
         modelContext.safeSave()
+        rebuildFoodStockReminder()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        stockKgInput = ""
-        dailyGramsInput = ""
         stockPriceInput = ""
         stockPayerId = ""
         withAnimation { editingStock = false }
+    }
+
+    private func insertFoodUsageRecord(brand: String) {
+        let dailyGrams = selectedStockMode == .precise
+            ? (Double(dailyGramsInput.replacingOccurrences(of: ",", with: ".")) ?? pet.dailyPortionGrams)
+            : 0
+        let startDate = selectedStockMode == .casual ? casualOpenDate : (pet.restockDate ?? Date())
+        let record = PetFoodRecord(
+            brand: brand.isEmpty ? pet.foodBrand : brand,
+            dailyGrams: dailyGrams,
+            startDate: startDate,
+            pet: pet,
+            executorId: stockPayerId.isEmpty ? UserDefaults.standard.string(forKey: "currentActiveHumanId") : stockPayerId
+        )
+
+        var noteParts: [String] = []
+        noteParts.append(selectedStockMode == .casual ? "估算 \(casualDurationDays)天" : "精准倒数")
+        if let kg = Double(stockKgInput.replacingOccurrences(of: ",", with: ".")), kg > 0 {
+            noteParts.append(String(format: "%.1fkg", kg))
+        }
+        if let price = Double(stockPriceInput.replacingOccurrences(of: ",", with: ".")), price > 0 {
+            noteParts.append(String(format: "¥%.0f", price))
+        }
+        record.notes = noteParts.joined(separator: " · ")
+        modelContext.insert(record)
     }
 
     /// 在插入并 save 后调用：只统计今日手动记录克数

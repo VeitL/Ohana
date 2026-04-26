@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftData
 import UserNotifications
 
 // MARK: - 今日服药进度追踪 Key
@@ -80,7 +81,7 @@ final class MedicationReminderService {
 
     // MARK: - 调度单个宠物的用药通知（覆盖替换）
 
-    func scheduleMedicationReminders(for pet: Pet) {
+    func scheduleMedicationReminders(for pet: Pet, context: ModelContext? = nil) {
         let meds = pet.medications.filter { $0.isActiveToday }
 
         // 先移除该宠物旧的用药通知
@@ -93,14 +94,14 @@ final class MedicationReminderService {
 
             // 重新调度
             for med in meds {
-                self.scheduleRemindersForMedication(med, pet: pet)
+                self.scheduleRemindersForMedication(med, pet: pet, context: context)
             }
         }
     }
 
     // MARK: - 调度单个药物的通知（未来14天窗口）
 
-    private func scheduleRemindersForMedication(_ med: PetMedication, pet: Pet) {
+    private func scheduleRemindersForMedication(_ med: PetMedication, pet: Pet, context: ModelContext?) {
         let dosesPerDay = med.frequency.dosesPerDay
         guard dosesPerDay > 0 else { return } // asNeeded / custom 不推送
 
@@ -148,19 +149,33 @@ final class MedicationReminderService {
                 let identifier = "medreminder_\(pet.id.uuidString)_\(med.id.uuidString)_d\(day)_i\(doseIdx)"
                 let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
 
-                center.add(request) { _ in }
+                let petId = pet.id.uuidString
+                let medicationId = med.id.uuidString
+                let medicationName = med.name
+                let metadata = "{\"notificationId\":\"\(identifier)\",\"scheduledAt\":\(fireDate.timeIntervalSince1970)}"
+                center.add(request) { error in
+                    self.recordMedicationScheduleResult(
+                        context: context,
+                        subjectKind: .pet,
+                        subjectId: petId,
+                        medicationId: medicationId,
+                        medicationName: medicationName,
+                        actionType: error == nil ? "medicationScheduleSuccess" : "medicationScheduleFailed",
+                        metadataJSON: error.map { "{\"notificationId\":\"\(identifier)\",\"error\":\"\($0.localizedDescription.replacingOccurrences(of: "\"", with: "\\\""))\"}" } ?? metadata
+                    )
+                }
                 scheduled += 1
                 if scheduled >= maxNotifications { break outerLoop }
             }
         }
 
         // 疗程结束前3天提醒
-        scheduleEndReminder(for: med, pet: pet)
+        scheduleEndReminder(for: med, pet: pet, context: context)
     }
 
     // MARK: - 疗程结束前3天提醒
 
-    private func scheduleEndReminder(for med: PetMedication, pet: Pet) {
+    private func scheduleEndReminder(for med: PetMedication, pet: Pet, context: ModelContext?) {
         guard let endDate = med.endDate else { return }
         guard let alertDate = Calendar.current.date(byAdding: .day, value: -3, to: endDate) else { return }
         guard alertDate > Date() else { return }
@@ -174,7 +189,20 @@ final class MedicationReminderService {
         let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
         let identifier = "medend_\(pet.id.uuidString)_\(med.id.uuidString)"
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
-        center.add(request) { _ in }
+        let petId = pet.id.uuidString
+        let medicationId = med.id.uuidString
+        let medicationName = med.name
+        center.add(request) { error in
+            self.recordMedicationScheduleResult(
+                context: context,
+                subjectKind: .pet,
+                subjectId: petId,
+                medicationId: medicationId,
+                medicationName: medicationName,
+                actionType: error == nil ? "medicationEndScheduleSuccess" : "medicationEndScheduleFailed",
+                metadataJSON: error.map { "{\"notificationId\":\"\(identifier)\",\"error\":\"\($0.localizedDescription.replacingOccurrences(of: "\"", with: "\\\""))\"}" } ?? "{\"notificationId\":\"\(identifier)\",\"scheduledAt\":\(alertDate.timeIntervalSince1970)}"
+            )
+        }
     }
 
     // MARK: - 取消某只宠物所有用药通知
@@ -189,7 +217,7 @@ final class MedicationReminderService {
 
     // MARK: - 调度单个人的用药通知
 
-    func scheduleHumanMedicationReminders(for human: Human, meds: [HumanMedication]) {
+    func scheduleHumanMedicationReminders(for human: Human, meds: [HumanMedication], context: ModelContext? = nil) {
         let activeMeds = meds.filter { $0.isActiveToday }
 
         let prefix = "humanmedreminder_\(human.id.uuidString)"
@@ -200,12 +228,12 @@ final class MedicationReminderService {
             self.center.removePendingNotificationRequests(withIdentifiers: ids)
 
             for med in activeMeds {
-                self.scheduleRemindersForHumanMedication(med, human: human)
+                self.scheduleRemindersForHumanMedication(med, human: human, context: context)
             }
         }
     }
 
-    private func scheduleRemindersForHumanMedication(_ med: HumanMedication, human: Human) {
+    private func scheduleRemindersForHumanMedication(_ med: HumanMedication, human: Human, context: ModelContext?) {
         let dosesPerDay = med.frequency.dosesPerDay
         guard dosesPerDay > 0 else { return }
 
@@ -251,9 +279,50 @@ final class MedicationReminderService {
                 let identifier = "humanmedreminder_\(human.id.uuidString)_\(med.id.uuidString)_d\(day)_i\(doseIdx)"
                 let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
 
-                center.add(request) { _ in }
+                let humanId = human.id.uuidString
+                let medicationId = med.id.uuidString
+                let medicationName = med.name
+                center.add(request) { error in
+                    self.recordMedicationScheduleResult(
+                        context: context,
+                        subjectKind: .human,
+                        subjectId: humanId,
+                        medicationId: medicationId,
+                        medicationName: medicationName,
+                        actionType: error == nil ? "medicationScheduleSuccess" : "medicationScheduleFailed",
+                        metadataJSON: error.map { "{\"notificationId\":\"\(identifier)\",\"error\":\"\($0.localizedDescription.replacingOccurrences(of: "\"", with: "\\\""))\"}" } ?? "{\"notificationId\":\"\(identifier)\",\"scheduledAt\":\(fireDate.timeIntervalSince1970)}"
+                    )
+                }
                 scheduled += 1
                 if scheduled >= maxNotifications { break outerLoop }
+            }
+        }
+    }
+
+    nonisolated private func recordMedicationScheduleResult(
+        context: ModelContext?,
+        subjectKind: CareLedgerSubjectKind,
+        subjectId: String,
+        medicationId: String,
+        medicationName: String,
+        actionType: String,
+        metadataJSON: String
+    ) {
+        guard let context else { return }
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                _ = CareLedgerService.record(
+                    subjectKind: subjectKind,
+                    subjectId: subjectId,
+                    eventKind: .reminder,
+                    actionType: actionType,
+                    note: medicationName,
+                    source: .notification,
+                    legacyModelName: "MedicationReminder",
+                    legacyModelId: medicationId,
+                    metadataJSON: metadataJSON,
+                    context: context
+                )
             }
         }
     }

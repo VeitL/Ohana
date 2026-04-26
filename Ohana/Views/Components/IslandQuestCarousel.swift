@@ -242,7 +242,11 @@ private struct IslandQuestCarouselCard: View {
         case "q_fertilize_plant": return "施肥"
         case "q_visit": return "探望"
         case "q_reminder": return "提醒"
-        default: return "委托"
+        default:
+            if quest.id.hasPrefix("q_play_") { return "陪玩" }
+            if quest.id.hasPrefix("q_weight_") { return "体重" }
+            if quest.id.hasPrefix("q_moment_") { return "日常" }
+            return "委托"
         }
     }
 

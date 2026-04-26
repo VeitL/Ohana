@@ -25,6 +25,7 @@ enum CatCareAction: String, CaseIterable {
 struct CatCareStationCard: View {
     let pet: Pet
     @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Event.startDate, order: .reverse) private var allEvents: [Event]
     
     @State private var recentAction: CatCareAction?
     @State private var undoTimer: Timer?
@@ -179,8 +180,12 @@ struct CatCareStationCard: View {
     }
     
     private func todayCount(for action: CatCareAction) -> Int {
-        // 简化统计：通过事件标题匹配
-        return 0 // TODO: 通过 Event query 统计
+        allEvents.filter {
+            $0.relatedEntityId == pet.id.uuidString &&
+            $0.eventType == EventType.litterBox.rawValue &&
+            Calendar.current.isDateInToday($0.startDate) &&
+            $0.title.contains(action.rawValue)
+        }.count
     }
 }
 
