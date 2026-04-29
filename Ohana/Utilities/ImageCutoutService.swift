@@ -123,13 +123,56 @@ final class ImageCutoutService {
         return UIImage(cgImage: outputCG)
     }
 
-    // MARK: - FIX 3-C: 透明通道检测
-    /// 检测 Data 是否为含透明通道的 PNG（抠图结果）
-    static func isTransparentPNG(_ data: Data) -> Bool {
-        guard let image = UIImage(data: data),
-              let cgImage = image.cgImage else { return false }
+    // MARK: - FIX 3-C: 透明像素检测
+    /// 检测 Data 是否真的包含透明像素。普通相册 PNG 往往带 alpha 通道但全部不透明，
+    /// 不能把它误判成「粘贴主体」抠图。
+    nonisolated static func isTransparentPNG(_ data: Data) -> Bool {
+        guard let image = UIImage(data: data) else { return false }
+        return imageHasTransparentPixels(image)
+    }
+
+    nonisolated static func imageHasTransparentPixels(_ image: UIImage, alphaThreshold: UInt8 = 245) -> Bool {
+        guard let cgImage = image.cgImage else { return false }
         let alpha = cgImage.alphaInfo
-        return alpha != .none && alpha != .noneSkipFirst && alpha != .noneSkipLast
+        guard alpha != .none && alpha != .noneSkipFirst && alpha != .noneSkipLast else { return false }
+
+        let sourceW = cgImage.width
+        let sourceH = cgImage.height
+        guard sourceW > 0, sourceH > 0 else { return false }
+
+        let maxSampleDim = 160
+        let sampleScale = min(CGFloat(maxSampleDim) / CGFloat(max(sourceW, sourceH)), 1)
+        let sampleW = max(1, Int(CGFloat(sourceW) * sampleScale))
+        let sampleH = max(1, Int(CGFloat(sourceH) * sampleScale))
+        let bytesPerRow = sampleW * 4
+        let pixelBufferCount = sampleH * bytesPerRow
+        var pixels = [UInt8](repeating: 0, count: pixelBufferCount)
+
+        return pixels.withUnsafeMutableBytes { rawBuffer in
+            guard let baseAddress = rawBuffer.baseAddress,
+                  let context = CGContext(
+                    data: baseAddress,
+                    width: sampleW,
+                    height: sampleH,
+                    bitsPerComponent: 8,
+                    bytesPerRow: bytesPerRow,
+                    space: CGColorSpaceCreateDeviceRGB(),
+                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                  ) else {
+                return false
+            }
+
+            context.interpolationQuality = .low
+            context.clear(CGRect(x: 0, y: 0, width: sampleW, height: sampleH))
+            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: sampleW, height: sampleH))
+
+            for index in stride(from: 3, to: pixelBufferCount, by: 4) {
+                if rawBuffer[index] < alphaThreshold {
+                    return true
+                }
+            }
+            return false
+        }
     }
 }
 

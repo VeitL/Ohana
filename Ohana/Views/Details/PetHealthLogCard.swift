@@ -181,7 +181,7 @@ struct HealthLogListView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
                 .background(isSelected ? Color.goPrimary : .clear, in: Capsule())
-                .glassEffect(isSelected ? .regular.tint(Color.goPrimary.opacity(0.2)) : .regular, in: Capsule())
+                .goSelectableSurface(isSelected: isSelected, tint: Color.goPrimary, in: Capsule())
         }
         .buttonStyle(.plain)
     }

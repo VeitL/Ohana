@@ -3,6 +3,7 @@
 //  Ohana
 //
 //  U13: 人类体重记录页
+//  统一 chrome：隐私开关（leading）+ xmark 关闭（trailing）+ 底部 FAB
 
 import SwiftUI
 import SwiftData
@@ -10,9 +11,11 @@ import SwiftData
 struct HumanWeightHistoryView: View {
     let human: Human
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
     @State private var showAddSheet = false
+
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isPrivacyLocked: Bool { human.isPrivate(.weight, viewedBy: activeHumanId) }
 
@@ -35,18 +38,34 @@ struct HumanWeightHistoryView: View {
                     recordListLayer.frame(height: 320)
                 }
                 .ignoresSafeArea(edges: .bottom)
+
+                // ── 底部 FAB
+                Button { showAddSheet = true } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 16, weight: .black))
+                        Text("添加体重")
+                            .font(.system(size: 16, weight: .black, design: .rounded))
+                    }
+                    .foregroundStyle(Color.arkInk)
+                    .padding(.horizontal, 28).padding(.vertical, 14)
+                    .background(Color.goPrimary, in: Capsule())
+                    .shadow(color: Color.goPrimary.opacity(0.4), radius: 14, y: 5)
+                }
+                .padding(.bottom, 28)
             }
         }
         .navigationTitle("体重追踪")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if !isPrivacyLocked {
-                ToolbarItem(placement: .topBarTrailing) {
-                Button { showAddSheet = true } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(OhanaFont.title3(.bold))
-                        .foregroundStyle(Color.goPrimary)
-                }
+            ToolbarItem(placement: .topBarLeading) {
+                HumanPrivacyToggleButton(human: human, field: .weight)
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -148,7 +167,6 @@ struct HumanWeightHistoryView: View {
     // MARK: - Record List
     private var recordListLayer: some View {
         ZStack(alignment: .top) {
-            // 深色玻璃面板，兼容深/浅色模式
             RoundedRectangle(cornerRadius: 32, style: .continuous)
                 .fill(.ultraThinMaterial)
                 .ignoresSafeArea(edges: .bottom)
@@ -176,14 +194,14 @@ struct HumanWeightHistoryView: View {
                             weightRow(log: log)
                         }
                         if sortedLogs.isEmpty {
-                            Text("还没有体重记录\n点击右上角 + 开始记录")
+                            Text("还没有体重记录\n点击下方按钮开始记录")
                                 .font(OhanaFont.callout())
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
                                 .padding(.vertical, 40)
                         }
                     }
-                    .padding(.horizontal, 16).padding(.bottom, 40)
+                    .padding(.horizontal, 16).padding(.bottom, 100)
                 }
             }
         }
@@ -221,7 +239,6 @@ struct HumanWeightHistoryView: View {
         .padding(.horizontal, 16).padding(.vertical, 12)
         .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
-
 }
 
 // MARK: - Line Chart

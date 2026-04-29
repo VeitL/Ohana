@@ -15,7 +15,7 @@ import PhotosUI
 
 private enum HumanWizardStep: Int, CaseIterable {
     case identity = 0   // 名字 + 头像
-    case profile  = 1   // 性别 + 生日 + 血型
+    case profile  = 1   // 生日 + 血型
     case family   = 2   // 家庭角色 + 国籍
     case body     = 3   // 身高体重 + 隐私
     case confirm  = 4   // 主题色 + 权限 + 确认
@@ -37,7 +37,6 @@ struct AddHumanWizardView: View {
 
     // ── Identity
     @State private var name            = ""
-    @State private var avatarEmoji     = "😊"
     @State private var avatarImageData: Data? = nil
     @State private var photosPickerItem: PhotosPickerItem? = nil
     @State private var showingCamera   = false
@@ -86,17 +85,12 @@ struct AddHumanWizardView: View {
 
     private let totalCards = HumanWizardStep.allCases.count
 
-    private let emojiOptions: [String] = [
-        "😊","😎","🧑‍💻","👩‍🍳","🧑‍🎨","🐱","🐶","🦊","🐸","🦁",
-        "👤","👨","👩","🧑","👦","👧","👴","👵","🧔","👱‍♀️",
-        "👩‍🦰","🧑‍🦱","🧒","👨‍🦳","👩‍🦳","🧓","👨‍🦲","👩‍🦲","👱","🥷"
-    ]
     private let bloodTypes     = ["A", "B", "AB", "O"]
     private let mbtiOptions: [String] = [
         "INTJ", "INTP", "ENTJ", "ENTP", "INFJ", "INFP", "ENFJ", "ENFP",
         "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP"
     ]
-    private let genderOptions  = [("男", "♂️"), ("女", "♀️"), ("非二元", "⚧️")]
+    private let genderOptions  = [("男", "♂️"), ("女", "♀️")]
     private let familyRoleOptions = [
         "爸爸","妈妈","爷爷","奶奶","外公","外婆",
         "哥哥","姐姐","弟弟","妹妹","朋友","伴侣","自己"
@@ -111,8 +105,17 @@ struct AddHumanWizardView: View {
 
     private var accentColor: Color { Color(hex: themeColorHex) }
 
-    private var walletDraftCardHeight: CGFloat { (ScreenCompat.width - 48) / 1.586 }
+    /// 标准信用卡比例 1.586:1，左右各 7pt 边距（与首页 K.cardH / K.cardMargin 保持一致）
+    private var walletDraftCardHeight: CGFloat { (ScreenCompat.width - 7 * 2) / 1.586 }
     private let walletCardCorner: CGFloat = 24
+
+    private func fallbackAvatarEmoji(for gender: String) -> String {
+        switch gender {
+        case "男": return "👨"
+        case "女": return "👩"
+        default: return "👤"
+        }
+    }
 
     /// 顶卡脚注：关系 · 国籍 · 现居 · 年龄（仅「岁」，不含月；星座单独显示在卡上）
     private var draftWalletSubtitle: String {
@@ -210,7 +213,12 @@ struct AddHumanWizardView: View {
                         var tx = Transaction()
                         tx.disablesAnimations = true
                         withTransaction(tx) {
-                            if let cropped { avatarImageData = cropped.jpegData(compressionQuality: 0.92) }
+                            if let cropped {
+                                let hasAlpha = ImageCutoutService.imageHasTransparentPixels(cropped)
+                                avatarImageData = hasAlpha
+                                    ? cropped.pngData()
+                                    : cropped.jpegData(compressionQuality: 0.92)
+                            }
                             cropImageItem = nil
                             photosPickerItem = nil
                         }
@@ -249,7 +257,7 @@ struct AddHumanWizardView: View {
             stickyWalletHumanPreview
 
             pagedCards
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 7) // Match the wallet preview card width above.
                 .frame(maxHeight: .infinity)
 
             wizardPageDotRow
@@ -261,7 +269,7 @@ struct AddHumanWizardView: View {
     private var stickyWalletHumanPreview: some View {
         WalletHumanCardDraftFront(
             name: name,
-            avatarEmoji: avatarEmoji,
+            gender: gender,
             avatarImageData: avatarImageData,
             decodedAvatar: decodedAvatar,
             decodedAvatarTransparent: decodedAvatarTransparent,
@@ -272,11 +280,11 @@ struct AddHumanWizardView: View {
             cornerRadius: walletCardCorner
         )
         .frame(height: walletDraftCardHeight)
-        .padding(.horizontal, 24)
+        .padding(.horizontal, 7)   // 与首页卡片堆 K.cardMargin 保持一致
         .padding(.top, 8)
         .padding(.bottom, 6)
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: name)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: avatarEmoji)
+        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: gender)
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: avatarImageData?.count)
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: themeColorHex)
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: familyRole)
@@ -400,38 +408,40 @@ struct AddHumanWizardView: View {
 
                 Divider().opacity(0.15)
 
-                // Emoji grid
+                // Gender silhouette
                 VStack(alignment: .leading, spacing: 10) {
-                    cardSectionLabel(l.humanWizEmojiAvatar)
-                    LazyVGrid(
-                        columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6),
-                        spacing: 8
-                    ) {
-                        ForEach(emojiOptions, id: \.self) { emoji in
+                    cardSectionLabel(l.humanWizGenderLabel)
+                    HStack(spacing: 10) {
+                        ForEach(genderOptions, id: \.0) { opt in
                             Button {
-                                avatarEmoji = emoji
-                                avatarImageData = nil
+                                gender = gender == opt.0 ? "" : opt.0
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             } label: {
-                                Text(emoji)
-                                    .font(.system(size: 24))
-                                    .frame(width: 44, height: 44)
+                                VStack(spacing: 8) {
+                                    HumanSilhouetteView(gender: opt.0, accent: gender == opt.0 ? .arkInk : accentColor)
+                                        .frame(width: 42, height: 48)
+                                    Text(l.humanGenderDisplay(opt.0))
+                                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                                        .foregroundStyle(gender == opt.0 ? Color.arkInk : .primary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
                                     .background(
-                                        avatarEmoji == emoji && avatarImageData == nil
-                                            ? Color.goPrimary.opacity(0.22)
+                                        gender == opt.0
+                                            ? Color.goPrimary
                                             : Color.primary.opacity(0.07),
-                                        in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
                                     )
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
                                             .strokeBorder(
-                                                avatarEmoji == emoji && avatarImageData == nil
+                                                gender == opt.0
                                                     ? Color.goPrimary : .clear,
                                                 lineWidth: 1.5
                                             )
                                     )
-                                    .scaleEffect(avatarEmoji == emoji && avatarImageData == nil ? 1.06 : 1.0)
-                                    .animation(.spring(response: 0.2), value: avatarEmoji)
+                                    .scaleEffect(gender == opt.0 ? 0.97 : 1.0)
+                                    .animation(.spring(response: 0.25), value: gender)
                             }
                             .buttonStyle(.plain)
                         }
@@ -444,42 +454,12 @@ struct AddHumanWizardView: View {
         }
     }
 
-    // MARK: - Card 2: Profile (Gender + Birthday + Blood type)
+    // MARK: - Card 2: Profile (Birthday + Blood type)
 
     private var card2Profile: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 22) {
                 meshCardLabel(l.humanWizMesh2).padding(.top, 14).padding(.horizontal, 20)
-
-                // Gender
-                VStack(alignment: .leading, spacing: 10) {
-                    cardSectionLabel(l.humanWizGenderLabel)
-                    HStack(spacing: 10) {
-                        ForEach(genderOptions, id: \.0) { opt in
-                            Button {
-                                gender = gender == opt.0 ? "" : opt.0
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            } label: {
-                                VStack(spacing: 6) {
-                                    Text(opt.1).font(.system(size: 24))
-                                    Text(l.humanGenderDisplay(opt.0))
-                                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                                        .foregroundStyle(gender == opt.0 ? Color.arkInk : .primary)
-                                }
-                                .frame(maxWidth: .infinity).padding(.vertical, 14)
-                                .background(
-                                    gender == opt.0 ? Color.goPrimary : Color.primary.opacity(0.08),
-                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                )
-                                .scaleEffect(gender == opt.0 ? 0.96 : 1.0)
-                                .animation(.spring(response: 0.25), value: gender)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-
-                Divider().opacity(0.15)
 
                 // Birthday（滚轮在 Sheet 内，需点「完成」确认）
                 VStack(alignment: .leading, spacing: 10) {
@@ -1145,7 +1125,7 @@ struct AddHumanWizardView: View {
             name: trimmed,
             birthday: hasBirthday ? birthday : nil,
             bloodType: bloodType,
-            avatarEmoji: avatarEmoji,
+            avatarEmoji: fallbackAvatarEmoji(for: gender),
             role: role
         )
         var parts: [String] = []
@@ -1178,7 +1158,9 @@ struct AddHumanWizardView: View {
         modelContext.insert(human)
 
         if let w = Double(weightText), w > 0 {
-            modelContext.insert(HumanWeightLog(date: Date(), weight: w, human: human))
+            let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+                .flatMap { $0.isEmpty ? nil : $0 }
+            modelContext.insert(HumanWeightLog(date: Date(), weight: w, human: human, executorId: executorId))
         }
         if hasBirthday {
             let l10 = L10n.current

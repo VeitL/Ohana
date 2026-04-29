@@ -14,6 +14,10 @@ struct HomeFamilyCollaborationCard: View {
     var onOpenActivity: () -> Void
     var onOpenWeeklyReport: () -> Void
 
+    private var shouldShowFamilyCollaboration: Bool {
+        humans.count > 1
+    }
+
     private var assignedReminders: [Reminder] {
         let petId = pet.id.uuidString
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date())) ?? Date()
@@ -30,16 +34,18 @@ struct HomeFamilyCollaborationCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            header
-                .padding(.horizontal, 18)
-                .padding(.top, 14)
-                .padding(.bottom, 4)
+        if shouldShowFamilyCollaboration {
+            VStack(alignment: .leading, spacing: 0) {
+                header
+                    .padding(.horizontal, 18)
+                    .padding(.top, 14)
+                    .padding(.bottom, 4)
 
-            card
-                .padding(.horizontal, 16)
-                .padding(.top, 2)
-                .padding(.bottom, 16)
+                card
+                    .padding(.horizontal, 16)
+                    .padding(.top, 2)
+                    .padding(.bottom, 16)
+            }
         }
     }
 

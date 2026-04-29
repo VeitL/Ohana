@@ -189,7 +189,7 @@ struct QuickPottyDetailSheet: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                     .buttonStyle(.plain)
                 }
@@ -251,7 +251,7 @@ struct QuickPottyDetailSheet: View {
                 }
             }
             .padding(14)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
     }
 

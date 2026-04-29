@@ -17,7 +17,7 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if hasOnboarded && !currentActiveHumanId.isEmpty {
+            if hasOnboarded {
                 ContentView()
             } else {
                 OnboardingView()

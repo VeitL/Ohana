@@ -82,7 +82,7 @@ struct QuickWeightSheet: View {
                 .padding(.horizontal, 32)
                 .padding(.vertical, 28)
                 .frame(maxWidth: .infinity)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .goGlassBackground(RoundedRectangle(cornerRadius: 28, style: .continuous))
                 .padding(.horizontal, 20)
 
                 // ── 上次体重提示
@@ -114,7 +114,7 @@ struct QuickWeightSheet: View {
                         .tint(themeColor)
                 }
                 .padding(.horizontal, 16).padding(.vertical, 12)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .padding(.horizontal, 20)
 
                 // ── 保存按钮
@@ -146,7 +146,9 @@ struct QuickWeightSheet: View {
 
     private func saveWeight() {
         guard let v = Double(safeWeightText), v > 0 else { return }
-        let log = PetWeightLog(date: recordDate, weight: v, pet: pet)
+        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            .flatMap { $0.isEmpty ? nil : $0 }
+        let log = PetWeightLog(date: recordDate, weight: v, pet: pet, executorId: executorId)
         modelContext.insert(log)
         modelContext.safeSave()
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()

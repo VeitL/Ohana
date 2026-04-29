@@ -316,6 +316,6 @@ struct WeeklyReportCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }

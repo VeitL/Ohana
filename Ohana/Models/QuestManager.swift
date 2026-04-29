@@ -645,12 +645,15 @@ final class QuestManager {
         default:      careTypeEnum = nil
         }
 
+        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            .flatMap { $0.isEmpty ? nil : $0 }
+
         for pet in livePets {
             if let ct = careTypeEnum {
-                let log = PetCareLog(type: ct, pet: pet)
+                let log = PetCareLog(type: ct, pet: pet, executorId: executorId)
                 context.insert(log)
             } else if case .potty = type {
-                let log = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet)
+                let log = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet, executorId: executorId)
                 context.insert(log)
             }
             // 更新宠物椰子账户

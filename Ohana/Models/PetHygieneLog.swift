@@ -83,12 +83,14 @@ final class PetHygieneLog {
     var id: UUID
     var date: Date
     var type: String
+    var executorId: String? // ArkSchemaV38: 执行该记录的 Human.id.uuidString
     var pet: Pet?
     
-    init(date: Date = Date(), type: HygieneType = .bath, pet: Pet? = nil) {
+    init(date: Date = Date(), type: HygieneType = .bath, pet: Pet? = nil, executorId: String? = nil) {
         self.id = UUID()
         self.date = date
         self.type = type.rawValue
+        self.executorId = executorId
         self.pet = pet
     }
     

@@ -55,9 +55,10 @@ final class PetHealthLog {
     var cost: Double
     var expirationDate: Date?
     var nextCheckupDate: Date?  // 下次体检提醒日期（仅体检记录使用）
+    var executorId: String?     // ArkSchemaV38: 执行该记录的 Human.id.uuidString
     var pet: Pet?
     
-    init(date: Date = Date(), type: HealthLogType = .general, note: String = "", pet: Pet? = nil) {
+    init(date: Date = Date(), type: HealthLogType = .general, note: String = "", pet: Pet? = nil, executorId: String? = nil) {
         self.id = UUID()
         self.date = date
         self.type = type.rawValue
@@ -66,6 +67,7 @@ final class PetHealthLog {
         self.cost = 0
         self.expirationDate = nil
         self.nextCheckupDate = nil
+        self.executorId = executorId
         self.pet = pet
     }
     

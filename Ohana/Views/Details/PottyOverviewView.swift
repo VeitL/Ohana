@@ -139,7 +139,7 @@ struct PottyOverviewView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                     .buttonStyle(.plain)
                 }
@@ -233,13 +233,15 @@ struct PottyOverviewView: View {
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - Actions
     private func logPotty(type: PottyType) {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        let log = PetPottyLog(date: Date(), type: type, pet: pet)
+        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            .flatMap { $0.isEmpty ? nil : $0 }
+        let log = PetPottyLog(date: Date(), type: type, pet: pet, executorId: executorId)
         modelContext.insert(log)
         modelContext.safeSave()
     }

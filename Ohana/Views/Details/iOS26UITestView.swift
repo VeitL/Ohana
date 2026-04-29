@@ -219,7 +219,7 @@ struct iOS26UITestView: View {
                     Text("「卡片标准背景」")
                         .font(OhanaFont.caption(.bold))
                         .foregroundStyle(accentColor)
-                    Text("UltimateGlassCard · 8 层折射")
+                    Text("UltimateGlassCard · Go Focus surface")
                         .font(OhanaFont.caption2())
                         .foregroundStyle(tertiaryText)
                 }

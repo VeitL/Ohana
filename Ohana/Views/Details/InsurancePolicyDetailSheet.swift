@@ -363,12 +363,14 @@ struct InsurancePolicyDetailSheet: View {
             // 写入负值 PetExpenseLog 代表报销到账
             if let claimPet = insurance.pet {
                 let productName = insurance.productName.isEmpty ? insurance.companyName : insurance.productName
+                let payerId = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
                 let expense = PetExpenseLog(
                     date: Date(),
                     amount: -claim.approvedAmount,
                     category: .insurancePremium,
                     note: "保险报销到账：\(productName)",
-                    pet: claimPet
+                    pet: claimPet,
+                    executorId: payerId
                 )
                 modelContext.insert(expense)
             }

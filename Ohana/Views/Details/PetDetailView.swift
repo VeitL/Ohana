@@ -611,7 +611,9 @@ struct PetDetailView: View {
         case "ears":     type = .ears
         default:         return
         }
-        let log = PetHygieneLog(date: Date(), type: type, pet: pet)
+        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            .flatMap { $0.isEmpty ? nil : $0 }
+        let log = PetHygieneLog(date: Date(), type: type, pet: pet, executorId: executorId)
         modelContext.insert(log); modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         QuestManager.shared.awardAction(type: .care(type: type), pet: pet, context: modelContext)
@@ -625,17 +627,19 @@ struct PetDetailView: View {
     }
 
     private func applyHealthCheckIn(_ raw: String) {
+        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            .flatMap { $0.isEmpty ? nil : $0 }
         switch raw {
         case "symptom":
             healthRecordType = .general
         case "vaccine":
-            modelContext.insert(PetHealthLog(date: Date(), type: .vaccine, note: "快速打卡", pet: pet))
+            modelContext.insert(PetHealthLog(date: Date(), type: .vaccine, note: "快速打卡", pet: pet, executorId: executorId))
             modelContext.safeSave()
         case "deworming":
-            modelContext.insert(PetHealthLog(date: Date(), type: .dewormingExternal, note: "快速打卡", pet: pet))
+            modelContext.insert(PetHealthLog(date: Date(), type: .dewormingExternal, note: "快速打卡", pet: pet, executorId: executorId))
             modelContext.safeSave()
         case "visit":
-            modelContext.insert(PetHealthLog(date: Date(), type: .checkup, note: "快速打卡", pet: pet))
+            modelContext.insert(PetHealthLog(date: Date(), type: .checkup, note: "快速打卡", pet: pet, executorId: executorId))
             modelContext.safeSave()
         case "heatCycle":
             healthRecordType = .general
@@ -1100,10 +1104,12 @@ private struct PetBentoGrid: View {
                             .font(OhanaFont.callout(.bold))
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 10).padding(.vertical, 6)
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .goGlassBackground(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         Button {
                             if let w = Double(quickWeightInput.replacingOccurrences(of: ",", with: ".")) {
-                                let log = PetWeightLog(date: Date(), weight: w, pet: pet)
+                                let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+                                    .flatMap { $0.isEmpty ? nil : $0 }
+                                let log = PetWeightLog(date: Date(), weight: w, pet: pet, executorId: executorId)
                                 modelContext.insert(log)
                                 modelContext.safeSave()
                                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()

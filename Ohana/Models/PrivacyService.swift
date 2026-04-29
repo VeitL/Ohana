@@ -16,6 +16,8 @@ enum PrivacyService {
             return .workout
         case "humanMedication", "medication":
             return .medication
+        case "humanNote", "note":
+            return .note
         case "humanWishlist", "wish", "wishlist":
             return .wishlist
         case "humanExpense", "expense":
@@ -39,7 +41,7 @@ enum PrivacyService {
     }
 
     static func badgeText(for field: HumanPrivateField, human: Human, viewedBy viewerId: UUID?) -> String {
-        isLocked(field, for: human, viewedBy: viewerId) ? "仅自己" : "公开"
+        human.privateFields.contains(field.rawValue) ? "仅自己" : "公开"
     }
 
     static func lockedMessage(for field: HumanPrivateField) -> String {
@@ -54,6 +56,8 @@ enum PrivacyService {
             return "椰子资产与愿望清单仅本人可见"
         case .expense:
             return "花费记录仅本人可见"
+        case .note:
+            return "备注仅本人可见"
         }
     }
 }

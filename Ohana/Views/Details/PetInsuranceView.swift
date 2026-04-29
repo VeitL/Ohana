@@ -88,7 +88,7 @@ struct PetInsuranceView: View {
             }
         }
         .padding(14)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var standaloneScroll: some View {
@@ -730,6 +730,7 @@ struct AddPetInsuranceSheet: View {
 
         // 计算所有付款日期
         let dates = paymentDates(for: ins, calendar: cal)
+        let payerId = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
 
         for (index, payDate) in dates.enumerated() {
             // 花费记录
@@ -741,7 +742,8 @@ struct AddPetInsuranceSheet: View {
                 amount: perPeriod,
                 category: .insurancePremium,
                 note: expNote,
-                pet: pet
+                pet: pet,
+                executorId: payerId
             )
             modelContext.insert(expense)
 

@@ -140,6 +140,7 @@ struct PetWalkLogBackup: Codable {
 
 struct PetWeightLogBackup: Codable {
     var id: String; var date: String; var weight: Double; var petId: String?
+    var executorId: String?
 }
 
 struct PetExpenseLogBackup: Codable {
@@ -151,10 +152,12 @@ struct PetExpenseLogBackup: Codable {
 struct PetHealthLogBackup: Codable {
     var id: String; var date: String; var type: String; var note: String
     var expirationDate: String?; var vetName: String; var cost: Double; var petId: String?
+    var executorId: String?
 }
 
 struct PetHygieneLogBackup: Codable {
     var id: String; var date: String; var type: String; var petId: String?
+    var executorId: String?
 }
 
 struct PetFoodRecordBackup: Codable {
@@ -186,6 +189,7 @@ struct PetMilestoneBackup: Codable {
 
 struct HumanWeightLogBackup: Codable {
     var id: String; var date: String; var weight: Double; var humanId: String?
+    var executorId: String?
 }
 
 struct HumanWorkoutLogBackup: Codable {
@@ -654,7 +658,8 @@ final class DataBackupManager {
 
     private func encodeWeightLog(_ l: PetWeightLog) -> PetWeightLogBackup {
         PetWeightLogBackup(id: l.id.uuidString, date: d(l.date),
-            weight: l.weight, petId: l.pet?.id.uuidString)
+            weight: l.weight, petId: l.pet?.id.uuidString,
+            executorId: l.executorId)
     }
 
     private func encodeExpenseLog(_ l: PetExpenseLog) -> PetExpenseLogBackup {
@@ -667,12 +672,14 @@ final class DataBackupManager {
     private func encodeHealthLog(_ l: PetHealthLog) -> PetHealthLogBackup {
         PetHealthLogBackup(id: l.id.uuidString, date: d(l.date), type: l.type,
             note: l.note, expirationDate: d(l.expirationDate), vetName: l.vetName,
-            cost: l.cost, petId: l.pet?.id.uuidString)
+            cost: l.cost, petId: l.pet?.id.uuidString,
+            executorId: l.executorId)
     }
 
     private func encodeHygieneLog(_ l: PetHygieneLog) -> PetHygieneLogBackup {
         PetHygieneLogBackup(id: l.id.uuidString, date: d(l.date), type: l.type,
-            petId: l.pet?.id.uuidString)
+            petId: l.pet?.id.uuidString,
+            executorId: l.executorId)
     }
 
     private func encodeFoodRecord(_ r: PetFoodRecord) -> PetFoodRecordBackup {
@@ -712,7 +719,8 @@ final class DataBackupManager {
 
     private func encodeHumanWeight(_ l: HumanWeightLog) -> HumanWeightLogBackup {
         HumanWeightLogBackup(id: l.id.uuidString, date: d(l.date),
-            weight: l.weight, humanId: l.human?.id.uuidString)
+            weight: l.weight, humanId: l.human?.id.uuidString,
+            executorId: l.executorId)
     }
 
     private func encodeHumanWorkout(_ l: HumanWorkoutLog) -> HumanWorkoutLogBackup {
@@ -1012,7 +1020,7 @@ final class DataBackupManager {
     }
 
     private func decodeWeightLog(_ dto: PetWeightLogBackup, pets: [String: Pet]) -> PetWeightLog {
-        let l = PetWeightLog(date: parseDate(dto.date) ?? Date(), weight: dto.weight, pet: dto.petId.flatMap { pets[$0] })
+        let l = PetWeightLog(date: parseDate(dto.date) ?? Date(), weight: dto.weight, pet: dto.petId.flatMap { pets[$0] }, executorId: dto.executorId)
         if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
         return l
     }
@@ -1032,7 +1040,8 @@ final class DataBackupManager {
         let l = PetHealthLog(date: parseDate(dto.date) ?? Date(),
                              type: HealthLogType(rawValue: dto.type) ?? .general,
                              note: dto.note,
-                             pet: dto.petId.flatMap { pets[$0] })
+                             pet: dto.petId.flatMap { pets[$0] },
+                             executorId: dto.executorId)
         if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
         l.vetName = dto.vetName
         l.cost = dto.cost
@@ -1043,7 +1052,8 @@ final class DataBackupManager {
     private func decodeHygieneLog(_ dto: PetHygieneLogBackup, pets: [String: Pet]) -> PetHygieneLog {
         let l = PetHygieneLog(date: parseDate(dto.date) ?? Date(),
                               type: HygieneType(rawValue: dto.type) ?? .bath,
-                              pet: dto.petId.flatMap { pets[$0] })
+                              pet: dto.petId.flatMap { pets[$0] },
+                              executorId: dto.executorId)
         if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
         return l
     }
@@ -1093,7 +1103,8 @@ final class DataBackupManager {
         let l = HumanWeightLog(
             date: parseDate(dto.date) ?? Date(),
             weight: dto.weight,
-            human: dto.humanId.flatMap { humans[$0] }
+            human: dto.humanId.flatMap { humans[$0] },
+            executorId: dto.executorId
         )
         if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
         return l

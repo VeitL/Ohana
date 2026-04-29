@@ -123,12 +123,15 @@ struct PetChartDashboard: View {
                         .padding(.horizontal, 8).padding(.vertical, 5)
                     Button {
                         if let w = Double(quickWeightInput.replacingOccurrences(of: ",", with: ".")) {
-                            let log = PetWeightLog(date: Date(), weight: w, pet: pet)
+                            let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+                                .flatMap { $0.isEmpty ? nil : $0 }
+                            let log = PetWeightLog(date: Date(), weight: w, pet: pet, executorId: executorId)
                             modelContext.insert(log)
                             modelContext.safeSave()
                             CareLedgerService.record(
                                 occurredAt: log.date,
-                                actorKind: .unknown,
+                                actorKind: executorId == nil ? .unknown : .human,
+                                actorId: executorId,
                                 subjectKind: .pet,
                                 subjectId: pet.id.uuidString,
                                 eventKind: .weight,
@@ -309,5 +312,4 @@ struct PetChartDashboard: View {
         }
     }
 }
-
 

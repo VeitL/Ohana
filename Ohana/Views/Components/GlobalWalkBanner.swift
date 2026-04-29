@@ -225,7 +225,7 @@ struct GlobalWalkBanner: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 20).padding(.vertical, 14)
         }
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .shadow(color: .black.opacity(0.25), radius: 16, x: 0, y: 6)
     }
 
@@ -247,7 +247,7 @@ struct GlobalWalkBanner: View {
         }
         .frame(maxWidth: .infinity, minHeight: flipCardHeight, maxHeight: flipCardHeight)
         .rotation3DEffect(.degrees(summaryRotation), axis: (x: 0, y: 1, z: 0), perspective: 0.75)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .shadow(color: .black.opacity(0.25), radius: 16, x: 0, y: 6)
         .padding(.horizontal, 16)
         .padding(.bottom, safeBottom(geo) + 160)

@@ -125,7 +125,7 @@ struct WeightHistoryView: View {
                 }
                 .foregroundStyle(.primary)
                 .padding(.horizontal, 10).padding(.vertical, 4)
-                .glassEffect(.regular, in: Capsule())
+                .goGlassBackground(Capsule())
                 .padding(.horizontal, 24)
             }
 

@@ -135,10 +135,10 @@ struct AddExpenseSheet: View {
 
                         GoDashedDivider().padding(.horizontal, 16)
 
-                        // 支付人
+                        // 支付者
                         if !humans.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
-                                sectionLabel(icon: "person.fill", title: "支付人")
+                                sectionLabel(icon: "person.fill", title: "支付者")
                                     .padding(.horizontal, 20)
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 12) {
@@ -169,6 +169,14 @@ struct AddExpenseSheet: View {
                             }
 
                             GoDashedDivider().padding(.horizontal, 16)
+                        }
+
+                        if let payerName = selectedPayerName {
+                            infoRow(icon: "creditcard.fill", label: "这笔钱由") {
+                                Text(payerName)
+                                    .font(.system(size: 13, weight: .black, design: .rounded))
+                                    .foregroundStyle(petThemeColor)
+                            }
                         }
 
                         // 日期行
@@ -330,6 +338,11 @@ struct AddExpenseSheet: View {
     private func humanThemeColor(_ human: Human) -> Color {
         let hex = human.themeColor
         return hex.count == 6 ? Color(hex: hex) : Color.goPrimary
+    }
+
+    private var selectedPayerName: String? {
+        guard let selectedPayerId else { return nil }
+        return humans.first(where: { $0.id.uuidString == selectedPayerId })?.name
     }
 
     private func saveExpense() {

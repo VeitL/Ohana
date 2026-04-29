@@ -106,7 +106,7 @@ struct FamilyActivityStripView: View {
 
     var body: some View {
         let entries = todayEntries
-        if !entries.isEmpty {
+        if humans.count > 1, !entries.isEmpty {
             switch style {
             case .full:
                 VStack(alignment: .leading, spacing: 6) {

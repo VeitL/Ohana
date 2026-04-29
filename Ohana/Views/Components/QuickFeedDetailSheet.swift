@@ -379,7 +379,7 @@ struct QuickFeedDetailSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(16)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
 
             Button { commitManualFeed() } label: {
                 HStack(spacing: 8) {
@@ -504,7 +504,7 @@ struct QuickFeedDetailSheet: View {
             }
         }
         .padding(16)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private func feedModeSideNote(icon: String, title: String, message: String) -> some View {
@@ -687,7 +687,7 @@ struct QuickFeedDetailSheet: View {
                                     .foregroundStyle(casualDurationDays == days ? Color.arkInk : .primary)
                                     .padding(.horizontal, 16).padding(.vertical, 9)
                                     .background(casualDurationDays == days ? themeColor : .clear, in: Capsule())
-                                    .glassEffect(casualDurationDays == days ? .regular.tint(themeColor.opacity(0.2)) : .regular, in: Capsule())
+                                    .goSelectableSurface(isSelected: casualDurationDays == days, tint: themeColor, in: Capsule())
                             }
                             .buttonStyle(.plain)
                         }
@@ -730,7 +730,7 @@ struct QuickFeedDetailSheet: View {
             }
         }
         .padding(16)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     // MARK: - Stock Section (precise)
@@ -759,7 +759,7 @@ struct QuickFeedDetailSheet: View {
             foodUsageRecordSection
         }
         .padding(16)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private var casualStockSummary: some View {
@@ -779,7 +779,7 @@ struct QuickFeedDetailSheet: View {
             )
         }
         .padding(.vertical, 10)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func stockEditForm(includeDailyPortion: Bool) -> some View {
@@ -797,12 +797,12 @@ struct QuickFeedDetailSheet: View {
                 .tint(Color.goOrange)
                 .padding(.horizontal, 12).padding(.vertical, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .goGlassBackground(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 if selectedBrand == "自定义品牌" {
                     TextField("输入自定义品牌名", text: $customBrandInput)
                         .font(.system(size: 14, weight: .medium, design: .rounded))
                         .padding(.horizontal, 12).padding(.vertical, 8)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .goGlassBackground(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
             }
 
@@ -829,7 +829,7 @@ struct QuickFeedDetailSheet: View {
                                     }
                                     .padding(.horizontal, 10).padding(.vertical, 6)
                                     .background(stockPayerId == human.id.uuidString ? themeColor : .clear, in: Capsule())
-                                    .glassEffect(stockPayerId == human.id.uuidString ? .regular.tint(themeColor.opacity(0.2)) : .regular, in: Capsule())
+                                    .goSelectableSurface(isSelected: stockPayerId == human.id.uuidString, tint: themeColor, in: Capsule())
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -859,7 +859,7 @@ struct QuickFeedDetailSheet: View {
                 stockStatCell(label: "实际消耗", value: pet.foodConsumedSinceRestock > 0 ? "\(Int(pet.foodConsumedSinceRestock))g" : "--", accent: .goYellow)
             }
             .padding(.vertical, 10)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
             if pet.remainingFoodDays > 0 {
                 VStack(spacing: 4) {
@@ -918,7 +918,7 @@ struct QuickFeedDetailSheet: View {
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 7)
                                     .background(pet.foodReminderAdvanceDays == days ? themeColor : .clear, in: Capsule())
-                                    .glassEffect(pet.foodReminderAdvanceDays == days ? .regular.tint(themeColor.opacity(0.2)) : .regular, in: Capsule())
+                                    .goSelectableSurface(isSelected: pet.foodReminderAdvanceDays == days, tint: themeColor, in: Capsule())
                             }
                             .buttonStyle(.plain)
                         }
@@ -1064,7 +1064,7 @@ struct QuickFeedDetailSheet: View {
             }
         }
         .animation(.spring(response: 0.38, dampingFraction: 0.86), value: showingCalculator)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private var calculatorBody: some View {
@@ -1216,7 +1216,7 @@ struct QuickFeedDetailSheet: View {
                 }
             }
             .padding(16)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
     }
 
@@ -1261,7 +1261,7 @@ struct QuickFeedDetailSheet: View {
                 .foregroundStyle(.primary)
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     // MARK: - Actions

@@ -140,7 +140,9 @@ struct CatCareStationCard: View {
         undoEvent = event
         
         if action == .litter {
-            let hygieneLog = PetHygieneLog(date: Date(), type: .bath, pet: pet)
+            let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+                .flatMap { $0.isEmpty ? nil : $0 }
+            let hygieneLog = PetHygieneLog(date: Date(), type: .bath, pet: pet, executorId: executorId)
             modelContext.insert(hygieneLog)
             undoHygieneLog = hygieneLog
         }

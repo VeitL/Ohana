@@ -94,7 +94,7 @@ struct PetUnifiedTimelineSheet: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private var emptyState: some View {
@@ -151,6 +151,6 @@ struct PetUnifiedTimelineSheet: View {
             }
         }
         .padding(16)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 }

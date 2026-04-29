@@ -30,6 +30,7 @@ struct GoDashboardView: View {
 
     // MARK: – Sheet state (mirrors OverviewView exactly)
     @State private var showingSettings = false
+    @State private var showingHeaderPopover = false
     @State private var showingAddEntity = false
     @State private var showingCalendar = false
     @State private var showingCrewRoster = false
@@ -49,6 +50,8 @@ struct GoDashboardView: View {
     @State private var quickHumanNoteHuman: Human? = nil
     @State private var quickHumanWeightDetailHuman: Human? = nil
     @State private var quickHumanWorkoutDetailHuman: Human? = nil
+    @State private var quickHumanMedicationDetailHuman: Human? = nil
+    @State private var quickHumanNoteDetailHuman: Human? = nil
     @State private var quickWeightValue: String = ""
     @State private var quickWalkPet: Pet? = nil
     @State private var actionToast: (pet: Pet, message: String, emoji: String)? = nil
@@ -201,7 +204,7 @@ struct GoDashboardView: View {
         .coconutRewardOverlay(trigger: $showRewardCoconut, amount: rewardCoconutAmount, label: rewardCoconutLabel)
         .navigationBarHidden(true)
         // Primary sheets (split to avoid type-checker timeout)
-        .sheet(isPresented: $showingSettings) { SettingsView() }
+        .fullScreenCover(isPresented: $showingSettings) { SettingsView() }
         .sheet(isPresented: $showingAddEntity) { AddEntityView() }
         .sheet(isPresented: $showingManageSheet) { HomeSectionManageSheet() }
         .sheet(isPresented: $showingCoconutLog) { CoconutLogView() }
@@ -235,6 +238,14 @@ struct GoDashboardView: View {
         }
         .sheet(item: $quickHumanWorkoutDetailHuman) { human in
             HumanWorkoutHistoryView(human: human)
+                .presentationDetents([.large]).presentationDragIndicator(.visible)
+        }
+        .sheet(item: $quickHumanMedicationDetailHuman) { human in
+            NavigationStack { HumanMedicationView(human: human) }
+                .presentationDetents([.large]).presentationDragIndicator(.visible)
+        }
+        .sheet(item: $quickHumanNoteDetailHuman) { human in
+            HumanNoteHistorySheet(human: human)
                 .presentationDetents([.large]).presentationDragIndicator(.visible)
         }
         .sheet(item: $showMomentPet) { pet in
@@ -325,7 +336,7 @@ private extension GoDashboardView {
                     }
 
                     // C. 家庭协作 mini 胶囊
-                    if let topPet = deckActivePet {
+                    if humans.count > 1, let topPet = deckActivePet {
                         FamilyActivityStripView(pet: topPet, style: .compact, onExpand: { showingFamilyStripFull = true })
                             .padding(.horizontal, 16)
                     }
@@ -675,12 +686,7 @@ private extension GoDashboardView {
                         .background(headerStreak >= 7 ? Color.goLime : .white.opacity(0.18), in: Capsule())
                     }
                     .buttonStyle(.plain)
-                    Menu {
-                        Button { showingAddEntity = true } label: { Label(l.addMember, systemImage: "person.badge.plus") }
-                        Button { showingCrewRoster = true } label: { Label(l.ohanaCrew, systemImage: "person.2.fill") }
-                        Button { showingManageSheet = true } label: { Label(l.manageHomeModules, systemImage: "slider.horizontal.3") }
-                        Button { showingSettings = true } label: { Label(l.settings, systemImage: "gearshape") }
-                    } label: {
+                    Button { showingHeaderPopover = true } label: {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(.white)
@@ -688,6 +694,16 @@ private extension GoDashboardView {
                             .background(.white.opacity(0.15), in: Circle())
                     }
                     .buttonStyle(.plain)
+                    .popover(isPresented: $showingHeaderPopover, arrowEdge: .top) {
+                        GoDashboardPopoverMenu(
+                            l: l,
+                            onAdd: { showingHeaderPopover = false; DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { showingAddEntity = true } },
+                            onCrew: { showingHeaderPopover = false; DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { showingCrewRoster = true } },
+                            onManage: { showingHeaderPopover = false; DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { showingManageSheet = true } },
+                            onSettings: { showingHeaderPopover = false; DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { showingSettings = true } }
+                        )
+                        .presentationCompactAdaptation(.popover)
+                    }
                 case 1:
                     goHeaderIconButton(systemName: "plus.circle.fill") { showingAddEntity = true }
                 case 2:
@@ -1663,8 +1679,8 @@ private extension GoDashboardView {
             switch item.actionType {
             case "humanWeight":     quickHumanWeightDetailHuman = human
             case "humanWorkout":    quickHumanWorkoutDetailHuman = human
-            case "humanMedication": quickHumanMedicationHuman = human
-            case "humanNote":       selectedHuman = human
+            case "humanMedication": quickHumanMedicationDetailHuman = human
+            case "humanNote":       quickHumanNoteDetailHuman = human
             default:                selectedHuman = human
             }
             return
@@ -1771,7 +1787,8 @@ private extension GoDashboardView {
         case "bath": type = .bath; case "teeth": type = .teeth; case "nails": type = .nails
         case "brushing": type = .brushing; case "ears": type = .ears; default: return
         }
-        let log = PetHygieneLog(date: Date(), type: type, pet: pet)
+        let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
+        let log = PetHygieneLog(date: Date(), type: type, pet: pet, executorId: eid)
         modelContext.insert(log); modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         let got = QuestManager.shared.awardAction(type: .care(type: type), pet: pet, context: modelContext)
@@ -1787,18 +1804,19 @@ private extension GoDashboardView {
     }
 
     func applyHealthCheckIn(_ raw: String, pet: Pet) {
+        let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
         switch raw {
         case "symptom": showingAddSymptomSheet = true; symptomSheetPet = pet
         case "vaccine":
-            modelContext.insert(PetHealthLog(date: Date(), type: .vaccine, note: l.homeQuickCheckInNote, pet: pet))
+            modelContext.insert(PetHealthLog(date: Date(), type: .vaccine, note: l.homeQuickCheckInNote, pet: pet, executorId: eid))
             modelContext.safeSave()
             showToast(pet, message: l.homeToastHealthVaccine(pet.name), emoji: "💉")
         case "deworming":
-            modelContext.insert(PetHealthLog(date: Date(), type: .dewormingExternal, note: l.homeQuickCheckInNote, pet: pet))
+            modelContext.insert(PetHealthLog(date: Date(), type: .dewormingExternal, note: l.homeQuickCheckInNote, pet: pet, executorId: eid))
             modelContext.safeSave()
             showToast(pet, message: l.homeToastHealthDeworm(pet.name), emoji: "💊")
         case "visit":
-            modelContext.insert(PetHealthLog(date: Date(), type: .checkup, note: l.homeQuickCheckInNote, pet: pet))
+            modelContext.insert(PetHealthLog(date: Date(), type: .checkup, note: l.homeQuickCheckInNote, pet: pet, executorId: eid))
             modelContext.safeSave()
             showToast(pet, message: l.homeToastHealthVisit(pet.name), emoji: "🏥")
         case "heatCycle":
@@ -1956,4 +1974,45 @@ private extension GoDashboardView {
 
     GoDashboardView(selectedPet: $pet, selectedHuman: $human, selectedPlant: $plant, selectedPetTab: $tab, heroNS: ns)
         .modelContainer(SharedModelContainer.make())
+}
+
+// MARK: - GoDashboard Popover Menu (avoids Menu+sheet UIContextMenuInteraction conflict)
+private struct GoDashboardPopoverMenu: View {
+    let l: L10n
+    let onAdd: () -> Void
+    let onCrew: () -> Void
+    let onManage: () -> Void
+    let onSettings: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            row(icon: "plus.circle.fill", title: l.addMember, action: onAdd)
+            Divider()
+            row(icon: "person.3.fill", title: l.ohanaCrew, action: onCrew)
+            Divider()
+            row(icon: "square.grid.2x2.fill", title: l.manageHomeModules, action: onManage)
+            Divider()
+            row(icon: "gearshape.fill", title: l.settings, action: onSettings)
+        }
+        .frame(minWidth: 220)
+        .padding(.vertical, 4)
+    }
+
+    private func row(icon: String, title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 22)
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                Spacer()
+            }
+            .foregroundStyle(Color.primary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
 }

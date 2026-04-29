@@ -1,14 +1,32 @@
 // FeatureAggregateView.swift
 // Aggregate view per feature.
-// Top: "全部" chip (selected) + per-entity chips (tap → navigate to detail).
-// Body: full feature content for all entities.
+// Aggregate view per feature. Can be used standalone or embedded under a
+// FeatureGroup segmented page. Embedded mode hides the extra entity chip row so
+// the page does not show pet names twice above the actual content.
 
 import SwiftUI
 import SwiftData
 
+private struct FeatureAggregateNavigationChrome: ViewModifier {
+    let title: String
+    let isEnabled: Bool
+
+    func body(content: Content) -> some View {
+        if isEnabled {
+            content
+                .navigationTitle(title)
+                .navigationBarTitleDisplayMode(.inline)
+        } else {
+            content
+        }
+    }
+}
+
 struct FeatureAggregateView: View {
     let feature: PetFeature
     @Binding var parentPath: NavigationPath
+    var showsNavigationChrome: Bool = true
+    var showsEntityChips: Bool = true
 
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.name)   private var humans: [Human]
@@ -37,13 +55,14 @@ struct FeatureAggregateView: View {
             .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                chipRow
-                Rectangle().fill(.white.opacity(0.08)).frame(height: 1)
+                if showsEntityChips {
+                    chipRow
+                    Rectangle().fill(.white.opacity(0.08)).frame(height: 1)
+                }
                 featureContent
             }
         }
-        .navigationTitle(feature.title)
-        .navigationBarTitleDisplayMode(.inline)
+        .modifier(FeatureAggregateNavigationChrome(title: feature.title, isEnabled: showsNavigationChrome))
     }
 
     // MARK: - Chip Row
@@ -117,6 +136,30 @@ struct FeatureAggregateView: View {
     @ViewBuilder
     private var featureContent: some View {
         switch feature {
+        case .health:
+            IslandHealthDashboard(standalone: false) { pet in
+                parentPath.append(petDest(.health, pet: pet))
+            }
+        case .medications:
+            IslandMedicationDashboard(standalone: false) { pet in
+                parentPath.append(petDest(.medications, pet: pet))
+            }
+        case .food:
+            IslandFoodDashboard(standalone: false) { pet in
+                parentPath.append(petDest(.food, pet: pet))
+            }
+        case .hygiene:
+            IslandHygieneDashboard(standalone: false) { pet in
+                parentPath.append(petDest(.hygiene, pet: pet))
+            }
+        case .potty:
+            IslandPottyDashboard(standalone: false) { pet in
+                parentPath.append(petDest(.potty, pet: pet))
+            }
+        case .retention:
+            IslandRetentionDashboard(standalone: false) { pet in
+                parentPath.append(petDest(.retention, pet: pet))
+            }
         case .weight:
             IslandWeightDashboard(standalone: false)
         case .expense:

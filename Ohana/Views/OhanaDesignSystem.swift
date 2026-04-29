@@ -305,16 +305,17 @@ struct GiantMetricStyle: ViewModifier {
 
 // MARK: - Go UI Card Modifiers
 struct GoCardModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
     var cornerRadius: CGFloat
     var color: Color
     
     func body(content: Content) -> some View {
         content
-            .background {
+            .background(color, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(color)
+                    .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.05), lineWidth: 1)
             }
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 }
 
@@ -342,20 +343,63 @@ struct GoBlueCardModifier: ViewModifier {
 }
 
 struct GoTranslucentCardModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
     var cornerRadius: CGFloat = 20
+
+    private var surface: Color {
+        colorScheme == .dark ? Color.white.opacity(0.075) : Color.white.opacity(0.86)
+    }
     
     func body(content: Content) -> some View {
         content
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .background(surface, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.11 : 0.06), lineWidth: 1)
+            }
+            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.16 : 0.06), radius: 8, y: 3)
     }
 }
 
 struct GoGlassBackground<S: InsettableShape>: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
     var shape: S
     
     func body(content: Content) -> some View {
         content
-            .glassEffect(.regular, in: shape)
+            .background(colorScheme == .dark ? Color.white.opacity(0.075) : Color.white.opacity(0.86), in: shape)
+            .overlay {
+                shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.11 : 0.06), lineWidth: 1)
+            }
+    }
+}
+
+struct GoSelectableSurface<S: InsettableShape>: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+    var isSelected: Bool
+    var tint: Color
+    var shape: S
+
+    private var surface: Color {
+        if isSelected {
+            return tint.opacity(colorScheme == .dark ? 0.22 : 0.18)
+        }
+        return colorScheme == .dark ? Color.white.opacity(0.075) : Color.white.opacity(0.86)
+    }
+
+    private var border: Color {
+        if isSelected {
+            return tint.opacity(colorScheme == .dark ? 0.40 : 0.30)
+        }
+        return Color.primary.opacity(colorScheme == .dark ? 0.11 : 0.06)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .background(surface, in: shape)
+            .overlay {
+                shape.strokeBorder(border, lineWidth: 1)
+            }
     }
 }
 
@@ -383,6 +427,14 @@ extension View {
     
     func goGlassBackground<S: InsettableShape>(_ shape: S) -> some View {
         modifier(GoGlassBackground(shape: shape))
+    }
+
+    func goSelectableSurface<S: InsettableShape>(
+        isSelected: Bool,
+        tint: Color,
+        in shape: S
+    ) -> some View {
+        modifier(GoSelectableSurface(isSelected: isSelected, tint: tint, shape: shape))
     }
     
     func capsuleButtonDark() -> some View {
@@ -786,9 +838,16 @@ public struct OhanaStandardCardModifier: ViewModifier {
     var cornerRadius: CGFloat
     
     public func body(content: Content) -> some View {
-        UltimateGlassCard(isDarkMode: isDarkMode) {
-            content
-        }
+        content
+            .background(
+                isDarkMode ? Color.white.opacity(0.075) : Color.white.opacity(0.88),
+                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(isDarkMode ? 0.11 : 0.06), lineWidth: 1)
+            }
+            .shadow(color: Color.black.opacity(isDarkMode ? 0.16 : 0.06), radius: 8, y: 3)
     }
 }
 

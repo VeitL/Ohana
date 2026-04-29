@@ -144,7 +144,7 @@ private struct HygieneDetailSheet: View {
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(.primary.opacity(0.6))
                             .frame(width: 34, height: 34)
-                            .glassEffect(.regular, in: Circle())
+                            .goGlassBackground(Circle())
                     }
                     Spacer()
                     VStack(spacing: 2) {
@@ -296,7 +296,9 @@ private struct HygieneDetailSheet: View {
             // 快速打卡按钮行
             HStack(spacing: 10) {
                 Button {
-                    let log = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet)
+                    let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+                        .flatMap { $0.isEmpty ? nil : $0 }
+                    let log = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet, executorId: executorId)
                     modelContext.insert(log)
                     modelContext.safeSave()
                     QuestManager.shared.awardAction(type: .potty(isLitter: false), pet: pet, context: modelContext)
@@ -313,7 +315,9 @@ private struct HygieneDetailSheet: View {
 
                 if isLitterPet {
                     Button {
-                        let log = PetCareLog(date: Date(), type: .litter, pet: pet)
+                        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+                            .flatMap { $0.isEmpty ? nil : $0 }
+                        let log = PetCareLog(date: Date(), type: .litter, pet: pet, executorId: executorId)
                         modelContext.insert(log)
                         modelContext.safeSave()
                         QuestManager.shared.awardAction(type: .potty(isLitter: true), pet: pet, context: modelContext)
@@ -381,7 +385,7 @@ private struct HygieneDetailSheet: View {
             }
         }
         .padding(14)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func hygieneSectionCard(_ type: HygieneType) -> some View {
@@ -448,7 +452,7 @@ private struct HygieneDetailSheet: View {
             }
         }
         .padding(14)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
@@ -506,7 +510,9 @@ private struct HygieneCheckButton: View {
 
     private func checkIn() {
         guard !isDoneToday else { return }
-        let log = PetHygieneLog(date: Date(), type: type, pet: pet)
+        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            .flatMap { $0.isEmpty ? nil : $0 }
+        let log = PetHygieneLog(date: Date(), type: type, pet: pet, executorId: executorId)
         modelContext.insert(log)
         modelContext.safeSave()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()

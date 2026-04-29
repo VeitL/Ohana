@@ -267,9 +267,16 @@ struct PetBasicInfoDetailView: View {
                     Picker("", selection: $eSpecies) {
                         ForEach(speciesOptions, id: \.self) { Text($0) }
                     }.pickerStyle(.menu).tint(Color.goPrimary)
+                    .onChange(of: eSpecies) { _, _ in
+                        let firstBreed = PetBreedDatabase.breeds(for: eSpecies).first
+                        eBreed = firstBreed?.name ?? ""
+                        eCoatColor = firstBreed?.coatColors.first?.name ?? ""
+                        eEyeColor = firstBreed?.eyeColors.first?.name ?? ""
+                        if let hex = firstBreed?.suggestedThemeHex { eThemeColorHex = hex }
+                    }
                 }
                 Divider().opacity(0.1)
-                editField("品种", text: $eBreed)
+                optionPickerRow("品种", selection: $eBreed, options: breedOptions)
                 Divider().opacity(0.1)
                 // 性别
                 HStack {
@@ -304,9 +311,9 @@ struct PetBasicInfoDetailView: View {
             }
             // 外貌
             editSection(title: "外貌特征", icon: "eye.fill", iconColor: Color.goCardCyan) {
-                editField("毛色", text: $eCoatColor)
+                colorOptionGrid(title: "毛色", selection: $eCoatColor, items: coatOptions)
                 Divider().opacity(0.1)
-                editField("眼色", text: $eEyeColor)
+                colorOptionGrid(title: "眼色", selection: $eEyeColor, items: eyeOptions)
             }
             // 健康
             editSection(title: "健康与医疗", icon: "cross.circle.fill", iconColor: Color.goRed) {
@@ -338,9 +345,9 @@ struct PetBasicInfoDetailView: View {
             editSection(title: "血统来源", icon: "list.star", iconColor: Color.goMint) {
                 editField("曾用名",   text: $eFormerName)
                 Divider().opacity(0.1)
-                editField("出生国家", text: $eBirthCountry)
+                optionPickerRow("出生国家", selection: $eBirthCountry, options: countryOptions)
                 Divider().opacity(0.1)
-                editField("出生城市", text: $eBirthCity)
+                optionPickerRow("出生城市", selection: $eBirthCity, options: birthCityOptions)
                 Divider().opacity(0.1)
                 editField("血统信息", text: $eLineageInfo)
             }
@@ -447,6 +454,102 @@ struct PetBasicInfoDetailView: View {
                 .foregroundStyle(.primary)
                 .tint(Color.goPrimary)
                 .multilineTextAlignment(.trailing)
+        }
+    }
+
+    private var selectedBreedInfo: BreedInfo? {
+        PetBreedDatabase.breeds(for: eSpecies).first { $0.name == eBreed }
+    }
+
+    private var breedOptions: [String] {
+        var options = ["未填写"] + PetBreedDatabase.breeds(for: eSpecies).map(\.name)
+        if !eBreed.isEmpty, eBreed != "未填写", !options.contains(eBreed) {
+            options.insert(eBreed, at: 1)
+        }
+        return options
+    }
+
+    private var coatOptions: [(name: String, hex: String)] {
+        let options = selectedBreedInfo?.coatColors ?? PetBreedDatabase.genericCoatColors
+        return uniqueColorOptions(options.map { ($0.name, $0.hex) }, current: eCoatColor)
+    }
+
+    private var eyeOptions: [(name: String, hex: String)] {
+        let options = PetBreedDatabase.refinedEyeColors(breed: selectedBreedInfo, coatColor: eCoatColor)
+        return uniqueColorOptions(options.map { ($0.name, $0.hex) }, current: eEyeColor)
+    }
+
+    private var countryOptions: [String] {
+        var options = ["未填写"] + PetBreedDatabase.countries
+        if !eBirthCountry.isEmpty, !options.contains(eBirthCountry) {
+            options.insert(eBirthCountry, at: 1)
+        }
+        return options
+    }
+
+    private var birthCityOptions: [String] {
+        let cities = eBirthCountry.isEmpty || eBirthCountry == "未填写"
+            ? ["未填写"]
+            : ["未填写"] + PetBreedDatabase.cities(for: eBirthCountry)
+        var options = cities
+        if !eBirthCity.isEmpty, !options.contains(eBirthCity) {
+            options.insert(eBirthCity, at: 1)
+        }
+        return options
+    }
+
+    private func uniqueColorOptions(_ options: [(name: String, hex: String)], current: String) -> [(name: String, hex: String)] {
+        var seen: Set<String> = []
+        var result = options.filter { seen.insert($0.name).inserted }
+        if !current.isEmpty, !result.contains(where: { $0.name == current }) {
+            result.insert((current, "BDBDBD"), at: 0)
+        }
+        return result
+    }
+
+    private func optionPickerRow(_ label: String, selection: Binding<String>, options: [String]) -> some View {
+        HStack {
+            editLabel(label).frame(width: 70, alignment: .leading)
+            Spacer()
+            Picker("", selection: Binding(
+                get: { selection.wrappedValue.isEmpty ? "未填写" : selection.wrappedValue },
+                set: { selection.wrappedValue = $0 == "未填写" ? "" : $0 }
+            )) {
+                ForEach(options, id: \.self) { option in
+                    Text(option).tag(option)
+                }
+            }
+            .pickerStyle(.menu)
+            .tint(Color.goPrimary)
+        }
+    }
+
+    private func colorOptionGrid(title: String, selection: Binding<String>, items: [(name: String, hex: String)]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            editLabel(title)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 74), spacing: 8)], alignment: .leading, spacing: 8) {
+                ForEach(items, id: \.name) { item in
+                    Button {
+                        selection.wrappedValue = item.name
+                    } label: {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(Color(hex: item.hex))
+                                .frame(width: 14, height: 14)
+                                .overlay(Circle().strokeBorder(Color.primary.opacity(0.14), lineWidth: 1))
+                            Text(item.name)
+                                .font(.system(size: 12, weight: selection.wrappedValue == item.name ? .black : .semibold, design: .rounded))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.72)
+                        }
+                        .foregroundStyle(selection.wrappedValue == item.name ? Color.arkInk : .primary.opacity(0.82))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 7)
+                        .background(selection.wrappedValue == item.name ? Color.goPrimary : Color.primary.opacity(0.07), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
     }
 

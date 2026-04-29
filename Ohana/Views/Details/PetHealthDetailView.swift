@@ -149,12 +149,12 @@ struct PetHealthDetailView: View {
                     if !healthAlerts.isEmpty {
                         alertsSection
                             .padding(14)
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     }
                     // ── 免疫状态总览
                     immunityOverviewRow
                         .padding(14)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     NavigationLink {
                         VaccinePassportView(pet: pet)
                     } label: {
@@ -177,31 +177,31 @@ struct PetHealthDetailView: View {
                         .padding(14)
                     }
                     .buttonStyle(.plain)
-                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     // ── 散点时间轴
                     if !scatterPoints.isEmpty {
                         healthTrendCard
                             .padding(14)
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     }
                     // ── 异常症状记录卡
                     if !(pet.symptomLogs ?? []).isEmpty {
                         symptomsCard
                             .padding(14)
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     }
                     
                     // ── 生理期记录卡
                     if !(pet.heatCycleLogs ?? []).isEmpty {
                         heatCycleCard
                             .padding(14)
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     }
 
                     // ── 健康记录列表
                     healthLogsCard
                         .padding(14)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     Spacer(minLength: 40)
                 }
                 .padding(.horizontal, 16)

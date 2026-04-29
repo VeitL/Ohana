@@ -47,12 +47,15 @@ enum EntityType: String, CaseIterable {
 struct AddEntityView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = "zh"
+    @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
     @State private var selectedType: EntityType?
 
+    private let onHumanSaved: ((Human) -> Void)?
     private var l: L10n { L10n(appLanguage) }
 
-    init(initialType: EntityType? = nil) {
+    init(initialType: EntityType? = nil, onHumanSaved: ((Human) -> Void)? = nil) {
         _selectedType = State(initialValue: initialType)
+        self.onHumanSaved = onHumanSaved
     }
 
     private var navigationTitleText: String {
@@ -74,7 +77,13 @@ struct AddEntityView: View {
                     case .pet:
                         AddPetWizardView(onComplete: { dismiss() })
                     case .human:
-                        AddHumanWizardView(onComplete: { dismiss() })
+                        AddHumanWizardView(
+                            onComplete: { dismiss() },
+                            onHumanSaved: { human in
+                                currentActiveHumanId = human.id.uuidString
+                                onHumanSaved?(human)
+                            }
+                        )
                     case .plant:
                         AddPlantView(onComplete: { dismiss() })
                     }

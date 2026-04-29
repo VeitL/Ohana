@@ -88,7 +88,7 @@ struct AddDocumentSheet: View {
                                 .font(.system(size: 36))
                         }
                         .padding(16)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
 
                     // ── 证件类型（Chip 横滚）
                     fieldCard {
@@ -408,6 +408,11 @@ struct AddDocumentSheet: View {
                 url.stopAccessingSecurityScopedResource()
             }
         }
+        .onAppear {
+            guard selectedPayerId == nil else { return }
+            let stored = UserDefaults.standard.string(forKey: "currentActiveHumanId") ?? ""
+            selectedPayerId = humans.contains(where: { $0.id.uuidString == stored }) ? stored : humans.first?.id.uuidString
+        }
     }
 
     // MARK: - 附件按钮辅助
@@ -433,7 +438,7 @@ struct AddDocumentSheet: View {
         content()
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func docRow<Content: View>(icon: String, iconColor: Color, label: String, @ViewBuilder content: @escaping () -> Content) -> some View {
@@ -476,18 +481,23 @@ struct AddDocumentSheet: View {
         let expenseDate = issueDate.isAfterToday ? Date() : (hasIssueDate ? issueDate : Date())
         if amount > 0 {
             let expCat: ExpenseCategory = selectedCategory == .insurance ? .other : .medical
+            let payerId = selectedPayerId.flatMap { id in
+                humans.contains(where: { $0.id.uuidString == id }) ? id : nil
+            }
             if selectedCategory == .insurance && isMonthlyInsurance {
                 // N2: 保险月付 — 生成未来12个月支出记录
                 for i in 0..<12 {
                     if let monthDate = Calendar.current.date(byAdding: .month, value: i, to: expenseDate) {
                         let expense = PetExpenseLog(date: monthDate, amount: amount,
-                                                    category: expCat, note: "\(doc.title)（月付）", pet: pet)
+                                                    category: expCat, note: "\(doc.title)（月付）", pet: pet,
+                                                    executorId: payerId)
                         modelContext.insert(expense)
                     }
                 }
             } else {
                 let expense = PetExpenseLog(date: expenseDate, amount: amount,
-                                            category: expCat, note: doc.title, pet: pet)
+                                            category: expCat, note: doc.title, pet: pet,
+                                            executorId: payerId)
                 modelContext.insert(expense)
             }
         }
@@ -584,7 +594,7 @@ struct EditDocumentSheet: View {
                                 .font(.system(size: 36))
                         }
                         .padding(16)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
 
                     // 证件类型
                     editFieldCard {
@@ -786,7 +796,7 @@ struct EditDocumentSheet: View {
         content()
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func editRow<Content: View>(icon: String, iconColor: Color, label: String, @ViewBuilder content: @escaping () -> Content) -> some View {

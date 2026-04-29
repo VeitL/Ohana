@@ -241,7 +241,8 @@ struct AddPetWizardView: View {
         }
     }
 
-    private var walletDraftCardHeight: CGFloat { (ScreenCompat.width - 48) / 1.586 }
+    /// 标准信用卡比例 1.586:1，左右各 7pt 边距（与首页 K.cardH / K.cardMargin 保持一致）
+    private var walletDraftCardHeight: CGFloat { (ScreenCompat.width - 7 * 2) / 1.586 }
     private let walletCardCorner: CGFloat = 24
 
     private var stickyWalletPreview: some View {
@@ -263,7 +264,7 @@ struct AddPetWizardView: View {
             cornerRadius: walletCardCorner
         )
         .frame(height: walletDraftCardHeight)
-        .padding(.horizontal, 24)
+        .padding(.horizontal, 7)   // 与首页卡片堆 K.cardMargin 保持一致
         .padding(.top, 8)
         .padding(.bottom, 6)
         // 不在 `name` 上套弹簧动画：每个按键都会触发布局+动画，输入会明显卡顿
@@ -300,13 +301,16 @@ struct AddPetWizardView: View {
             stickyWalletPreview
 
             wizardPagedContent
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 7) // Match the wallet preview card width above.
                 .frame(maxHeight: .infinity)
                 .background(.clear)
 
             wizardPageDotRow
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // 阻止键盘弹出时压缩整列布局：TabView 相邻卡片的顶部内容
+        // 否则会随键盘一起上移，收起时再滑落。键盘直接覆盖当前卡片下方区域。
+        .ignoresSafeArea(.keyboard)
     }
 
     private var wizardPageDotRow: some View {
@@ -428,7 +432,14 @@ struct AddPetWizardView: View {
                     var tx = Transaction()
                     tx.disablesAnimations = true
                     withTransaction(tx) {
-                        if let cropped { avatarImageData = cropped.jpegData(compressionQuality: 0.92) }
+                        if let cropped {
+                            // Preserve alpha: transparent cutout subjects (from "Copy Subject")
+                            // must be saved as PNG so isTransparentPNG detection stays accurate.
+                            let hasAlpha = ImageCutoutService.imageHasTransparentPixels(cropped)
+                            avatarImageData = hasAlpha
+                                ? cropped.pngData()
+                                : cropped.jpegData(compressionQuality: 0.92)
+                        }
                         cropImageItem = nil
                         photosPickerItem = nil
                     }
@@ -2621,34 +2632,6 @@ struct AddPetWizardView: View {
         return VStack(alignment: .leading, spacing: 14) {
             meshCardLabel(l.petWizMesh2).padding(.top, 14).padding(.horizontal, 20)
 
-            ZStack {
-                if let data = avatarImageData, let ui = UIImage(data: data) {
-                    let isTransparent = ImageCutoutService.isTransparentPNG(data)
-                    if isTransparent {
-                        Image(uiImage: ui).resizable().scaledToFit().frame(maxWidth: .infinity).frame(height: 130)
-                    } else {
-                        Image(uiImage: ui).resizable().scaledToFill().frame(maxWidth: .infinity).frame(height: 130)
-                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    }
-                } else {
-                    // 未选图 / 未拍照 / 未粘贴：预览区保持空白，仅保留底板与描边
-                    Color.clear
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 130)
-                        .contentShape(Rectangle())
-                }
-            }
-            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(
-                        Color.goPrimary.opacity(avatarImageData != nil ? (colorScheme == .dark ? 0.55 : 0.45) : (colorScheme == .dark ? 0.35 : 0.22)),
-                        lineWidth: 1.5
-                    )
-            )
-            .onTapGesture { pastePasteboardImage() }
-            .padding(.horizontal, 20)
-
             HStack(spacing: 8) {
                 Button { pastePasteboardImage() } label: {
                     HStack(spacing: 5) {
@@ -2777,52 +2760,57 @@ struct AddPetWizardView: View {
     // MARK: - Wizard Card 4
     private var wizardCard4Appearance: some View {
         let l = wizardL10n
-        return VStack(alignment: .leading, spacing: 14) {
-            meshCardLabel(l.petWizMesh4).padding(.top, 14).padding(.horizontal, 20)
+        let bi = selectedBreedInfo
+        let coatItems = (bi?.coatColors.map { ($0.name, $0.hex) }) ?? PetBreedDatabase.genericCoatColors.map { ($0.name, $0.hex) }
+        let eyeItems = PetBreedDatabase.refinedEyeColors(breed: bi, coatColor: coatColor).map { ($0.name, $0.hex) }
+        let coatPatterns = PetCoatPattern.patterns(forBreed: bi)
 
-            let bi = selectedBreedInfo
-            let coatItems = (bi?.coatColors.map { ($0.name, $0.hex) }) ?? PetBreedDatabase.genericCoatColors.map { ($0.name, $0.hex) }
-            let eyeItems = PetBreedDatabase.refinedEyeColors(breed: bi, coatColor: coatColor).map { ($0.name, $0.hex) }
-            let coatPatterns = PetCoatPattern.patterns(forBreed: bi)
+        return VStack(alignment: .leading, spacing: 0) {
+            meshCardLabel(l.petWizMesh4).padding(.top, 14).padding(.horizontal, 20).padding(.bottom, 14)
 
-            if bi == nil {
-                Text(l.petWizAppearanceNoBreedHint)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 20)
-            }
-
-            colorSectionOnMesh(title: l.petWizCoatSection, items: coatItems, patternItems: coatPatterns, selected: $coatColor, showCustomPicker: $showCoatColorSheet, customColor: $customCoatUIColor, swatchLayout: .wrappingGrid)
-            colorSectionOnMesh(title: l.petWizEyeSection, items: eyeItems, patternItems: [], selected: $eyeColor, showCustomPicker: $showEyeColorSheet, customColor: $customEyeUIColor, swatchLayout: .wrappingGrid)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text(l.petWizThemeSection).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(.secondary).padding(.horizontal, 20)
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6), spacing: 10) {
-                    ForEach(PetThemeColor.allCases, id: \.rawValue) { tc in
-                        let tcHex = tc.hexValue
-                        let isUsed = usedThemeColorHexes.contains(tcHex.uppercased())
-                        Button { if !isUsed { withAnimation(.spring(response: 0.3)) { themeColorHex = tcHex } } } label: {
-                            ZStack {
-                                Circle().fill(tc.color.opacity(isUsed ? 0.3 : 1.0)).frame(width: 36, height: 36)
-                                if themeColorHex.uppercased() == tcHex.uppercased() {
-                                    Circle().strokeBorder(.white, lineWidth: 2)
-                                    Image(systemName: "checkmark").font(.system(size: 11, weight: .black)).foregroundStyle(.black)
-                                }
-                                if isUsed { Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(Color.primary.opacity(0.55)) }
-                            }
-                        }.disabled(isUsed)
+            // 可滚动区域：内容超出卡片高度时可上下滑，底部留白让圆角可见
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 14) {
+                    if bi == nil {
+                        Text(l.petWizAppearanceNoBreedHint)
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 20)
                     }
-                    ColorPicker("", selection: Binding(
-                        get: { Color(hex: themeColorHex) },
-                        set: { newColor in if let hex = newColor.toHex() { themeColorHex = hex } }
-                    ), supportsOpacity: false)
-                    .labelsHidden().frame(width: 36, height: 36).scaleEffect(1.2).clipShape(Circle())
-                    .overlay(Circle().strokeBorder(Color.black.opacity(0.15), lineWidth: 1))
-                }
-                .padding(.horizontal, 20)
-            }
 
-            Spacer()
+                    colorSectionOnMesh(title: l.petWizCoatSection, items: coatItems, patternItems: coatPatterns, selected: $coatColor, showCustomPicker: $showCoatColorSheet, customColor: $customCoatUIColor, swatchLayout: .wrappingGrid)
+                    colorSectionOnMesh(title: l.petWizEyeSection, items: eyeItems, patternItems: [], selected: $eyeColor, showCustomPicker: $showEyeColorSheet, customColor: $customEyeUIColor, swatchLayout: .wrappingGrid)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(l.petWizThemeSection).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(.secondary).padding(.horizontal, 20)
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6), spacing: 10) {
+                            ForEach(PetThemeColor.allCases, id: \.rawValue) { tc in
+                                let tcHex = tc.hexValue
+                                let isUsed = usedThemeColorHexes.contains(tcHex.uppercased())
+                                Button { if !isUsed { withAnimation(.spring(response: 0.3)) { themeColorHex = tcHex } } } label: {
+                                    ZStack {
+                                        Circle().fill(tc.color.opacity(isUsed ? 0.3 : 1.0)).frame(width: 36, height: 36)
+                                        if themeColorHex.uppercased() == tcHex.uppercased() {
+                                            Circle().strokeBorder(.white, lineWidth: 2)
+                                            Image(systemName: "checkmark").font(.system(size: 11, weight: .black)).foregroundStyle(.black)
+                                        }
+                                        if isUsed { Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(Color.primary.opacity(0.55)) }
+                                    }
+                                }.disabled(isUsed)
+                            }
+                            ColorPicker("", selection: Binding(
+                                get: { Color(hex: themeColorHex) },
+                                set: { newColor in if let hex = newColor.toHex() { themeColorHex = hex } }
+                            ), supportsOpacity: false)
+                            .labelsHidden().frame(width: 36, height: 36).scaleEffect(1.2).clipShape(Circle())
+                            .overlay(Circle().strokeBorder(Color.black.opacity(0.15), lineWidth: 1))
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                }
+                // 底部留白，使卡片底部圆角清晰可见
+                .padding(.bottom, 24)
+            }
         }
     }
 
@@ -3190,12 +3178,16 @@ struct AddPetWizardView: View {
                         showBreedPickerSheet = false
                     } label: {
                         HStack {
-                            Text(l.petWizBreedNone).font(.system(size: 15, weight: breed.isEmpty && !isCustomBreed ? .bold : .medium, design: .rounded)).foregroundStyle(.primary)
+                            Text(l.petWizBreedNone)
+                                .font(.system(size: 15, weight: breed.isEmpty && !isCustomBreed ? .bold : .medium, design: .rounded))
+                                .foregroundStyle(Color.primary)
                             Spacer()
                             if breed.isEmpty && !isCustomBreed { Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.goPrimary) }
-                        }.padding(.horizontal, 16).padding(.vertical, 12)
+                        }
+                        .padding(.horizontal, 16).padding(.vertical, 12)
                         .background(breed.isEmpty && !isCustomBreed ? Color.goPrimary.opacity(0.12) : Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
                     }
+                    .buttonStyle(.plain)
                     ForEach(currentBreeds) { b in
                         let isOther = b.name == "其他"
                         let isSelected = (isOther && isCustomBreed) || (!isCustomBreed && breed == b.name)
@@ -3204,12 +3196,16 @@ struct AddPetWizardView: View {
                             else { breed = b.name; isCustomBreed = false; customBreedText = ""; themeColorHex = b.suggestedThemeHex; coatColor = b.coatColors.first?.name ?? ""; eyeColor = b.eyeColors.first?.name ?? ""; showBreedPickerSheet = false }
                         } label: {
                             HStack {
-                                Text(b.name).font(.system(size: 15, weight: isSelected ? .bold : .medium, design: .rounded)).foregroundStyle(.primary)
+                                Text(b.name)
+                                    .font(.system(size: 15, weight: isSelected ? .bold : .medium, design: .rounded))
+                                    .foregroundStyle(Color.primary)
                                 Spacer()
                                 if isSelected { Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.goPrimary) }
-                            }.padding(.horizontal, 16).padding(.vertical, 12)
+                            }
+                            .padding(.horizontal, 16).padding(.vertical, 12)
                             .background(isSelected ? Color.goPrimary.opacity(0.12) : Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
                         }
+                        .buttonStyle(.plain)
                         if isOther && isCustomBreed {
                             TextField(l.petWizBreedFieldPh, text: $customBreedText).font(.system(size: 15, weight: .medium, design: .rounded)).foregroundStyle(.primary)
                                 .padding(12).background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
@@ -3418,7 +3414,11 @@ struct PetImageCropView: View {
     var silhouetteSystemName: String? = nil
     let onCrop: (UIImage?) -> Void
 
-    private let cardAspect: CGFloat = 1.586
+    /// GO 首页展开卡片尺寸：宽度 = 屏幕宽 - 两侧 7pt，固定高 360pt。
+    /// 头像裁剪使用这个尺寸，确保普通照片在首页展开卡片中可以 1:1 填满；
+    /// 小卡片再按高度等比缩小并左对齐融合。
+    private let cardMargin: CGFloat = 7
+    private let expandedCardHeight: CGFloat = 360
     private let cornerRadius: CGFloat = 24
 
     @Environment(\.colorScheme) private var colorScheme
@@ -3432,9 +3432,18 @@ struct PetImageCropView: View {
     @State private var containerSize: CGSize = .zero
 
     private func cropSize(for container: CGSize) -> (w: CGFloat, h: CGFloat) {
-        let maxW = max(container.width - 24, 220)
-        let cw = min(maxW, max(ScreenCompat.width - 48, 220))
-        let ch = cw / cardAspect
+        let targetW = max(container.width - cardMargin * 2, 220)
+        let targetAspect = targetW / expandedCardHeight
+        let availableH = max(container.height - 170, 260)
+        let cw: CGFloat
+        let ch: CGFloat
+        if expandedCardHeight <= availableH {
+            cw = targetW
+            ch = expandedCardHeight
+        } else {
+            ch = availableH
+            cw = ch * targetAspect
+        }
         return (cw, ch)
     }
 
@@ -3459,27 +3468,11 @@ struct PetImageCropView: View {
                     .frame(width: geo.size.width, height: geo.size.height)
                     .scaleEffect(scale, anchor: .center)
                     .offset(offset)
-                    .simultaneousGesture(
-                        SimultaneousGesture(
-                            MagnifyGesture()
-                                .onChanged { v in
-                                    let proposed = lastScale * v.magnification
-                                    let mn = minScale(cropW: cropW, cropH: cropH)
-                                    scale = min(maxScale, max(mn, proposed))
-                                }
-                                .onEnded { _ in lastScale = scale },
-                            DragGesture(minimumDistance: 0)
-                                .onChanged { v in
-                                    offset = CGSize(
-                                        width: lastOffset.width + v.translation.width,
-                                        height: lastOffset.height + v.translation.height
-                                    )
-                                }
-                                .onEnded { _ in lastOffset = offset }
-                        )
-                    )
+                    .allowsHitTesting(false)
 
+                // 遮罩层不参与手势命中，确保暗色区域的双指操作能穿透到 ZStack
                 CardCropOverlay(cropW: cropW, cropH: cropH, cornerRadius: cornerRadius)
+                    .allowsHitTesting(false)
 
                 // 左半区大轮廓引导（居中于取景框左半）
                 HStack(spacing: 0) {
@@ -3517,6 +3510,26 @@ struct PetImageCropView: View {
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .clipped()
+            // 手势挂在 ZStack 顶层，整个屏幕（含暗色遮罩区）均可触发缩放与拖移
+            .simultaneousGesture(
+                SimultaneousGesture(
+                    MagnifyGesture()
+                        .onChanged { v in
+                            let proposed = lastScale * v.magnification
+                            let mn = minScale(cropW: cropW, cropH: cropH)
+                            scale = min(maxScale, max(mn, proposed))
+                        }
+                        .onEnded { _ in lastScale = scale },
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { v in
+                            offset = CGSize(
+                                width: lastOffset.width + v.translation.width,
+                                height: lastOffset.height + v.translation.height
+                            )
+                        }
+                        .onEnded { _ in lastOffset = offset }
+                )
+            )
             .onAppear {
                 containerSize = geo.size
                 let img = normalizedImage(image)
@@ -3525,7 +3538,11 @@ struct PetImageCropView: View {
                 let aspectFit = min(geo.size.width / iw, geo.size.height / ih)
                 fitDisplaySize = CGSize(width: iw * aspectFit, height: ih * aspectFit)
                 let mn = minScale(cropW: cropW, cropH: cropH)
-                let s = max(mn, 1.0)
+                // Cover scale: 图片恰好填满整个取景框（两方向中较大的那个）
+                // 相当于 CSS `object-fit: cover` — 用户拖动选择要保留哪个区域
+                let fw = fitDisplaySize.width  > 0 ? cropW / fitDisplaySize.width  : 1.0
+                let fh = fitDisplaySize.height > 0 ? cropH / fitDisplaySize.height : 1.0
+                let s = max(mn, max(fw, fh))
                 scale = s
                 lastScale = s
             }
@@ -3581,44 +3598,57 @@ struct PetImageCropView: View {
             return
         }
 
+        // ──────────────────────────────────────────────────────────────────
+        // WYSIWYG 渲染：输出画布与取景框同尺寸，图片按它在预览中相对取景框的
+        // 位置 / 缩放直接绘制。越界部分由 UIKit 自动裁剪，不足部分保持黑底——
+        // 与裁剪预览中用户看到的完全一致，消除因 clamp 导致的比例拉伸。
+        // ──────────────────────────────────────────────────────────────────
+
         let fitScale = min(viewSize.width / iw, viewSize.height / ih)
         let totalScale = fitScale * scale
         let displayW = iw * totalScale
         let displayH = ih * totalScale
 
-        let imgOriginX = (viewSize.width - displayW) / 2 + offset.width
+        // 图片左上角在视图坐标中的位置
+        let imgOriginX = (viewSize.width  - displayW) / 2 + offset.width
         let imgOriginY = (viewSize.height - displayH) / 2 + offset.height
 
-        let cropOriginX = (viewSize.width - cropW) / 2
+        // 取景框左上角在视图坐标中的位置
+        let cropOriginX = (viewSize.width  - cropW) / 2
         let cropOriginY = (viewSize.height - cropH) / 2
 
-        let relX = cropOriginX - imgOriginX
-        let relY = cropOriginY - imgOriginY
-
-        let pixelScale = totalScale / src.scale
-        let srcX = max(0, relX / pixelScale)
-        let srcY = max(0, relY / pixelScale)
-        let srcW = cropW / pixelScale
-        let srcH = cropH / pixelScale
-        let clampedW = min(srcW, iw - srcX)
-        let clampedH = min(srcH, ih - srcY)
-
-        guard clampedW > 0, clampedH > 0,
-              let cgCrop = src.cgImage?.cropping(to: CGRect(
-                x: srcX * src.scale, y: srcY * src.scale,
-                width: clampedW * src.scale, height: clampedH * src.scale
-              ))
-        else {
-            onCrop(src)
-            return
-        }
+        // 图片左上角相对于取景框左上角的偏移（视图点）
+        // 正值 = 图片在取景框内向右/下偏移；负值 = 超出取景框左/上边缘
+        let dx = imgOriginX - cropOriginX
+        let dy = imgOriginY - cropOriginY
 
         let screenScale = UIGraphicsImageRendererFormat.default().scale
         let outW = cropW * screenScale
         let outH = cropH * screenScale
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: outW, height: outH))
+
+        // 输出画布中图片的绘制矩形（screenScale 倍率放大）
+        let drawRect = CGRect(
+            x: dx * screenScale,
+            y: dy * screenScale,
+            width:  displayW * screenScale,
+            height: displayH * screenScale
+        )
+
+        // Detect whether the source image has meaningful transparent pixels
+        // (e.g. a "Copy Subject" cutout). Many Photos PNGs carry an alpha
+        // channel while all pixels are opaque; those must be treated as normal
+        // photos so they render as full-card images, not pasted subjects.
+        let srcHasAlpha = ImageCutoutService.imageHasTransparentPixels(src)
+
+        let fmt = UIGraphicsImageRendererFormat.default()
+        fmt.scale = screenScale
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: outW, height: outH), format: fmt)
         let cropped = renderer.image { _ in
-            UIImage(cgImage: cgCrop).draw(in: CGRect(x: 0, y: 0, width: outW, height: outH))
+            if !srcHasAlpha {
+                UIColor.black.setFill()
+                UIRectFill(CGRect(x: 0, y: 0, width: outW, height: outH))
+            }
+            src.draw(in: drawRect)
         }
         onCrop(cropped)
     }
@@ -3911,4 +3941,3 @@ private struct AhaHatchOverlay: View {
         }
     }
 }
-

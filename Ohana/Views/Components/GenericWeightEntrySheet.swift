@@ -258,15 +258,17 @@ struct GenericWeightEntrySheet: View {
 
     private func save() {
         guard let w = parsedWeight, w > 0 else { return }
+        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            .flatMap { $0.isEmpty ? nil : $0 }
         let coconutBefore = QuestManager.shared.coconutCount
         switch target {
         case .pet(let p):
             let bcs = autoBcsForPet ?? 0
-            let log = PetWeightLog(date: selectedDate, weight: w, weightUnit: weightUnit, bcsScore: bcs, pet: p)
+            let log = PetWeightLog(date: selectedDate, weight: w, weightUnit: weightUnit, bcsScore: bcs, pet: p, executorId: executorId)
             modelContext.insert(log)
             QuestManager.shared.awardAction(type: .weight, pet: p, context: modelContext) // Also reward user
         case .human(let h):
-            let log = HumanWeightLog(date: selectedDate, weight: w, human: h)
+            let log = HumanWeightLog(date: selectedDate, weight: w, human: h, executorId: executorId)
             modelContext.insert(log)
             h.weightLogs.append(log)
         }

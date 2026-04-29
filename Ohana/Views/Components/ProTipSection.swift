@@ -23,9 +23,15 @@ struct ProTipSection: View {
     private var cardBorder: Color {
         Color.goPrimary.opacity(colorScheme == .light ? 0.42 : 0.55)
     }
-    
+
     private var titleColor: Color {
         colorScheme == .light ? .primary : .white
+    }
+
+    /// goLime (#C8FF00) is near-invisible on the warm-cream light background;
+    /// swap to a dark olive-green in light mode for proper contrast.
+    private var highlightColor: Color {
+        colorScheme == .light ? Color(hex: "4F7A00") : Color.goPrimary
     }
 
     var body: some View {
@@ -35,13 +41,13 @@ struct ProTipSection: View {
                 // 魔法图标
                 ZStack {
                     Circle()
-                        .fill(Color.goPrimary.opacity(colorScheme == .light ? 0.14 : 0.28))
+                        .fill(highlightColor.opacity(colorScheme == .light ? 0.14 : 0.28))
                         .frame(width: 36, height: 36)
-                    
+
                     Image(systemName: "sparkles")
                         .font(.system(size: 16, weight: .bold))
                         .symbolRenderingMode(.monochrome)
-                        .foregroundStyle(Color.goPrimary)
+                        .foregroundStyle(highlightColor)
                 }
                 
                 Text(l.petProTipTitle)
@@ -66,23 +72,23 @@ struct ProTipSection: View {
                     text: l.petProTipStep1Prefix,
                     highlightText: l.petProTipStep1Highlight,
                     suffix: "",
-                    highlightColor: Color.goPrimary
+                    highlightColor: highlightColor
                 )
-                
+
                 StepRow(
                     icon: "2.circle.fill",
                     text: l.petProTipStep2Prefix,
                     highlightText: l.petProTipStep2Highlight,
                     suffix: l.petProTipStep2Suffix,
-                    highlightColor: Color.goPrimary
+                    highlightColor: highlightColor
                 )
-                
+
                 StepRow(
                     icon: "3.circle.fill",
                     text: l.petProTipStep3Prefix,
                     highlightText: l.petProTipStep3Highlight,
                     suffix: "",
-                    highlightColor: Color.goPrimary
+                    highlightColor: highlightColor
                 )
             }
         }

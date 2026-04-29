@@ -404,6 +404,37 @@ struct SettingsView: View {
 
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
 
+                            NavigationLink {
+                                GoFocusUIView()
+                            } label: {
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .fill(Color.goPrimary.opacity(0.12))
+                                            .frame(width: 32, height: 32)
+                                        Image(systemName: "paintpalette.fill")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundStyle(Color.goPrimary)
+                                    }
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Go Focus UI")
+                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                            .foregroundStyle(primaryText)
+                                        Text("App UI 规范 · 寒蝉字体 · 控件示例")
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(tertiaryText)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(tertiaryText.opacity(0.6))
+                                }
+                                .padding(.vertical, 8)
+                            }
+                            .buttonStyle(.plain)
+
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+
                             Button {
                                 showingFocusStackTest = true
                             } label: {
@@ -886,7 +917,15 @@ struct SettingsView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         } else {
             content()
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .background(
+                    (colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.76)),
+                    in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.black.opacity(0.06), lineWidth: 1)
+                }
+                .shadow(color: .black.opacity(colorScheme == .dark ? 0.18 : 0.05), radius: 12, x: 0, y: 6)
         }
     }
 }

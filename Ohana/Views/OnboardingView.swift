@@ -77,13 +77,15 @@ struct OnboardingView: View {
 
     private struct IntroCard: Identifiable {
         let id: String
+        let label: String
         let title: String
         let subtitle: String
         let icon: String
-        let emoji: String
         let color: Color
+        let labelForeground: Color
         let iconForeground: Color
         let bullets: [String]
+        let mockRows: [String]
     }
 
     @State private var step: FlowStep = .intro
@@ -100,44 +102,64 @@ struct OnboardingView: View {
     private var introCards: [IntroCard] {
         [
         IntroCard(
-            id: "overview",
-            title: isEnglish ? "Care for everyone at a glance" : "照顾全家，一眼看懂",
-            subtitle: isEnglish ? "Pets, people, and plants share one island with their own cards, status, and records." : "宠物、家人、植物都在同一个岛上，各自有卡片、状态和记录。",
+            id: "home",
+            label: isEnglish ? "HOME" : "首页",
+            title: isEnglish ? "One home for every family member" : "把宠物和家人的状态放在一个首页",
+            subtitle: isEnglish ? "Wallet-style cards show who needs attention, what changed, and where to jump next." : "像钱包一样的卡片堆，直接看到谁需要照顾、今天发生了什么、下一步去哪。",
             icon: "rectangle.stack.fill",
-            emoji: "🏝️",
             color: Color(hex: "5B6AFF"),
+            labelForeground: .white,
             iconForeground: .white,
-            bullets: isEnglish ? ["Home card overview", "Jump into details", "Light and dark ready"] : ["首页卡片总览", "快速进入详情", "深浅色自动适配"]
+            bullets: isEnglish ? ["Pet, human, and plant cards", "Tap to expand full details", "No spreadsheet-style chaos"] : ["宠物、家人、植物统一管理", "点击卡片展开完整信息", "不用在多个表格里找记录"],
+            mockRows: isEnglish ? ["Mochi · walk due", "Lilo · water changed", "Family · 2 helpers"] : ["Mochi · 今天待遛", "Lilo · 换水已完成", "家人 · 2 位协作者"]
         ),
         IntroCard(
             id: "quick",
-            title: isEnglish ? "Quick logs, no disruption" : "快捷打卡，不打扰生活",
-            subtitle: isEnglish ? "Record play, weight, walks, workouts, medication, and other moments in seconds." : "陪玩、体重、遛狗、运动、吃药和日常时刻都能快速记录。",
+            label: isEnglish ? "QUICK LOGS" : "快速记录",
+            title: isEnglish ? "Log care in seconds" : "喂食、喂水、铲屎、逗玩几秒完成",
+            subtitle: isEnglish ? "Daily actions stay lightweight, with the current device owner automatically recorded as the executor." : "日常照顾不需要填长表单，执行者会自动绑定为当前手机使用者。",
             icon: "bolt.heart.fill",
-            emoji: "⚡️",
             color: Color.goLime,
+            labelForeground: Color.arkInk,
             iconForeground: Color.arkInk,
-            bullets: isEnglish ? ["Fast daily records", "Long press for details", "Earn coconut rewards"] : ["快速完成日常记录", "长按进入详情页", "自动获得椰子奖励"]
+            bullets: isEnglish ? ["Feed, water, litter, play", "Weight and health records", "Executor saved automatically"] : ["喂食/喂水/换水/铲屎/便便/逗玩", "体重、护理、健康也能快速记录", "自动记录是谁做的"],
+            mockRows: isEnglish ? ["Feed +1", "Water changed", "Weight 5.2 kg"] : ["喂食 +1", "换水完成", "体重 5.2 kg"]
         ),
         IntroCard(
             id: "calendar",
-            title: isEnglish ? "Reminders and calendar as backup" : "提醒和日历帮你兜底",
-            subtitle: isEnglish ? "Birthdays, vaccines, medication, food stock, and care plans can live in your calendar after you set them up." : "生日、疫苗、吃药、粮仓和护理计划会在你设置后沉淀到日历里。",
+            label: isEnglish ? "CALENDAR" : "日历提醒",
+            title: isEnglish ? "Never lose the next important date" : "疫苗、用药、生日和护理计划不再靠脑子记",
+            subtitle: isEnglish ? "Pet-specific calendars keep reminders and history tied to the right companion." : "日程会和对应宠物绑定，打开宠物日历只看它相关的安排。",
             icon: "calendar.badge.clock",
-            emoji: "🗓️",
             color: Color.goTeal,
+            labelForeground: .white,
             iconForeground: .white,
-            bullets: isEnglish ? ["Important reminders", "Trackable history", "Fewer missed tasks"] : ["重要事项提醒", "历史记录可追踪", "减少遗忘和重复"]
+            bullets: isEnglish ? ["Vaccines and medication", "Food stock and care plans", "Filter by pet"] : ["疫苗、用药、生日提醒", "粮仓和护理计划", "按宠物查看相关日程"],
+            mockRows: isEnglish ? ["Vaccine · Apr 30", "Medication · tonight", "Food stock · 6 days"] : ["疫苗 · 4月30日", "用药 · 今晚", "粮仓 · 还能吃 6 天"]
+        ),
+        IntroCard(
+            id: "family",
+            label: isEnglish ? "FAMILY" : "家庭协作",
+            title: isEnglish ? "Know who paid and who helped" : "谁照顾了、谁花了钱，都有记录",
+            subtitle: isEnglish ? "Shared care logs, payer tracking, and collaboration modules make multi-person households clearer." : "多人家庭里，照顾记录和花费支付者都会保留下来，减少重复沟通。",
+            icon: "person.2.fill",
+            color: Color(hex: "FF6B9D"),
+            labelForeground: .white,
+            iconForeground: .white,
+            bullets: isEnglish ? ["Payer saved for expenses", "Human collaboration when needed", "Clear family history"] : ["花费可记录支付者", "多人时显示家庭协作", "家庭记录更清楚"],
+            mockRows: isEnglish ? ["Paid by Alex · 32", "Litter by Jamie", "Care streak · 8 days"] : ["Alex 支付 · 32", "Jamie 铲屎", "连续照顾 · 8 天"]
         ),
         IntroCard(
             id: "oasis",
-            title: isEnglish ? "Turn consistency into a game" : "把坚持变成小游戏",
-            subtitle: isEnglish ? "Finish care actions, earn coconuts, and grow the Oasis together." : "完成任务会获得椰子，解锁绿洲奖励，让照顾变得更有趣。",
+            label: isEnglish ? "REWARDS" : "绿洲奖励",
+            title: isEnglish ? "Make consistency visible" : "把坚持照顾变成可见的成长",
+            subtitle: isEnglish ? "Care actions earn coconuts, streaks, and Oasis progress without turning chores into noise." : "完成照顾会获得椰子、连续打卡和绿洲成长，让家务变得更有反馈。",
             icon: "sparkles",
-            emoji: "🥥",
             color: Color(hex: "FFB020"),
+            labelForeground: Color.arkInk,
             iconForeground: Color.arkInk,
-            bullets: isEnglish ? ["Check-in streaks", "Oasis growth", "Family participation"] : ["连续打卡", "绿洲成长", "家庭共同参与"]
+            bullets: isEnglish ? ["Coconut rewards", "Streak feedback", "Oasis growth"] : ["椰子奖励", "连续打卡反馈", "绿洲成长"],
+            mockRows: isEnglish ? ["Coconuts +12", "Streak 8", "Oasis level 3"] : ["椰子 +12", "连续 8 天", "绿洲等级 3"]
         )
         ]
     }
@@ -267,21 +289,22 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             progressBar
                 .padding(.horizontal, 28)
-                .padding(.top, 60)
-                .padding(.bottom, 22)
+                .padding(.top, 54)
+                .padding(.bottom, 14)
 
-            VStack(spacing: 10) {
-                OhanaIconView(size: 58)
+            VStack(spacing: 7) {
+                OhanaIconView(size: 46)
                     .scaleEffect(iconPulse ? 1.04 : 1.0)
                     .shadow(color: Color.goLime.opacity(iconPulse ? 0.34 : 0.18), radius: 24)
 
                 Text(isEnglish ? "Welcome to Ohana" : "欢迎来到 Ohana")
-                    .font(.system(size: 30, weight: .black, design: .rounded))
+                    .font(.system(size: 27, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
-                Text(isEnglish ? "Meet the island in three minutes, then set up your family profile." : "三分钟认识小岛，然后建立你的家庭档案。")
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                Text(isEnglish ? "Swipe through the essentials, then set up your family." : "先看完核心功能，再开始建立你的家庭。")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.55))
                     .multilineTextAlignment(.center)
+                    .lineLimit(2)
             }
             .padding(.horizontal, 24)
 
@@ -293,8 +316,8 @@ struct OnboardingView: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(maxHeight: 430)
-            .padding(.top, 18)
+            .frame(maxHeight: 470)
+            .padding(.top, 14)
 
             introPageIndicator
                 .padding(.top, 4)
@@ -308,56 +331,61 @@ struct OnboardingView: View {
     }
 
     private func introFeatureCard(_ card: IntroCard) -> some View {
-        VStack(spacing: 22) {
-            ZStack {
-                Circle()
-                    .fill(card.color.opacity(iconPulse ? 0.26 : 0.14))
-                    .frame(width: 170, height: 170)
-                    .blur(radius: 22)
-
-                Text(card.emoji)
-                    .font(.system(size: 76))
-                    .scaleEffect(iconPulse ? 1.06 : 0.96)
-                    .rotationEffect(.degrees(iconPulse ? 3 : -3))
-
+        VStack(spacing: 14) {
+            HStack {
+                Text(card.label)
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .tracking(1.5)
+                    .foregroundStyle(card.labelForeground)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(card.color, in: Capsule())
+                Spacer()
                 Image(systemName: card.icon)
-                    .font(.system(size: 24, weight: .black))
+                    .font(.system(size: 18, weight: .black))
                     .foregroundStyle(card.iconForeground)
-                    .frame(width: 54, height: 54)
+                    .frame(width: 42, height: 42)
                     .background(card.color, in: Circle())
-                    .offset(x: 72, y: 70)
-                    .shadow(color: card.color.opacity(0.4), radius: 16, y: 8)
+                    .shadow(color: card.color.opacity(0.35), radius: 14, y: 7)
             }
-            .animation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true), value: iconPulse)
 
-            VStack(spacing: 9) {
+            VStack(alignment: .leading, spacing: 9) {
                 Text(card.title)
-                    .font(.system(size: 25, weight: .black, design: .rounded))
+                    .font(.system(size: 21, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
+                    .multilineTextAlignment(.leading)
+                    .lineSpacing(1)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.82)
 
                 Text(card.subtitle)
-                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.62))
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(3)
-                    .padding(.horizontal, 6)
+                    .multilineTextAlignment(.leading)
+                    .lineSpacing(2)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            VStack(spacing: 10) {
+            introMockScreenshot(card)
+
+            VStack(spacing: 8) {
                 ForEach(card.bullets, id: \.self) { bullet in
                     HStack(spacing: 10) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(card.color)
                         Text(bullet)
-                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
                             .foregroundStyle(.white.opacity(0.78))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
                         Spacer()
                     }
                 }
             }
-            .padding(16)
+            .padding(12)
             .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -365,7 +393,7 @@ struct OnboardingView: View {
             )
         }
         .frame(maxWidth: .infinity)
-        .padding(22)
+        .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 32, style: .continuous)
                 .fill(.ultraThinMaterial)
@@ -375,6 +403,61 @@ struct OnboardingView: View {
                 .strokeBorder(.white.opacity(0.18), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.22), radius: 24, y: 14)
+    }
+
+    private func introMockScreenshot(_ card: IntroCard) -> some View {
+        VStack(spacing: 10) {
+            HStack(alignment: .bottom, spacing: 10) {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [card.color.opacity(0.92), card.color.mix(with: .black, by: 0.34)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 82, height: 116)
+                    .overlay(alignment: .topLeading) {
+                        Image(systemName: card.icon)
+                            .font(.system(size: 20, weight: .black))
+                            .foregroundStyle(card.iconForeground)
+                            .padding(13)
+                    }
+                    .overlay(alignment: .bottomLeading) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Capsule().fill(.white.opacity(0.86)).frame(width: 44, height: 6)
+                            Capsule().fill(.white.opacity(0.42)).frame(width: 58, height: 5)
+                        }
+                        .padding(13)
+                    }
+
+                VStack(spacing: 7) {
+                    ForEach(Array(card.mockRows.enumerated()), id: \.offset) { index, row in
+                        HStack(spacing: 8) {
+                            Image(systemName: index == 0 ? "checkmark.circle.fill" : index == 1 ? "clock.fill" : "sparkles")
+                                .font(.system(size: 12, weight: .black))
+                                .foregroundStyle(index == 0 ? card.color : .white.opacity(0.65))
+                                .frame(width: 18)
+                            Text(row)
+                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.86))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 8)
+                        .background(.white.opacity(index == 0 ? 0.14 : 0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(Color(hex: "07112F").opacity(0.72), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .strokeBorder(.white.opacity(0.1), lineWidth: 1)
+        )
     }
 
     private var introPageIndicator: some View {
@@ -394,10 +477,10 @@ struct OnboardingView: View {
         VStack(spacing: 12) {
             Button(action: advanceFromWelcome) {
                 HStack(spacing: 8) {
-                    Text(isLastIntroPage ? (isEnglish ? "Create My Profile" : "建立我的档案") : (isEnglish ? "Next" : "下一张"))
+                    Text(isLastIntroPage ? (isEnglish ? "Continue" : "继续") : (isEnglish ? "Next" : "下一张"))
                         .font(.system(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(Color(hex: "1A1A2E"))
-                    Image(systemName: isLastIntroPage ? "person.crop.circle.badge.plus" : "arrow.right")
+                    Image(systemName: "arrow.right")
                         .font(.system(size: 14, weight: .black))
                         .foregroundStyle(Color(hex: "1A1A2E"))
                 }
