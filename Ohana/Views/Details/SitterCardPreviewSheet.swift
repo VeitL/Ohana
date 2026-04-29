@@ -220,7 +220,7 @@ struct SitterCardPreviewSheet: View {
             .font(.system(size: 10, weight: .bold, design: .rounded))
             .foregroundStyle(.primary.opacity(0.6))
             .padding(.horizontal, 8).padding(.vertical, 3)
-            .glassEffect(.regular, in: Capsule())
+            .goGlassBackground(Capsule())
     }
 
     // MARK: - Share

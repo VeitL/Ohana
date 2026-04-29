@@ -400,7 +400,7 @@ struct WalkSummarySheet: View {
                         .foregroundStyle(.primary.opacity(0.3))
                 }
                 .frame(width: 56, height: 56)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .goGlassBackground(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             // 右侧箭头提示
             Image(systemName: "chevron.right")

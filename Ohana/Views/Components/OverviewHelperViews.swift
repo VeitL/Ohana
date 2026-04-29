@@ -65,7 +65,7 @@ struct FloatingDockNav: View {
             }
         }
         .padding(.horizontal, 8)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .shadow(color: .black.opacity(0.25), radius: 16, x: 0, y: 6)
         .padding(.horizontal, 32)
     }
@@ -538,7 +538,7 @@ struct BentoStatCard: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .frame(height: 130)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 }
 

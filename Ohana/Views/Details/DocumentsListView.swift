@@ -89,7 +89,7 @@ struct DocumentsListView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(40)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
@@ -115,7 +115,7 @@ private struct DocumentDetailRow: View {
                 Text(doc.documentCategory.emoji)
                     .font(.system(size: 26))
                     .frame(width: 40, height: 40)
-                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .goGlassBackground(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(doc.title.isEmpty ? doc.category : doc.title)
@@ -183,11 +183,11 @@ private struct DocumentDetailRow: View {
                         .lineLimit(1)
                 }
                 .padding(10)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .goGlassBackground(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
         }
         .padding(14)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onTapGesture { onDetail() }
         .contextMenu {
             Button { onDetail() } label: {

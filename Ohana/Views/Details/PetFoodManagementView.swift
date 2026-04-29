@@ -80,7 +80,7 @@ private struct FoodReminderSheet: View {
                         TextField("标题", text: $title)
                             .font(.system(size: 15, weight: .semibold, design: .rounded))
                             .padding(.horizontal, 16).padding(.vertical, 12)
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .goGlassBackground(RoundedRectangle(cornerRadius: 12, style: .continuous))
                             .padding(.horizontal, 24)
                     }
 
@@ -95,7 +95,7 @@ private struct FoodReminderSheet: View {
                             .labelsHidden()
                     }
                     .padding(.horizontal, 24).padding(.vertical, 14)
-                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .goGlassBackground(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .padding(.horizontal, 24)
 
                     // 开始时间（可选）
@@ -161,7 +161,7 @@ private struct FoodReminderSheet: View {
                                             .foregroundStyle(recurrenceDays == days ? Color.arkInk : .primary.opacity(0.7))
                                             .padding(.horizontal, 16).padding(.vertical, 10)
                                             .background(recurrenceDays == days ? Color.goPrimary : .clear, in: Capsule())
-                                            .glassEffect(recurrenceDays == days ? .regular.tint(Color.goPrimary.opacity(0.2)) : .regular, in: Capsule())
+                                            .goSelectableSurface(isSelected: recurrenceDays == days, tint: Color.goPrimary, in: Capsule())
                                     }
                                 }
                             }
@@ -403,7 +403,7 @@ struct PetFoodManagementView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(14)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - 佛系模式卡
@@ -449,7 +449,7 @@ struct PetFoodManagementView: View {
                                     .foregroundStyle(casualDurationDays == days ? Color.arkInk : .primary)
                                     .padding(.horizontal, 16).padding(.vertical, 9)
                                     .background(casualDurationDays == days ? Color.goPrimary : .clear, in: Capsule())
-                                    .glassEffect(casualDurationDays == days ? .regular.tint(Color.goPrimary.opacity(0.2)) : .regular, in: Capsule())
+                                    .goSelectableSurface(isSelected: casualDurationDays == days, tint: Color.goPrimary, in: Capsule())
                             }
                             .buttonStyle(.plain)
                         }
@@ -487,7 +487,7 @@ struct PetFoodManagementView: View {
             }
         }
         .padding(16)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     // MARK: - 库存卡（品牌 Picker）
@@ -523,14 +523,14 @@ struct PetFoodManagementView: View {
                         .tint(Color.goOrange)
                         .padding(.horizontal, 12).padding(.vertical, 8)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .goGlassBackground(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                         if selectedBrand == "自定义品牌" {
                             TextField("输入自定义品牌名", text: $customBrandInput)
                                 .font(.system(size: 14, weight: .medium, design: .rounded))
                                 .foregroundStyle(.primary)
                                 .padding(.horizontal, 12).padding(.vertical, 8)
-                                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .goGlassBackground(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         }
                     }
 
@@ -568,7 +568,7 @@ struct PetFoodManagementView: View {
                                             }
                                             .padding(.horizontal, 10).padding(.vertical, 6)
                                             .background(stockPayerId == human.id.uuidString ? Color.goPrimary : .clear, in: Capsule())
-                                            .glassEffect(stockPayerId == human.id.uuidString ? .regular.tint(Color.goPrimary.opacity(0.2)) : .regular, in: Capsule())
+                                            .goSelectableSurface(isSelected: stockPayerId == human.id.uuidString, tint: Color.goPrimary, in: Capsule())
                                         }
                                         .buttonStyle(.plain)
                                     }
@@ -600,7 +600,7 @@ struct PetFoodManagementView: View {
                                   accent: .goYellow)
                 }
                 .padding(.vertical, 10)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                 if pet.remainingFoodDays > 0 {
                     VStack(spacing: 4) {
@@ -622,7 +622,7 @@ struct PetFoodManagementView: View {
             }
         }
         .padding(16)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     // MARK: - 喂食打卡卡
@@ -689,7 +689,7 @@ struct PetFoodManagementView: View {
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 10).padding(.vertical, 8)
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .goGlassBackground(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         Text("g").font(.system(size: 13, weight: .bold)).foregroundStyle(.primary.opacity(0.4))
                         Button {
                             let g = Double(feedGramsInput.replacingOccurrences(of: ",", with: ".")) ?? 0
@@ -735,7 +735,7 @@ struct PetFoodManagementView: View {
             }
         }
         .padding(16)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     // MARK: - 喂水卡
@@ -795,7 +795,7 @@ struct PetFoodManagementView: View {
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 10).padding(.vertical, 8)
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .goGlassBackground(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         Text("ml").font(.system(size: 13, weight: .bold)).foregroundStyle(.primary.opacity(0.4))
                         Button {
                             let ml = Double(waterMlInput) ?? 0
@@ -839,7 +839,7 @@ struct PetFoodManagementView: View {
             }
         }
         .padding(16)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
 
@@ -866,7 +866,7 @@ struct PetFoodManagementView: View {
                 }
             }
             .padding(16)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
         )
     }
 
@@ -1013,7 +1013,7 @@ struct PetFoodManagementView: View {
                 }
             }
         }
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     // MARK: - 辅助组件
@@ -1038,7 +1038,7 @@ struct PetFoodManagementView: View {
             field().foregroundStyle(.primary)
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     // MARK: - 数据操作

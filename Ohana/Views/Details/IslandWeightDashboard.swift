@@ -73,6 +73,7 @@ struct IslandWeightDashboard: View {
 
     @State private var vm = IslandUnifiedStatsViewModel()
     @State private var weightTimeRange: WeightTimeFilter = .all
+    @State private var selectedSeriesID: String? = nil
     @State private var chartRevealProgress: CGFloat = 0
 
     enum WeightTimeFilter: String, CaseIterable, Identifiable {
@@ -150,6 +151,10 @@ struct IslandWeightDashboard: View {
 
     // 全岛总质量
     private var totalIslandWeightKg: Double {
+        if let selectedSeriesID,
+           let latest = latestWeight(for: selectedSeriesID) {
+            return latest
+        }
         let petWeight  = pets.compactMap   { $0.weightLogs.sorted { $0.date > $1.date }.first?.weight }.reduce(0, +)
         let humanWeight = visibleHumans.compactMap { $0.weightLogs.sorted { $0.date > $1.date }.first?.weight }.reduce(0, +)
         return petWeight + humanWeight
@@ -192,12 +197,14 @@ struct IslandWeightDashboard: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 20) {
                 if standalone { navBar }
-                weightFloatingChart
+                memberSelector
+                weightHeroCard
                 funBentoRow
                 individualSparklineCard
                 Color.clear.frame(height: 40)
             }
             .padding(.horizontal, 16)
+            .padding(.top, standalone ? 0 : 14)
         }
     }
 
@@ -209,7 +216,7 @@ struct IslandWeightDashboard: View {
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(primaryText)
                     .frame(width: 36, height: 36)
-                    .glassEffect(.regular, in: Circle())
+                    .goGlassBackground(Circle())
             }
             .buttonStyle(.plain)
             Spacer()
@@ -222,40 +229,158 @@ struct IslandWeightDashboard: View {
         .padding(.top, 64)
     }
 
-    // MARK: - 模块 1: 全岛体重变动趋势（悬浮无卡片）
-    private var weightFloatingChart: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // 时间 filter
-            HStack {
-                Picker("", selection: $weightTimeRange) {
-                    ForEach(WeightTimeFilter.allCases) { r in
-                        Text(r.rawValue).tag(r)
+    // MARK: - Entity Selector
+    private var memberSelector: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                weightEntityChip(
+                    title: "全部",
+                    subtitle: "\(buildSparklineEntries(includeSelection: false).count) 位成员",
+                    icon: "square.grid.2x2.fill",
+                    tint: Color.goLime,
+                    isSelected: selectedSeriesID == nil
+                ) {
+                    selectedSeriesID = nil
+                }
+
+                ForEach(pets.filter { !$0.hasPassedAway }) { pet in
+                    let seriesID = "pet:\(pet.id.uuidString)"
+                    weightEntityChip(
+                        title: pet.name,
+                        subtitle: latestWeightText(for: seriesID),
+                        avatar: { FMPetAvatar(pet: pet, size: 26) },
+                        tint: Color(hex: pet.themeColorHex),
+                        isSelected: selectedSeriesID == seriesID
+                    ) {
+                        selectedSeriesID = seriesID
                     }
                 }
-                .pickerStyle(.segmented)
-            }
-            .padding(.horizontal, 4)
 
-            HStack(spacing: 6) {
-                Text("⚖️").font(.system(size: 13))
-                Text("体重趋势")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(secondaryText)
-                Spacer()
-                Text("kg")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(tertiaryText)
+                ForEach(visibleHumans) { human in
+                    let seriesID = "human:\(human.id.uuidString)"
+                    weightEntityChip(
+                        title: human.name,
+                        subtitle: latestWeightText(for: seriesID),
+                        avatar: { humanAvatarView(human, size: 26) },
+                        tint: Color(hex: human.themeColorHex),
+                        isSelected: selectedSeriesID == seriesID
+                    ) {
+                        selectedSeriesID = seriesID
+                    }
+                }
             }
-            .padding(.horizontal, 4)
-
-            if filteredWeightAbsolutes.isEmpty {
-                emptyState("暂无体重数据\n记录后即可看到趋势曲线")
-            } else {
-                weightAbsoluteLineChart
-                weightAbsoluteLegend
-            }
+            .padding(.vertical, 2)
         }
-        .padding(.horizontal, 4)
+    }
+
+    private func weightEntityChip(
+        title: String,
+        subtitle: String,
+        icon: String,
+        tint: Color,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .black))
+                    .frame(width: 26, height: 26)
+                    .background(isSelected ? .black.opacity(0.12) : tint.opacity(0.18), in: Circle())
+                weightEntityChipText(title: title, subtitle: subtitle, isSelected: isSelected)
+            }
+            .padding(.leading, 8)
+            .padding(.trailing, 12)
+            .padding(.vertical, 8)
+            .background(isSelected ? tint : Color.white.opacity(0.11), in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func weightEntityChip<Avatar: View>(
+        title: String,
+        subtitle: String,
+        @ViewBuilder avatar: () -> Avatar,
+        tint: Color,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                avatar()
+                weightEntityChipText(title: title, subtitle: subtitle, isSelected: isSelected)
+            }
+            .padding(.leading, 8)
+            .padding(.trailing, 12)
+            .padding(.vertical, 8)
+            .background(isSelected ? tint : Color.white.opacity(0.11), in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func weightEntityChipText(title: String, subtitle: String, isSelected: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(title)
+                .font(.system(size: 13, weight: .black, design: .rounded))
+                .lineLimit(1)
+            Text(subtitle)
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .lineLimit(1)
+                .opacity(0.68)
+        }
+        .foregroundStyle(isSelected ? .black : .white)
+    }
+
+    // MARK: - 模块 1: 体重趋势主卡
+    private var weightHeroCard: some View {
+        glassCard(cornerRadius: 28) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(selectedSeriesID == nil ? "全员体重趋势" : "\(selectedEntityName) 的体重趋势")
+                            .font(.system(size: 22, weight: .black, design: .rounded))
+                            .foregroundStyle(primaryText)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        HStack(alignment: .firstTextBaseline, spacing: 5) {
+                            Text(String(format: "%.1f", totalIslandWeightKg))
+                                .font(.system(size: 46, weight: .black, design: .rounded))
+                                .foregroundStyle(colorScheme == .dark ? Color.goYellow : Color.goOrange)
+                                .minimumScaleFactor(0.7)
+                                .lineLimit(1)
+                            Text("kg")
+                                .font(.system(size: 15, weight: .black, design: .rounded))
+                                .foregroundStyle(secondaryText)
+                        }
+
+                        Text(selectedSeriesID == nil ? weightComparison : selectedEntitySubtitle)
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundStyle(secondaryText)
+                            .lineLimit(2)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    Picker("", selection: $weightTimeRange) {
+                        ForEach(WeightTimeFilter.allCases) { r in
+                            Text(r.rawValue).tag(r)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 156)
+                }
+
+                if filteredWeightAbsolutes.isEmpty {
+                    emptyState("暂无体重数据\n记录后即可看到趋势曲线")
+                        .frame(height: 220)
+                } else {
+                    weightAbsoluteLineChart
+                    weightAbsoluteLegend
+                }
+            }
+            .padding(18)
+        }
     }
 
     private var filteredWeightAbsolutes: [WeightAbsolutePoint] {
@@ -270,8 +395,11 @@ struct IslandWeightDashboard: View {
             case .all:   return nil
             }
         }()
-        guard let c = cutoff else { return vm.weightAbsolutes }
-        return vm.weightAbsolutes.filter { $0.date >= c }
+        let selected = selectedSeriesID.map { sid in
+            vm.weightAbsolutes.filter { $0.seriesID == sid }
+        } ?? vm.weightAbsolutes
+        guard let c = cutoff else { return selected }
+        return selected.filter { $0.date >= c }
     }
 
     /// 按 `seriesID` 分线，避免同名多只宠物数据混成一条曲线
@@ -371,7 +499,7 @@ struct IslandWeightDashboard: View {
         }
         .chartLegend(.hidden)
         .frame(maxWidth: .infinity)
-        .frame(height: 248)
+        .frame(height: 224)
         .mask(alignment: .leading) {
             GeometryReader { geo in
                 Rectangle()
@@ -401,122 +529,150 @@ struct IslandWeightDashboard: View {
 
     // MARK: - 模块 2: 趣味 Bento（干饭王 + 全岛总质量）
     private var funBentoRow: some View {
-        HStack(spacing: 12) {
+        VStack(spacing: 12) {
             championsCard
             islandMassCard
         }
     }
 
     private var championsCard: some View {
-        glassCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("🏆 本月排行")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(primaryText)
+        glassCard(cornerRadius: 24) {
+            VStack(alignment: .leading, spacing: 2) {
+                cardHeader(icon: "trophy.fill", title: "本月变化榜", subtitle: "按本月体重变化自动计算")
 
-                if let gain = vm.gainChampion {
-                    HStack(spacing: 6) {
-                        Text(gain.emoji).font(.system(size: 18))
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("干饭王")
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundStyle(colorScheme == .dark ? Color.goYellow.opacity(0.8) : Color.goOrange)
-                            Text(gain.entityName)
-                                .font(.system(size: 12, weight: .black, design: .rounded))
-                                .foregroundStyle(primaryText)
-                                .lineLimit(1)
-                            Text("+\(String(format: "%.1f", gain.deltaPercent))%")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(colorScheme == .dark ? Color.goYellow : Color.goOrange)
-                        }
-                    }
-                } else {
-                    Text("暂无数据").font(.system(size: 11)).foregroundStyle(tertiaryText)
+                HStack(spacing: 12) {
+                    rankingTile(
+                        title: "增长最多",
+                        ranking: vm.gainChampion,
+                        accent: colorScheme == .dark ? Color.goYellow : Color.goOrange,
+                        fallback: "暂无增重数据"
+                    )
+                    rankingTile(
+                        title: "下降最多",
+                        ranking: vm.lossChampion,
+                        accent: colorScheme == .dark ? Color.goTeal : Color.goBlue,
+                        fallback: "暂无下降数据"
+                    )
                 }
-
-                if let loss = vm.lossChampion {
-                    HStack(spacing: 6) {
-                        Text(loss.emoji).font(.system(size: 18))
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("自律王")
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundStyle(colorScheme == .dark ? Color.goTeal.opacity(0.8) : Color.goBlue)
-                            Text(loss.entityName)
-                                .font(.system(size: 12, weight: .black, design: .rounded))
-                                .foregroundStyle(primaryText)
-                                .lineLimit(1)
-                            Text("\(String(format: "%.1f", loss.deltaPercent))%")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(colorScheme == .dark ? Color.goTeal : Color.goBlue)
-                        }
-                    }
-                } else {
-                    Text("暂无数据").font(.system(size: 11)).foregroundStyle(tertiaryText)
-                }
-
-                Spacer(minLength: 0)
             }
-            .padding(14)
-            .frame(height: 160)
+            .padding(16)
         }
     }
 
-    private var islandMassCard: some View {
-        glassCard {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("🌐 全岛总质量")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(primaryText)
+    private func rankingTile(title: String, ranking: FameRanking?, accent: Color, fallback: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 11, weight: .black, design: .rounded))
+                .foregroundStyle(secondaryText)
 
-                HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Text(String(format: "%.1f", totalIslandWeightKg))
-                        .font(.system(size: 36, weight: .black, design: .rounded))
-                        .foregroundStyle(colorScheme == .dark ? Color.goYellow : Color.goOrange)
-                        .minimumScaleFactor(0.6)
-                        .lineLimit(1)
-                    Text("kg")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(secondaryText)
+            if let ranking {
+                HStack(spacing: 8) {
+                    Text(ranking.emoji)
+                        .font(.system(size: 24))
+                        .frame(width: 34, height: 34)
+                        .background(accent.opacity(0.14), in: Circle())
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(ranking.entityName)
+                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .foregroundStyle(primaryText)
+                            .lineLimit(1)
+                        Text("\(ranking.deltaPercent >= 0 ? "+" : "")\(String(format: "%.1f", ranking.deltaPercent))%")
+                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .foregroundStyle(accent)
+                    }
+                }
+            } else {
+                Text(fallback)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(tertiaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
+        .background(accent.opacity(colorScheme == .dark ? 0.12 : 0.1), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var islandMassCard: some View {
+        glassCard(cornerRadius: 24) {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(
+                            colors: [Color.goLime.opacity(0.95), Color.goTeal.opacity(0.55)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                        .frame(width: 58, height: 58)
+                    Image(systemName: selectedSeriesID == nil ? "scalemass.fill" : "person.text.rectangle.fill")
+                        .font(.system(size: 23, weight: .black))
+                        .foregroundStyle(.black.opacity(0.82))
                 }
 
-                Text(weightComparison)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(tertiaryText)
-                    .lineLimit(2)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(selectedSeriesID == nil ? "全岛总质量" : "当前体重")
+                        .font(.system(size: 16, weight: .black, design: .rounded))
+                        .foregroundStyle(primaryText)
+                    Text(selectedSeriesID == nil ? "来自所有有体重记录的成员" : selectedEntityName)
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(secondaryText)
+                        .lineLimit(1)
+                }
 
-                Spacer(minLength: 0)
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(String(format: "%.1f", totalIslandWeightKg))
+                        .font(.system(size: 34, weight: .black, design: .rounded))
+                        .foregroundStyle(colorScheme == .dark ? Color.goYellow : Color.goOrange)
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
+                    Text("kg")
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(secondaryText)
+                }
             }
-            .padding(14)
-            .frame(height: 160)
+            .padding(16)
         }
     }
 
     // MARK: - 模块 3: 个体 Sparkline 清单
     private var individualSparklineCard: some View {
-        glassCard {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 6) {
-                    Text("📊").font(.system(size: 14))
-                    Text("个体体重清单")
-                        .font(.system(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(primaryText)
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            cardHeader(icon: "waveform.path.ecg", title: "成员体重卡片", subtitle: "点进单个成员查看记录和新增体重")
 
-                let allEntries = buildSparklineEntries()
-                if allEntries.isEmpty {
+            let allEntries = buildSparklineEntries()
+            if allEntries.isEmpty {
+                glassCard(cornerRadius: 24) {
                     emptyState("暂无个体体重数据")
-                } else {
-                    VStack(spacing: 0) {
-                        ForEach(Array(allEntries.enumerated()), id: \.offset) { idx, entry in
-                            sparklineRow(entry: entry)
-                            if idx < allEntries.count - 1 {
-                                Divider().background(colorScheme == .dark ? .white.opacity(0.06) : .black.opacity(0.06))
-                            }
-                        }
+                        .padding(24)
+                }
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(allEntries) { entry in
+                        sparklineRow(entry: entry)
                     }
                 }
             }
-            .padding(16)
+        }
+    }
+
+    private func cardHeader(icon: String, title: String, subtitle: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .black))
+                .foregroundStyle(Color.goLime)
+                .frame(width: 28, height: 28)
+                .background(Color.goLime.opacity(0.14), in: Circle())
+            VStack(alignment: .leading, spacing: 14) {
+                Text(title)
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .foregroundStyle(primaryText)
+                Text(subtitle)
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(secondaryText)
+            }
+            Spacer()
         }
     }
 
@@ -532,9 +688,11 @@ struct IslandWeightDashboard: View {
         let humanRef: Human?
     }
 
-    private func buildSparklineEntries() -> [SparkEntry] {
+    private func buildSparklineEntries(includeSelection: Bool = true) -> [SparkEntry] {
         var result: [SparkEntry] = []
         for pet in pets {
+            let seriesID = "pet:\(pet.id.uuidString)"
+            if includeSelection, let selectedSeriesID, selectedSeriesID != seriesID { continue }
             let sorted = pet.weightLogs.sorted { $0.date < $1.date }
             guard !sorted.isEmpty else { continue }
             let pts = sorted.map { SparkPoint(date: $0.date, weight: $0.weight) }
@@ -547,6 +705,8 @@ struct IslandWeightDashboard: View {
             ))
         }
         for human in visibleHumans {
+            let seriesID = "human:\(human.id.uuidString)"
+            if includeSelection, let selectedSeriesID, selectedSeriesID != seriesID { continue }
             let sorted = human.weightLogs.sorted { $0.date < $1.date }
             guard !sorted.isEmpty else { continue }
             let pts = sorted.map { SparkPoint(date: $0.date, weight: $0.weight) }
@@ -562,36 +722,47 @@ struct IslandWeightDashboard: View {
     }
 
     private func sparklineRow(entry: SparkEntry) -> some View {
-        let rowContent = HStack(spacing: 12) {
-            Text(entry.emoji).font(.system(size: 22))
+        let rowContent = HStack(spacing: 14) {
+            Text(entry.emoji)
+                .font(.system(size: 24))
+                .frame(width: 46, height: 46)
+                .background(entry.accentColor.opacity(0.16), in: Circle())
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.name)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(.system(size: 16, weight: .black, design: .rounded))
                     .foregroundStyle(primaryText)
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
                     Text(String(format: "%.1f", entry.current))
-                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .font(.system(size: 24, weight: .black, design: .rounded))
                         .foregroundStyle(entry.accentColor)
                     Text("kg")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(tertiaryText)
                 }
             }
 
             Spacer()
 
-            // 极简无轴 Sparkline
             if entry.history.count > 1 {
                 AnimatedWeightSparkline(history: entry.history, accentColor: entry.accentColor)
-                .frame(width: 80, height: 36)
+                    .frame(width: 104, height: 44)
             }
 
             Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(tertiaryText.opacity(0.6))
         }
-        .padding(.vertical, 10)
+        .padding(14)
+        .frame(minHeight: 86)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(entry.accentColor.opacity(colorScheme == .dark ? 0.12 : 0.08))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(entry.accentColor.opacity(0.14), lineWidth: 1)
+        }
         .contentShape(Rectangle())
 
         return Group {
@@ -618,23 +789,74 @@ struct IslandWeightDashboard: View {
             .foregroundStyle(tertiaryText)
             .frame(maxWidth: .infinity, alignment: .center)
     }
+
+    private var selectedEntityName: String {
+        guard let selectedSeriesID else { return "全部成员" }
+        if selectedSeriesID.hasPrefix("pet:"),
+           let id = UUID(uuidString: String(selectedSeriesID.dropFirst(4))),
+           let pet = pets.first(where: { $0.id == id }) {
+            return pet.name
+        }
+        if selectedSeriesID.hasPrefix("human:"),
+           let id = UUID(uuidString: String(selectedSeriesID.dropFirst(6))),
+           let human = visibleHumans.first(where: { $0.id == id }) {
+            return human.name
+        }
+        return "成员"
+    }
+
+    private var selectedEntitySubtitle: String {
+        guard let selectedSeriesID else { return weightComparison }
+        let count = vm.weightAbsolutes.filter { $0.seriesID == selectedSeriesID }.count
+        return count == 0 ? "还没有体重记录" : "\(count) 条体重记录"
+    }
+
+    private func latestWeight(for seriesID: String) -> Double? {
+        vm.weightAbsolutes
+            .filter { $0.seriesID == seriesID }
+            .max(by: { $0.date < $1.date })?
+            .weight
+    }
+
+    private func latestWeightText(for seriesID: String) -> String {
+        guard let weight = latestWeight(for: seriesID) else { return "暂无记录" }
+        return String(format: "%.1fkg", weight)
+    }
+
+    private func humanAvatarView(_ human: Human, size: CGFloat) -> some View {
+        let color = Color(hex: human.themeColorHex.isEmpty ? "4ECDC4" : human.themeColorHex)
+        return ZStack {
+            Circle().fill(color.opacity(0.24)).frame(width: size, height: size)
+            if let data = human.avatarImageData, let img = UIImage(data: data) {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            } else {
+                Text(String(human.name.prefix(1)))
+                    .font(.system(size: size * 0.42, weight: .black, design: .rounded))
+                    .foregroundStyle(color)
+            }
+        }
+    }
     
     // MARK: - Glass Card Helper
     @ViewBuilder
-    private func glassCard<C: View>(@ViewBuilder content: () -> C) -> some View {
+    private func glassCard<C: View>(cornerRadius: CGFloat = 24, @ViewBuilder content: () -> C) -> some View {
         if reduceTransparency {
             // 无障碍降级：纯色不透明背景
             content()
                 .background(Color(.systemBackground).opacity(0.95))
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         } else {
             // 浅色模式下更透明
             if colorScheme == .light {
                 content()
-                    .background(.ultraThinMaterial.opacity(0.3), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .background(.ultraThinMaterial.opacity(0.3), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             } else {
                 content()
-                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .goGlassBackground(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             }
         }
     }

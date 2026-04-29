@@ -360,7 +360,9 @@ struct PetHygieneDetailView: View {
                 }
                 .buttonStyle(.plain)
                 Button {
-                    let log = PetHygieneLog(date: Date(), type: type, pet: pet)
+                    let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+                        .flatMap { $0.isEmpty ? nil : $0 }
+                    let log = PetHygieneLog(date: Date(), type: type, pet: pet, executorId: executorId)
                     modelContext.insert(log)
                     modelContext.safeSave()
                     QuestManager.shared.awardAction(type: .care(type: type), pet: pet, context: modelContext)

@@ -153,7 +153,7 @@ struct QuickWaterChangeDetailSheet: View {
             }
         }
         .padding(16)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     // MARK: - Filter Section
@@ -222,7 +222,7 @@ struct QuickWaterChangeDetailSheet: View {
             }
         }
         .padding(16)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     // MARK: - History

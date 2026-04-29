@@ -187,7 +187,7 @@ struct DailyStreakDetailView: View {
             }
         }
         .padding(18)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private var checkInCalendarSection: some View {
@@ -227,7 +227,7 @@ struct DailyStreakDetailView: View {
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.primary.opacity(0.5))
                         .frame(width: 36, height: 36)
-                        .glassEffect(.regular, in: Circle())
+                        .goGlassBackground(Circle())
                 }
 
                 Spacer()
@@ -254,7 +254,7 @@ struct DailyStreakDetailView: View {
                             : Color.primary.opacity(0.5)
                         )
                         .frame(width: 36, height: 36)
-                        .glassEffect(.regular, in: Circle())
+                        .goGlassBackground(Circle())
                 }
                 .disabled(cal.isDate(selectedMonth, equalTo: Date(), toGranularity: .month))
             }
@@ -307,7 +307,7 @@ struct DailyStreakDetailView: View {
             }
         }
         .padding(16)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private var checkInStatsRow: some View {

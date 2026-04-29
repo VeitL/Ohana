@@ -116,7 +116,7 @@ struct AddHealthRecordSheet: View {
                             Text(selectedType.emoji).font(.system(size: 32))
                         }
                         .padding(16)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
 
                         if let mode = entryMode {
                             healthSubtypeCapsules(mode: mode)
@@ -327,7 +327,7 @@ struct AddHealthRecordSheet: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func applyDefaultsForSelectedType() {
@@ -349,13 +349,15 @@ struct AddHealthRecordSheet: View {
         content()
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func save() {
         // N9: 名称字段内容写入 note（如果填了名称则用它，否则用备注）
         let finalNote = showsNameField ? (name.isEmpty ? note : name + (note.isEmpty ? "" : " - " + note)) : note
-        let log = PetHealthLog(date: date, type: selectedType, note: finalNote, pet: pet)
+        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            .flatMap { $0.isEmpty ? nil : $0 }
+        let log = PetHealthLog(date: date, type: selectedType, note: finalNote, pet: pet, executorId: executorId)
         log.vetName = vetName
         log.cost = Double(cost) ?? 0
         log.expirationDate = (showsExpiration && hasExpiration) ? expirationDate : nil
@@ -364,7 +366,7 @@ struct AddHealthRecordSheet: View {
 
         // 同步费用记录
         if let amount = Double(cost), amount > 0 {
-            let expense = PetExpenseLog(date: date, amount: amount, category: .medical, note: typeLabel, pet: pet)
+            let expense = PetExpenseLog(date: date, amount: amount, category: .medical, note: typeLabel, pet: pet, executorId: executorId)
             modelContext.insert(expense)
         }
 

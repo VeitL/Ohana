@@ -15,6 +15,7 @@ enum HumanPrivateField: String, CaseIterable, Identifiable {
     case medication
     case wishlist
     case expense
+    case note
 
     var id: String { rawValue }
 
@@ -25,6 +26,7 @@ enum HumanPrivateField: String, CaseIterable, Identifiable {
         case .medication: return "吃药提醒"
         case .wishlist: return "椰子资产与心愿"
         case .expense: return "花费"
+        case .note: return "备注"
         }
     }
 }
@@ -159,6 +161,14 @@ final class Human {
         case "viewer": return "查看"
         default: return role
         }
+    }
+
+    var genderRaw: String {
+        let marker = "性别:"
+        guard let range = notes.range(of: marker) else { return "" }
+        let tail = notes[range.upperBound...]
+        let value = tail.split(separator: "｜", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? ""
+        return value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     // MARK: - 隐私控制（FIX 1）

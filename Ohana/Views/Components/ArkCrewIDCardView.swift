@@ -1039,7 +1039,7 @@ struct ArkCrewIDCardView: View {
                                     .foregroundStyle(.primary.opacity(0.5))
                             }
                             .padding(.horizontal, 12).padding(.vertical, 6)
-                            .glassEffect(.regular, in: Capsule())
+                            .goGlassBackground(Capsule())
                         }
                         .buttonStyle(.plain)
                     }
@@ -1061,7 +1061,7 @@ struct ArkCrewIDCardView: View {
                 }
             }
         }
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 32, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
         .transaction { tx in
             tx.animation = nil
@@ -1372,7 +1372,7 @@ struct ArkCrewIDCardView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .strokeBorder(Color.goPrimary.opacity(0.3), lineWidth: 1)
@@ -2730,7 +2730,8 @@ struct SpeciesCheckInGrid: View {
     private func performHygieneCheckIn(_ type: HygieneType) {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         let now = Date()
-        let log = PetHygieneLog(date: now, type: type, pet: pet)
+        let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
+        let log = PetHygieneLog(date: now, type: type, pet: pet, executorId: eid)
         modelContext.insert(log)
         let emoji: String
         let label: String

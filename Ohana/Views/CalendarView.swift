@@ -82,6 +82,8 @@ struct CalendarView: View {
     @Query(sort: \Event.startDate, order: .reverse) private var events: [Event]
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Plant.createdAt) private var plants: [Plant]
+    @Query(sort: \PetInsurance.createdAt) private var insurances: [PetInsurance]
+    @Query(sort: \PetMedication.createdAt) private var petMedications: [PetMedication]
     
     @State private var selectedDate = Date()
     @AppStorage("calendar_filterPetId") private var calendarFilterPetId: String = ""
@@ -116,9 +118,25 @@ struct CalendarView: View {
     private var filteredEvents: [Event] {
         var result = events.filter { $0.eventType != EventType.foodChange.rawValue }
         if let petId = effectivePetFilterId {
-            result = result.filter { $0.relatedEntityId == petId }
+            result = result.filter { eventIsRelatedToPet($0, petId: petId) }
         }
         return result
+    }
+
+    private func eventIsRelatedToPet(_ event: Event, petId: String) -> Bool {
+        let entityType = event.relatedEntityType.lowercased()
+        if event.relatedEntityId == petId {
+            return entityType == EntityKind.pet.rawValue.lowercased()
+                || entityType == "pet"
+                || entityType == "pet_food_stock"
+        }
+        if entityType == "pet_insurance" {
+            return insurances.first { $0.id.uuidString == event.relatedEntityId }?.pet?.id.uuidString == petId
+        }
+        if entityType == PetMedicationDoseLogging.relatedEntityTypeMedication.lowercased() {
+            return petMedications.first { $0.id.uuidString == event.relatedEntityId }?.pet?.id.uuidString == petId
+        }
+        return false
     }
 
     /// 嵌入 Overview 时顶栏 + 外层宠物条占位（经典 Ark）；略减小使宠物筛选条更靠上
@@ -279,7 +297,7 @@ struct CalendarView: View {
                 iconModeBtn(systemName: "list.bullet.rectangle.fill", mode: .list)
             }
             .padding(3)
-            .glassEffect(.regular, in: Capsule())
+            .goGlassBackground(Capsule())
 
             // 添加事件按钮
             Button { showingAddEvent = true } label: {
@@ -321,7 +339,7 @@ struct CalendarView: View {
                 iconModeBtn(systemName: "list.bullet.rectangle.fill", mode: .list)
             }
             .padding(4)
-            .glassEffect(.regular, in: Capsule())
+            .goGlassBackground(Capsule())
             .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
 
             Spacer()
@@ -447,7 +465,7 @@ struct CalendarView: View {
             iconModeBtn(systemName: "list.bullet.rectangle.fill", mode: .list)
         }
         .padding(3)
-        .glassEffect(.regular, in: Capsule())
+        .goGlassBackground(Capsule())
         .padding(.horizontal, 16)
         .padding(.bottom, 6)
     }

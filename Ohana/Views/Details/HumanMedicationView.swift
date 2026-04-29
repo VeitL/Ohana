@@ -32,7 +32,7 @@ private struct MedicationAdherenceDay: Identifiable {
 
 struct HumanMedicationView: View {
     let human: Human
-    var showsDoneButton: Bool = false
+    var showsDoneButton: Bool = true
     var onDoseTaken: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
@@ -143,14 +143,20 @@ struct HumanMedicationView: View {
                 medicationContent
             }
         }
-        .navigationTitle("💊 吃药提醒")
+        .navigationTitle("吃药提醒")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // 隐私开关（leading）
+            ToolbarItem(placement: .topBarLeading) {
+                HumanPrivacyToggleButton(human: human, field: .medication)
+            }
             if showsDoneButton {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { dismiss() }
-                        .font(OhanaFont.callout(.semibold))
-                        .foregroundStyle(Color.goPrimary)
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
@@ -172,17 +178,24 @@ struct HumanMedicationView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 20) {
-                    // Summary Bento
-                    summaryBento
+                    // ── 人物标识栏
+                    humanIdentityHeader
                         .padding(.horizontal, 16)
                         .padding(.top, 16)
+
+                    // ── 汇总 Bento
+                    summaryBento
+                        .padding(.horizontal, 16)
+
+                    overviewMetricGrid
+                        .padding(.horizontal, 16)
 
                     if !myMeds.isEmpty {
                         adherenceChartCard
                             .padding(.horizontal, 16)
                     }
 
-                    // Today's Schedule Timeline
+                    // ── 今日时间表
                     if !todayScheduleItems.isEmpty {
                         sectionLabel("今日时间表")
                         UltimateGlassCard {
@@ -199,16 +212,16 @@ struct HumanMedicationView: View {
                         .padding(.horizontal, 16)
                     }
 
-                    // Today's Doses
+                    // ── 当前用药
                     if !activeMeds.isEmpty {
-                        sectionLabel("今日服药计划")
+                        sectionLabel("当前用药")
                         ForEach(activeMeds) { med in
                             medicationRow(med)
                                 .padding(.horizontal, 16)
                         }
                     }
 
-                    // Inactive
+                    // ── 已停药
                     if !inactiveMeds.isEmpty {
                         sectionLabel("已停药")
                         ForEach(inactiveMeds) { med in
@@ -223,11 +236,11 @@ struct HumanMedicationView: View {
                             .padding(.top, 20)
                     }
 
-                    Spacer(minLength: 100)
+                    Spacer(minLength: 120)
                 }
             }
 
-            // FAB
+            // ── Toast + FAB
             VStack(spacing: 0) {
                 if showToast {
                     HStack(spacing: 8) {
@@ -245,18 +258,62 @@ struct HumanMedicationView: View {
                 Button { showAddSheet = true } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "plus")
-                            .font(OhanaFont.headline(.black))
+                            .font(.system(size: 16, weight: .black))
                         Text("添加药物")
-                            .font(OhanaFont.headline(.black))
+                            .font(.system(size: 16, weight: .black, design: .rounded))
                     }
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 28).padding(.vertical, 14)
                     .background(Color.goPrimary, in: Capsule())
                     .shadow(color: Color.goPrimary.opacity(0.4), radius: 14, y: 5)
                 }
+                .buttonStyle(.plain)
                 .padding(.bottom, 28)
             }
         }
+    }
+
+    // MARK: - Human Identity Header
+    private var humanIdentityHeader: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color(hex: human.themeColorHex).opacity(0.18))
+                    .frame(width: 48, height: 48)
+                if let data = human.avatarImageData, let img = UIImage(data: data) {
+                    Image(uiImage: img)
+                        .resizable().scaledToFill()
+                        .frame(width: 48, height: 48)
+                        .clipShape(Circle())
+                } else {
+                    Text(human.avatarEmoji).font(.system(size: 24))
+                }
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(human.name)
+                    .font(OhanaFont.headline(.bold))
+                    .foregroundStyle(.primary)
+                Text("用药管理")
+                    .font(OhanaFont.caption())
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            // 今日完成进度
+            let todayTotal = todayScheduleItems.count
+            let todayDone  = todayScheduleItems.filter { $0.log?.status == .taken }.count
+            if todayTotal > 0 {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("\(todayDone)/\(todayTotal)")
+                        .font(OhanaFont.metric(size: 20))
+                        .foregroundStyle(todayDone == todayTotal ? Color.goTeal : Color.goPrimary)
+                    Text("今日服药")
+                        .font(OhanaFont.caption2(.bold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(14)
+        .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private var privacyLockedView: some View {
@@ -284,35 +341,117 @@ struct HumanMedicationView: View {
 
     private var summaryBento: some View {
         UltimateGlassCard {
-            HStack(spacing: 12) {
-                bentoStat(
-                    icon: "pills.fill",
-                    label: "当前用药",
-                    value: "\(activeMeds.count)",
-                    color: Color.goRed
-                )
-                divider
-                bentoStat(
-                    icon: "checkmark.seal.fill",
-                    label: "今日到期",
-                    value: "\(todayEndingCount)",
-                    color: Color.goOrange
-                )
-                divider
-                bentoStat(
-                    icon: "calendar.badge.clock",
-                    label: "长期用药",
-                    value: "\(longTermCount)",
-                    color: Color.goTeal
-                )
+            HStack(spacing: 18) {
+                medicationProgressRing
+
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles")
+                            .font(OhanaFont.caption(.black))
+                            .foregroundStyle(Color.goPrimary)
+                        Text("OVERVIEW")
+                            .font(OhanaFont.caption(.black))
+                            .tracking(1.2)
+                            .foregroundStyle(tertiaryText)
+                    }
+
+                    Text(todayOverviewTitle)
+                        .font(OhanaFont.title2(.black))
+                        .foregroundStyle(primaryText)
+                        .lineLimit(2)
+
+                    Text(todayOverviewSubtitle)
+                        .font(OhanaFont.callout(.semibold))
+                        .foregroundStyle(secondaryText)
+                        .lineLimit(2)
+
+                    HStack(spacing: 8) {
+                        overviewPill("\(activeMeds.count) 个当前用药", color: Color.goRed)
+                        overviewPill("\(sevenDayCompletionRate)% 七日完成", color: Color.goPrimary)
+                    }
+                }
+
+                Spacer(minLength: 0)
             }
-            .padding(16)
+            .padding(18)
         }
     }
 
-    private var todayEndingCount: Int {
+    private var overviewMetricGrid: some View {
+        HStack(spacing: 10) {
+            overviewMetricCard(
+                icon: "checkmark.seal.fill",
+                label: "今日已服",
+                value: "\(todayTakenCount)",
+                suffix: todayPlannedCount > 0 ? "/\(todayPlannedCount)" : "",
+                color: Color.goTeal
+            )
+            overviewMetricCard(
+                icon: "forward.fill",
+                label: "已跳过",
+                value: "\(todaySkippedCount)",
+                suffix: "次",
+                color: Color.goOrange
+            )
+            overviewMetricCard(
+                icon: "calendar.badge.clock",
+                label: "即将结束",
+                value: "\(endingSoonCount)",
+                suffix: "个",
+                color: Color.goYellow
+            )
+        }
+    }
+
+    private var medicationProgressRing: some View {
+        ZStack {
+            Circle()
+                .stroke(controlFill, lineWidth: 12)
+                .frame(width: 108, height: 108)
+            Circle()
+                .trim(from: 0, to: todayCompletion)
+                .stroke(
+                    LinearGradient(colors: [Color.goPrimary, Color.goTeal], startPoint: .topLeading, endPoint: .bottomTrailing),
+                    style: StrokeStyle(lineWidth: 12, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+                .frame(width: 108, height: 108)
+            VStack(spacing: 0) {
+                Text(todayPlannedCount == 0 ? "--" : "\(Int((todayCompletion * 100).rounded()))%")
+                    .font(OhanaFont.metric(size: 26))
+                    .foregroundStyle(primaryText)
+                Text("今日")
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(tertiaryText)
+            }
+        }
+    }
+
+    private var todayPlannedCount: Int { todayScheduleItems.count }
+    private var todayTakenCount: Int { todayScheduleItems.filter { $0.log?.status == .taken }.count }
+    private var todaySkippedCount: Int { todayScheduleItems.filter { $0.log?.status == .skipped }.count }
+    private var todayResolvedCount: Int { todayTakenCount + todaySkippedCount }
+    private var todayCompletion: Double {
+        guard todayPlannedCount > 0 else { return 0 }
+        return min(1, Double(todayTakenCount) / Double(todayPlannedCount))
+    }
+
+    private var todayOverviewTitle: String {
+        if todayPlannedCount == 0 { return activeMeds.isEmpty ? "还没有服药计划" : "今日没有固定剂量" }
+        if todayTakenCount == todayPlannedCount { return "今日服药已完成" }
+        if todayResolvedCount == todayPlannedCount { return "今日记录已处理" }
+        return "还剩 \(max(0, todayPlannedCount - todayResolvedCount)) 次待记录"
+    }
+
+    private var todayOverviewSubtitle: String {
+        if todayPlannedCount == 0 { return "添加药物后，这里会展示今日进度、七日趋势和待处理剂量。" }
+        let skipped = todaySkippedCount > 0 ? " · 跳过 \(todaySkippedCount)" : ""
+        return "已服 \(todayTakenCount)/\(todayPlannedCount)\(skipped) · 长按快捷操作可直接回到这里。"
+    }
+
+    private var endingSoonCount: Int {
         activeMeds.filter {
-            if let days = $0.daysRemaining { return days <= 3 }
+            if let days = $0.daysRemaining { return days <= 7 }
             return false
         }.count
     }
@@ -427,38 +566,54 @@ struct HumanMedicationView: View {
         }
     }
 
-    private var divider: some View {
-        Rectangle()
-            .fill(dividerColor)
-            .frame(width: 1, height: 40)
-    }
-
-    private func bentoStat(icon: String, label: String, value: String, color: Color) -> some View {
+    private func overviewMetricCard(icon: String, label: String, value: String, suffix: String, color: Color) -> some View {
         VStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(OhanaFont.title3(.bold))
-                .foregroundStyle(color)
-            Text(value)
-                .font(OhanaFont.metric(size: 24))
-                .foregroundStyle(primaryText)
-            Text(label)
-                .font(OhanaFont.caption())
-                .foregroundStyle(secondaryText)
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(color)
+                Text(label)
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(tertiaryText)
+                    .lineLimit(1)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(value)
+                    .font(OhanaFont.metric(size: 24))
+                    .foregroundStyle(primaryText)
+                if !suffix.isEmpty {
+                    Text(suffix)
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(secondaryText)
+                }
+            }
         }
         .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func overviewPill(_ text: String, color: Color) -> some View {
+        Text(text)
+            .font(OhanaFont.caption2(.black))
+            .foregroundStyle(color)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(color.opacity(0.12), in: Capsule())
     }
 
     // MARK: - Schedule Timeline
 
     private func scheduleRow(_ item: DailyDoseItem) -> some View {
         let isTaken = item.log?.status == .taken
+        let isSkipped = item.log?.status == .skipped
         
         return HStack(spacing: 16) {
             // Time
             VStack(alignment: .trailing) {
                 Text(item.scheduledTime, style: .time)
                     .font(OhanaFont.callout(.bold))
-                    .foregroundStyle(isTaken ? tertiaryText : primaryText)
+                    .foregroundStyle((isTaken || isSkipped) ? tertiaryText : primaryText)
             }
             .frame(width: 52, alignment: .trailing)
             
@@ -468,13 +623,17 @@ struct HumanMedicationView: View {
             } label: {
                 ZStack {
                     Circle()
-                        .strokeBorder(isTaken ? Color.goTeal : dividerColor.opacity(0.9), lineWidth: 2)
+                        .strokeBorder(doseStatusColor(item.log?.status), lineWidth: 2)
                         .frame(width: 28, height: 28)
                         .background(
-                            Circle().fill(isTaken ? Color.goTeal : Color.clear)
+                            Circle().fill((isTaken || isSkipped) ? doseStatusColor(item.log?.status) : Color.clear)
                         )
                     if isTaken {
                         Image(systemName: "checkmark")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.black)
+                    } else if isSkipped {
+                        Image(systemName: "minus")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(.black)
                     }
@@ -486,8 +645,8 @@ struct HumanMedicationView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.medication.name)
                     .font(OhanaFont.headline(.semibold))
-                    .foregroundStyle(isTaken ? secondaryText : primaryText)
-                    .strikethrough(isTaken, color: secondaryText)
+                    .foregroundStyle((isTaken || isSkipped) ? secondaryText : primaryText)
+                    .strikethrough(isTaken || isSkipped, color: secondaryText)
                 if !item.medication.dosage.isEmpty {
                     Text(item.medication.dosage)
                         .font(OhanaFont.caption())
@@ -496,64 +655,81 @@ struct HumanMedicationView: View {
             }
             
             Spacer()
+
+            Button {
+                setDoseStatus(isSkipped ? .pending : .skipped, for: item)
+            } label: {
+                Text(isSkipped ? "已跳过" : "跳过")
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(isSkipped ? Color.goOrange : secondaryText)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background((isSkipped ? Color.goOrange : controlFill).opacity(isSkipped ? 0.16 : 1), in: Capsule())
+            }
+            .buttonStyle(.plain)
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 16)
     }
 
     private func toggleDoseStatus(_ item: DailyDoseItem) {
+        setDoseStatus(item.log?.status == .taken ? .pending : .taken, for: item)
+    }
+
+    private func setDoseStatus(_ status: HumanMedicationStatus, for item: DailyDoseItem) {
         withAnimation(.spring(response: 0.3)) {
-            if let log = item.log {
-                if log.status == .taken {
-                    log.status = .pending
-                    log.recordedTime = nil
-                } else {
-                    log.status = .taken
-                    log.recordedTime = Date()
-                    CareLedgerService.record(
-                        occurredAt: log.recordedTime ?? Date(),
-                        actorKind: .human,
-                        actorId: human.id.uuidString,
-                        subjectKind: .human,
-                        subjectId: human.id.uuidString,
-                        eventKind: .medication,
-                        actionType: "humanMedicationTaken",
-                        source: .detail,
-                        legacyModelName: "HumanMedicationLog",
-                        legacyModelId: log.id.uuidString,
-                        metadataJSON: "{\"medicationId\":\"\(item.medication.id.uuidString)\"}",
-                        context: modelContext,
-                        save: false
-                    )
-                    onDoseTaken?()
-                }
-            } else {
-                let newLog = HumanMedicationLog(
-                    humanId: human.id.uuidString,
-                    medicationId: item.medication.id.uuidString,
-                    scheduledTime: item.scheduledTime,
-                    status: .taken,
-                    recordedTime: Date()
-                )
-                modelContext.insert(newLog)
+            let log = item.log ?? HumanMedicationLog(
+                humanId: human.id.uuidString,
+                medicationId: item.medication.id.uuidString,
+                scheduledTime: item.scheduledTime
+            )
+            if item.log == nil { modelContext.insert(log) }
+
+            log.status = status
+            log.recordedTime = status == .pending ? nil : Date()
+
+            if status != .pending {
                 CareLedgerService.record(
-                    occurredAt: newLog.recordedTime ?? Date(),
+                    occurredAt: log.recordedTime ?? Date(),
                     actorKind: .human,
                     actorId: human.id.uuidString,
                     subjectKind: .human,
                     subjectId: human.id.uuidString,
                     eventKind: .medication,
-                    actionType: "humanMedicationTaken",
+                    actionType: status == .taken ? "humanMedicationTaken" : "humanMedicationSkipped",
                     source: .detail,
                     legacyModelName: "HumanMedicationLog",
-                    legacyModelId: newLog.id.uuidString,
+                    legacyModelId: log.id.uuidString,
                     metadataJSON: "{\"medicationId\":\"\(item.medication.id.uuidString)\"}",
                     context: modelContext,
                     save: false
                 )
-                onDoseTaken?()
+                if status == .taken { onDoseTaken?() }
             }
+
             modelContext.safeSave()
+            toastMessage = doseToastMessage(status, medicationName: item.medication.name)
+            showToast = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                withAnimation { showToast = false }
+            }
+        }
+    }
+
+    private func doseStatusColor(_ status: HumanMedicationStatus?) -> Color {
+        switch status {
+        case .taken: return Color.goTeal
+        case .skipped: return Color.goOrange
+        default: return dividerColor.opacity(0.9)
+        }
+    }
+
+    private func doseToastMessage(_ status: HumanMedicationStatus, medicationName: String) -> String {
+        let name = medicationName.isEmpty ? "药物" : medicationName
+        switch status {
+        case .taken: return "✅ 已记录 \(name)"
+        case .skipped: return "⏭ 已跳过 \(name)"
+        case .pending: return "↩️ 已恢复待记录"
         }
     }
 
@@ -647,6 +823,7 @@ struct HumanMedicationView: View {
                 .padding(14)
             }
         }
+        .goGlassBackground(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .buttonStyle(.plain)
     }
 

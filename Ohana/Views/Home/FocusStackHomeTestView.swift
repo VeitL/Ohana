@@ -22,11 +22,15 @@ private struct FocusCard: Identifiable {
     let color: Color
     let streak: Int
     let coconutBalance: Int
+    var createdAt: Date = .distantPast
     var daysTogetherText: String?
     var ageText: String?
     var zodiacText: String?
+    var mbtiText: String?
+    var humanEquivalentAgeText: String?
     var genderText: String?
     var avatarImageData: Data?
+    var humanGender: String? = nil
     var petSpecies: String?
     var coatColor:      Color = Color(hex: "E8C49A")
     var eyeColor:       Color = Color(hex: "6B3A2A")
@@ -45,6 +49,39 @@ private struct FocusCard: Identifiable {
         let icon: String
         let colorHex: String
     }
+}
+
+private struct HomeFabFunctionShortcut: Identifiable {
+    var label: String
+    var icon: String
+    var isAvailable: Bool = true
+    var badge: String? = nil
+    var destination: FMDest? = nil
+
+    var id: String { label }
+}
+
+private enum ExpandedCardFabAction: Hashable {
+    case quick(String)
+    case detail(PetFeature)
+    case allFeatures
+    case humanQuick(String)
+    case humanAllFeatures
+}
+
+private struct ExpandedCardFabShortcut: Identifiable {
+    var label: String
+    var icon: String
+    var action: ExpandedCardFabAction
+    var isAvailable: Bool = true
+    var badge: String? = nil
+
+    var id: String { "\(label)-\(String(describing: action))" }
+}
+
+private struct FunctionMenuPresentation: Identifiable {
+    let id = UUID()
+    let destination: FMDest?
 }
 
 private extension FocusCard {
@@ -80,9 +117,11 @@ private extension FocusCard {
             color: Color(hex: hex),
             streak: pet.currentStreak,
             coconutBalance: pet.coconutBalance,
+            createdAt: pet.createdAt,
             daysTogetherText: pet.homeDate == nil ? nil : "\(pet.daysTogether) 天",
             ageText: pet.birthday == nil ? nil : pet.ageText,
             zodiacText: pet.birthday.map { Human.westernZodiacDisplay(for: $0, isEnglish: false) },
+            humanEquivalentAgeText: pet.birthday.map { pet.humanEquivalentAgeTextForWallet(birthday: $0) },
             genderText: pet.genderSymbol + (pet.isNeutered ? " 已绝育" : ""),
             avatarImageData: pet.avatarImageData,
             petSpecies: pet.species,
@@ -108,11 +147,14 @@ private extension FocusCard {
             color: Color(hex: hex),
             streak: 0,
             coconutBalance: human.coconutBalance,
+            createdAt: human.createdAt,
             daysTogetherText: "\(days) 天",
             ageText: human.birthday == nil ? nil : human.ageText,
             zodiacText: human.birthday.map { Human.westernZodiacDisplay(for: $0, isEnglish: false) },
+            mbtiText: human.mbti.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : human.mbti.uppercased(),
             genderText: human.roleText,
             avatarImageData: human.avatarImageData,
+            humanGender: human.genderRaw,
             themeColorHex: hex,
             daysTogether:  days,
             isHuman: true,
@@ -158,6 +200,84 @@ private extension FocusCard {
     ]
 }
 
+private extension Pet {
+    func humanEquivalentAgeTextForWallet(birthday: Date) -> String {
+        let equivalent = FocusPetHumanAgeEstimator.equivalentHumanYears(
+            birthday: birthday,
+            species: species,
+            breed: breed
+        )
+        guard equivalent > 0 else { return "" }
+        return "约人类\(equivalent)岁"
+    }
+}
+
+private enum FocusPetHumanAgeEstimator {
+    static func equivalentHumanYears(birthday: Date, species: String, breed: String) -> Int {
+        let ageYears = max(0, Calendar.current.dateComponents([.day], from: birthday, to: Date()).day ?? 0) / 365
+        let preciseAge = max(0, Double(Calendar.current.dateComponents([.day], from: birthday, to: Date()).day ?? 0) / 365.25)
+        let normalizedSpecies = species.lowercased()
+
+        if species.contains("狗") || normalizedSpecies.contains("dog") {
+            return dogHumanYears(age: preciseAge, breed: breed)
+        }
+        if species.contains("猫") || normalizedSpecies.contains("cat") {
+            return catHumanYears(age: preciseAge)
+        }
+        if species.contains("兔") || normalizedSpecies.contains("rabbit") {
+            return Int((preciseAge * 8.0).rounded())
+        }
+        if species.contains("仓鼠") || normalizedSpecies.contains("hamster") {
+            return Int((preciseAge * 26.0).rounded())
+        }
+        if species.contains("鸟") || normalizedSpecies.contains("bird") {
+            return Int((preciseAge * 5.0).rounded())
+        }
+        if species.contains("鱼") || normalizedSpecies.contains("fish") {
+            return Int((preciseAge * 6.0).rounded())
+        }
+        return max(0, ageYears)
+    }
+
+    private static func dogHumanYears(age: Double, breed: String) -> Int {
+        guard age > 0 else { return 0 }
+        if age <= 1 { return Int((age * 15).rounded()) }
+        if age <= 2 { return Int((15 + (age - 1) * 9).rounded()) }
+
+        let increment: Double
+        switch dogSize(for: breed) {
+        case .small: increment = 4
+        case .medium: increment = 5
+        case .large: increment = 6
+        case .giant: increment = 7
+        }
+        return Int((24 + (age - 2) * increment).rounded())
+    }
+
+    private static func catHumanYears(age: Double) -> Int {
+        guard age > 0 else { return 0 }
+        if age <= 1 { return Int((age * 15).rounded()) }
+        if age <= 2 { return Int((15 + (age - 1) * 9).rounded()) }
+        return Int((24 + (age - 2) * 4).rounded())
+    }
+
+    private enum DogSize { case small, medium, large, giant }
+
+    private static func dogSize(for breed: String) -> DogSize {
+        let b = breed.lowercased()
+        if ["马尔济斯", "约克夏", "博美", "比熊", "西施", "查理王", "泰迪", "贵宾", "腊肠", "法斗", "法国斗牛", "corgi", "poodle", "yorkshire", "pomeranian", "bichon", "maltese", "dachshund", "shih"].contains(where: { b.contains($0.lowercased()) }) {
+            return .small
+        }
+        if ["阿拉斯加", "大丹", "圣伯纳", "獒", "纽芬兰", "giant", "great dane", "mastiff", "saint bernard", "newfoundland", "alaskan"].contains(where: { b.contains($0.lowercased()) }) {
+            return .giant
+        }
+        if ["金毛", "拉布拉多", "德国牧羊", "杜宾", "哈士奇", "萨摩耶", "大麦町", "边境牧羊", "golden", "labrador", "german shepherd", "husky", "samoyed", "doberman", "dalmatian", "border collie"].contains(where: { b.contains($0.lowercased()) }) {
+            return .large
+        }
+        return .medium
+    }
+}
+
 // ─────────────────────────────────────────────────
 // MARK: – Layout constants
 // ─────────────────────────────────────────────────
@@ -169,22 +289,36 @@ private enum K {
 
     static let hPad: CGFloat = 20        // header padding
     static let cardMargin: CGFloat = 7   // card-to-screen-edge gap (= hPad / 3)
-    static let cardH: CGFloat = 200
+    /// 标准信用卡比例 85.6×53.98mm ≈ 1.586:1（宽/高），随屏幕宽度动态计算
+    static var cardH: CGFloat { (ScreenCompat.width - cardMargin * 2) / 1.586 }
     static let expandedCardH: CGFloat = 360
-    static let stackPeekH: CGFloat = 38
-    static let cardTitleH: CGFloat = 76
-    // Visible gap between front card's bottom edge and the GeometryReader's bottom edge.
-    // Must clear the FAB (≈80pt above safe area: 24pt padding + 56pt circle) and the
-    // home indicator (34pt) with comfortable breathing room.
-    static let stackBottomGap: CGFloat = 220
+    // Default stack mode: each covered card exposes the one-line identity area
+    // (name + species / role), while avoiding an overly loose card stack.
+    static let cardTitleH: CGFloat = 52
+    static let collapsedStackPeekH: CGFloat = cardTitleH
+    // Expanded hero mode keeps the inactive cards in a tighter mini-stack.
+    static let stackPeekH: CGFloat = collapsedStackPeekH
+    static var expandedInactiveStackPeekH: CGFloat { collapsedStackPeekH / 5 }
+    // In expanded mode the inactive mini-stack lives mostly below the real
+    // screen bottom, with only the front card's top edge peeking above it.
+    static let expandedInactiveFrontPeekH: CGFloat = 18
+    // Collapsed front card bottom gap above the screen bottom safe area.
+    // The front card is always fully visible; additional cards grow upward.
+    static let collapsedStackBottomGap: CGFloat = 22
     static let expandedStackBottomGap: CGFloat = 12
+    static let stackAddButtonH: CGFloat = 28
+    static let stackAddButtonTopGap: CGFloat = 8
+    static let stackAddButtonToCardsGap: CGFloat = 8
+    static var stackMinTopY: CGFloat {
+        stackAddButtonTopGap + stackAddButtonH + stackAddButtonToCardsGap
+    }
     // Global target for expanded card's top: safe-area top + this offset.
     // Keep the active card directly below the top controls so
     // the quick modules below it remain visible above the compressed card stack.
     static let expandedCardGlobalTopOffset: CGFloat = 76
     static let expandedQuickModuleH: CGFloat = 112
     static let expandedQuickModuleEditH: CGFloat = 206
-    static var stackSpacing: CGFloat { -(cardH - stackPeekH) }
+    static var stackSpacing: CGFloat { -(cardH - collapsedStackPeekH) }
 
     static let heroMargin: CGFloat = 16
     static let focusCardPadding: CGFloat = heroMargin / 3
@@ -233,12 +367,12 @@ struct FocusStackHomeTestView: View {
     @Query(sort: \Event.startDate) private var allEvents: [Event]
 
     // Header state
-    @State private var showingFunctionMenu = false
+    @State private var functionMenuPresentation: FunctionMenuPresentation?
     @State private var showStreakDetail    = false
+    @State private var headerStreak        = 0
     @State private var fabExpanded         = false
     @State private var showingCoconutLog   = false
     @State private var showingAddEntity    = false
-    @State private var showingSettings     = false
     @State private var showingCrewRoster   = false
     @State private var showingCalendar     = false
     @State private var familyActivityPet: Pet? = nil
@@ -248,6 +382,8 @@ struct FocusStackHomeTestView: View {
     @State private var cardFabExpanded     = false
     @State private var expandedAllFeaturesPet: Pet? = nil
     @State private var expandedAllFeaturesHuman: Human? = nil
+    @State private var expandedBasicInfoPet: Pet? = nil
+    @State private var expandedBasicInfoHuman: Human? = nil
     @State private var pressedExpandedActionId: String? = nil
     @State private var expandedQuickWeightPet: Pet? = nil
     @State private var expandedQuickExpensePet: Pet? = nil
@@ -269,6 +405,7 @@ struct FocusStackHomeTestView: View {
     @State private var expandedQuickHumanNote: Human? = nil
     @State private var expandedHumanWeightDetail: Human? = nil
     @State private var expandedHumanWorkoutDetail: Human? = nil
+    @State private var expandedHumanNoteDetail: Human? = nil
     @State private var isExpandedQAEditMode = false
     @State private var expandedQAJiggle = false
     @State private var expandedQAEditItems: [QuickActionItem] = []
@@ -328,16 +465,20 @@ struct FocusStackHomeTestView: View {
             .keyWindow?.safeAreaInsets.bottom ?? 34
     }
 
-    private var headerStreak: Int {
-        pets.map { $0.currentStreak }.max() ?? 0
-    }
-
     private var l: L10n { L10n(appLanguage) }
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
 
     private var cards: [FocusCard] {
-        let real = pets.filter { !$0.hasPassedAway }.map { FocusCard.from($0) }
-                 + humans.map { FocusCard.from($0) }
+        let real = (
+            pets.filter { !$0.hasPassedAway }.map { FocusCard.from($0) }
+            + humans.map { FocusCard.from($0) }
+        )
+        .sorted { lhs, rhs in
+            if lhs.createdAt != rhs.createdAt {
+                return lhs.createdAt > rhs.createdAt
+            }
+            return lhs.name < rhs.name
+        }
         if !real.isEmpty { return real }
         // Real empty state → no dummy fallback (handled by EmptyStateWelcomeCard in stackLayer).
         // Debug flag preserves the old Mochi/Luna stack for UI exploration.
@@ -349,6 +490,12 @@ struct FocusStackHomeTestView: View {
 
     private var isEmptyState: Bool {
         pets.allSatisfy { $0.hasPassedAway } && humans.isEmpty && !showDummyCards
+    }
+
+    private var activeWalletCard: FocusCard? {
+        guard isExpanded else { return nil }
+        let heroId = activeCardId ?? cards.first?.id
+        return cards.first { $0.id == heroId }
     }
 
     var body: some View {
@@ -368,20 +515,16 @@ struct FocusStackHomeTestView: View {
                     expandedLayer(card: card, geo: geo, outerCornerRadius: outerR, windowSize: windowSize)
                 }
 
-                if expandedId == nil, isExpanded, !cards.isEmpty {
-                    expandedWalletLayer(cards: cards, geo: geo)
-                }
-
-                // FAB: only visible when card stack is shown (not in card-expand mode)
-                if expandedId == nil && !isExpanded {
-                    // Dim scrim when FAB is open
+                // FAB stays mounted while the wallet card stack changes modes; only its submenu content changes.
+                if expandedId == nil {
                     if fabExpanded {
                         Color.black.opacity(0.25)
                             .ignoresSafeArea()
-                            .onTapGesture { withAnimation(.spring(response: 0.3)) { fabExpanded = false } }
+                            .onTapGesture { fabExpanded = false }
                             .transition(.opacity)
                     }
-                    fabOverlay(geo: geo)
+                    homeFabOverlay(activeCard: activeWalletCard)
+                        .zIndex(999)
                 }
             }
             .animation(HeroAnim.transitionSpring, value: expandedId)
@@ -408,15 +551,14 @@ struct FocusStackHomeTestView: View {
             label: expandedCoconutRewardLabel
         )
         // Sheets
-        .sheet(isPresented: $showingFunctionMenu) {
-            FunctionMenuSheet()
+        .sheet(item: $functionMenuPresentation) { presentation in
+            FunctionMenuSheet(initialDestination: presentation.destination)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
         .fullScreenCover(isPresented: $showStreakDetail) { DailyStreakDetailView(pets: pets) }
         .fullScreenCover(isPresented: $showingCoconutLog) { IslandWealthDashboardView() }
         .sheet(isPresented: $showingAddEntity) { AddEntityView() }
-        .sheet(isPresented: $showingSettings) { SettingsView() }
         .sheet(isPresented: $showingCrewRoster) {
             NavigationStack {
                 CrewRosterOverlay(
@@ -469,6 +611,16 @@ struct FocusStackHomeTestView: View {
         }
         .sheet(item: $expandedAllFeaturesHuman) { human in
             ExpandedHumanFeaturesSheet(human: human)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $expandedBasicInfoPet) { pet in
+            NavigationStack { PetBasicInfoDetailView(pet: pet) }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $expandedBasicInfoHuman) { human in
+            NavigationStack { HumanBasicInfoDetailView(human: human) }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
@@ -620,6 +772,11 @@ struct FocusStackHomeTestView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(item: $expandedHumanNoteDetail) { human in
+            HumanNoteHistorySheet(human: human)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
         .fullScreenCover(isPresented: $showingOasisReward) {
             OasisRewardView()
         }
@@ -647,6 +804,13 @@ struct FocusStackHomeTestView: View {
         // Collapse wallet hero state when returning from pet/human detail
         .onChange(of: selectedPet)   { _, new in if new == nil { withAnimation(HeroAnim.walletSpring) { isExpanded = false } } }
         .onChange(of: selectedHuman) { _, new in if new == nil { withAnimation(HeroAnim.walletSpring) { isExpanded = false } } }
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
+            refreshHeaderStreak()
+        }
+        .onAppear {
+            ensureTodayCheckIn()
+            refreshHeaderStreak()
+        }
     }
 }
 
@@ -655,6 +819,42 @@ struct FocusStackHomeTestView: View {
 // ─────────────────────────────────────────────────
 
 extension FocusStackHomeTestView {
+
+    private var dailyCheckInKey: String { "oasis_checkedIn_dates" }
+
+    private func dailyCheckInDateString(_ date: Date = Date()) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone.current
+        return formatter.string(from: date)
+    }
+
+    private func ensureTodayCheckIn() {
+        let today = dailyCheckInDateString()
+        var checkedInDates = Set(UserDefaults.standard.stringArray(forKey: dailyCheckInKey) ?? [])
+        guard !checkedInDates.contains(today) else { return }
+
+        checkedInDates.insert(today)
+        UserDefaults.standard.set(Array(checkedInDates), forKey: dailyCheckInKey)
+        QuestManager.shared.addCoconuts(1, emoji: "📅", title: l.homeDailyCheckInRewardTitle)
+    }
+
+    private func refreshHeaderStreak() {
+        let calendar = Calendar.current
+        let checkedInDates = Set(UserDefaults.standard.stringArray(forKey: dailyCheckInKey) ?? [])
+        var streak = 0
+        var day = Date()
+
+        while true {
+            let dayString = dailyCheckInDateString(day)
+            guard checkedInDates.contains(dayString) else { break }
+            streak += 1
+            guard let previousDay = calendar.date(byAdding: .day, value: -1, to: day) else { break }
+            day = previousDay
+        }
+
+        headerStreak = streak
+    }
 
     private func stackLayer(geo: GeometryProxy, outerCornerRadius: CGFloat) -> some View {
         let activePets = pets.filter { !$0.hasPassedAway }
@@ -671,12 +871,12 @@ extension FocusStackHomeTestView {
                 )
                 .padding(.horizontal, K.cardMargin)
                 .padding(.bottom, 24)
-            } else if !isExpanded {
-                // GeometryReader-based stack fills all remaining space below mood strip
+            } else {
+                // GeometryReader-based stack fills all remaining space below the header/focus strip.
+                // Keep the same wallet stack mounted in both collapsed and expanded modes so
+                // card positions animate instead of swapping between two separate layers.
                 walletCardStack(cards: cards)
                     .padding(.horizontal, K.cardMargin)
-            } else {
-                Spacer(minLength: 0)
             }
         }
     }
@@ -711,7 +911,7 @@ extension FocusStackHomeTestView {
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
-                if let pet = todayFocusActivePet {
+                if humans.count > 1, let pet = todayFocusActivePet {
                     HomeFamilyCollaborationCard(
                         pet: pet,
                         pendingReminders: pendingReminders,
@@ -744,13 +944,13 @@ extension FocusStackHomeTestView {
         let heroId = activeCardId ?? cards.first?.id
         let cardW = geo.size.width - K.cardMargin * 2
         let activeTopY = safeAreaTop + K.expandedCardGlobalTopOffset
-        let inactiveBottomY = geo.size.height
+        let inactiveBottomY = geo.size.height + K.cardH - K.expandedInactiveFrontPeekH
         let quickModulesTopY = activeTopY + K.expandedCardH + 14
 
         ZStack(alignment: .topLeading) {
             ForEach(Array(cards.enumerated()), id: \.element.id) { idx, card in
                 let isHero = card.id == heroId
-                let visibleHeight = isHero ? K.expandedCardH : K.stackPeekH
+                let visibleHeight = isHero ? K.expandedCardH : K.cardH
 
                 transformedWalletCard(card: card, isHero: isHero)
                 .frame(width: cardW)
@@ -778,8 +978,12 @@ extension FocusStackHomeTestView {
                     )
                 )
                 .zIndex(walletZIndex(idx: idx, n: n, isHero: isHero, heroId: heroId, cards: cards))
-                .contextMenu { cardContextMenu(card: card) }
                 .onTapGesture { handleWalletCardTap(card: card, n: n, isHero: isHero) }
+                .onLongPressGesture(minimumDuration: 0.45) {
+                    guard isHero else { return }
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    openWalletCardBasicInfo(card)
+                }
                 .simultaneousGesture(collapseWalletDragGesture())
                 .animation(HeroAnim.walletSpring, value: isExpanded)
                 .animation(HeroAnim.walletSpring, value: activeCardId)
@@ -794,11 +998,6 @@ extension FocusStackHomeTestView {
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .simultaneousGesture(collapseWalletDragGesture())
                     .animation(HeroAnim.walletSpring, value: activeCardId)
-
-                expandedCardFab(card: activeCard, safeBottom: geo.safeAreaInsets.bottom)
-                    .frame(width: cardW, alignment: .trailing)
-                    .offset(x: K.cardMargin, y: geo.size.height - geo.safeAreaInsets.bottom - 74)
-                    .zIndex(Double(n + 120))
             }
         }
         .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
@@ -857,12 +1056,12 @@ extension FocusStackHomeTestView {
         let themeHex = pet.themeColorHex.isEmpty ? nil : pet.themeColorHex
 
         return VStack(spacing: 8) {
-            HStack {
+            HStack(spacing: 8) {
                 Text("快捷操作")
                     .font(OhanaFont.caption2(.black))
                     .foregroundStyle(.white.opacity(0.9))
                     .tracking(2.6)
-                Spacer()
+                Spacer(minLength: 4)
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     if isExpandedQAEditMode {
@@ -894,9 +1093,18 @@ extension FocusStackHomeTestView {
                     )
                 }
 
-                if isExpandedQAEditMode {
+                if isExpandedQAEditMode && QuickActionLimit.count(for: pet, in: expandedQAEditItems) < QuickActionLimit.maxItemsPerEntity {
                     expandedQuickAddButton(pet: pet)
                 }
+            }
+
+            if isExpandedQAEditMode && QuickActionLimit.count(for: pet, in: expandedQAEditItems) >= QuickActionLimit.maxItemsPerEntity {
+                Text("最多 8 个快捷操作")
+                    .font(OhanaFont.caption2(.medium))
+                    .foregroundStyle(.white.opacity(0.45))
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 2)
+                    .transition(.opacity)
             }
         }
         .padding(.horizontal, 2)
@@ -911,12 +1119,12 @@ extension FocusStackHomeTestView {
         let themeHex = human.themeColorHex.isEmpty ? nil : human.themeColorHex
 
         return VStack(spacing: 8) {
-            HStack {
+            HStack(spacing: 8) {
                 Text("快捷操作")
                     .font(OhanaFont.caption2(.black))
                     .foregroundStyle(.white.opacity(0.9))
                     .tracking(2.6)
-                Spacer()
+                Spacer(minLength: 4)
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     if isExpandedQAEditMode {
@@ -948,9 +1156,18 @@ extension FocusStackHomeTestView {
                     )
                 }
 
-                if isExpandedQAEditMode {
+                if isExpandedQAEditMode && expandedQAEditItems.count < QuickActionLimit.maxItemsPerEntity {
                     expandedHumanQuickAddButton(human: human)
                 }
+            }
+
+            if isExpandedQAEditMode && expandedQAEditItems.count >= QuickActionLimit.maxItemsPerEntity {
+                Text("最多 8 个快捷操作")
+                    .font(OhanaFont.caption2(.medium))
+                    .foregroundStyle(.white.opacity(0.45))
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 2)
+                    .transition(.opacity)
             }
         }
         .padding(.horizontal, 2)
@@ -1221,7 +1438,7 @@ extension FocusStackHomeTestView {
         if idx == heroIdx { return heroTopY }
         let cr = idx < heroIdx ? idx : idx - 1
         let inactiveCount = max(1, n - 1)
-        return bottomY - CGFloat(inactiveCount - cr) * K.stackPeekH
+        return bottomY - K.cardH - CGFloat(inactiveCount - 1 - cr) * K.expandedInactiveStackPeekH
     }
 
     @ViewBuilder
@@ -1230,18 +1447,24 @@ extension FocusStackHomeTestView {
         let heroId = activeCardId ?? cards.first?.id
 
         GeometryReader { geo in
-            // Anchor card stack relative to GR's bottom edge (more robust than
-            // global-coord math, which can read stale during initial layout).
-            // K.stackBottomGap = visible space between front card's bottom and the GR's bottom.
-            // Add the bottom safe-area inset (home indicator) so the gap is on top of it.
+            // Anchor the stack to the real screen bottom, then convert that
+            // global target back into this lower-page GeometryReader's space.
+            // This reader starts below the focus module, so using only
+            // geo.size.height can push the front card below the visible screen.
             let bottomInset = max(safeAreaBottom, geo.safeAreaInsets.bottom)
-            let collapsedBottomY = max(K.cardH, geo.size.height - bottomInset - K.stackBottomGap)
-            let expandedBottomY = max(K.stackPeekH, geo.size.height - bottomInset - K.expandedStackBottomGap)
-            let stackBottomY = isExpanded ? expandedBottomY : collapsedBottomY
+            let collapsedBottomY = collapsedStackBottomY(in: geo, bottomInset: bottomInset)
+            let expandedBottomY = expandedStackBottomY(in: geo, bottomInset: bottomInset)
             let heroTopY = safeAreaTop + K.expandedCardGlobalTopOffset - geo.frame(in: .global).minY
+            let stackTopY = collapsedWalletStackTopY(n: n, bottomY: collapsedBottomY)
+            let addButtonY = max(
+                K.stackAddButtonTopGap,
+                min(
+                    stackTopY - K.stackAddButtonToCardsGap - K.stackAddButtonH,
+                    collapsedBottomY - K.cardH - K.stackAddButtonToCardsGap - K.stackAddButtonH
+                )
+            )
 
             ZStack(alignment: .topLeading) {
-                // Add button floats above the fan, hidden in hero mode.
                 if !isExpanded {
                     HStack {
                         Spacer()
@@ -1254,47 +1477,60 @@ extension FocusStackHomeTestView {
                         .buttonStyle(.plain)
                         .accessibilityLabel("添加成员")
                     }
-                    .offset(y: max(0, stackBottomY - fanHeight(n: n, bottomY: stackBottomY) - 44))
-                    .animation(HeroAnim.walletSpring, value: isExpanded)
+                    .frame(height: K.stackAddButtonH, alignment: .center)
+                    .offset(y: addButtonY)
                     .zIndex(999)
+                    .transition(.opacity)
                 }
 
                 ForEach(Array(cards.enumerated()), id: \.element.id) { idx, card in
                     let isHero = isExpanded && card.id == heroId
-                    let visibleHeight = isHero ? K.expandedCardH : (isExpanded ? K.stackPeekH : K.cardH)
+                    let visibleHeight = isHero ? K.expandedCardH : K.cardH
+                    let offsetY = isExpanded
+                    ? walletOffsetY(
+                        idx: idx,
+                        n: n,
+                        bottomY: expandedBottomY,
+                        heroId: heroId,
+                        heroTopY: heroTopY,
+                        cards: cards
+                    )
+                    : walletOffsetY(
+                        idx: idx,
+                        n: n,
+                        bottomY: collapsedBottomY,
+                        heroId: heroId,
+                        heroTopY: heroTopY,
+                        cards: cards
+                    )
 
-                    transformedWalletCard(card: card, isHero: isHero)
-                        .frame(height: isHero ? K.expandedCardH : K.cardH)
-                        .frame(height: visibleHeight, alignment: .top)
-                        .clipped()
-                        .frame(maxWidth: .infinity)
-                        .overlay { expandedActionPulseOverlay(for: card.id) }
-                        .overlay { walkTransformBurstOverlay(for: card.id) }
-                        .shadow(
-                            color: .black.opacity(isHero ? 0.22 : 0.09),
-                            radius: isHero ? 20 : 7,
-                            x: 0, y: isHero ? 12 : 4
-                        )
-                        .scaleEffect(
-                            (isHero ? 1.0 : (isExpanded ? 0.97 : 1.0)) *
-                            (expandedActionPulseCardId == card.id ? 1.025 : 1.0),
-                            anchor: .top
-                        )
-                        .offset(y: walletOffsetY(idx: idx, n: n, bottomY: stackBottomY,
-                                                  heroId: heroId, heroTopY: heroTopY, cards: cards))
-                        .zIndex(walletZIndex(idx: idx, n: n, isHero: isHero,
-                                             heroId: heroId, cards: cards))
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("\(card.name) 的卡片")
-                        .accessibilityHint(isHero ? "再次点击收起卡片堆" :
-                                          (isExpanded ? "点击选为当前卡片" : "点击展开查看"))
-                        .contextMenu { cardContextMenu(card: card) }
-                        .onTapGesture { handleWalletCardTap(card: card, n: n, isHero: isHero) }
-                        .animation(HeroAnim.walletSpring, value: isExpanded)
+                    walletCardStackItem(
+                        card: card,
+                        idx: idx,
+                        n: n,
+                        isHero: isHero,
+                        visibleHeight: visibleHeight,
+                        offsetY: offsetY,
+                        heroId: heroId,
+                        cards: cards
+                    )
+                }
+
+                if isExpanded, let activeCard = cards.first(where: { $0.id == heroId }) {
+                    let quickModuleH = expandedQuickModuleHeight(for: activeCard)
+                    expandedQuickModules(card: activeCard)
+                        .frame(width: geo.size.width, height: quickModuleH)
+                        .offset(y: heroTopY + K.expandedCardH + 14)
+                        .zIndex(Double(n + 80))
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        .simultaneousGesture(collapseWalletDragGesture())
                         .animation(HeroAnim.walletSpring, value: activeCardId)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .contentShape(Rectangle())
+            .animation(HeroAnim.walletSpring, value: isExpanded)
+            .animation(HeroAnim.walletSpring, value: activeCardId)
             // Swipe-down anywhere collapses hero back to fan
             .gesture(
                 DragGesture()
@@ -1310,6 +1546,98 @@ extension FocusStackHomeTestView {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func collapsedWalletCards(
+        cards: [FocusCard],
+        n: Int,
+        heroId: UUID?,
+        bottomY: CGFloat
+    ) -> some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(cards.enumerated()), id: \.element.id) { idx, card in
+                walletCardStackItem(
+                    card: card,
+                    idx: idx,
+                    n: n,
+                    isHero: false,
+                    visibleHeight: K.cardH,
+                    offsetY: walletOffsetY(
+                        idx: idx,
+                        n: n,
+                        bottomY: bottomY,
+                        heroId: heroId,
+                        heroTopY: 0,
+                        cards: cards
+                    ),
+                    heroId: heroId,
+                    cards: cards
+                )
+            }
+        }
+    }
+
+    private func collapsedStackBottomY(in geo: GeometryProxy, bottomInset: CGFloat) -> CGFloat {
+        // Fixed screen anchor: the front card's bottom edge always lands above
+        // the device bottom safe area. Adding cards only changes the stack's
+        // top edge, never the existing lower-card positions.
+        let globalBottomY = ScreenCompat.bounds.height - bottomInset - K.collapsedStackBottomGap
+        let localBottomY = globalBottomY - geo.frame(in: .global).minY
+        return max(K.cardH, localBottomY)
+    }
+
+    private func expandedStackBottomY(in geo: GeometryProxy, bottomInset: CGFloat) -> CGFloat {
+        let globalBottomY = ScreenCompat.bounds.height + K.cardH - K.expandedInactiveFrontPeekH
+        let localBottomY = globalBottomY - geo.frame(in: .global).minY
+        return max(K.stackPeekH, localBottomY)
+    }
+
+    private func walletCardStackItem(
+        card: FocusCard,
+        idx: Int,
+        n: Int,
+        isHero: Bool,
+        visibleHeight: CGFloat,
+        offsetY: CGFloat,
+        heroId: UUID?,
+        cards: [FocusCard]
+    ) -> some View {
+        transformedWalletCard(card: card, isHero: isHero)
+            .frame(height: isHero ? K.expandedCardH : K.cardH)
+            .frame(height: visibleHeight, alignment: .top)
+            .clipped()
+            .frame(maxWidth: .infinity)
+            .overlay { expandedActionPulseOverlay(for: card.id) }
+            .overlay { walkTransformBurstOverlay(for: card.id) }
+            .shadow(
+                color: .black.opacity(isHero ? 0.22 : 0.09),
+                radius: isHero ? 20 : 7,
+                x: 0, y: isHero ? 12 : 4
+            )
+            .scaleEffect(
+                (isHero ? 1.0 : (isExpanded ? 0.97 : 1.0)) *
+                (expandedActionPulseCardId == card.id ? 1.025 : 1.0),
+                anchor: .top
+            )
+            .offset(y: offsetY)
+            .zIndex(walletZIndex(idx: idx, n: n, isHero: isHero,
+                                 heroId: heroId, cards: cards))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(card.name) 的卡片")
+            .accessibilityHint(isHero ? "点击返回首页，长按进入基本信息" :
+                              (isExpanded ? "点击返回首页" : "点击展开查看"))
+            .if(!(isHero && isExpanded)) { view in
+                view.contextMenu { cardContextMenu(card: card) }
+            }
+            .onTapGesture { handleWalletCardTap(card: card, n: n, isHero: isHero) }
+            .onLongPressGesture(minimumDuration: 0.45) {
+                guard isHero && isExpanded else { return }
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                openWalletCardBasicInfo(card)
+            }
+            .animation(HeroAnim.walletSpring, value: isExpanded)
+            .animation(HeroAnim.walletSpring, value: activeCardId)
     }
 
     private var addMemberCapsuleLabel: some View {
@@ -1330,15 +1658,20 @@ extension FocusStackHomeTestView {
         .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
     }
 
-    // Total height of the fan stack (used to anchor it at the bottom of bottomY).
+    private func collapsedWalletStackTopY(n: Int, bottomY: CGFloat) -> CGFloat {
+        bottomY - fanHeight(n: n, bottomY: bottomY)
+    }
+
+    // Total height of the default fan stack (used to anchor it at the bottom of bottomY).
+    // Keep the peek fixed so every covered card's top identity strip remains visible.
+    // If the stack is taller than the wallet area, the whole stack becomes scrollable.
     private func fanHeight(n: Int, bottomY: CGFloat) -> CGFloat {
         CGFloat(max(0, n - 1)) * stackPeek(n: n, bottomY: bottomY) + K.cardH
     }
 
     private func stackPeek(n: Int, bottomY: CGFloat) -> CGFloat {
         guard n > 1 else { return 0 }
-        let maxPeekThatKeepsBottomCardVisible = max(0, (bottomY - K.cardH) / CGFloat(n - 1))
-        return min(K.stackPeekH, maxPeekThatKeepsBottomCardVisible)
+        return K.collapsedStackPeekH
     }
 
     // Fan  — cards anchored at container bottom, fanning upward.
@@ -1346,10 +1679,9 @@ extension FocusStackHomeTestView {
     //   y_i = bottomY − cardH − (n−1−i) × stackPeek
     //
     // Hero — hero card snaps just below the coconut/check-in buttons.
-    //   Non-hero cards compress at the screen bottom; each card only reveals its
-    //   top identity strip.
+    //   Non-hero cards form a tighter version of the home card stack.
     //   compressedRank r = (idx < heroIdx ? idx : idx−1)
-    //   y = bottomY − (inactiveCount−r) × stackPeekH
+    //   y = bottomY − cardH − (inactiveCount−1−r) × expandedInactiveStackPeekH
     private func walletOffsetY(idx: Int, n: Int, bottomY: CGFloat,
                                heroId: UUID?, heroTopY: CGFloat, cards: [FocusCard]) -> CGFloat {
         if !isExpanded {
@@ -1359,7 +1691,7 @@ extension FocusStackHomeTestView {
         if idx == heroIdx { return heroTopY }
         let cr = idx < heroIdx ? idx : idx - 1
         let inactiveCount = max(1, n - 1)
-        return bottomY - CGFloat(inactiveCount - cr) * K.stackPeekH
+        return bottomY - K.cardH - CGFloat(inactiveCount - 1 - cr) * K.expandedInactiveStackPeekH
     }
 
     // Fan: higher idx = higher z (frontmost).
@@ -1374,32 +1706,58 @@ extension FocusStackHomeTestView {
     }
 
     // Fan:  tap any card → lift that card to the active position.
-    // Hero: tap active card → restore fan; tap another card → switch active card.
+    // Hero: tap active card → restore fan; long-press active card → basic info.
+    //       Tap any inactive card strip → restore fan.
     //       Swipe-down → restore fan (via DragGesture above).
     private func handleWalletCardTap(card: FocusCard, n: Int, isHero: Bool) {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
 
         if n <= 1 {
-            withAnimation(HeroAnim.walletSpring) {
-                activeCardId = card.id
-                isExpanded.toggle()
+            if isExpanded {
+                collapseWalletToHome()
+            } else {
+                withAnimation(HeroAnim.walletSpring) {
+                    activeCardId = card.id
+                    isExpanded = true
+                }
             }
             return
         }
 
         if isHero {
-            withAnimation(HeroAnim.walletSpring) {
-                isExpanded = false
-            }
+            collapseWalletToHome()
         } else if isExpanded {
-            withAnimation(HeroAnim.walletSpring) {
-                activeCardId = card.id
-            }
+            collapseWalletToHome()
         } else {
             withAnimation(HeroAnim.walletSpring) {
                 activeCardId = card.id
                 isExpanded = true
             }
+        }
+    }
+
+    private func collapseWalletToHome() {
+        withAnimation(HeroAnim.walletSpring) {
+            isExpanded = false
+            fabExpanded = false
+            isExpandedQAEditMode = false
+        }
+    }
+
+    private func openWalletCardBasicInfo(_ card: FocusCard) {
+        fabExpanded = false
+        isExpandedQAEditMode = false
+        withAnimation(HeroAnim.walletSpring) {
+            isExpanded = false
+        }
+
+        if card.isHuman {
+            expandedBasicInfoHuman = humans.first(where: { $0.id == card.id })
+            return
+        }
+
+        if let pet = pets.first(where: { $0.id == card.id && !$0.hasPassedAway }) {
+            expandedBasicInfoPet = pet
         }
     }
 
@@ -1763,7 +2121,7 @@ extension FocusStackHomeTestView {
         case "humanMedication":
             expandedQuickHumanMedication = human
         case "humanNote":
-            selectedHuman = human
+            expandedHumanNoteDetail = human
         default:
             selectedHuman = human
         }
@@ -1969,7 +2327,9 @@ extension FocusStackHomeTestView {
         case "ears": type = .ears
         default: return
         }
-        let log = PetHygieneLog(date: Date(), type: type, pet: pet)
+        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            .flatMap { $0.isEmpty ? nil : $0 }
+        let log = PetHygieneLog(date: Date(), type: type, pet: pet, executorId: executorId)
         modelContext.insert(log)
         modelContext.safeSave()
         let got = QuestManager.shared.awardAction(type: .care(type: type), pet: pet, context: modelContext)
@@ -1989,13 +2349,15 @@ extension FocusStackHomeTestView {
     }
 
     private func applyExpandedHealthCheckIn(_ raw: String, pet: Pet) {
+        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            .flatMap { $0.isEmpty ? nil : $0 }
         switch raw {
         case "vaccine":
-            modelContext.insert(PetHealthLog(date: Date(), type: .vaccine, note: "快捷打卡", pet: pet))
+            modelContext.insert(PetHealthLog(date: Date(), type: .vaccine, note: "快捷打卡", pet: pet, executorId: executorId))
         case "deworming":
-            modelContext.insert(PetHealthLog(date: Date(), type: .dewormingExternal, note: "快捷打卡", pet: pet))
+            modelContext.insert(PetHealthLog(date: Date(), type: .dewormingExternal, note: "快捷打卡", pet: pet, executorId: executorId))
         case "visit":
-            modelContext.insert(PetHealthLog(date: Date(), type: .checkup, note: "快捷打卡", pet: pet))
+            modelContext.insert(PetHealthLog(date: Date(), type: .checkup, note: "快捷打卡", pet: pet, executorId: executorId))
         default:
             expandedQuickHealthPet = pet
             return
@@ -2340,87 +2702,80 @@ extension FocusStackHomeTestView {
 
     // MARK: FAB (floating action button)
 
-    @ViewBuilder
-    private func fabOverlay(geo: GeometryProxy) -> some View {
+    private var floatingFabBottomPadding: CGFloat {
         let safeBottom = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
             .keyWindow?.safeAreaInsets.bottom ?? 34
-        let fabItems: [(label: String, icon: String, isAvailable: Bool, badge: String?)] = [
-            ("全部功能", "square.grid.2x2.fill", true, nil),
-            ("日历",     "calendar", true, nil),
-            ("绿洲",     "leaf.fill", true, nil),
-            ("植物", "camera.macro", false, "待开发"),
-        ]
+        return safeBottom + 40
+    }
 
+    @ViewBuilder
+    private func homeFabOverlay(activeCard: FocusCard?) -> some View {
         VStack(alignment: .trailing, spacing: 14) {
             // Expanded action buttons (上方弹出)
-            ForEach(Array(fabItems.enumerated()), id: \.offset) { idx, item in
-                HStack(spacing: 10) {
-                    // Label pill
-                    HStack(spacing: 6) {
-                        Text(item.label)
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        if let badge = item.badge {
-                            Text(badge)
-                                .font(.system(size: 9, weight: .black, design: .rounded))
-                                .foregroundStyle(Color.goPrimary)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.goPrimary.opacity(0.14), in: Capsule())
+            if let activeCard {
+                let activeItems = expandedCardFabShortcuts(for: activeCard)
+                ForEach(Array(activeItems.enumerated()), id: \.element.id) { idx, item in
+                    fabActionRow(
+                        item: HomeFabFunctionShortcut(
+                            label: item.label,
+                            icon: item.icon,
+                            isAvailable: item.isAvailable,
+                            badge: item.badge
+                        ),
+                        rowHeight: 48
+                    )
+                    .scaleEffect(fabExpanded ? 1 : 0.6, anchor: .bottomTrailing)
+                    .opacity(fabExpanded ? 1 : 0)
+                    .offset(y: fabExpanded ? 0 : 24)
+                    .animation(
+                        .spring(response: 0.35, dampingFraction: 0.72)
+                        .delay(fabExpanded
+                               ? Double(activeItems.count - 1 - idx) * 0.055
+                               : Double(idx) * 0.04),
+                        value: fabExpanded
+                    )
+                    .onTapGesture {
+                        guard item.isAvailable else {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            return
                         }
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(.ultraThinMaterial.opacity(item.isAvailable ? 0.9 : 0.45), in: Capsule())
-                    .shadow(color: .black.opacity(item.isAvailable ? 0.15 : 0.06), radius: 4, y: 2)
-
-                    // Icon circle
-                    ZStack {
-                        Circle()
-                            .fill(Color(hex: "1A2E8A").opacity(item.isAvailable ? 1 : 0.35))
-                            .frame(width: 48, height: 48)
-                            .shadow(color: .black.opacity(item.isAvailable ? 0.25 : 0.08), radius: 6, y: 3)
-                        Image(systemName: item.icon)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white.opacity(item.isAvailable ? 1 : 0.5))
-                    }
-                }
-                .opacity(item.isAvailable ? 1 : 0.55)
-                .scaleEffect(fabExpanded ? 1 : 0.6, anchor: .bottomTrailing)
-                .opacity(fabExpanded ? 1 : 0)
-                .offset(y: fabExpanded ? 0 : 24)
-                .animation(
-                    .spring(response: 0.35, dampingFraction: 0.72)
-                    .delay(fabExpanded
-                           ? Double(fabItems.count - 1 - idx) * 0.055
-                           : Double(idx) * 0.04),
-                    value: fabExpanded
-                )
-                .onTapGesture {
-                    guard item.isAvailable else {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        return
+                        fabExpanded = false
+                        openExpandedCardFabShortcut(item, card: activeCard)
                     }
-                    withAnimation(.spring(response: 0.3)) { fabExpanded = false }
-                    switch idx {
-                    case 0: showingFunctionMenu = true
-                    case 1: openGlobalCalendar()
-                    case 2: showingOasisReward  = true
-                    default: break
-                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(item.label)
+                    .accessibilityHint("前往\(item.label)详情")
+                    .allowsHitTesting(fabExpanded)
+                    .accessibilityHidden(!fabExpanded)
                 }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(item.label)
-                .accessibilityHint("前往\(item.label)")
-                .accessibilityHidden(!fabExpanded)
+            } else {
+                let fabItems = homeFabFunctionShortcuts
+                ForEach(Array(fabItems.enumerated()), id: \.element.id) { idx, item in
+                    fabActionRow(item: item, rowHeight: 48)
+                        .scaleEffect(fabExpanded ? 1 : 0.6, anchor: .bottomTrailing)
+                        .opacity(fabExpanded ? 1 : 0)
+                        .offset(y: fabExpanded ? 0 : 24)
+                        .animation(
+                            .spring(response: 0.35, dampingFraction: 0.72)
+                            .delay(fabExpanded
+                                   ? Double(fabItems.count - 1 - idx) * 0.055
+                                   : Double(idx) * 0.04),
+                            value: fabExpanded
+                        )
+                        .onTapGesture { openHomeFabShortcut(item) }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(item.label)
+                        .accessibilityHint(item.isAvailable ? "前往\(item.label)" : "当前不可用")
+                        .allowsHitTesting(fabExpanded)
+                        .accessibilityHidden(!fabExpanded)
+                }
             }
 
             // Main FAB button
             Button {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                    fabExpanded.toggle()
-                }
+                fabExpanded.toggle()
             } label: {
                 ZStack {
                     Circle()
@@ -2436,104 +2791,308 @@ extension FocusStackHomeTestView {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(fabExpanded ? "收起菜单" : "展开菜单")
-            .accessibilityHint("点击展开全部功能、日历、绿洲")
+            .accessibilityHint("点击展开常用功能")
         }
         .padding(.trailing, 20)
-        .padding(.bottom, safeBottom + 24)
+        .padding(.bottom, floatingFabBottomPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
     }
 
-    @ViewBuilder
-    private func expandedCardFab(card: FocusCard, safeBottom: CGFloat) -> some View {
-        let items: [(label: String, icon: String)] = [
-            ("全部功能", "square.grid.2x2.fill"),
-            ("日历", "calendar"),
-            ("个人信息", "person.crop.circle")
+    private var homeFabFunctionShortcuts: [HomeFabFunctionShortcut] {
+        // FAB 只放最高频、最容易理解的入口；日历在顶部固定入口，绿洲从椰子数进入。
+        // 其他低频或奖励/工具类能力统一收进「更多」。
+        [
+            HomeFabFunctionShortcut(label: PetFeature.food.title,     icon: PetFeature.food.icon,     destination: .featureAggregate(.food)),
+            HomeFabFunctionShortcut(label: PetFeature.hygiene.title,  icon: PetFeature.hygiene.icon,  destination: .featureAggregate(.hygiene)),
+            HomeFabFunctionShortcut(label: PetFeature.health.title,   icon: PetFeature.health.icon,   destination: .featureAggregate(.health)),
+            HomeFabFunctionShortcut(label: PetFeature.weight.title,   icon: PetFeature.weight.icon,   destination: .featureAggregate(.weight)),
+            HomeFabFunctionShortcut(label: PetFeature.expense.title,  icon: PetFeature.expense.icon,  destination: .featureAggregate(.expense)),
+            HomeFabFunctionShortcut(label: "更多",                    icon: "ellipsis.circle.fill",   destination: nil)
         ]
+    }
 
-        VStack(alignment: .trailing, spacing: 12) {
-            ForEach(Array(items.enumerated()), id: \.offset) { idx, item in
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.76)) {
-                        cardFabExpanded = false
-                    }
-                    openExpandedCardFabAction(index: idx, card: card)
-                } label: {
-                    HStack(spacing: 10) {
-                        Text(item.label)
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .background(.ultraThinMaterial.opacity(0.9), in: Capsule())
-                            .shadow(color: .black.opacity(0.16), radius: 4, y: 2)
-
-                        Image(systemName: item.icon)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 48, height: 48)
-                            .background(Color(hex: "1A2E8A"), in: Circle())
-                            .shadow(color: Color(hex: "1A2E8A").opacity(0.35), radius: 8, y: 3)
-                    }
+    private func homeFabFunctionTray(items: [HomeFabFunctionShortcut]) -> some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            LazyVStack(alignment: .trailing, spacing: 10) {
+                ForEach(items) { item in
+                    fabActionRow(item: item, rowHeight: 44)
+                        .onTapGesture { openHomeFabShortcut(item) }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(item.label)
+                        .accessibilityHint(item.isAvailable ? "前往\(item.label)" : "当前不可用")
                 }
-                .buttonStyle(.plain)
-                .scaleEffect(cardFabExpanded ? 1 : 0.65, anchor: .bottomTrailing)
+            }
+            .padding(.vertical, 8)
+        }
+        .frame(maxHeight: 430)
+        .padding(.trailing, 1)
+    }
+
+    private func fabActionRow(item: HomeFabFunctionShortcut, rowHeight: CGFloat) -> some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 6) {
+                Text(item.label)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                if let badge = item.badge {
+                    Text(badge)
+                        .font(.system(size: 9, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.goPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.goPrimary.opacity(0.14), in: Capsule())
+                }
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(.ultraThinMaterial.opacity(item.isAvailable ? 0.9 : 0.45), in: Capsule())
+            .shadow(color: .black.opacity(item.isAvailable ? 0.15 : 0.06), radius: 4, y: 2)
+
+            ZStack {
+                Circle()
+                    .fill(Color(hex: "1A2E8A").opacity(item.isAvailable ? 1 : 0.35))
+                    .frame(width: rowHeight, height: rowHeight)
+                    .shadow(color: .black.opacity(item.isAvailable ? 0.25 : 0.08), radius: 6, y: 3)
+                Image(systemName: item.icon)
+                    .font(.system(size: rowHeight >= 48 ? 16 : 15, weight: .semibold))
+                    .foregroundStyle(.white.opacity(item.isAvailable ? 1 : 0.5))
+            }
+        }
+        .opacity(item.isAvailable ? 1 : 0.55)
+    }
+
+    private func openHomeFabShortcut(_ item: HomeFabFunctionShortcut) {
+        guard item.isAvailable else {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            return
+        }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        fabExpanded = false
+        functionMenuPresentation = FunctionMenuPresentation(destination: item.destination)
+    }
+
+    private func expandedCardFabShortcuts(for card: FocusCard) -> [ExpandedCardFabShortcut] {
+        if card.isHuman {
+            return [
+                ExpandedCardFabShortcut(label: "体重", icon: "scalemass.fill", action: .humanQuick("humanWeight")),
+                ExpandedCardFabShortcut(label: "运动", icon: "figure.run", action: .humanQuick("humanWorkout")),
+                ExpandedCardFabShortcut(label: "用药", icon: "pill.fill", action: .humanQuick("humanMedication")),
+                ExpandedCardFabShortcut(label: "记录", icon: "note.text", action: .humanQuick("humanNote")),
+                ExpandedCardFabShortcut(label: "其他", icon: "ellipsis.circle.fill", action: .humanAllFeatures)
+            ]
+        }
+
+        let species = card.petSpecies?.lowercased() ?? card.kind.lowercased()
+        let isDog = species.contains("狗") || species.contains("dog")
+        let isCat = species.contains("猫") || species.contains("cat")
+        let isFish = species.contains("鱼") || species.contains("fish")
+
+        if isDog {
+            return [
+                ExpandedCardFabShortcut(label: "喂食", icon: "fork.knife", action: .quick("feed")),
+                ExpandedCardFabShortcut(label: "喂水", icon: "drop.fill", action: .quick("water")),
+                ExpandedCardFabShortcut(label: "遛狗", icon: "figure.walk", action: .quick("walk")),
+                ExpandedCardFabShortcut(label: "便便", icon: "allergens", action: .quick("potty")),
+                ExpandedCardFabShortcut(label: "逗玩", icon: "sparkles", action: .quick("play")),
+                ExpandedCardFabShortcut(label: "其他", icon: "ellipsis.circle.fill", action: .allFeatures)
+            ]
+        }
+
+        if isCat {
+            return [
+                ExpandedCardFabShortcut(label: "喂食", icon: "fork.knife", action: .quick("feed")),
+                ExpandedCardFabShortcut(label: "喂水", icon: "drop.fill", action: .quick("water")),
+                ExpandedCardFabShortcut(label: "铲屎", icon: "trash.fill", action: .quick("litter")),
+                ExpandedCardFabShortcut(label: "便便", icon: "allergens", action: .quick("potty")),
+                ExpandedCardFabShortcut(label: "逗玩", icon: "sparkles", action: .quick("play")),
+                ExpandedCardFabShortcut(label: "其他", icon: "ellipsis.circle.fill", action: .allFeatures)
+            ]
+        }
+
+        if isFish {
+            return [
+                ExpandedCardFabShortcut(label: "喂食", icon: "fork.knife", action: .quick("feed")),
+                ExpandedCardFabShortcut(label: "换水", icon: "drop.circle.fill", action: .quick("waterChange")),
+                ExpandedCardFabShortcut(label: "清滤", icon: "wrench.and.screwdriver.fill", action: .quick("filterClean")),
+                ExpandedCardFabShortcut(label: "健康", icon: "cross.fill", action: .detail(.health)),
+                ExpandedCardFabShortcut(label: "记录", icon: "sparkles", action: .quick("moment")),
+                ExpandedCardFabShortcut(label: "其他", icon: "ellipsis.circle.fill", action: .allFeatures)
+            ]
+        }
+
+        return [
+            ExpandedCardFabShortcut(label: "喂食", icon: "fork.knife", action: .quick("feed")),
+            ExpandedCardFabShortcut(label: "喂水", icon: "drop.fill", action: .quick("water")),
+            ExpandedCardFabShortcut(label: "清洁", icon: "bubbles.and.sparkles.fill", action: .quick("groom")),
+            ExpandedCardFabShortcut(label: "体重", icon: "scalemass.fill", action: .detail(.weight)),
+            ExpandedCardFabShortcut(label: "记录", icon: "sparkles", action: .quick("moment")),
+            ExpandedCardFabShortcut(label: "其他", icon: "ellipsis.circle.fill", action: .allFeatures)
+        ]
+    }
+
+    @ViewBuilder
+    private func expandedCardFab(card: FocusCard) -> some View {
+        let items = expandedCardFabShortcuts(for: card)
+
+        VStack(alignment: .trailing, spacing: 14) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
+                fabActionRow(
+                    item: HomeFabFunctionShortcut(
+                        label: item.label,
+                        icon: item.icon,
+                        isAvailable: item.isAvailable,
+                        badge: item.badge
+                    ),
+                    rowHeight: 48
+                )
+                .scaleEffect(cardFabExpanded ? 1 : 0.6, anchor: .bottomTrailing)
                 .opacity(cardFabExpanded ? 1 : 0)
-                .offset(y: cardFabExpanded ? 0 : 18)
+                .offset(y: cardFabExpanded ? 0 : 24)
                 .animation(
-                    .spring(response: 0.32, dampingFraction: 0.74)
-                    .delay(cardFabExpanded ? Double(items.count - 1 - idx) * 0.05 : Double(idx) * 0.03),
+                    .spring(response: 0.35, dampingFraction: 0.72)
+                    .delay(cardFabExpanded ? Double(items.count - 1 - idx) * 0.055 : Double(idx) * 0.04),
                     value: cardFabExpanded
                 )
+                .onTapGesture {
+                    guard item.isAvailable else {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        return
+                    }
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    cardFabExpanded = false
+                    openExpandedCardFabShortcut(item, card: card)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(item.label)
+                .accessibilityHint("前往\(item.label)详情")
                 .accessibilityHidden(!cardFabExpanded)
             }
 
             Button {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                    cardFabExpanded.toggle()
-                }
+                cardFabExpanded.toggle()
             } label: {
-                Image(systemName: cardFabExpanded ? "xmark" : "ellipsis")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 56, height: 56)
-                    .background(Color.goPrimary, in: Circle())
-                    .shadow(color: Color.goPrimary.opacity(0.4), radius: 10, y: 4)
-                    .rotationEffect(.degrees(cardFabExpanded ? 90 : 0))
+                ZStack {
+                    Circle()
+                        .fill(Color(hex: "1A2E8A"))
+                        .frame(width: 56, height: 56)
+                        .shadow(color: Color(hex: "1A2E8A").opacity(0.45), radius: 10, y: 4)
+                    Image(systemName: cardFabExpanded ? "xmark" : "square.grid.2x2.fill")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(.white)
+                        .rotationEffect(.degrees(cardFabExpanded ? 90 : 0))
+                        .animation(.spring(response: 0.3), value: cardFabExpanded)
+                }
             }
             .buttonStyle(.plain)
             .accessibilityLabel(cardFabExpanded ? "收起成员快捷菜单" : "展开成员快捷菜单")
-            .accessibilityHint("打开全部功能、日历或个人信息页")
+            .accessibilityHint("点击展开常用功能")
         }
     }
 
-    private func openExpandedCardFabAction(index: Int, card: FocusCard) {
-        switch index {
-        case 0:
-            if card.isHuman, let human = humans.first(where: { $0.id == card.id }) {
-                expandedAllFeaturesHuman = human
-            } else if let pet = pets.first(where: { $0.id == card.id && !$0.hasPassedAway }) {
+    private func openExpandedCardFabShortcut(_ item: ExpandedCardFabShortcut, card: FocusCard) {
+        switch item.action {
+        case .allFeatures:
+            if let pet = pets.first(where: { $0.id == card.id && !$0.hasPassedAway }) {
                 expandedAllFeaturesPet = pet
             }
-        case 1:
-            calendarEntityFilterId = card.id.uuidString
-            showingCalendar = true
-        case 2:
+        case .humanAllFeatures:
             if card.isHuman, let human = humans.first(where: { $0.id == card.id }) {
-                selectedHuman = human
-            } else if let pet = pets.first(where: { $0.id == card.id && !$0.hasPassedAway }) {
-                selectedPetTab = .overview
-                selectedPet = pet
+                expandedAllFeaturesHuman = human
             }
+        case .quick(let actionType):
+            guard let pet = pets.first(where: { $0.id == card.id && !$0.hasPassedAway }) else { return }
+            openExpandedPetShortcut(actionType, pet: pet)
+        case .detail(let feature):
+            guard let pet = pets.first(where: { $0.id == card.id && !$0.hasPassedAway }) else { return }
+            openExpandedPetDetail(feature, pet: pet)
+        case .humanQuick(let actionType):
+            guard let human = humans.first(where: { $0.id == card.id }) else { return }
+            openExpandedHumanShortcut(actionType, human: human)
+        }
+    }
+
+    private func openExpandedPetShortcut(_ actionType: String, pet: Pet) {
+        switch actionType {
+        case "feed":
+            expandedQuickFeedDetailPet = pet
+        case "water":
+            expandedQuickWaterDetailModeRaw = QuickWaterDetailSheet.WaterMode.drink.rawValue
+            expandedQuickWaterDetailPet = pet
+        case "waterChange":
+            expandedQuickWaterDetailModeRaw = QuickWaterDetailSheet.WaterMode.change.rawValue
+            expandedQuickWaterDetailPet = pet
+        case "walk":
+            expandedQuickWalkPet = pet
+        case "potty", "litter":
+            expandedQuickPottyDetailPet = pet
+        case "play":
+            expandedQuickPlayDetailPet = pet
+        case "groom", "filterClean":
+            expandedQuickHygienePet = pet
+        case "moment":
+            expandedQuickMomentPet = pet
         default:
             break
         }
     }
 
+    private func openExpandedPetDetail(_ feature: PetFeature, pet: Pet) {
+        switch feature {
+        case .health:
+            expandedQuickHealthPet = pet
+        case .food:
+            expandedQuickFeedDetailPet = pet
+        case .hygiene:
+            expandedQuickHygienePet = pet
+        case .walks:
+            expandedQuickWalkPet = pet
+        case .potty:
+            expandedQuickPottyDetailPet = pet
+        case .weight:
+            expandedQuickWeightDetailPet = pet
+        case .expense:
+            expandedQuickExpenseDetailPet = pet
+        case .retention, .basicInfo, .documents, .moments, .achievements, .medications:
+            expandedAllFeaturesPet = pet
+        }
+    }
+
+    private func openExpandedHumanShortcut(_ actionType: String, human: Human) {
+        if let field = PrivacyService.field(forHumanAction: actionType),
+           PrivacyService.isLocked(field, for: human, viewedBy: activeHumanId) {
+            showingHumanPrivacyAlert = true
+            return
+        }
+
+        switch actionType {
+        case "humanWeight":
+            expandedHumanWeightDetail = human
+        case "humanWorkout":
+            expandedHumanWorkoutDetail = human
+        case "humanMedication":
+            expandedQuickHumanMedication = human
+        case "humanNote":
+            expandedHumanNoteDetail = human
+        default:
+            expandedAllFeaturesHuman = human
+        }
+    }
+
     private func openGlobalCalendar() {
         calendarEntityFilterId = nil
+        showingCalendar = true
+    }
+
+    private func openTopCalendar() {
+        if let activeCard = activeWalletCard, !activeCard.isHuman {
+            calendarEntityFilterId = activeCard.id.uuidString
+        } else {
+            calendarEntityFilterId = nil
+        }
         showingCalendar = true
     }
 
@@ -2557,24 +3116,27 @@ extension FocusStackHomeTestView {
                 .buttonStyle(.plain)
                 .accessibilityLabel("连续打卡 \(headerStreak) 天")
 
-                CoconutBalanceCapsule(onTap: { showingCoconutLog = true })
+                CoconutBalanceCapsule(onTap: { showingOasisReward = true })
             }
 
             Spacer()
 
-            // ── Right: ... menu ──
-            Menu {
-                Button { showingAddEntity = true }   label: { Label("添加成员", systemImage: "person.badge.plus") }
-                Button { showingCrewRoster = true }  label: { Label("OHANA 成员", systemImage: "person.2.fill") }
-                Button { showingSettings = true }    label: { Label("设置", systemImage: "gearshape") }
-            } label: {
-                topLimePill {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 13, weight: .black))
-                        .frame(width: 18)
+            // ── Right: calendar + ... menu ──
+            HStack(spacing: 8) {
+                Button { openTopCalendar() } label: {
+                    topLimePill {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 12, weight: .black))
+                            .frame(width: 18)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("日历")
+
+                HeaderMenuButton {
+                    showingCrewRoster = true
                 }
             }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, K.hPad)
         .padding(.top, safeT + 12)
@@ -2675,19 +3237,18 @@ private struct FocusWalletCardView: View {
                     )
                     .allowsHitTesting(false)
 
-                // 2. Full-bleed photo + right-side readability scrim
+                // 2. Full-card photo + right-side readability scrim
                 if usesFullBleed, let img = avatarImage {
-                    ZStack {
-                        Image(uiImage: img)
-                            .resizable().scaledToFill()
-                            .frame(width: w, height: h).clipped()
-                            .saturation(1.02).contrast(1.03)
-                        WalletCardTrailingReadabilityOverlay(width: w, height: h)
-                    }
+                    cardPhotoLayer(img, w: w, h: h)
                     .allowsHitTesting(false)
                 }
 
-                // 3. Left avatar (silhouette or transparent photo popout)
+                // 3. Oversized background identity. For regular photos this sits
+                // above the image as a translucent orange watermark; for pasted
+                // transparent subjects it still remains behind the subject.
+                backgroundHeadlineLayer(w: w)
+
+                // 4. Left avatar (silhouette or transparent photo popout)
                 if !usesFullBleed {
                     leftAvatarContent(avatarImage: avatarImage, hasPopout: hasPopout, w: w, h: h)
                         .matchedGeometryEffect(
@@ -2695,44 +3256,19 @@ private struct FocusWalletCardView: View {
                             in: namespace,
                             isSource: !(expandedId == card.id)
                         )
-                        .frame(width: w * 0.52, height: h)
-                        .clipped()
+                        .frame(width: w * avatarContentWidthRatio, height: h)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                         .allowsHitTesting(false)
                 }
 
-                // 4. Right info column: streak · days together · footnote · barcode
+                // 5. Right info column: streak · days together · footnote · barcode
                 rightInfoColumn(h: h)
 
-                // 5. Headline name at top-center
-                Text(card.name.uppercased())
-                    .font(.system(
-                        size: WalletPetCardTheme.headlinePointSize(cardWidth: w, headlineCount: card.name.count),
-                        weight: .black, design: .rounded
-                    ))
-                    .foregroundStyle(accent.opacity(0.85))
-                    .lineLimit(1).minimumScaleFactor(0.22)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.horizontal, 8).padding(.top, 8)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .opacity(isHeroExpanded ? 1 : 0)
-                    .allowsHitTesting(false)
-
-                // 6. Kind subtitle below headline
-                Text(card.kind.prefix(10).uppercased())
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.7))
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.top, kindSubtitleTop(w: w))
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .opacity(isHeroExpanded ? 1 : 0)
-                    .allowsHitTesting(false)
-
-                // 7. Top identity bar (peek strip shown when card is behind others)
+                // 6. Top identity bar (peek strip shown when card is behind others)
                 topIdentityBar
                     .opacity(isHeroExpanded ? 0 : 1)
 
-                // 8. Compact cards now keep the same uninterrupted background as the hero card.
+                // 7. Compact cards now keep the same uninterrupted background as the hero card.
             }
             .animation(HeroAnim.walletSpring, value: isHeroExpanded)
         }
@@ -2746,6 +3282,36 @@ private struct FocusWalletCardView: View {
     }
 
     // MARK: – Background
+
+    private var avatarContentWidthRatio: CGFloat {
+        if isHeroExpanded && !card.isHuman && card.petSpecies != nil {
+            return 0.98
+        }
+        return 0.52
+    }
+
+    private func backgroundHeadlineLayer(w: CGFloat) -> some View {
+        VStack(spacing: 4) {
+            Text(card.name.uppercased())
+                .font(.system(
+                    size: WalletPetCardTheme.headlinePointSize(cardWidth: w, headlineCount: card.name.count),
+                    weight: .black, design: .rounded
+                ))
+                .foregroundStyle(accent.opacity(0.85))
+                .lineLimit(1).minimumScaleFactor(0.22)
+                .frame(maxWidth: .infinity, alignment: .center)
+
+            Text(card.kind.prefix(10).uppercased())
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.7))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 8)
+        .padding(.top, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .opacity(isHeroExpanded ? 1 : 0.78)
+        .allowsHitTesting(false)
+    }
 
     @ViewBuilder
     private func cardBackground(usesFullBleed: Bool) -> some View {
@@ -2777,21 +3343,108 @@ private struct FocusWalletCardView: View {
         .allowsHitTesting(false)
     }
 
+    @ViewBuilder
+    private func cardPhotoLayer(_ img: UIImage, w: CGFloat, h: CGFloat) -> some View {
+        if isHeroExpanded {
+            ZStack {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: w, height: h)
+                    .clipped()
+                    .saturation(1.02)
+                    .contrast(1.03)
+                WalletCardTrailingReadabilityOverlay(width: w, height: h)
+                bottomRightTextShadow(width: w, height: h, isExpanded: true)
+            }
+        } else {
+            let photoW = compactPhotoRenderedWidth(img, h: h, cardW: w)
+            ZStack(alignment: .leading) {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: photoW, height: h)
+                    .clipped()
+                    .frame(width: w, height: h, alignment: .leading)
+                    .saturation(1.04)
+                    .contrast(1.02)
+                    .mask(compactPhotoSoftMask(width: w, height: h))
+                bottomRightTextShadow(width: w, height: h, isExpanded: false)
+            }
+        }
+    }
+
+    private func compactPhotoRenderedWidth(_ img: UIImage, h: CGFloat, cardW: CGFloat) -> CGFloat {
+        guard img.size.height > 0 else { return cardW }
+        return max(cardW, h * img.size.width / img.size.height)
+    }
+
+    private func compactPhotoSoftMask(width: CGFloat, height: CGFloat) -> some View {
+        LinearGradient(
+            stops: [
+                .init(color: .white, location: 0),
+                .init(color: .white, location: 0.46),
+                .init(color: .white.opacity(0.72), location: 0.60),
+                .init(color: .white.opacity(0.18), location: 0.76),
+                .init(color: .clear, location: 0.92)
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+        .frame(width: width, height: height)
+    }
+
+    private func bottomRightTextShadow(width: CGFloat, height: CGFloat, isExpanded: Bool) -> some View {
+        ZStack {
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0.0),
+                    .init(color: .black.opacity(isExpanded ? 0.18 : 0.10), location: 0.38),
+                    .init(color: .black.opacity(isExpanded ? 0.44 : 0.32), location: 0.76),
+                    .init(color: .black.opacity(isExpanded ? 0.62 : 0.46), location: 1.0)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            RadialGradient(
+                colors: [
+                    .black.opacity(isExpanded ? 0.56 : 0.42),
+                    .black.opacity(isExpanded ? 0.28 : 0.20),
+                    .clear
+                ],
+                center: .bottomTrailing,
+                startRadius: 8,
+                endRadius: min(width, height) * (isExpanded ? 0.78 : 0.66)
+            )
+        }
+        .frame(width: width, height: height)
+        .allowsHitTesting(false)
+    }
+
     // MARK: – Left avatar
 
     @ViewBuilder
     private func leftAvatarContent(avatarImage: UIImage?, hasPopout: Bool, w: CGFloat, h: CGFloat) -> some View {
         if let img = avatarImage, hasPopout {
-            // Transparent cutout: white outline + actual image, popout shadow
+            // Transparent cutout. In expanded pet cards we intentionally avoid the
+            // white-outline duplicate layer; sibling FAB animations can otherwise
+            // redraw that outline one frame before the real image and create a flash.
             ZStack(alignment: .bottom) {
+                if !(isHeroExpanded && !card.isHuman) {
+                    Image(uiImage: img).resizable().scaledToFit()
+                        .scaleEffect(0.88)
+                        .colorMultiply(.white)
+                        .shadow(color: .white, radius: 0, x: 2, y: 0)
+                        .shadow(color: .white, radius: 0, x: -2, y: 0)
+                        .shadow(color: .white, radius: 0, x: 0, y: -2)
+                        .allowsHitTesting(false)
+                }
                 Image(uiImage: img).resizable().scaledToFit()
-                    .scaleEffect(0.88).colorMultiply(.white)
-                    .shadow(color: .white, radius: 0, x: 2, y: 0)
-                    .shadow(color: .white, radius: 0, x: -2, y: 0)
-                    .shadow(color: .white, radius: 0, x: 0, y: -2)
-                Image(uiImage: img).resizable().scaledToFit()
+                    .scaleEffect(1)
+                    .allowsHitTesting(false)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(isHeroExpanded && !card.isHuman ? 16 : 0)
             .shadow(color: .black.opacity(0.28), radius: 18, x: 0, y: 12)
         } else if !card.isHuman, let species = card.petSpecies {
             // Pet silhouette
@@ -2799,8 +3452,9 @@ private struct FocusWalletCardView: View {
             ZStack {
                 Ellipse()
                     .fill(Color.black.opacity(0.16))
-                    .frame(width: w * 0.28, height: 24).blur(radius: 10)
-                    .offset(y: h * 0.14)
+                    .frame(width: w * (isHeroExpanded ? 0.32 : 0.28), height: isHeroExpanded ? 26 : 24)
+                    .blur(radius: 10)
+                    .offset(y: h * (isHeroExpanded ? 0.18 : 0.14))
                 PetSilhouetteView(
                     species: silSpecies,
                     coatColor: card.coatColor,
@@ -2808,12 +3462,21 @@ private struct FocusWalletCardView: View {
                     patternName: card.patternName,
                     isAnimationEnabled: false
                 )
-                .scaleEffect(0.92)
-                .frame(width: w * 0.38, height: h * 0.68)
+                .scaleEffect(isHeroExpanded ? 1.0 : 0.92)
+                .frame(
+                    width: w * (isHeroExpanded ? 0.78 : 0.38),
+                    height: h * (isHeroExpanded ? 0.90 : 0.68)
+                )
+                .offset(x: isHeroExpanded ? -w * 0.03 : 0, y: isHeroExpanded ? h * 0.04 : 0)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if card.isHuman {
+            HumanSilhouetteView(gender: card.humanGender ?? "", accent: .white.opacity(0.78))
+                .scaleEffect(0.9)
+                .frame(width: w * 0.34, height: h * 0.68)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         } else {
-            // Human or unknown: emoji
+            // Unknown: emoji fallback
             Text(card.emoji.isEmpty ? "👤" : card.emoji)
                 .font(.system(size: min(w * 0.22, 60)))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -2832,17 +3495,11 @@ private struct FocusWalletCardView: View {
                     .background(Color.goPrimary, in: Capsule())
             }
             Spacer(minLength: 4)
-            Text(card.daysTogether > 0 ? "\(card.daysTogether)" : "—")
-                .font(.system(size: isHeroExpanded ? 34 : 26, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
-                .lineLimit(1).minimumScaleFactor(0.5)
-            Text("Days Together")
-                .font(.system(size: isHeroExpanded ? 11 : 9, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.92))
-            Text(footnoteText)
-                .font(.system(size: 9, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.7))
-                .lineLimit(1).minimumScaleFactor(0.7)
+            if card.isHuman {
+                humanInfoStack
+            } else {
+                petInfoStack
+            }
             if isHeroExpanded {
                 barcodeView.padding(.top, 8)
             }
@@ -2851,13 +3508,55 @@ private struct FocusWalletCardView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
     }
 
-    private var footnoteText: String {
-        var parts: [String] = []
-        if let age = card.ageText, !age.isEmpty { parts.append(age) }
-        if !card.breed.isEmpty { parts.append(card.breed) }
-        else if let sp = card.petSpecies, !sp.isEmpty { parts.append(sp) }
-        if parts.isEmpty { parts.append("Ohana ID") }
-        return parts.joined(separator: " · ")
+    private var humanInfoStack: some View {
+        let details = [card.zodiacText, card.mbtiText]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        return VStack(alignment: .trailing, spacing: isHeroExpanded ? 5 : 3) {
+            Text(details.first ?? "OHANA MEMBER")
+                .font(.system(size: isHeroExpanded ? 20 : 15, weight: .black, design: .rounded))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
+
+            if details.count > 1 {
+                Text(details.dropFirst().joined(separator: " · "))
+                    .font(.system(size: isHeroExpanded ? 11 : 9, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.78))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+    }
+
+    private var petInfoStack: some View {
+        let meta = [card.ageText, card.humanEquivalentAgeText, card.zodiacText]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && $0 != "未知" }
+
+        return VStack(alignment: .trailing, spacing: isHeroExpanded ? 5 : 3) {
+            Text(petTogetherHeadline)
+                .font(.system(size: isHeroExpanded ? 20 : 15, weight: .black, design: .rounded))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+
+            if !meta.isEmpty {
+                Text(meta.joined(separator: " · "))
+                    .font(.system(size: isHeroExpanded ? 10 : 8.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.76))
+                    .lineLimit(isHeroExpanded ? 2 : 1)
+                    .multilineTextAlignment(.trailing)
+                    .minimumScaleFactor(0.62)
+            }
+        }
+    }
+
+    private var petTogetherHeadline: String {
+        guard card.daysTogetherText != nil else { return "New Family" }
+        if card.daysTogether < 0 { return "\(abs(card.daysTogether)) Days Until Home" }
+        return "\(card.daysTogether) Days Together"
     }
 
     private var barcodeView: some View {
@@ -2870,7 +3569,7 @@ private struct FocusWalletCardView: View {
                         .frame(width: 2, height: h)
                 }
             }
-            Text("O H A N A   P E T")
+            Text(card.isHuman ? "O H A N A   H U M A N" : "O H A N A   P E T")
                 .font(.system(size: 9, weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.82))
                 .tracking(1.2)
@@ -3009,7 +3708,46 @@ private struct WalkLaunchBurst: View {
 private struct ExpandedHumanFeaturesSheet: View {
     let human: Human
 
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+
+    @Query private var allPets: [Pet]
+    @Query private var allHumans: [Human]
+    @Query(filter: #Predicate<Reminder> { $0.status == "pending" },
+           sort: \Reminder.scheduledAt) private var allPendingReminders: [Reminder]
+    @Query private var allMeds: [HumanMedication]
+    @Query private var allReports: [HumanHealthReport]
+
+    @State private var showingEditSheet = false
+    @State private var showingCoconutLog = false
+    @State private var showingDeleteConfirm = false
+
+    private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
+    private var isViewingOwnProfile: Bool { activeHumanId == human.id }
+    private var isAllPrivateForViewer: Bool {
+        !isViewingOwnProfile && HumanPrivateField.allCases.allSatisfy { human.privateFields.contains($0.rawValue) }
+    }
+
+    private var humanReminders: [Reminder] {
+        guard !isAllPrivateForViewer,
+              !human.isPrivate(.medication, viewedBy: activeHumanId) else { return [] }
+        return allPendingReminders.filter {
+            $0.event?.relatedEntityType == "Human" &&
+            $0.event?.relatedEntityId == human.id.uuidString
+        }
+    }
+
+    private var myMeds: [HumanMedication] {
+        guard !human.isPrivate(.medication, viewedBy: activeHumanId) else { return [] }
+        return allMeds.filter { $0.humanId == human.id.uuidString && $0.isActive && $0.isActiveToday }
+    }
+
+    private var myReports: [HumanHealthReport] {
+        guard !isAllPrivateForViewer,
+              !human.isPrivate(.weight, viewedBy: activeHumanId) else { return [] }
+        return allReports.filter { $0.humanId == human.id.uuidString }
+    }
 
     var body: some View {
         NavigationStack {
@@ -3021,67 +3759,719 @@ private struct ExpandedHumanFeaturesSheet: View {
                 )
                 .ignoresSafeArea()
 
-                List {
-                    Section {
+                ScrollView {
+                    VStack(spacing: 14) {
                         NavigationLink {
-                            HumanWeightHistoryView(human: human)
+                            HumanBasicInfoDetailView(human: human)
                         } label: {
-                            row(icon: "scalemass.fill", color: .goTeal, title: "体重记录", subtitle: "查看体重趋势")
+                            humanFeatureHero
                         }
-                        NavigationLink {
-                            HumanMedicationView(human: human)
-                        } label: {
-                            row(icon: "pills.fill", color: .goPurple, title: "用药管理", subtitle: "记录服药和提醒")
-                        }
-                        NavigationLink {
-                            HumanHealthReportView(human: human)
-                        } label: {
-                            row(icon: "cross.case.fill", color: .goRed, title: "健康报告", subtitle: "体检与健康档案")
-                        }
-                    } header: {
-                        sectionHeader("健康 & 身体")
-                    }
-                    .listRowBackground(rowBackground)
+                        .buttonStyle(.plain)
 
-                    Section {
-                        NavigationLink {
-                            CoHealthDashboardFullView(human: human)
-                        } label: {
-                            row(icon: "figure.run", color: .goTeal, title: "活动记录", subtitle: "运动与共同健康")
+                        if isAllPrivateForViewer {
+                            fullPrivacyCard
+                        } else {
+                            badgesCard
+                            visibilityCard
                         }
-                        NavigationLink {
-                            HumanExpenseDetailView(human: human)
-                        } label: {
-                            row(icon: "creditcard.fill", color: .goOrange, title: "花费记录", subtitle: "查看支出明细")
+
+                        sectionHeader("功能入口")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        HStack(spacing: 12) {
+                            featureNavigation(
+                                field: .weight,
+                                destination: HumanWeightHistoryView(human: human),
+                                lockedTitle: "体重",
+                                label: {
+                                    bentoCard(
+                                        icon: "scalemass.fill",
+                                        color: .goTeal,
+                                        title: "体重",
+                                        value: latestWeightText,
+                                        subtitle: "趋势与记录",
+                                        height: 146
+                                    )
+                                }
+                            )
+                            featureNavigation(
+                                field: .workout,
+                                destination: CoHealthDashboardFullView(human: human),
+                                lockedTitle: "活动",
+                                label: {
+                                    bentoCard(
+                                        icon: "figure.run",
+                                        color: Color(hex: "38BDF8"),
+                                        title: "活动",
+                                        value: "\(visibleWorkoutCount)",
+                                        subtitle: "运动与共同健康",
+                                        height: 146
+                                    )
+                                }
+                            )
                         }
-                        NavigationLink {
-                            HumanWishlistView(human: human)
-                        } label: {
-                            row(icon: "gift.fill", color: Color(hex: "EC4899"), title: "椰子资产", subtitle: "愿望清单和资产")
+
+                        HStack(spacing: 12) {
+                            featureNavigation(
+                                field: .medication,
+                                destination: HumanMedicationView(human: human),
+                                lockedTitle: "用药",
+                                label: {
+                                    compactBentoCard(icon: "pills.fill", color: .goPurple, title: "用药", subtitle: "服药与提醒")
+                                }
+                            )
+                            featureNavigation(
+                                field: .weight,
+                                destination: HumanHealthReportView(human: human),
+                                lockedTitle: "健康报告",
+                                label: {
+                                    compactBentoCard(icon: "cross.case.fill", color: .goRed, title: "健康报告", subtitle: "体检与档案")
+                                }
+                            )
                         }
-                    } header: {
-                        sectionHeader("活动 & 财务")
+
+                        HStack(spacing: 12) {
+                            featureNavigation(
+                                field: .expense,
+                                destination: HumanExpenseDetailView(human: human),
+                                lockedTitle: "花费",
+                                label: {
+                                    bentoCard(
+                                        icon: "creditcard.fill",
+                                        color: .goOrange,
+                                        title: "花费",
+                                        value: "账本",
+                                        subtitle: "谁花了多少钱",
+                                        height: 132
+                                    )
+                                }
+                            )
+                            featureNavigation(
+                                field: .wishlist,
+                                destination: HumanWishlistView(human: human),
+                                lockedTitle: "椰子资产",
+                                label: {
+                                    bentoCard(
+                                        icon: "gift.fill",
+                                        color: Color(hex: "EC4899"),
+                                        title: "椰子资产",
+                                        value: visibleCoconutText,
+                                        subtitle: "愿望清单和资产",
+                                        height: 132
+                                    )
+                                }
+                            )
+                        }
+
+                        if !isAllPrivateForViewer {
+                            sectionHeader("提醒与备注")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            remindersCard
+                            notesCard
+                            deleteCard
+                        }
                     }
-                    .listRowBackground(rowBackground)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 28)
                 }
-                .listStyle(.insetGrouped)
-                .scrollContentBackground(.hidden)
             }
             .navigationTitle("\(human.name) 的功能")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    CoconutBalanceCapsule {
+                        showingCoconutLog = true
+                    }
+                    .disabled(human.isPrivate(.wishlist, viewedBy: activeHumanId))
+                }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { dismiss() }
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.goLime)
+                    HStack(spacing: 10) {
+                        Button {
+                            showingEditSheet = true
+                        } label: {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 14, weight: .black))
+                                .foregroundStyle(.black)
+                                .frame(width: 30, height: 30)
+                                .background(Color.goLime, in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        Button("完成") { dismiss() }
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.goLime)
+                    }
+                }
+            }
+            .sheet(isPresented: $showingEditSheet) { EditHumanSheet(human: human) }
+            .sheet(isPresented: $showingCoconutLog) { CoconutLogView() }
+            .alert("确认删除", isPresented: $showingDeleteConfirm) {
+                Button("取消", role: .cancel) {}
+                Button("删除", role: .destructive) {
+                    deleteHumanAndDismiss()
+                }
+            } message: {
+                Text("确定要删除 \(human.name) 吗？此操作不可撤销。")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func featureNavigation<Destination: View, Label: View>(
+        field: HumanPrivateField,
+        destination: Destination,
+        lockedTitle: String,
+        @ViewBuilder label: () -> Label
+    ) -> some View {
+        if human.isPrivate(field, viewedBy: activeHumanId) {
+            lockedFeatureCard(title: lockedTitle)
+        } else {
+            NavigationLink {
+                destination
+            } label: {
+                label()
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var visibleWorkoutCount: Int {
+        human.isPrivate(.workout, viewedBy: activeHumanId) ? 0 : human.workoutLogs.count
+    }
+
+    private var visibleCoconutText: String {
+        human.isPrivate(.wishlist, viewedBy: activeHumanId) ? "—" : "\(human.coconutBalance)"
+    }
+
+    private var basicInfoCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                humanAvatar(size: 58)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(human.name)
+                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text(humanSubtitle.isEmpty ? "OHANA MEMBER" : humanSubtitle)
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(.white.opacity(0.56))
+                }
+                Spacer()
+                Button {
+                    showingEditSheet = true
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 13, weight: .black))
+                        .foregroundStyle(.black)
+                        .frame(width: 32, height: 32)
+                        .background(Color.goLime, in: Circle())
+                }
+                .buttonStyle(.plain)
+            }
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                infoPill(title: "身份", value: human.roleText.isEmpty ? "成员" : human.roleText)
+                infoPill(title: "年龄", value: human.birthday == nil ? "未设置" : human.ageText)
+                infoPill(title: "血型", value: human.bloodType.isEmpty ? "未设置" : human.bloodType)
+                infoPill(title: "身高", value: human.heightCm > 0 && human.heightCm.isFinite ? String(format: "%.0f cm", human.heightCm) : "未设置")
+                infoPill(title: "国籍", value: human.nationality.isEmpty ? "未设置" : human.nationality)
+                infoPill(title: "城市", value: human.city.isEmpty ? "未设置" : human.city)
+            }
+        }
+        .padding(16)
+        .background(.white.opacity(0.085), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(.white.opacity(0.11), lineWidth: 1)
+        }
+    }
+
+    private var badgesCard: some View {
+        let badges = human.dynamicBadges(allPets: allPets, allHumans: allHumans)
+        return Group {
+            if !badges.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "trophy.fill")
+                            .foregroundStyle(Color.goYellow)
+                        Text("动态称号")
+                            .font(OhanaFont.callout(.black))
+                            .foregroundStyle(.white)
+                    }
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(badges) { badge in
+                                HStack(spacing: 5) {
+                                    Text(badge.emoji)
+                                    Text(badge.title)
+                                        .font(OhanaFont.caption(.bold))
+                                }
+                                .foregroundStyle(Color(hex: badge.color))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .background(Color(hex: badge.color).opacity(0.16), in: Capsule())
+                                .overlay(Capsule().strokeBorder(Color(hex: badge.color).opacity(0.28), lineWidth: 1))
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+                .background(.white.opacity(0.075), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .strokeBorder(.white.opacity(0.09), lineWidth: 1)
                 }
             }
         }
     }
 
+    private var visibilityCard: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "rectangle.stack.fill")
+                .font(.system(size: 16, weight: .black))
+                .foregroundStyle(.black)
+                .frame(width: 36, height: 36)
+                .background(Color.goLime, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            VStack(alignment: .leading, spacing: 3) {
+                Text("在首页显示")
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(.white)
+                Text(human.shouldShowOnHome ? "已加入首页卡堆与岛屿统计" : "不在首页卡堆与岛屿体重中显示")
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(.white.opacity(0.48))
+            }
+            Spacer()
+            Toggle("", isOn: Binding(
+                get: { human.shouldShowOnHome },
+                set: { human.shouldShowOnHome = $0; modelContext.safeSave() }
+            ))
+            .tint(Color.goLime)
+            .labelsHidden()
+        }
+        .padding(14)
+        .background(.white.opacity(0.075), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(.white.opacity(0.09), lineWidth: 1)
+        }
+    }
+
+    private var remindersCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "bell.badge.fill")
+                    .foregroundStyle(Color.goOrange)
+                Text("待办提醒")
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(.white)
+                Spacer()
+                Text("\(humanReminders.count)")
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.goOrange, in: Capsule())
+            }
+
+            if humanReminders.isEmpty {
+                emptyInlineRow(icon: "checkmark.circle", title: "暂无待办提醒")
+            } else {
+                ForEach(humanReminders.prefix(4)) { reminder in
+                    reminderRow(reminder)
+                }
+            }
+        }
+        .padding(16)
+        .background(.white.opacity(0.075), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(.white.opacity(0.09), lineWidth: 1)
+        }
+    }
+
+    @ViewBuilder
+    private var notesCard: some View {
+        if human.isPrivate(.note, viewedBy: activeHumanId) {
+            lockedWideCard(title: "备注")
+        } else {
+            NavigationLink {
+                HumanNoteHistorySheet(human: human)
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "note.text")
+                        .font(.system(size: 16, weight: .black))
+                        .foregroundStyle(Color.goPrimary)
+                        .frame(width: 36, height: 36)
+                        .background(Color.goPrimary.opacity(0.16), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("备注记录")
+                            .font(OhanaFont.callout(.black))
+                            .foregroundStyle(.white)
+                        Text(human.notes.isEmpty ? "暂无备注" : human.notes.components(separatedBy: "\n\n").first ?? "查看备注")
+                            .font(OhanaFont.caption2(.bold))
+                            .foregroundStyle(.white.opacity(0.48))
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(.white.opacity(0.26))
+                }
+                .padding(14)
+                .background(.white.opacity(0.075), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(.white.opacity(0.09), lineWidth: 1)
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var deleteCard: some View {
+        Button(role: .destructive) {
+            showingDeleteConfirm = true
+        } label: {
+            Label("删除成员", systemImage: "trash")
+                .font(OhanaFont.callout(.black))
+                .foregroundStyle(Color.goRed)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 13)
+                .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(Color.goRed.opacity(0.24), lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var fullPrivacyCard: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "lock.shield.fill")
+                .font(.system(size: 34, weight: .black))
+                .foregroundStyle(Color.goYellow)
+            Text("此成员资料仅本人可见")
+                .font(OhanaFont.title3(.black))
+                .foregroundStyle(.white)
+            Text("当前家庭成员无法查看 TA 的体重、运动、吃药、备注、花费和椰子资产等相关数据。")
+                .font(OhanaFont.caption(.bold))
+                .foregroundStyle(.white.opacity(0.54))
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(22)
+        .background(.white.opacity(0.075), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(.white.opacity(0.09), lineWidth: 1)
+        }
+    }
+
+    private func infoPill(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(OhanaFont.caption2(.black))
+                .foregroundStyle(.white.opacity(0.42))
+            Text(value)
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(.white.opacity(0.9))
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func lockedFeatureCard(title: String) -> some View {
+        lockedWideCard(title: title)
+            .frame(maxWidth: .infinity, minHeight: 132)
+    }
+
+    private func lockedWideCard(title: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "lock.fill")
+                .foregroundStyle(.white.opacity(0.42))
+            Text("\(title) · 仅本人可见")
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(.white.opacity(0.48))
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(.white.opacity(0.07), lineWidth: 1)
+        }
+    }
+
+    private func emptyInlineRow(icon: String, title: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .foregroundStyle(.white.opacity(0.34))
+            Text(title)
+                .font(OhanaFont.caption(.bold))
+                .foregroundStyle(.white.opacity(0.45))
+            Spacer()
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func reminderRow(_ reminder: Reminder) -> some View {
+        HStack(spacing: 12) {
+            Text(reminder.event?.emoji ?? "📌")
+                .font(OhanaFont.title3())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(reminder.event?.title ?? "提醒")
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(.white)
+                Text(reminder.scheduledAt, style: .date)
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(.white.opacity(0.45))
+            }
+            Spacer()
+            Button {
+                completeReminder(reminder)
+            } label: {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(OhanaFont.title3(.bold))
+                    .foregroundStyle(Color.goLime)
+            }
+            Button {
+                skipReminder(reminder)
+            } label: {
+                Image(systemName: "forward.circle.fill")
+                    .font(OhanaFont.title3(.bold))
+                    .foregroundStyle(Color.goYellow)
+            }
+        }
+        .padding(.vertical, 5)
+    }
+
+    private func completeReminder(_ reminder: Reminder) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        ReminderCompletionService.complete(reminder, by: human.id.uuidString, context: modelContext)
+    }
+
+    private func skipReminder(_ reminder: Reminder) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        ReminderCompletionService.skip(reminder, by: human.id.uuidString, context: modelContext)
+    }
+
+    private func deleteHumanAndDismiss() {
+        let deletedHumanId = human.id.uuidString
+        let fallbackHumanId = allHumans.first(where: { $0.id.uuidString != deletedHumanId })?.id.uuidString ?? ""
+
+        if activeHumanIdStr == deletedHumanId {
+            activeHumanIdStr = fallbackHumanId
+        }
+
+        modelContext.delete(human)
+        modelContext.safeSave()
+        NotificationCenter.default.post(name: .ohanaReturnHomeAfterHumanDeletion, object: nil)
+        dismiss()
+    }
+
     private var rowBackground: some View {
         RoundedRectangle(cornerRadius: 18, style: .continuous)
             .fill(Color.white.opacity(0.12))
+    }
+
+    private var humanFeatureHero: some View {
+        ZStack(alignment: .topLeading) {
+            MeshGradient(
+                width: 3,
+                height: 3,
+                points: [
+                    SIMD2(0.0, 0.0), SIMD2(0.5, 0.0), SIMD2(1.0, 0.0),
+                    SIMD2(0.0, 0.5), SIMD2(0.54, 0.32), SIMD2(1.0, 0.5),
+                    SIMD2(0.0, 1.0), SIMD2(0.5, 1.0), SIMD2(1.0, 1.0)
+                ],
+                colors: [
+                    Color(hex: human.themeColorHex).mix(with: .white, by: 0.2),
+                    Color(hex: "38BDF8").opacity(0.88),
+                    Color(hex: "C8FF00").opacity(0.62),
+                    Color(hex: human.themeColorHex),
+                    Color(hex: "1A2E8A"),
+                    Color(hex: "EC4899").opacity(0.7),
+                    Color(hex: "0C1640"),
+                    Color(hex: human.themeColorHex).mix(with: .black, by: 0.28),
+                    Color(hex: "050816")
+                ]
+            )
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("MEMBER OS")
+                            .font(OhanaFont.caption2(.black))
+                            .tracking(2.6)
+                            .foregroundStyle(.white.opacity(0.55))
+                        Text(human.name)
+                            .font(.system(size: 32, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.62)
+                        Text(humanSubtitle)
+                            .font(OhanaFont.caption(.bold))
+                            .foregroundStyle(.white.opacity(0.62))
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    humanAvatar(size: 54)
+                }
+
+                HStack(spacing: 9) {
+                    heroChip(title: "椰子", value: "\(human.coconutBalance)")
+                    heroChip(title: "运动", value: "\(human.workoutLogs.count)")
+                    heroChip(title: "体重", value: "\(human.weightLogs.count)")
+                }
+            }
+            .padding(18)
+
+            Image(systemName: "chevron.right.circle.fill")
+                .font(.system(size: 22, weight: .black))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.white.opacity(0.68))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                .padding(16)
+
+            Image(systemName: "person.crop.circle.badge.checkmark")
+                .font(.system(size: 88, weight: .black))
+                .foregroundStyle(.white.opacity(0.08))
+                .offset(x: 246, y: 76)
+        }
+        .frame(height: 188)
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(.white.opacity(0.16), lineWidth: 1)
+        }
+        .shadow(color: Color(hex: human.themeColorHex).opacity(0.28), radius: 22, y: 12)
+    }
+
+    private var humanSubtitle: String {
+        let zodiac = human.birthday.map { Human.westernZodiacChinese(for: $0) }
+        return [human.roleText, zodiac, human.mbti.isEmpty ? nil : human.mbti]
+            .compactMap { $0 }
+            .joined(separator: " · ")
+    }
+
+    private var latestWeightText: String {
+        guard !human.isPrivate(.weight, viewedBy: activeHumanId) else { return "—" }
+        guard let latest = human.weightLogs.sorted(by: { $0.date > $1.date }).first else { return "--" }
+        return String(format: "%.1f", latest.weight)
+    }
+
+    private func bentoCard(icon: String, color: Color, title: String, value: String, subtitle: String, height: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .black))
+                    .foregroundStyle(.black)
+                    .frame(width: 34, height: 34)
+                    .background(color, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(.white.opacity(0.36))
+            }
+            Spacer(minLength: 4)
+            Text(value)
+                .font(.system(size: 29, weight: .black, design: .rounded))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.58)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(.white.opacity(0.92))
+                Text(subtitle)
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(.white.opacity(0.45))
+                    .lineLimit(2)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: height, maxHeight: height, alignment: .topLeading)
+        .background(
+            LinearGradient(
+                colors: [color.opacity(0.28), Color.white.opacity(0.07), Color.black.opacity(0.08)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(.white.opacity(0.11), lineWidth: 1)
+        }
+    }
+
+    private func compactBentoCard(icon: String, color: Color, title: String, subtitle: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .black))
+                .foregroundStyle(color)
+                .frame(width: 36, height: 36)
+                .background(color.opacity(0.16), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(.white)
+                Text(subtitle)
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(.white.opacity(0.45))
+                    .lineLimit(1)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(OhanaFont.caption(.bold))
+                .foregroundStyle(.white.opacity(0.26))
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 76, maxHeight: 76)
+        .background(.white.opacity(0.075), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(.white.opacity(0.09), lineWidth: 1)
+        }
+    }
+
+    private func heroChip(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(OhanaFont.callout(.black))
+                .foregroundStyle(.white)
+            Text(title)
+                .font(OhanaFont.caption2(.bold))
+                .foregroundStyle(.white.opacity(0.48))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .background(.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func humanAvatar(size: CGFloat) -> some View {
+        ZStack {
+            Circle()
+                .fill(.white.opacity(0.12))
+                .frame(width: size, height: size)
+            if let data = human.avatarImageData, let ui = UIImage(data: data) {
+                Image(uiImage: ui)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            } else {
+                Text(human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji)
+                    .font(.system(size: size * 0.48))
+            }
+        }
     }
 
     private func sectionHeader(_ title: String) -> some View {
@@ -3207,11 +4597,10 @@ extension FocusStackHomeTestView {
             }
             .allowsHitTesting(true)
 
-            expandedCardFab(card: card, safeBottom: safeB)
-                .frame(width: heroW, alignment: .trailing)
+            expandedCardFab(card: card)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                .padding(.trailing, padding)
-                .padding(.bottom, safeB + 24)
+                .padding(.trailing, 20)
+                .padding(.bottom, floatingFabBottomPadding)
                 .allowsHitTesting(true)
         }
         .frame(width: fullW, height: fullH)
@@ -3372,5 +4761,87 @@ struct FocusStackHomeTestViewPreviewWrapper: View {
             selectedPetTab: $selectedPetTab,
             heroNS:         heroNS
         )
+    }
+}
+
+
+// MARK: - Header Menu
+private struct HeaderMenuButton: View {
+    let onCrew: () -> Void
+
+    @State private var showingPopover = false
+    @State private var showingSettings = false
+
+    var body: some View {
+        Button {
+            showingPopover = true
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 13, weight: .black))
+                    .frame(width: 18)
+            }
+            .foregroundStyle(.black)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+            .frame(height: 26)
+            .fixedSize(horizontal: true, vertical: false)
+            .background(Color.goPrimary, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showingPopover, arrowEdge: .top) {
+            HeaderPopoverMenu(
+                onCrew: {
+                    showingPopover = false
+                    DispatchQueue.main.async {
+                        onCrew()
+                    }
+                },
+                onSettings: {
+                    showingPopover = false
+                    DispatchQueue.main.async {
+                        showingSettings = true
+                    }
+                }
+            )
+            .presentationCompactAdaptation(.popover)
+        }
+        .fullScreenCover(isPresented: $showingSettings) {
+            SettingsView()
+        }
+    }
+}
+
+// MARK: - Header Popover Menu (replacement for Menu to avoid Menu+sheet UIContextMenuInteraction conflict)
+private struct HeaderPopoverMenu: View {
+    let onCrew: () -> Void
+    let onSettings: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            popoverRow(icon: "person.3.fill", title: "OHANA 成员", action: onCrew)
+            Divider()
+            popoverRow(icon: "gearshape.fill", title: "设置", action: onSettings)
+        }
+        .frame(minWidth: 200)
+        .padding(.vertical, 4)
+    }
+
+    private func popoverRow(icon: String, title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 22)
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                Spacer()
+            }
+            .foregroundStyle(Color.primary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }

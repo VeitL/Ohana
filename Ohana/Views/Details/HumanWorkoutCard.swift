@@ -494,21 +494,22 @@ struct HumanWorkoutHistoryView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var hkManager = HumanHealthKitManager.shared
 
+    @State private var showAddSheet = false
+
     private var sortedLogs: [HumanWorkoutLog] {
         human.workoutLogs.sorted { $0.date > $1.date }
     }
 
     var body: some View {
         NavigationStack {
-            ZStack {
+            ZStack(alignment: .bottom) {
                 ArkBackgroundView()
+
                 ScrollView {
                     VStack(spacing: 12) {
-                        // 汇总统计
                         summarySection
                             .padding(.horizontal, 16)
 
-                        // 手动记录
                         if !sortedLogs.isEmpty {
                             manualSection
                         }
@@ -519,8 +520,7 @@ struct HumanWorkoutHistoryView: View {
                                     .font(OhanaFont.body())
                                     .foregroundStyle(.primary.opacity(0.35))
                                     .padding(.top, 60)
-                                
-                                // 🚧 占位提示
+
                                 HStack(spacing: 8) {
                                     Image(systemName: "hammer.fill")
                                         .font(OhanaFont.callout())
@@ -538,18 +538,44 @@ struct HumanWorkoutHistoryView: View {
                             }
                         }
 
-                        Spacer(minLength: 40)
+                        Spacer(minLength: 100)
                     }
                     .padding(.top, 8)
                 }
+
+                // ── 底部 FAB
+                Button { showAddSheet = true } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 16, weight: .black))
+                        Text("添加运动")
+                            .font(.system(size: 16, weight: .black, design: .rounded))
+                    }
+                    .foregroundStyle(Color.arkInk)
+                    .padding(.horizontal, 28).padding(.vertical, 14)
+                    .background(Color.goPrimary, in: Capsule())
+                    .shadow(color: Color.goPrimary.opacity(0.4), radius: 14, y: 5)
+                }
+                .padding(.bottom, 28)
             }
             .navigationTitle("运动历史")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { dismiss() }
-                        .foregroundStyle(Color.goPrimary)
+                ToolbarItem(placement: .topBarLeading) {
+                    HumanPrivacyToggleButton(human: human, field: .workout)
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .sheet(isPresented: $showAddSheet) {
+                AddWorkoutSheet(human: human)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
             }
         }
     }

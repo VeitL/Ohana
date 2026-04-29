@@ -545,7 +545,7 @@ struct L10n {
     var petProTipStep2Prefix: String { isEn ? "Tap " : "点击" }
     var petProTipStep2Highlight: String { isEn ? "Copy Subject" : "拷贝" }
     var petProTipStep2Suffix: String { isEn ? " to stash it on the clipboard" : "保存到剪贴板" }
-    var petProTipStep3Prefix: String { isEn ? "Back in Ohana, tap " : "返回 Ohana，点击下方" }
+    var petProTipStep3Prefix: String { isEn ? "Back in Ohana, tap " : "返回 Ohana，点击上方" }
     var petProTipStep3Highlight: String { isEn ? "Paste" : "粘贴按钮" }
 
     // MARK: - Home / Overview & GO dashboard

@@ -6,7 +6,58 @@ import SwiftData
 
 // MARK: - Navigation Destination Enum (internal — shared with FeatureAggregateView & PetAllFeaturesSheet)
 
+enum FeatureGroup: String, Hashable, CaseIterable {
+    // Top-level information architecture (post-2026-04 IA refactor):
+    //   • dailyCare      — 每日照护：饮食 / 清洁 / 遛狗 / 便便 / 玩耍
+    //   • healthBody     — 健康：健康档案 / 用药 / 体重
+    //   • archiveMemory  — 成长档案：单一聚合入口 (PetRetentionHub)；
+    //                      子页（基本信息 / 证件 / 重要时刻 / 成就）只能通过 hub 访问
+    //   • householdHub   — 家：花费记录 / 照护分析 / 提醒 / 悬赏榜 / 家庭周报
+    //                      (合并自旧 financeLedger + familyCollab)
+    //   • oasisRewards / plants — 保留 case，供深链或未来菜单使用
+    case dailyCare
+    case healthBody
+    case archiveMemory
+    case householdHub
+    case oasisRewards
+    case plants
+
+    var title: String {
+        switch self {
+        case .dailyCare:     return "每日照护"
+        case .healthBody:    return "健康"
+        case .archiveMemory: return "成长档案"
+        case .householdHub:  return "家庭事务"
+        case .oasisRewards:  return "绿洲奖励"
+        case .plants:        return "植物"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .dailyCare:     return "sun.max.fill"
+        case .healthBody:    return "cross.fill"
+        case .archiveMemory: return "folder.fill"
+        case .householdHub:  return "house.fill"
+        case .oasisRewards:  return "globe.asia.australia.fill"
+        case .plants:        return "leaf.fill"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .dailyCare:     return Color(hex: "F59E0B")
+        case .healthBody:    return Color(hex: "EF4444")
+        case .archiveMemory: return Color(hex: "C8FF00")
+        case .householdHub:  return Color(hex: "38BDF8")
+        case .oasisRewards:  return Color(hex: "EAB308")
+        case .plants:        return Color(hex: "22C55E")
+        }
+    }
+}
+
 enum FMDest: Hashable {
+    case featureGroup(FeatureGroup)
     case featureAggregate(PetFeature)
     case petHealth(PersistentIdentifier)
     case petMedications(PersistentIdentifier)
@@ -86,161 +137,114 @@ struct FunctionMenuSheet: View {
     @Query(sort: \Plant.createdAt) private var plants: [Plant]
     @Bindable private var questMgr = QuestManager.shared
 
+    let initialDestination: FMDest?
     @State private var path = NavigationPath()
+    @State private var didOpenInitialDestination = false
     // Stub binding for PlantDashboardView (full navigation into plant detail happens via its own sheet)
     @State private var plantRouteStub: Plant?
 
+    init(initialDestination: FMDest? = nil) {
+        self.initialDestination = initialDestination
+    }
+
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
+    private var visibleHumans: [Human] { allHumans.filter { $0.shouldShowOnHome } }
+    private var showsFamilyCollaboration: Bool { visibleHumans.count > 1 }
+
+    /// 当 FAB 直达到这些目的地之一时，跳过根列表，直接以该目的地作为 NavigationStack 根视图，
+    /// 避免出现「先闪一下菜单列表再 push」的视觉跳动。
+    /// pet/human 特定的 destination（带 PersistentIdentifier）继续走 onAppear 的 path.append 路径。
+    private var directLandingDestination: FMDest? {
+        guard let dest = initialDestination else { return nil }
+        switch dest {
+        case .featureGroup,
+             .featureAggregate,
+             .calendar,
+             .bountyBoard,
+             .familyWeeklyReport,
+             .careLedgerAnalysis,
+             .reminderObservability,
+             .coconutShop,
+             .gacha,
+             .wealthDashboard,
+             .plantsDashboard:
+            return dest
+        default:
+            return nil
+        }
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
-            ZStack {
-                LinearGradient(
-                    colors: [Color(hex: "1A2E8A"), Color(hex: "0C1640")],
-                    startPoint: .top, endPoint: .bottom
-                )
-                .ignoresSafeArea()
-
-                List {
-                    // ── Section 1: 健康管理 ──
-                    Section {
-                        fmRow(icon: "cross.fill", iconColor: Color(hex: "EF4444"),
-                              title: "健康档案", subtitle: healthSubtitle) {
-                            path.append(FMDest.featureAggregate(.health))
+            if let landing = directLandingDestination {
+                fmDestinationView(landing)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("关闭") { dismiss() }
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Color.goLime)
                         }
-                        fmRow(icon: "scalemass.fill", iconColor: Color(hex: "16A34A"),
-                              title: "体重记录", subtitle: weightSubtitle) {
-                            path.append(FMDest.featureAggregate(.weight))
-                        }
-                        fmRow(icon: PetFeature.medications.icon, iconColor: Color(hex: "8B5CF6"),
-                              title: PetFeature.medications.title, subtitle: "\(activePets.count)只宠物") {
-                            path.append(FMDest.featureAggregate(.medications))
-                        }
-                    } header: {
-                        fmSectionHeader(icon: "cross.fill", title: "健康管理", label: "HEALTH")
                     }
-                    .listRowBackground(rowBackground)
+                    .navigationDestination(for: FMDest.self) { dest in
+                        fmDestinationView(dest)
+                    }
+            } else {
+                ZStack {
+                    LinearGradient(
+                        colors: [Color(hex: "1A2E8A"), Color(hex: "0C1640")],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                    .ignoresSafeArea()
 
-                    // ── Section 2: 日常生活 ──
-                    Section {
-                        fmRow(icon: PetFeature.food.icon, iconColor: Color(hex: "F59E0B"),
-                              title: PetFeature.food.title, subtitle: foodSubtitle) {
-                            path.append(FMDest.featureAggregate(.food))
-                        }
-                        fmRow(icon: PetFeature.hygiene.icon, iconColor: Color(hex: "06B6D4"),
-                              title: PetFeature.hygiene.title, subtitle: "\(activePets.count)只宠物") {
-                            path.append(FMDest.featureAggregate(.hygiene))
-                        }
-                        if hasDogs {
-                            fmRow(icon: PetFeature.walks.icon, iconColor: Color(hex: "0EA5E9"),
-                                  title: PetFeature.walks.title, subtitle: walkSubtitle) {
-                                path.append(FMDest.featureAggregate(.walks))
+                    List {
+                        Section {
+                            ForEach(functionMenuGroups, id: \.self) { group in
+                                fmRow(icon: group.icon, iconColor: group.color,
+                                      title: group.title, subtitle: subtitle(for: group)) {
+                                    path.append(destination(for: group))
+                                }
                             }
+                        } header: {
+                            fmSectionHeader(icon: "square.grid.2x2.fill", title: "聚合功能", label: "FUNCTIONS")
                         }
-                        fmRow(icon: PetFeature.potty.icon, iconColor: Color(hex: "D97706"),
-                              title: PetFeature.potty.title, subtitle: pottySubtitle) {
-                            path.append(FMDest.featureAggregate(.potty))
-                        }
-                        fmRow(icon: "creditcard.fill", iconColor: Color(hex: "D97706"),
-                              title: "花费记录", subtitle: expenseSubtitle) {
-                            path.append(FMDest.featureAggregate(.expense))
-                        }
-                    } header: {
-                        fmSectionHeader(icon: "sun.max.fill", title: "日常生活", label: "DAILY LIFE")
-                    }
-                    .listRowBackground(rowBackground)
+                        .listRowBackground(rowBackground)
 
-                    // ── Section 3: 植物与绿洲 ──
-                    Section {
-                        fmRow(icon: "leaf.fill", iconColor: Color(hex: "22C55E"),
-                              title: "植物管理", subtitle: plantsSubtitle) {
-                            path.append(FMDest.plantsDashboard)
+                        Section {
+                            ForEach(toolEntries, id: \.id) { entry in
+                                fmRow(icon: entry.icon, iconColor: entry.color,
+                                      title: entry.title, subtitle: entry.subtitle) {
+                                    path.append(entry.destination)
+                                }
+                            }
+                        } header: {
+                            fmSectionHeader(icon: "wrench.and.screwdriver.fill", title: "工具与奖励", label: "TOOLS")
                         }
-                    } header: {
-                        fmSectionHeader(icon: "leaf.fill", title: "植物与绿洲", label: "GARDEN")
+                        .listRowBackground(rowBackground)
                     }
-                    .listRowBackground(rowBackground)
-
-                    // ── Section 4: 档案与记忆 ──
-                    Section {
-                        fmRow(icon: PetFeature.retention.icon, iconColor: Color(hex: "C8FF00"),
-                              title: PetFeature.retention.title, subtitle: retentionSubtitle) {
-                            path.append(FMDest.featureAggregate(.retention))
-                        }
-                        fmRow(icon: PetFeature.basicInfo.icon, iconColor: Color(hex: "6B82C4"),
-                              title: PetFeature.basicInfo.title, subtitle: "\(activePets.count)只宠物") {
-                            path.append(FMDest.featureAggregate(.basicInfo))
-                        }
-                        fmRow(icon: PetFeature.documents.icon, iconColor: Color(hex: "6B7280"),
-                              title: PetFeature.documents.title, subtitle: "\(activePets.count)只宠物") {
-                            path.append(FMDest.featureAggregate(.documents))
-                        }
-                        fmRow(icon: PetFeature.moments.icon, iconColor: Color(hex: "C8FF00"),
-                              title: PetFeature.moments.title, subtitle: momentsSubtitle) {
-                            path.append(FMDest.featureAggregate(.moments))
-                        }
-                        fmRow(icon: PetFeature.achievements.icon, iconColor: Color(hex: "F59E0B"),
-                              title: PetFeature.achievements.title, subtitle: "\(activePets.count)只宠物") {
-                            path.append(FMDest.featureAggregate(.achievements))
-                        }
-                    } header: {
-                        fmSectionHeader(icon: "folder.fill", title: "档案与记忆", label: "ARCHIVE")
-                    }
-                    .listRowBackground(rowBackground)
-
-                    // ── Section 5: 家庭岛屿 ──
-                    Section {
-                        fmRow(icon: "chart.pie.fill", iconColor: Color(hex: "EAB308"),
-                              title: "岛屿财富", subtitle: wealthSubtitle) {
-                            path.append(FMDest.wealthDashboard)
-                        }
-                        fmRow(icon: "megaphone.fill", iconColor: Color(hex: "EF4444"),
-                              title: "家庭悬赏榜", subtitle: bountySubtitle) {
-                            path.append(FMDest.bountyBoard)
-                        }
-                        fmRow(icon: "chart.bar.doc.horizontal", iconColor: Color(hex: "38BDF8"),
-                              title: "家庭周报", subtitle: weeklyReportSubtitle) {
-                            path.append(FMDest.familyWeeklyReport)
-                        }
-                        fmRow(icon: "list.bullet.rectangle.portrait.fill", iconColor: Color(hex: "C8FF00"),
-                              title: "照护账本分析", subtitle: ledgerSubtitle) {
-                            path.append(FMDest.careLedgerAnalysis)
-                        }
-                        fmRow(icon: "bell.badge.fill", iconColor: Color(hex: "F59E0B"),
-                              title: "提醒健康", subtitle: "权限 · 队列 · 失败补偿") {
-                            path.append(FMDest.reminderObservability)
-                        }
-                        fmRow(icon: "bag.fill", iconColor: Color(hex: "F472B6"),
-                              title: "椰子商店", subtitle: shopSubtitle) {
-                            path.append(FMDest.coconutShop)
-                        }
-                        fmRow(icon: "sparkles", iconColor: Color(hex: "A78BFA"),
-                              title: "欧气扭蛋机", subtitle: "30🥥 / 次 · 随机奖励") {
-                            path.append(FMDest.gacha)
-                        }
-                        fmRow(icon: "calendar", iconColor: Color(hex: "38BDF8"),
-                              title: "岛屿日历", subtitle: "行程 · 提醒 · 纪念日") {
-                            path.append(FMDest.calendar)
-                        }
-                    } header: {
-                        fmSectionHeader(icon: "globe.asia.australia.fill", title: "家庭岛屿", label: "ISLAND")
-                    }
-                    .listRowBackground(rowBackground)
+                    .listStyle(.insetGrouped)
+                    .scrollContentBackground(.hidden)
                 }
-                .listStyle(.insetGrouped)
-                .scrollContentBackground(.hidden)
-            }
-            .navigationTitle("所有功能")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { dismiss() }
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.goLime)
+                .navigationTitle("更多功能")
+                .navigationBarTitleDisplayMode(.large)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("完成") { dismiss() }
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.goLime)
+                    }
+                }
+                .navigationDestination(for: FMDest.self) { dest in
+                    fmDestinationView(dest)
                 }
             }
-            .navigationDestination(for: FMDest.self) { dest in
-                fmDestinationView(dest)
+        }
+        .onAppear {
+            // 直达 destination 已作为 NavigationStack 根视图渲染，无需再 push
+            guard directLandingDestination == nil else { return }
+            guard !didOpenInitialDestination, let initialDestination else { return }
+            didOpenInitialDestination = true
+            DispatchQueue.main.async {
+                path.append(initialDestination)
             }
         }
     }
@@ -250,8 +254,10 @@ struct FunctionMenuSheet: View {
     @ViewBuilder
     private func fmDestinationView(_ dest: FMDest) -> some View {
         switch dest {
+        case .featureGroup(let group):
+            FeatureGroupDashboardView(group: group, parentPath: $path)
         case .featureAggregate(let feature):
-            FeatureAggregateView(feature: feature, parentPath: $path)
+            FeatureAggregateView(feature: feature, parentPath: $path, showsEntityChips: false)
         case .petHealth(let id):
             if let p = pet(for: id) { PetHealthDetailView(pet: p, isModal: false) }
         case .petMedications(let id):
@@ -309,6 +315,68 @@ struct FunctionMenuSheet: View {
 
     private func human(for id: PersistentIdentifier) -> Human? {
         allHumans.first { $0.persistentModelID == id }
+    }
+
+    // MARK: - Function Groups
+
+    private var functionMenuGroups: [FeatureGroup] {
+        // 4 主分组（不再随家人数量条件插入；「家」hub 内部自行决定是否展示悬赏/周报）
+        [.dailyCare, .healthBody, .archiveMemory, .householdHub]
+    }
+
+    private func destination(for group: FeatureGroup) -> FMDest {
+        .featureGroup(group)
+    }
+
+    private func subtitle(for group: FeatureGroup) -> String {
+        switch group {
+        case .dailyCare:
+            return hasDogs ? "饮食 · 清洁 · 遛狗 · 便便" : "饮食 · 清洁 · 便便"
+        case .healthBody:
+            return "健康档案 · 用药 · 体重"
+        case .archiveMemory:
+            return "成长 · 基本信息 · 证件 · 时刻"
+        case .householdHub:
+            return showsFamilyCollaboration
+                ? "花费 · 照护分析 · 提醒 · 悬赏 · 周报"
+                : "花费 · 照护分析 · 提醒"
+        case .oasisRewards:
+            return "\(wealthSubtitle) · 商店 · 扭蛋"
+        case .plants:
+            return plantsSubtitle
+        }
+    }
+
+    // MARK: - Tools / Rewards Section
+
+    private struct ToolEntry: Identifiable {
+        let id: String
+        let title: String
+        let subtitle: String
+        let icon: String
+        let color: Color
+        let destination: FMDest
+    }
+
+    private var toolEntries: [ToolEntry] {
+        [
+            ToolEntry(id: "wealth", title: "总资产",
+                      subtitle: wealthSubtitle,
+                      icon: "creditcard.fill", color: Color(hex: "EAB308"),
+                      destination: .wealthDashboard),
+            ToolEntry(id: "shop", title: "商店",
+                      subtitle: shopSubtitle,
+                      icon: "bag.fill", color: Color(hex: "F472B6"),
+                      destination: .coconutShop),
+            ToolEntry(id: "gacha", title: "扭蛋",
+                      subtitle: "随机奖励 · 限定皮肤",
+                      icon: "gift.fill", color: Color(hex: "C084FC"),
+                      destination: .gacha),
+            ToolEntry(id: "plants", title: "植物",
+                      subtitle: plantsSubtitle,
+                      icon: "leaf.fill", color: Color(hex: "22C55E"),
+                      destination: .plantsDashboard)
+        ]
     }
 
     // MARK: - Aggregate Subtitles

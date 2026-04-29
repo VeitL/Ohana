@@ -146,7 +146,7 @@ struct CareTrackingDetailSheet: View {
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(.primary.opacity(0.6))
                             .frame(width: 34, height: 34)
-                            .glassEffect(.regular, in: Circle())
+                            .goGlassBackground(Circle())
                     }
                     Spacer()
                     VStack(spacing: 2) {
@@ -219,7 +219,9 @@ struct CareTrackingDetailSheet: View {
             TextField("克数 (g)", text: $addGrams).keyboardType(.decimalPad)
             Button("添加") {
                 if let g = Double(addGrams), g > 0 {
-                    let log = PetCareLog(date: Date(), type: .feeding, amountGrams: g, pet: pet)
+                    let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+                        .flatMap { $0.isEmpty ? nil : $0 }
+                    let log = PetCareLog(date: Date(), type: .feeding, amountGrams: g, pet: pet, executorId: executorId)
                     modelContext.insert(log); modelContext.safeSave()
                 }
                 addGrams = ""
@@ -298,7 +300,7 @@ struct CareTrackingDetailSheet: View {
             }
         }
         .padding(14)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 

@@ -96,7 +96,7 @@ struct VaccinePassportView: View {
             Text("💉").font(.system(size: 36))
         }
         .padding(16)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     // MARK: - Empty State
@@ -113,7 +113,7 @@ struct VaccinePassportView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(32)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
@@ -199,7 +199,7 @@ private struct VaccineRow: View {
             Spacer()
         }
         .padding(14)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .contextMenu {
             Button(role: .destructive) { onDelete() } label: {
                 Label("删除记录", systemImage: "trash")
@@ -255,7 +255,7 @@ struct AddVaccineSheet: View {
                             Text("💉").font(.system(size: 28))
                         }
                         .padding(14)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                         // 疫苗名称
                         fieldCard {
@@ -330,7 +330,7 @@ struct AddVaccineSheet: View {
                                                             reminderDaysBefore == days ? Color.goYellow : .clear,
                                                             in: Capsule()
                                                         )
-                                                        .glassEffect(reminderDaysBefore == days ? .regular.tint(Color.goYellow.opacity(0.4)) : .regular, in: Capsule())
+                                                        .goSelectableSurface(isSelected: reminderDaysBefore == days, tint: Color.goYellow, in: Capsule())
                                                 }
                                             }
                                         }
@@ -393,13 +393,16 @@ struct AddVaccineSheet: View {
         content()
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func save() {
+        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            .flatMap { $0.isEmpty ? nil : $0 }
         let log = PetHealthLog(date: date, type: .vaccine,
                                note: vaccineName.isEmpty ? "疫苗接种" : vaccineName,
-                               pet: pet)
+                               pet: pet,
+                               executorId: executorId)
         log.vetName = vetName
         log.cost = Double(costText) ?? 0
         if hasExpiry { log.expirationDate = expiryDate }
@@ -408,7 +411,7 @@ struct AddVaccineSheet: View {
         // 费用同步
         if let amount = Double(costText), amount > 0 {
             let expense = PetExpenseLog(date: date, amount: amount, category: .medical,
-                                        note: vaccineName.isEmpty ? "疫苗接种" : vaccineName, pet: pet)
+                                        note: vaccineName.isEmpty ? "疫苗接种" : vaccineName, pet: pet, executorId: executorId)
             modelContext.insert(expense)
         }
 

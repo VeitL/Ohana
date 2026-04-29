@@ -189,7 +189,7 @@ struct PetMilestoneListView: View {
                             }
                         }
                         .padding(12)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                     .buttonStyle(.plain)
                     .padding(.bottom, 8)
@@ -255,7 +255,7 @@ struct PetMilestoneListView: View {
                                         Button { newEmoji = e } label: {
                                             Text(e).font(.system(size: 26))
                                                 .frame(width: 46, height: 46)
-                                                .glassEffect(newEmoji == e ? .regular.tint(Color.goPrimary.opacity(0.3)) : .regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                                .goSelectableSurface(isSelected: newEmoji == e, tint: Color.goPrimary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                                         }.buttonStyle(.plain)
                                     }
                                 }
@@ -268,14 +268,14 @@ struct PetMilestoneListView: View {
                                 .font(.system(size: 28))
                                 .multilineTextAlignment(.center)
                                 .frame(width: 56, height: 56)
-                                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
                                 .foregroundStyle(.primary)
                             TextField("里程碑标题", text: $newTitle)
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.primary)
                                 .tint(Color.goPrimary)
                                 .padding(.horizontal, 14).padding(.vertical, 14)
-                                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
                                 .frame(maxWidth: .infinity)
                         }
 
@@ -292,7 +292,7 @@ struct PetMilestoneListView: View {
                                 .datePickerStyle(.compact).tint(Color.goPrimary).labelsHidden()
                         }
                         .padding(.horizontal, 14).padding(.vertical, 12)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                         // 地址选择 (地图搜索)
                         Button {
@@ -318,7 +318,7 @@ struct PetMilestoneListView: View {
                                     .foregroundStyle(.primary.opacity(0.25))
                             }
                             .padding(.horizontal, 14).padding(.vertical, 12)
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
                         .buttonStyle(.plain)
 
@@ -329,7 +329,7 @@ struct PetMilestoneListView: View {
                             .tint(Color.goPrimary)
                             .lineLimit(3...5)
                             .padding(14)
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                         // 照片选择
                         PhotosPicker(selection: $newPhotoItem, matching: .images) {
@@ -458,7 +458,7 @@ struct MapLocationPickerSheet: View {
                         }
                     }
                     .padding(.horizontal, 14).padding(.vertical, 12)
-                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .padding(.horizontal, 16).padding(.vertical, 12)
 
                     if isSearching {
@@ -572,7 +572,7 @@ private struct MilestoneDetailSheet: View {
                                 .font(.system(size: 13, weight: .medium, design: .rounded))
                                 .foregroundStyle(.primary.opacity(0.45))
                                 .padding(.horizontal, 14).padding(.vertical, 5)
-                                .glassEffect(.regular, in: Capsule())
+                                .goGlassBackground(Capsule())
                         }
                         .padding(.top, 8)
 

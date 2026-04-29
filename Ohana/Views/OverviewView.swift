@@ -35,6 +35,8 @@ struct OverviewView: View {
     @State private var showingAddEntity = false
     @State private var showingCalendar = false
     @State private var showingCrewRoster = false
+    @State private var showingHomeHeaderPopover = false
+    @State private var showingGreetingHeaderPopover = false
     @State private var selectedDockTab: Int = 0
     @State private var showingSearch = false
     @State private var searchText = ""
@@ -65,6 +67,8 @@ struct OverviewView: View {
     @State private var quickHumanNoteHuman: Human? = nil        // 快速备注
     @State private var quickHumanWeightDetailHuman: Human? = nil
     @State private var quickHumanWorkoutDetailHuman: Human? = nil
+    @State private var quickHumanMedicationDetailHuman: Human? = nil
+    @State private var quickHumanNoteDetailHuman: Human? = nil
     @State private var quickWeightValue: String = ""
     @State private var quickWalkPet: Pet? = nil     // 快速开始遛狗
     @State private var actionToast: (pet: Pet, message: String, emoji: String)? = nil  // N6: 打卡反馈 toast
@@ -174,6 +178,8 @@ struct OverviewView: View {
     @State private var oasisInventoryTrigger = false
     @State private var isCardDragging = false
     @State private var activeHumanId: UUID? = nil
+    @AppStorage("currentActiveHumanId") private var activeViewerHumanIdStr: String = ""
+    private var activeViewerHumanId: UUID? { UUID(uuidString: activeViewerHumanIdStr) }
     private var activeHuman: Human? {
         guard let id = activeHumanId else { return nil }
         return humans.first(where: { $0.id == id })
@@ -478,6 +484,16 @@ struct OverviewView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(item: $quickHumanMedicationDetailHuman) { human in
+            NavigationStack { HumanMedicationView(human: human) }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $quickHumanNoteDetailHuman) { human in
+            HumanNoteHistorySheet(human: human)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
         .fullScreenCover(isPresented: $showIslandWeight) {
             IslandWeightDashboard()
         }
@@ -718,7 +734,7 @@ struct OverviewView: View {
                 }
 
                 // ── 层2.5：家庭协作活动 mini 胶囊（降级为 30pt，点击展开）
-                if let topPet = deckActivePet, !hiddenSections.contains("familyStripMini") {
+                if humans.count > 1, let topPet = deckActivePet, !hiddenSections.contains("familyStripMini") {
                     FamilyActivityStripView(
                         pet: topPet,
                         style: .compact,
@@ -947,19 +963,8 @@ struct OverviewView: View {
                     switch selectedDockTab {
                     case 0:
                         // 首页：更多（圆角矩形 ⋯）+ 连续打卡数字 + 椰子
-                        Menu {
-                            Button { showingAddEntity = true } label: {
-                                Label(l.addMember, systemImage: "person.badge.plus")
-                            }
-                            Button { showingCrewRoster = true } label: {
-                                Label(l.ohanaCrew, systemImage: "person.2.fill")
-                            }
-                            Button { showingManageSheet = true } label: {
-                                Label(l.manageHome, systemImage: "slider.horizontal.3")
-                            }
-                            Button { showingSettings = true } label: {
-                                Label(l.settings, systemImage: "gearshape")
-                            }
+                        Button {
+                            showingHomeHeaderPopover = true
                         } label: {
                             Image(systemName: "ellipsis")
                                 .font(OhanaFont.subheadline(.bold))
@@ -967,8 +972,40 @@ struct OverviewView: View {
                                 .frame(width: 32, height: 28)
                                 .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                         }
-                        .menuActionDismissBehavior(.automatic)
                         .buttonStyle(.plain)
+                        .popover(isPresented: $showingHomeHeaderPopover, arrowEdge: .top) {
+                            OverviewHeaderPopoverMenu(
+                                addTitle: l.addMember,
+                                crewTitle: l.ohanaCrew,
+                                manageTitle: l.manageHome,
+                                settingsTitle: l.settings,
+                                onAdd: {
+                                    showingHomeHeaderPopover = false
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                        showingAddEntity = true
+                                    }
+                                },
+                                onCrew: {
+                                    showingHomeHeaderPopover = false
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                        showingCrewRoster = true
+                                    }
+                                },
+                                onManage: {
+                                    showingHomeHeaderPopover = false
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                        showingManageSheet = true
+                                    }
+                                },
+                                onSettings: {
+                                    showingHomeHeaderPopover = false
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                        showingSettings = true
+                                    }
+                                }
+                            )
+                            .presentationCompactAdaptation(.popover)
+                        }
 
                         Button { showStreakDetail = true } label: {
                             HStack(spacing: 3) {
@@ -1050,7 +1087,7 @@ struct OverviewView: View {
         }
         .padding(.horizontal, 2)
         .frame(height: 32)
-        .glassEffect(.regular, in: Capsule())
+        .goGlassBackground(Capsule())
     }
 
     private func headerViewModeBtn(systemName: String, mode: CalendarViewMode, current: CalendarViewMode) -> some View {
@@ -1087,21 +1124,39 @@ struct OverviewView: View {
                 CoconutBalanceCapsule {
                     showingCoconutLog = true
                 }
-                Menu {
-                    Button { showingAddEntity = true } label: {
-                        Label("添加成员", systemImage: "person.badge.plus")
-                    }
-                    Button { showingCrewRoster = true } label: {
-                        Label(l.ohanaCrew, systemImage: "pawprint.fill")
-                    }
-                    Button { showingManageSheet = true } label: {
-                        Label("管理主页", systemImage: "slider.horizontal.3")
-                    }
-                    Button { showingSettings = true } label: {
-                        Label("设置", systemImage: "gearshape")
-                    }
+                Button {
+                    showingGreetingHeaderPopover = true
                 } label: {
                     avatarMenuLabel
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showingGreetingHeaderPopover, arrowEdge: .top) {
+                    OverviewHeaderPopoverMenu(
+                        addTitle: nil,
+                        crewTitle: l.ohanaCrew,
+                        manageTitle: l.manageHome,
+                        settingsTitle: l.settings,
+                        onAdd: nil,
+                        onCrew: {
+                            showingGreetingHeaderPopover = false
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                showingCrewRoster = true
+                            }
+                        },
+                        onManage: {
+                            showingGreetingHeaderPopover = false
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                showingManageSheet = true
+                            }
+                        },
+                        onSettings: {
+                            showingGreetingHeaderPopover = false
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                showingSettings = true
+                            }
+                        }
+                    )
+                    .presentationCompactAdaptation(.popover)
                 }
             }
         }
@@ -1514,7 +1569,7 @@ struct OverviewView: View {
                         .font(OhanaFont.callout(.bold))
                         .foregroundStyle(.primary.opacity(0.7))
                         .frame(width: 30, height: 30)
-                        .glassEffect(.regular, in: Circle())
+                        .goGlassBackground(Circle())
                 }
                 .buttonStyle(.plain)
             }
@@ -2511,8 +2566,8 @@ struct OverviewView: View {
             switch item.actionType {
             case "humanWeight":     quickHumanWeightDetailHuman = human
             case "humanWorkout":    quickHumanWorkoutDetailHuman = human
-            case "humanMedication": quickHumanMedicationHuman = human
-            case "humanNote":       selectedHuman = human
+            case "humanMedication": quickHumanMedicationDetailHuman = human
+            case "humanNote":       quickHumanNoteDetailHuman = human
             default:                selectedHuman = human
             }
             return
@@ -2995,14 +3050,14 @@ struct OverviewView: View {
 
     private func isHumanQuickActionPrivate(_ item: QuickActionItem, human: Human? = nil) -> Bool {
         let target = human ?? item.entityId.flatMap { id in humans.first(where: { $0.id == id }) }
-        return PrivacyService.isHumanQuickActionLocked(item, human: target, viewedBy: activeHumanId)
+        return PrivacyService.isHumanQuickActionLocked(item, human: target, viewedBy: activeViewerHumanId)
     }
 
     private func privacyBadgeText(for item: QuickActionItem) -> String? {
         guard item.entityKind == .human,
               let field = privacyField(forHumanAction: item.actionType),
               let human = item.entityId.flatMap({ id in humans.first(where: { $0.id == id }) }) else { return nil }
-        return PrivacyService.badgeText(for: field, human: human, viewedBy: activeHumanId)
+        return PrivacyService.badgeText(for: field, human: human, viewedBy: activeViewerHumanId)
     }
 
     private func applyGroomCheckIn(_ raw: String, pet: Pet) {
@@ -3015,7 +3070,8 @@ struct OverviewView: View {
         case "ears":     type = .ears
         default: return
         }
-        let log = PetHygieneLog(date: Date(), type: type, pet: pet)
+        let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
+        let log = PetHygieneLog(date: Date(), type: type, pet: pet, executorId: eid)
         modelContext.insert(log)
         modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -3043,7 +3099,7 @@ struct OverviewView: View {
             showToast(pet, message: "\(pet.name) 准备记录症状 +\(got.petGot + got.humanGot)🥥", emoji: "⚠️")
         case "vaccine":
             // 快速打卡疫苗（创建健康记录）
-            let record = PetHealthLog(date: Date(), type: .vaccine, note: "快捷打卡", pet: pet)
+            let record = PetHealthLog(date: Date(), type: .vaccine, note: "快捷打卡", pet: pet, executorId: eid)
             modelContext.insert(record)
             modelContext.safeSave()
             let got = QuestManager.shared.awardAction(type: .general(humanReward: 10, petReward: 8, emoji: "💉", title: "\(pet.name) 疫苗记录"), pet: pet, context: modelContext)
@@ -3051,7 +3107,7 @@ struct OverviewView: View {
             showToast(pet, message: "\(pet.name) 疫苗记录 +\(got.petGot + got.humanGot)🥥", emoji: "💉")
         case "deworming":
             // 快速打卡驱虫
-            let record = PetHealthLog(date: Date(), type: .dewormingExternal, note: "快捷打卡", pet: pet)
+            let record = PetHealthLog(date: Date(), type: .dewormingExternal, note: "快捷打卡", pet: pet, executorId: eid)
             modelContext.insert(record)
             modelContext.safeSave()
             let got = QuestManager.shared.awardAction(type: .general(humanReward: 10, petReward: 8, emoji: "💊", title: "\(pet.name) 驱虫记录"), pet: pet, context: modelContext)
@@ -3059,7 +3115,7 @@ struct OverviewView: View {
             showToast(pet, message: "\(pet.name) 驱虫记录 +\(got.petGot + got.humanGot)🥥", emoji: "💊")
         case "visit":
             // 快速打卡就诊
-            let record = PetHealthLog(date: Date(), type: .checkup, note: "快捷打卡", pet: pet)
+            let record = PetHealthLog(date: Date(), type: .checkup, note: "快捷打卡", pet: pet, executorId: eid)
             modelContext.insert(record)
             modelContext.safeSave()
             let got = QuestManager.shared.awardAction(type: .general(humanReward: 8, petReward: 5, emoji: "🏥", title: "\(pet.name) 就诊记录"), pet: pet, context: modelContext)
@@ -3175,7 +3231,7 @@ struct OverviewView: View {
                 performWater()
             }
         case "bath":
-            let log = PetHygieneLog(date: Date(), type: .bath, pet: pet)
+            let log = PetHygieneLog(date: Date(), type: .bath, pet: pet, executorId: currentUserId)
             modelContext.insert(log)
             let bathGot = QuestManager.shared.awardAction(type: .care(type: .bath), pet: pet, context: modelContext)
             showToast(pet, message: "\(pet.name) 洗澡打卡 +\(bathGot.petGot + bathGot.humanGot)🥥", emoji: "🛁")
@@ -3514,6 +3570,52 @@ struct OverviewView: View {
             }
             .padding(.top, 16)
         }
+    }
+}
+
+// MARK: - Header Popover Menu
+private struct OverviewHeaderPopoverMenu: View {
+    let addTitle: String?
+    let crewTitle: String
+    let manageTitle: String
+    let settingsTitle: String
+    let onAdd: (() -> Void)?
+    let onCrew: () -> Void
+    let onManage: () -> Void
+    let onSettings: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if let addTitle, let onAdd {
+                row(icon: "person.badge.plus", title: addTitle, action: onAdd)
+                Divider()
+            }
+            row(icon: "person.2.fill", title: crewTitle, action: onCrew)
+            Divider()
+            row(icon: "slider.horizontal.3", title: manageTitle, action: onManage)
+            Divider()
+            row(icon: "gearshape.fill", title: settingsTitle, action: onSettings)
+        }
+        .frame(minWidth: 220)
+        .padding(.vertical, 4)
+    }
+
+    private func row(icon: String, title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 22)
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                Spacer()
+            }
+            .foregroundStyle(Color.primary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 

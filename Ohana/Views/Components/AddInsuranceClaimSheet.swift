@@ -280,12 +280,14 @@ struct AddInsuranceClaimSheet: View {
         // 若直接标记为已报销，写负值 ExpenseLog
         if initialStatus == .approved && claimedDouble > 0 {
             let productName = insurance.productName.isEmpty ? insurance.companyName : insurance.productName
+            let payerId = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
             let expense = PetExpenseLog(
                 date: Date(),
                 amount: -claimedDouble,
                 category: .insurancePremium,
                 note: "保险报销到账：\(productName)",
-                pet: pet
+                pet: pet,
+                executorId: payerId
             )
             modelContext.insert(expense)
         }

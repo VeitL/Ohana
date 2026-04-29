@@ -15,14 +15,16 @@ final class PetWeightLog {
     var weight: Double
     var weightUnit: String  // "kg" | "g" — ArkSchemaV23
     var bcsScore: Int       // ArkSchemaV24：BCS 体型评分 1-9，0 = 未评
+    var executorId: String? // ArkSchemaV38: 执行该记录的 Human.id.uuidString
     var pet: Pet?
     
-    init(date: Date = Date(), weight: Double = 0, weightUnit: String = "kg", bcsScore: Int = 0, pet: Pet? = nil) {
+    init(date: Date = Date(), weight: Double = 0, weightUnit: String = "kg", bcsScore: Int = 0, pet: Pet? = nil, executorId: String? = nil) {
         self.id = UUID()
         self.date = date
         self.weight = weight
         self.weightUnit = weightUnit
         self.bcsScore = bcsScore
+        self.executorId = executorId
         self.pet = pet
     }
 

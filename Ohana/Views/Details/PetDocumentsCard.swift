@@ -69,7 +69,7 @@ struct PetDocumentsCard: View {
                             Text(doc.documentCategory.emoji)
                                 .font(.system(size: 20))
                                 .frame(width: 36, height: 36)
-                                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .goGlassBackground(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         }
                         if pet.documents.count > 5 {
                             Text("+\(pet.documents.count - 5)")

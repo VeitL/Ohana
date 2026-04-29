@@ -62,7 +62,7 @@ struct IslandEnergyBar: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onAppear {
             withAnimation(.easeOut(duration: 0.8).delay(0.1)) {
                 animatedProgress = progress

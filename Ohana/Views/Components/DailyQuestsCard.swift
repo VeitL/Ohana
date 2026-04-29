@@ -446,7 +446,7 @@ struct DailyQuestsCard: View {
             }
         }
         .padding(20)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     private func questRow(_ quest: IslandQuest) -> some View {

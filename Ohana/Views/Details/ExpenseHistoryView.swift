@@ -150,7 +150,7 @@ struct ExpenseHistoryView: View {
                             .foregroundStyle(selectedRange == range ? Color.arkInk : .primary.opacity(0.5))
                             .padding(.horizontal, 14).padding(.vertical, 7)
                             .background(selectedRange == range ? Color.goYellow : .clear, in: Capsule())
-                            .glassEffect(selectedRange == range ? .regular.tint(Color.goYellow.opacity(0.3)) : .regular, in: Capsule())
+                            .goSelectableSurface(isSelected: selectedRange == range, tint: Color.goYellow, in: Capsule())
                     }
                     .buttonStyle(.plain)
                 }
@@ -290,6 +290,9 @@ struct ExpenseHistoryView: View {
         let cat = ExpenseCategory(rawValue: log.category) ?? .other
         let isReimbursement = log.amount < 0
         let accentColor: Color = isReimbursement ? Color(hex: "4ECDC4") : Color.goYellow
+        let payer = payer(for: log)
+        let payerLabel = isReimbursement ? "到账" : "支付者"
+        let payerName = payer?.name ?? (isReimbursement ? "保险" : "未指定")
 
         return HStack(spacing: 14) {
             ZStack {
@@ -303,7 +306,7 @@ struct ExpenseHistoryView: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(isReimbursement ? "保险报销" : log.category)
                         .font(.system(size: 13, weight: .bold, design: .rounded))
@@ -327,6 +330,14 @@ struct ExpenseHistoryView: View {
                             .lineLimit(1)
                     }
                 }
+                HStack(spacing: 5) {
+                    Image(systemName: isReimbursement ? "arrow.down.circle.fill" : "person.crop.circle.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text("\(payerLabel)：\(payerName)")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(accentColor.opacity(payer == nil && !isReimbursement ? 0.65 : 1))
             }
 
             Spacer()
@@ -345,8 +356,12 @@ struct ExpenseHistoryView: View {
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
-        .glassEffect(isReimbursement ? .regular.tint(accentColor.opacity(0.08)) : .regular,
-                     in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .goSelectableSurface(isSelected: isReimbursement, tint: accentColor, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func payer(for log: PetExpenseLog) -> Human? {
+        guard let executorId = log.executorId else { return nil }
+        return allHumans.first { $0.id.uuidString == executorId }
     }
 
     // MARK: - Add Expense Sheet
@@ -379,7 +394,7 @@ struct ExpenseHistoryView: View {
                                 .foregroundStyle(.primary)
                         }
                         .padding(.horizontal, 24).padding(.vertical, 20)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
                         .padding(.horizontal, 24)
                         Text("金额 (元)")
                             .font(.system(size: 12, weight: .medium))
@@ -404,7 +419,7 @@ struct ExpenseHistoryView: View {
                                         }
                                         .padding(.horizontal, 16).padding(.vertical, 10)
                                         .background(newCategory == cat ? Color.goYellow : .clear, in: Capsule())
-                                        .glassEffect(newCategory == cat ? .regular.tint(Color.goYellow.opacity(0.3)) : .regular, in: Capsule())
+                                        .goSelectableSurface(isSelected: newCategory == cat, tint: Color.goYellow, in: Capsule())
                                     }
                                 }
                             }
@@ -421,7 +436,7 @@ struct ExpenseHistoryView: View {
                             .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 16).padding(.vertical, 14)
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                     .padding(.horizontal, 24)
 
@@ -453,7 +468,7 @@ struct ExpenseHistoryView: View {
                                             .foregroundStyle(selectedPayerId == nil ? Color.arkInk : .primary.opacity(0.6))
                                             .padding(.horizontal, 14).padding(.vertical, 8)
                                             .background(selectedPayerId == nil ? Color.goYellow : .clear, in: Capsule())
-                                            .glassEffect(selectedPayerId == nil ? .regular.tint(Color.goYellow.opacity(0.3)) : .regular, in: Capsule())
+                                            .goSelectableSurface(isSelected: selectedPayerId == nil, tint: Color.goYellow, in: Capsule())
                                     }
                                     .buttonStyle(.plain)
                                     ForEach(allHumans) { human in
@@ -466,7 +481,7 @@ struct ExpenseHistoryView: View {
                                             }
                                             .padding(.horizontal, 14).padding(.vertical, 8)
                                             .background(selectedPayerId == human.id.uuidString ? Color.goYellow : .clear, in: Capsule())
-                                            .glassEffect(selectedPayerId == human.id.uuidString ? .regular.tint(Color.goYellow.opacity(0.3)) : .regular, in: Capsule())
+                                            .goSelectableSurface(isSelected: selectedPayerId == human.id.uuidString, tint: Color.goYellow, in: Capsule())
                                         }
                                         .buttonStyle(.plain)
                                     }

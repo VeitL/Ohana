@@ -34,8 +34,15 @@ struct HumanDetailView: View {
     @Query private var allMeds: [HumanMedication]
     @Query private var allReports: [HumanHealthReport]
 
+    private var isViewingOwnProfile: Bool { activeHumanId == human.id }
+    private var isAllPrivateForViewer: Bool {
+        !isViewingOwnProfile && HumanPrivateField.allCases.allSatisfy { human.privateFields.contains($0.rawValue) }
+    }
+
     private var humanReminders: [Reminder] {
-        allPendingReminders.filter {
+        guard !isAllPrivateForViewer,
+              !human.isPrivate(.medication, viewedBy: activeHumanId) else { return [] }
+        return allPendingReminders.filter {
             $0.event?.relatedEntityType == "Human" &&
             $0.event?.relatedEntityId == human.id.uuidString
         }
@@ -47,7 +54,9 @@ struct HumanDetailView: View {
     }
 
     private var myReports: [HumanHealthReport] {
-        allReports.filter { $0.humanId == human.id.uuidString }
+        guard !isAllPrivateForViewer,
+              !human.isPrivate(.weight, viewedBy: activeHumanId) else { return [] }
+        return allReports.filter { $0.humanId == human.id.uuidString }
     }
 
     private var themeColor: Color { Color(hex: human.themeColorHex) }
@@ -59,56 +68,68 @@ struct HumanDetailView: View {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 16) {
                     heroCard
-                    badgesCard
-                    statsBento
-                    showOnHomeCard
-
-                    sectionHeader("健康 & 身体")
-
-                    if human.isPrivate(.weight, viewedBy: activeHumanId) {
-                        privacyPlaceholderCard(label: "体重记录")
+                    if isAllPrivateForViewer {
+                        fullPrivacyPlaceholder
                     } else {
-                        weightCard
-                    }
-                    if human.isPrivate(.medication, viewedBy: activeHumanId) {
-                        privacyPlaceholderCard(label: "吃药提醒")
-                    } else {
-                        medicationCard
-                    }
-                    healthReportCard
+                        badgesCard
+                        statsBento
+                        showOnHomeCard
 
-                    sectionHeader("活动 & 记录")
+                        sectionHeader("健康 & 身体")
 
-                    if human.isPrivate(.workout, viewedBy: activeHumanId) {
-                        privacyPlaceholderCard(label: "运动记录")
-                    } else {
-                        HumanWorkoutCard(human: human, pets: allPets)
-                            .padding(.horizontal, 16)
-                    }
-                    if human.isPrivate(.weight, viewedBy: activeHumanId) ||
-                        human.isPrivate(.workout, viewedBy: activeHumanId) {
-                        privacyPlaceholderCard(label: "共健数据")
-                    } else {
-                        coHealthCard
-                    }
+                        if human.isPrivate(.weight, viewedBy: activeHumanId) {
+                            privacyPlaceholderCard(label: "体重记录")
+                        } else {
+                            weightCard
+                        }
+                        if human.isPrivate(.medication, viewedBy: activeHumanId) {
+                            privacyPlaceholderCard(label: "吃药提醒")
+                        } else {
+                            medicationCard
+                        }
+                        if human.isPrivate(.weight, viewedBy: activeHumanId) {
+                            privacyPlaceholderCard(label: "身体检测报告")
+                        } else {
+                            healthReportCard
+                        }
 
-                    sectionHeader("财务")
+                        sectionHeader("活动 & 记录")
 
-                    if human.isPrivate(.expense, viewedBy: activeHumanId) {
-                        privacyPlaceholderCard(label: "花费记录")
-                    } else {
-                        humanExpenseCard
-                    }
-                    if human.isPrivate(.wishlist, viewedBy: activeHumanId) {
-                        privacyPlaceholderCard(label: "椰子资产")
-                    } else {
-                        humanAssetCard
-                    }
+                        if human.isPrivate(.workout, viewedBy: activeHumanId) {
+                            privacyPlaceholderCard(label: "运动记录")
+                        } else {
+                            HumanWorkoutCard(human: human, pets: allPets)
+                                .padding(.horizontal, 16)
+                        }
+                        if human.isPrivate(.weight, viewedBy: activeHumanId) ||
+                            human.isPrivate(.workout, viewedBy: activeHumanId) {
+                            privacyPlaceholderCard(label: "共健数据")
+                        } else {
+                            coHealthCard
+                        }
 
-                    sectionHeader("提醒 & 备注")
-                    remindersSection
-                    notesSection
-                    deleteSection
+                        sectionHeader("财务")
+
+                        if human.isPrivate(.expense, viewedBy: activeHumanId) {
+                            privacyPlaceholderCard(label: "花费记录")
+                        } else {
+                            humanExpenseCard
+                        }
+                        if human.isPrivate(.wishlist, viewedBy: activeHumanId) {
+                            privacyPlaceholderCard(label: "椰子资产")
+                        } else {
+                            humanAssetCard
+                        }
+
+                        sectionHeader("提醒 & 备注")
+                        if human.isPrivate(.medication, viewedBy: activeHumanId) {
+                            privacyPlaceholderCard(label: "待办提醒")
+                        } else {
+                            remindersSection
+                        }
+                        notesSection
+                        deleteSection
+                    }
                     Spacer(minLength: 40)
                 }
                 .padding(.top, 8)
@@ -145,9 +166,7 @@ struct HumanDetailView: View {
         .alert("确认删除", isPresented: $showingDeleteConfirm) {
             Button("取消", role: .cancel) {}
             Button("删除", role: .destructive) {
-                modelContext.delete(human)
-                modelContext.safeSave()
-                dismiss()
+                deleteHumanAndReturnHome()
             }
         } message: {
             Text("确定要删除 \(human.name) 吗？此操作不可撤销。")
@@ -602,6 +621,27 @@ struct HumanDetailView: View {
         .padding(.horizontal, 16)
     }
 
+    private var fullPrivacyPlaceholder: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "lock.shield.fill")
+                .font(OhanaFont.metric(size: 34))
+                .foregroundStyle(Color.goYellow)
+            Text("此成员资料仅本人可见")
+                .font(OhanaFont.title3(.black))
+                .foregroundStyle(Color(hex: "1E3A8A"))
+            Text("当前家庭成员无法查看 TA 的体重、运动、吃药、备注、花费和椰子资产等相关数据。")
+                .font(OhanaFont.callout(.medium))
+                .foregroundStyle(Color(hex: "6B82C4"))
+                .multilineTextAlignment(.center)
+                .lineSpacing(3)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 22)
+        .padding(.vertical, 28)
+        .goIslandModuleCard(cornerRadius: 24)
+        .padding(.horizontal, 16)
+    }
+
     // MARK: - Reminders Section
     private var remindersSection: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -679,7 +719,9 @@ struct HumanDetailView: View {
     // MARK: - Notes Section
     private var notesSection: some View {
         Group {
-            if !human.notes.isEmpty {
+            if human.isPrivate(.note, viewedBy: activeHumanId) {
+                privacyPlaceholderCard(label: "备注")
+            } else if !human.notes.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 8) {
                         Image(systemName: "note.text")
@@ -753,6 +795,21 @@ struct HumanDetailView: View {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         ReminderCompletionService.skip(reminder, by: human.id.uuidString, context: modelContext)
     }
+
+    private func deleteHumanAndReturnHome() {
+        let deletedHumanId = human.id.uuidString
+        let fallbackHumanId = allHumans.first(where: { $0.id.uuidString != deletedHumanId })?.id.uuidString ?? ""
+
+        if activeHumanIdStr == deletedHumanId {
+            activeHumanIdStr = fallbackHumanId
+        }
+
+        modelContext.delete(human)
+        modelContext.safeSave()
+
+        NotificationCenter.default.post(name: .ohanaReturnHomeAfterHumanDeletion, object: nil)
+        dismiss()
+    }
 }
 
 // MARK: - Edit Human Sheet
@@ -776,6 +833,7 @@ struct EditHumanSheet: View {
     @State private var privateMedication = false
     @State private var privateWishlist = false
     @State private var privateExpense = false
+    @State private var privateNote = false
     
     var body: some View {
         OhanaSheetWrapper(title: "编辑成员", onDismiss: { dismiss() }) {
@@ -819,6 +877,7 @@ struct EditHumanSheet: View {
                     editPrivacyRow("体重记录", binding: $privateWeight)
                     editPrivacyRow("运动记录", binding: $privateWorkout)
                     editPrivacyRow("吃药提醒", binding: $privateMedication)
+                    editPrivacyRow("备注", binding: $privateNote)
                     editPrivacyRow("心愿单", binding: $privateWishlist)
                     editPrivacyRow("花费记录", binding: $privateExpense)
                 }
@@ -848,6 +907,7 @@ struct EditHumanSheet: View {
             privateWeight   = fields.contains(HumanPrivateField.weight.rawValue)
             privateWorkout  = fields.contains(HumanPrivateField.workout.rawValue)
             privateMedication = fields.contains(HumanPrivateField.medication.rawValue)
+            privateNote = fields.contains(HumanPrivateField.note.rawValue)
             privateWishlist = fields.contains(HumanPrivateField.wishlist.rawValue)
             privateExpense  = fields.contains(HumanPrivateField.expense.rawValue)
         }
@@ -876,6 +936,7 @@ struct EditHumanSheet: View {
         human.setPrivate(.weight, privateWeight)
         human.setPrivate(.workout, privateWorkout)
         human.setPrivate(.medication, privateMedication)
+        human.setPrivate(.note, privateNote)
         human.setPrivate(.wishlist, privateWishlist)
         human.setPrivate(.expense, privateExpense)
         modelContext.safeSave()

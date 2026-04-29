@@ -64,7 +64,7 @@ struct DocumentDetailSheet: View {
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundStyle(.primary.opacity(0.4))
                                 .padding(.horizontal, 12).padding(.vertical, 4)
-                                .glassEffect(.regular, in: Capsule())
+                                .goGlassBackground(Capsule())
                         }
                         .padding(.top, 8)
 
@@ -105,7 +105,7 @@ struct DocumentDetailSheet: View {
                                 infoRow(icon: "note.text", label: "备注", value: doc.notes)
                             }
                         }
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .goGlassBackground(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                         // ── 图片附件（支持多附件）
                         if !imageAttachments.isEmpty {
@@ -143,7 +143,7 @@ struct DocumentDetailSheet: View {
                                         Spacer()
                                     }
                                     .padding(12)
-                                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    .goGlassBackground(RoundedRectangle(cornerRadius: 12, style: .continuous))
                                 }
                             }
                         }

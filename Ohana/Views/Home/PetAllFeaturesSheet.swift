@@ -22,45 +22,97 @@ struct PetAllFeaturesSheet: View {
                 )
                 .ignoresSafeArea()
 
-                List {
-                    // ── Section 1: 健康管理 ──
-                    Section {
-                        row(icon: "cross.fill",        color: "EF4444", title: "健康档案",  subtitle: healthSub)   { path.append(FMDest.petHealth(pet.persistentModelID)) }
-                        row(icon: "scalemass.fill",    color: "16A34A", title: "体重记录",  subtitle: weightSub)   { path.append(FMDest.petWeight(pet.persistentModelID)) }
-                        row(icon: "pills.fill",        color: "8B5CF6", title: "用药管理",  subtitle: medSub)      { path.append(FMDest.petMedications(pet.persistentModelID)) }
-                    } header: {
-                        sectionHeader(icon: "cross.fill", title: "健康管理", label: "HEALTH")
-                    }
-                    .listRowBackground(rowBg)
+                ScrollView {
+                    VStack(spacing: 14) {
+                        petFeatureHero
 
-                    // ── Section 2: 日常生活 ──
-                    Section {
-                        row(icon: "fork.knife",        color: "F59E0B", title: "饮食管理",  subtitle: foodSub)     { path.append(FMDest.petFood(pet.persistentModelID)) }
-                        row(icon: "bubbles.and.sparkles.fill", color: "06B6D4", title: "清洁护理", subtitle: hygieneSub) { path.append(FMDest.petHygiene(pet.persistentModelID)) }
-                        if isDog {
-                            row(icon: "figure.walk",   color: "0EA5E9", title: "遛狗记录",  subtitle: walkSub)     { path.append(FMDest.petWalks(pet.persistentModelID)) }
+                        HStack(spacing: 12) {
+                            featureTile(
+                                icon: "fork.knife",
+                                color: Color(hex: "F59E0B"),
+                                title: "饮食",
+                                value: todayFeedMetric,
+                                subtitle: foodSub,
+                                destination: .petFood(pet.persistentModelID),
+                                height: 142
+                            )
+                            featureTile(
+                                icon: "cross.fill",
+                                color: Color(hex: "EF4444"),
+                                title: "健康",
+                                value: "\(pet.healthLogs.count)",
+                                subtitle: healthSub,
+                                destination: .petHealth(pet.persistentModelID),
+                                height: 142
+                            )
                         }
-                        row(icon: "drop.fill",         color: "D97706", title: "便便记录",  subtitle: pottySub)    { path.append(FMDest.petPotty(pet.persistentModelID)) }
-                        row(icon: "creditcard.fill",   color: "D97706", title: "花费记录",  subtitle: expenseSub)  { path.append(FMDest.petExpense(pet.persistentModelID)) }
-                    } header: {
-                        sectionHeader(icon: "sun.max.fill", title: "日常生活", label: "DAILY LIFE")
-                    }
-                    .listRowBackground(rowBg)
 
-                    // ── Section 3: 档案与记忆 ──
-                    Section {
-                        row(icon: "sparkles.rectangle.stack.fill", color: "C8FF00", title: "成长档案", subtitle: retentionSub) { path.append(FMDest.petRetention(pet.persistentModelID)) }
-                        row(icon: "person.fill",       color: "6B82C4", title: "基本信息",  subtitle: pet.breed.isEmpty ? pet.species : pet.breed) { path.append(FMDest.petBasicInfo(pet.persistentModelID)) }
-                        row(icon: "doc.fill",          color: "6B7280", title: "证件保障",  subtitle: "\(pet.documents.count)份证件")               { path.append(FMDest.petDocuments(pet.persistentModelID)) }
-                        row(icon: "sparkles",          color: "C8FF00", title: "重要时刻",  subtitle: momentsSub)  { path.append(FMDest.petMoments(pet.persistentModelID)) }
-                        row(icon: "trophy.fill",       color: "F59E0B", title: "成就",      subtitle: "\(pet.milestones.count)个里程碑")             { path.append(FMDest.petAchievements(pet.persistentModelID)) }
-                    } header: {
-                        sectionHeader(icon: "folder.fill", title: "档案与记忆", label: "ARCHIVE")
+                        HStack(spacing: 12) {
+                            featureTile(
+                                icon: "scalemass.fill",
+                                color: Color(hex: "16A34A"),
+                                title: "体重",
+                                value: latestWeightText,
+                                subtitle: weightSub,
+                                destination: .petWeight(pet.persistentModelID),
+                                height: 156
+                            )
+                            VStack(spacing: 12) {
+                                compactFeatureTile(
+                                    icon: "pills.fill",
+                                    color: Color(hex: "8B5CF6"),
+                                    title: "用药",
+                                    subtitle: medSub,
+                                    destination: .petMedications(pet.persistentModelID)
+                                )
+                                compactFeatureTile(
+                                    icon: "bubbles.and.sparkles.fill",
+                                    color: Color(hex: "06B6D4"),
+                                    title: "清洁护理",
+                                    subtitle: hygieneSub,
+                                    destination: .petHygiene(pet.persistentModelID)
+                                )
+                            }
+                        }
+
+                        HStack(spacing: 12) {
+                            if isDog {
+                                featureTile(
+                                    icon: "figure.walk",
+                                    color: Color(hex: "38BDF8"),
+                                    title: "遛狗",
+                                    value: weekWalkText,
+                                    subtitle: walkSub,
+                                    destination: .petWalks(pet.persistentModelID),
+                                    height: 138
+                                )
+                            }
+                            featureTile(
+                                icon: "drop.fill",
+                                color: Color(hex: "D97706"),
+                                title: "便便",
+                                value: todayPottyMetric,
+                                subtitle: pottySub,
+                                destination: .petPotty(pet.persistentModelID),
+                                height: 138
+                            )
+                            featureTile(
+                                icon: "creditcard.fill",
+                                color: Color(hex: "F97316"),
+                                title: "花费",
+                                value: expenseMetric,
+                                subtitle: expenseSub,
+                                destination: .petExpense(pet.persistentModelID),
+                                height: 138
+                            )
+                        }
+
+                        archiveBento
                     }
-                    .listRowBackground(rowBg)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 28)
                 }
-                .listStyle(.insetGrouped)
-                .scrollContentBackground(.hidden)
             }
             .navigationTitle("\(pet.name) 的功能")
             .navigationBarTitleDisplayMode(.large)
@@ -98,6 +150,9 @@ struct PetAllFeaturesSheet: View {
         // The following FMDest cases are cross-entity / aggregate routes; they
         // are not reachable from a single-pet sheet. Assert in debug to catch
         // accidental wiring, fall back to EmptyView in release.
+        case .featureGroup(_):
+            let _ = { assertionFailure("PetAllFeaturesSheet: featureGroup route is unreachable from single-pet sheet") }()
+            EmptyView()
         case .featureAggregate(_):
             let _ = { assertionFailure("PetAllFeaturesSheet: featureAggregate route is unreachable from single-pet sheet") }()
             EmptyView()
@@ -155,6 +210,314 @@ struct PetAllFeaturesSheet: View {
             pet.currentStreak > 0
         ].filter { $0 }.count
         return "长期模块 \(score)/5"
+    }
+
+    private var todayFeedMetric: String {
+        "\(pet.careLogs.filter { $0.careType == .feeding && Calendar.current.isDateInToday($0.date) }.count)"
+    }
+
+    private var todayPottyMetric: String {
+        "\(pet.pottyLogs.filter { Calendar.current.isDateInToday($0.date) }.count)"
+    }
+
+    private var latestWeightText: String {
+        guard let latest = pet.weightLogs.sorted(by: { $0.date > $1.date }).first else { return "--" }
+        return String(format: "%.1f", latest.weightInKg)
+    }
+
+    private var weekWalkText: String {
+        let start = Calendar.current.date(byAdding: .day, value: -6, to: Date()) ?? Date()
+        let km = pet.walkLogs
+            .filter { $0.startDate >= start }
+            .reduce(0.0) { $0 + $1.distanceMeters } / 1000
+        return km >= 10 ? String(format: "%.0fkm", km) : String(format: "%.1fkm", km)
+    }
+
+    private var expenseMetric: String {
+        let total = pet.expenseLogs.reduce(0.0) { $0 + $1.amount }
+        if total >= 10_000 { return String(format: "¥%.0fk", total / 1000) }
+        if total >= 100 { return String(format: "¥%.0f", total) }
+        return total > 0 ? String(format: "¥%.1f", total) : "¥0"
+    }
+
+    // MARK: - Bento Builders
+
+    private var petFeatureHero: some View {
+        Button {
+            path.append(FMDest.petRetention(pet.persistentModelID))
+        } label: {
+            ZStack(alignment: .topLeading) {
+                MeshGradient(
+                    width: 3,
+                    height: 3,
+                    points: [
+                        SIMD2(0.0, 0.0), SIMD2(0.5, 0.0), SIMD2(1.0, 0.0),
+                        SIMD2(0.0, 0.5), SIMD2(0.55, 0.35), SIMD2(1.0, 0.5),
+                        SIMD2(0.0, 1.0), SIMD2(0.5, 1.0), SIMD2(1.0, 1.0)
+                    ],
+                    colors: [
+                        Color(hex: pet.themeColorHex).mix(with: .white, by: 0.22),
+                        Color(hex: "C8FF00").opacity(0.9),
+                        Color(hex: "38BDF8").opacity(0.65),
+                        Color(hex: pet.themeColorHex).opacity(0.85),
+                        Color(hex: "1A2E8A"),
+                        Color(hex: "F97316").opacity(0.72),
+                        Color(hex: "0C1640"),
+                        Color(hex: pet.themeColorHex).mix(with: .black, by: 0.2),
+                        Color(hex: "050816")
+                    ]
+                )
+
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("OHANA OS")
+                                .font(OhanaFont.caption2(.black))
+                                .tracking(2.6)
+                                .foregroundStyle(.white.opacity(0.55))
+                            Text(pet.name)
+                                .font(.system(size: 32, weight: .black, design: .rounded))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.62)
+                            Text(pet.breed.isEmpty ? pet.species : "\(pet.species) · \(pet.breed)")
+                                .font(OhanaFont.caption(.bold))
+                                .foregroundStyle(.white.opacity(0.62))
+                                .lineLimit(1)
+                        }
+                        Spacer()
+                        petAvatar(size: 54)
+                    }
+
+                    HStack(spacing: 9) {
+                        heroChip(title: "今日照护", value: "\(todayCareCount)")
+                        heroChip(title: "记录", value: "\(pet.careLogs.count + pet.healthLogs.count + pet.weightLogs.count)")
+                        heroChip(title: "档案", value: "\(archiveScore)/5")
+                    }
+                }
+                .padding(18)
+
+                Image(systemName: "sparkles.rectangle.stack.fill")
+                    .font(.system(size: 84, weight: .black))
+                    .foregroundStyle(.white.opacity(0.08))
+                    .offset(x: 250, y: 78)
+            }
+            .frame(height: 188)
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .strokeBorder(.white.opacity(0.16), lineWidth: 1)
+            }
+            .shadow(color: Color(hex: pet.themeColorHex).opacity(0.28), radius: 22, y: 12)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var archiveBento: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("档案与记忆", systemImage: "folder.fill")
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(.white.opacity(0.8))
+                Spacer()
+                Text("ARCHIVE")
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(Color.goPrimary.opacity(0.7))
+                    .tracking(2)
+            }
+            .padding(.horizontal, 2)
+
+            HStack(spacing: 12) {
+                compactFeatureTile(
+                    icon: "sparkles.rectangle.stack.fill",
+                    color: Color.goPrimary,
+                    title: "成长档案",
+                    subtitle: retentionSub,
+                    destination: .petRetention(pet.persistentModelID)
+                )
+                compactFeatureTile(
+                    icon: "person.fill",
+                    color: Color(hex: "6B82C4"),
+                    title: "基本信息",
+                    subtitle: pet.breed.isEmpty ? pet.species : pet.breed,
+                    destination: .petBasicInfo(pet.persistentModelID)
+                )
+            }
+            HStack(spacing: 12) {
+                compactFeatureTile(
+                    icon: "doc.fill",
+                    color: Color(hex: "94A3B8"),
+                    title: "证件保障",
+                    subtitle: "\(pet.documents.count)份证件",
+                    destination: .petDocuments(pet.persistentModelID)
+                )
+                compactFeatureTile(
+                    icon: "sparkles",
+                    color: Color(hex: "EC4899"),
+                    title: "重要时刻",
+                    subtitle: momentsSub,
+                    destination: .petMoments(pet.persistentModelID)
+                )
+                compactFeatureTile(
+                    icon: "trophy.fill",
+                    color: Color(hex: "F59E0B"),
+                    title: "成就",
+                    subtitle: "\(pet.milestones.count)个里程碑",
+                    destination: .petAchievements(pet.persistentModelID)
+                )
+            }
+        }
+        .padding(14)
+        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .strokeBorder(.white.opacity(0.1), lineWidth: 1)
+        }
+    }
+
+    private var todayCareCount: Int {
+        let cal = Calendar.current
+        let care = pet.careLogs.filter { cal.isDateInToday($0.date) }.count
+        let potty = pet.pottyLogs.filter { cal.isDateInToday($0.date) }.count
+        let walks = pet.walkLogs.filter { cal.isDateInToday($0.startDate) }.count
+        return care + potty + walks
+    }
+
+    private var archiveScore: Int {
+        [
+            !pet.weightLogs.isEmpty || !pet.healthLogs.isEmpty,
+            !pet.photoLogs.isEmpty || !pet.milestones.isEmpty,
+            !pet.expenseLogs.isEmpty,
+            !pet.documents.isEmpty || !pet.insurances.isEmpty || !pet.medications.isEmpty,
+            pet.currentStreak > 0
+        ].filter { $0 }.count
+    }
+
+    private func featureTile(
+        icon: String,
+        color: Color,
+        title: String,
+        value: String,
+        subtitle: String,
+        destination: FMDest,
+        height: CGFloat
+    ) -> some View {
+        Button { path.append(destination) } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Image(systemName: icon)
+                        .font(.system(size: 17, weight: .black))
+                        .foregroundStyle(.black)
+                        .frame(width: 34, height: 34)
+                        .background(color, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(.white.opacity(0.36))
+                }
+                Spacer(minLength: 4)
+                Text(value)
+                    .font(.system(size: 29, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.58)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(.white.opacity(0.92))
+                    Text(subtitle)
+                        .font(OhanaFont.caption2(.bold))
+                        .foregroundStyle(.white.opacity(0.45))
+                        .lineLimit(2)
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, minHeight: height, maxHeight: height, alignment: .topLeading)
+            .background(
+                LinearGradient(
+                    colors: [color.opacity(0.28), Color.white.opacity(0.07), Color.black.opacity(0.08)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(.white.opacity(0.11), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func compactFeatureTile(
+        icon: String,
+        color: Color,
+        title: String,
+        subtitle: String,
+        destination: FMDest
+    ) -> some View {
+        Button { path.append(destination) } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .black))
+                    .foregroundStyle(color)
+                    .frame(width: 28, height: 28)
+                    .background(color.opacity(0.16), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                Spacer(minLength: 0)
+                Text(title)
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.76)
+                Text(subtitle)
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(.white.opacity(0.43))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 72, maxHeight: 72, alignment: .leading)
+            .background(.white.opacity(0.075), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(.white.opacity(0.09), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func heroChip(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(OhanaFont.callout(.black))
+                .foregroundStyle(.white)
+            Text(title)
+                .font(OhanaFont.caption2(.bold))
+                .foregroundStyle(.white.opacity(0.48))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .background(.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func petAvatar(size: CGFloat) -> some View {
+        ZStack {
+            Circle()
+                .fill(.white.opacity(0.12))
+                .frame(width: size, height: size)
+            if let data = pet.avatarImageData, let ui = UIImage(data: data) {
+                Image(uiImage: ui)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            } else {
+                Text(pet.speciesEmoji)
+                    .font(.system(size: size * 0.48))
+            }
+        }
     }
 
     // MARK: - Row / Header Builders

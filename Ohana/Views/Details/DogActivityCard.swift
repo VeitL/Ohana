@@ -99,7 +99,9 @@ struct DogActivityCard: View {
                     .foregroundStyle(tertiaryText)
                 Spacer()
                 Button {
-                    let log = PetCareLog(date: Date(), type: .play, pet: pet)
+                    let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+                        .flatMap { $0.isEmpty ? nil : $0 }
+                    let log = PetCareLog(date: Date(), type: .play, pet: pet, executorId: executorId)
                     modelContext.insert(log)
                     modelContext.safeSave()
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -132,7 +134,7 @@ struct DogActivityCard: View {
                     .background(.ultraThinMaterial.opacity(0.3), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             } else {
                 content()
-                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .goGlassBackground(RoundedRectangle(cornerRadius: 24, style: .continuous))
             }
         }
     }

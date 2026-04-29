@@ -23,6 +23,7 @@ struct OasisRewardView: View {
     @State private var treeGlow: CGFloat    = 0.4
     @State private var showAchievements     = false
     @State private var showingCoconutLog    = false
+    @State private var showingIslandWealth  = false
     @State private var showCoconutShop      = false
     @State private var showGacha            = false
     @State private var showBountyBoard      = false
@@ -173,6 +174,7 @@ struct OasisRewardView: View {
             }
         }
         .sheet(isPresented: $showingCoconutLog) { CoconutLogView() }
+        .fullScreenCover(isPresented: $showingIslandWealth) { IslandWealthDashboardView() }
         .sheet(isPresented: $showCoconutRules) { CoconutRulesSheet() }
         .sheet(isPresented: $showAchievements) {
             if let pet = pets.first {
@@ -273,16 +275,26 @@ struct OasisRewardView: View {
                     .foregroundStyle(.white)
             }
             Spacer()
-            // Coconut balance pill
-            HStack(spacing: 5) {
-                Text("🥥")
-                    .font(.system(size: 15))
-                Text("\(QuestManager.shared.coconutCount)")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.black)
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                showingIslandWealth = true
+            } label: {
+                HStack(spacing: 5) {
+                    Text("🥥")
+                        .font(.system(size: 15))
+                    Text("\(QuestManager.shared.coconutCount)")
+                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .foregroundStyle(.black)
+                    Image(systemName: "chart.pie.fill")
+                        .font(.system(size: 10, weight: .black))
+                        .foregroundStyle(.black.opacity(0.72))
+                }
+                .padding(.horizontal, 14).padding(.vertical, 7)
+                .background(Color.goPrimary, in: Capsule())
             }
-            .padding(.horizontal, 14).padding(.vertical, 7)
-            .background(Color.goPrimary, in: Capsule())
+            .buttonStyle(.plain)
+            .accessibilityLabel("椰子资产 \(QuestManager.shared.coconutCount)")
+            .accessibilityHint("打开岛屿财富")
         }
     }
 

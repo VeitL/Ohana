@@ -736,7 +736,7 @@ struct AddQuickActionSheet: View {
                                 .foregroundStyle(Color(hex: pet.themeColorHex))
                         }
                         .padding(.horizontal, 16).padding(.vertical, 12)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     }
                     .buttonStyle(.plain)
                 }
