@@ -48,14 +48,10 @@ struct CrewRosterOverlay: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                if isMaterial {
-                    matBg.ignoresSafeArea()
-                } else {
-                    ArkBackgroundView()
-                    IslandMoodWeatherView(mood: .breezy)
-                        .ignoresSafeArea()
-                        .allowsHitTesting(false)
-                }
+                OhanaAppBackground()
+                IslandMoodWeatherView(mood: .breezy)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
 
                 VStack(spacing: 0) {
                     // R6: 全局 header 占位
@@ -106,6 +102,7 @@ struct CrewRosterOverlay: View {
                             Spacer(minLength: 60)
                         }
                         .padding(.top, 4)
+                        .animation(.spring(response: 0.36, dampingFraction: 0.84), value: searchText)
                     }
                 }
             }
@@ -176,8 +173,9 @@ struct CrewRosterOverlay: View {
                 dexSectionLabel("PLANTS", count: filteredPlants.count, emoji: "🌿")
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(filteredPlants) { plant in
+                        ForEach(Array(filteredPlants.enumerated()), id: \.element.id) { index, plant in
                             PlantTallCard(plant: plant)
+                                .ohanaSmoothAppear(index: index)
                         }
                     }
                     .padding(.horizontal, 16)
@@ -298,16 +296,17 @@ private struct BentoPetGrid: View {
 
     var body: some View {
         LazyVGrid(columns: columns, spacing: 12) {
-            ForEach(pets) { pet in
+            ForEach(Array(pets.enumerated()), id: \.element.id) { index, pet in
                 PetSquareCard(pet: pet) {
                     onSelect(pet)
                 }
+                .ohanaSmoothAppear(index: index)
             }
         }
     }
 }
 
-// MARK: - 宠物小卡片（两列网格用，单击进详情，只显示名字）
+// MARK: - 宠物小卡片（两列网格用，单击进详情）
 
 private struct PetSquareCard: View {
     let pet: Pet
@@ -318,8 +317,10 @@ private struct PetSquareCard: View {
     @State private var showDeleteAlert = false
     @State private var deleteConfirmName = ""
     @State private var showNameMismatch = false
+    @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
 
     private var themeColor: Color { Color(hex: pet.themeColorHex.isEmpty ? "4338FF" : pet.themeColorHex) }
+    private var isShownOnHome: Bool { HomeCardVisibility.isPetVisible(pet, raw: hiddenHomePetIDsRaw) }
 
     private var posterHeadline: String {
         let trimmed = pet.name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -329,53 +330,10 @@ private struct PetSquareCard: View {
 
     var body: some View {
         Button(action: onTap) {
-            GeometryReader { geo in
-                let w = geo.size.width
-                let h = geo.size.height
-                let avatarImage: UIImage? = pet.avatarImageData.flatMap { UIImage(data: $0) }
-                let isTransparent: Bool = pet.avatarImageData.map { ImageCutoutService.isTransparentPNG($0) } ?? false
-                let isPopout = isTransparent && avatarImage != nil
-
-                ZStack {
-                    // 蓝色渐变背景（与首页 posterFront 一致）
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(hex: "233BFF"), Color(hex: "141FAE")],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [.clear, .black.opacity(0.22)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-
-                    // 背景大字（橙红色，与首页一致）
-                    Text(posterHeadline)
-                        .font(.system(size: w * 0.28, weight: .black, design: .rounded))
-                        .foregroundStyle(Color(hex: "FF5A3D").opacity(0.85))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.25)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .offset(y: -h * 0.22)
-                        .allowsHitTesting(false)
-
-                    // 左半：头像主体层（与首页布局一致）
-                    miniSubjectLayer(avatarImage: avatarImage, isPopout: isPopout, w: w, h: h)
-                        .frame(width: w * 0.52, height: h)
-                        .clipped()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                        .allowsHitTesting(false)
-                }
+            VStack(spacing: 6) {
+                cardFace
+                homeVisibilityLabel(isShown: isShownOnHome)
             }
-            .aspectRatio(1.586, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: Color(hex: "233BFF").opacity(0.35), radius: 12, x: 0, y: 4)
         }
         .buttonStyle(.plain)
         .scaleEffect(isPressed ? 0.95 : 1.0)
@@ -413,6 +371,98 @@ private struct PetSquareCard: View {
         } message: {
             Text(showNameMismatch ? "❌ 输入名称不匹配，请重新输入 \"\(pet.name)\"" : "请输入 \"\(pet.name)\" 确认删除。此操作不可撤销。")
         }
+    }
+
+    private var cardFace: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let (cardTop, cardBottom) = WalletPetCardTheme.gradientPair(for: pet.themeColorHex)
+            let avatarImage: UIImage? = pet.avatarImageData.flatMap { UIImage(data: $0) }
+            let isTransparent: Bool = pet.avatarImageData.map { ImageCutoutService.isTransparentPNG($0) } ?? false
+            let isPopout = isTransparent && avatarImage != nil
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [cardTop, cardBottom],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [.clear, .black.opacity(0.22)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+
+                Text(posterHeadline)
+                    .font(.system(size: w * 0.28, weight: .black, design: .rounded))
+                    .foregroundStyle(Color(hex: "FF5A3D").opacity(0.85))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.25)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .offset(y: -h * 0.22)
+                    .allowsHitTesting(false)
+
+                miniSubjectLayer(avatarImage: avatarImage, isPopout: isPopout, w: w, h: h)
+                    .frame(width: w * 0.52, height: h)
+                    .clipped()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    .allowsHitTesting(false)
+
+                HStack(alignment: .bottom, spacing: 0) {
+                    Spacer().frame(width: w * 0.50)
+                    miniInfoColumn(w: w, h: h)
+                }
+                .allowsHitTesting(false)
+            }
+        }
+        .aspectRatio(1.586, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: themeColor.opacity(0.32), radius: 12, x: 0, y: 4)
+    }
+
+    private var readableTextColor: Color {
+        let bright = ["C8FF00","E8FFB0","B8FFD0","FFF44F","FFEB3B","FFFFFF","FFEAA7","FDCB6E"]
+        return bright.contains(pet.themeColorHex.uppercased()) ? Color.arkInk : .white
+    }
+
+    private func compactBadge(_ text: String, textColor: Color) -> some View {
+        Text(text)
+            .font(OhanaFont.caption2(.black))
+            .foregroundStyle(textColor.opacity(0.9))
+            .lineLimit(1)
+            .minimumScaleFactor(0.72)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(textColor.opacity(0.16), in: Capsule())
+            .overlay(Capsule().strokeBorder(textColor.opacity(0.12), lineWidth: 0.5))
+    }
+
+    private func homeVisibilityLabel(isShown: Bool) -> some View {
+        HStack {
+            Spacer(minLength: 0)
+            Text(isShown ? "首页显示" : "首页隐藏")
+                .font(.system(size: 10, weight: .black, design: .rounded))
+                .foregroundStyle(isShown ? Color.arkInk : Color.white.opacity(0.62))
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(
+                    isShown ? Color.goLime : Color.white.opacity(0.08),
+                    in: Capsule()
+                )
+                .overlay(
+                    Capsule().strokeBorder(isShown ? Color.clear : Color.white.opacity(0.12), lineWidth: 0.5)
+                )
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
     @ViewBuilder
@@ -585,10 +635,9 @@ private struct PetSquareCard: View {
         }
     }
 
-    // ── 右侧信息列（名字 + 相伴天数）
+    // ── 右侧信息列（姓名 + 陪伴天数）
     private func miniInfoColumn(w: CGFloat, h: CGFloat, textColor: Color? = nil) -> some View {
-        let bright = ["C8FF00","E8FFB0","B8FFD0","FFF44F","FFEB3B","FFFFFF"]
-        let tc: Color = textColor ?? (bright.contains(pet.themeColorHex.uppercased()) ? Color.arkInk : .white)
+        let tc: Color = textColor ?? readableTextColor
         return VStack(alignment: .trailing, spacing: 0) {
             Spacer(minLength: 0)
             if pet.daysTogether > 0 {
@@ -601,20 +650,18 @@ private struct PetSquareCard: View {
                         .foregroundStyle(tc.opacity(0.6))
                 }
                 .padding(.bottom, 3)
+            } else {
+                Text("新成员")
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(tc.opacity(0.68))
+                    .padding(.bottom, 3)
             }
-            Text(pet.name)
-                .font(OhanaFont.subheadline(.heavy))
-                .foregroundStyle(tc)
-                .lineLimit(1).minimumScaleFactor(0.45)
-                .padding(.bottom, 4)
-            if !pet.ageText.isEmpty {
-                Text(pet.ageText)
-                    .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(tc.opacity(0.65))
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(tc.opacity(0.15), in: Capsule())
-                    .padding(.bottom, 10)
+
+            HStack(spacing: 4) {
+                compactBadge(pet.species.isEmpty ? "宠物" : pet.species, textColor: tc)
+                compactBadge(pet.ageText.isEmpty ? "年龄未知" : pet.ageText, textColor: tc)
             }
+            .padding(.bottom, 10)
         }
         .padding(.trailing, 10)
         .frame(width: w * 0.50, alignment: .trailing)
@@ -669,16 +716,17 @@ private struct BentoHumanGrid: View {
 
     var body: some View {
         LazyVGrid(columns: columns, spacing: 12) {
-            ForEach(humans) { human in
+            ForEach(Array(humans.enumerated()), id: \.element.id) { index, human in
                 HumanSquareCard(human: human) {
                     onSelect(human)
                 }
+                .ohanaSmoothAppear(index: index)
             }
         }
     }
 }
 
-// MARK: - 人类小卡片（两列网格用，单击进详情，只显示名字）
+// MARK: - 人类小卡片（两列网格用，单击进详情）
 
 private struct HumanSquareCard: View {
     let human: Human
@@ -689,31 +737,15 @@ private struct HumanSquareCard: View {
     @State private var showDeleteAlert = false
 
     private var themeColor: Color { Color(hex: human.themeColor) }
+    private var companionshipDays: Int {
+        max(0, Calendar.current.dateComponents([.day], from: human.createdAt, to: Date()).day ?? 0)
+    }
 
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 0) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [themeColor, themeColor.mix(with: .black, by: 0.35)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                    humanAvatarContent
-                }
-                .frame(height: 120)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-
-                Text(human.name)
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .padding(.top, 8)
-                    .padding(.horizontal, 4)
+            VStack(spacing: 6) {
+                cardFace
+                homeVisibilityLabel(isShown: human.shouldShowOnHome)
             }
         }
         .buttonStyle(.plain)
@@ -739,6 +771,128 @@ private struct HumanSquareCard: View {
         } message: {
             Text("确定要删除 \(human.name) 吗？此操作不可撤销。")
         }
+    }
+
+    private var cardFace: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let avatarImage: UIImage? = human.avatarImageData.flatMap { UIImage(data: $0) }
+            let usesFullBleed = avatarImage != nil
+
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(
+                        MeshGradient(
+                            width: 3, height: 3,
+                            points: [
+                                SIMD2(0.0, 0.0), SIMD2(0.5, 0.0), SIMD2(1.0, 0.0),
+                                SIMD2(0.0, 0.5), SIMD2(0.52, 0.38), SIMD2(1.0, 0.5),
+                                SIMD2(0.0, 1.0), SIMD2(0.5, 1.0), SIMD2(1.0, 1.0)
+                            ],
+                            colors: WalletPetCardTheme.meshColors(for: human.themeColor)
+                        )
+                    )
+                LinearGradient(
+                    colors: [.clear, .black.opacity(usesFullBleed ? 0.12 : 0.28)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                if let avatarImage {
+                    Image(uiImage: avatarImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: max(w, h), height: h)
+                        .clipped()
+                        .frame(width: w, height: h, alignment: .leading)
+                        .mask(
+                            LinearGradient(
+                                stops: [
+                                    .init(color: .white, location: 0),
+                                    .init(color: .white, location: 0.46),
+                                    .init(color: .white.opacity(0.72), location: 0.60),
+                                    .init(color: .white.opacity(0.18), location: 0.76),
+                                    .init(color: .clear, location: 0.92)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .allowsHitTesting(false)
+                }
+
+                Text(human.name.uppercased())
+                    .font(.system(size: WalletPetCardTheme.headlinePointSize(cardWidth: w, headlineCount: human.name.count), weight: .black, design: .rounded))
+                    .foregroundStyle(Color(hex: "FF5A3D").opacity(0.85))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.22)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.horizontal, 8)
+                    .padding(.top, 24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .opacity(0.78)
+                    .allowsHitTesting(false)
+
+                if !usesFullBleed {
+                    humanAvatarContent
+                        .frame(width: w * 0.52, height: h)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                        .allowsHitTesting(false)
+                }
+
+                HStack(alignment: .bottom, spacing: 0) {
+                    Spacer().frame(width: w * 0.50)
+                    miniInfoColumn(w: w, h: h)
+                }
+                .allowsHitTesting(false)
+            }
+        }
+        .aspectRatio(1.586, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
+        )
+        .shadow(color: themeColor.opacity(0.28), radius: 12, x: 0, y: 4)
+    }
+
+    private var readableTextColor: Color {
+        let bright = ["C8FF00","E8FFB0","B8FFD0","FFF44F","FFEB3B","FFFFFF","FFEAA7","FDCB6E"]
+        return bright.contains(human.themeColor.uppercased()) ? Color.arkInk : .white
+    }
+
+    private func compactBadge(_ text: String, textColor: Color) -> some View {
+        Text(text)
+            .font(OhanaFont.caption2(.black))
+            .foregroundStyle(textColor.opacity(0.9))
+            .lineLimit(1)
+            .minimumScaleFactor(0.72)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(textColor.opacity(0.16), in: Capsule())
+            .overlay(Capsule().strokeBorder(textColor.opacity(0.12), lineWidth: 0.5))
+    }
+
+    private func homeVisibilityLabel(isShown: Bool) -> some View {
+        HStack {
+            Spacer(minLength: 0)
+            Text(isShown ? "首页显示" : "首页隐藏")
+                .font(.system(size: 10, weight: .black, design: .rounded))
+                .foregroundStyle(isShown ? Color.arkInk : Color.white.opacity(0.62))
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(
+                    isShown ? Color.goLime : Color.white.opacity(0.08),
+                    in: Capsule()
+                )
+                .overlay(
+                    Capsule().strokeBorder(isShown ? Color.clear : Color.white.opacity(0.12), lineWidth: 0.5)
+                )
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
     @ViewBuilder
@@ -849,25 +1003,27 @@ private struct HumanSquareCard: View {
         }
     }
 
-    // ── 右侧信息列（名字 + 角色）
+    // ── 右侧信息列（姓名 + 陪伴天数 + 角色）
     private func miniInfoColumn(w: CGFloat, h: CGFloat, textColor: Color? = nil) -> some View {
-        let bright = ["C8FF00","E8FFB0","B8FFD0","FFF44F","FFEB3B","FFFFFF"]
-        let tc: Color = textColor ?? (bright.contains(human.themeColor.uppercased()) ? Color.arkInk : .white)
+        let tc: Color = textColor ?? readableTextColor
         return VStack(alignment: .trailing, spacing: 0) {
             Spacer(minLength: 0)
-            
-            Text(human.name)
-                .font(OhanaFont.subheadline(.heavy))
-                .foregroundStyle(tc)
-                .lineLimit(1).minimumScaleFactor(0.45)
-                .padding(.bottom, 4)
-                
-            Text(human.roleText)
-                .font(OhanaFont.caption2(.bold))
-                .foregroundStyle(tc.opacity(0.65))
-                .padding(.horizontal, 6).padding(.vertical, 2)
-                .background(tc.opacity(0.15), in: Capsule())
-                .padding(.bottom, 10)
+
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text("\(companionshipDays)")
+                    .font(OhanaFont.metric(size: 20))
+                    .foregroundStyle(tc)
+                Text("天")
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(tc.opacity(0.6))
+            }
+            .padding(.bottom, 3)
+
+            HStack(spacing: 4) {
+                compactBadge("人类", textColor: tc)
+                compactBadge(human.birthday == nil ? "年龄未知" : human.ageText, textColor: tc)
+            }
+            .padding(.bottom, 10)
         }
         .padding(.trailing, 10)
         .frame(width: w * 0.50, alignment: .trailing)

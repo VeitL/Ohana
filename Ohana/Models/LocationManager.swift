@@ -23,6 +23,12 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
     var authorizationStatus: CLAuthorizationStatus = .notDetermined
     var isTracking = false
     var pendingStart = false
+
+    private var lastAcceptedLocation: CLLocation?
+    private let routeAccuracyLimit: CLLocationAccuracy = 65
+    private let minimumRoutePointDistance: CLLocationDistance = 8
+    private let maximumRoutePointInterval: TimeInterval = 18
+    private let maximumPlausibleSpeed: CLLocationSpeed = 12
     
     /// 当前设备是否支持后台定位更新（需 UIBackgroundModes 包含 location）
     private var canUseBackgroundLocation: Bool {
@@ -40,8 +46,8 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
     private override init() {
         super.init()
         manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyBest
-        manager.distanceFilter = 5
+        manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        manager.distanceFilter = 8
         manager.activityType = .fitness
         manager.pausesLocationUpdatesAutomatically = false
         authorizationStatus = manager.authorizationStatus
@@ -74,7 +80,10 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         }
         
         collectedLocations.removeAll()
+        lastAcceptedLocation = nil
         isTracking = true
+        manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        manager.distanceFilter = 8
 
         #if !targetEnvironment(simulator)
         // 任务六：iOS 17+ — 用 CLBackgroundActivitySession 在 WhenInUse 授权下保持后台追踪
@@ -93,6 +102,8 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
     func stopTracking() {
         isTracking = false
         manager.stopUpdatingLocation()
+        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        manager.distanceFilter = kCLDistanceFilterNone
 
         #if !targetEnvironment(simulator)
         // 任务六：销毁后台 session
@@ -114,6 +125,8 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
     
     func resumeTracking() {
         isTracking = true
+        manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        manager.distanceFilter = 8
         if canUseBackgroundLocation {
             manager.allowsBackgroundLocationUpdates = true
             manager.showsBackgroundLocationIndicator = true
@@ -125,13 +138,58 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard isTracking else { return }
         currentLocation = locations.last
-        collectedLocations.append(contentsOf: locations)
-        // F6: 防止无界增长 — 超过阈值时降采样（保留每隔一个点）
-        if collectedLocations.count > 5000 {
-            collectedLocations = collectedLocations.enumerated().compactMap { i, loc in
-                i.isMultiple(of: 2) ? loc : nil
+        for location in locations where shouldAcceptRoutePoint(location) {
+            collectedLocations.append(location)
+            lastAcceptedLocation = location
+        }
+        // F6: 防止无界增长 — 保留可见轨迹形状，同时限制内存和后续渲染成本。
+        if collectedLocations.count > 1600 {
+            collectedLocations = downsample(collectedLocations, maxCount: 800)
+            lastAcceptedLocation = collectedLocations.last
+        }
+    }
+
+    private func shouldAcceptRoutePoint(_ location: CLLocation) -> Bool {
+        guard location.horizontalAccuracy >= 0,
+              location.horizontalAccuracy <= routeAccuracyLimit,
+              abs(location.timestamp.timeIntervalSinceNow) < 30
+        else { return false }
+
+        guard let previous = lastAcceptedLocation else { return true }
+        let distance = location.distance(from: previous)
+        let interval = location.timestamp.timeIntervalSince(previous.timestamp)
+        guard interval >= 0 else { return false }
+
+        if interval > 0 {
+            let speed = distance / interval
+            if speed > maximumPlausibleSpeed { return false }
+        }
+
+        return distance >= minimumRoutePointDistance || interval >= maximumRoutePointInterval
+    }
+
+    func routeLocationsForPersistence(maxCount: Int = 600) -> [CLLocation] {
+        downsample(collectedLocations, maxCount: maxCount)
+    }
+
+    private func downsample(_ locations: [CLLocation], maxCount: Int) -> [CLLocation] {
+        guard locations.count > maxCount, maxCount >= 2 else { return locations }
+        let step = Double(locations.count - 1) / Double(maxCount - 1)
+        var result: [CLLocation] = []
+        result.reserveCapacity(maxCount)
+
+        var lastIndex = -1
+        for i in 0..<maxCount {
+            let index = min(locations.count - 1, Int((Double(i) * step).rounded()))
+            if index != lastIndex {
+                result.append(locations[index])
+                lastIndex = index
             }
         }
+        if let last = locations.last, result.last?.timestamp != last.timestamp {
+            result[result.count - 1] = last
+        }
+        return result
     }
     
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {

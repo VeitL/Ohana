@@ -96,12 +96,13 @@ final class PetWalkingManager {
         walkLog.endDate = Date()
         walkLog.distanceMeters = locationManager.totalDistance
         
-        let coordinates = locationManager.collectedLocations.map {
+        let routeLocations = locationManager.routeLocationsForPersistence()
+        let coordinates = routeLocations.map {
             ["lat": $0.coordinate.latitude, "lon": $0.coordinate.longitude]
         }
         walkLog.routeLocationsData = try? JSONSerialization.data(withJSONObject: coordinates)
         
-        generateMapSnapshot(for: walkLog)
+        generateMapSnapshot(for: walkLog, routeLocations: routeLocations, modelContext: modelContext)
         
         // 保存便便记录（对应 poopCount 次）
         for _ in 0..<poop {
@@ -169,8 +170,8 @@ final class PetWalkingManager {
     }
     
     // MARK: - Map Snapshot
-    private func generateMapSnapshot(for walkLog: PetWalkLog) {
-        let locations = locationManager.collectedLocations
+    private func generateMapSnapshot(for walkLog: PetWalkLog, routeLocations: [CLLocation], modelContext: ModelContext) {
+        let locations = routeLocations
         guard locations.count >= 2 else { return }
         
         let coordinates = locations.map(\.coordinate)
@@ -229,6 +230,7 @@ final class PetWalkingManager {
             // F2: SwiftData 模型必须在 MainActor 上写入
             DispatchQueue.main.async {
                 walkLog.mapSnapshotData = jpegData
+                modelContext.safeSave()
             }
         }
     }

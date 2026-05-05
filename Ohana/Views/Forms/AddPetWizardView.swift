@@ -3771,7 +3771,7 @@ struct GoColorPickerSheet: View {
 
     var body: some View {
         ZStack {
-            Color(hex: "0A0F2C").ignoresSafeArea()
+            OhanaAppBackground()
             VStack(spacing: 20) {
                 // 顶部把手
                 Capsule()

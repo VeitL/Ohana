@@ -22,7 +22,7 @@ struct TodayFocusCarousel<Content: View>: View {
             .indexViewStyle(.page(backgroundDisplayMode: .automatic))
             .animation(animation, value: cardWidth)
         }
-        .frame(height: 192)
+        .frame(height: 232)
         .padding(.top, 12)
     }
 }

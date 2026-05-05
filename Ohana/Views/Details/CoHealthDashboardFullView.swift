@@ -10,7 +10,13 @@ import Charts
 
 struct CoHealthDashboardFullView: View {
     let human: Human
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @Query(sort: \Pet.name) private var allPets: [Pet]
+
+    private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
+    private var isPrivacyLocked: Bool {
+        human.isPrivate(.weight, viewedBy: activeHumanId) || human.isPrivate(.workout, viewedBy: activeHumanId)
+    }
 
     private var past30Days: Date {
         Calendar.current.date(byAdding: .day, value: -29,
@@ -53,33 +59,61 @@ struct CoHealthDashboardFullView: View {
     var body: some View {
         ZStack {
             ArkBackgroundView().ignoresSafeArea()
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    // 趣味文案卡
-                    summaryCard
-                        .padding(.horizontal, 20)
-                        .padding(.top, 16)
 
-                    // 遛狗历史柱状图
-                    walkBarSection
-                        .padding(.horizontal, 20)
-
-                    // 体重对比折线图
-                    weightCompareSection
-                        .padding(.horizontal, 20)
-
-                    // 宠物健康摘要
-                    if !associatedPets.isEmpty {
-                        petHealthSection
+            if isPrivacyLocked {
+                privacyLockedView
+            } else {
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 20) {
+                        // 趣味文案卡
+                        summaryCard
                             .padding(.horizontal, 20)
-                    }
 
-                    Spacer(minLength: 40)
+                        VStack(spacing: 10) {
+                            HumanPrivateDataNotice(human: human, field: .workout)
+                            HumanPrivateDataNotice(human: human, field: .weight)
+                        }
+                        .padding(.horizontal, 20)
+
+                        // 遛狗历史柱状图
+                        walkBarSection
+                            .padding(.horizontal, 20)
+
+                        // 体重对比折线图
+                        weightCompareSection
+                            .padding(.horizontal, 20)
+
+                        // 宠物健康摘要
+                        if !associatedPets.isEmpty {
+                            petHealthSection
+                                .padding(.horizontal, 20)
+                        }
+
+                        Spacer(minLength: 40)
+                    }
+                    .padding(.top, 16)
                 }
             }
         }
         .navigationTitle("人宠共健")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var privacyLockedView: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "lock.shield.fill")
+                .font(OhanaFont.metric(size: 44))
+                .foregroundStyle(Color.goYellow)
+            Text("共健数据仅本人可见")
+                .font(OhanaFont.headline(.bold))
+                .foregroundStyle(.primary)
+            Text("请切换到本人档案后再查看。")
+                .font(OhanaFont.callout())
+                .foregroundStyle(.secondary)
+        }
+        .multilineTextAlignment(.center)
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Summary Card

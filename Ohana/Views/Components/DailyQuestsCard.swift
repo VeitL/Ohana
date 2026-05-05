@@ -55,11 +55,12 @@ struct IslandQuestEngine {
             }
         }
 
-        // ── 轻量引导：默认不安排喂食 / 换水等计划型照护任务。
-        // 这些应由用户创建日历提醒后，通过 q_reminder 进入 Today Focus。
-        if quests.count < 3, let pet = activePets.first(where: { p in
-            !p.careLogs.contains { $0.careType == .play && cal.isDateInToday($0.date) }
-        }) {
+        // ── 轻量互动：每天最多一次家庭级陪玩引导；遛狗也视为已互动，避免给每只宠物轮流派发陪玩任务。
+        let hasAnyPlayEquivalentToday = activePets.contains { pet in
+            pet.careLogs.contains { $0.careType == .play && cal.isDateInToday($0.date) }
+                || pet.walkLogs.contains { cal.isDateInToday($0.startDate) }
+        }
+        if quests.count < 3, !hasAnyPlayEquivalentToday, let pet = activePets.first {
             quests.append(IslandQuest(
                 id: "q_play_\(pet.id.uuidString)",
                 emoji: "🎾",

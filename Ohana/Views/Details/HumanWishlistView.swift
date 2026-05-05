@@ -67,6 +67,9 @@ struct HumanWishlistView: View {
             VStack(spacing: 20) {
                 balanceCard
 
+                HumanPrivateDataNotice(human: human, field: .wishlist)
+                    .padding(.horizontal, 20)
+
                 if pendingItems.isEmpty && redeemedItems.isEmpty {
                     emptyState.padding(.top, 60)
                 } else {

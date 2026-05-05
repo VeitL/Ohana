@@ -531,20 +531,26 @@ struct HygieneTodoSheet: View {
     let type: HygieneType
     /// 与护理页、钱包卡一致：传入 `Color(hex: pet.themeColorHex)`
     var accent: Color = Color.goPrimary
+    var onSave: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
     @State private var startDate: Date = Date()
+    @State private var isAllDay: Bool = true
+    @State private var startTime: Date = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
     @State private var endDate: Date = Calendar.current.startOfDay(for: Date())
     @State private var hasEndDate: Bool = false
     @State private var repeatDays: Int = 0
     @State private var customNote: String = ""
 
-    private let repeatOptions: [(String, Int)] = [
-        ("不重复", 0), ("每天", 1), ("每2天", 2), ("每3天", 3),
-        ("每周", 7), ("每两周", 14), ("每月", 30)
-    ]
+    private var repeatDescription: String {
+        switch repeatDays {
+        case 0: return "只安排这一次"
+        case 1: return "每天重复"
+        default: return "每 \(repeatDays) 天重复"
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -588,6 +594,21 @@ struct HygieneTodoSheet: View {
                             .labelsHidden()
                     }
 
+                    settingRow(icon: "sun.max", iconColor: accent.opacity(0.9), label: "全天日程") {
+                        Toggle("", isOn: $isAllDay)
+                            .tint(accent)
+                            .labelsHidden()
+                    }
+
+                    if !isAllDay {
+                        settingRow(icon: "clock", iconColor: accent.opacity(0.85), label: "时间") {
+                            DatePicker("", selection: $startTime, displayedComponents: [.hourAndMinute])
+                                .datePickerStyle(.compact)
+                                .tint(accent)
+                                .labelsHidden()
+                        }
+                    }
+
                     // ── 结束日期（可选）
                     settingRow(icon: "calendar.badge.checkmark", iconColor: accent.opacity(0.9), label: "结束日期") {
                         HStack(spacing: 10) {
@@ -603,30 +624,50 @@ struct HygieneTodoSheet: View {
                         }
                     }
 
-                    // ── 重复频率
+                    // ── 护理周期
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 6) {
                             Image(systemName: "repeat").font(.system(size: 13, weight: .semibold)).foregroundStyle(accent)
-                            Text("重复频率").font(.system(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(.primary)
+                            Text("护理周期").font(.system(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(.primary)
                         }
                         .padding(.horizontal, 4)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(repeatOptions, id: \.1) { label, days in
-                                    Button { repeatDays = days } label: {
-                                        Text(label)
-                                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                                            .foregroundStyle(repeatDays == days ? Color.white : .primary)
-                                            .padding(.horizontal, 14).padding(.vertical, 8)
-                                            .background(
-                                                repeatDays == days ? accent : Color(.systemGray6),
-                                                in: Capsule()
-                                            )
-                                    }
-                                    .buttonStyle(.plain)
-                                }
+                        HStack(spacing: 14) {
+                            Button {
+                                repeatDays = max(0, repeatDays - 1)
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            } label: {
+                                Image(systemName: "minus")
+                                    .font(.system(size: 15, weight: .black))
+                                    .foregroundStyle(repeatDays == 0 ? .secondary : accent)
+                                    .frame(width: 38, height: 38)
+                                    .background(Color(.systemBackground).opacity(0.82), in: Circle())
                             }
+                            .buttonStyle(.plain)
+                            .disabled(repeatDays == 0)
+
+                            VStack(spacing: 2) {
+                                Text(repeatDays == 0 ? "不重复" : "\(repeatDays) 天")
+                                    .font(.system(size: 22, weight: .black, design: .rounded))
+                                    .foregroundStyle(.primary)
+                                Text(repeatDescription)
+                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity)
+
+                            Button {
+                                repeatDays = min(365, repeatDays + 1)
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            } label: {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 15, weight: .black))
+                                    .foregroundStyle(accent)
+                                    .frame(width: 38, height: 38)
+                                    .background(Color(.systemBackground).opacity(0.82), in: Circle())
+                            }
+                            .buttonStyle(.plain)
                         }
+                        .padding(.horizontal, 8)
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
@@ -685,17 +726,26 @@ struct HygieneTodoSheet: View {
         let fullTitle = customNote.isEmpty ? title : "\(title) — \(customNote)"
 
         let dayStart = cal.startOfDay(for: startDate)
-        let eventStart = cal.date(bySettingHour: 9, minute: 0, second: 0, of: dayStart) ?? dayStart
+        let time = cal.dateComponents([.hour, .minute], from: startTime)
+        let eventStart = isAllDay
+        ? dayStart
+        : (cal.date(bySettingHour: time.hour ?? 9, minute: time.minute ?? 0, second: 0, of: dayStart) ?? dayStart)
+        let reminderTime = isAllDay
+        ? (cal.date(bySettingHour: 9, minute: 0, second: 0, of: dayStart) ?? dayStart)
+        : eventStart
         var eventEndDate: Date? = nil
         if hasEndDate {
             let endDay = cal.startOfDay(for: endDate)
-            eventEndDate = cal.date(bySettingHour: 21, minute: 0, second: 0, of: endDay)
+            eventEndDate = isAllDay
+            ? endDay
+            : (cal.date(bySettingHour: time.hour ?? 9, minute: time.minute ?? 0, second: 0, of: endDay) ?? endDay)
         }
 
         let event = Event(
             title: fullTitle,
             startDate: eventStart,
             endDate: eventEndDate,
+            isAllDay: isAllDay,
             eventType: EventType.grooming.rawValue,
             relatedEntityType: EntityKind.pet.rawValue,
             relatedEntityId: pet.id.uuidString
@@ -706,9 +756,12 @@ struct HygieneTodoSheet: View {
         } else if repeatDays > 0 {
             event.recurrenceEndDate = cal.date(byAdding: .year, value: 1, to: dayStart)
         }
+        if repeatDays > 0 {
+            HygieneType.setCustomCycleDays(repeatDays, for: type, petId: pet.id)
+        }
         modelContext.insert(event)
 
-        let reminder = Reminder(event: event, scheduledAt: eventStart)
+        let reminder = Reminder(event: event, scheduledAt: reminderTime)
         reminder.status = "pending"
         modelContext.insert(reminder)
 
@@ -717,6 +770,7 @@ struct HygieneTodoSheet: View {
             await ReminderSchedulingService.scheduleIfNeeded(reminder: reminder, context: modelContext, source: .detail)
         }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+        onSave?()
         dismiss()
     }
 }

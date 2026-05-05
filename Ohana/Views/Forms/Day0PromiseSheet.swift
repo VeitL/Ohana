@@ -57,7 +57,7 @@ struct Day0PromiseSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(.systemBackground).ignoresSafeArea()
+                OhanaAppBackground()
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {

@@ -13,12 +13,35 @@ import Charts
 struct IslandWealthDashboardView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var vm = IslandWealthViewModel()
-    @State private var showingCoconutLog = false
+    @Bindable private var questManager = QuestManager.shared
+    @State private var selectedCoconutActorId: String? = nil
     @Query(sort: \Pet.name) private var pets: [Pet]
     @Query(sort: \Human.name) private var humans: [Human]
 
     private var petColorMap: [String: Color] {
         Dictionary(uniqueKeysWithValues: pets.map { ($0.id.uuidString, Color(hex: $0.themeColorHex)) })
+    }
+
+    private var filteredCoconutLogs: [CoconutLogEntry] {
+        guard let id = selectedCoconutActorId else { return questManager.coconutLogs }
+        return questManager.coconutLogs.filter { $0.actorId == id }
+    }
+
+    private var coconutActors: [(id: String, name: String, emoji: String)] {
+        var seen = Set<String>()
+        var result: [(String, String, String)] = []
+        for log in questManager.coconutLogs {
+            guard let id = log.actorId, let name = log.actorName, !seen.contains(id) else { continue }
+            seen.insert(id)
+            if let human = humans.first(where: { $0.id.uuidString == id }) {
+                result.append((id, name, human.avatarEmoji))
+            } else if let pet = pets.first(where: { $0.id.uuidString == id }) {
+                result.append((id, name, pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji))
+            } else {
+                result.append((id, name, "🏝️"))
+            }
+        }
+        return result
     }
 
     private var safeTop: CGFloat {
@@ -55,6 +78,9 @@ struct IslandWealthDashboardView: View {
                     // 排行榜
                     leaderboardSection
 
+                    // 椰子记录
+                    coconutLogSection
+
                     Spacer().frame(height: 40)
                 }
                 .padding(.horizontal, 20)
@@ -62,7 +88,6 @@ struct IslandWealthDashboardView: View {
         }
         .navigationBarHidden(true)
         .overlay(alignment: .top) { navBar }
-        .sheet(isPresented: $showingCoconutLog) { CoconutLogView() }
         .onAppear   { syncVM() }
         .onChange(of: pets.count)   { syncVM() }
         .onChange(of: humans.count) { syncVM() }
@@ -98,7 +123,7 @@ struct IslandWealthDashboardView: View {
                     .background(.white.opacity(0.12), in: Circle())
             }
             .buttonStyle(.plain)
-            CoconutBalanceCapsule { showingCoconutLog = true }
+            CoconutBalanceCapsule {}
         }
         .padding(.horizontal, 20)
         .padding(.top, safeTop + 8)
@@ -379,6 +404,150 @@ struct IslandWealthDashboardView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: - Coconut Log
+
+    private var coconutLogSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("椰子记录")
+                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .foregroundStyle(.primary.opacity(0.5))
+                    Text("最近收支都在这里")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.primary.opacity(0.32))
+                }
+                Spacer()
+                Text("\(questManager.coconutLogs.count) 条")
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.goPrimary)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(Color.goPrimary.opacity(0.14), in: Capsule())
+            }
+            .padding(.horizontal, 4)
+
+            if !coconutActors.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        coconutFilterChip(id: nil, emoji: "🌴", name: "全部")
+                        ForEach(coconutActors, id: \.id) { actor in
+                            coconutFilterChip(id: actor.id, emoji: actor.emoji, name: actor.name)
+                        }
+                    }
+                    .padding(.horizontal, 2)
+                }
+            }
+
+            if filteredCoconutLogs.isEmpty {
+                VStack(spacing: 10) {
+                    Text("🥥").font(.system(size: 42))
+                    Text(selectedCoconutActorId == nil ? "还没有椰子记录" : "该成员暂无椰子记录")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(.primary.opacity(0.45))
+                    Text("完成打卡、照顾家人后椰子会出现在这里")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(.primary.opacity(0.28))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 28)
+                .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            } else {
+                LazyVStack(spacing: 8) {
+                    ForEach(filteredCoconutLogs.prefix(80)) { log in
+                        coconutLogRow(log)
+                    }
+                }
+            }
+        }
+    }
+
+    private func coconutFilterChip(id: String?, emoji: String, name: String) -> some View {
+        let isSelected = selectedCoconutActorId == id
+        return Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
+                selectedCoconutActorId = id
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Text(emoji).font(.system(size: 13))
+                Text(name)
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(isSelected ? Color.arkInk : .primary.opacity(0.62))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(isSelected ? Color.goPrimary : Color.white.opacity(0.07), in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func coconutLogRow(_ log: CoconutLogEntry) -> some View {
+        let isEarning = log.amount > 0
+        let isPet = log.actorId.map { id in pets.contains { $0.id.uuidString == id } } ?? false
+        let isHuman = log.actorId.map { id in humans.contains { $0.id.uuidString == id } } ?? false
+        let isSystem = log.actorId == nil || (!isPet && !isHuman)
+
+        return HStack(spacing: 12) {
+            Text(log.emoji)
+                .font(.system(size: 20))
+                .frame(width: 40, height: 40)
+                .background((isEarning ? Color.goPrimary : Color.goRed).opacity(0.13), in: Circle())
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(log.title)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    coconutActorBadge(log: log, isPet: isPet, isHuman: isHuman, isSystem: isSystem)
+                    Text(log.timeAgoString)
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(.primary.opacity(0.35))
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            HStack(spacing: 3) {
+                Text(isEarning ? "+\(log.amount)" : "\(log.amount)")
+                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .foregroundStyle(isEarning ? Color.goPrimary : Color.goRed)
+                Text("🥥").font(.system(size: 12))
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func coconutActorBadge(log: CoconutLogEntry, isPet: Bool, isHuman: Bool, isSystem: Bool) -> some View {
+        if isSystem {
+            Text("🏝️ 岛屿奖励")
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .foregroundStyle(.primary.opacity(0.48))
+                .background(.white.opacity(0.07), in: Capsule())
+        } else if isPet {
+            Text("🐾 \(log.actorName ?? "")")
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .foregroundStyle(Color.goTeal)
+                .background(Color.goTeal.opacity(0.12), in: Capsule())
+        } else if isHuman {
+            Text(log.actorName ?? "")
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .foregroundStyle(Color.goPrimary.opacity(0.9))
+                .background(Color.goPrimary.opacity(0.1), in: Capsule())
+        }
     }
 }
 

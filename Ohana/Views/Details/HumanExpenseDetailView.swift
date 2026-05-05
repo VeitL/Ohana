@@ -64,6 +64,10 @@ struct HumanExpenseDetailView: View {
                 .frame(maxWidth: .infinity)
                 .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 0))
 
+                HumanPrivateDataNotice(human: human, field: .expense)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+
                 GoDashedDivider()
 
                 // List

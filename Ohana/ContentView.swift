@@ -50,12 +50,7 @@ struct ContentView: View {
                     }
                 }
                 .navigationDestination(item: $selectedPet) { pet in
-                    PetDetailView(
-                        pet: pet,
-                        initialTab: selectedPetTab,
-                        openHealthOnAppear: selectedPetTab == .health
-                    )
-                    .navigationTransition(.zoom(sourceID: pet.id, in: heroNS))
+                    petDestination(for: pet)
                 }
                 .navigationDestination(item: $selectedHuman) { human in
                     HumanDetailView(human: human)
@@ -100,6 +95,18 @@ struct ContentView: View {
             }
             .interactiveDismissDisabled(true)
         }
+    }
+
+    @ViewBuilder
+    private func petDestination(for pet: Pet) -> some View {
+        Group {
+            if selectedPetTab == .health {
+                PetHealthDetailView(pet: pet)
+            } else {
+                PetBasicInfoDetailView(pet: pet)
+            }
+        }
+        .navigationTransition(.zoom(sourceID: pet.id, in: heroNS))
     }
 
     private func reconcileHumanProfileRequirement() {

@@ -118,17 +118,26 @@ struct PetHygieneDetailView: View {
         return pet.hygieneLogs.filter { cal.isDate($0.date, equalTo: now, toGranularity: .month) }.count
     }
 
-    private var currentStreak: Int {
+    private var currentStrike: Int {
         let cal = Calendar.current
-        var streak = 0
-        var day = Date()
-        while true {
-            let hasAny = pet.hygieneLogs.contains { cal.isDate($0.date, inSameDayAs: day) }
-            if hasAny { streak += 1 } else { break }
-            guard let prev = cal.date(byAdding: .day, value: -1, to: day) else { break }
-            day = prev
+        var strike = 0
+        var lastDateByType: [String: Date] = [:]
+
+        for log in pet.hygieneLogs.sorted(by: { $0.date < $1.date }) {
+            guard let type = HygieneType(rawValue: log.type) else { continue }
+            if let lastDate = lastDateByType[log.type] {
+                let days = cal.dateComponents(
+                    [.day],
+                    from: cal.startOfDay(for: lastDate),
+                    to: cal.startOfDay(for: log.date)
+                ).day ?? 0
+                strike = days <= type.effectiveCycleDays(for: pet.id) ? strike + 1 : 1
+            } else {
+                strike += 1
+            }
+            lastDateByType[log.type] = log.date
         }
-        return streak
+        return strike
     }
 
     private var overdueTypes: [HygieneType] {
@@ -137,9 +146,13 @@ struct PetHygieneDetailView: View {
             return d >= type.effectiveCycleDays(for: pet.id)
         }
     }
-    // P1: 护理周期自定义状态
-    @State private var editingCycleType: HygieneType? = nil
-    @State private var cycleDayDraft: Int = 1
+
+    private var completedTodayCount: Int {
+        HygieneType.allCases.filter { isDoneToday($0) }.count
+    }
+    @State private var hygieneCycleRefresh = 0
+    @State private var showSingleUseNotice = false
+    @State private var singleUseNoticeMessage = ""
 
     var body: some View {
         ZStack {
@@ -181,127 +194,99 @@ struct PetHygieneDetailView: View {
         }
         // 护理卡片「计划」按钮 → 待办 sheet
         .sheet(item: $groomingPlanTarget) { hygieneType in
-            HygieneTodoSheet(pet: pet, type: hygieneType, accent: themeColor)
+            HygieneTodoSheet(pet: pet, type: hygieneType, accent: themeColor) {
+                hygieneCycleRefresh += 1
+            }
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
-        // 周期天数自定义 sheet
-        .sheet(item: $editingCycleType) { hygieneType in
-            cycleDaysEditorSheet(for: hygieneType)
-                .presentationDetents([.height(300)])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(.regularMaterial)
-        }
-    }
-
-    // MARK: - Cycle Days Editor Sheet
-    private func cycleDaysEditorSheet(for type: HygieneType) -> some View {
-        VStack(spacing: 20) {
-            HStack {
-                Text("\(type.emoji) \(type.rawValue) · 提醒周期")
-                    .font(.system(size: 17, weight: .black, design: .rounded))
-                Spacer()
-                Button {
-                    // 恢复默认
-                    HygieneType.setCustomCycleDays(0, for: type, petId: pet.id)
-                    editingCycleType = nil
-                } label: {
-                    Text("恢复默认")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.top, 20)
-            .padding(.horizontal, 24)
-
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("\(cycleDayDraft)")
-                    .font(.system(size: 52, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
-                    .animation(.spring(duration: 0.2), value: cycleDayDraft)
-                Text("天 / 次")
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundStyle(.secondary)
-            }
-
-            HStack(spacing: 14) {
-                Button {
-                    if cycleDayDraft > 1 { cycleDayDraft -= 1 }
-                } label: {
-                    Image(systemName: "minus.circle.fill")
-                        .font(.system(size: 32))
-                        .foregroundStyle(Color.primary.opacity(0.25))
-                }
-                .buttonStyle(.plain)
-
-                Stepper("", value: $cycleDayDraft, in: 1...90)
-                    .labelsHidden()
-
-                Button {
-                    if cycleDayDraft < 90 { cycleDayDraft += 1 }
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 32))
-                        .foregroundStyle(themeColor)
-                }
-                .buttonStyle(.plain)
-            }
-
-            Button {
-                HygieneType.setCustomCycleDays(cycleDayDraft, for: type, petId: pet.id)
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                editingCycleType = nil
-            } label: {
-                Text("保存")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.black)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(themeColor, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 24)
-            Spacer()
-        }
-        .onAppear {
-            cycleDayDraft = type.effectiveCycleDays(for: pet.id)
+        .alert("今天已经完成了", isPresented: $showSingleUseNotice) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text(singleUseNoticeMessage)
         }
     }
 
     // MARK: - 本月概览
     private var monthlySummaryCard: some View {
-        HStack(spacing: 0) {
-            VStack(spacing: 4) {
-                Text("\(monthlyTotalCount)")
-                    .font(.system(size: 28, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
-                Text("本月护理次数")
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+        let totalTypes = max(HygieneType.allCases.count, 1)
+        let progress = CGFloat(completedTodayCount) / CGFloat(totalTypes)
+        let headline = overdueTypes.isEmpty ? "今天的护理节奏很好" : "\(overdueTypes.count) 项护理需要关注"
+
+        return VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .stroke(themeColor.opacity(0.16), lineWidth: 9)
+                    Circle()
+                        .trim(from: 0, to: progress)
+                        .stroke(themeColor, style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    VStack(spacing: 1) {
+                        Text("\(completedTodayCount)/\(totalTypes)")
+                            .font(.system(size: 17, weight: .black, design: .rounded))
+                            .foregroundStyle(.primary)
+                        Text("今日")
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(width: 66, height: 66)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(headline)
+                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .foregroundStyle(.primary)
+                    Text(overdueTypes.isEmpty ? "继续保持，下一次护理会自动提醒。" : overdueTypes.map(\.rawValue).joined(separator: "、"))
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(overdueTypes.isEmpty ? .secondary : Color.goRed.opacity(0.9))
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity)
-            VStack(spacing: 4) {
-                Text("\(currentStreak)")
-                    .font(.system(size: 28, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
-                Text("连续打卡天数")
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+
+            HStack(spacing: 8) {
+                overviewMetric(icon: "sparkle", value: "\(monthlyTotalCount)", label: "本月护理", tint: themeColor)
+                overviewMetric(icon: "bolt.fill", value: "\(currentStrike)", label: "连续打卡 strike", tint: Color.goOrange)
+                overviewMetric(icon: "clock", value: "\(overdueTypes.count)", label: "待护理", tint: overdueTypes.isEmpty ? themeColor : Color.goRed)
             }
-            .frame(maxWidth: .infinity)
-            VStack(spacing: 4) {
-                Text("\(overdueTypes.count)")
-                    .font(.system(size: 28, weight: .black, design: .rounded))
-                    .foregroundStyle(overdueTypes.isEmpty ? .primary : Color.goRed)
-                Text("待护理项目")
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
         }
-        .padding(14)
-        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(16)
+        .background(
+            LinearGradient(
+                colors: [Color.white.opacity(0.12), themeColor.opacity(0.08)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+        )
+    }
+
+    private func overviewMetric(icon: String, value: String, label: String, tint: Color) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .black))
+                .foregroundStyle(tint)
+                .frame(width: 18, height: 18)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(value)
+                    .font(.system(size: 17, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                Text(label)
+                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity)
+        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     // MARK: - 是否今天已完成
@@ -313,6 +298,7 @@ struct PetHygieneDetailView: View {
 
     // MARK: - 护理类型卡片（重构）
     private func hygieneTypeCard(_ type: HygieneType) -> some View {
+        let _ = hygieneCycleRefresh
         let logs = pet.hygieneLogs.filter { $0.type == type.rawValue }.sorted { $0.date > $1.date }
         let color = statusColor(type)
         let days = daysSince(type)
@@ -360,6 +346,12 @@ struct PetHygieneDetailView: View {
                 }
                 .buttonStyle(.plain)
                 Button {
+                    guard !doneToday else {
+                        singleUseNoticeMessage = "\(pet.name) 今天已经记录过\(type.rawValue)了，这类护理一天记录一次就够了。"
+                        showSingleUseNotice = true
+                        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                        return
+                    }
                     let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
                         .flatMap { $0.isEmpty ? nil : $0 }
                     let log = PetHygieneLog(date: Date(), type: type, pet: pet, executorId: executorId)
@@ -441,17 +433,6 @@ struct PetHygieneDetailView: View {
                     .font(.system(size: 10, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary.opacity(0.7))
                 Spacer()
-                Button {
-                    cycleDayDraft = type.effectiveCycleDays(for: pet.id)
-                    editingCycleType = type
-                } label: {
-                    Text("调整周期")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .foregroundStyle(themeColor)
-                        .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(themeColor.opacity(0.1), in: Capsule())
-                }
-                .buttonStyle(.plain)
             }
 
             // 最近记录（无分割线）

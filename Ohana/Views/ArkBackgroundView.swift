@@ -78,6 +78,15 @@ struct ArkBackgroundView: View {
     }
 }
 
+/// Single app-wide screen backdrop. Use this for full-screen views and sheets so
+/// Settings > Background Style applies consistently across the app.
+struct OhanaAppBackground: View {
+    var body: some View {
+        ArkBackgroundView()
+            .ignoresSafeArea()
+    }
+}
+
 // MARK: - 1. Go 经典（原设计系统三球 Blob）
 private struct GoDefaultBackground: View {
     @Environment(\.colorScheme) private var colorScheme

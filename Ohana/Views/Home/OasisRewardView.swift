@@ -22,9 +22,9 @@ struct OasisRewardView: View {
     @State private var treeScale: CGFloat   = 1.0
     @State private var treeGlow: CGFloat    = 0.4
     @State private var showAchievements     = false
-    @State private var showingCoconutLog    = false
     @State private var showingIslandWealth  = false
     @State private var showCoconutShop      = false
+    @State private var coconutShopInitialCategory: ShopItem.ShopCategory = .effect
     @State private var showGacha            = false
     @State private var showBountyBoard      = false
     @State private var showInventory        = false
@@ -75,6 +75,22 @@ struct OasisRewardView: View {
         return (x, y)
     }
 
+    private func oasisToolbarButton(systemName: String, action: @escaping () -> Void) -> some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            action()
+        } label: {
+            Image(systemName: systemName)
+                .font(.system(size: 15, weight: .semibold))
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(Color.goPrimary.opacity(0.18), in: Circle())
+                .overlay(Circle().strokeBorder(Color.goPrimary.opacity(0.35), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
     var body: some View {
         ZStack {
             // ── Navy gradient background
@@ -108,27 +124,14 @@ struct OasisRewardView: View {
                             }
                             .buttonStyle(.plain)
 
-                            Button { showCoconutRules = true } label: {
-                                Image(systemName: "info.circle")
-                                    .font(.system(size: 18, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.45))
-                            }
-                            .buttonStyle(.plain)
-
                             Spacer()
 
-                            Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                showInventory = true
-                            } label: {
-                                Image(systemName: "shippingbox.fill")
-                                    .font(.system(size: 15))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 32, height: 32)
-                                    .background(Color.goPrimary.opacity(0.18), in: Circle())
-                                    .overlay(Circle().strokeBorder(Color.goPrimary.opacity(0.35), lineWidth: 1))
+                            oasisToolbarButton(systemName: "info.circle") {
+                                showCoconutRules = true
                             }
-                            .buttonStyle(.plain)
+                            oasisToolbarButton(systemName: "shippingbox.fill") {
+                                showInventory = true
+                            }
                         }
                         .padding(.horizontal, 24).padding(.top, 4)
                     }
@@ -173,12 +176,11 @@ struct OasisRewardView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingCoconutLog) { CoconutLogView() }
         .fullScreenCover(isPresented: $showingIslandWealth) { IslandWealthDashboardView() }
         .sheet(isPresented: $showCoconutRules) { CoconutRulesSheet() }
         .sheet(isPresented: $showAchievements) {
             if let pet = pets.first {
-                NavigationStack { AchievementWallView(pet: pet) }
+                AchievementWallView(pet: pet, allPets: pets)
                     .presentationDetents([.large])
             }
         }
@@ -187,7 +189,7 @@ struct OasisRewardView: View {
                 .presentationDetents([.large])
         }
         .sheet(isPresented: $showCoconutShop) {
-            CoconutShopView()
+            CoconutShopView(initialCategory: coconutShopInitialCategory)
                 .presentationDetents([.large])
         }
         .sheet(isPresented: $showGacha) {
@@ -775,7 +777,10 @@ struct OasisRewardView: View {
                         .font(.system(size: 10, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.goPrimary.opacity(0.6))
                 } else {
-                    Button { showCoconutShop = true } label: {
+                    Button {
+                        coconutShopInitialCategory = .boost
+                        showCoconutShop = true
+                    } label: {
                         Text("去商店购买 →")
                             .font(.system(size: 10, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.goYellow.opacity(0.8))
@@ -1107,7 +1112,10 @@ struct OasisRewardView: View {
             HStack(spacing: 8) {
                 bentoMiniCard(emoji: "🛒", title: "椰子商店",
                     subtitle: shopSubtitle, accent: Color.goYellow,
-                    action: { showCoconutShop = true })
+                    action: {
+                        coconutShopInitialCategory = .effect
+                        showCoconutShop = true
+                    })
                 bentoMiniCard(emoji: "🏆", title: "成就解锁",
                     subtitle: noPet ? "添加宠物后解锁 🐾" : "\(unlockedCount)/\(totalCount)",
                     accent: noPet ? Color.white.opacity(0.35) : Color.goTeal,

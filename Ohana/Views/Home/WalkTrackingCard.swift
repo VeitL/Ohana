@@ -38,20 +38,27 @@ struct WalkTrackingCard: View {
     }
 
     var body: some View {
-        ZStack {
-            trackingFrontFace
-                .opacity(summaryRotation < 90 ? 1 : 0)
+        GeometryReader { proxy in
+            ZStack {
+                trackingFrontFace
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .opacity(summaryRotation < 90 ? 1 : 0)
 
-            walkSummaryBackFace
-                .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-                .opacity(summaryRotation >= 90 ? 1 : 0)
+                walkSummaryBackFace
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+                    .opacity(summaryRotation >= 90 ? 1 : 0)
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .rotation3DEffect(.degrees(summaryRotation), axis: (x: 0, y: 1, z: 0), perspective: 0.75)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
-        .rotation3DEffect(.degrees(summaryRotation), axis: (x: 0, y: 1, z: 0), perspective: 0.75)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(.white.opacity(0.12), lineWidth: 1)
-        )
+        .clipped()
         .sheet(item: $showWalkDetail) { walk in WalkDetailView(walk: walk, pet: pet) }
         .sheet(isPresented: $showingGoalSetter) {
             walkGoalSetterSheet
@@ -296,13 +303,32 @@ struct WalkTrackingCard: View {
                 summaryGoalRow(distance: distance)
             }
             .padding(14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
     }
 
     @ViewBuilder
     private func summaryRouteMap(walk: PetWalkLog?) -> some View {
         let coords = routeCoordinates(for: walk)
-        if coords.count >= 2, let region = routeRegion(for: coords) {
+        if let walk, let data = walk.mapSnapshotData, let ui = UIImage(data: data) {
+            Image(uiImage: ui)
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(alignment: .bottomLeading) {
+                    Label("本次轨迹", systemImage: "map.fill")
+                        .font(OhanaFont.caption2(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(.black.opacity(0.46), in: Capsule())
+                        .padding(8)
+                }
+        } else if coords.count >= 2, let region = routeRegion(for: coords) {
             Map(initialPosition: .region(region)) {
                 MapPolyline(coordinates: coords)
                     .stroke(Color.goPrimary, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
@@ -326,6 +352,7 @@ struct WalkTrackingCard: View {
             .mapStyle(.standard(elevation: .flat))
             .allowsHitTesting(false)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipped()
             .overlay(alignment: .bottomLeading) {
                 Label("本次轨迹", systemImage: "map.fill")
                     .font(OhanaFont.caption2(.bold))
@@ -335,21 +362,6 @@ struct WalkTrackingCard: View {
                     .background(.black.opacity(0.46), in: Capsule())
                     .padding(8)
             }
-        } else if let walk, let data = walk.mapSnapshotData, let ui = UIImage(data: data) {
-            Image(uiImage: ui)
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(alignment: .bottomLeading) {
-                    Label("本次轨迹", systemImage: "map.fill")
-                        .font(OhanaFont.caption2(.bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .background(.black.opacity(0.46), in: Capsule())
-                        .padding(8)
-                }
         } else {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(.white.opacity(0.08))

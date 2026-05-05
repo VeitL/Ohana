@@ -51,15 +51,16 @@ struct WalkDetailView: View {
 
                 ScrollView {
                     VStack(spacing: 20) {
+                        detailHeader
                         mapSection
                         statsSection
                         Spacer(minLength: 40)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
                 }
             }
-            .navigationTitle("🦮 \(pet.name)的巡岛")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -79,7 +80,11 @@ struct WalkDetailView: View {
                     .disabled(isRendering)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("关闭") { dismiss() }
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             .sheet(isPresented: $isSharing) {
@@ -88,6 +93,39 @@ struct WalkDetailView: View {
                 }
             }
         }
+    }
+
+    private var detailHeader: some View {
+        HStack(spacing: 14) {
+            if let data = pet.avatarImageData, let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 54, height: 54)
+                    .clipShape(Circle())
+            } else {
+                Text(pet.avatarEmoji)
+                    .font(.system(size: 34))
+                    .frame(width: 54, height: 54)
+                    .background(Color(hex: pet.themeColorHex).opacity(0.16), in: Circle())
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("单次记录")
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.goPrimary)
+                    .tracking(1.2)
+                Text(walk.startDate, format: .dateTime.month().day().weekday(.wide))
+                    .font(.system(size: 24, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                Text(walk.startDate, format: .dateTime.hour().minute())
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(18)
+        .goTranslucentCard(cornerRadius: 24)
     }
 
     // MARK: - Map Section
@@ -133,7 +171,7 @@ struct WalkDetailView: View {
                 // Apple Maps 跳转按钮
                 Button { openInAppleMaps(coords: coords) } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: "map.fill")
+                        Image(systemName: "arrow.up.forward")
                             .font(.system(size: 14, weight: .bold))
                         Text("在 Apple Maps 中查看")
                             .font(.system(size: 14, weight: .bold, design: .rounded))
@@ -146,6 +184,8 @@ struct WalkDetailView: View {
                 }
                 .buttonStyle(.plain)
             }
+            .padding(12)
+            .goTranslucentCard(cornerRadius: 24)
         } else if let snapshotData = walk.mapSnapshotData, let img = UIImage(data: snapshotData) {
             // fallback：静态截图（无坐标时）
             Image(uiImage: img)
@@ -153,6 +193,7 @@ struct WalkDetailView: View {
                 .scaledToFill()
                 .frame(height: 220)
                 .clipShape(RoundedRectangle(cornerRadius: 20))
+                .goTranslucentCard(cornerRadius: 24)
         } else {
             ZStack {
                 RoundedRectangle(cornerRadius: 20)
@@ -167,22 +208,26 @@ struct WalkDetailView: View {
                         .foregroundStyle(.primary.opacity(0.3))
                 }
             }
+            .goTranslucentCard(cornerRadius: 24)
         }
     }
 
     // MARK: - Stats Section
     private var statsSection: some View {
-        HStack(spacing: 0) {
-            statCell(icon: "ruler", value: walk.distanceText, label: "距离", color: Color.goPrimary)
-            divider
-            statCell(icon: "clock", value: walk.durationText, label: "时长", color: Color.goTeal)
-            divider
-            statCell(icon: "calendar", value: walk.startDate.formatted(.dateTime.month().day()), label: "日期", color: Color.goYellow)
-            divider
-            statCell(icon: "clock.badge", value: walk.startDate.formatted(.dateTime.hour().minute()), label: "出发", color: Color.goMint)
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Overview")
+                .font(.system(size: 13, weight: .black, design: .rounded))
+                .foregroundStyle(.secondary)
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 2), spacing: 10) {
+                statCell(icon: "arrow.left.and.right", value: walk.distanceText, label: "距离")
+                statCell(icon: "clock", value: walk.durationText, label: "时长")
+                statCell(icon: "calendar", value: walk.startDate.formatted(.dateTime.month().day()), label: "日期")
+                statCell(icon: "circle", value: walk.startDate.formatted(.dateTime.hour().minute()), label: "出发")
+            }
         }
-        .padding(.vertical, 20)
-        .goTranslucentCard(cornerRadius: 20)
+        .padding(16)
+        .goTranslucentCard(cornerRadius: 24)
     }
 
     private var divider: some View {
@@ -191,20 +236,24 @@ struct WalkDetailView: View {
             .frame(width: 1, height: 40)
     }
 
-    private func statCell(icon: String, value: String, label: String, color: Color) -> some View {
-        VStack(spacing: 6) {
+    private func statCell(icon: String, value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(color)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.secondary)
+                .frame(width: 26, height: 26)
+                .background(Color.primary.opacity(0.07), in: Circle())
             Text(value)
-                .font(.system(size: 15, weight: .heavy, design: .rounded))
+                .font(.system(size: 18, weight: .heavy, design: .rounded))
                 .foregroundStyle(.primary)
                 .lineLimit(1).minimumScaleFactor(0.7)
             Text(label)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.primary.opacity(0.4))
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
+        .padding(12)
+        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - Share

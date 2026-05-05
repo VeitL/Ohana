@@ -1,8 +1,8 @@
 # Ohana iOS App 项目文档
 
-> 最后更新: 2026-04-27（GO 首页 FAB 分类直达 / 分段详情页 / 宠物日历筛选 / 引导页重构 / 人类剪影卡 / 执行人&支付者绑定）| Build: ✅ | Tests: ✅ `OhanaTests` | Schema: ArkSchemaV38
+> 最后更新: 2026-05-05（GO 首页 7 张卡片上限 / Today Focus 横滑任务 / 护理计划全天/时间与周期统一 / 日历按展开宠物筛选 / 成员与商店功能落地）| Build: ✅ | Tests: ⚠️ 既有隐私/提醒去重用例待修 | Schema: ArkSchemaV38
 >
-> **当前默认首页**：GO UI（`FocusStackHomeTestView`）。仅保留 GO UI + 经典 `OverviewView`；Material UI 已于 2026-04-24 移除。通过 `@AppStorage("appUIStyle")` 切换。
+> **当前默认首页**：GO UI（`FocusStackHomeTestView`）。仅保留 GO UI + 经典 `OverviewView`；Material UI 已于 2026-04-24 移除。首页卡片堆固定只取前 7 张可显示卡片；宠物/人类“在首页显示”开关位于卡片展开页，切换后同步影响首页卡片堆，满 7 张时会提示先隐藏一张。
 
 ---
 
@@ -52,14 +52,14 @@ Ohana/
 │   ├── CalendarView.swift
 │   ├── OnboardingView.swift         # 首次启动引导：App Store 截图式功能介绍 + 建档流程
 │   ├── OhanaDesignSystem.swift      # CoconutBalanceCapsule + OhanaFont + goTranslucentCard 等
-│   ├── ArkBackgroundView.swift      # AppBackgroundStyle 全局背景
+│   ├── ArkBackgroundView.swift      # AppBackgroundStyle / OhanaAppBackground 全局背景
 │   ├── Home/
-│   │   ├── FocusStackHomeTestView.swift # GO UI 默认首页：Wallet 卡片堆 + Today Focus + 家庭协作 + FAB
+│   │   ├── FocusStackHomeTestView.swift # GO UI 默认首页：Wallet 卡片堆（前 7 张可显示卡）+ Today Focus 横滑任务 + 展开态快捷模块 + FAB
 │   │   ├── FocusMoodQuestStrip.swift    # 旧 GO UI 心情 + 任务白卡组件，部分路径仍可复用
 │   │   ├── EmptyStateWelcomeCard.swift  # GO UI 空态欢迎卡
 │   │   ├── FunctionMenuSheet.swift      # GO UI 功能分类 sheet + FMDest / FeatureGroup / PetFeature
 │   │   ├── FeatureGroupDashboardView.swift # FAB 分类二级页：分段详情 + 左右滑动子功能
-│   │   ├── PetWalletStack.swift     # 经典首页宠物钱包卡转盘
+│   │   ├── PetWalletStack.swift     # 经典首页钱包卡堆（遗留/复用视觉组件）
 │   │   ├── HomeHighlightDeck.swift  # 宠物卡下方横滑甲板（130pt）
 │   │   ├── CritterDeckCarousel.swift
 │   │   └── DailyStreakDetailView.swift
@@ -377,7 +377,16 @@ ForEach(orderedSections)     // 受 HomeSectionManageSheet 控制（顺序 + 显
 - **打卡连击**：`oasis_checkedIn_dates` UserDefaults 用于 `DailyStreakDetailView` / `OasisRewardView` 的每日打开 App 连胜；GO UI 顶部 `🔥` 当前显示 `pets.map(\.currentStreak).max()`（所有宠物护理 streak 最大值），两者不是同一数据源。
 
 ### 成就系统（AchievementManager，15枚）
-`static func compute(for pet: Pet) -> [Achievement]` 纯计算，无副作用
+`static func compute(for pet: Pet) -> [Achievement]` 纯计算，无副作用；`AchievementWallView` 负责展示进度、宠物切换、过滤、详情弹窗与椰子奖励领取。
+
+入口：
+- 绿洲页 `OasisRewardView` 的成就入口打开 `AchievementWallView(pet:allPets:)`，支持在全部未离世宠物间切换。
+- 宠物详情 / 功能菜单 / retention hub 仍可直达单宠成就页。
+
+奖励：
+- 每个宠物的每枚成就可领取一次 `10🥥`，领取记录存储在 `achievement_claimedRewardIDs`，key 为 `<petId>_<achievementId>`。
+- 领取时通过 `QuestManager.shared.addCoconuts` 写入椰子流水，标题为 `成就奖励 · <成就名>`。
+- 已解锁未领取的成就会在页面 overview 中显示待领取数量，并支持“领取全部”。
 
 | 序号 | ID | 触发条件 |
 |------|----|---------|
@@ -385,11 +394,11 @@ ForEach(orderedSections)     // 受 HomeSectionManageSheet 控制（顺序 + 显
 | 2 | `iron_paw` | 累计遛狗 ≥ 100km |
 | 3 | `walk_streak` | 连续7天有遛狗记录 |
 | 4 | `health_hero` | 30天内无紧急就医/手术 |
-| 5 | `nutritionist` | 喂食记录跨度 ≥ 14天 |
+| 5 | `nutritionist` | 喂食记录或喂食 care log 跨度 ≥ 14天 |
 | 6 | `happy_birthday` | 今天是宠物生日 |
 | 7 | `hundred_days` | `pet.daysTogether >= 100` |
-| 8 | `first_record` | 至少一条任意记录 |
-| 9 | `day_one_checkin` | 今天完成至少一次打卡 |
+| 8 | `first_record` | 至少一条健康、便便、遛狗、护理、喂食、花费、体重、照片或里程碑记录 |
+| 9 | `day_one_checkin` | 今天完成至少一次健康、清洁、便便、护理、遛狗或体重记录 |
 | 10 | `old_friend` | App 使用 ≥ 7天 |
 | 11 | `long_runner` | 单次遛狗 ≥ 5km |
 | 12 | `medication_complete` | 完成至少一个完整用药疗程 |
@@ -474,13 +483,15 @@ Color.petThemeMagenta / Pink / Purple / Indigo / Violet / Navy / Blue / SkyBlue
 
 ## 十四、清洁护理周期自定义
 
-**文件**：`Ohana/Models/PetHygieneLog.swift`
+**文件**：`Ohana/Models/PetHygieneLog.swift`、`Ohana/Views/Details/PetHygieneCard.swift`、`Ohana/Views/Details/PetHygieneDetailView.swift`
 
 - `HygieneType` 新增：`defaultCycleDays`（硬编码默认值）、`effectiveCycleDays(for petId: UUID)`（读自定义，否则用默认）
 - 自定义存储键：`hygiene_cycle_<petUUID>_<typeRawValue>`（UserDefaults）
 - 静态工具：`customCycleDays(for:petId:)` / `setCustomCycleDays(_:for:petId:)`
-- `PetHygieneDetailView` 每张类型卡底部新增「调整周期」按钮 → Sheet（`cycleDaysEditorSheet`）
-  - Stepper 范围 1-90 天，保存后立即生效于超期判断和状态色
+- 周期只在“设置护理计划”页维护：`HygieneTodoSheet` 提供 `- / +` 天数步进，保存计划时写入 `Event.recurrenceDays`，并同步更新该宠物该护理项的 `hygiene_cycle_*`。
+- 护理计划支持“全天日程”开关；关闭全天后显示时间选择器，`Event.startDate` 和 `Reminder.scheduledAt` 使用用户指定时间。全天日程的提醒默认按当天 09:00 注册。
+- `PetHygieneDetailView` 每张类型卡只展示当前周期标签，不再提供单独“调整周期”按钮，避免周期入口分散。
+- 顶部 overview 使用“连续打卡 strike”：按各护理项的有效周期判断记录是否连续，而不是要求每天护理。
 
 ---
 
@@ -731,11 +742,10 @@ ZStack
   - `headerStreak = pets.map { $0.currentStreak }.max() ?? 0`
   - 注意：这不是 `oasis_checkedIn_dates` 的每日打开 App 连胜，而是所有宠物护理 streak 的最大值。
   - 椰子胶囊点击 → `OasisRewardView`；绿洲页内的椰子资产胶囊再进入 `IslandWealthDashboardView`
-- **右侧**：`calendar` 胶囊 + `...` 胶囊 Menu
-  - 日历胶囊 → `CalendarView`
-  - 添加成员 → `AddEntityView()`
-  - OHANA 成员 → `CrewRosterOverlay`
-  - 设置 → `SettingsView`
+- **右侧**：`person.2.fill` 成员胶囊 + `calendar` 胶囊 + `gearshape.fill` 设置胶囊
+  - 成员胶囊 → `CrewRosterOverlay`
+  - 日历胶囊 → `CalendarView`；若当前处于宠物卡展开态，会自动传入 active pet id 并只显示该宠物相关日程
+  - 设置胶囊 → `SettingsView`
 - 高度 = `safeT + 56`；`safeT` 用 UIKit keyWindow safe area，避免 `.ignoresSafeArea(.all)` 下 GeometryReader 返回 0。
 
 ### Apple-Wallet 卡片堆状态
@@ -761,11 +771,10 @@ ZStack
 |---|---:|---|
 | `hPad` | 20 | header 水平 padding |
 | `cardMargin` | 7 | 卡片到屏幕边缘的间距 |
-| `cardH` | 200 | 折叠态卡片高度 |
+| `cardH` | `(ScreenCompat.width - cardMargin * 2) / 1.586` | 折叠态卡片高度，保持信用卡比例 |
 | `expandedCardH` | 360 | 点选态 active card 高度（竖向放大） |
-| `stackPeekH` | 38 | 折叠/压缩态每张卡露出的顶部文字条高度 |
-| `cardTitleH` | 76 | 折叠卡底部标题条高度 |
-| `stackBottomGap` | 220 | 折叠态前卡底部到 GeometryReader 底部的可见间距 |
+| `cardTitleH` / `collapsedStackPeekH` | 49 | 折叠/压缩态每张卡露出的顶部身份条高度 |
+| `collapsedStackBottomGap` | 22 | 折叠态前卡底部到屏幕安全区的间距 |
 | `expandedStackBottomGap` | 12 | 展开态底部压缩卡堆到安全区底部的间距 |
 | `expandedCardGlobalTopOffset` | 76 | active card 顶部 = safeAreaTop + 76，保持在顶部按钮下方 |
 | `expandedQuickModuleH` | 112 | active card 下方快捷模块高度 |
@@ -776,6 +785,8 @@ ZStack
 
 `FocusCard` 从 `Pet` / `Human` 组装，用同一个结构喂给卡片堆、展开卡、快捷模块。
 
+- 首页卡片源头先过滤：宠物读取 `HomeCardVisibility.hiddenPetIDsKey`（UserDefaults key: `hiddenHomePetIDs.v1`），人类读取 `Human.shouldShowOnHome`。
+- GO 首页只取过滤后的前 7 张。卡片展开页提供“首页显示”开关，若首页已满 7 张，尝试显示新的宠物/人类会提示先隐藏一张。
 - `FocusCard.from(Pet)`：
   - 狗：FEED / WALK / WATER / POTTY
   - 猫：FEED / WATER / LITTER / PLAY
@@ -790,7 +801,7 @@ ZStack
 
 ### 卡片渲染 — `FocusWalletCardView`
 
-`FocusWalletCardView` 复用 `WalletPetCardFront` 的视觉语言，并在展开态切换到更接近身份卡的竖向布局；折叠卡片左下角不再重复显示名字，识别信息集中在顶部身份条。
+`FocusWalletCardView` 复用 `WalletPetCardFront` 的视觉语言，并在展开态切换到更接近身份卡的竖向布局；折叠卡片的顶部身份条左侧显示名字，名字右侧显示物种/角色，物种使用普通字重。
 
 - 背景：真实实体使用 `WalletPetCardTheme.meshColors(for:)` 的 3×3 `MeshGradient`；dummy 使用 `card.color` 派生渐变。
 - 宠物图像：
@@ -821,10 +832,12 @@ active 宠物 / 人类卡下方复用经典 UI 的 `GoQuickActionCard` 网格样
 椰子增长动画：`CoconutBalanceCapsule` 监听 `QuestManager.shared.coconutCount`，只在数值增加时触发轻微 pulse、`+N` 浮标和 haptic；减少椰子时只更新数字，不播放奖励动画。
 
 默认项：
-- 狗：喂食 / 喂水 / 遛狗 / 便便
-- 猫：喂食 / 喂水 / 铲屎 / 便便
+- 狗：喂食 / 喂水 / 换水 / 遛狗 / 护理 / 体重 / 记录
+- 猫：喂食 / 喂水 / 换水 / 铲屎 / 陪玩 / 体重 / 记录
 - 鱼：喂食 / 换水 / 清滤材 / 体重
 - 其它：喂食 / 喂水 / 护理 / 体重
+
+展开态 FAB 会读取当前快捷模块中已经显示的项目，只展示未显示项目和“全部功能”；用户编辑快捷模块后，FAB 子菜单同步变化。铲屎、护理等一天只应完成一次的项目，今天已打卡时会给出提示并阻止重复打卡。
 
 ### Today Focus 与家庭协作入口
 
@@ -833,7 +846,9 @@ GO UI 折叠态首屏已收敛为 Today Focus：优先回答“今天谁需要�
 **`TodayFocusCard`**：
 - 数据来自 `IslandQuestEngine.todayQuests(pets:reminders:plants:events:)`
 - 传入 `activePet: todayFocusActivePet`
-- 完成回调走 `completeQuestInFocusStack(_:)`，继续发放椰子奖励并写入现有照护日志/账本路径
+- 多个任务横向分页显示，底部使用自定义页点；卡片按钮为“去完成”，完成后短暂显示“已完成”并划走。
+- 完成回调走 `completeQuestInFocusStack(_:)`，继续发放椰子奖励并写入现有照护日志/账本路径。
+- 已遛狗会自动视作今日陪玩已完成，避免每个宠物每天都生成重复陪玩任务；无任务时显示庆祝卡。
 - 右侧绿洲入口 `onTapOasis` 打开 `OasisRewardView`
 
 **新用户 3 分钟成功体验**：
@@ -863,17 +878,18 @@ GO UI 折叠态首屏已收敛为 Today Focus：优先回答“今天谁需要�
 
 主按钮是 56pt 深蓝圆（`#1A2E8A`），在 GO 首页和宠物卡点选态保持同一位置、同一实例挂载；点击卡片不会造成 FAB 闪烁，只切换子菜单内容。
 
-折叠态 / 未点选卡片时，展开后只显示与当前首页照护任务相关的功能集合：
+折叠态 / 未点选卡片时，展开后显示首页级常用入口：
 
-1. **日常照护** → `FeatureGroupDashboardView(.dailyCare)`：饮食 / 清洁 / 遛狗（有狗时）/ 便便
-2. **健康身体** → `FeatureGroupDashboardView(.healthBody)`：健康档案 / 体重 / 用药 / 提醒健康
-3. **档案记忆** → `FeatureGroupDashboardView(.archiveMemory)`：成长档案 / 基本信息 / 证件 / 重要时刻 / 成就
-4. **花费账本** → `FeatureGroupDashboardView(.financeLedger)`：花费记录 / 照护账本分析
-5. **家庭协作** → `FeatureGroupDashboardView(.familyCollab)`，仅当人类成员数 > 1 时显示：家庭悬赏榜 / 家庭周报
+1. **饮食** → `FeatureAggregateView(.food)`
+2. **清洁** → `FeatureAggregateView(.hygiene)`
+3. **健康** → `FeatureAggregateView(.health)`
+4. **体重** → `FeatureAggregateView(.weight)`
+5. **花费** → `FeatureAggregateView(.expense)`
+6. **更多** → `FunctionMenuSheet` 所有功能入口
 
-`植物` 和 `绿洲奖励` 不再出现在首页 FAB 集合中：植物走成员/植物相关入口，绿洲走顶部椰子数入口；`日历` 也不在 FAB 内，保留在顶部 `...` 左侧的日历胶囊。
+`OHANA 成员` 已移到首页顶部成员胶囊；`植物` 和 `绿洲奖励` 不再出现在首页 FAB 集合中：植物走成员/植物相关入口，绿洲走顶部椰子数入口；`日历` 保留为顶部独立胶囊。
 
-从 FAB 点击上述集合时，`FunctionMenuSheet(initialDestination:)` 会把对应 `FeatureGroupDashboardView` 作为 sheet 根页面；右上角显示 **关闭**，点击直接 dismiss，不返回“所有功能”列表。
+从 FAB 点击上述功能时，`FunctionMenuSheet(initialDestination:)` 会把对应 `FeatureAggregateView` 作为 sheet 根页面；右上角显示 **关闭**，点击直接 dismiss，不返回“所有功能”列表。
 
 二级集合页采用分段详情页：
 - 顶部横向 segment 只展示当前集合内的子功能。
@@ -885,9 +901,9 @@ GO UI 折叠态首屏已收敛为 Today Focus：优先回答“今天谁需要�
 1. **全部功能**
    - 宠物：`PetAllFeaturesSheet` / 当前宠物全部功能
    - 人类：`HumanAllFeaturesSheet` 风格的人类功能列表（体重、用药、健康、活动、花费、椰子资产）
-2. **日历**
-   - 宠物：`CalendarView(preselectedPetId: card.id.uuidString)`，自动筛选当前宠物相关日程
-   - 人类：打开全局 `CalendarView`（避免把人类 id 当宠物筛选）
+2. **顶部日历胶囊**
+   - 宠物展开态：`CalendarView(preselectedPetId: card.id.uuidString)`，自动筛选当前宠物相关日程
+   - 人类 / 未展开态：打开全局 `CalendarView`
 
 细节：
 - 展开时有 `Color.black.opacity(0.25)` scrim，点击 scrim 收回。
@@ -1002,6 +1018,17 @@ Zoom 目标页。背景 = 宠物主题渐变（与卡片正面无缝转场）。
 **分桶粒度**：`.day → .hour`，`.week / .month → .day`，`.all → .month`。
 
 **空状态**：`periodSpending == 0` 时右格显示"本期无花费"灰字；无收入时图表空态。
+
+### 椰子商店与百宝箱
+
+入口：`OasisRewardView`、`DailyStreakDetailView`、打卡补签包入口、`FunctionMenuSheet` 均可打开 `CoconutShopView`；已购外观/称号在 `InventoryView` 管理。补签包入口会自动跳到加成分类。
+
+- 永久外观/称号购买后立即生效：青柠光晕、彩虹轨迹、星尘落雨、烟花庆典自动启用；守护者/先行者/首席厨师自动装备为当前称号。
+- 商店已购卡片可再次点击切换启用状态或装备称号；3D 破框卡片点击后直接选择宠物并打开 `EquipPopoutCardSheet`。
+- 百宝箱同样支持装备/卸下称号、启停外观、绑定 3D 破框卡片。
+- 当前消费 key：`purchasedShopItems`、`shop_equipped_title`、`shop_equip_fx_lime_glow`、`shop_equip_fx_rainbow`、`shop_equip_fx_stars`、`shop_equip_fx_firework`。
+- 加成类：`boost_double` 通过 `shop_boostDoubleActive` 在下次椰子奖励中消耗；`boost_streak` 写入 `shop_streakShieldExpiry`；`boost_tree` 注入 `OasisTreeManager.injectedEnergy`；`boost_backdate_pack` 增加 `inventory_backdate_1day_count`；`boost_cooldown_reset` 清空 `quest_cooldownLogs`。
+- 椰子记录已合并到 `IslandWealthDashboard2`：财富榜下方展示椰子流水，椰子指南按钮与“我的百宝箱”并列。
 
 ---
 
@@ -1169,6 +1196,18 @@ introFlow（最多 5 张功能介绍卡）
   - 植物、绿洲奖励、日历不再作为 FAB 集合项；绿洲走顶部椰子入口，日历走顶部日历胶囊
   - 从 FAB 直达分类页时，右上角“关闭”直接 dismiss sheet，不返回“所有功能”
   - 分类二级页采用 segment + 横向分页切换子功能，且每个集合只展示自己的子功能
+- [x] **GO 首页 7 张卡片、成员入口与展开态筛选**（2026-05-05 落地）
+  - 首页卡片堆上限为 7 张；“首页显示”开关移到宠物/人类卡片展开页，满 7 张时阻止继续添加并提示用户先隐藏一张
+  - OHANA 成员入口移到首页顶部成员胶囊；点击成员卡统一进入 GO 首页卡片展开逻辑，旧宠物专页删除
+  - 首页顶部日历胶囊在宠物卡展开时自动筛选当前宠物日程，未展开或人类卡时显示全局日历
+- [x] **Today Focus 横向任务与快捷项联动**（2026-05-05 落地）
+  - Today Focus 多任务横向分页，按钮文案为“去完成 / 已完成”，完成后卡片划走
+  - 已遛狗自动视作今日陪玩完成，减少重复陪玩任务；无任务时显示庆祝提示
+  - 展开卡 FAB 按当前快捷模块反向生成未显示项目 + “全部功能”，快捷模块编辑后同步更新
+- [x] **护理计划与护理详情统一**（2026-05-05 落地）
+  - 护理计划支持全天日程 / 指定时间；非全天时写入用户选择的 time
+  - 护理周期只在设置计划页通过天数加减维护，保存后同步 `Event.recurrenceDays` 与 `hygiene_cycle_*`
+  - 护理页 overview 改为今日进度 + 连续打卡 strike，移除独立“调整周期”按钮
 
 ### 当前未完成 TODO（按最新状态补充）
 

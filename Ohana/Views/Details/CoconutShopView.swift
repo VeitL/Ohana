@@ -35,6 +35,11 @@ struct CoconutShopView: View {
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @AppStorage("purchasedShopItems") private var purchasedRaw: String = ""
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
+    @AppStorage("shop_equipped_title") private var equippedTitle: String = ""
+    @AppStorage("shop_equip_fx_lime_glow") private var equipFxLimeGlow: Bool = false
+    @AppStorage("shop_equip_fx_rainbow") private var equipFxRainbow: Bool = false
+    @AppStorage("shop_equip_fx_stars") private var equipFxStars: Bool = false
+    @AppStorage("shop_equip_fx_firework") private var equipFxFirework: Bool = false
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @State private var questManager = QuestManager.shared
     @State private var selectedCategory: ShopItem.ShopCategory = .effect
@@ -46,6 +51,10 @@ struct CoconutShopView: View {
     @State private var showEquipPopout = false
     @State private var showPetPickerForPopout = false
     @State private var equipPopoutPet: Pet? = nil
+
+    init(initialCategory: ShopItem.ShopCategory = .effect) {
+        _selectedCategory = State(initialValue: initialCategory)
+    }
 
     // MARK: - 深浅色文字（UIRules）
     private var primaryText: Color { colorScheme == .dark ? .white : .black }
@@ -73,11 +82,12 @@ struct CoconutShopView: View {
             ShopItem(id: "title_guardian", emoji: "🛡️", name: "守护者",     description: "称号 · 显示在首页头像旁",                  cost: 120, category: .title_),
             ShopItem(id: "title_pioneer",  emoji: "🚀", name: "先行者",     description: "称号 · 解锁岛屿探索徽章",                  cost: 150, category: .title_),
             ShopItem(id: "title_chef",     emoji: "👨‍🍳", name: "首席厨师",   description: "称号 · 喂食打卡额外 +1🥥",               cost: 200, category: .title_),
-            ShopItem(id: "boost_double",        emoji: "⚡️", name: "双倍椰子券",   description: "下次打卡奖励 ×2（单次有效）",          cost: 30,  category: .boost, isConsumable: true),
-            ShopItem(id: "boost_streak",        emoji: "🛡️", name: "Streak 保护盾", description: "漏打卡 1 天不断 Streak（24 小时有效）",  cost: 50,  category: .boost, isConsumable: true),
-            ShopItem(id: "boost_tree",          emoji: "🌳", name: "生命树加速",   description: "立即为生命之树注入 30 点额外能量",        cost: 25,  category: .boost, isConsumable: true),
-            ShopItem(id: "boost_backdate_pack", emoji: "📅", name: "补打卡包",     description: "获得 3 张昨日补打卡券，放入物品栏",      cost: 120, category: .boost, isConsumable: true),
-            ShopItem(id: "boost_cooldown_reset",emoji: "⏱️", name: "冷却重置券",   description: "立即重置全部宠物打卡冷却（单次有效）",   cost: 80,  category: .boost, isConsumable: true),
+            ShopItem(id: "boost_double",          emoji: "⚡️", name: "双倍椰子券",     description: "下次获得椰子时奖励翻倍，触发后自动消耗", cost: 40,  category: .boost, isConsumable: true),
+            ShopItem(id: "boost_streak",          emoji: "🛡️", name: "Streak 保护盾",  description: "48 小时内漏签 1 天也不断连胜",          cost: 80,  category: .boost, isConsumable: true),
+            ShopItem(id: "boost_tree",            emoji: "🌱", name: "生命树能量 +30", description: "立即为生命之树注入 30 点能量",          cost: 30,  category: .boost, isConsumable: true),
+            ShopItem(id: "boost_tree_large",      emoji: "🌳", name: "生命树能量 +110",description: "批量注入 110 点能量，比小包更划算",      cost: 95,  category: .boost, isConsumable: true),
+            ShopItem(id: "boost_backdate_single", emoji: "📅", name: "补签券 ×1",      description: "获得 1 张昨日补签券，放入百宝箱",        cost: 45,  category: .boost, isConsumable: true),
+            ShopItem(id: "boost_backdate_pack",   emoji: "🗓️", name: "补签券 ×3",      description: "获得 3 张昨日补签券，适合连续补签",      cost: 120, category: .boost, isConsumable: true),
         ].map { item in
             var copy = item
             if !item.isConsumable {
@@ -252,9 +262,13 @@ struct CoconutShopView: View {
         let canAfford = questManager.coconutCount >= item.cost
         let purchased = item.isPurchased
         let activeStatus = activeConsumableStatus(for: item)
+        let ownedStatus = ownedItemStatus(for: item)
 
         return Button {
-            if purchased { return }
+            if purchased {
+                toggleOwnedItem(item)
+                return
+            }
             if activeStatus != nil { return }
             if canAfford {
                 pendingItem = item
@@ -290,7 +304,7 @@ struct CoconutShopView: View {
 
                 HStack {
                     if purchased {
-                        Text("已兑换")
+                        Text(ownedStatus ?? "已兑换")
                             .font(OhanaFont.caption(.bold))
                             .foregroundStyle(Color.goPrimary)
                     } else if let status = activeStatus {
@@ -384,6 +398,7 @@ struct CoconutShopView: View {
             var current = purchasedSet
             current.insert(item.id)
             purchasedRaw = current.sorted().joined(separator: ",")
+            activateOwnedItem(item)
         }
 
         // 破框卡片：购买后弹出宠物选择器 → EquipPopoutCardSheet
@@ -408,9 +423,9 @@ struct CoconutShopView: View {
     // MARK: - 消耗品立即激活
     private func activateBoost(_ item: ShopItem) {
         switch item.id {
-        case "boost_tree":
-            // 立即为生命之树注入 30 点额外能量（不额外扣椰子）
-            OasisTreeManager.shared.injectedEnergy += 30
+        case "boost_tree", "boost_tree_large":
+            // 立即为生命之树注入额外能量（不额外扣椰子）
+            OasisTreeManager.shared.injectedEnergy += item.id == "boost_tree_large" ? 110 : 30
             OasisTreeManager.shared.checkAndRewardLevelUp()
 
         case "boost_double":
@@ -418,21 +433,77 @@ struct CoconutShopView: View {
             UserDefaults.standard.set(true, forKey: "shop_boostDoubleActive")
 
         case "boost_streak":
-            // Streak 保护盾，标记有效期（24 小时内漏打不断 Streak）
-            UserDefaults.standard.set(Date().addingTimeInterval(86400), forKey: "shop_streakShieldExpiry")
+            // Streak 保护盾，标记有效期（48 小时内漏打不断 Streak）
+            UserDefaults.standard.set(Date().addingTimeInterval(172800), forKey: "shop_streakShieldExpiry")
 
-        case "boost_backdate_pack":
-            // 补打卡包：增加 3 张补签券库存
+        case "boost_backdate_single", "boost_backdate_pack":
+            // 补签券：增加补签库存
             let key = "inventory_backdate_1day_count"
             let cur = UserDefaults.standard.integer(forKey: key)
-            UserDefaults.standard.set(cur + 3, forKey: key)
-
-        case "boost_cooldown_reset":
-            // 冷却重置券：清空所有宠物的冷却记录
-            UserDefaults.standard.removeObject(forKey: "quest_cooldownLogs")
+            UserDefaults.standard.set(cur + (item.id == "boost_backdate_pack" ? 3 : 1), forKey: key)
 
         default:
             break
+        }
+    }
+
+    private func activateOwnedItem(_ item: ShopItem) {
+        switch item.id {
+        case "fx_lime_glow":
+            equipFxLimeGlow = true
+        case "fx_rainbow":
+            equipFxRainbow = true
+        case "fx_stars":
+            equipFxStars = true
+        case "fx_firework":
+            equipFxFirework = true
+        case "title_guardian", "title_pioneer", "title_chef":
+            equippedTitle = item.id
+        default:
+            break
+        }
+    }
+
+    private func toggleOwnedItem(_ item: ShopItem) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        switch item.id {
+        case "fx_lime_glow":
+            equipFxLimeGlow.toggle()
+        case "fx_rainbow":
+            equipFxRainbow.toggle()
+        case "fx_stars":
+            equipFxStars.toggle()
+        case "fx_firework":
+            equipFxFirework.toggle()
+        case "title_guardian", "title_pioneer", "title_chef":
+            equippedTitle = equippedTitle == item.id ? "" : item.id
+        case "fx_popout_card":
+            if pets.count == 1 {
+                equipPopoutPet = pets.first
+            } else if pets.count > 1 {
+                showPetPickerForPopout = true
+            }
+        default:
+            break
+        }
+    }
+
+    private func ownedItemStatus(for item: ShopItem) -> String? {
+        switch item.id {
+        case "fx_lime_glow":
+            return equipFxLimeGlow ? "已启用" : "未启用"
+        case "fx_rainbow":
+            return equipFxRainbow ? "已启用" : "未启用"
+        case "fx_stars":
+            return equipFxStars ? "已启用" : "未启用"
+        case "fx_firework":
+            return equipFxFirework ? "已启用" : "未启用"
+        case "title_guardian", "title_pioneer", "title_chef":
+            return equippedTitle == item.id ? "已装备" : "未装备"
+        case "fx_popout_card":
+            return "点按绑定"
+        default:
+            return nil
         }
     }
 

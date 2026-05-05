@@ -1677,7 +1677,7 @@ struct AddReminderFromCheckInSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             Capsule()
-                .fill(Color.black.opacity(0.12))
+                .fill(Color.primary.opacity(0.12))
                 .frame(width: 40, height: 4)
                 .padding(.top, 12).padding(.bottom, 20)
 
@@ -1689,7 +1689,7 @@ struct AddReminderFromCheckInSheet: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("添加待办")
                                 .font(.system(size: 22, weight: .black, design: .rounded))
-                                .foregroundStyle(.black)
+                                .foregroundStyle(.primary)
                             Text("\(pet.name) · \(actionLabel)")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(.secondary)
@@ -1702,7 +1702,7 @@ struct AddReminderFromCheckInSheet: View {
                     HStack {
                         Label("全天", systemImage: "sun.max.fill")
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(.primary)
                         Spacer()
                         Toggle("", isOn: $isAllDay)
                             .tint(Color.goPrimary)
@@ -1785,7 +1785,7 @@ struct AddReminderFromCheckInSheet: View {
                 }
             }
         }
-        .background(Color.white)
+        .background(OhanaAppBackground())
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
     }

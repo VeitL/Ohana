@@ -67,7 +67,9 @@ enum FMDest: Hashable {
     case petPotty(PersistentIdentifier)
     case petBasicInfo(PersistentIdentifier)
     case petDocuments(PersistentIdentifier)
+    case petInsurance(PersistentIdentifier)
     case petMoments(PersistentIdentifier)
+    case petTimeline(PersistentIdentifier)
     case petAchievements(PersistentIdentifier)
     case petRetention(PersistentIdentifier)
     case petWeight(PersistentIdentifier)
@@ -274,8 +276,12 @@ struct FunctionMenuSheet: View {
             if let p = pet(for: id) { PetBasicInfoDetailView(pet: p) }
         case .petDocuments(let id):
             if let p = pet(for: id) { DocumentsListView(pet: p) }
+        case .petInsurance(let id):
+            if let p = pet(for: id) { PetInsuranceView(pet: p) }
         case .petMoments(let id):
             if let p = pet(for: id) { PetMomentsHubView(pet: p) }
+        case .petTimeline(let id):
+            if let p = pet(for: id) { PetUnifiedTimelineSheet(pet: p) }
         case .petAchievements(let id):
             if let p = pet(for: id) { AchievementWallView(pet: p) }
         case .petRetention(let id):

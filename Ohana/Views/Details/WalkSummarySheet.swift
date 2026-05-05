@@ -12,6 +12,7 @@ struct WalkSummarySheet: View {
     let pet: Pet
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @State private var selectedWalk: PetWalkLog? = nil
     @State private var showingGoalSetter = false
     @State private var goalDraft: Double = 0
@@ -65,6 +66,8 @@ struct WalkSummarySheet: View {
                 
                 ScrollView {
                     VStack(spacing: 20) {
+                        petHeader
+
                         // 本次心情备注（仅最近一次步行完成后显示）
                         if let latest = sortedWalks.first, isFreshWalk(latest), !moodSaved {
                             walkMoodCard(walk: latest)
@@ -85,14 +88,53 @@ struct WalkSummarySheet: View {
                     .padding(.top, 8)
                 }
             }
-            .navigationTitle("🏝️ 巡岛日志")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("关闭") { dismiss() }
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
+    }
+
+    private var petHeader: some View {
+        HStack(spacing: 14) {
+            if let data = pet.avatarImageData, let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 54, height: 54)
+                    .clipShape(Circle())
+            } else {
+                Text(pet.avatarEmoji)
+                    .font(.system(size: 34))
+                    .frame(width: 54, height: 54)
+                    .background(Color(hex: pet.themeColorHex).opacity(0.16), in: Circle())
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("遛狗详情")
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.goPrimary)
+                    .tracking(1.2)
+                Text("\(pet.name) 的路线记录")
+                    .font(.system(size: 24, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Text("目标、总览和历史轨迹")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(18)
+        .goTranslucentCard(cornerRadius: 24)
     }
     
     // MARK: - Fresh Walk Helpers
@@ -103,9 +145,14 @@ struct WalkSummarySheet: View {
 
     private func walkMoodCard(walk: PetWalkLog) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("🐾 本次巡岛心情")
-                .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+            HStack(spacing: 8) {
+                Image(systemName: "circle")
+                    .font(.system(size: 11, weight: .black))
+                    .foregroundStyle(Color.goPrimary)
+                Text("本次心情")
+                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+            }
 
             // 星级评分
             HStack(spacing: 10) {
@@ -320,37 +367,49 @@ struct WalkSummarySheet: View {
 
     // MARK: - Summary Card
     private var summaryCard: some View {
-        HStack(spacing: 0) {
-            statColumn(value: "\(sortedWalks.count)", label: "总次数", emoji: "🚶")
-            
-            Rectangle()
-                .fill(.primary.opacity(0.15))
-                .frame(width: 1, height: 40)
-            
-            statColumn(value: distanceFormatted(totalDistance), label: "总距离", emoji: "📏")
-            
-            Rectangle()
-                .fill(.primary.opacity(0.15))
-                .frame(width: 1, height: 40)
-            
-            statColumn(value: durationFormatted(totalDuration), label: "总时长", emoji: "⏱️")
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Overview")
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(thisWeekDistanceKm > 0 ? String(format: "本周 %.1f km", thisWeekDistanceKm) : "本周暂无记录")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.goPrimary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.goPrimary.opacity(0.12), in: Capsule())
+            }
+
+            HStack(spacing: 10) {
+                statColumn(value: "\(sortedWalks.count)", label: "总次数", icon: "number", accent: Color.goPrimary)
+                statColumn(value: distanceFormatted(totalDistance), label: "总距离", icon: "arrow.left.and.right", accent: Color.goTeal)
+                statColumn(value: durationFormatted(totalDuration), label: "总时长", icon: "clock", accent: Color.goYellow)
+            }
         }
-        .padding(.vertical, 24)
+        .padding(16)
         .goTranslucentCard(cornerRadius: 24)
     }
     
-    private func statColumn(value: String, label: String, emoji: String) -> some View {
-        VStack(spacing: 6) {
-            Text(emoji)
-                .font(.system(size: 20))
+    private func statColumn(value: String, label: String, icon: String, accent: Color) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.secondary)
+                .frame(width: 26, height: 26)
+                .background(accent.opacity(0.12), in: Circle())
             Text(value)
-                .font(.system(size: 22, weight: .heavy, design: .rounded))
+                .font(.system(size: 20, weight: .heavy, design: .rounded))
                 .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
             Text(label)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.primary.opacity(0.5))
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
+        .padding(12)
+        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
     
     // MARK: - Walk List
@@ -358,16 +417,23 @@ struct WalkSummarySheet: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("历史记录")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.6))
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
                 Spacer()
+                Text("\(sortedWalks.count)")
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .background(Color.primary.opacity(0.07), in: Capsule())
             }
             
-            ForEach(sortedWalks) { walk in
+            ForEach(Array(sortedWalks.enumerated()), id: \.element.id) { index, walk in
                 Button { selectedWalk = walk } label: {
                     walkRow(walk)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
+                .ohanaSmoothAppear(index: index)
             }
             
             if sortedWalks.isEmpty {
@@ -376,82 +442,128 @@ struct WalkSummarySheet: View {
                     .foregroundStyle(.primary.opacity(0.4))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 20)
+                    .goTranslucentCard(cornerRadius: 18)
             }
         }
-        .padding(16)
-        .goTranslucentCard(cornerRadius: 20)
         .sheet(item: $selectedWalk) { walk in
             WalkDetailView(walk: walk, pet: pet)
         }
     }
     
     private func walkRow(_ walk: PetWalkLog) -> some View {
-        HStack(spacing: 12) {
-            // 地图缩略图
-            if let data = walk.mapSnapshotData, let uiImage = UIImage(data: data) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 56, height: 56)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-            } else {
-                ZStack {
-                    Image(systemName: "map")
-                        .foregroundStyle(.primary.opacity(0.3))
+        HStack(spacing: 0) {
+            routeArtwork(for: walk)
+                .frame(width: 132, height: 104)
+                .overlay(alignment: .trailing) {
+                    LinearGradient(
+                        colors: [
+                            .clear,
+                            blendedCardSurface.opacity(colorScheme == .dark ? 0.74 : 0.90)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(width: 54)
                 }
-                .frame(width: 56, height: 56)
-                .goGlassBackground(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            }
-            // 右侧箭头提示
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.primary.opacity(0.25))
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(walk.startDate, format: .dateTime.month().day().weekday(.abbreviated))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.primary)
-                
+
+            VStack(alignment: .leading, spacing: 9) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(walk.startDate, format: .dateTime.month().day().weekday(.abbreviated))
+                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .foregroundStyle(.primary)
+                    Spacer(minLength: 8)
+                    Text(walk.startDate, format: .dateTime.hour().minute())
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack(spacing: 12) {
+                    compactMetric(icon: "arrow.left.and.right", text: walk.distanceText)
+                    compactMetric(icon: "clock", text: walk.durationText)
+                }
+
                 HStack(spacing: 8) {
-                    Label(walk.distanceText, systemImage: "arrow.triangle.swap")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.primary.opacity(0.5))
-                    
                     if walk.coconutsEarned > 0 {
-                        Text("+\(walk.coconutsEarned)🥥")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.goPrimary)
+                        compactBadge(icon: "plus", text: "\(walk.coconutsEarned)")
                     }
-
-                    Label(walk.durationText, systemImage: "clock")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.primary.opacity(0.5))
+                    if walk.moodRating > 0 {
+                        compactBadge(icon: "star", text: "\(walk.moodRating)/5")
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.secondary.opacity(0.55))
                 }
-                // 心情 + 备注
-                if walk.moodRating > 0 || walk.behaviorNotes != nil {
-                    HStack(spacing: 4) {
-                        if walk.moodRating > 0 {
-                            Text(String(repeating: "★", count: walk.moodRating))
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(Color.goYellow)
-                        }
-                        if let notes = walk.behaviorNotes, !notes.isEmpty {
-                            Text(notes)
-                                .font(.system(size: 10, weight: .medium, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.4))
-                                .lineLimit(1)
-                        }
-                    }
+
+                if let notes = walk.behaviorNotes, !notes.isEmpty {
+                    Text(notes)
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
             }
-
-            Spacer()
-
-            Text(walk.startDate, format: .dateTime.hour().minute())
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.4))
+            .padding(.vertical, 13)
+            .padding(.leading, 14)
+            .padding(.trailing, 14)
         }
+        .frame(height: 104)
+        .goTranslucentCard(cornerRadius: 20)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    private var blendedCardSurface: Color {
+        colorScheme == .dark ? Color(hex: "111827") : Color.white
+    }
+
+    @ViewBuilder
+    private func routeArtwork(for walk: PetWalkLog) -> some View {
+        if let data = walk.mapSnapshotData, let uiImage = UIImage(data: data) {
+            Image(uiImage: uiImage)
+                .resizable()
+                .scaledToFill()
+                .overlay(Color.black.opacity(colorScheme == .dark ? 0.08 : 0.02))
+                .clipped()
+        } else {
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color.goPrimary.opacity(colorScheme == .dark ? 0.28 : 0.18),
+                        Color.goTeal.opacity(colorScheme == .dark ? 0.18 : 0.10)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                RoutePlaceholderPath()
+                    .stroke(Color.primary.opacity(colorScheme == .dark ? 0.55 : 0.28), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                    .padding(20)
+            }
+        }
+    }
+
+    private func compactMetric(icon: String, text: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .bold))
+            Text(text)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .foregroundStyle(.secondary)
+    }
+
+    private func compactBadge(icon: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 9, weight: .black))
+            Text(text)
+                .font(.system(size: 10, weight: .black, design: .rounded))
+        }
+        .foregroundStyle(Color.goPrimary)
+        .padding(.horizontal, 7)
         .padding(.vertical, 4)
+        .background(Color.goPrimary.opacity(0.12), in: Capsule())
     }
     
     // MARK: - Formatters
@@ -468,5 +580,23 @@ struct WalkSummarySheet: View {
             return "\(minutes / 60)h\(minutes % 60)m"
         }
         return "\(minutes)min"
+    }
+}
+
+private struct RoutePlaceholderPath: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX + rect.width * 0.10, y: rect.maxY - rect.height * 0.18))
+        path.addCurve(
+            to: CGPoint(x: rect.minX + rect.width * 0.52, y: rect.midY),
+            control1: CGPoint(x: rect.minX + rect.width * 0.26, y: rect.maxY - rect.height * 0.12),
+            control2: CGPoint(x: rect.minX + rect.width * 0.34, y: rect.minY + rect.height * 0.28)
+        )
+        path.addCurve(
+            to: CGPoint(x: rect.maxX - rect.width * 0.10, y: rect.minY + rect.height * 0.20),
+            control1: CGPoint(x: rect.minX + rect.width * 0.70, y: rect.maxY - rect.height * 0.08),
+            control2: CGPoint(x: rect.minX + rect.width * 0.78, y: rect.minY + rect.height * 0.20)
+        )
+        return path
     }
 }

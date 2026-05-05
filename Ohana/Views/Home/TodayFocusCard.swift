@@ -47,22 +47,47 @@ struct TodayFocusCard: View {
     @State private var pulse: CGFloat = 0
     @State private var particles: [Particle] = []
     @State private var burstActive = false
+    @State private var completingQuestId: String?
+    @State private var selectedFocusIndex = 0
 
     @Environment(\.colorScheme) private var colorScheme
 
-    private var content: TodayFocusService.Content {
-        TodayFocusService.decide(
+    private var refreshedQuests: [IslandQuest] {
+        TodayFocusService.refreshedQuests(
+            quests,
             pets: pets,
-            plants: plants,
-            quests: quests,
             careLogs: liveCare,
             walkLogs: liveWalks,
             pottyLogs: livePotty
         )
     }
 
+    private var pendingQuests: [IslandQuest] {
+        refreshedQuests.filter { !$0.isCompleted }
+    }
+
+    private var focusCards: [TodayFocusService.Content] {
+        if !pendingQuests.isEmpty {
+            return pendingQuests.map { .quest($0) }
+        }
+        if !refreshedQuests.isEmpty || !pets.isEmpty || !plants.isEmpty {
+            return [.celebrate(pets: pets)]
+        }
+        return [.welcome]
+    }
+
+    private var content: TodayFocusService.Content {
+        let cards = focusCards
+        guard !cards.isEmpty else { return .welcome }
+        return cards[min(selectedFocusIndex, cards.count - 1)]
+    }
+
     private var focusStatusText: String {
-        TodayFocusService.statusText(for: content)
+        let pending = pendingQuests.count
+        if pending > 0 {
+            return "\(pending)/\(max(refreshedQuests.count, pending)) 个任务"
+        }
+        return TodayFocusService.statusText(for: content)
     }
 
     // MARK: - Body
@@ -99,6 +124,11 @@ struct TodayFocusCard: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 2)
                     .padding(.bottom, 16)
+                    .id(contentIdentity)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
             }
 
             // Particle burst overlay
@@ -115,12 +145,40 @@ struct TodayFocusCard: View {
         .onAppear {
             withAnimation(.easeInOut(duration: 2.6).repeatForever(autoreverses: true)) { pulse = 1 }
         }
+        .onChange(of: focusCards.count) { _, count in
+            if selectedFocusIndex >= count {
+                selectedFocusIndex = max(0, count - 1)
+            }
+        }
+        .animation(.spring(response: 0.42, dampingFraction: 0.82), value: contentIdentity)
     }
 
     // MARK: - Card switcher
 
     @ViewBuilder
     private var card: some View {
+        let cards = focusCards
+        if cards.count > 1 {
+            VStack(spacing: 4) {
+                TabView(selection: $selectedFocusIndex) {
+                    ForEach(Array(cards.enumerated()), id: \.offset) { idx, item in
+                        cardContent(item)
+                            .padding(.horizontal, 2)
+                            .tag(idx)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .frame(height: 112)
+
+                focusPageIndicator(count: cards.count, selected: selectedFocusIndex)
+            }
+        } else {
+            cardContent(cards.first ?? .welcome)
+        }
+    }
+
+    @ViewBuilder
+    private func cardContent(_ content: TodayFocusService.Content) -> some View {
         switch content {
         case .quest(let q):      questCard(q)
         case .negative(let s):   negativeCard(s)
@@ -134,6 +192,7 @@ struct TodayFocusCard: View {
 
     private func questCard(_ q: IslandQuest) -> some View {
         let accent = Color.goPrimary
+        let isCompleting = completingQuestId == q.id
         return HStack(spacing: 14) {
             iconBubble(emoji: q.emoji, accent: accent)
 
@@ -152,13 +211,25 @@ struct TodayFocusCard: View {
 
             Button {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                fireBurst(accent: accent)
-                onCompleteQuest(q)
+                if completesInline(q) {
+                    withAnimation(.spring(response: 0.26, dampingFraction: 0.82)) {
+                        completingQuestId = q.id
+                    }
+                    fireBurst(accent: accent)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                        onCompleteQuest(q)
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                        if completingQuestId == q.id { completingQuestId = nil }
+                    }
+                } else {
+                    onCompleteQuest(q)
+                }
             } label: {
                 HStack(spacing: 4) {
-                    Image(systemName: "checkmark")
+                    Image(systemName: isCompleting ? "checkmark.circle.fill" : "arrow.right")
                         .font(.system(size: 12, weight: .black))
-                    Text("完成")
+                    Text(isCompleting ? "已完成" : "去完成")
                         .font(.system(size: 13, weight: .black, design: .rounded))
                 }
                 .foregroundStyle(Color.arkInk)
@@ -166,9 +237,13 @@ struct TodayFocusCard: View {
                 .background(accent, in: Capsule())
             }
             .buttonStyle(.plain)
+            .disabled(isCompleting)
         }
         .padding(14)
         .background(cardBackground(accent))
+        .offset(x: isCompleting ? 360 : 0)
+        .opacity(isCompleting ? 0 : 1)
+        .animation(.spring(response: 0.46, dampingFraction: 0.86), value: isCompleting)
     }
 
     // MARK: - Negative signal card
@@ -264,11 +339,11 @@ struct TodayFocusCard: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("今日任务全部完成")
+                Text("今日任务已清空")
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                Text("岛屿风和日丽，去绿洲领取椰子盲盒吧")
+                Text("没有需要处理的任务，安心享受今天")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(.primary.opacity(0.55))
                     .lineLimit(2)
@@ -334,6 +409,39 @@ struct TodayFocusCard: View {
         }
         .padding(.horizontal, 8).padding(.vertical, 4)
         .background(Color.goYellow.opacity(0.15), in: Capsule())
+    }
+
+    private func focusPageIndicator(count: Int, selected: Int) -> some View {
+        HStack(spacing: 5) {
+            ForEach(0..<count, id: \.self) { idx in
+                Capsule()
+                    .fill(idx == selected ? Color.goPrimary : Color.primary.opacity(0.18))
+                    .frame(width: idx == selected ? 16 : 5, height: 5)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.8), value: selected)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityLabel("今日任务 \(min(selected + 1, count)) / \(count)")
+    }
+
+    private var contentIdentity: String {
+        focusCards.map(contentKey).joined(separator: "|")
+    }
+
+    private func contentKey(_ content: TodayFocusService.Content) -> String {
+        switch content {
+        case .quest(let q): return "quest-\(q.id)"
+        case .negative(let s): return "negative-\(s.title)"
+        case .memory(let m): return "memory-\(m.headline)"
+        case .celebrate: return "celebrate"
+        case .welcome: return "welcome"
+        }
+    }
+
+    private func completesInline(_ quest: IslandQuest) -> Bool {
+        if quest.id == "q_walk" || quest.id == "q_reminder" { return false }
+        if quest.id.hasPrefix("q_weight_") || quest.id.hasPrefix("q_moment_") { return false }
+        return true
     }
 
     private func cardBackground(_ accent: Color) -> some View {

@@ -46,6 +46,8 @@ struct HumanNoteHistorySheet: View {
                 } else {
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 10) {
+                            HumanPrivateDataNotice(human: human, field: .note)
+
                             if noteEntries.isEmpty {
                                 emptyState
                             } else {

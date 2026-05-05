@@ -73,16 +73,7 @@ enum TodayFocusService {
             return .quest(first)
         }
 
-        let signals = IslandNegativeFeedback.signals(pets: pets, plants: plants)
-        if let signal = signals.first(where: { $0.severity == .critical }) ?? signals.first {
-            return .negative(signal)
-        }
-
-        if let memory = memory ?? MemoryEngine.pickFragment(pets: pets, plants: plants) {
-            return .memory(memory)
-        }
-
-        if !refreshed.isEmpty {
+        if !refreshed.isEmpty || !pets.isEmpty || !plants.isEmpty {
             return .celebrate(pets: pets)
         }
         return .welcome
@@ -129,7 +120,16 @@ enum TodayFocusService {
             return pottyLogs.contains { $0.pet?.id == petId && calendar.isDate($0.date, inSameDayAs: now) }
         }
         if quest.id.hasPrefix("q_play_"), let petId = quest.targetPetId {
-            return careLogs.contains { $0.careType == .play && $0.pet?.id == petId && calendar.isDate($0.date, inSameDayAs: now) }
+            let playedToday = careLogs.contains {
+                $0.careType == .play
+                    && $0.pet?.id == petId
+                    && calendar.isDate($0.date, inSameDayAs: now)
+            }
+            let walkedToday = walkLogs.contains {
+                $0.pet?.id == petId
+                    && calendar.isDate($0.startDate, inSameDayAs: now)
+            }
+            return playedToday || walkedToday
         }
         if quest.id.hasPrefix("q_weight_"), let petId = quest.targetPetId {
             return pets.first(where: { $0.id == petId })?.weightLogs.contains { calendar.isDate($0.date, inSameDayAs: now) } == true

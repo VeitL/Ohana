@@ -38,7 +38,7 @@ struct PetPickerSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             Capsule()
-                .fill(Color.black.opacity(0.12))
+                .fill(Color.primary.opacity(0.12))
                 .frame(width: 40, height: 4)
                 .padding(.top, 12)
                 .padding(.bottom, 20)
@@ -50,7 +50,7 @@ struct PetPickerSheet: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(actionTitle)
                             .font(.system(size: 22, weight: .black, design: .rounded))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(.primary)
                         Text("选择一只宠物继续")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.secondary)
@@ -87,7 +87,7 @@ struct PetPickerSheet: View {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(pet.name)
                                         .font(.system(size: 17, weight: .bold, design: .rounded))
-                                        .foregroundStyle(.black)
+                                        .foregroundStyle(.primary)
                                     Text("\(pet.species) · \(pet.breed)")
                                         .font(.system(size: 13, weight: .medium))
                                         .foregroundStyle(.secondary)
@@ -102,7 +102,7 @@ struct PetPickerSheet: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 16))
+                            .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
                         }
                         .buttonStyle(.plain)
                     }
@@ -112,7 +112,7 @@ struct PetPickerSheet: View {
 
             Spacer(minLength: 40)
         }
-        .background(Color.white)
+        .background(OhanaAppBackground())
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.hidden)
     }

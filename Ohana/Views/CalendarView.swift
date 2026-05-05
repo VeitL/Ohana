@@ -13,6 +13,14 @@ enum CalendarViewMode: String, CaseIterable {
     case list = "列表"
 }
 
+private struct CalendarDateTopPreferenceKey: PreferenceKey {
+    static var defaultValue: [Date: CGFloat] = [:]
+
+    static func reduce(value: inout [Date: CGFloat], nextValue: () -> [Date: CGFloat]) {
+        value.merge(nextValue(), uniquingKeysWith: { $1 })
+    }
+}
+
 /// 日历宠物筛选条（与 `CalendarView` 共享 `calendar_filterPetId`，空字符串表示「全部」）
 struct CalendarPetChipFilterBar: View {
     @AppStorage("calendar_filterPetId") private var calendarFilterPetId: String = ""
@@ -96,6 +104,8 @@ struct CalendarView: View {
     @AppStorage("appUIStyle") private var appUIStyle: String = "go"
     @Environment(\.colorScheme) private var colorScheme
     @State private var coconutCount: Int = QuestManager.shared.coconutCount
+    @State private var listVisibleTopDate = Calendar.current.startOfDay(for: Date())
+    @State private var didScrollListToToday = false
 
     private var isMaterial: Bool { false }
     private var matBg:      Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
@@ -108,6 +118,9 @@ struct CalendarView: View {
     private var classicSubtleFill: Color { colorScheme == .dark ? .white.opacity(0.1) : .primary.opacity(0.07) }
     private var classicDotFill: Color { colorScheme == .dark ? .white.opacity(0.12) : .primary.opacity(0.12) }
     private var classicLineColors: [Color] { colorScheme == .dark ? [.white.opacity(0.35), .white.opacity(0.06)] : [.primary.opacity(0.2), .primary.opacity(0.04)] }
+    private var calendarHeaderDate: Date {
+        viewMode == .list ? listVisibleTopDate : selectedDate
+    }
     
     /// 从宠物详情进入时固定为该宠物；否则使用 AppStorage 筛选
     private var effectivePetFilterId: String? {
@@ -153,6 +166,13 @@ struct CalendarView: View {
         let occurrenceDate: Date
     }
 
+    private struct TimelineDateSection: Identifiable {
+        let date: Date
+        let occurrences: [EventOccurrence]
+
+        var id: Date { date }
+    }
+
     private var expandedOccurrences: [EventOccurrence] {
         let cal = Calendar.current
         let cutoff = cal.date(byAdding: .month, value: -3, to: Date()) ?? Date() // 只展开近3个月
@@ -194,7 +214,30 @@ struct CalendarView: View {
                 }
             }
         }
-        return result.sorted { $0.occurrenceDate > $1.occurrenceDate }
+        return result.sorted { $0.occurrenceDate < $1.occurrenceDate }
+    }
+
+    private var timelineSections: [TimelineDateSection] {
+        let today = Calendar.current.startOfDay(for: Date())
+        let occurrencesByDay = Dictionary(grouping: expandedOccurrences) { occ in
+            Calendar.current.startOfDay(for: occ.occurrenceDate)
+        }
+        .mapValues { occurrences in
+            occurrences.sorted {
+                if $0.occurrenceDate == $1.occurrenceDate {
+                    return $0.event.startDate < $1.event.startDate
+                }
+                return $0.occurrenceDate < $1.occurrenceDate
+            }
+        }
+
+        return Array(Set(occurrencesByDay.keys).union([today]))
+            .sorted()
+            .map { TimelineDateSection(date: $0, occurrences: occurrencesByDay[$0] ?? []) }
+    }
+
+    private var timelineDates: [Date] {
+        timelineSections.map(\.date)
     }
     
     private var eventsForSelectedDate: [Event] {
@@ -239,7 +282,7 @@ struct CalendarView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
-                if isMaterial { matBg.ignoresSafeArea() } else { ArkBackgroundView() }
+                OhanaAppBackground()
                 
                 VStack(spacing: 0) {
                     if isMaterial {
@@ -274,6 +317,12 @@ struct CalendarView: View {
             .sheet(isPresented: $showingAddEvent) { AddEventView() }
             .sheet(isPresented: $showingCoconutLog) { CoconutLogView() }
             .onChange(of: addEventTrigger) { _, _ in showingAddEvent = true }
+            .onChange(of: viewModeRaw) { _, newValue in
+                if CalendarViewMode(rawValue: newValue) == .list {
+                    didScrollListToToday = false
+                    listVisibleTopDate = Calendar.current.startOfDay(for: Date())
+                }
+            }
             .onAppear { coconutCount = QuestManager.shared.coconutCount }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("coconutCountChanged"))) { _ in
                 coconutCount = QuestManager.shared.coconutCount
@@ -285,7 +334,7 @@ struct CalendarView: View {
     private var classicCalendarHeader: some View {
         HStack(spacing: 12) {
             // 月历标题
-            Text(Date(), format: .dateTime.year().month(.wide))
+            Text(calendarHeaderDate, format: .dateTime.year().month(.wide))
                 .font(.system(size: 20, weight: .black, design: .rounded))
                 .foregroundStyle(.primary)
 
@@ -607,32 +656,34 @@ struct CalendarView: View {
             // 环境光斑（毛玻璃卡片后方，营造流动光影）
             ambientLightBlobs
 
-            ScrollView {
-                // D1: 用展开后的重复事件按 occurrenceDate 分组
-                let grouped = Dictionary(grouping: expandedOccurrences) { occ in
-                    Calendar.current.startOfDay(for: occ.occurrenceDate)
-                }.sorted { $0.key > $1.key }
-
-                if grouped.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "tray.fill")
-                            .font(OhanaFont.metric(size: 40, .medium))
-                            .symbolRenderingMode(.monochrome)
-                            .foregroundStyle(.tertiary)
-                        Text("暂无记录")
-                            .font(OhanaFont.headline(.bold))
-                            .foregroundStyle(.primary.opacity(0.4))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 60)
-                } else {
+            ScrollViewReader { proxy in
+                ScrollView {
                     LazyVStack(spacing: 0, pinnedViews: []) {
-                        ForEach(grouped, id: \.key) { date, occurrences in
-                            timelineSection(date: date, occurrences: occurrences)
+                        ForEach(timelineSections) { section in
+                            timelineSection(date: section.date, occurrences: section.occurrences)
+                                .id(timelineDateID(section.date))
+                                .background(
+                                    GeometryReader { geo in
+                                        Color.clear.preference(
+                                            key: CalendarDateTopPreferenceKey.self,
+                                            value: [section.date: geo.frame(in: .named("calendarListScroll")).minY]
+                                        )
+                                    }
+                                )
                         }
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 20)
+                }
+                .coordinateSpace(name: "calendarListScroll")
+                .onAppear {
+                    scrollListToTodayIfNeeded(proxy)
+                }
+                .onChange(of: timelineDates) { _, _ in
+                    scrollListToTodayIfNeeded(proxy)
+                }
+                .onPreferenceChange(CalendarDateTopPreferenceKey.self) { positions in
+                    updateVisibleCalendarMonth(from: positions)
                 }
             }
             // F2: 删除 alert 已移至 SwipeableEventRow’s confirmationDialog
@@ -673,33 +724,30 @@ struct CalendarView: View {
 
     // 单日时间轴组
     private func timelineSection(date: Date, occurrences: [EventOccurrence]) -> some View {
-        VStack(spacing: 0) {
+        let isToday = Calendar.current.isDateInToday(date)
+        return VStack(spacing: 0) {
             // 日期组头
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(Calendar.current.isDateInToday(date) ? chipAccent : (isMaterial ? Color(hex: "C7C7CC") : classicDotFill))
-                        .frame(width: 10, height: 10)
-                    if Calendar.current.isDateInToday(date) {
-                        Circle().fill(.clear).frame(width: 18, height: 18)
-                            .overlay(Circle().strokeBorder(chipAccent.opacity(0.3), lineWidth: 1.5))
-                    }
+            if isToday {
+                todayTimelineAnchor(date: date, count: occurrences.count)
+            } else {
+                HStack(spacing: 10) {
+                    timelineDateBadge(date, isToday: false)
+                        .frame(width: 40)
+
+                    Text(relativeDate(date))
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(isMaterial ? Color(hex: "8E8E93") : classicSoftText)
+                        .tracking(0.5)
+
+                    Text("·  \(occurrences.count)")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(.primary.opacity(0.25))
+
+                    Spacer()
                 }
-                .frame(width: 40)
-
-                Text(relativeDate(date))
-                    .font(.system(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(Calendar.current.isDateInToday(date) ? chipAccent : (isMaterial ? Color(hex: "8E8E93") : classicSoftText))
-                    .tracking(0.5)
-
-                Text("·  \(occurrences.count)")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.25))
-
-                Spacer()
+                .padding(.top, 16)
+                .padding(.bottom, 6)
             }
-            .padding(.top, 16)
-            .padding(.bottom, 6)
 
             // 事件行列（左侧纵线贯穿）
             HStack(alignment: .top, spacing: 0) {
@@ -717,13 +765,108 @@ struct CalendarView: View {
                 .frame(width: 40)
 
                 VStack(spacing: 8) {
-                    ForEach(occurrences) { occ in
-                        goEventRow(occ.event, occurrenceDate: occ.occurrenceDate)
+                    if occurrences.isEmpty {
+                        emptyTodayPill
+                    } else {
+                        ForEach(occurrences) { occ in
+                            goEventRow(occ.event, occurrenceDate: occ.occurrenceDate)
+                        }
                     }
                 }
                 .padding(.bottom, 8)
             }
         }
+    }
+
+    private func todayTimelineAnchor(date: Date, count: Int) -> some View {
+        HStack(spacing: 10) {
+            timelineDateBadge(date, isToday: true)
+                .frame(width: 40)
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Text("今天")
+                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .foregroundStyle(chipAccent)
+                    Text(count == 0 ? "暂无事件" : "\(count) 项")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(classicPrimaryText.opacity(0.55))
+                    Spacer()
+                }
+
+                Rectangle()
+                    .fill(chipAccent.opacity(colorScheme == .dark ? 0.45 : 0.7))
+                    .frame(height: 1.5)
+            }
+        }
+        .padding(.top, 10)
+        .padding(.bottom, 8)
+    }
+
+    private func timelineDateBadge(_ date: Date, isToday: Bool) -> some View {
+        VStack(spacing: 3) {
+            Text(weekdayShort(date))
+                .font(.system(size: 10, weight: .black, design: .rounded))
+                .foregroundStyle(isToday ? chipAccent : classicSoftText)
+                .textCase(.uppercase)
+
+            Text("\(Calendar.current.component(.day, from: date))")
+                .font(.system(size: isToday ? 18 : 17, weight: .black, design: .rounded))
+                .foregroundStyle(isToday ? chipSelFg : classicPrimaryText)
+                .frame(width: 34, height: 34)
+                .background(isToday ? chipAccent : classicSubtleFill, in: Circle())
+        }
+    }
+
+    private var emptyTodayPill: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 14, weight: .bold))
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(chipAccent)
+            Text("今天没有安排，保持轻松")
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(classicPrimaryText.opacity(0.66))
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .background(classicSubtleFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func weekdayShort(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = AppLanguage.effectiveLocale
+        formatter.dateFormat = AppLanguage.isEnglish ? "EEE" : "EEE"
+        return formatter.string(from: date)
+    }
+
+    private func timelineDateID(_ date: Date) -> String {
+        String(Int(Calendar.current.startOfDay(for: date).timeIntervalSince1970))
+    }
+
+    private func scrollListToTodayIfNeeded(_ proxy: ScrollViewProxy) {
+        guard !didScrollListToToday, timelineDates.contains(where: { Calendar.current.isDateInToday($0) }) else { return }
+        didScrollListToToday = true
+        let today = Calendar.current.startOfDay(for: Date())
+        listVisibleTopDate = today
+        DispatchQueue.main.async {
+            proxy.scrollTo(timelineDateID(today), anchor: .top)
+        }
+    }
+
+    private func updateVisibleCalendarMonth(from positions: [Date: CGFloat]) {
+        guard !positions.isEmpty else { return }
+        let threshold: CGFloat = 12
+        let sorted = positions.sorted { lhs, rhs in
+            if lhs.value == rhs.value { return lhs.key < rhs.key }
+            return lhs.value < rhs.value
+        }
+        let candidate = sorted.last(where: { $0.value <= threshold }) ?? sorted.first
+        guard let date = candidate?.key else { return }
+        let normalized = Calendar.current.startOfDay(for: date)
+        guard !Calendar.current.isDate(listVisibleTopDate, inSameDayAs: normalized) else { return }
+        listVisibleTopDate = normalized
     }
 
     private func relativeDate(_ date: Date) -> String {
@@ -752,7 +895,17 @@ struct CalendarView: View {
             petThemeColor: relatedPetColor,
             onComplete: {
                 withAnimation(.spring(response: 0.3)) {
-                    event.toggleOccurrenceComplete(on: occurrenceDate)
+                    let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
+                    event.setOccurrenceMarkedComplete(shouldComplete, on: occurrenceDate)
+                    let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+                    CalendarTaskCompletionSyncService.syncPetTask(
+                        event: event,
+                        occurrenceDate: occurrenceDate,
+                        isCompleted: shouldComplete,
+                        pets: pets,
+                        context: modelContext,
+                        executorId: activeHumanId
+                    )
                     let now = Date()
                     let cal = Calendar.current
                     let today = cal.startOfDay(for: now)
@@ -761,8 +914,7 @@ struct CalendarView: View {
                     if event.recurrenceDays == 0 {
                         for reminder in event.reminders {
                             if reminder.scheduledAt >= today && reminder.scheduledAt < tomorrow {
-                                let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-                                if event.isCompleted {
+                                if shouldComplete {
                                     ReminderCompletionService.complete(reminder, by: activeHumanId, context: modelContext)
                                 } else {
                                     ReminderCompletionService.reopen(reminder, by: activeHumanId, context: modelContext)

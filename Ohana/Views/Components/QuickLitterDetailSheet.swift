@@ -28,6 +28,8 @@ struct QuickLitterDetailSheet: View {
     @State private var scoopReminderOn = false
     @State private var hasScoopEndDate: Bool = false
     @State private var scoopPlanEndDate: Date = Calendar.current.date(byAdding: .month, value: 3, to: Date()) ?? Date()
+    @State private var showSingleUseNotice = false
+    @State private var singleUseNoticeMessage = ""
 
     private var todayLitterCount: Int {
         pet.careLogs.filter { $0.type == CareType.litter.rawValue && Calendar.current.isDateInToday($0.date) }.count
@@ -83,6 +85,11 @@ struct QuickLitterDetailSheet: View {
             }
         }
         .onAppear { loadSettings() }
+        .alert("今天已经完成了", isPresented: $showSingleUseNotice) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text(singleUseNoticeMessage)
+        }
     }
 
     // MARK: - Header
@@ -425,12 +432,30 @@ struct QuickLitterDetailSheet: View {
 
     // MARK: - Actions
     private func doScoop() {
+        guard todayLitterCount == 0 else {
+            singleUseNoticeMessage = "\(pet.name) 今天已经铲屎过了，这类操作一天记录一次就够了。"
+            showSingleUseNotice = true
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            return
+        }
         let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
         CareEventService.recordCare(pet: pet, type: .litter, context: modelContext, executorId: eid, reward: .potty(isLitter: true))
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     private func doFullChange() {
+        if let lastFullChange, Calendar.current.isDateInToday(lastFullChange) {
+            singleUseNoticeMessage = "\(pet.name) 今天已经换过猫砂了，不需要重复记录。"
+            showSingleUseNotice = true
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            return
+        }
+        guard todayLitterCount == 0 else {
+            singleUseNoticeMessage = "\(pet.name) 今天已经铲屎过了，换猫砂可以明天再记录。"
+            showSingleUseNotice = true
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            return
+        }
         let now = Date().timeIntervalSince1970
         UserDefaults.standard.set(now, forKey: "lastLitterChangeDate_\(petKey)")
         UserDefaults.standard.set(now, forKey: "litterChangeCycleAnchor_\(petKey)")

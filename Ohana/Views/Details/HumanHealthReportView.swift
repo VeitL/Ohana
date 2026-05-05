@@ -12,10 +12,14 @@ import SwiftData
 struct HumanHealthReportView: View {
     let human: Human
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @Query private var myReports: [HumanHealthReport]
 
     @State private var showAddSheet = false
     @State private var editingReport: HumanHealthReport? = nil
+
+    private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
+    private var isPrivacyLocked: Bool { human.isPrivate(.weight, viewedBy: activeHumanId) }
 
     init(human: Human) {
         self.human = human
@@ -38,44 +42,53 @@ struct HumanHealthReportView: View {
         ZStack(alignment: .bottom) {
             ArkBackgroundView().ignoresSafeArea()
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    summaryBento
-                        .padding(.horizontal, 16)
-                        .padding(.top, 16)
-
-                    if !myReports.isEmpty {
-                        sectionLabel("检测报告")
-                        ForEach(myReports) { report in
-                            reportRow(report)
-                                .padding(.horizontal, 16)
-                        }
-                    }
-
-                    if myReports.isEmpty {
-                        emptyState
+            if isPrivacyLocked {
+                privacyLockedView
+            } else {
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 20) {
+                        summaryBento
                             .padding(.horizontal, 16)
-                            .padding(.top, 20)
-                    }
+                            .padding(.top, 16)
 
-                    Spacer(minLength: 100)
+                        HumanPrivateDataNotice(human: human, field: .weight)
+                            .padding(.horizontal, 16)
+
+                        if !myReports.isEmpty {
+                            sectionLabel("检测报告")
+                            ForEach(myReports) { report in
+                                reportRow(report)
+                                    .padding(.horizontal, 16)
+                            }
+                        }
+
+                        if myReports.isEmpty {
+                            emptyState
+                                .padding(.horizontal, 16)
+                                .padding(.top, 20)
+                        }
+
+                        Spacer(minLength: 100)
+                    }
                 }
             }
 
             // FAB
-            Button { showAddSheet = true } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "plus")
-                        .font(OhanaFont.headline(.black))
-                    Text("添加报告")
-                        .font(OhanaFont.headline(.black))
+            if !isPrivacyLocked {
+                Button { showAddSheet = true } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus")
+                            .font(OhanaFont.headline(.black))
+                        Text("添加报告")
+                            .font(OhanaFont.headline(.black))
+                    }
+                    .foregroundStyle(Color.arkInk)
+                    .padding(.horizontal, 28).padding(.vertical, 14)
+                    .background(Color.goTeal, in: Capsule())
+                    .shadow(color: Color.goTeal.opacity(0.4), radius: 14, y: 5)
                 }
-                .foregroundStyle(Color.arkInk)
-                .padding(.horizontal, 28).padding(.vertical, 14)
-                .background(Color.goTeal, in: Capsule())
-                .shadow(color: Color.goTeal.opacity(0.4), radius: 14, y: 5)
+                .padding(.bottom, 28)
             }
-            .padding(.bottom, 28)
         }
         .navigationTitle("🏥 身体检测报告")
         .navigationBarTitleDisplayMode(.inline)
@@ -89,6 +102,23 @@ struct HumanHealthReportView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+    }
+
+    private var privacyLockedView: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "lock.shield.fill")
+                .font(OhanaFont.metric(size: 44))
+                .foregroundStyle(Color.goYellow)
+            Text("身体数据仅本人可见")
+                .font(OhanaFont.headline(.bold))
+                .foregroundStyle(.primary)
+            Text("请切换到本人档案后再查看。")
+                .font(OhanaFont.callout())
+                .foregroundStyle(.secondary)
+        }
+        .multilineTextAlignment(.center)
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Summary Bento

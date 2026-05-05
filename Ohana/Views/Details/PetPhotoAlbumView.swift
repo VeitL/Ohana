@@ -12,19 +12,19 @@ import PhotosUI
 struct PetPhotoAlbumView: View {
     let pet: Pet
     /// 嵌入 `PetMomentsHubView` 时传入，由外层工具栏与 onChange 负责选图入库
-    var hubPickerSelection: Binding<PhotosPickerItem?>? = nil
+    var hubPickerSelection: Binding<[PhotosPickerItem]>? = nil
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @State private var internalPickerItem: PhotosPickerItem? = nil
+    @State private var internalPickerItems: [PhotosPickerItem] = []
     @State private var selectedPhoto: PetPhotoLog? = nil
     @State private var showingPhotoDetail = false
 
     private var isHubEmbedded: Bool { hubPickerSelection != nil }
 
-    private var pickerBinding: Binding<PhotosPickerItem?> {
+    private var pickerBinding: Binding<[PhotosPickerItem]> {
         if let hub = hubPickerSelection { return hub }
-        return $internalPickerItem
+        return $internalPickerItems
     }
 
     private let columns = [GridItem(.flexible(), spacing: 3), GridItem(.flexible(), spacing: 3), GridItem(.flexible(), spacing: 3)]
@@ -73,7 +73,7 @@ struct PetPhotoAlbumView: View {
                                 }
                             }
                             ToolbarItem(placement: .topBarTrailing) {
-                                PhotosPicker(selection: pickerBinding, matching: .images) {
+                                PhotosPicker(selection: pickerBinding, maxSelectionCount: 12, matching: .images) {
                                     Image(systemName: "plus.circle.fill")
                                         .symbolRenderingMode(.hierarchical)
                                         .foregroundStyle(Color.goPrimary)
@@ -82,9 +82,9 @@ struct PetPhotoAlbumView: View {
                             }
                         }
                 }
-                .onChange(of: internalPickerItem) { _, newItem in
-                    Self.consumePickerItem(newItem, pet: pet, modelContext: modelContext)
-                    internalPickerItem = nil
+                .onChange(of: internalPickerItems) { _, newItems in
+                    Self.consumePickerItems(newItems, pet: pet, modelContext: modelContext)
+                    internalPickerItems = []
                 }
             }
         }
@@ -98,10 +98,19 @@ struct PetPhotoAlbumView: View {
     /// 供 `PetMomentsHubView` 等外层调用：从 PhotosPicker 项写入相册
     static func consumePickerItem(_ newItem: PhotosPickerItem?, pet: Pet, modelContext: ModelContext) {
         guard let newItem else { return }
+        consumePickerItems([newItem], pet: pet, modelContext: modelContext)
+    }
+
+    static func consumePickerItems(_ newItems: [PhotosPickerItem], pet: Pet, modelContext: ModelContext) {
+        guard !newItems.isEmpty else { return }
         Task { @MainActor in
-            if let data = try? await newItem.loadTransferable(type: Data.self) {
-                let log = PetPhotoLog(imageData: data, pet: pet)
-                modelContext.insert(log)
+            for item in newItems {
+                if let data = try? await item.loadTransferable(type: Data.self) {
+                    let log = PetPhotoLog(imageData: data, pet: pet)
+                    modelContext.insert(log)
+                }
+            }
+            if !newItems.isEmpty {
                 modelContext.safeSave()
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
             }
@@ -170,7 +179,7 @@ struct PetPhotoAlbumView: View {
                 .foregroundStyle(.secondary)
             Text("暂无照片").font(OhanaFont.title3(.black))
             Text("记录\(pet.name)的每一个精彩瞬间").font(OhanaFont.subheadline(.medium)).foregroundStyle(.secondary)
-            PhotosPicker(selection: pickerBinding, matching: .images) {
+            PhotosPicker(selection: pickerBinding, maxSelectionCount: 12, matching: .images) {
                 Text("添加第一张照片")
                     .font(OhanaFont.body(.black)).foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 28).padding(.vertical, 12)

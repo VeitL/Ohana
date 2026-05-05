@@ -125,6 +125,10 @@ struct HumanWeightHistoryView: View {
             }
             .padding(.horizontal, 24).padding(.top, 16)
 
+            HumanPrivateDataNotice(human: human, field: .weight)
+                .padding(.horizontal, 24)
+                .padding(.top, 2)
+
             if chartLogs.count >= 2 {
                 let delta = chartLogs.last!.weight - chartLogs.first!.weight
                 HStack(spacing: 6) {

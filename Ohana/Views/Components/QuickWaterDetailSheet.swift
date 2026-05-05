@@ -68,6 +68,9 @@ struct QuickWaterDetailSheet: View {
     @State private var filterReplaceIntervalDays: Int = 90
     @State private var waterReminderOn = false
     @State private var filterReminderOn = false
+    @State private var saveToastMessage = ""
+    @State private var showSaveToast = false
+    @State private var saveToastTask: Task<Void, Never>?
 
     private var petKey: String { pet.id.uuidString }
 
@@ -117,6 +120,19 @@ struct QuickWaterDetailSheet: View {
                 .safeAreaPadding(.bottom, 28)
             }
             .navigationTitle("")
+            .overlay(alignment: .top) {
+                if showSaveToast {
+                    Text(saveToastMessage)
+                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.arkInk)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                        .background(chromeTint, in: Capsule())
+                        .shadow(color: chromeTint.opacity(0.32), radius: 12, y: 6)
+                        .padding(.top, 8)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { dismiss() } label: {
@@ -363,7 +379,7 @@ struct QuickWaterDetailSheet: View {
                 UserDefaults.standard.set(on, forKey: "waterReminder_\(petKey)")
             }
 
-            waterPlanSaveButton(title: "保存并同步日历") { saveWaterChangePlanToCalendar() }
+            waterPlanSaveButton(title: "保存") { saveWaterChangePlanToCalendar() }
         }
         .padding(16)
         .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -520,6 +536,7 @@ struct QuickWaterDetailSheet: View {
         )
         modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+        showSaveConfirmation(waterReminderOn ? "已保存，并同步到日历" : "已保存")
     }
 
     private func saveFilterPlanSettings() {
@@ -527,6 +544,23 @@ struct QuickWaterDetailSheet: View {
         UserDefaults.standard.set(filterReplaceIntervalDays, forKey: "filterReplaceInterval_\(petKey)")
         UserDefaults.standard.set(filterReminderOn, forKey: "filterReminder_\(petKey)")
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+        showSaveConfirmation("已保存")
+    }
+
+    private func showSaveConfirmation(_ message: String) {
+        saveToastTask?.cancel()
+        saveToastMessage = message
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+            showSaveToast = true
+        }
+        saveToastTask = Task {
+            try? await Task.sleep(nanoseconds: 1_600_000_000)
+            await MainActor.run {
+                withAnimation(.easeOut(duration: 0.22)) {
+                    showSaveToast = false
+                }
+            }
+        }
     }
 
     private func statusPill(_ text: String, isOverdue: Bool) -> some View {

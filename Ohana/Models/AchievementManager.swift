@@ -102,6 +102,9 @@ final class AchievementManager {
         let hasTodayHealth  = pet.healthLogs.contains  { calendar.isDateInToday($0.date) }
         let hasTodayHygiene = pet.hygieneLogs.contains  { calendar.isDateInToday($0.date) }
         let hasTodayPotty   = recentPottyLogs.contains  { calendar.isDateInToday($0.date) }
+        let hasTodayCare    = pet.careLogs.contains     { calendar.isDateInToday($0.date) }
+        let hasTodayWalk    = recentWalkLogs.contains   { calendar.isDateInToday($0.startDate) }
+        let hasTodayWeight  = pet.weightLogs.contains   { calendar.isDateInToday($0.date) }
 
         // 1. 🔥 钢铁肠胃：连续 7 天每天有 perfectPoop
         let ironGut: Achievement = {
@@ -152,14 +155,16 @@ final class AchievementManager {
 
         // 5. 🍗 营养师：连续记录喂食 14 天（foodRecords 中最近记录间隔 ≤ 1天）
         let nutritionist: Achievement = {
-            let sorted = pet.foodRecords.sorted { $0.startDate < $1.startDate }
+            let feedDates = pet.foodRecords.map(\.startDate)
+                + pet.careLogs.filter { $0.careType == .feeding }.map(\.date)
+            let sorted = feedDates.sorted()
             guard sorted.count >= 2 else {
                 return Achievement(id: "nutritionist", emoji: "🍗", title: "营养师",
                                    description: "坚持记录喂食信息超过 14 天",
                                    color: Color.goOrange, isUnlocked: false)
             }
-            let first = sorted.first!.startDate
-            let last = sorted.last!.startDate
+            let first = sorted.first!
+            let last = sorted.last!
             let days = calendar.dateComponents([.day], from: first, to: last).day ?? 0
             return Achievement(id: "nutritionist", emoji: "🍗", title: "营养师",
                                description: "坚持记录喂食信息超过 14 天",
@@ -190,6 +195,9 @@ final class AchievementManager {
         let firstRecord: Achievement = {
             let hasAny = !pet.healthLogs.isEmpty || !pet.pottyLogs.isEmpty
                 || !pet.walkLogs.isEmpty || !pet.hygieneLogs.isEmpty
+                || !pet.careLogs.isEmpty || !pet.foodRecords.isEmpty
+                || !pet.expenseLogs.isEmpty || !pet.weightLogs.isEmpty
+                || !pet.photoLogs.isEmpty || !pet.milestones.isEmpty
             return Achievement(id: "first_record", emoji: "📝", title: "第一步",
                                description: "完成第一条宠物记录",
                                color: Color.goCardCyan, isUnlocked: hasAny)
@@ -199,7 +207,8 @@ final class AchievementManager {
         let dayOneCheckin: Achievement = {
             return Achievement(id: "day_one_checkin", emoji: "✅", title: "今日全勤",
                                description: "今天至少完成了一次打卡记录",
-                               color: Color.goTeal, isUnlocked: hasTodayHealth || hasTodayHygiene || hasTodayPotty)
+                               color: Color.goTeal,
+                               isUnlocked: hasTodayHealth || hasTodayHygiene || hasTodayPotty || hasTodayCare || hasTodayWalk || hasTodayWeight)
         }()
 
         // 10. 🤝 老朋友：使用 Ohana 超过 7 天（基于 pet.createdAt）

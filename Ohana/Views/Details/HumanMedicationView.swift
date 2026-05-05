@@ -183,6 +183,9 @@ struct HumanMedicationView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 16)
 
+                    HumanPrivateDataNotice(human: human, field: .medication)
+                        .padding(.horizontal, 16)
+
                     // ── 汇总 Bento
                     summaryBento
                         .padding(.horizontal, 16)

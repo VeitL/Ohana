@@ -77,11 +77,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                if isMaterial {
-                    matBg.ignoresSafeArea()
-                } else {
-                    ArkBackgroundView()
-                }
+                OhanaAppBackground()
                 
                 ScrollView {
                     VStack(spacing: 18) {
@@ -491,34 +487,10 @@ struct SettingsView: View {
                     .padding(.top, 8)
                 }
             }
-            .navigationTitle(isMaterial ? "" : "设置")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        if isMaterial {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(tertiaryText)
-                                .frame(width: 32, height: 32)
-                                .background(matSurface, in: Circle())
-                                .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
-                        } else {
-                            Image(systemName: "xmark.circle.fill")
-                                .symbolRenderingMode(.hierarchical)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                ToolbarItem(placement: .topBarLeading) {
-                    if isMaterial {
-                        Text("Settings")
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
-                    }
-                }
-            }
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbar(.hidden, for: .navigationBar)
         }
         .preferredColorScheme(preferredScheme)
         .fullScreenCover(isPresented: $showingFocusStackTest) {
@@ -777,9 +749,14 @@ struct SettingsView: View {
                         .foregroundStyle(tertiaryText)
                 }
                 Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(tertiaryText.opacity(0.6))
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .black))
+                        .foregroundStyle(secondaryText)
+                        .frame(width: 34, height: 34)
+                        .background(Color.primary.opacity(0.07), in: Circle())
+                }
+                .buttonStyle(ScaleButtonStyle())
             }
             .padding(20)
         }
@@ -844,7 +821,7 @@ struct SettingsView: View {
             }
             .padding(.vertical, 4)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func notificationToggleRow(icon: String, iconColor: Color, title: String, key: String) -> some View {
@@ -966,7 +943,8 @@ private struct BackgroundStyleCard: View {
                     .foregroundStyle(isSelected ? Color.goPrimary : .primary.opacity(0.6))
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
+        .animation(.spring(response: 0.28, dampingFraction: 0.82), value: isSelected)
     }
 }
 
@@ -1036,7 +1014,8 @@ private struct UIStyleCard: View {
                     .fill(.white.opacity(isSelected ? 0.08 : 0.04))
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
+        .animation(.spring(response: 0.28, dampingFraction: 0.82), value: isSelected)
     }
 }
 

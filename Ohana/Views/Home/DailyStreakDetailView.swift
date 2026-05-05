@@ -71,7 +71,7 @@ struct DailyStreakDetailView: View {
             Text("补签 \(showMakeupConfirm ?? "")，将消耗1个补签包")
         }
         .sheet(isPresented: $showCoconutShop) {
-            CoconutShopView()
+            CoconutShopView(initialCategory: .boost)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }

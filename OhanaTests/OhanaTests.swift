@@ -515,6 +515,30 @@ struct OhanaTests {
         } else {
             Issue.record("没有任务和历史时应进入欢迎态")
         }
+
+        if case .celebrate = TodayFocusService.decide(pets: [pet], plants: [], quests: [], careLogs: [], walkLogs: [], pottyLogs: [], memory: nil) {
+        } else {
+            Issue.record("有成员但没有任务时应显示恭喜提示")
+        }
+    }
+
+    @MainActor
+    @Test func todayFocusTreatsWalkAsPlayCompletion() async throws {
+        let pet = Pet(name: "Momo", species: "狗")
+        let playQuest = IslandQuest(
+            id: "q_play_\(pet.id.uuidString)",
+            emoji: "🎾",
+            title: "陪 Momo 玩一会儿",
+            subtitle: "",
+            isCompleted: false,
+            targetPetId: pet.id,
+            targetPlantId: nil
+        )
+        let walkLog = PetWalkLog(pet: pet)
+
+        let refreshed = TodayFocusService.refreshedQuests([playQuest], pets: [pet], careLogs: [], walkLogs: [walkLog], pottyLogs: [])
+
+        #expect(refreshed.first?.isCompleted == true)
     }
 
     @MainActor
@@ -544,6 +568,17 @@ struct OhanaTests {
         #expect(ids.contains("q_moment_\(pet.id.uuidString)"))
         #expect(!ids.contains { $0.hasPrefix("q_feed_") })
         #expect(!ids.contains { $0.hasPrefix("q_water_") })
+    }
+
+    @MainActor
+    @Test func islandQuestEngineDoesNotCreatePlayTaskForEveryPetAfterInteraction() async throws {
+        let momo = Pet(name: "Momo", species: "狗")
+        let lilo = Pet(name: "Lilo", species: "猫")
+        momo.walkLogs.append(PetWalkLog(pet: momo))
+
+        let quests = IslandQuestEngine.todayQuests(pets: [momo, lilo], reminders: [])
+
+        #expect(!quests.contains { $0.id.hasPrefix("q_play_") })
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {

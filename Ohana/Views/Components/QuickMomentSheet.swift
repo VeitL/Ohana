@@ -15,13 +15,15 @@ import Combine
 struct QuickMomentSheet: View {
     let pet: Pet?
     var onRemove: (() -> Void)? = nil
+    var onSaved: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
     @State private var noteText = ""
-    @State private var selectedItem: PhotosPickerItem? = nil
-    @State private var selectedImage: UIImage? = nil
+    @State private var selectedItems: [PhotosPickerItem] = []
+    @State private var selectedPhotos: [MomentDraftPhoto] = []
+    @State private var capturedImage: UIImage? = nil
     @State private var showCamera = false
     @State private var manualPlace = ""
     @StateObject private var locationModel = MomentLocationModel()
@@ -46,8 +48,10 @@ struct QuickMomentSheet: View {
     }
 
     private var canSave: Bool {
-        selectedImage != nil || !noteText.trimmingCharacters(in: .whitespaces).isEmpty
+        !selectedPhotos.isEmpty || !noteText.trimmingCharacters(in: .whitespaces).isEmpty
     }
+
+    private let maxDraftPhotos = 9
 
     var body: some View {
         NavigationStack {
@@ -105,13 +109,25 @@ struct QuickMomentSheet: View {
                 }
             }
         }
-        .onChange(of: selectedItem) { _, newItem in
+        .onChange(of: selectedItems) { _, newItems in
             Task {
-                if let data = try? await newItem?.loadTransferable(type: Data.self),
-                   let img = UIImage(data: data) {
-                    await MainActor.run { selectedImage = img }
+                var loaded: [MomentDraftPhoto] = []
+                for item in newItems {
+                    if let data = try? await item.loadTransferable(type: Data.self),
+                       let img = UIImage(data: data) {
+                        loaded.append(MomentDraftPhoto(image: img))
+                    }
+                }
+                await MainActor.run {
+                    appendDraftPhotos(loaded)
+                    selectedItems = []
                 }
             }
+        }
+        .onChange(of: capturedImage) { _, img in
+            guard let img else { return }
+            appendDraftPhotos([MomentDraftPhoto(image: img)])
+            capturedImage = nil
         }
         .overlay {
             if savedSuccess {
@@ -119,7 +135,7 @@ struct QuickMomentSheet: View {
             }
         }
         .sheet(isPresented: $showCamera) {
-            MomentCameraPicker(image: $selectedImage)
+            MomentCameraPicker(image: $capturedImage)
         }
     }
 
@@ -244,75 +260,94 @@ struct QuickMomentSheet: View {
     // MARK: - Photo Section
 
     private var photoSection: some View {
-        Group {
-            if let img = selectedImage {
-                ZStack(alignment: .topTrailing) {
-                    Image(uiImage: img)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 200)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-
-                    Button {
-                        selectedImage = nil
-                        selectedItem = nil
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundStyle(.white)
-                            .shadow(radius: 4)
-                    }
-                    .padding(10)
-                }
-            } else {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
-                        .foregroundStyle(Color.secondary.opacity(0.35))
-
-                    VStack(spacing: 16) {
-                        HStack(spacing: 20) {
-                            PhotosPicker(selection: $selectedItem, matching: .images) {
-                                VStack(spacing: 6) {
-                                    Image(systemName: "photo.on.rectangle.angled")
-                                        .font(.system(size: 28))
-                                        .foregroundStyle(momentAccent)
-                                    Text("从相册选择")
-                                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                                        .foregroundStyle(.primary)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
-                            }
-                            .buttonStyle(.plain)
-
-                            Button { showCamera = true } label: {
-                                VStack(spacing: 6) {
-                                    Image(systemName: "camera.fill")
-                                        .font(.system(size: 28))
-                                        .foregroundStyle(Color.goTeal)
-                                    Text("拍照")
-                                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                                        .foregroundStyle(.primary)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
-                            }
-                            .buttonStyle(.plain)
+        VStack(spacing: 12) {
+            if !selectedPhotos.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(selectedPhotos) { photo in
+                            draftPhotoCard(photo)
                         }
-
-                        Text("也可以跳过照片，仅写下文字")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.tertiary)
                     }
-                    .padding(16)
+                    .padding(.horizontal, 2)
+                    .scrollTargetLayout()
                 }
-                .frame(height: 140)
+                .scrollTargetBehavior(.viewAligned)
             }
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                    .foregroundStyle(Color.secondary.opacity(0.28))
+
+                VStack(spacing: 12) {
+                    HStack(spacing: 12) {
+                        PhotosPicker(selection: $selectedItems, maxSelectionCount: max(1, maxDraftPhotos - selectedPhotos.count), matching: .images) {
+                            photoActionLabel(icon: "photo.on.rectangle.angled", title: selectedPhotos.isEmpty ? "从相册选择" : "继续添加", color: momentAccent)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(selectedPhotos.count >= maxDraftPhotos)
+
+                        Button { showCamera = true } label: {
+                            photoActionLabel(icon: "camera.fill", title: "拍照", color: Color.goTeal)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(selectedPhotos.count >= maxDraftPhotos)
+                    }
+
+                    Text(selectedPhotos.isEmpty ? "可以跳过照片，仅写下文字" : "已添加 \(selectedPhotos.count)/\(maxDraftPhotos) 张，保存后都会进入历史记录")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(16)
+            }
+            .frame(height: selectedPhotos.isEmpty ? 140 : 126)
         }
+    }
+
+    private func draftPhotoCard(_ photo: MomentDraftPhoto) -> some View {
+        ZStack(alignment: .topTrailing) {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.black.opacity(0.88))
+                .overlay {
+                    Image(uiImage: photo.image)
+                        .resizable()
+                        .scaledToFit()
+                        .padding(8)
+                }
+
+            Button {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                    selectedPhotos.removeAll { $0.id == photo.id }
+                }
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 24))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.white)
+                    .shadow(radius: 4)
+            }
+            .padding(10)
+        }
+        .frame(width: min(ScreenCompat.width - 64, 320), height: 240)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+        }
+    }
+
+    private func photoActionLabel(icon: String, title: String, color: Color) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 26, weight: .bold))
+                .foregroundStyle(color)
+            Text(title)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(.primary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     // MARK: - 心情标签 + 文字
@@ -484,34 +519,41 @@ struct QuickMomentSheet: View {
         let lat = locationModel.latitude
         let lon = locationModel.longitude
         let hasCoords = lat != 0 || lon != 0
-        var savedLog: PetPhotoLog?
+        var savedLogs: [PetPhotoLog] = []
+        let baseDate = Date()
 
-        if let img = selectedImage, let data = img.jpegData(compressionQuality: 0.82) {
-            let log = PetPhotoLog(
-                imageData: data, date: Date(), note: note, pet: pet,
-                locationLatitude: hasCoords ? lat : 0,
-                locationLongitude: hasCoords ? lon : 0,
-                locationPlacename: placeName
-            )
-            modelContext.insert(log)
-            savedLog = log
+        if !selectedPhotos.isEmpty {
+            for (index, photo) in selectedPhotos.enumerated() {
+                guard let data = photo.image.jpegData(compressionQuality: 0.82) else { continue }
+                let log = PetPhotoLog(
+                    imageData: data,
+                    date: baseDate.addingTimeInterval(Double(index) * 0.01),
+                    note: note,
+                    pet: pet,
+                    locationLatitude: hasCoords ? lat : 0,
+                    locationLongitude: hasCoords ? lon : 0,
+                    locationPlacename: placeName
+                )
+                modelContext.insert(log)
+                savedLogs.append(log)
+            }
         } else if !note.isEmpty {
             let placeholder = UIImage()
             let data = placeholder.pngData() ?? Data(count: 1)
             let log = PetPhotoLog(
-                imageData: data, date: Date(), note: note, pet: pet,
+                imageData: data, date: baseDate, note: note, pet: pet,
                 locationLatitude: hasCoords ? lat : 0,
                 locationLongitude: hasCoords ? lon : 0,
                 locationPlacename: placeName
             )
             modelContext.insert(log)
-            savedLog = log
+            savedLogs.append(log)
         }
 
         modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         QuestManager.shared.addCoconuts(1, emoji: "📸", title: "记录时刻 +1🥥")
-        if let savedLog {
+        if let savedLog = savedLogs.first {
             CareLedgerService.record(
                 occurredAt: savedLog.date,
                 actorKind: .unknown,
@@ -529,16 +571,35 @@ struct QuickMomentSheet: View {
         }
 
         withAnimation(.spring(response: 0.3)) { savedSuccess = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            isSaving = false
+            onSaved?()
+            dismiss()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             noteText = ""
-            selectedImage = nil
-            selectedItem = nil
+            selectedPhotos = []
+            selectedItems = []
             manualPlace = ""
             locationModel.reset()
-            isSaving = false
             withAnimation(.easeOut(duration: 0.25)) { savedSuccess = false }
         }
     }
+
+    @MainActor
+    private func appendDraftPhotos(_ photos: [MomentDraftPhoto]) {
+        guard !photos.isEmpty else { return }
+        let remaining = max(0, maxDraftPhotos - selectedPhotos.count)
+        guard remaining > 0 else { return }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
+            selectedPhotos.append(contentsOf: photos.prefix(remaining))
+        }
+    }
+}
+
+private struct MomentDraftPhoto: Identifiable {
+    let id = UUID()
+    let image: UIImage
 }
 
 // MARK: - 定位

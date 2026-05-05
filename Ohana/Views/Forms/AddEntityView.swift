@@ -39,7 +39,8 @@ enum EntityType: String, CaseIterable {
 
     var isAvailable: Bool {
         switch self {
-        case .pet, .human, .plant: return true
+        case .pet, .human: return true
+        case .plant: return false
         }
     }
 }
@@ -85,7 +86,7 @@ struct AddEntityView: View {
                             }
                         )
                     case .plant:
-                        AddPlantView(onComplete: { dismiss() })
+                        plantComingSoonView
                     }
                 } else {
                     entitySelector
@@ -128,7 +129,7 @@ struct AddEntityView: View {
             .padding(.horizontal, 24)
 
             VStack(spacing: 12) {
-                ForEach(EntityType.allCases, id: \.self) { type in
+                ForEach(Array(EntityType.allCases.enumerated()), id: \.element) { index, type in
                     Button {
                         guard type.isAvailable else { return }
                         withAnimation(.spring(response: 0.4)) { selectedType = type }
@@ -137,10 +138,44 @@ struct AddEntityView: View {
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .disabled(!type.isAvailable)
+                    .ohanaSmoothAppear(index: index)
                 }
             }
             .padding(.horizontal, 20)
 
+            Spacer()
+        }
+    }
+
+    private var plantComingSoonView: some View {
+        VStack(spacing: 18) {
+            Spacer()
+            Image(systemName: "leaf")
+                .font(.system(size: 34, weight: .semibold))
+                .foregroundStyle(Color.goLime.opacity(0.45))
+                .frame(width: 76, height: 76)
+                .background(Color.white.opacity(0.06), in: Circle())
+            VStack(spacing: 8) {
+                Text("植物功能待开发")
+                    .font(.system(size: 24, weight: .black, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.82))
+                Text("现在先添加宠物或人类成员。植物照护会在后续版本开放。")
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.48))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 28)
+            }
+            Button {
+                withAnimation(.easeInOut(duration: 0.22)) { selectedType = nil }
+            } label: {
+                Text("返回")
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.arkInk)
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 12)
+                    .background(Color.goLime.opacity(0.85), in: Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
             Spacer()
         }
     }
@@ -202,7 +237,7 @@ struct AddEntityView: View {
         switch type {
         case .pet: return l.addEntityPetBlurb
         case .human: return l.addEntityHumanBlurb
-        case .plant: return l.addEntityPlantBlurb
+        case .plant: return "待开发 · 暂不可添加"
         }
     }
 }

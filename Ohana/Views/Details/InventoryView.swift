@@ -10,6 +10,7 @@ import SwiftData
 
 struct InventoryView: View {
     @Environment(\.dismiss) private var dismiss
+    @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @AppStorage("purchasedShopItems") private var purchasedRaw: String = ""
     
     // Equip states
@@ -23,6 +24,8 @@ struct InventoryView: View {
     @AppStorage("inventory_backdate_1day_count") private var backdatePacks: Int = 0
     @AppStorage("shop_boostDoubleActive") private var doubleBoostActive: Bool = false
     @State private var streakShieldExpiry: Date? = nil
+    @State private var showPetPickerForPopout = false
+    @State private var equipPopoutPet: Pet? = nil
     
     // All items reference (mirrors CoconutShopView)
     private var allEffectsAndTitles: [ShopItem] {
@@ -119,6 +122,17 @@ struct InventoryView: View {
             }
         }
         .onAppear { loadStreakShieldExpiry() }
+        .confirmationDialog("选择要绑定破框卡片的宠物", isPresented: $showPetPickerForPopout, titleVisibility: .visible) {
+            ForEach(pets) { pet in
+                Button(pet.name) { equipPopoutPet = pet }
+            }
+            Button("取消", role: .cancel) {}
+        }
+        .sheet(item: $equipPopoutPet) { pet in
+            EquipPopoutCardSheet(pet: pet)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
     }
     
     // MARK: - Section Helper
@@ -220,9 +234,21 @@ struct InventoryView: View {
             Spacer()
             
             if item.id == "fx_popout_card" {
-                Text("去商店绑定")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.3))
+                Button {
+                    if pets.count == 1 {
+                        equipPopoutPet = pets.first
+                    } else if pets.count > 1 {
+                        showPetPickerForPopout = true
+                    }
+                } label: {
+                    Text("绑定")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.goDarkBlue)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                        .background(Color.goPrimary, in: Capsule())
+                }
+                .buttonStyle(.plain)
             } else {
                 Toggle("", isOn: isActive)
                     .tint(Color.goPrimary)

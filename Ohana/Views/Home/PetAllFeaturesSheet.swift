@@ -142,7 +142,9 @@ struct PetAllFeaturesSheet: View {
         case .petPotty(_):         PottyOverviewView(pet: pet)
         case .petBasicInfo(_):     PetBasicInfoDetailView(pet: pet)
         case .petDocuments(_):     DocumentsListView(pet: pet)
+        case .petInsurance(_):     PetInsuranceView(pet: pet)
         case .petMoments(_):       PetMomentsHubView(pet: pet)
+        case .petTimeline(_):      PetUnifiedTimelineSheet(pet: pet)
         case .petAchievements(_):  AchievementWallView(pet: pet)
         case .petRetention(_):     PetRetentionHubView(pet: pet)
         case .petWeight(_):        WeightHistoryView(pet: pet)
@@ -200,6 +202,29 @@ struct PetAllFeaturesSheet: View {
     }
     private var momentsSub: String {
         let n = pet.photoLogs.count; return n > 0 ? "\(n)个时刻" : "暂无时刻"
+    }
+    private var basicInfoSub: String {
+        if !pet.breed.isEmpty { return pet.breed }
+        if !pet.species.isEmpty { return pet.species }
+        return "完善基本信息"
+    }
+    private var documentsSub: String {
+        let n = pet.documents.count
+        return n > 0 ? "\(n)份证件" : "暂无证件"
+    }
+    private var insuranceSub: String {
+        let n = pet.insurances.count
+        if n == 0 { return "暂无保险" }
+        let active = pet.insurances.filter { $0.renewalDate >= Date() }.count
+        return active > 0 ? "\(active)份生效中" : "\(n)份已过期"
+    }
+    private var timelineSub: String {
+        let total = pet.photoLogs.count + pet.milestones.count + pet.healthLogs.count + pet.weightLogs.count
+        return total > 0 ? "\(total)条记录" : "暂无记录"
+    }
+    private var achievementsSub: String {
+        let n = pet.milestones.count
+        return n > 0 ? "\(n)个里程碑" : "暂无成就"
     }
     private var retentionSub: String {
         let score = [
@@ -327,6 +352,7 @@ struct PetAllFeaturesSheet: View {
             }
             .padding(.horizontal, 2)
 
+            // 第一行：成长档案（综合） + 基本信息
             HStack(spacing: 12) {
                 compactFeatureTile(
                     icon: "sparkles.rectangle.stack.fill",
@@ -339,17 +365,35 @@ struct PetAllFeaturesSheet: View {
                     icon: "person.fill",
                     color: Color(hex: "6B82C4"),
                     title: "基本信息",
-                    subtitle: pet.breed.isEmpty ? pet.species : pet.breed,
+                    subtitle: basicInfoSub,
                     destination: .petBasicInfo(pet.persistentModelID)
                 )
             }
+            // 第二行：证件 + 保险（拆出来独立入口）
             HStack(spacing: 12) {
                 compactFeatureTile(
                     icon: "doc.fill",
                     color: Color(hex: "94A3B8"),
                     title: "证件保障",
-                    subtitle: "\(pet.documents.count)份证件",
+                    subtitle: documentsSub,
                     destination: .petDocuments(pet.persistentModelID)
+                )
+                compactFeatureTile(
+                    icon: "shield.lefthalf.filled",
+                    color: Color(hex: "10B981"),
+                    title: "保险",
+                    subtitle: insuranceSub,
+                    destination: .petInsurance(pet.persistentModelID)
+                )
+            }
+            // 第三行：记忆 — 时间轴 + 重要时刻 + 成就
+            HStack(spacing: 12) {
+                compactFeatureTile(
+                    icon: "clock.arrow.circlepath",
+                    color: Color(hex: "8B5CF6"),
+                    title: "时间轴",
+                    subtitle: timelineSub,
+                    destination: .petTimeline(pet.persistentModelID)
                 )
                 compactFeatureTile(
                     icon: "sparkles",
@@ -362,7 +406,7 @@ struct PetAllFeaturesSheet: View {
                     icon: "trophy.fill",
                     color: Color(hex: "F59E0B"),
                     title: "成就",
-                    subtitle: "\(pet.milestones.count)个里程碑",
+                    subtitle: achievementsSub,
                     destination: .petAchievements(pet.persistentModelID)
                 )
             }

@@ -14,6 +14,7 @@ struct HumanDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
 
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
 
@@ -26,6 +27,7 @@ struct HumanDetailView: View {
     @State private var showingExpenses = false
     @State private var showingMedication = false
     @State private var showingHealthReport = false
+    @State private var showingHomeStackFullAlert = false
 
     @Query private var allPets: [Pet]
     @Query private var allHumans: [Human]
@@ -80,11 +82,15 @@ struct HumanDetailView: View {
                         if human.isPrivate(.weight, viewedBy: activeHumanId) {
                             privacyPlaceholderCard(label: "体重记录")
                         } else {
+                            HumanPrivateDataNotice(human: human, field: .weight)
+                                .padding(.horizontal, 16)
                             weightCard
                         }
                         if human.isPrivate(.medication, viewedBy: activeHumanId) {
                             privacyPlaceholderCard(label: "吃药提醒")
                         } else {
+                            HumanPrivateDataNotice(human: human, field: .medication)
+                                .padding(.horizontal, 16)
                             medicationCard
                         }
                         if human.isPrivate(.weight, viewedBy: activeHumanId) {
@@ -98,6 +104,8 @@ struct HumanDetailView: View {
                         if human.isPrivate(.workout, viewedBy: activeHumanId) {
                             privacyPlaceholderCard(label: "运动记录")
                         } else {
+                            HumanPrivateDataNotice(human: human, field: .workout)
+                                .padding(.horizontal, 16)
                             HumanWorkoutCard(human: human, pets: allPets)
                                 .padding(.horizontal, 16)
                         }
@@ -113,11 +121,15 @@ struct HumanDetailView: View {
                         if human.isPrivate(.expense, viewedBy: activeHumanId) {
                             privacyPlaceholderCard(label: "花费记录")
                         } else {
+                            HumanPrivateDataNotice(human: human, field: .expense)
+                                .padding(.horizontal, 16)
                             humanExpenseCard
                         }
                         if human.isPrivate(.wishlist, viewedBy: activeHumanId) {
                             privacyPlaceholderCard(label: "椰子资产")
                         } else {
+                            HumanPrivateDataNotice(human: human, field: .wishlist)
+                                .padding(.horizontal, 16)
                             humanAssetCard
                         }
 
@@ -170,6 +182,11 @@ struct HumanDetailView: View {
             }
         } message: {
             Text("确定要删除 \(human.name) 吗？此操作不可撤销。")
+        }
+        .alert("首页卡片堆已满", isPresented: $showingHomeStackFullAlert) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text("首页最多显示 \(HomeCardVisibility.maxVisibleCards) 张卡片。请先从首页移除一张宠物或人类卡片，再添加 \(human.name)。")
         }
     }
 
@@ -522,7 +539,14 @@ struct HumanDetailView: View {
             Spacer()
             Toggle("", isOn: Binding(
                 get: { human.shouldShowOnHome },
-                set: { human.shouldShowOnHome = $0; modelContext.safeSave() }
+                set: { visible in
+                    if visible && !HomeCardVisibility.canShowHuman(human, pets: allPets, humans: allHumans, raw: hiddenHomePetIDsRaw) {
+                        showingHomeStackFullAlert = true
+                        return
+                    }
+                    human.shouldShowOnHome = visible
+                    modelContext.safeSave()
+                }
             ))
             .tint(Color.goPrimary)
             .labelsHidden()
@@ -722,22 +746,26 @@ struct HumanDetailView: View {
             if human.isPrivate(.note, viewedBy: activeHumanId) {
                 privacyPlaceholderCard(label: "备注")
             } else if !human.notes.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "note.text")
-                            .font(OhanaFont.callout(.bold))
-                            .foregroundStyle(Color.goPrimary)
-                        Text("备注")
-                            .font(OhanaFont.headline(.bold))
-                            .foregroundStyle(Color(hex: "1E3A8A"))
+                VStack(spacing: 10) {
+                    HumanPrivateDataNotice(human: human, field: .note)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "note.text")
+                                .font(OhanaFont.callout(.bold))
+                                .foregroundStyle(Color.goPrimary)
+                            Text("备注")
+                                .font(OhanaFont.headline(.bold))
+                                .foregroundStyle(Color(hex: "1E3A8A"))
+                        }
+                        Text(human.notes)
+                            .font(OhanaFont.body())
+                            .foregroundStyle(Color(hex: "475569"))
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    Text(human.notes)
-                        .font(OhanaFont.body())
-                        .foregroundStyle(Color(hex: "475569"))
-                        .fixedSize(horizontal: false, vertical: true)
+                    .padding(16)
+                    .goIslandModuleCard(cornerRadius: 24)
                 }
-                .padding(16)
-                .goIslandModuleCard(cornerRadius: 24)
                 .padding(.horizontal, 16)
             }
         }

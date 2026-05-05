@@ -84,6 +84,7 @@ struct GoDashboardView: View {
     @State private var memoryDismissed = false
     @State private var memoryDragOffset: CGFloat = 0
     @State private var showMomentPet: Pet? = nil
+    @State private var showMomentHistoryPet: Pet? = nil
     @State private var isQAEditMode = false
     @State private var qaJiggle = false
     @State private var qaEditItems: [QuickActionItem] = []
@@ -255,6 +256,11 @@ struct GoDashboardView: View {
                     .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(l.addEntityClose) { showMomentPet = nil } } }
             }
             .presentationDetents([.large]).presentationDragIndicator(.visible)
+        }
+        .sheet(item: $showMomentHistoryPet) { pet in
+            PetMomentsHubView(pet: pet)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         .background(goSecondarySheets)
         .alert(antiRepeatTitle, isPresented: $showingAntiRepeatAlert) {
@@ -703,6 +709,7 @@ private extension GoDashboardView {
                             onSettings: { showingHeaderPopover = false; DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { showingSettings = true } }
                         )
                         .presentationCompactAdaptation(.popover)
+                        .presentationBackground(.clear)
                     }
                 case 1:
                     goHeaderIconButton(systemName: "plus.circle.fill") { showingAddEntity = true }
@@ -1707,6 +1714,7 @@ private extension GoDashboardView {
         case "walk":                quickWalkDetailPet = p
         case "weight":              quickWeightDetailPet = p
         case "expense":             quickExpenseDetailPet = p
+        case "moment":              showMomentHistoryPet = p
         default:                    selectedPet = p; selectedPetTab = .overview
         }
     }

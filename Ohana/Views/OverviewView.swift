@@ -329,6 +329,18 @@ struct OverviewView: View {
                 .transition(.opacity)
             }
 
+            if showingHomeHeaderPopover {
+                Color.black.opacity(0.001)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                            showingHomeHeaderPopover = false
+                        }
+                    }
+                    .zIndex(80)
+            }
+
             // R6: 全局固定前置层 — glass header；首页上滑时随滚动渐隐
             VStack(spacing: 0) {
                 globalFixedHeader
@@ -342,6 +354,7 @@ struct OverviewView: View {
                 }
                 Spacer()
             }
+            .zIndex(100)
 
             // Floating Dock Nav
             VStack {
@@ -964,48 +977,57 @@ struct OverviewView: View {
                     case 0:
                         // 首页：更多（圆角矩形 ⋯）+ 连续打卡数字 + 椰子
                         Button {
-                            showingHomeHeaderPopover = true
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.76)) {
+                                showingHomeHeaderPopover.toggle()
+                            }
                         } label: {
                             Image(systemName: "ellipsis")
                                 .font(OhanaFont.subheadline(.bold))
-                                .foregroundStyle(Color.goPrimary)
+                                .foregroundStyle(showingHomeHeaderPopover ? Color.arkInk : Color.goPrimary)
                                 .frame(width: 32, height: 28)
-                                .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .background(
+                                    showingHomeHeaderPopover ? Color.goPrimary : Color.primary.opacity(0.08),
+                                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                )
                         }
-                        .buttonStyle(.plain)
-                        .popover(isPresented: $showingHomeHeaderPopover, arrowEdge: .top) {
-                            OverviewHeaderPopoverMenu(
-                                addTitle: l.addMember,
-                                crewTitle: l.ohanaCrew,
-                                manageTitle: l.manageHome,
-                                settingsTitle: l.settings,
-                                onAdd: {
-                                    showingHomeHeaderPopover = false
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        .buttonStyle(ScaleButtonStyle())
+                        .animation(.spring(response: 0.28, dampingFraction: 0.82), value: showingHomeHeaderPopover)
+                        .overlay(alignment: .topTrailing) {
+                            if showingHomeHeaderPopover {
+                                OverviewHeaderPopoverMenu(
+                                    addTitle: l.addMember,
+                                    crewTitle: l.ohanaCrew,
+                                    manageTitle: l.manageHome,
+                                    settingsTitle: l.settings,
+                                    onAdd: {
+                                        closeHomeHeaderMenu()
                                         showingAddEntity = true
-                                    }
-                                },
-                                onCrew: {
-                                    showingHomeHeaderPopover = false
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                    },
+                                    onCrew: {
+                                        closeHomeHeaderMenu()
                                         showingCrewRoster = true
-                                    }
-                                },
-                                onManage: {
-                                    showingHomeHeaderPopover = false
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                    },
+                                    onManage: {
+                                        closeHomeHeaderMenu()
                                         showingManageSheet = true
-                                    }
-                                },
-                                onSettings: {
-                                    showingHomeHeaderPopover = false
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                    },
+                                    onSettings: {
+                                        closeHomeHeaderMenu()
                                         showingSettings = true
                                     }
-                                }
-                            )
-                            .presentationCompactAdaptation(.popover)
+                                )
+                                .offset(y: 38)
+                                .transition(.asymmetric(
+                                    insertion: .scale(scale: 0.72, anchor: .topTrailing)
+                                        .combined(with: .opacity)
+                                        .combined(with: .move(edge: .top)),
+                                    removal: .scale(scale: 0.88, anchor: .topTrailing)
+                                        .combined(with: .opacity)
+                                ))
+                            }
                         }
+                        .zIndex(showingHomeHeaderPopover ? 200 : 0)
 
                         Button { showStreakDetail = true } label: {
                             HStack(spacing: 3) {
@@ -2608,6 +2630,8 @@ struct OverviewView: View {
             quickWeightDetailPet = p
         case "expense":
             quickExpenseDetailPet = p
+        case "moment":
+            cardBackMomentsPet = p
         default:
             selectedPet = p
             selectedPetTab = .overview
@@ -3571,6 +3595,13 @@ struct OverviewView: View {
             .padding(.top, 16)
         }
     }
+
+    private func closeHomeHeaderMenu() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+            showingHomeHeaderPopover = false
+        }
+    }
 }
 
 // MARK: - Header Popover Menu
@@ -3583,39 +3614,59 @@ private struct OverviewHeaderPopoverMenu: View {
     let onCrew: () -> Void
     let onManage: () -> Void
     let onSettings: () -> Void
+    @State private var appeared = false
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .trailing, spacing: 10) {
             if let addTitle, let onAdd {
-                row(icon: "person.badge.plus", title: addTitle, action: onAdd)
-                Divider()
+                row(index: 0, icon: "person.badge.plus", title: addTitle, action: onAdd)
             }
-            row(icon: "person.2.fill", title: crewTitle, action: onCrew)
-            Divider()
-            row(icon: "slider.horizontal.3", title: manageTitle, action: onManage)
-            Divider()
-            row(icon: "gearshape.fill", title: settingsTitle, action: onSettings)
+            row(index: 1, icon: "person.2.fill", title: crewTitle, action: onCrew)
+            row(index: 2, icon: "slider.horizontal.3", title: manageTitle, action: onManage)
+            row(index: 3, icon: "gearshape.fill", title: settingsTitle, action: onSettings)
         }
-        .frame(minWidth: 220)
-        .padding(.vertical, 4)
+        .padding(10)
+        .background(.ultraThinMaterial.opacity(0.94), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.16), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.22), radius: 18, x: 0, y: 10)
+        .onAppear {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.76)) {
+                appeared = true
+            }
+        }
     }
 
-    private func row(icon: String, title: String, action: @escaping () -> Void) -> some View {
+    private func row(index: Int, icon: String, title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.ultraThinMaterial.opacity(0.82), in: Capsule())
                 Image(systemName: icon)
                     .font(.system(size: 15, weight: .semibold))
-                    .frame(width: 22)
-                Text(title)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                Spacer()
+                    .foregroundStyle(.white)
+                    .frame(width: 40, height: 40)
+                    .background(Color(hex: "1A2E8A"), in: Circle())
+                    .shadow(color: Color(hex: "1A2E8A").opacity(0.34), radius: 8, y: 4)
             }
-            .foregroundStyle(Color.primary)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .contentShape(Rectangle())
+            .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
+        .opacity(appeared ? 1 : 0)
+        .scaleEffect(appeared ? 1 : 0.62, anchor: .trailing)
+        .offset(y: appeared ? 0 : -12)
+        .animation(
+            .spring(response: 0.34, dampingFraction: 0.74)
+            .delay(Double(index) * 0.045),
+            value: appeared
+        )
     }
 }
 

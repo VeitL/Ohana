@@ -96,6 +96,51 @@ enum WalletPetCardTheme {
     }
 }
 
+enum HomeCardVisibility {
+    static let hiddenPetIDsKey = "hiddenHomePetIDs.v1"
+    static let maxVisibleCards = 7
+
+    static func isPetVisible(_ pet: Pet, raw: String? = nil) -> Bool {
+        !hiddenPetIDs(from: raw ?? UserDefaults.standard.string(forKey: hiddenPetIDsKey) ?? "")
+            .contains(pet.id.uuidString)
+    }
+
+    static func visibleCardCount(pets: [Pet], humans: [Human], raw: String? = nil) -> Int {
+        let hiddenRaw = raw ?? UserDefaults.standard.string(forKey: hiddenPetIDsKey) ?? ""
+        let petCount = pets.filter { !$0.hasPassedAway && isPetVisible($0, raw: hiddenRaw) }.count
+        let humanCount = humans.filter(\.shouldShowOnHome).count
+        return petCount + humanCount
+    }
+
+    static func canShowPet(_ pet: Pet, pets: [Pet], humans: [Human], raw: String? = nil) -> Bool {
+        if isPetVisible(pet, raw: raw) { return true }
+        return visibleCardCount(pets: pets, humans: humans, raw: raw) < maxVisibleCards
+    }
+
+    static func canShowHuman(_ human: Human, pets: [Pet], humans: [Human], raw: String? = nil) -> Bool {
+        if human.shouldShowOnHome { return true }
+        return visibleCardCount(pets: pets, humans: humans, raw: raw) < maxVisibleCards
+    }
+
+    static func rawBySettingPet(_ pet: Pet, visible: Bool, raw: String) -> String {
+        var ids = hiddenPetIDs(from: raw)
+        if visible {
+            ids.remove(pet.id.uuidString)
+        } else {
+            ids.insert(pet.id.uuidString)
+        }
+        return encodedHiddenPetIDs(ids)
+    }
+
+    private static func hiddenPetIDs(from raw: String) -> Set<String> {
+        Set(raw.split(separator: ",").map(String.init))
+    }
+
+    private static func encodedHiddenPetIDs(_ ids: Set<String>) -> String {
+        ids.sorted().joined(separator: ",")
+    }
+}
+
 // MARK: - Wallet Stack Container
 struct PetWalletStack: View {
     let pets: [Pet]
@@ -112,22 +157,25 @@ struct PetWalletStack: View {
     @State private var isDragging = false
     /// 顶部卡片空闲时微漂浮（首页简化 · 可爱化）
     @State private var idleBreath: CGFloat = 0
+    @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
 
     private var items: [DeckItem] {
-        let petItems = pets.map { DeckItem.pet($0) }
+        let petItems = pets
+            .filter { HomeCardVisibility.isPetVisible($0, raw: hiddenHomePetIDsRaw) }
+            .map { DeckItem.pet($0) }
         let humanItems = humans.filter { $0.shouldShowOnHome }.map { DeckItem.human($0) }
-        return petItems + humanItems
+        return Array((petItems + humanItems).prefix(maxVisible))
     }
 
-    private let maxVisible = 3
-    private let stackPeek: CGFloat = 30
+    private let maxVisible = 6
+    private let stackPeek: CGFloat = 28
     private let cardCorner: CGFloat = 24
 
     private var stackCardHeight: CGFloat {
         (ScreenCompat.width - 48) / 1.586
     }
 
-    /// 最多显示 maxVisible 张，超出部分在栈上方（off-screen）待命
+    /// 首页只展示前 maxVisible 张卡片。
     private var visibleCount: Int { min(items.count, maxVisible) }
 
     /// 相对深度：0 = 最前，maxVisible-1 = 最后可见，>= maxVisible = 隐藏于栈上方
@@ -152,18 +200,6 @@ struct PetWalletStack: View {
             .contentShape(Rectangle())
             .highPriorityGesture(stackDragGesture)
 
-            // 分页指示器：位于最前方卡片正下方
-            if items.count > 1 {
-                HStack(spacing: 6) {
-                    ForEach(0..<min(items.count, 6), id: \.self) { idx in
-                        Capsule()
-                            .fill(idx == activeIndex ? Color.goPrimary : Color.white.opacity(0.35))
-                            .frame(width: idx == activeIndex ? 24 : 7, height: 7)
-                    }
-                }
-                .animation(.spring(response: 0.35, dampingFraction: 0.7), value: activeIndex)
-                .padding(.top, 22)
-            }
         }
         .padding(.horizontal, 24)
         .onAppear {
@@ -178,6 +214,14 @@ struct PetWalletStack: View {
             guard items.indices.contains(newValue) else { return }
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             onTopCardChanged?(items[newValue])
+        }
+        .onChange(of: items.map(\.id)) { _, _ in
+            if activeIndex >= items.count {
+                activeIndex = max(items.count - 1, 0)
+            }
+            if items.indices.contains(activeIndex) {
+                onTopCardChanged?(items[activeIndex])
+            }
         }
     }
 
@@ -251,10 +295,13 @@ struct PetWalletStack: View {
                 isDragging = false
                 onDraggingChanged?(false)
                 let threshold: CGFloat = 50
-                if (value.translation.height < -threshold || value.translation.height > threshold) && items.count > 1 {
-                    // 上滑 / 下滑 → 当前卡放到最后，显示下一张
+                let dy = value.translation.height
+                let dx = value.translation.width
+                if abs(dy) > abs(dx) + 8, abs(dy) > threshold, items.count > 1 {
+                    // 上滑 → 下一张；下滑 → 上一张。首页数据源已限制为最多 7 张。
+                    let direction = dy < 0 ? 1 : -1
                     withAnimation(.spring(response: 0.42, dampingFraction: 0.80)) {
-                        activeIndex = (activeIndex + 1) % items.count
+                        activeIndex = (activeIndex + direction + items.count) % items.count
                         dragOffset = 0
                     }
                 } else {
@@ -423,6 +470,7 @@ struct WalletPetCardFront: View {
     let cornerRadius: CGFloat
 
     private let accent = Color(hex: "FF5A3D")
+    @AppStorage("shop_equip_fx_lime_glow") private var equipFxLimeGlow: Bool = false
 
     private var headlineText: String {
         let trimmed = pet.name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -562,8 +610,9 @@ struct WalletPetCardFront: View {
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
+                    .strokeBorder(equipFxLimeGlow ? Color.goPrimary.opacity(0.72) : .white.opacity(0.15), lineWidth: equipFxLimeGlow ? 1.4 : 0.5)
             )
+            .shadow(color: equipFxLimeGlow ? Color.goPrimary.opacity(0.34) : .clear, radius: equipFxLimeGlow ? 18 : 0, y: 0)
         }
     }
 
@@ -913,6 +962,8 @@ struct WalletHumanCardFront: View {
 
     private let baseBlue = Color(hex: "233BFF")
     private let deepBlue = Color(hex: "141FAE")
+    @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
+    @AppStorage("shop_equipped_title") private var equippedTitle: String = ""
 
     var body: some View {
         GeometryReader { geo in
@@ -977,6 +1028,15 @@ struct WalletHumanCardFront: View {
                     Text(L10n.current.humanWalletResident)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(.white.opacity(0.6))
+                    if let title = equippedTitleBadge {
+                        Text(title)
+                            .font(.system(size: 11, weight: .black, design: .rounded))
+                            .foregroundStyle(.black)
+                            .lineLimit(1)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 4)
+                            .background(Color.goPrimary, in: Capsule())
+                    }
                     let mbtiTrim = human.mbti.trimmingCharacters(in: .whitespaces)
                     let isEn = AppLanguage.isEnglish
                     let hasAgeOrZodiac = human.walletAgeChip(isEnglish: isEn) != nil || human.birthday != nil
@@ -1024,6 +1084,16 @@ struct WalletHumanCardFront: View {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
             )
+        }
+    }
+
+    private var equippedTitleBadge: String? {
+        guard human.id.uuidString == activeHumanId, !equippedTitle.isEmpty else { return nil }
+        switch equippedTitle {
+        case "title_guardian": return "🛡️ 守护者"
+        case "title_pioneer": return "🚀 先行者"
+        case "title_chef": return "👨‍🍳 首席厨师"
+        default: return nil
         }
     }
 

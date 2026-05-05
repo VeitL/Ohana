@@ -492,9 +492,13 @@ struct HumanWorkoutHistoryView: View {
     let human: Human
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @StateObject private var hkManager = HumanHealthKitManager.shared
 
     @State private var showAddSheet = false
+
+    private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
+    private var isPrivacyLocked: Bool { human.isPrivate(.workout, viewedBy: activeHumanId) }
 
     private var sortedLogs: [HumanWorkoutLog] {
         human.workoutLogs.sorted { $0.date > $1.date }
@@ -505,58 +509,67 @@ struct HumanWorkoutHistoryView: View {
             ZStack(alignment: .bottom) {
                 ArkBackgroundView()
 
-                ScrollView {
-                    VStack(spacing: 12) {
-                        summarySection
-                            .padding(.horizontal, 16)
-
-                        if !sortedLogs.isEmpty {
-                            manualSection
-                        }
-
-                        if sortedLogs.isEmpty {
-                            VStack(spacing: 12) {
-                                Text("还没有运动记录")
-                                    .font(OhanaFont.body())
-                                    .foregroundStyle(.primary.opacity(0.35))
-                                    .padding(.top, 60)
-
-                                HStack(spacing: 8) {
-                                    Image(systemName: "hammer.fill")
-                                        .font(OhanaFont.callout())
-                                        .foregroundStyle(.primary.opacity(0.4))
-                                    Text("Apple Health 同步功能开发中")
-                                        .font(OhanaFont.subheadline(.medium))
-                                        .foregroundStyle(.primary.opacity(0.5))
-                                }
+                if isPrivacyLocked {
+                    privacyLockedView
+                } else {
+                    ScrollView {
+                        VStack(spacing: 12) {
+                            HumanPrivateDataNotice(human: human, field: .workout)
                                 .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                .background(
-                                    Color.white.opacity(0.03),
-                                    in: RoundedRectangle(cornerRadius: 12)
-                                )
-                            }
-                        }
 
-                        Spacer(minLength: 100)
+                            summarySection
+                                .padding(.horizontal, 16)
+
+                            if !sortedLogs.isEmpty {
+                                manualSection
+                            }
+
+                            if sortedLogs.isEmpty {
+                                VStack(spacing: 12) {
+                                    Text("还没有运动记录")
+                                        .font(OhanaFont.body())
+                                        .foregroundStyle(.primary.opacity(0.35))
+                                        .padding(.top, 60)
+
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "hammer.fill")
+                                            .font(OhanaFont.callout())
+                                            .foregroundStyle(.primary.opacity(0.4))
+                                        Text("Apple Health 同步功能开发中")
+                                            .font(OhanaFont.subheadline(.medium))
+                                            .foregroundStyle(.primary.opacity(0.5))
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(
+                                        Color.white.opacity(0.03),
+                                        in: RoundedRectangle(cornerRadius: 12)
+                                    )
+                                }
+                            }
+
+                            Spacer(minLength: 100)
+                        }
+                        .padding(.top, 8)
                     }
-                    .padding(.top, 8)
                 }
 
                 // ── 底部 FAB
-                Button { showAddSheet = true } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .black))
-                        Text("添加运动")
-                            .font(.system(size: 16, weight: .black, design: .rounded))
+                if !isPrivacyLocked {
+                    Button { showAddSheet = true } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 16, weight: .black))
+                            Text("添加运动")
+                                .font(.system(size: 16, weight: .black, design: .rounded))
+                        }
+                        .foregroundStyle(Color.arkInk)
+                        .padding(.horizontal, 28).padding(.vertical, 14)
+                        .background(Color.goPrimary, in: Capsule())
+                        .shadow(color: Color.goPrimary.opacity(0.4), radius: 14, y: 5)
                     }
-                    .foregroundStyle(Color.arkInk)
-                    .padding(.horizontal, 28).padding(.vertical, 14)
-                    .background(Color.goPrimary, in: Capsule())
-                    .shadow(color: Color.goPrimary.opacity(0.4), radius: 14, y: 5)
+                    .padding(.bottom, 28)
                 }
-                .padding(.bottom, 28)
             }
             .navigationTitle("运动历史")
             .navigationBarTitleDisplayMode(.inline)
@@ -578,6 +591,23 @@ struct HumanWorkoutHistoryView: View {
                     .presentationDragIndicator(.visible)
             }
         }
+    }
+
+    private var privacyLockedView: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "lock.shield.fill")
+                .font(OhanaFont.metric(size: 44))
+                .foregroundStyle(Color.goYellow)
+            Text(PrivacyService.lockedMessage(for: .workout))
+                .font(OhanaFont.headline(.bold))
+                .foregroundStyle(.primary)
+            Text("请切换到本人档案后再查看。")
+                .font(OhanaFont.callout())
+                .foregroundStyle(.secondary)
+        }
+        .multilineTextAlignment(.center)
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var summarySection: some View {

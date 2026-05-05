@@ -27,7 +27,7 @@ enum QuickActionPickerCatalog {
         Option(id: "health", label: "健康", icon: "heart.fill", colorHex: "FF4757"),
         Option(id: "expense", label: "花费", icon: "yensign.circle", colorHex: "A78BFA"),
         Option(id: "weight", label: "体重", icon: "scalemass.fill", colorHex: "80FFEA"),
-        Option(id: "play", label: "逗玩", icon: "tennisball.fill", colorHex: "FF6B6B"),
+        Option(id: "play", label: "陪玩", icon: "tennisball.fill", colorHex: "FF6B6B"),
         Option(id: "moment", label: "记录", icon: "camera.circle.fill", colorHex: "FF6B9D"),
         Option(id: "waterChange", label: "换水", icon: "drop.circle.fill", colorHex: "4ECDC4"),
         Option(id: "filterClean", label: "清滤材", icon: "wrench.and.screwdriver.fill", colorHex: "A78BFA"),
@@ -44,6 +44,16 @@ enum QuickActionPickerCatalog {
         allowed.insert("water")
         allowed.insert("waterChange")
         allowed.insert("moment")
+        if species.contains("猫") || species.lowercased().contains("cat") {
+            allowed.insert("litter")
+            allowed.insert("play")
+            allowed.insert("weight")
+        }
+        if species.contains("狗") || species.lowercased().contains("dog") {
+            allowed.insert("walk")
+            allowed.insert("groom")
+            allowed.insert("weight")
+        }
         return allowed
     }
 
@@ -135,7 +145,7 @@ struct GoQuickActionCard: View {
             "walk": "遛狗", "feed": "喂食", "water": "喂水",
             "potty": "便便", "litter": "铲屎", "groom": "护理",
             "health": "健康", "expense": "花费", "weight": "体重",
-            "play": "逗玩", "moment": "记录", "waterChange": "换水",
+            "play": "陪玩", "moment": "记录", "waterChange": "换水",
             "filterClean": "清滤材", "cageCleaning": "清鸟笼",
             "freeFlight": "放飞", "misting": "喷水", "substrateChange": "换垫材"
         ]
@@ -1264,4 +1274,3 @@ struct QuickActionReorderDragPreview: View {
         .fixedSize()
     }
 }
-

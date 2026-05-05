@@ -12,12 +12,15 @@ struct HumanBasicInfoDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
 
+    @Query private var allPets: [Pet]
     @Query private var allHumans: [Human]
 
     @State private var isEditing = false
     @State private var showingDeleteConfirm = false
     @State private var deleteConfirmName = ""
+    @State private var showingHomeStackFullAlert = false
 
     @State private var eName = ""
     @State private var eAvatarEmoji = ""
@@ -103,6 +106,11 @@ struct HumanBasicInfoDetailView: View {
             }
         } message: {
             Text("请输入 \"\(human.name)\" 确认删除。此操作不可撤销。")
+        }
+        .alert("首页卡片堆已满", isPresented: $showingHomeStackFullAlert) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text("首页最多显示 \(HomeCardVisibility.maxVisibleCards) 张卡片。请先从首页移除一张宠物或人类卡片，再添加 \(human.name)。")
         }
     }
 
@@ -258,7 +266,16 @@ struct HumanBasicInfoDetailView: View {
                 Divider().opacity(0.1)
                 optionPickerRow("现居地", selection: $eCity, options: residenceCityOptions)
                 Divider().opacity(0.1)
-                Toggle(isOn: $eShouldShowOnHome) {
+                Toggle(isOn: Binding(
+                    get: { eShouldShowOnHome },
+                    set: { visible in
+                        if visible && !HomeCardVisibility.canShowHuman(human, pets: allPets, humans: allHumans, raw: hiddenHomePetIDsRaw) {
+                            showingHomeStackFullAlert = true
+                            return
+                        }
+                        eShouldShowOnHome = visible
+                    }
+                )) {
                     editLabel("在首页显示")
                 }
                 .tint(Color.goPrimary)
@@ -551,6 +568,11 @@ struct HumanBasicInfoDetailView: View {
     }
 
     private func saveChanges() {
+        if eShouldShowOnHome && !HomeCardVisibility.canShowHuman(human, pets: allPets, humans: allHumans, raw: hiddenHomePetIDsRaw) {
+            showingHomeStackFullAlert = true
+            return
+        }
+
         human.name = eName.trimmingCharacters(in: .whitespacesAndNewlines)
         human.avatarEmoji = eAvatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "👤" : eAvatarEmoji
         human.role = eRole
