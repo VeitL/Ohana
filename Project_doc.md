@@ -1,6 +1,6 @@
 # Ohana iOS App 项目文档
 
-> 最后更新: 2026-05-05（GO 首页 7 张卡片上限 / Today Focus 横滑任务 / 护理计划全天/时间与周期统一 / 日历按展开宠物筛选 / 成员与商店功能落地）| Build: ✅ | Tests: ⚠️ 既有隐私/提醒去重用例待修 | Schema: ArkSchemaV38
+> 最后更新: 2026-05-07（GO 首页密度微调 / 自定义颜色直接色块矩阵 / 首屏头像与首击稳定化 / 护理计划与日历筛选落地）| Build: ✅ | Tests: ⚠️ 既有隐私/提醒去重用例待修 | Schema: ArkSchemaV38
 >
 > **当前默认首页**：GO UI（`FocusStackHomeTestView`）。仅保留 GO UI + 经典 `OverviewView`；Material UI 已于 2026-04-24 移除。首页卡片堆固定只取前 7 张可显示卡片；宠物/人类“在首页显示”开关位于卡片展开页，切换后同步影响首页卡片堆，满 7 张时会提示先隐藏一张。
 
@@ -723,7 +723,7 @@ ZStack
 ├── ArkBackgroundView()                         // 跟随 Settings 背景设置
 ├── stackLayer                                  // 未展开时：header + 任务白卡 + 卡片堆/空态
 │   ├── goFocusHeader(safeT: safeAreaTop)
-│   ├── TodayFocusCard                          // 今天谁需要照顾 / 什么最紧急 / 一点完成
+│   ├── TodayFocusCard                          // 今天谁需要照顾 / 什么最紧急 / 一点完成；本次再上移 10pt，当前 offset -20pt
 │   ├── firstSuccessCheckInCard                 // 新用户首次快捷打卡闭环（按需）
 │   ├── familyCollaborationCard                 // 家庭协作：谁做了什么 / 指派待办 / 催办 / 周报
 │   └── walletCardStack(cards:)                 // 仅 collapsed 显示，底部锚定
@@ -773,7 +773,7 @@ ZStack
 | `cardMargin` | 7 | 卡片到屏幕边缘的间距 |
 | `cardH` | `(ScreenCompat.width - cardMargin * 2) / 1.586` | 折叠态卡片高度，保持信用卡比例 |
 | `expandedCardH` | 360 | 点选态 active card 高度（竖向放大） |
-| `cardTitleH` / `collapsedStackPeekH` | 49 | 折叠/压缩态每张卡露出的顶部身份条高度 |
+| `cardTitleH` / `collapsedStackPeekH` | 49 / 44.1 | 折叠/压缩态每张卡露出的顶部身份条高度；卡片堆露出间隔为原来的 90%，底部锚点不变 |
 | `collapsedStackBottomGap` | 22 | 折叠态前卡底部到屏幕安全区的间距 |
 | `expandedStackBottomGap` | 12 | 展开态底部压缩卡堆到安全区底部的间距 |
 | `expandedCardGlobalTopOffset` | 76 | active card 顶部 = safeAreaTop + 76，保持在顶部按钮下方 |
@@ -841,7 +841,7 @@ active 宠物 / 人类卡下方复用经典 UI 的 `GoQuickActionCard` 网格样
 
 ### Today Focus 与家庭协作入口
 
-GO UI 折叠态首屏已收敛为 Today Focus：优先回答“今天谁需要照顾、什么最紧急、我点一下能完成什么”。展开卡片时隐藏，避免与 active card 下方快捷模块争抢空间。
+GO UI 折叠态首屏已收敛为 Today Focus：优先回答“今天谁需要照顾、什么最紧急、我点一下能完成什么”。当前模块 offset 为 -20pt，展开卡片时隐藏，避免与 active card 下方快捷模块争抢空间。
 
 **`TodayFocusCard`**：
 - 数据来自 `IslandQuestEngine.todayQuests(pets:reminders:plants:events:)`
@@ -1204,6 +1204,11 @@ introFlow（最多 5 张功能介绍卡）
   - Today Focus 多任务横向分页，按钮文案为“去完成 / 已完成”，完成后卡片划走
   - 已遛狗自动视作今日陪玩完成，减少重复陪玩任务；无任务时显示庆祝提示
   - 展开卡 FAB 按当前快捷模块反向生成未显示项目 + “全部功能”，快捷模块编辑后同步更新
+- [x] **GO 首页密度与自定义颜色体验微调**（2026-05-07 落地）
+  - Today Focus 在折叠态首页继续上移 10pt，当前整体 offset 为 -20pt
+  - 首页卡片堆露出间隔调整为原来的 90%，底部位置保持不变，因此卡片堆顶端随总高度下移
+  - 毛色 / 瞳色 / 主题色的“自定义”入口改为直接打开带确认按钮的 GO 色块矩阵，不再二次点击系统圆形 ColorPicker
+  - 首页卡片头像缓存首屏同步下采样，启动稳定期短暂禁用排序手势，避免首屏头像延迟和首次点击被排序手势吞掉
 - [x] **护理计划与护理详情统一**（2026-05-05 落地）
   - 护理计划支持全天日程 / 指定时间；非全天时写入用户选择的 time
   - 护理周期只在设置计划页通过天数加减维护，保存后同步 `Event.recurrenceDays` 与 `hygiene_cycle_*`

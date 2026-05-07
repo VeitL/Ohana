@@ -18,7 +18,7 @@ final class ImageCutoutService {
     // MARK: - 主入口
     /// 将图片主体前景抠出，背景替换为透明，返回 PNG 格式的 UIImage
     func removeBackground(from image: UIImage) async throws -> UIImage? {
-        guard let cgImage = image.cgImage else { return nil }
+        guard image.cgImage != nil else { return nil }
 
         // 转换到正确方向
         let orientedImage = image.fixedOrientation()
@@ -70,7 +70,7 @@ final class ImageCutoutService {
         // 先画原图
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
 
-        guard let rendered = context.makeImage() else { return nil }
+        guard context.makeImage() != nil else { return nil }
 
         // 用 mask buffer 抠图：将 mask 白色区域保留，黑色区域变透明
         CVPixelBufferLockBaseAddress(mask, .readOnly)

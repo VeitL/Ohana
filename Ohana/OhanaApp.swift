@@ -19,7 +19,6 @@ struct OhanaApp: App {
     init() {
         self.container = SharedModelContainer.make()
         OhanaApp.registerBGTasks()
-        FamilyWeeklyReportService.shared.scheduleWeeklyReminder()
     }
     
     private var preferredScheme: ColorScheme? {

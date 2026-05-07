@@ -9,6 +9,14 @@ import Foundation
 import SwiftData
 import UserNotifications
 
+private final class MedicationReminderContextBox: @unchecked Sendable {
+    let context: ModelContext?
+
+    init(_ context: ModelContext?) {
+        self.context = context
+    }
+}
+
 // MARK: - 今日服药进度追踪 Key
 
 extension MedicationReminderService {
@@ -153,9 +161,10 @@ final class MedicationReminderService {
                 let medicationId = med.id.uuidString
                 let medicationName = med.name
                 let metadata = "{\"notificationId\":\"\(identifier)\",\"scheduledAt\":\(fireDate.timeIntervalSince1970)}"
+                let contextBox = MedicationReminderContextBox(context)
                 center.add(request) { error in
                     self.recordMedicationScheduleResult(
-                        context: context,
+                        contextBox: contextBox,
                         subjectKind: .pet,
                         subjectId: petId,
                         medicationId: medicationId,
@@ -192,9 +201,10 @@ final class MedicationReminderService {
         let petId = pet.id.uuidString
         let medicationId = med.id.uuidString
         let medicationName = med.name
+        let contextBox = MedicationReminderContextBox(context)
         center.add(request) { error in
             self.recordMedicationScheduleResult(
-                context: context,
+                contextBox: contextBox,
                 subjectKind: .pet,
                 subjectId: petId,
                 medicationId: medicationId,
@@ -282,9 +292,10 @@ final class MedicationReminderService {
                 let humanId = human.id.uuidString
                 let medicationId = med.id.uuidString
                 let medicationName = med.name
+                let contextBox = MedicationReminderContextBox(context)
                 center.add(request) { error in
                     self.recordMedicationScheduleResult(
-                        context: context,
+                        contextBox: contextBox,
                         subjectKind: .human,
                         subjectId: humanId,
                         medicationId: medicationId,
@@ -300,7 +311,7 @@ final class MedicationReminderService {
     }
 
     nonisolated private func recordMedicationScheduleResult(
-        context: ModelContext?,
+        contextBox: MedicationReminderContextBox,
         subjectKind: CareLedgerSubjectKind,
         subjectId: String,
         medicationId: String,
@@ -308,9 +319,9 @@ final class MedicationReminderService {
         actionType: String,
         metadataJSON: String
     ) {
-        guard let context else { return }
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
+                guard let context = contextBox.context else { return }
                 _ = CareLedgerService.record(
                     subjectKind: subjectKind,
                     subjectId: subjectId,

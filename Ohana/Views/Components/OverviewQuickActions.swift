@@ -1083,7 +1083,13 @@ private struct QuickActionWaterDropWithWaves: View {
     let accent: Color
     var isPressed: Bool = false
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+
     private var dropSize: CGFloat { 30 }
+    private var shouldReduceWork: Bool {
+        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
+    }
 
     var body: some View {
         let frame = dropSize * 1.2
@@ -1092,7 +1098,7 @@ private struct QuickActionWaterDropWithWaves: View {
                 .font(.system(size: dropSize, weight: .semibold))
                 .foregroundStyle(accent)
 
-            TimelineView(.animation(minimumInterval: 1.0 / 20.0, paused: false)) { timeline in
+            TimelineView(.animation(minimumInterval: 1.0 / 20.0, paused: shouldReduceWork)) { timeline in
                 let t = timeline.date.timeIntervalSinceReferenceDate
                 Canvas { context, size in
                     let w = size.width

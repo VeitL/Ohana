@@ -48,6 +48,7 @@ struct PetBasicInfoDetailView: View {
     @State private var eLineageInfo = ""
     @State private var eNotes = ""
     @State private var eThemeColorHex = ""
+    @State private var eAvatarImageData: Data? = nil
 
     private let speciesOptions = ["狗", "猫", "兔子", "仓鼠", "鸟", "其他"]
     private let themePresets: [(String, String)] = [
@@ -386,29 +387,71 @@ struct PetBasicInfoDetailView: View {
 
     // MARK: - Avatar Section
     private var avatarSection: some View {
-        HStack(spacing: 16) {
-            ZStack {
-                Circle().fill((isEditing ? Color(hex: eThemeColorHex) : Color(hex: pet.themeColorHex)).opacity(0.25)).frame(width: 72, height: 72)
-                if let data = pet.avatarImageData, let img = UIImage(data: data) {
-                    Image(uiImage: img).resizable().scaledToFill().frame(width: 64, height: 64).clipShape(Circle())
-                } else {
-                    Text(pet.avatarEmoji).font(.system(size: 36))
+        VStack(spacing: 12) {
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 10) {
+                    profileAvatarImage(
+                        data: isEditing ? eAvatarImageData : pet.avatarImageData,
+                        fallbackEmoji: pet.avatarEmoji,
+                        accent: isEditing ? Color(hex: eThemeColorHex) : Color(hex: pet.themeColorHex),
+                        size: 84
+                    )
+                    VStack(spacing: 4) {
+                        Text(isEditing ? (eName.isEmpty ? pet.name : eName) : pet.name)
+                            .font(.system(size: 22, weight: .black, design: .rounded))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.65)
+                        Text("\(isEditing ? eSpecies : pet.species) · \(isEditing ? (eBreed.isEmpty ? "未填写品种" : eBreed) : (pet.breed.isEmpty ? "未填写品种" : pet.breed))")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.primary.opacity(0.5))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+
+                if isEditing {
+                    Text("编辑中")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.goPrimary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.goPrimary.opacity(0.15), in: Capsule())
                 }
             }
-            VStack(alignment: .leading, spacing: 4) {
-                Text(isEditing ? (eName.isEmpty ? pet.name : eName) : pet.name)
-                    .font(.system(size: 22, weight: .black, design: .rounded)).foregroundStyle(.primary)
-                Text("\(isEditing ? eSpecies : pet.species) · \(isEditing ? (eBreed.isEmpty ? "未填写品种" : eBreed) : (pet.breed.isEmpty ? "未填写品种" : pet.breed))")
-                    .font(.system(size: 13, weight: .medium)).foregroundStyle(.primary.opacity(0.5))
-            }
-            Spacer()
+
             if isEditing {
-                Text("编辑中").font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.goPrimary).padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(Color.goPrimary.opacity(0.15), in: Capsule())
+                EditableProfileAvatarPicker(
+                    avatarImageData: $eAvatarImageData,
+                    fallbackEmoji: pet.avatarEmoji,
+                    accentColor: Color(hex: eThemeColorHex),
+                    cropSpecies: eSpecies,
+                    silhouetteSystemName: nil
+                )
             }
         }
-        .padding(16).goTranslucentCard(cornerRadius: 20)
+        .padding(16)
+        .goTranslucentCard(cornerRadius: 20)
+    }
+
+    private func profileAvatarImage(data: Data?, fallbackEmoji: String, accent: Color, size: CGFloat) -> some View {
+        ZStack {
+            Circle()
+                .fill(accent.opacity(0.25))
+                .frame(width: size, height: size)
+            if let data, let img = UIImage(data: data) {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size - 8, height: size - 8, alignment: .center)
+                    .clipShape(Circle())
+            } else {
+                Text(fallbackEmoji)
+                    .font(.system(size: size * 0.5))
+            }
+        }
+        .frame(width: size, height: size, alignment: .center)
     }
 
     // MARK: - Helpers
@@ -727,6 +770,7 @@ struct PetBasicInfoDetailView: View {
         eFormerName = pet.formerName; eBirthCountry = pet.birthCountry; eBirthCity = pet.birthCity
         eLineageInfo = pet.lineageInfo; eNotes = pet.notes
         eThemeColorHex = pet.themeColorHex
+        eAvatarImageData = pet.avatarImageData
     }
 
     private func saveChanges() {
@@ -744,7 +788,191 @@ struct PetBasicInfoDetailView: View {
         pet.formerName = eFormerName; pet.birthCountry = eBirthCountry; pet.birthCity = eBirthCity
         pet.lineageInfo = eLineageInfo; pet.notes = eNotes
         pet.themeColorHex = eThemeColorHex
+        pet.avatarImageData = eAvatarImageData
         modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+}
+
+private enum AvatarImageEditingSupport {
+    nonisolated static func downsample(_ image: UIImage, maxDim: CGFloat) -> UIImage {
+        let size = image.size
+        let scale = min(maxDim / max(size.width, size.height), 1.0)
+        guard scale < 1.0 else { return image }
+        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        return renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: newSize)) }
+    }
+
+    nonisolated static func optimizedAvatarAsset(_ image: UIImage, preserveAlpha: Bool, maxPixel: CGFloat = 900) -> UIImage {
+        let pixelSize = CGSize(width: image.size.width * image.scale, height: image.size.height * image.scale)
+        let longest = max(pixelSize.width, pixelSize.height)
+        guard longest > maxPixel else { return image }
+
+        let scale = maxPixel / longest
+        let targetSize = CGSize(width: floor(pixelSize.width * scale), height: floor(pixelSize.height * scale))
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = !preserveAlpha
+        let renderer = UIGraphicsImageRenderer(size: targetSize, format: format)
+        return renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+    }
+}
+
+struct EditableProfileAvatarPicker: View {
+    @Binding var avatarImageData: Data?
+    let fallbackEmoji: String
+    let accentColor: Color
+    let cropSpecies: String
+    let silhouetteSystemName: String?
+
+    @State private var photosPickerItem: PhotosPickerItem? = nil
+    @State private var showingCamera = false
+    @State private var showCameraPermissionAlert = false
+    @State private var pendingCapturedAvatarImage: UIImage? = nil
+    @State private var cropImageItem: IdentifiableCropImage? = nil
+    @State private var isPasting = false
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 8) {
+                avatarActionButton(icon: "doc.on.clipboard.fill", title: "粘贴") {
+                    pastePasteboardImage()
+                }
+
+                PhotosPicker(selection: $photosPickerItem, matching: .images) {
+                    avatarActionLabel(icon: "photo.on.rectangle.angled", title: "相册")
+                }
+                .buttonStyle(.plain)
+
+                avatarActionButton(icon: "camera.fill", title: "拍照") {
+                    presentCamera()
+                }
+            }
+
+            if avatarImageData != nil {
+                Button {
+                    avatarImageData = nil
+                } label: {
+                    Text("移除头像")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(.primary.opacity(0.45))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .disabled(isPasting)
+        .onChange(of: photosPickerItem) { _, item in
+            handlePhotosPickerItemChanged(item)
+        }
+        .fullScreenCover(isPresented: $showingCamera, onDismiss: {
+            if let img = pendingCapturedAvatarImage {
+                pendingCapturedAvatarImage = nil
+                cropImageItem = IdentifiableCropImage(image: img)
+            }
+        }) {
+            PetCameraPickerView(maxPixel: 1_600) { img in
+                pendingCapturedAvatarImage = img
+                showingCamera = false
+            } onCancel: {
+                showingCamera = false
+            }
+        }
+        .sheet(item: $cropImageItem) { item in
+            NavigationStack {
+                PetImageCropView(
+                    image: item.image,
+                    species: cropSpecies,
+                    silhouetteSystemName: silhouetteSystemName
+                ) { cropped in
+                    if let cropped {
+                        let hasAlpha = ImageCutoutService.imageHasTransparentPixels(cropped)
+                        let optimized = AvatarImageEditingSupport.optimizedAvatarAsset(cropped, preserveAlpha: hasAlpha)
+                        avatarImageData = hasAlpha
+                            ? optimized.pngData()
+                            : optimized.jpegData(compressionQuality: 0.88)
+                    }
+                    cropImageItem = nil
+                    photosPickerItem = nil
+                }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("取消") {
+                            cropImageItem = nil
+                            photosPickerItem = nil
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.large])
+        }
+        .alert("无法打开相机", isPresented: $showCameraPermissionAlert) {
+            Button("好", role: .cancel) { }
+        } message: {
+            Text("请在系统设置中允许 Ohana 访问相机。")
+        }
+    }
+
+    private func avatarActionButton(icon: String, title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            avatarActionLabel(icon: icon, title: title)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func avatarActionLabel(icon: String, title: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .symbolRenderingMode(.monochrome)
+            Text(title)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+        }
+        .foregroundStyle(Color.arkInk)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(accentColor, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private func handlePhotosPickerItemChanged(_ item: PhotosPickerItem?) {
+        Task {
+            guard let item else { return }
+            if let data = try? await item.loadTransferable(type: Data.self) {
+                let resized = await Task.detached(priority: .userInitiated) {
+                    AddPetWizardView.cropReadyImage(from: data, maxPixel: 1_600)
+                }.value
+                await MainActor.run {
+                    if let resized {
+                        cropImageItem = IdentifiableCropImage(image: resized)
+                    }
+                }
+            }
+        }
+    }
+
+    private func presentCamera() {
+        requestOhanaCameraAccess {
+            showingCamera = true
+        } onDenied: {
+            showCameraPermissionAlert = true
+        }
+    }
+
+    private func pastePasteboardImage() {
+        guard let img = UIPasteboard.general.image else {
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            return
+        }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        isPasting = true
+        Task {
+            let prepared = await Task.detached(priority: .userInitiated) {
+                AddPetWizardView.preparedCropImage(img, maxPixel: 1_600)
+            }.value
+            cropImageItem = IdentifiableCropImage(image: prepared)
+            isPasting = false
+        }
     }
 }

@@ -18,6 +18,7 @@ struct SettingsView: View {
     @AppStorage("appThemePreference") private var appThemePreference: String = "system"
     @AppStorage("appBackgroundStyle") private var appBackgroundStyle: String = AppBackgroundStyle.goIsland.rawValue
     @AppStorage("appUIStyle") private var appUIStyle: String = "go"
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
     @AppStorage("userNickname") private var userNickname = ""
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
     @State private var showingNicknameEdit = false
@@ -201,6 +202,10 @@ struct SettingsView: View {
                             .padding(.top, 8)
 
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+                            performanceToggleRow
+
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+
                             settingsRow(icon: "sparkles.tv", title: "查看引导页", subtitle: "重新播放首次启动引导，方便测试") {
                                 showingOnboardingReplay = true
                             }
@@ -822,6 +827,32 @@ struct SettingsView: View {
             .padding(.vertical, 4)
         }
         .buttonStyle(ScaleButtonStyle())
+    }
+
+    private var performanceToggleRow: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.goLime.opacity(colorScheme == .dark ? 0.16 : 0.10))
+                    .frame(width: 32, height: 32)
+                Image(systemName: "battery.75percent")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.goLime)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("省电模式")
+                    .font(OhanaFont.body(.semibold))
+                    .foregroundStyle(primaryText)
+                Text("减少背景动效和首页持续渲染")
+                    .font(OhanaFont.footnote())
+                    .foregroundStyle(tertiaryText)
+            }
+            Spacer()
+            Toggle("", isOn: $powerSavingMode)
+                .tint(Color.goLime)
+                .labelsHidden()
+        }
+        .padding(.vertical, 4)
     }
 
     private func notificationToggleRow(icon: String, iconColor: Color, title: String, key: String) -> some View {

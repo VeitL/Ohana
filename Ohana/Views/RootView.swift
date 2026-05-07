@@ -11,8 +11,11 @@ import SwiftData
 struct RootView: View {
     @AppStorage("ohana_has_onboarded") private var hasOnboarded = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
+    @AppStorage("ohana_startup_maintenance_last_run_at") private var startupMaintenanceLastRunAt: Double = 0
+    @AppStorage("ohana_avatar_asset_compaction_v1_completed") private var avatarAssetCompactionCompleted = false
     // F3: 数据库降级警告
     @State private var showDBFallbackAlert = UserDefaults.standard.bool(forKey: "ohana_db_fallback_active")
+    @State private var didQueueStartupMaintenance = false
     @Environment(\.modelContext) private var modelContext
 
     var body: some View {
@@ -24,22 +27,7 @@ struct RootView: View {
             }
         }
         .onAppear {
-            // 任务二：App 启动时补充 14 天内的通知窗口
-            Task { @MainActor in
-                let allReminders = (try? modelContext.fetch(FetchDescriptor<Reminder>())) ?? []
-                await ReminderSchedulingService.refillMissingPendingNotifications(reminders: allReminders, context: modelContext)
-                ReminderSchedulingService.compensate(reminders: allReminders, context: modelContext)
-                if !UserDefaults.standard.bool(forKey: "careLedgerBackfill_v1_completed") {
-                    do {
-                        try CareLedgerBackfillService.backfill(context: modelContext)
-                        UserDefaults.standard.set(true, forKey: "careLedgerBackfill_v1_completed")
-                    } catch {
-                        #if DEBUG
-                        print("⚠️ CareLedger backfill failed: \(error.localizedDescription)")
-                        #endif
-                    }
-                }
-            }
+            queueStartupMaintenance()
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("OhanaReminderAction"))) { notification in
             handleReminderAction(notification.userInfo)
@@ -67,6 +55,57 @@ struct RootView: View {
         default:
             return
         }
+    }
+
+    private func queueStartupMaintenance() {
+        guard !didQueueStartupMaintenance else { return }
+        didQueueStartupMaintenance = true
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard !Task.isCancelled else { return }
+            FamilyWeeklyReportService.shared.scheduleWeeklyReminder()
+
+            try? await Task.sleep(nanoseconds: 17_000_000_000)
+            guard !Task.isCancelled else { return }
+            if shouldRunStartupReminderMaintenance() {
+                let allReminders = (try? modelContext.fetch(FetchDescriptor<Reminder>())) ?? []
+                await ReminderSchedulingService.refillMissingPendingNotifications(reminders: allReminders, context: modelContext)
+                ReminderSchedulingService.compensate(reminders: allReminders, context: modelContext)
+                startupMaintenanceLastRunAt = Date().timeIntervalSince1970
+            }
+
+            try? await Task.sleep(nanoseconds: 25_000_000_000)
+            guard !Task.isCancelled else { return }
+            runCareLedgerBackfillIfNeeded()
+
+            try? await Task.sleep(nanoseconds: 15_000_000_000)
+            guard !Task.isCancelled else { return }
+            await compactAvatarAssetsIfNeeded()
+        }
+    }
+
+    private func shouldRunStartupReminderMaintenance() -> Bool {
+        let twelveHours: TimeInterval = 12 * 60 * 60
+        return Date().timeIntervalSince1970 - startupMaintenanceLastRunAt >= twelveHours
+    }
+
+    private func runCareLedgerBackfillIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: "careLedgerBackfill_v1_completed") else { return }
+        do {
+            try CareLedgerBackfillService.backfill(context: modelContext)
+            UserDefaults.standard.set(true, forKey: "careLedgerBackfill_v1_completed")
+        } catch {
+            #if DEBUG
+            print("⚠️ CareLedger backfill failed: \(error.localizedDescription)")
+            #endif
+        }
+    }
+
+    private func compactAvatarAssetsIfNeeded() async {
+        guard !avatarAssetCompactionCompleted else { return }
+        await AvatarAssetMaintenanceService.compactStoredAvatars(context: modelContext)
+        avatarAssetCompactionCompleted = true
     }
 
     private func reminder(from userInfo: [AnyHashable: Any]?) -> Reminder? {

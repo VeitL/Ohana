@@ -158,6 +158,12 @@ struct PetWalletStack: View {
     /// 顶部卡片空闲时微漂浮（首页简化 · 可爱化）
     @State private var idleBreath: CGFloat = 0
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var shouldReduceWork: Bool {
+        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
+    }
 
     private var items: [DeckItem] {
         let petItems = pets
@@ -205,6 +211,10 @@ struct PetWalletStack: View {
         .onAppear {
             if items.indices.contains(activeIndex) {
                 onTopCardChanged?(items[activeIndex])
+            }
+            guard !shouldReduceWork else {
+                idleBreath = 0
+                return
             }
             withAnimation(.easeInOut(duration: 3.5).repeatForever(autoreverses: true)) {
                 idleBreath = 1
@@ -732,10 +742,10 @@ struct WalletPetCardDraftFront: View {
         GeometryReader { geo in
             let w = geo.size.width
             let h = geo.size.height
-            let avatarImage: UIImage? = decodedAvatar ?? avatarImageData.flatMap { UIImage(data: $0) }
+            let avatarImage: UIImage? = decodedAvatar
             let isTransparent: Bool = {
                 if decodedAvatar != nil { return decodedAvatarIsTransparent }
-                return avatarImageData.map { ImageCutoutService.isTransparentPNG($0) } ?? false
+                return false
             }()
             let hasPopout = isTransparent && avatarImage != nil
             let usesFullBleedPhoto = avatarImage != nil && !isTransparent
@@ -1147,10 +1157,10 @@ struct WalletHumanCardDraftFront: View {
         GeometryReader { geo in
             let w = geo.size.width
             let h = geo.size.height
-            let avatarImage: UIImage? = decodedAvatar ?? avatarImageData.flatMap { UIImage(data: $0) }
+            let avatarImage: UIImage? = decodedAvatar
             let isTransparent: Bool = {
                 if decodedAvatar != nil { return decodedAvatarTransparent }
-                return avatarImageData.map { ImageCutoutService.isTransparentPNG($0) } ?? false
+                return false
             }()
             let hasPopout = isTransparent && avatarImage != nil
             let usesFullBleedPhoto = avatarImage != nil && !isTransparent

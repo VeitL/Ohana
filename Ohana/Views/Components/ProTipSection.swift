@@ -119,13 +119,13 @@ private struct StepRow: View {
                 .foregroundStyle(highlightColor)
                 .frame(width: 24)
             
-            Group {
+            HStack(spacing: 0) {
                 Text(text)
                     .foregroundStyle(.primary.opacity(0.8))
-                + Text(highlightText)
+                Text(highlightText)
                     .bold()
                     .foregroundStyle(highlightColor)
-                + Text(suffix)
+                Text(suffix)
                     .foregroundStyle(.primary.opacity(0.8))
             }
             .font(.system(size: 14, weight: .medium))

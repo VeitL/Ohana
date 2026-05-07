@@ -22,9 +22,6 @@ final class DataExportService {
             let fm = FileManager.default
             let tmpDir = fm.temporaryDirectory
                 .appendingPathComponent("ohana_backup_\(Int(Date().timeIntervalSince1970))", isDirectory: true)
-            let zipURL = fm.temporaryDirectory
-                .appendingPathComponent("ohana_backup_\(Self.dateStamp()).zip")
-
             do {
                 try fm.createDirectory(at: tmpDir, withIntermediateDirectories: true)
 

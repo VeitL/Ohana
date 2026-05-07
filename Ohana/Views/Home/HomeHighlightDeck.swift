@@ -253,7 +253,7 @@ struct HomeHighlightDeck: View {
                     },
                     onSkip: {
                         let qid = quest.id
-                        withAnimation(.spring(response: 0.3)) {
+                        _ = withAnimation(.spring(response: 0.3)) {
                             skippedIds.insert(qid)
                         }
                         onSkipQuest(quest)
@@ -301,7 +301,6 @@ private struct DeckHumanStatusCard: View {
 
     var body: some View {
         GeometryReader { geo in
-            let w = geo.size.width
             ZStack {
                 // 背景
                 RoundedRectangle(cornerRadius: 20, style: .continuous)

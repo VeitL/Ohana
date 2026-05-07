@@ -31,6 +31,12 @@ struct IslandMoodWeatherView: View {
     
     @State private var particles: [WeatherParticle] = []
     @State private var timer: Timer?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+
+    private var shouldReduceWork: Bool {
+        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
+    }
     
     var body: some View {
         GeometryReader { geo in
@@ -52,7 +58,7 @@ struct IslandMoodWeatherView: View {
             .onChange(of: mood) { _, newMood in
                 stopParticles()
                 particles.removeAll()
-                if newMood != .calm {
+                if newMood != .calm, !shouldReduceWork {
                     startParticles(in: geo.size)
                 }
             }
@@ -61,7 +67,7 @@ struct IslandMoodWeatherView: View {
     }
     
     private func startParticles(in size: CGSize) {
-        guard mood != .calm else { return }
+        guard mood != .calm, !shouldReduceWork else { return }
         
         timer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { _ in
             withAnimation(.linear(duration: 3)) {

@@ -25,6 +25,7 @@ struct QuickMomentSheet: View {
     @State private var selectedPhotos: [MomentDraftPhoto] = []
     @State private var capturedImage: UIImage? = nil
     @State private var showCamera = false
+    @State private var showCameraPermissionAlert = false
     @State private var manualPlace = ""
     @StateObject private var locationModel = MomentLocationModel()
     @State private var isSaving = false
@@ -134,8 +135,18 @@ struct QuickMomentSheet: View {
                 successOverlay
             }
         }
-        .sheet(isPresented: $showCamera) {
-            MomentCameraPicker(image: $capturedImage)
+        .fullScreenCover(isPresented: $showCamera) {
+            PetCameraPickerView { img in
+                capturedImage = img
+                showCamera = false
+            } onCancel: {
+                showCamera = false
+            }
+        }
+        .alert("无法打开相机", isPresented: $showCameraPermissionAlert) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text("请在系统设置中允许 Ohana 访问相机。")
         }
     }
 
@@ -287,7 +298,7 @@ struct QuickMomentSheet: View {
                         .buttonStyle(.plain)
                         .disabled(selectedPhotos.count >= maxDraftPhotos)
 
-                        Button { showCamera = true } label: {
+                        Button { presentMomentCamera() } label: {
                             photoActionLabel(icon: "camera.fill", title: "拍照", color: Color.goTeal)
                         }
                         .buttonStyle(.plain)
@@ -595,6 +606,14 @@ struct QuickMomentSheet: View {
             selectedPhotos.append(contentsOf: photos.prefix(remaining))
         }
     }
+
+    private func presentMomentCamera() {
+        requestOhanaCameraAccess {
+            showCamera = true
+        } onDenied: {
+            showCameraPermissionAlert = true
+        }
+    }
 }
 
 private struct MomentDraftPhoto: Identifiable {
@@ -648,40 +667,6 @@ private final class MomentLocationModel: NSObject, ObservableObject, CLLocationM
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         DispatchQueue.main.async {
             self.statusText = "定位不可用"
-        }
-    }
-}
-
-// MARK: - 相机
-
-private struct MomentCameraPicker: UIViewControllerRepresentable {
-    @Binding var image: UIImage?
-    @Environment(\.dismiss) private var dismiss
-
-    func makeCoordinator() -> Coord { Coord(self) }
-
-    func makeUIViewController(context: Context) -> UIImagePickerController {
-        let p = UIImagePickerController()
-        p.sourceType = UIImagePickerController.isSourceTypeAvailable(.camera) ? .camera : .photoLibrary
-        p.delegate = context.coordinator
-        return p
-    }
-
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
-
-    final class Coord: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        let parent: MomentCameraPicker
-        init(_ p: MomentCameraPicker) { parent = p }
-
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            parent.dismiss()
-        }
-
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
-            if let img = info[.originalImage] as? UIImage {
-                parent.image = img
-            }
-            parent.dismiss()
         }
     }
 }

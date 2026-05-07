@@ -185,14 +185,14 @@ struct PetHealthDetailView: View {
                             .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     }
                     // ── 异常症状记录卡
-                    if !(pet.symptomLogs ?? []).isEmpty {
+                    if !pet.symptomLogs.isEmpty {
                         symptomsCard
                             .padding(14)
                             .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     }
                     
                     // ── 生理期记录卡
-                    if !(pet.heatCycleLogs ?? []).isEmpty {
+                    if !pet.heatCycleLogs.isEmpty {
                         heatCycleCard
                             .padding(14)
                             .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -518,14 +518,14 @@ struct PetHealthDetailView: View {
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.red)
                 Spacer()
-                Text("\((pet.symptomLogs ?? []).count) 条")
+                Text("\(pet.symptomLogs.count) 条")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.primary.opacity(0.4))
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(Color.primary.opacity(0.06), in: Capsule())
             }
 
-            ForEach((pet.symptomLogs ?? []).sorted(by: { $0.date > $1.date })) { log in
+            ForEach(pet.symptomLogs.sorted(by: { $0.date > $1.date })) { log in
                 HStack(spacing: 12) {
                     ZStack {
                         Circle().fill(Color.red.opacity(0.15)).frame(width: 38, height: 38)
@@ -561,7 +561,7 @@ struct PetHealthDetailView: View {
                     }
                 }
                 .padding(.vertical, 6)
-                if log.id != (pet.symptomLogs ?? []).sorted(by: { $0.date > $1.date }).last?.id {
+                if log.id != pet.symptomLogs.sorted(by: { $0.date > $1.date }).last?.id {
                     Divider()
                 }
             }
@@ -576,14 +576,14 @@ struct PetHealthDetailView: View {
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.pink)
                 Spacer()
-                Text("\((pet.heatCycleLogs ?? []).count) 条")
+                Text("\(pet.heatCycleLogs.count) 条")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.primary.opacity(0.4))
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(Color.primary.opacity(0.06), in: Capsule())
             }
 
-            ForEach((pet.heatCycleLogs ?? []).sorted(by: { $0.startDate > $1.startDate })) { log in
+            ForEach(pet.heatCycleLogs.sorted(by: { $0.startDate > $1.startDate })) { log in
                 HStack(spacing: 12) {
                     ZStack {
                         Circle().fill(Color(hex: log.status.colorHex).opacity(0.15)).frame(width: 38, height: 38)
@@ -615,7 +615,7 @@ struct PetHealthDetailView: View {
                     }
                 }
                 .padding(.vertical, 6)
-                if log.id != (pet.heatCycleLogs ?? []).sorted(by: { $0.startDate > $1.startDate }).last?.id {
+                if log.id != pet.heatCycleLogs.sorted(by: { $0.startDate > $1.startDate }).last?.id {
                     Divider()
                 }
             }

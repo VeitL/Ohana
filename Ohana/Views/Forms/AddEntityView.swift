@@ -51,12 +51,21 @@ struct AddEntityView: View {
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
     @State private var selectedType: EntityType?
 
+    private let onPetSaved: ((Pet) -> Void)?
     private let onHumanSaved: ((Human) -> Void)?
+    private let onTypeChange: ((EntityType?) -> Void)?
     private var l: L10n { L10n(appLanguage) }
 
-    init(initialType: EntityType? = nil, onHumanSaved: ((Human) -> Void)? = nil) {
+    init(
+        initialType: EntityType? = nil,
+        onPetSaved: ((Pet) -> Void)? = nil,
+        onHumanSaved: ((Human) -> Void)? = nil,
+        onTypeChange: ((EntityType?) -> Void)? = nil
+    ) {
         _selectedType = State(initialValue: initialType)
+        self.onPetSaved = onPetSaved
         self.onHumanSaved = onHumanSaved
+        self.onTypeChange = onTypeChange
     }
 
     private var navigationTitleText: String {
@@ -76,7 +85,10 @@ struct AddEntityView: View {
                 if let type = selectedType {
                     switch type {
                     case .pet:
-                        AddPetWizardView(onComplete: { dismiss() })
+                        AddPetWizardView(
+                            onComplete: { dismiss() },
+                            onPetSaved: { pet in onPetSaved?(pet) }
+                        )
                     case .human:
                         AddHumanWizardView(
                             onComplete: { dismiss() },
@@ -101,6 +113,7 @@ struct AddEntityView: View {
                     if selectedType != nil {
                         Button(l.addEntityBack) {
                             withAnimation(.easeInOut(duration: 0.22)) { selectedType = nil }
+                            onTypeChange?(nil)
                         }
                         .foregroundStyle(Color.goLime)
                     }
@@ -133,6 +146,7 @@ struct AddEntityView: View {
                     Button {
                         guard type.isAvailable else { return }
                         withAnimation(.spring(response: 0.4)) { selectedType = type }
+                        onTypeChange?(type)
                     } label: {
                         entityCard(type)
                     }

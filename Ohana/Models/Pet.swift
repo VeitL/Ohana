@@ -329,7 +329,6 @@ final class Pet {
     var remainingFoodGrams: Double {
         guard foodTrackingMode == .precise else { return 0 }
         guard restockWeight > 0 else { return 0 }
-        guard let restockDate else { return restockWeight * 1000 }
         return max(0, (restockWeight * 1000) - foodConsumedSinceRestock)
     }
 

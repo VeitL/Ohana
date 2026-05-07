@@ -21,11 +21,16 @@ struct IslandMoodHeaderStrip: View {
     var onExpand: () -> Void = {}
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
     @State private var cloudOffsetA: CGFloat = -8
     @State private var cloudOffsetB: CGFloat = 8
     @State private var breath: CGFloat = 0
 
     // MARK: - 计算综合状态
+    private var shouldReduceWork: Bool {
+        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
+    }
 
     private var mood: IslandMood {
         IslandMoodCalculator.calculate(pets: pets, pendingReminders: pendingReminders, plants: plants)
@@ -185,6 +190,12 @@ struct IslandMoodHeaderStrip: View {
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
         .onAppear {
+            guard !shouldReduceWork else {
+                cloudOffsetA = -8
+                cloudOffsetB = 8
+                breath = 0
+                return
+            }
             withAnimation(.easeInOut(duration: 4.5).repeatForever(autoreverses: true)) {
                 cloudOffsetA = 10
             }

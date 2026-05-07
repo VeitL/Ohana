@@ -51,6 +51,12 @@ struct TodayFocusCard: View {
     @State private var selectedFocusIndex = 0
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+
+    private var shouldReduceWork: Bool {
+        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
+    }
 
     private var refreshedQuests: [IslandQuest] {
         TodayFocusService.refreshedQuests(
@@ -143,6 +149,7 @@ struct TodayFocusCard: View {
             }
         }
         .onAppear {
+            guard !shouldReduceWork else { return }
             withAnimation(.easeInOut(duration: 2.6).repeatForever(autoreverses: true)) { pulse = 1 }
         }
         .onChange(of: focusCards.count) { _, count in
@@ -332,6 +339,7 @@ struct TodayFocusCard: View {
                     .font(.system(size: 30))
                     .scaleEffect(bounceEmoji ? 1.1 : 1)
                     .onAppear {
+                        guard !shouldReduceWork else { return }
                         withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
                             bounceEmoji = true
                         }

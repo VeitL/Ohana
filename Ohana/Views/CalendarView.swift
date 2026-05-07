@@ -369,7 +369,6 @@ struct CalendarView: View {
         let bg: Color = colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C")
         let surface: Color = colorScheme == .light ? .white : Color(hex: "1C1C1E")
         let accent = Color(hex: "FF5A00")
-        let textSec: Color = colorScheme == .light ? Color(hex: "8E8E93") : Color(hex: "64748B")
         return HStack(spacing: 10) {
             // Add event
             Button { showingAddEvent = true } label: {

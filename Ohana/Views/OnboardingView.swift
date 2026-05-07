@@ -66,6 +66,8 @@ struct OnboardingView: View {
     @AppStorage("ohana_show_first_success_card") private var showFirstSuccessCard: Bool = false
     @AppStorage("ohana_first_quick_checkin_completed") private var firstQuickCheckInCompleted: Bool = false
     @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.fallbackCode
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var isReplay: Bool = false
     var onReplayFinished: (() -> Void)?
 
@@ -98,6 +100,9 @@ struct OnboardingView: View {
     @State private var iconPulse = false
 
     private var isEnglish: Bool { AppLanguage.normalize(appLanguage) == "en" }
+    private var shouldReduceWork: Bool {
+        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
+    }
 
     private var introCards: [IntroCard] {
         [
@@ -207,8 +212,13 @@ struct OnboardingView: View {
             content
         }
         .onAppear {
-            withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) { blobPulse = true }
-            withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) { iconPulse = true }
+            if shouldReduceWork {
+                blobPulse = false
+                iconPulse = false
+            } else {
+                withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) { blobPulse = true }
+                withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) { iconPulse = true }
+            }
             if !isReplay && !currentActiveHumanId.isEmpty && !hasOnboarded {
                 step = .firstPet
             }

@@ -198,7 +198,7 @@ final class OasisTreeManager {
         injectedEnergy += cost
         
         // 检查是否升级，只有升级时才奖励椰子
-        if let newLevel = checkAndRewardLevelUp() {
+        if checkAndRewardLevelUp() != nil {
             // 升级成功，已在 checkAndRewardLevelUp 中发放椰子奖励
             UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
         } else {

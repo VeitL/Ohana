@@ -40,6 +40,8 @@ struct AddHumanWizardView: View {
     @State private var avatarImageData: Data? = nil
     @State private var photosPickerItem: PhotosPickerItem? = nil
     @State private var showingCamera   = false
+    @State private var showCameraPermissionAlert = false
+    @State private var pendingCapturedAvatarImage: UIImage? = nil
     @State private var cropImageItem: IdentifiableCropImage? = nil
 
     // ── Profile
@@ -195,12 +197,17 @@ struct AddHumanWizardView: View {
                     isCustomResidenceCity = false
                 }
             }
-            .sheet(isPresented: $showingCamera) {
-                PetCameraPickerView { img in
+            .fullScreenCover(isPresented: $showingCamera, onDismiss: {
+                if let img = pendingCapturedAvatarImage {
+                    pendingCapturedAvatarImage = nil
+                    cropImageItem = IdentifiableCropImage(image: img)
+                }
+            }) {
+                PetCameraPickerView(maxPixel: 1_600) { img in
+                    pendingCapturedAvatarImage = img
                     showingCamera = false
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        cropImageItem = IdentifiableCropImage(image: img)
-                    }
+                } onCancel: {
+                    showingCamera = false
                 }
             }
             .sheet(item: $cropImageItem) { item in
@@ -215,9 +222,10 @@ struct AddHumanWizardView: View {
                         withTransaction(tx) {
                             if let cropped {
                                 let hasAlpha = ImageCutoutService.imageHasTransparentPixels(cropped)
+                                let optimized = AddPetWizardView.optimizedAvatarAsset(cropped, preserveAlpha: hasAlpha)
                                 avatarImageData = hasAlpha
-                                    ? cropped.pngData()
-                                    : cropped.jpegData(compressionQuality: 0.92)
+                                    ? optimized.pngData()
+                                    : optimized.jpegData(compressionQuality: 0.88)
                             }
                             cropImageItem = nil
                             photosPickerItem = nil
@@ -243,6 +251,11 @@ struct AddHumanWizardView: View {
                 Button(l.humanWizDupAlertOk, role: .cancel) { }
             } message: {
                 Text(l.humanWizDupAlertMsg(name.trimmingCharacters(in: .whitespaces)))
+            }
+            .alert("无法打开相机", isPresented: $showCameraPermissionAlert) {
+                Button(l.done, role: .cancel) { }
+            } message: {
+                Text("请在系统设置中允许 Ohana 访问相机。")
             }
             .sheet(isPresented: $showBirthdayPickerSheet) { birthdayPickerSheet }
             .onChange(of: hasBirthday) { _, on in
@@ -394,7 +407,7 @@ struct AddHumanWizardView: View {
                         PhotosPicker(selection: $photosPickerItem, matching: .images) {
                             avatarActionButton(icon: "photo.on.rectangle", label: l.humanWizPhotoLibrary)
                         }
-                        Button { showingCamera = true } label: {
+                        Button { presentCamera() } label: {
                             avatarActionButton(icon: "camera.fill", label: l.humanWizCamera)
                         }
                         Button { pastePasteboardImage() } label: {
@@ -1077,12 +1090,24 @@ struct AddHumanWizardView: View {
     private func handlePhotosPicker(_ item: PhotosPickerItem?) {
         Task {
             guard let item else { return }
-            if let data = try? await item.loadTransferable(type: Data.self),
-               let ui = UIImage(data: data) {
+            if let data = try? await item.loadTransferable(type: Data.self) {
+                let ui = await Task.detached(priority: .userInitiated) {
+                    AddPetWizardView.cropReadyImage(from: data, maxPixel: 1_600)
+                }.value
                 await MainActor.run {
-                    cropImageItem = IdentifiableCropImage(image: ui)
+                    if let ui {
+                        cropImageItem = IdentifiableCropImage(image: ui)
+                    }
                 }
             }
+        }
+    }
+
+    private func presentCamera() {
+        requestOhanaCameraAccess {
+            showingCamera = true
+        } onDenied: {
+            showCameraPermissionAlert = true
         }
     }
 
@@ -1092,10 +1117,15 @@ struct AddHumanWizardView: View {
             return
         }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        if let pngData = image.pngData() {
-            avatarImageData = pngData
-        } else if let jpg = image.jpegData(compressionQuality: 0.92) {
-            avatarImageData = jpg
+        Task {
+            let prepared = await Task.detached(priority: .userInitiated) {
+                AddPetWizardView.preparedCropImage(image, maxPixel: 900)
+            }.value
+            let hasAlpha = ImageCutoutService.imageHasTransparentPixels(prepared)
+            let optimized = AddPetWizardView.optimizedAvatarAsset(prepared, preserveAlpha: hasAlpha)
+            avatarImageData = hasAlpha
+                ? optimized.pngData()
+                : optimized.jpegData(compressionQuality: 0.88)
         }
     }
 
@@ -1105,7 +1135,7 @@ struct AddHumanWizardView: View {
         }
         let snap = data
         Task.detached(priority: .utility) {
-            let img = UIImage(data: snap)
+            let img = UIImage(data: snap).map { AddPetWizardView.downsample($0, maxDim: 900) }
             let transparent = ImageCutoutService.isTransparentPNG(snap)
             await MainActor.run {
                 guard avatarImageData == snap else { return }

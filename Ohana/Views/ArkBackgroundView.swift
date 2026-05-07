@@ -6,6 +6,15 @@
 //
 
 import SwiftUI
+import UIKit
+
+enum AppPerformanceMode {
+    static let powerSavingKey = "appPowerSavingMode"
+
+    static var systemPrefersReducedWork: Bool {
+        ProcessInfo.processInfo.isLowPowerModeEnabled || UIAccessibility.isReduceMotionEnabled
+    }
+}
 
 // MARK: - 背景风格枚举
 enum AppBackgroundStyle: String, CaseIterable, Identifiable {
@@ -57,23 +66,33 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
 // MARK: - ArkBackgroundView（根据用户设置切换背景风格）
 struct ArkBackgroundView: View {
     @AppStorage("appBackgroundStyle") private var styleRaw: String = AppBackgroundStyle.goIsland.rawValue
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var style: AppBackgroundStyle {
         AppBackgroundStyle(rawValue: styleRaw) ?? .goDefault
     }
 
+    private var shouldReduceWork: Bool {
+        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
+    }
+
     var body: some View {
-        switch style {
-        case .goDefault:   GoDefaultBackground()
-        case .goIsland:   GoIslandBackground()
-        case .deepAmbient: DeepAmbientBackground()
-        case .aurora:      AuroraBackground()
-        case .midnight:    MidnightBackground()
-        case .sunsetGlow:  SunsetGlowBackground()
-        case .sakuraMist:  SakuraMistBackground()
-        case .forestGlade: ForestGladeBackground()
-        case .paperCream:  PaperCreamBackground()
-        case .neonGrid:    NeonGridBackground()
+        if shouldReduceWork {
+            GoIslandBackground()
+        } else {
+            switch style {
+            case .goDefault:   GoDefaultBackground()
+            case .goIsland:   GoIslandBackground()
+            case .deepAmbient: DeepAmbientBackground()
+            case .aurora:      AuroraBackground()
+            case .midnight:    MidnightBackground()
+            case .sunsetGlow:  SunsetGlowBackground()
+            case .sakuraMist:  SakuraMistBackground()
+            case .forestGlade: ForestGladeBackground()
+            case .paperCream:  PaperCreamBackground()
+            case .neonGrid:    NeonGridBackground()
+            }
         }
     }
 }
@@ -540,7 +559,13 @@ private struct NeonGridBackground: View {
 // MARK: - GO 岛屿向导底（与 `GoDashboardView` 渐变 + 浮动色球一致；`ArkBackgroundView` 默认「Go 经典」与此不同）
 /// 添加宠物 / 家庭成员等全屏向导使用，避免误用 `ArkBackgroundView` 的 `go_default` 浅色底。
 struct GoIslandWizardBackdrop: View {
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var blobPulse = false
+
+    private var shouldReduceWork: Bool {
+        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
+    }
 
     var body: some View {
         ZStack {
@@ -557,14 +582,14 @@ struct GoIslandWizardBackdrop: View {
                         .fill(Color.goLime)
                         .frame(width: 260, height: 260)
                         .blur(radius: 80)
-                        .opacity(0.22)
+                        .opacity(shouldReduceWork ? 0.12 : 0.22)
                         .offset(x: blobPulse ? -50 : -70, y: blobPulse ? -70 : -90)
 
                     Circle()
                         .fill(Color(hex: "5B6AFF"))
                         .frame(width: 300, height: 300)
                         .blur(radius: 90)
-                        .opacity(0.40)
+                        .opacity(shouldReduceWork ? 0.20 : 0.40)
                         .offset(x: blobPulse ? geo.size.width - 80 : geo.size.width - 100,
                                 y: blobPulse ? 180 : 220)
 
@@ -572,7 +597,7 @@ struct GoIslandWizardBackdrop: View {
                         .fill(Color(hex: "A855F7"))
                         .frame(width: 240, height: 240)
                         .blur(radius: 90)
-                        .opacity(0.30)
+                        .opacity(shouldReduceWork ? 0.14 : 0.30)
                         .offset(x: blobPulse ? -40 : -60,
                                 y: blobPulse ? geo.size.height * 0.55 : geo.size.height * 0.5)
                 }
@@ -588,6 +613,7 @@ struct GoIslandWizardBackdrop: View {
         }
         .ignoresSafeArea()
         .onAppear {
+            guard !shouldReduceWork else { return }
             withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) {
                 blobPulse = true
             }

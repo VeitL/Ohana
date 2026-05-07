@@ -9,6 +9,7 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+import ImageIO
 
 // ─────────────────────────────────────────────────
 // MARK: – Data model
@@ -295,7 +296,7 @@ private enum K {
     // Default stack mode: each covered card exposes the one-line identity area
     // (name + species / role), while avoiding an overly loose card stack.
     static let cardTitleH: CGFloat = 49
-    static let collapsedStackPeekH: CGFloat = cardTitleH
+    static let collapsedStackPeekH: CGFloat = cardTitleH * 0.9
     // Expanded hero mode keeps the inactive cards in a tighter mini-stack.
     static let stackPeekH: CGFloat = collapsedStackPeekH
     static var expandedInactiveStackPeekH: CGFloat { collapsedStackPeekH / 5 }
@@ -325,7 +326,13 @@ private enum HeroAnim {
     }
     // Apple-Wallet-style card morph: quick, restrained, slight overshoot.
     static var walletSpring: Animation {
-        .spring(response: 0.4, dampingFraction: 0.85)
+        .spring(response: 0.36, dampingFraction: 0.84)
+    }
+    static var fabSpring: Animation {
+        .spring(response: 0.35, dampingFraction: 0.72)
+    }
+    static var buttonSpring: Animation {
+        .spring(response: 0.3, dampingFraction: 0.82)
     }
     // Compact-mode peek (how much of each non-active card shows behind the active one)
     static let compactPeek: CGFloat = 14
@@ -352,13 +359,10 @@ struct FocusStackHomeTestView: View {
     @Query(sort: \Pet.createdAt,   order: .reverse) private var pets:   [Pet]
     @Query(sort: \Human.createdAt, order: .reverse) private var humans: [Human]
     @Query(sort: \Plant.createdAt) private var plants: [Plant]
-    @Query private var allHumanMedications: [HumanMedication]
-    @Query private var allMedicationLogs: [HumanMedicationLog]
     @Query(filter: #Predicate<Reminder> { $0.status == "pending" },
            sort: \Reminder.scheduledAt) private var pendingReminders: [Reminder]
-    @Query(filter: #Predicate<Reminder> { $0.status == "failed" },
-           sort: \Reminder.scheduledAt) private var failedReminders: [Reminder]
-    @Query(sort: \Event.startDate) private var allEvents: [Event]
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // Header state
     @State private var functionMenuPresentation: FunctionMenuPresentation?
@@ -367,6 +371,7 @@ struct FocusStackHomeTestView: View {
     @State private var fabExpanded         = false
     @State private var showingCoconutLog   = false
     @State private var showingAddEntity    = false
+    @State private var addEntityInitialType: EntityType? = nil
     @State private var showingCrewRoster   = false
     @State private var showingSettings     = false
     @State private var showingCalendar     = false
@@ -406,6 +411,15 @@ struct FocusStackHomeTestView: View {
     @State private var isExpandedQAEditMode = false
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
     private var maxCardsPerPage: Int { 7 }
+    private var shouldReduceWork: Bool {
+        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
+    }
+    private var walletAnimation: Animation {
+        shouldReduceWork ? .easeOut(duration: 0.16) : HeroAnim.walletSpring
+    }
+    private var transitionAnimation: Animation {
+        shouldReduceWork ? .easeOut(duration: 0.14) : HeroAnim.transitionSpring
+    }
     @State private var expandedQAJiggle = false
     @State private var expandedQAEditItems: [QuickActionItem] = []
     @State private var showingExpandedQAQuickAdd = false
@@ -425,10 +439,18 @@ struct FocusStackHomeTestView: View {
     @State private var showExpandedCoconutReward = false
     @State private var expandedCoconutRewardAmount = 0
     @State private var expandedCoconutRewardLabel: String? = nil
+    @State private var homeCardReorderDragId: UUID? = nil
+    @State private var homeCardReorderDragOffset: CGFloat = 0
+    @State private var homeCardReorderStartOffsetY: CGFloat = 0
+    @State private var homeCardReorderCards: [FocusCard]? = nil
+    @State private var homeCardReorderDidMove = false
+    @State private var suppressNextHomeCardTap = false
+    @State private var homeCardReorderEnabled = false
 
     // Debug-only: show Mochi/Luna dummy stack even when real data is empty.
     @AppStorage("debugShowDummyCards") private var showDummyCards: Bool = false
     @AppStorage("quickActionItems_v2") private var quickActionItemsJSON: String = ""
+    @AppStorage("goFocusHomeCardOrder.v1") private var homeCardOrderRaw: String = ""
     @AppStorage("appLanguage") private var appLanguage = "zh"
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr: String = ""
     @AppStorage("ohana_show_first_success_card") private var showFirstSuccessCard: Bool = false
@@ -446,11 +468,13 @@ struct FocusStackHomeTestView: View {
     //  • expanded  (isExpanded=true): tapped card lifts below the top controls; the
     //    inactive cards compress into a tight wallet stack at the screen bottom.
     //  • restore: tapping the active card again, or swiping down, returns to collapsed.
-    // Tapping cards only changes the wallet state. Detail navigation remains in the
-    // long-press context menu for real data.
+    // Tapping cards only changes the wallet state. In collapsed mode, long-press
+    // then drag reorders the home stack; expanded hero long-press opens basic info.
     @State private var isExpanded: Bool = false
     @State private var activeCardId: UUID?
     @State private var rosterPreviewCard: FocusCard?
+
+    private let homeCardReorderLiftY: CGFloat = -10
 
     private var todayFocusActivePet: Pet? {
         if let id = activeCardId,
@@ -488,13 +512,13 @@ struct FocusStackHomeTestView: View {
             }
             return lhs.name < rhs.name
         }
-        if !real.isEmpty { return real }
+        if !real.isEmpty { return homeCardsOrderedByPreference(real) }
         // Real empty state → no dummy fallback (handled by EmptyStateWelcomeCard in stackLayer).
         // Debug flag preserves the old Mochi/Luna stack for UI exploration.
         guard showDummyCards else { return [] }
         let usedNames = Set(real.map { $0.name })
         let extras = FocusCard.dummies.filter { !usedNames.contains($0.name) }
-        return real + extras
+        return homeCardsOrderedByPreference(real + extras)
     }
 
     private var visibleHomeCards: [FocusCard] {
@@ -505,6 +529,15 @@ struct FocusStackHomeTestView: View {
             visible.append(rosterPreviewCard)
         }
         return visible
+    }
+
+    private var visibleHomeCardsAvatarSignature: String {
+        visibleHomeCards
+            .map { card in
+                let data = card.avatarImageData
+                return "\(card.id.uuidString):\(data?.count ?? 0)"
+            }
+            .joined(separator: "|")
     }
 
     private var isEmptyState: Bool {
@@ -546,7 +579,7 @@ struct FocusStackHomeTestView: View {
                         .zIndex(999)
                 }
             }
-            .animation(HeroAnim.transitionSpring, value: expandedId)
+            .animation(transitionAnimation, value: expandedId)
             .onChange(of: expandedId) { _, newId in
                 if newId != nil {
                     detailFooterVisible = false
@@ -556,7 +589,7 @@ struct FocusStackHomeTestView: View {
                 } else {
                     detailFooterVisible = false
                     // Collapse wallet hero mode when bloom closes
-                    withAnimation(HeroAnim.walletSpring) { isExpanded = false }
+                    withAnimation(walletAnimation) { isExpanded = false }
                 }
             }
         }
@@ -578,7 +611,14 @@ struct FocusStackHomeTestView: View {
         .fullScreenCover(isPresented: $showStreakDetail) { DailyStreakDetailView(pets: pets) }
         .fullScreenCover(isPresented: $showingCoconutLog) { IslandWealthDashboardView() }
         .fullScreenCover(isPresented: $showingSettings) { SettingsView() }
-        .sheet(isPresented: $showingAddEntity) { AddEntityView() }
+        .sheet(isPresented: $showingAddEntity, onDismiss: handleAddEntityDismissed) {
+            AddEntityView(
+                initialType: addEntityInitialType,
+                onTypeChange: { type in
+                    addEntityInitialType = type
+                }
+            )
+        }
         .sheet(isPresented: $showingCrewRoster) {
             NavigationStack {
                 CrewRosterOverlay(
@@ -840,15 +880,50 @@ struct FocusStackHomeTestView: View {
             Text("首页最多显示 \(HomeCardVisibility.maxVisibleCards) 张卡片。请先从首页移除一张宠物或人类卡片，再添加 \(homeStackFullEntityName)。")
         }
         // Collapse wallet hero state when returning from pet/human detail
-        .onChange(of: selectedPet)   { _, new in if new == nil { withAnimation(HeroAnim.walletSpring) { isExpanded = false } } }
-        .onChange(of: selectedHuman) { _, new in if new == nil { withAnimation(HeroAnim.walletSpring) { isExpanded = false } } }
+        .onChange(of: selectedPet)   { _, new in if new == nil { withAnimation(walletAnimation) { isExpanded = false } } }
+        .onChange(of: selectedHuman) { _, new in if new == nil { withAnimation(walletAnimation) { isExpanded = false } } }
         .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
             refreshHeaderStreak()
         }
         .onAppear {
             ensureTodayCheckIn()
             refreshHeaderStreak()
+            if !homeCardReorderEnabled {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    homeCardReorderEnabled = true
+                }
+            }
         }
+        .task(id: visibleHomeCardsAvatarSignature) {
+            await FocusWalletAvatarCache.preload(cards: visibleHomeCards)
+        }
+    }
+}
+
+private struct TodayFocusQuestCardHost: View {
+    let pets: [Pet]
+    let plants: [Plant]
+    let reminders: [Reminder]
+    let activePet: Pet?
+    var onCompleteQuest: (IslandQuest) -> Void
+    var onTapOasis: () -> Void
+
+    @Query(sort: \Event.startDate) private var allEvents: [Event]
+
+    var body: some View {
+        TodayFocusCard(
+            pets: pets,
+            plants: plants,
+            quests: IslandQuestEngine.todayQuests(
+                pets: pets,
+                reminders: reminders,
+                plants: plants,
+                events: allEvents
+            ),
+            activePet: activePet,
+            onCompleteQuest: onCompleteQuest,
+            onTapOasis: onTapOasis
+        )
     }
 }
 
@@ -900,14 +975,14 @@ extension FocusStackHomeTestView {
             goFocusHeader(safeT: safeAreaTop)
 
             todayFocusSection(activePets: activePets)
-                .offset(y: -10)
+                .offset(y: -20)
                 .padding(.bottom, -10)
 
             if isEmptyState {
                 Spacer(minLength: 0)
                 EmptyStateWelcomeCard(
-                    onAddPet:   { showingAddEntity = true },
-                    onAddHuman: { showingAddEntity = true }
+                    onAddPet:   { presentAddEntity(initialType: .pet) },
+                    onAddHuman: { presentAddEntity(initialType: .human) }
                 )
                 .padding(.horizontal, K.cardMargin)
                 .padding(.bottom, 24)
@@ -925,16 +1000,11 @@ extension FocusStackHomeTestView {
     private func todayFocusSection(activePets: [Pet]) -> some View {
         // Collapsed first screen answers: who needs care, what is urgent, what can be done now.
         if !activePets.isEmpty && !isExpanded {
-            TodayFocusCarousel(cardMargin: K.cardMargin, animation: HeroAnim.walletSpring) { cardWidth in
-                TodayFocusCard(
+            TodayFocusCarousel(cardMargin: K.cardMargin, animation: walletAnimation) { cardWidth in
+                TodayFocusQuestCardHost(
                     pets: activePets,
                     plants: plants,
-                    quests: IslandQuestEngine.todayQuests(
-                        pets: activePets,
-                        reminders: pendingReminders,
-                        plants: plants,
-                        events: allEvents
-                    ),
+                    reminders: pendingReminders,
                     activePet: todayFocusActivePet,
                     onCompleteQuest: { completeQuestInFocusStack($0) },
                     onTapOasis: { showingOasisReward = true }
@@ -962,7 +1032,7 @@ extension FocusStackHomeTestView {
                     .frame(width: cardWidth)
                 }
             }
-            .animation(HeroAnim.walletSpring, value: isExpanded)
+            .animation(walletAnimation, value: isExpanded)
         }
     }
 
@@ -1025,8 +1095,8 @@ extension FocusStackHomeTestView {
                     openWalletCardBasicInfo(card)
                 }
                 .simultaneousGesture(collapseWalletDragGesture())
-                .animation(HeroAnim.walletSpring, value: isExpanded)
-                .animation(HeroAnim.walletSpring, value: activeCardId)
+                .animation(walletAnimation, value: isExpanded)
+                .animation(walletAnimation, value: activeCardId)
             }
 
             if let activeCard = cards.first(where: { $0.id == heroId }) {
@@ -1043,7 +1113,7 @@ extension FocusStackHomeTestView {
                     .zIndex(Double(n + 80))
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .simultaneousGesture(collapseWalletDragGesture())
-                    .animation(HeroAnim.walletSpring, value: activeCardId)
+                    .animation(walletAnimation, value: activeCardId)
             }
         }
         .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
@@ -1124,12 +1194,57 @@ extension FocusStackHomeTestView {
         if !visible { rosterPreviewCard = FocusCard.from(pet) }
     }
 
+    private func presentAddEntity(initialType: EntityType? = nil) {
+        addEntityInitialType = initialType
+        showingAddEntity = true
+    }
+
+    private func handleAddEntityDismissed() {
+        addEntityInitialType = nil
+    }
+
+    private func homeCardsOrderedByPreference(_ base: [FocusCard]) -> [FocusCard] {
+        let preferredIds = homeCardOrderRaw
+            .split(separator: ",")
+            .map(String.init)
+        guard !preferredIds.isEmpty else { return base }
+
+        var preferredRank: [String: Int] = [:]
+        for (index, id) in preferredIds.enumerated() where preferredRank[id] == nil {
+            preferredRank[id] = index
+        }
+        return base.enumerated()
+            .sorted { lhs, rhs in
+                let lhsRank = preferredRank[lhs.element.id.uuidString] ?? Int.max
+                let rhsRank = preferredRank[rhs.element.id.uuidString] ?? Int.max
+                if lhsRank != rhsRank { return lhsRank < rhsRank }
+                return lhs.offset < rhs.offset
+            }
+            .map(\.element)
+    }
+
+    private func saveHomeCardOrder(_ cards: [FocusCard]) {
+        homeCardOrderRaw = cards
+            .map { $0.id.uuidString }
+            .joined(separator: ",")
+    }
+
+    private func homeCardDisplayCards(from source: [FocusCard]) -> [FocusCard] {
+        guard let reorderingCards = homeCardReorderCards else { return source }
+
+        let sourceById = Dictionary(uniqueKeysWithValues: source.map { ($0.id, $0) })
+        let ordered = reorderingCards.compactMap { sourceById[$0.id] }
+        let orderedIds = Set(ordered.map(\.id))
+        let remaining = source.filter { !orderedIds.contains($0.id) }
+        return ordered + remaining
+    }
+
     private func collapseWalletDragGesture() -> some Gesture {
         DragGesture()
             .onEnded { v in
                 guard v.translation.height > 80 else { return }
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                withAnimation(HeroAnim.walletSpring) { isExpanded = false }
+                withAnimation(walletAnimation) { isExpanded = false }
             }
     }
 
@@ -1152,7 +1267,7 @@ extension FocusStackHomeTestView {
         let items = isExpandedQAEditMode
             ? expandedQAEditItems
             : Array(expandedQuickActionItems(for: pet).prefix(8))
-        let avatar = pet.avatarImageData.flatMap { UIImage(data: $0) }
+        let avatar = FocusWalletAvatarCache.entry(for: pet.id, data: pet.avatarImageData).image
         let themeHex = pet.themeColorHex.isEmpty ? nil : pet.themeColorHex
 
         return VStack(spacing: 8) {
@@ -1215,7 +1330,7 @@ extension FocusStackHomeTestView {
         let items = isExpandedQAEditMode
             ? expandedQAEditItems
             : Array(expandedHumanQuickActionItems(for: human).prefix(8))
-        let avatar = human.avatarImageData.flatMap { UIImage(data: $0) }
+        let avatar = FocusWalletAvatarCache.entry(for: human.id, data: human.avatarImageData).image
         let themeHex = human.themeColorHex.isEmpty ? nil : human.themeColorHex
 
         return VStack(spacing: 8) {
@@ -1314,7 +1429,7 @@ extension FocusStackHomeTestView {
         .rotationEffect(.degrees(isExpandedQAEditMode ? (expandedQAJiggle ? -2.5 : 2.5) : 0))
         .animation(
             isExpandedQAEditMode
-                ? .easeInOut(duration: 0.12 + Double(idx % 4) * 0.015).repeatForever(autoreverses: true)
+                ? (shouldReduceWork ? nil : .easeInOut(duration: 0.12 + Double(idx % 4) * 0.015).repeatForever(autoreverses: true))
                 : .easeOut(duration: 0.2),
             value: expandedQAJiggle
         )
@@ -1417,7 +1532,7 @@ extension FocusStackHomeTestView {
         .rotationEffect(.degrees(isExpandedQAEditMode ? (expandedQAJiggle ? -2.5 : 2.5) : 0))
         .animation(
             isExpandedQAEditMode
-                ? .easeInOut(duration: 0.12 + Double(idx % 4) * 0.015).repeatForever(autoreverses: true)
+                ? (shouldReduceWork ? nil : .easeInOut(duration: 0.12 + Double(idx % 4) * 0.015).repeatForever(autoreverses: true))
                 : .easeOut(duration: 0.2),
             value: expandedQAJiggle
         )
@@ -1543,8 +1658,9 @@ extension FocusStackHomeTestView {
 
     @ViewBuilder
     private func walletCardStack(cards: [FocusCard]) -> some View {
-        let n = cards.count
-        let heroId = activeCardId ?? cards.first?.id
+        let displayCards = homeCardDisplayCards(from: cards)
+        let n = displayCards.count
+        let heroId = activeCardId ?? displayCards.first?.id
 
         GeometryReader { geo in
             // Anchor the stack to the real screen bottom, then convert that
@@ -1557,7 +1673,7 @@ extension FocusStackHomeTestView {
             let heroTopY = safeAreaTop + K.expandedCardGlobalTopOffset - geo.frame(in: .global).minY
 
             ZStack(alignment: .topLeading) {
-                ForEach(Array(cards.enumerated()), id: \.element.id) { idx, card in
+                ForEach(Array(displayCards.enumerated()), id: \.element.id) { idx, card in
                     let isHero = isExpanded && card.id == heroId
                     let visibleHeight = isHero ? K.expandedCardH : K.cardH
                     let offsetY = isExpanded
@@ -1567,7 +1683,7 @@ extension FocusStackHomeTestView {
                         bottomY: expandedBottomY,
                         heroId: heroId,
                         heroTopY: heroTopY,
-                        cards: cards
+                        cards: displayCards
                     )
                     : walletOffsetY(
                         idx: idx,
@@ -1575,7 +1691,7 @@ extension FocusStackHomeTestView {
                         bottomY: collapsedBottomY,
                         heroId: heroId,
                         heroTopY: heroTopY,
-                        cards: cards
+                        cards: displayCards
                     )
 
                     walletCardStackItem(
@@ -1585,12 +1701,13 @@ extension FocusStackHomeTestView {
                         isHero: isHero,
                         visibleHeight: visibleHeight,
                         offsetY: offsetY,
+                        collapsedBottomY: collapsedBottomY,
                         heroId: heroId,
-                        cards: cards
+                        cards: displayCards
                     )
                 }
 
-                if isExpanded, let activeCard = cards.first(where: { $0.id == heroId }) {
+                if isExpanded, let activeCard = displayCards.first(where: { $0.id == heroId }) {
                     let quickModuleH = expandedQuickModuleHeight(for: activeCard)
                     homeVisibilityControl(for: activeCard)
                         .frame(maxWidth: .infinity, alignment: .trailing)
@@ -1604,28 +1721,28 @@ extension FocusStackHomeTestView {
                         .zIndex(Double(n + 80))
                         .transition(.opacity.combined(with: .move(edge: .top)))
                         .simultaneousGesture(collapseWalletDragGesture())
-                        .animation(HeroAnim.walletSpring, value: activeCardId)
+                        .animation(walletAnimation, value: activeCardId)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .contentShape(Rectangle())
-            .animation(HeroAnim.walletSpring, value: isExpanded)
-            .animation(HeroAnim.walletSpring, value: activeCardId)
+            .animation(walletAnimation, value: isExpanded)
+            .animation(walletAnimation, value: activeCardId)
             // Swipe-down anywhere collapses hero back to fan
             .gesture(
                 DragGesture()
                     .onEnded { v in
                         guard isExpanded, v.translation.height > 80 else { return }
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        withAnimation(HeroAnim.walletSpring) { isExpanded = false }
+                        withAnimation(walletAnimation) { isExpanded = false }
                     }
             )
             .onAppear {
-                if activeCardId == nil || !cards.contains(where: { $0.id == activeCardId }) {
-                    activeCardId = cards.first?.id
+                if activeCardId == nil || !displayCards.contains(where: { $0.id == activeCardId }) {
+                    activeCardId = displayCards.first?.id
                 }
             }
-            .onChange(of: cards.map(\.id)) { _, ids in
+            .onChange(of: displayCards.map(\.id)) { _, ids in
                 guard activeCardId == nil || !ids.contains(activeCardId!) else { return }
                 activeCardId = ids.first
             }
@@ -1655,6 +1772,7 @@ extension FocusStackHomeTestView {
                         heroTopY: 0,
                         cards: cards
                     ),
+                    collapsedBottomY: bottomY,
                     heroId: heroId,
                     cards: cards
                 )
@@ -1677,6 +1795,151 @@ extension FocusStackHomeTestView {
         return max(K.stackPeekH, localBottomY)
     }
 
+    private func homeCardReorderGesture(
+        card: FocusCard,
+        cards: [FocusCard],
+        currentOffsetY: CGFloat,
+        collapsedBottomY: CGFloat
+    ) -> some Gesture {
+        LongPressGesture(minimumDuration: 0.45)
+            .sequenced(before: DragGesture(minimumDistance: 0))
+            .onChanged { value in
+                guard homeCardReorderEnabled, !isExpanded, cards.count > 1 else { return }
+                switch value {
+                case .first(true):
+                    beginHomeCardReorder(card: card, cards: cards, currentOffsetY: currentOffsetY)
+                case .second(true, let drag):
+                    beginHomeCardReorder(card: card, cards: cards, currentOffsetY: currentOffsetY)
+                    updateHomeCardReorder(
+                        cardId: card.id,
+                        cards: cards,
+                        dragTranslationY: drag?.translation.height ?? 0,
+                        collapsedBottomY: collapsedBottomY
+                    )
+                default:
+                    break
+                }
+            }
+            .onEnded { value in
+                guard homeCardReorderEnabled, !isExpanded, homeCardReorderDragId == card.id else {
+                    resetHomeCardReorderState()
+                    return
+                }
+
+                let finalTranslation: CGFloat
+                if case .second(true, let drag) = value {
+                    finalTranslation = drag?.translation.height ?? 0
+                } else {
+                    finalTranslation = 0
+                }
+                updateHomeCardReorder(
+                    cardId: card.id,
+                    cards: cards,
+                    dragTranslationY: finalTranslation,
+                    collapsedBottomY: collapsedBottomY
+                )
+                commitHomeCardReorder()
+                resetHomeCardReorderState()
+            }
+    }
+
+    private func beginHomeCardReorder(card: FocusCard, cards: [FocusCard], currentOffsetY: CGFloat) {
+        guard homeCardReorderDragId == nil else { return }
+        homeCardReorderDragId = card.id
+        homeCardReorderStartOffsetY = currentOffsetY
+        homeCardReorderCards = cards
+        homeCardReorderDidMove = false
+        withAnimation(walletAnimation) {
+            homeCardReorderDragOffset = homeCardReorderLiftY
+        }
+        suppressNextHomeCardTap = true
+        fabExpanded = false
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    private func updateHomeCardReorder(
+        cardId: UUID,
+        cards: [FocusCard],
+        dragTranslationY: CGFloat,
+        collapsedBottomY: CGFloat
+    ) {
+        var workingCards = homeCardReorderCards ?? cards
+        guard let currentIndex = workingCards.firstIndex(where: { $0.id == cardId }) else { return }
+
+        let draggedTopY = homeCardReorderStartOffsetY + homeCardReorderLiftY + dragTranslationY
+        var targetIndex = currentIndex
+
+        while targetIndex > 0 {
+            let previousTopY = walletOffsetY(
+                idx: targetIndex - 1,
+                n: workingCards.count,
+                bottomY: collapsedBottomY,
+                heroId: nil,
+                heroTopY: 0,
+                cards: workingCards
+            )
+            guard draggedTopY < previousTopY else { break }
+            targetIndex -= 1
+        }
+
+        while targetIndex < workingCards.count - 1 {
+            let nextTopY = walletOffsetY(
+                idx: targetIndex + 1,
+                n: workingCards.count,
+                bottomY: collapsedBottomY,
+                heroId: nil,
+                heroTopY: 0,
+                cards: workingCards
+            )
+            guard draggedTopY > nextTopY else { break }
+            targetIndex += 1
+        }
+
+        if targetIndex != currentIndex {
+            let movedCard = workingCards.remove(at: currentIndex)
+            workingCards.insert(movedCard, at: targetIndex)
+            withAnimation(walletAnimation) {
+                homeCardReorderCards = workingCards
+            }
+            homeCardReorderDidMove = true
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
+
+        let currentSlotTopY = walletOffsetY(
+            idx: targetIndex,
+            n: workingCards.count,
+            bottomY: collapsedBottomY,
+            heroId: nil,
+            heroTopY: 0,
+            cards: workingCards
+        )
+        var dragTransaction = Transaction(animation: .linear(duration: 0.045))
+        dragTransaction.disablesAnimations = false
+        withTransaction(dragTransaction) {
+            homeCardReorderDragOffset = draggedTopY - currentSlotTopY
+        }
+    }
+
+    private func commitHomeCardReorder() {
+        guard let reorderedCards = homeCardReorderCards else { return }
+        saveHomeCardOrder(reorderedCards)
+    }
+
+    private func resetHomeCardReorderState() {
+        let didReorder = homeCardReorderDidMove
+        homeCardReorderDragId = nil
+        homeCardReorderDragOffset = 0
+        homeCardReorderStartOffsetY = 0
+        homeCardReorderCards = nil
+        homeCardReorderDidMove = false
+        if didReorder {
+            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            suppressNextHomeCardTap = false
+        }
+    }
+
     private func walletCardStackItem(
         card: FocusCard,
         idx: Int,
@@ -1684,10 +1947,13 @@ extension FocusStackHomeTestView {
         isHero: Bool,
         visibleHeight: CGFloat,
         offsetY: CGFloat,
+        collapsedBottomY: CGFloat,
         heroId: UUID?,
         cards: [FocusCard]
     ) -> some View {
-        transformedWalletCard(card: card, isHero: isHero)
+        let isReorderingCard = homeCardReorderDragId == card.id
+
+        return transformedWalletCard(card: card, isHero: isHero)
             .frame(height: isHero ? K.expandedCardH : K.cardH)
             .frame(height: visibleHeight, alignment: .top)
             .clipped()
@@ -1695,33 +1961,47 @@ extension FocusStackHomeTestView {
             .overlay { expandedActionPulseOverlay(for: card.id) }
             .overlay { walkTransformBurstOverlay(for: card.id) }
             .shadow(
-                color: .black.opacity(isHero ? 0.22 : 0.09),
-                radius: isHero ? 20 : 7,
-                x: 0, y: isHero ? 12 : 4
+                color: .black.opacity(isHero ? 0.22 : (isReorderingCard ? 0.16 : 0.09)),
+                radius: isHero ? 20 : (isReorderingCard ? 13 : 7),
+                x: 0, y: isHero ? 12 : (isReorderingCard ? 8 : 4)
             )
             .scaleEffect(
                 (isHero ? 1.0 : (isExpanded ? 0.97 : 1.0)) *
+                (isReorderingCard ? 1.015 : 1.0) *
                 (expandedActionPulseCardId == card.id ? 1.025 : 1.0),
                 anchor: .top
             )
-            .offset(y: offsetY)
-            .zIndex(walletZIndex(idx: idx, n: n, isHero: isHero,
-                                 heroId: heroId, cards: cards))
+            .offset(y: offsetY + (isReorderingCard ? homeCardReorderDragOffset : 0))
+            .zIndex(walletZIndex(idx: idx, n: n, isHero: isHero, heroId: heroId, cards: cards))
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(card.name) 的卡片")
             .accessibilityHint(isHero ? "点击返回首页，长按进入基本信息" :
-                              (isExpanded ? "点击返回首页" : "点击展开查看"))
-            .if(!(isHero && isExpanded)) { view in
+                              (isExpanded ? "点击返回首页" : "长按拖动排序，点击展开查看"))
+            .if(isExpanded && !isHero && homeCardReorderDragId == nil) { view in
                 view.contextMenu { cardContextMenu(card: card) }
             }
-            .onTapGesture { handleWalletCardTap(card: card, n: n, isHero: isHero) }
+            .highPriorityGesture(
+                TapGesture()
+                    .onEnded { handleWalletCardTap(card: card, n: n, isHero: isHero) }
+            )
+            .if(!isExpanded && homeCardReorderEnabled) { view in
+                view.simultaneousGesture(
+                    homeCardReorderGesture(
+                        card: card,
+                        cards: cards,
+                        currentOffsetY: offsetY,
+                        collapsedBottomY: collapsedBottomY
+                    )
+                )
+            }
             .onLongPressGesture(minimumDuration: 0.45) {
                 guard isHero && isExpanded else { return }
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 openWalletCardBasicInfo(card)
             }
-            .animation(HeroAnim.walletSpring, value: isExpanded)
-            .animation(HeroAnim.walletSpring, value: activeCardId)
+            .animation(walletAnimation, value: isExpanded)
+            .animation(walletAnimation, value: activeCardId)
+            .animation(walletAnimation, value: homeCardReorderDragId)
     }
 
     // Total height of the default fan stack (used to anchor it at the bottom of bottomY).
@@ -1772,13 +2052,18 @@ extension FocusStackHomeTestView {
     //       Tap any inactive card strip → restore fan.
     //       Swipe-down → restore fan (via DragGesture above).
     private func handleWalletCardTap(card: FocusCard, n: Int, isHero: Bool) {
+        if suppressNextHomeCardTap {
+            suppressNextHomeCardTap = false
+            return
+        }
+
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
 
         if n <= 1 {
             if isExpanded {
                 collapseWalletToHome()
             } else {
-                withAnimation(HeroAnim.walletSpring) {
+                withAnimation(walletAnimation) {
                     activeCardId = card.id
                     isExpanded = true
                 }
@@ -1791,7 +2076,7 @@ extension FocusStackHomeTestView {
         } else if isExpanded {
             collapseWalletToHome()
         } else {
-            withAnimation(HeroAnim.walletSpring) {
+            withAnimation(walletAnimation) {
                 activeCardId = card.id
                 isExpanded = true
             }
@@ -1799,7 +2084,7 @@ extension FocusStackHomeTestView {
     }
 
     private func collapseWalletToHome() {
-        withAnimation(HeroAnim.walletSpring) {
+        withAnimation(walletAnimation) {
             isExpanded = false
             fabExpanded = false
             isExpandedQAEditMode = false
@@ -1822,7 +2107,7 @@ extension FocusStackHomeTestView {
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-            withAnimation(HeroAnim.walletSpring) {
+            withAnimation(walletAnimation) {
                 activeCardId = card.id
                 isExpanded = true
             }
@@ -1832,7 +2117,7 @@ extension FocusStackHomeTestView {
     private func openWalletCardBasicInfo(_ card: FocusCard) {
         fabExpanded = false
         isExpandedQAEditMode = false
-        withAnimation(HeroAnim.walletSpring) {
+        withAnimation(walletAnimation) {
             isExpanded = false
         }
 
@@ -1941,7 +2226,7 @@ extension FocusStackHomeTestView {
             reward: reward
         )
         let coconutDelta = max(0, QuestManager.shared.coconutCount - coconutBefore)
-        withAnimation(HeroAnim.walletSpring) {
+        withAnimation(walletAnimation) {
             activeCardId = pet.id
             isExpanded = true
         }
@@ -1963,7 +2248,7 @@ extension FocusStackHomeTestView {
     }
 
     private func triggerWalkCardTransform(for pet: Pet) {
-        withAnimation(HeroAnim.walletSpring) {
+        withAnimation(walletAnimation) {
             activeCardId = pet.id
             isExpanded = true
         }
@@ -2298,11 +2583,17 @@ extension FocusStackHomeTestView {
 
     private func expandedPetHasPlannedFeedSchedules(_ pet: Pet) -> Bool {
         let petIdStr = pet.id.uuidString
-        return allEvents.contains {
-            ($0.relatedEntityType == EntityKind.pet.rawValue || $0.relatedEntityType == "pet")
-                && $0.relatedEntityId == petIdStr
-                && $0.eventType == EventType.foodChange.rawValue
-        }
+        let petKind = EntityKind.pet.rawValue
+        let foodChange = EventType.foodChange.rawValue
+        var descriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { event in
+                (event.relatedEntityType == petKind || event.relatedEntityType == "pet")
+                && event.relatedEntityId == petIdStr
+                && event.eventType == foodChange
+            }
+        )
+        descriptor.fetchLimit = 1
+        return ((try? modelContext.fetch(descriptor))?.isEmpty == false)
     }
 
     private func expandedPendingFeedReminderForPlannedMode(pet: Pet) -> Reminder? {
@@ -2318,6 +2609,18 @@ extension FocusStackHomeTestView {
         guard HomeFeedRecordMode.isPlanned(for: pet.id) else { return false }
         let petIdStr = pet.id.uuidString
         let cal = Calendar.current
+        let start = cal.startOfDay(for: Date())
+        let end = cal.date(byAdding: .day, value: 1, to: start) ?? Date()
+        var descriptor = FetchDescriptor<Reminder>(
+            predicate: #Predicate<Reminder> { reminder in
+                reminder.status == "failed" &&
+                reminder.scheduledAt >= start &&
+                reminder.scheduledAt < end
+            },
+            sortBy: [SortDescriptor(\.scheduledAt)]
+        )
+        descriptor.fetchLimit = 24
+        let failedReminders = (try? modelContext.fetch(descriptor)) ?? []
         return failedReminders.contains {
             cal.isDateInToday($0.scheduledAt) && expandedIsPlannedFeedReminder($0, petIdStr: petIdStr)
         }
@@ -2585,7 +2888,7 @@ extension FocusStackHomeTestView {
             return human.workoutLogs.contains { cal.isDateInToday($0.date) }
         case "humanMedication":
             let humanId = human.id.uuidString
-            return allMedicationLogs.contains {
+            return fetchTodayMedicationLogs(for: humanId).contains {
                 $0.humanId == humanId &&
                 cal.isDateInToday($0.scheduledTime) &&
                 $0.status == .taken
@@ -2610,11 +2913,11 @@ extension FocusStackHomeTestView {
             return count > 0 ? "近30天 \(count)次" : nil
         case "humanMedication":
             let humanId = human.id.uuidString
-            let activeMedCount = allHumanMedications.filter {
+            let activeMedCount = fetchActiveMedications(for: humanId).filter {
                 $0.humanId == humanId && $0.isActive && $0.isActiveToday
             }.count
             guard activeMedCount > 0 else { return nil }
-            let takenToday = allMedicationLogs.filter {
+            let takenToday = fetchTodayMedicationLogs(for: humanId).filter {
                 $0.humanId == humanId &&
                 cal.isDateInToday($0.scheduledTime) &&
                 $0.status == .taken
@@ -2623,6 +2926,32 @@ extension FocusStackHomeTestView {
         default:
             return nil
         }
+    }
+
+    private func fetchActiveMedications(for humanId: String) -> [HumanMedication] {
+        var descriptor = FetchDescriptor<HumanMedication>(
+            predicate: #Predicate<HumanMedication> { medication in
+                medication.humanId == humanId && medication.isActive
+            }
+        )
+        descriptor.fetchLimit = 24
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+
+    private func fetchTodayMedicationLogs(for humanId: String) -> [HumanMedicationLog] {
+        let cal = Calendar.current
+        let start = cal.startOfDay(for: Date())
+        let end = cal.date(byAdding: .day, value: 1, to: start) ?? Date()
+        var descriptor = FetchDescriptor<HumanMedicationLog>(
+            predicate: #Predicate<HumanMedicationLog> { log in
+                log.humanId == humanId &&
+                log.scheduledTime >= start &&
+                log.scheduledTime < end
+            },
+            sortBy: [SortDescriptor(\.scheduledTime)]
+        )
+        descriptor.fetchLimit = 48
+        return (try? modelContext.fetch(descriptor)) ?? []
     }
 
     private func expandedHumanPrivacyField(for actionType: String) -> HumanPrivateField? {
@@ -2855,7 +3184,7 @@ extension FocusStackHomeTestView {
                     .opacity(fabExpanded ? 1 : 0)
                     .offset(y: fabExpanded ? 0 : 24)
                     .animation(
-                        .spring(response: 0.35, dampingFraction: 0.72)
+                        HeroAnim.fabSpring
                         .delay(fabExpanded
                                ? Double(activeItems.count - 1 - idx) * 0.055
                                : Double(idx) * 0.04),
@@ -2884,7 +3213,7 @@ extension FocusStackHomeTestView {
                         .opacity(fabExpanded ? 1 : 0)
                         .offset(y: fabExpanded ? 0 : 24)
                         .animation(
-                            .spring(response: 0.35, dampingFraction: 0.72)
+                            HeroAnim.fabSpring
                             .delay(fabExpanded
                                    ? Double(fabItems.count - 1 - idx) * 0.055
                                    : Double(idx) * 0.04),
@@ -2913,7 +3242,7 @@ extension FocusStackHomeTestView {
                         .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(.white)
                         .rotationEffect(.degrees(fabExpanded ? 90 : 0))
-                        .animation(.spring(response: 0.3), value: fabExpanded)
+                        .animation(HeroAnim.buttonSpring, value: fabExpanded)
                 }
             }
             .buttonStyle(.plain)
@@ -3065,7 +3394,7 @@ extension FocusStackHomeTestView {
                 .opacity(cardFabExpanded ? 1 : 0)
                 .offset(y: cardFabExpanded ? 0 : 24)
                 .animation(
-                    .spring(response: 0.35, dampingFraction: 0.72)
+                    HeroAnim.fabSpring
                     .delay(cardFabExpanded ? Double(items.count - 1 - idx) * 0.055 : Double(idx) * 0.04),
                     value: cardFabExpanded
                 )
@@ -3097,7 +3426,7 @@ extension FocusStackHomeTestView {
                         .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(.white)
                         .rotationEffect(.degrees(cardFabExpanded ? 90 : 0))
-                        .animation(.spring(response: 0.3), value: cardFabExpanded)
+                        .animation(HeroAnim.buttonSpring, value: cardFabExpanded)
                 }
             }
             .buttonStyle(.plain)
@@ -3340,6 +3669,91 @@ extension FocusStackHomeTestView {
 // MARK: – Wallet card view  (WalletPetCardFront style)
 // ─────────────────────────────────────────────────
 
+@MainActor
+private enum FocusWalletAvatarCache {
+    struct Entry {
+        let image: UIImage?
+        let isTransparent: Bool
+        let signature: String
+    }
+
+    private static var entries: [UUID: Entry] = [:]
+
+    static func entry(for cardId: UUID, data: Data?) -> Entry {
+        guard let data else {
+            entries.removeValue(forKey: cardId)
+            return Entry(image: nil, isTransparent: false, signature: "")
+        }
+
+        let signature = avatarSignature(data)
+        if let cached = entries[cardId], cached.signature == signature {
+            return cached
+        }
+
+        let entry = decodedEntry(from: data, signature: signature)
+        entries[cardId] = entry
+        return entry
+    }
+
+    static func preload(cards: [FocusCard]) async {
+        let payloads: [(UUID, Data, String)] = cards.compactMap { card in
+            guard let data = card.avatarImageData else {
+                entries.removeValue(forKey: card.id)
+                return nil
+            }
+            let signature = avatarSignature(data)
+            if let cached = entries[card.id], cached.signature == signature { return nil }
+            return (card.id, data, signature)
+        }
+        guard !payloads.isEmpty else { return }
+
+        let decoded = await Task.detached(priority: .utility) {
+            payloads.map { id, data, signature in
+                let entry = decodedEntry(from: data, signature: signature)
+                return (
+                    id,
+                    entry.image,
+                    entry.isTransparent,
+                    entry.signature
+                )
+            }
+        }.value
+
+        for (id, image, isTransparent, signature) in decoded {
+            entries[id] = Entry(image: image, isTransparent: isTransparent, signature: signature)
+        }
+    }
+
+    nonisolated private static func avatarSignature(_ data: Data) -> String {
+        let head = data.prefix(12).map { String(format: "%02x", $0) }.joined()
+        let tail = data.suffix(12).map { String(format: "%02x", $0) }.joined()
+        return "\(data.count)-\(head)-\(tail)"
+    }
+
+    nonisolated private static func decodedEntry(from data: Data, signature: String) -> Entry {
+        let image = decodedImage(from: data)
+        let isTransparent = image.map { ImageCutoutService.imageHasTransparentPixels($0) } ?? false
+        return Entry(image: image, isTransparent: isTransparent, signature: signature)
+    }
+
+    nonisolated private static func decodedImage(from data: Data, maxPixel: CGFloat = 1_200) -> UIImage? {
+        let options: [CFString: Any] = [kCGImageSourceShouldCache: false]
+        guard let source = CGImageSourceCreateWithData(data as CFData, options as CFDictionary) else {
+            return UIImage(data: data)
+        }
+        let thumbnailOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: Int(maxPixel)
+        ]
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions as CFDictionary) else {
+            return UIImage(data: data)
+        }
+        return UIImage(cgImage: cgImage)
+    }
+}
+
 private struct FocusWalletCardView: View {
     let card: FocusCard
     let namespace: Namespace.ID
@@ -3347,19 +3761,31 @@ private struct FocusWalletCardView: View {
     let expandedId: UUID?
     let isHeroExpanded: Bool
 
+    @State private var delayedPopoutExpanded = false
+
     private let accent = Color(hex: "FF5A3D")
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
     @AppStorage("shop_equipped_title") private var equippedTitle: String = ""
     @AppStorage("shop_equip_fx_lime_glow") private var equipFxLimeGlow: Bool = false
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var shouldReduceWork: Bool {
+        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
+    }
+    private var walletAnimation: Animation {
+        shouldReduceWork ? .easeOut(duration: 0.16) : HeroAnim.walletSpring
+    }
 
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width
             let h = geo.size.height
-            let avatarImage: UIImage? = card.avatarImageData.flatMap { UIImage(data: $0) }
-            let isTransparent = card.avatarImageData.map { ImageCutoutService.isTransparentPNG($0) } ?? false
-            let hasPopout    = isTransparent && avatarImage != nil
-            let usesFullBleed = avatarImage != nil && !isTransparent
+            let avatarEntry = FocusWalletAvatarCache.entry(for: card.id, data: card.avatarImageData)
+            let avatarImage = avatarEntry.image
+            let hasPopout = avatarEntry.isTransparent && avatarImage != nil
+            let usesFullBleed = avatarImage != nil && !avatarEntry.isTransparent
+            let avatarExpanded = hasPopout && !card.isHuman ? delayedPopoutExpanded : isHeroExpanded
 
             ZStack(alignment: .topLeading) {
                 // 1. Background: mesh gradient (real pet/human) or flat gradient (dummy)
@@ -3380,20 +3806,32 @@ private struct FocusWalletCardView: View {
                     .allowsHitTesting(false)
                 }
 
-                // 3. Oversized background identity. For regular photos this sits
-                // above the image as a translucent orange watermark; for pasted
-                // transparent subjects it still remains behind the subject.
-                backgroundHeadlineLayer(w: w)
+                // 3. Expanded cards keep the oversized background identity; compact
+                // stack cards stay clean so the peek strip remains legible.
+                if isHeroExpanded {
+                    backgroundHeadlineLayer(w: w)
+                }
 
                 // 4. Left avatar (silhouette or transparent photo popout)
                 if !usesFullBleed {
-                    leftAvatarContent(avatarImage: avatarImage, hasPopout: hasPopout, w: w, h: h)
+                    leftAvatarContent(
+                        avatarImage: avatarImage,
+                        hasPopout: hasPopout,
+                        avatarExpanded: avatarExpanded,
+                        w: w,
+                        h: h
+                    )
                         .matchedGeometryEffect(
                             id: HeroArtID(cardId: card.id),
                             in: namespace,
                             isSource: !(expandedId == card.id)
                         )
-                        .frame(width: w * avatarContentWidthRatio, height: h)
+                        .frame(
+                            width: w * avatarContentWidthRatio(hasPopout: hasPopout, avatarExpanded: avatarExpanded),
+                            height: h,
+                            alignment: .leading
+                        )
+                        .clipped()
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                         .allowsHitTesting(false)
                 }
@@ -3407,7 +3845,23 @@ private struct FocusWalletCardView: View {
 
                 // 7. Compact cards now keep the same uninterrupted background as the hero card.
             }
-            .animation(HeroAnim.walletSpring, value: isHeroExpanded)
+            .animation(walletAnimation, value: isHeroExpanded)
+        }
+        .onAppear {
+            delayedPopoutExpanded = isHeroExpanded
+        }
+        .onChange(of: isHeroExpanded) { _, newValue in
+            if newValue {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.07) {
+                    withAnimation(.spring(response: 0.36, dampingFraction: 0.84)) {
+                        delayedPopoutExpanded = true
+                    }
+                }
+            } else {
+                withAnimation(.spring(response: 0.24, dampingFraction: 0.9)) {
+                    delayedPopoutExpanded = false
+                }
+            }
         }
         .frame(height: isHeroExpanded ? K.expandedCardH : K.cardH)
         .clipShape(RoundedRectangle(cornerRadius: HeroAnim.stackCardCorner, style: .continuous))
@@ -3421,8 +3875,9 @@ private struct FocusWalletCardView: View {
 
     // MARK: – Background
 
-    private var avatarContentWidthRatio: CGFloat {
-        if isHeroExpanded && !card.isHuman && card.petSpecies != nil {
+    private func avatarContentWidthRatio(hasPopout: Bool, avatarExpanded: Bool) -> CGFloat {
+        let shouldUseExpandedWidth = hasPopout ? avatarExpanded : isHeroExpanded
+        if shouldUseExpandedWidth && !card.isHuman && card.petSpecies != nil {
             return 0.98
         }
         return 0.52
@@ -3436,13 +3891,13 @@ private struct FocusWalletCardView: View {
                     weight: .black, design: .rounded
                 ))
                 .foregroundStyle(accent.opacity(0.85))
-                .lineLimit(1).minimumScaleFactor(0.22)
+                .lineLimit(1)
+                .minimumScaleFactor(0.22)
                 .frame(maxWidth: .infinity, alignment: .center)
         }
         .padding(.horizontal, 8)
         .padding(.top, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .opacity(isHeroExpanded ? 1 : 0.78)
         .allowsHitTesting(false)
     }
 
@@ -3557,28 +4012,17 @@ private struct FocusWalletCardView: View {
     // MARK: – Left avatar
 
     @ViewBuilder
-    private func leftAvatarContent(avatarImage: UIImage?, hasPopout: Bool, w: CGFloat, h: CGFloat) -> some View {
+    private func leftAvatarContent(avatarImage: UIImage?, hasPopout: Bool, avatarExpanded: Bool, w: CGFloat, h: CGFloat) -> some View {
         if let img = avatarImage, hasPopout {
-            // Transparent cutout. In expanded pet cards we intentionally avoid the
-            // white-outline duplicate layer; sibling FAB animations can otherwise
-            // redraw that outline one frame before the real image and create a flash.
-            ZStack(alignment: .bottom) {
-                if !(isHeroExpanded && !card.isHuman) {
-                    Image(uiImage: img).resizable().scaledToFit()
-                        .scaleEffect(0.88)
-                        .colorMultiply(.white)
-                        .shadow(color: .white, radius: 0, x: 2, y: 0)
-                        .shadow(color: .white, radius: 0, x: -2, y: 0)
-                        .shadow(color: .white, radius: 0, x: 0, y: -2)
-                        .allowsHitTesting(false)
-                }
-                Image(uiImage: img).resizable().scaledToFit()
-                    .scaleEffect(1)
-                    .allowsHitTesting(false)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(isHeroExpanded && !card.isHuman ? 16 : 0)
-            .shadow(color: .black.opacity(0.28), radius: 18, x: 0, y: 12)
+            let expandedCardOffsetX = avatarExpanded && !card.isHuman ? w * 0.10 : 0
+            Image(uiImage: img)
+                .resizable()
+                .scaledToFill()
+                .frame(width: w, height: h)
+                .offset(x: expandedCardOffsetX)
+                .allowsHitTesting(false)
+                .padding(avatarExpanded && !card.isHuman ? 16 : 0)
+                .shadow(color: .black.opacity(0.28), radius: 18, x: 0, y: 12)
         } else if !card.isHuman, let species = card.petSpecies {
             // Pet silhouette
             let silSpecies = FocusWalletCardView.normalizeSpecies(species)
@@ -3722,17 +4166,6 @@ private struct FocusWalletCardView: View {
 
     private var topIdentityBar: some View {
         HStack(spacing: 8) {
-            Text(card.name)
-                .font(.system(size: 15, weight: .black, design: .rounded))
-                .foregroundStyle(.white.opacity(0.9))
-                .lineLimit(1)
-                .minimumScaleFactor(0.65)
-            Text(card.kind.isEmpty ? (card.isHuman ? "HUMAN" : "PET") : card.kind)
-                .font(.system(size: 12, weight: .regular, design: .rounded))
-                .foregroundStyle(.white.opacity(0.62))
-                .lineLimit(1)
-                .minimumScaleFactor(0.65)
-            Spacer(minLength: 0)
             if let title = equippedTitleBadge {
                 Text(title)
                     .font(.system(size: 11, weight: .black, design: .rounded))
@@ -3742,6 +4175,19 @@ private struct FocusWalletCardView: View {
                     .padding(.vertical, 3)
                     .background(Color.goPrimary, in: Capsule())
             }
+            if let topDescriptor {
+                Text(topDescriptor)
+                    .font(.system(size: 12, weight: .regular, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.62))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+            }
+            Spacer(minLength: 0)
+            Text(card.name)
+                .font(.system(size: 15, weight: .black, design: .rounded))
+                .foregroundStyle(.white.opacity(0.9))
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
         }
         .padding(.horizontal, 18)
         .frame(height: K.stackPeekH, alignment: .center)
@@ -3755,6 +4201,15 @@ private struct FocusWalletCardView: View {
             .frame(maxHeight: .infinity, alignment: .top)
             .allowsHitTesting(false)
         )
+    }
+
+    private var topDescriptor: String? {
+        if card.isHuman {
+            let text = card.kind.trimmingCharacters(in: .whitespacesAndNewlines)
+            return text.isEmpty ? "HUMAN" : text
+        }
+        let breed = card.breed.trimmingCharacters(in: .whitespacesAndNewlines)
+        return breed.isEmpty ? nil : breed
     }
 
     private var equippedTitleBadge: String? {
@@ -4717,7 +5172,7 @@ extension FocusStackHomeTestView {
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         detailFooterVisible = false
-                        withAnimation(HeroAnim.transitionSpring) {
+                        withAnimation(transitionAnimation) {
                             expandedId = nil
                             dragOffset = 0
                         }
@@ -4752,9 +5207,9 @@ extension FocusStackHomeTestView {
                     if v.translation.height > 80 {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         detailFooterVisible = false
-                        withAnimation(HeroAnim.transitionSpring) { expandedId = nil; dragOffset = 0 }
+                        withAnimation(transitionAnimation) { expandedId = nil; dragOffset = 0 }
                     } else {
-                        withAnimation(HeroAnim.transitionSpring) { dragOffset = 0 }
+                        withAnimation(transitionAnimation) { dragOffset = 0 }
                     }
                 }
         )
@@ -4762,7 +5217,9 @@ extension FocusStackHomeTestView {
     }
 
     private func heroCardView(card: FocusCard, width: CGFloat, height: CGFloat) -> some View {
-        ZStack {
+        let avatarImage = FocusWalletAvatarCache.entry(for: card.id, data: card.avatarImageData).image
+
+        return ZStack {
             LinearGradient(
                 colors: [card.color.mix(with: .white, by: 0.28),
                          card.color,
@@ -4772,7 +5229,7 @@ extension FocusStackHomeTestView {
             .frame(width: width, height: height)
 
             Group {
-                if let data = card.avatarImageData, let img = UIImage(data: data) {
+                if let img = avatarImage {
                     Image(uiImage: img).resizable().scaledToFill()
                         .frame(width: width, height: height).clipped()
                 } else if card.isHuman {

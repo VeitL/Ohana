@@ -36,9 +36,7 @@ final class AchievementManager {
 
     // 计算给定宠物的所有成就状态（异步，不阻塞主线程）
     func evaluate(for pet: Pet) async {
-        let computed = await Task.detached(priority: .utility) {
-            Self.compute(for: pet)
-        }.value
+        let computed = Self.compute(for: pet)
 
         await MainActor.run {
             let prev = self.achievements

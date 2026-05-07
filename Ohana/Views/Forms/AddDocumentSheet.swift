@@ -36,6 +36,7 @@ struct AddDocumentSheet: View {
     // B4: 多附件
     @State private var attachments: [DocAttachment] = []
     @State private var showingCamera = false
+    @State private var showCameraPermissionAlert = false
     @State private var showingFilePicker = false
     @State private var photoPickerItems: [PhotosPickerItem] = []
     // B4: 拍照暂存（避免 sheet dismiss 冲突）
@@ -291,7 +292,7 @@ struct AddDocumentSheet: View {
                             }
 
                             HStack(spacing: 10) {
-                                attachmentBtn(icon: "camera.fill", label: "拍照", color: petThemeColor) { showingCamera = true }
+                                attachmentBtn(icon: "camera.fill", label: "拍照", color: petThemeColor) { presentCamera() }
                                 PhotosPicker(selection: $photoPickerItems, maxSelectionCount: 10, matching: .images) {
                                     attachmentBtnLabel(icon: "photo.fill", label: "相册", color: petThemeColor.opacity(0.85))
                                 }
@@ -360,7 +361,7 @@ struct AddDocumentSheet: View {
         .presentationDragIndicator(.visible)
         .presentationBackground(.bar)
         // B4: 拍照 sheet — onDismiss 后处理 pending image，避免 sheet 嵌套冲突
-        .sheet(isPresented: $showingCamera, onDismiss: {
+        .fullScreenCover(isPresented: $showingCamera, onDismiss: {
             if let img = pendingCapturedImage {
                 let data = img.jpegData(compressionQuality: 0.85) ?? Data()
                 attachments.append(DocAttachment(data: data, filename: "photo_\(attachments.count + 1).jpg", isImage: true))
@@ -369,8 +370,16 @@ struct AddDocumentSheet: View {
         }) {
             PetCameraPickerView { img in
                 pendingCapturedImage = img
+                showingCamera = false
                 // 不在此处操作 attachments，等 onDismiss 处理
+            } onCancel: {
+                showingCamera = false
             }
+        }
+        .alert("无法打开相机", isPresented: $showCameraPermissionAlert) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text("请在系统设置中允许 Ohana 访问相机。")
         }
         // F3: 附件图片全屏预览
         .fullScreenCover(item: $previewAttachment) { att in
@@ -418,6 +427,14 @@ struct AddDocumentSheet: View {
     // MARK: - 附件按钮辅助
     private func attachmentBtn(icon: String, label: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) { attachmentBtnLabel(icon: icon, label: label, color: color) }
+    }
+
+    private func presentCamera() {
+        requestOhanaCameraAccess {
+            showingCamera = true
+        } onDenied: {
+            showCameraPermissionAlert = true
+        }
     }
 
     private func attachmentBtnLabel(icon: String, label: String, color: Color) -> some View {
@@ -539,6 +556,7 @@ struct EditDocumentSheet: View {
     @State private var showingPreview = false
     @State private var photoPickerItem: PhotosPickerItem? = nil
     @State private var showingCamera = false
+    @State private var showCameraPermissionAlert = false
     @State private var pendingCapturedImage: UIImage? = nil
 
     init(doc: PetDocument, pet: Pet) {
@@ -693,7 +711,7 @@ struct EditDocumentSheet: View {
                                 }.buttonStyle(.plain)
                             } else {
                                 HStack(spacing: 10) {
-                                    Button { showingCamera = true } label: {
+                                    Button { presentCamera() } label: {
                                         VStack(spacing: 6) {
                                             Image(systemName: "camera.fill").font(.system(size: 20, weight: .semibold))
                                                 .foregroundStyle(petThemeColor)
@@ -766,10 +784,20 @@ struct EditDocumentSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .presentationBackground(.bar)
-        .sheet(isPresented: $showingCamera, onDismiss: {
+        .fullScreenCover(isPresented: $showingCamera, onDismiss: {
             if let img = pendingCapturedImage { attachmentImage = img; pendingCapturedImage = nil }
         }) {
-            PetCameraPickerView { img in pendingCapturedImage = img }
+            PetCameraPickerView { img in
+                pendingCapturedImage = img
+                showingCamera = false
+            } onCancel: {
+                showingCamera = false
+            }
+        }
+        .alert("无法打开相机", isPresented: $showCameraPermissionAlert) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text("请在系统设置中允许 Ohana 访问相机。")
         }
         .fullScreenCover(isPresented: $showingPreview) {
             if let img = attachmentImage {
@@ -824,5 +852,13 @@ struct EditDocumentSheet: View {
         }
         modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+
+    private func presentCamera() {
+        requestOhanaCameraAccess {
+            showingCamera = true
+        } onDenied: {
+            showCameraPermissionAlert = true
+        }
     }
 }

@@ -23,6 +23,7 @@ struct HumanBasicInfoDetailView: View {
     @State private var showingHomeStackFullAlert = false
 
     @State private var eName = ""
+    @State private var eAvatarImageData: Data? = nil
     @State private var eAvatarEmoji = ""
     @State private var eRole = "owner"
     @State private var eGender = ""
@@ -116,42 +117,80 @@ struct HumanBasicInfoDetailView: View {
 
     private var avatarSection: some View {
         VStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(Color(hex: human.themeColorHex).opacity(0.16))
-                    .frame(width: 112, height: 112)
-                    .overlay(Circle().strokeBorder(Color(hex: human.themeColorHex).opacity(0.35), lineWidth: 2))
-                if let data = human.avatarImageData, let image = UIImage(data: data) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 104, height: 104)
-                        .clipShape(Circle())
-                } else {
-                    Text(human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji)
-                        .font(OhanaFont.metric(size: 54))
+            humanAvatarImage(
+                data: isEditing ? eAvatarImageData : human.avatarImageData,
+                fallbackEmoji: isEditing ? eAvatarEmoji : human.avatarEmoji,
+                accent: isEditing ? Color(hex: eThemeColorHex) : Color(hex: human.themeColorHex),
+                size: 112
+            )
+
+            VStack(spacing: 6) {
+                Text(isEditing ? (eName.isEmpty ? human.name : eName) : human.name)
+                    .font(OhanaFont.metric(size: 32))
+                    .foregroundStyle(Color(hex: "1E3A8A"))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.62)
+                HStack(spacing: 8) {
+                    chip(isEditing ? roleLabel(for: eRole) : human.roleText, color: isEditing ? Color(hex: eThemeColorHex) : Color(hex: human.themeColorHex))
+                    if let birthday = isEditing && eHasBirthday ? eBirthday : human.birthday {
+                        chip(isEditing && eHasBirthday ? humanAgeText(for: birthday) : human.ageText, color: Color.goPrimary)
+                        chip(Human.westernZodiacChinese(for: birthday), color: Color.goPurple)
+                    }
+                    let mbti = isEditing ? eMBTI : human.mbti
+                    if !mbti.isEmpty {
+                        chip(mbti.uppercased(), color: Color.goOrange)
+                    }
                 }
             }
 
-            VStack(spacing: 6) {
-                Text(human.name)
-                    .font(OhanaFont.metric(size: 32))
-                    .foregroundStyle(Color(hex: "1E3A8A"))
-                HStack(spacing: 8) {
-                    chip(human.roleText, color: Color(hex: human.themeColorHex))
-                    if let birthday = human.birthday {
-                        chip(human.ageText, color: Color.goPrimary)
-                        chip(Human.westernZodiacChinese(for: birthday), color: Color.goPurple)
-                    }
-                    if !human.mbti.isEmpty {
-                        chip(human.mbti.uppercased(), color: Color.goOrange)
-                    }
-                }
+            if isEditing {
+                EditableProfileAvatarPicker(
+                    avatarImageData: $eAvatarImageData,
+                    fallbackEmoji: eAvatarEmoji.isEmpty ? "👤" : eAvatarEmoji,
+                    accentColor: Color(hex: eThemeColorHex),
+                    cropSpecies: "",
+                    silhouetteSystemName: "person.fill"
+                )
             }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
+        .padding(.horizontal, 16)
         .goIslandModuleCard(cornerRadius: 28)
+    }
+
+    private func humanAvatarImage(data: Data?, fallbackEmoji: String, accent: Color, size: CGFloat) -> some View {
+        ZStack {
+            Circle()
+                .fill(accent.opacity(0.16))
+                .frame(width: size, height: size)
+                .overlay(Circle().strokeBorder(accent.opacity(0.35), lineWidth: 2))
+            if let data, let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size - 8, height: size - 8, alignment: .center)
+                    .clipShape(Circle())
+            } else {
+                Text(fallbackEmoji.isEmpty ? "👤" : fallbackEmoji)
+                    .font(OhanaFont.metric(size: size * 0.48))
+            }
+        }
+        .frame(width: size, height: size, alignment: .center)
+    }
+
+    private func roleLabel(for role: String) -> String {
+        switch role {
+        case "owner": return "主人"
+        case "editor": return "编辑"
+        case "viewer": return "查看"
+        default: return role
+        }
+    }
+
+    private func humanAgeText(for birthday: Date) -> String {
+        let years = Calendar.current.dateComponents([.year], from: birthday, to: Date()).year ?? 0
+        return years > 0 ? "\(years)岁" : "未满1岁"
     }
 
     private var readContent: some View {
@@ -546,6 +585,7 @@ struct HumanBasicInfoDetailView: View {
 
     private func loadEditState() {
         eName = human.name
+        eAvatarImageData = human.avatarImageData
         eAvatarEmoji = human.avatarEmoji
         eRole = human.role
         eGender = human.genderRaw
@@ -574,6 +614,7 @@ struct HumanBasicInfoDetailView: View {
         }
 
         human.name = eName.trimmingCharacters(in: .whitespacesAndNewlines)
+        human.avatarImageData = eAvatarImageData
         human.avatarEmoji = eAvatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "👤" : eAvatarEmoji
         human.role = eRole
         human.birthday = eHasBirthday ? eBirthday : nil

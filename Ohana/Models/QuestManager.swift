@@ -188,8 +188,7 @@ final class QuestManager {
         let pid = petId.uuidString
         if var dict = Self.defaults.dictionary(forKey: Keys.cooldownLogs) {
             dict = dict.filter { key, _ in
-                guard let k = key as? String else { return true }
-                return !k.hasPrefix("\(pid)_")
+                !key.hasPrefix("\(pid)_")
             }
             Self.defaults.set(dict, forKey: Keys.cooldownLogs)
         }

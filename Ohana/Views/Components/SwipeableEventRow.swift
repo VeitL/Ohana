@@ -17,6 +17,8 @@ struct SwipeableEventRow: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
 
     @State private var offsetX: CGFloat = 0
     @State private var isTriggerred = false
@@ -33,6 +35,9 @@ struct SwipeableEventRow: View {
 
     private let triggerThreshold: CGFloat = 100
     private let dampFactor: CGFloat = 0.4
+    private var shouldReduceWork: Bool {
+        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
+    }
 
     private var leftProgress:  CGFloat { max(0, -offsetX) / triggerThreshold }
     private var rightProgress: CGFloat { max(0,  offsetX) / triggerThreshold }
@@ -172,7 +177,11 @@ struct SwipeableEventRow: View {
                  : "确定要删除「\(event.title)」吗？此操作不可撤回。")
         }
         .onAppear {
-            guard rowState == .overdue else { return }
+            guard rowState == .overdue, !shouldReduceWork else {
+                overdueBreath = false
+                overdueFloat = 0
+                return
+            }
             withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) {
                 overdueBreath = true
             }
@@ -515,7 +524,7 @@ struct SwipeableEventRow: View {
     }
 
     private func spawnCoconutFloat() {
-        var f = CoconutFloat()
+        let f = CoconutFloat()
         coconutFloats.append(f)
         let id = f.id
         withAnimation(.easeOut(duration: 0.9)) {

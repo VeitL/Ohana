@@ -468,6 +468,10 @@ final class SynergyEngine {
                                   expenseLogs: [(executorId: String?, amount: Double, date: Date)])
     private typealias HumanSnap = (id: String, avatarEmoji: String, name: String, coconutBalance: Int)
 
+    private nonisolated static func rgb(_ red: Double, _ green: Double, _ blue: Double) -> Color {
+        Color(.sRGB, red: red / 255, green: green / 255, blue: blue / 255, opacity: 1)
+    }
+
     private nonisolated static func computeFromSnapshots(pets: [PetSnap], humans: [HumanSnap]) -> [SynergyBrief] {
         var results: [SynergyBrief] = []
         let cal = Calendar.current
@@ -487,7 +491,7 @@ final class SynergyEngine {
                     emojis: [winner.0.avatarEmoji, loser.0.avatarEmoji] + pets.prefix(1).map { $0.avatarEmoji },
                     headline: "\(winner.0.name) 铲了 \(winner.1) 次",
                     subtext: "本月铲屎战况 \(winner.1):\(loser.1)，\(loser.0.name) 加油！🧹",
-                    accentColor: .goYellow
+                    accentColor: Self.rgb(255, 244, 79)
                 ))
             }
         }
@@ -509,7 +513,7 @@ final class SynergyEngine {
                     emojis: [top.0.avatarEmoji, top.2],
                     headline: String(format: "%.1f km 最强搭档", top.1),
                     subtext: "\(top.0.name) 本月称霸遛宠榜 🏃",
-                    accentColor: .goPrimary
+                    accentColor: Self.rgb(200, 255, 0)
                 ))
             } else {
                 let totalKm = allWalks.reduce(0.0) { $0 + $1.1.distanceMeters / 1000 }
@@ -517,7 +521,7 @@ final class SynergyEngine {
                     emojis: Array(pets.prefix(3).map { $0.avatarEmoji }),
                     headline: String(format: "本月探索 %.1f km", totalKm),
                     subtext: "全岛宠物集体出征 🐾",
-                    accentColor: .goPrimary
+                    accentColor: Self.rgb(200, 255, 0)
                 ))
             }
         }
@@ -536,7 +540,7 @@ final class SynergyEngine {
                     emojis: [top.0.avatarEmoji, "💸"],
                     headline: String(format: "¥%.0f 首席提款机", top.1),
                     subtext: "\(top.0.name) 本月最豪 💳",
-                    accentColor: .goRed
+                    accentColor: Self.rgb(255, 71, 87)
                 ))
             }
         }
@@ -550,7 +554,7 @@ final class SynergyEngine {
                 emojis: [richest.0, "🥥"],
                 headline: "\(richest.2) 🥥 岛主",
                 subtext: "\(richest.1) 是全岛最富有的成员！",
-                accentColor: .goPrimary
+                accentColor: Self.rgb(200, 255, 0)
             ))
         }
 
@@ -560,7 +564,7 @@ final class SynergyEngine {
                 emojis: (pets.prefix(2).map { $0.avatarEmoji } + humans.prefix(2).map { $0.avatarEmoji }),
                 headline: "欢迎来到欧哈纳！",
                 subtext: "多打卡，解锁家庭故事 🌴",
-                accentColor: .goTeal
+                accentColor: Self.rgb(0, 212, 170)
             ))
         }
         return results
@@ -652,9 +656,11 @@ struct SynergyFlashCard: View {
         stopTimer()
         guard timer == nil else { return }
         timer = Timer.scheduledTimer(withTimeInterval: 6, repeats: true) { _ in
-            guard !engine.briefs.isEmpty else { return }
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                currentIndex = (currentIndex + 1) % engine.briefs.count
+            Task { @MainActor in
+                guard !engine.briefs.isEmpty else { return }
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    currentIndex = (currentIndex + 1) % engine.briefs.count
+                }
             }
         }
     }

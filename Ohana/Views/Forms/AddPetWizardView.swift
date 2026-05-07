@@ -8,6 +8,8 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import AVFoundation
+import ImageIO
 
 // MARK: - Steps enum
 private enum WizardStep: Int, CaseIterable {
@@ -25,6 +27,7 @@ private enum WizardStep: Int, CaseIterable {
 
 struct AddPetWizardView: View {
     let onComplete: () -> Void
+    var onPetSaved: ((Pet) -> Void)? = nil
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Query(sort: \Pet.createdAt) private var existingPets: [Pet]
@@ -43,6 +46,8 @@ struct AddPetWizardView: View {
     @State private var avatarImageData: Data? = nil
     @State private var photosPickerItem: PhotosPickerItem? = nil
     @State private var showingCamera = false
+    @State private var showCameraPermissionAlert = false
+    @State private var pendingCapturedAvatarImage: UIImage? = nil
     @State private var cropImageItem: IdentifiableCropImage? = nil
     @State private var hasBirthday = true
     @State private var birthday = Calendar.current.date(byAdding: .year, value: -1, to: Date())!
@@ -65,6 +70,7 @@ struct AddPetWizardView: View {
     @State private var customEyeUIColor: Color = .white
     @State private var showCoatColorSheet = false
     @State private var showEyeColorSheet = false
+    @State private var showThemeColorSheet = false
     @State private var showSaveFailedAlert = false
     @State private var saveFailedMessage = ""
     // 家庭关系选择
@@ -113,6 +119,16 @@ struct AddPetWizardView: View {
     
     // MARK: - Computed helpers
     private var accentColor: Color { Color(hex: themeColorHex) }
+    private var themeUIColorBinding: Binding<Color> {
+        Binding(
+            get: { Color(hex: themeColorHex) },
+            set: { newColor in
+                if let hex = newColor.toHex() {
+                    themeColorHex = hex
+                }
+            }
+        )
+    }
     private var avatarInitial: String { name.isEmpty ? "?" : String(name.prefix(1)) }
     private var canProceed: Bool {
         if currentStep == .basicInfo {
@@ -129,6 +145,13 @@ struct AddPetWizardView: View {
         let petNames = existingPets.map { $0.name.trimmingCharacters(in: .whitespaces).lowercased() }
         let humanNames = existingHumans.map { $0.name.trimmingCharacters(in: .whitespaces).lowercased() }
         return petNames.contains(candidate) || humanNames.contains(candidate)
+    }
+
+    private var normalizedExistingMemberNames: Set<String> {
+        Set(
+            existingPets.map { $0.name.trimmingCharacters(in: .whitespaces).lowercased() }
+            + existingHumans.map { $0.name.trimmingCharacters(in: .whitespaces).lowercased() }
+        )
     }
 
     // 任务6：已被占用的主题色 hex 集合（排除当前正在编辑的实体）
@@ -231,7 +254,7 @@ struct AddPetWizardView: View {
         }
         let snapshot = data
         Task.detached(priority: .utility) {
-            let img = UIImage(data: snapshot)
+            let img = UIImage(data: snapshot).map { Self.downsample($0, maxDim: 900) }
             let transparent = ImageCutoutService.isTransparentPNG(snapshot)
             await MainActor.run {
                 guard avatarImageData == snapshot else { return }
@@ -389,12 +412,20 @@ struct AddPetWizardView: View {
             guard let item else { return }
             if let data = try? await item.loadTransferable(type: Data.self) {
                 let resized = await Task.detached(priority: .userInitiated) {
-                    UIImage(data: data).flatMap { Self.downsample($0, maxDim: 1200) }
+                    Self.cropReadyImage(from: data, maxPixel: 1_600)
                 }.value
                 await MainActor.run {
                     if let img = resized { cropImageItem = IdentifiableCropImage(image: img) }
                 }
             }
+        }
+    }
+
+    private func presentCamera() {
+        requestOhanaCameraAccess {
+            showingCamera = true
+        } onDenied: {
+            showCameraPermissionAlert = true
         }
     }
 
@@ -418,12 +449,17 @@ struct AddPetWizardView: View {
 
     var body: some View {
         addPetWizardLifecycleBase
-        .sheet(isPresented: $showingCamera) {
-            PetCameraPickerView { img in
+        .fullScreenCover(isPresented: $showingCamera, onDismiss: {
+            if let img = pendingCapturedAvatarImage {
+                pendingCapturedAvatarImage = nil
+                cropImageItem = IdentifiableCropImage(image: img)
+            }
+        }) {
+            PetCameraPickerView(maxPixel: 1_600) { img in
+                pendingCapturedAvatarImage = img
                 showingCamera = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    cropImageItem = IdentifiableCropImage(image: img)
-                }
+            } onCancel: {
+                showingCamera = false
             }
         }
         .sheet(item: $cropImageItem) { item in
@@ -436,9 +472,10 @@ struct AddPetWizardView: View {
                             // Preserve alpha: transparent cutout subjects (from "Copy Subject")
                             // must be saved as PNG so isTransparentPNG detection stays accurate.
                             let hasAlpha = ImageCutoutService.imageHasTransparentPixels(cropped)
+                            let optimized = Self.optimizedAvatarAsset(cropped, preserveAlpha: hasAlpha)
                             avatarImageData = hasAlpha
-                                ? cropped.pngData()
-                                : cropped.jpegData(compressionQuality: 0.92)
+                                ? optimized.pngData()
+                                : optimized.jpegData(compressionQuality: 0.88)
                         }
                         cropImageItem = nil
                         photosPickerItem = nil
@@ -461,6 +498,14 @@ struct AddPetWizardView: View {
             .presentationDetents([.large])
         }
         .sheet(isPresented: $showBreedPickerSheet) { breedPickerSheet }
+        .sheet(isPresented: $showThemeColorSheet) {
+            GoColorPickerSheet(selectedColor: themeUIColorBinding) { chosen in
+                if let hex = chosen.toHex() {
+                    themeColorHex = hex
+                }
+            }
+            .presentationDetents([.medium])
+        }
         .alert(wizardL10n.humanWizDupAlertTitle, isPresented: $showDuplicateNameAlert) {
             Button(wizardL10n.humanWizDupAlertOk, role: .cancel) { }
         } message: {
@@ -470,6 +515,11 @@ struct AddPetWizardView: View {
             Button(wizardL10n.done, role: .cancel) { }
         } message: {
             Text(saveFailedMessage.isEmpty ? wizardL10n.petWizSaveFailedDefault : saveFailedMessage)
+        }
+        .alert("无法打开相机", isPresented: $showCameraPermissionAlert) {
+            Button(wizardL10n.done, role: .cancel) { }
+        } message: {
+            Text("请在系统设置中允许 Ohana 访问相机。")
         }
         // P0 留存：首日承诺 Sheet
         .sheet(item: day0PromiseBinding) { info in
@@ -830,7 +880,7 @@ struct AddPetWizardView: View {
                     .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
 
-                Button { showingCamera = true } label: {
+                Button { presentCamera() } label: {
                     HStack(spacing: 5) {
                         Image(systemName: "camera.fill")
                             .font(.system(size: 13, weight: .semibold))
@@ -1035,15 +1085,7 @@ struct AddPetWizardView: View {
                         }
                     }.disabled(isUsed)
                 }
-                ColorPicker("", selection: Binding(
-                    get: { Color(hex: themeColorHex) },
-                    set: { newColor in if let hex = newColor.toHex() { themeColorHex = hex } }
-                ), supportsOpacity: false)
-                .labelsHidden()
-                .frame(width: 40, height: 40)
-                .scaleEffect(1.3)
-                .clipShape(Circle())
-                .overlay(Circle().strokeBorder(.white.opacity(0.3), lineWidth: 1))
+                themeCustomColorButton(size: 40)
             }
         }
         .padding(20)
@@ -1575,7 +1617,7 @@ struct AddPetWizardView: View {
                         .strokeBorder(.white.opacity(0.12), lineWidth: 1)
                 )
             }
-            Button { showingCamera = true } label: {
+            Button { presentCamera() } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "camera.fill")
                         .font(.system(size: 14, weight: .semibold))
@@ -1609,13 +1651,60 @@ struct AddPetWizardView: View {
     }
 
     /// 将图片压缩到 maxDim 长边以内，在后台线程调用
-    static func downsample(_ image: UIImage, maxDim: CGFloat) -> UIImage {
+    nonisolated static func downsample(_ image: UIImage, maxDim: CGFloat) -> UIImage {
         let size = image.size
         let scale = min(maxDim / max(size.width, size.height), 1.0)
         guard scale < 1.0 else { return image }
         let newSize = CGSize(width: size.width * scale, height: size.height * scale)
         let renderer = UIGraphicsImageRenderer(size: newSize)
         return renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: newSize)) }
+    }
+
+    /// Prepare camera/photo-library images before showing the crop UI.
+    /// This avoids presenting a 12MP image to SwiftUI and keeps gestures smooth.
+    nonisolated static func cropReadyImage(from data: Data, maxPixel: CGFloat = 1_600) -> UIImage? {
+        let options: [CFString: Any] = [kCGImageSourceShouldCache: false]
+        guard let source = CGImageSourceCreateWithData(data as CFData, options as CFDictionary) else {
+            return UIImage(data: data).map { preparedCropImage($0, maxPixel: maxPixel) }
+        }
+
+        let thumbnailOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: Int(maxPixel)
+        ]
+        if let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions as CFDictionary) {
+            return UIImage(cgImage: cgImage)
+        }
+
+        return UIImage(data: data).map { preparedCropImage($0, maxPixel: maxPixel) }
+    }
+
+    nonisolated static func preparedCropImage(_ image: UIImage, maxPixel: CGFloat = 1_600) -> UIImage {
+        let resized = downsample(image, maxDim: maxPixel)
+        guard resized.imageOrientation != .up else { return resized }
+        let renderer = UIGraphicsImageRenderer(size: resized.size)
+        return renderer.image { _ in
+            resized.draw(in: CGRect(origin: .zero, size: resized.size))
+        }
+    }
+
+    /// Store card avatars near their largest display size instead of keeping oversized camera/PNG textures.
+    nonisolated static func optimizedAvatarAsset(_ image: UIImage, preserveAlpha: Bool, maxPixel: CGFloat = 900) -> UIImage {
+        let pixelSize = CGSize(width: image.size.width * image.scale, height: image.size.height * image.scale)
+        let longest = max(pixelSize.width, pixelSize.height)
+        guard longest > maxPixel else { return image }
+
+        let scale = maxPixel / longest
+        let targetSize = CGSize(width: floor(pixelSize.width * scale), height: floor(pixelSize.height * scale))
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = !preserveAlpha
+        let renderer = UIGraphicsImageRenderer(size: targetSize, format: format)
+        return renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: targetSize))
+        }
     }
 
     /// 从剪贴板读取图片 → 触觉反馈 → 直达裁剪（任务三）
@@ -1627,8 +1716,11 @@ struct AddPetWizardView: View {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         // 显示短暂加载态，让用户感知响应
         isPasting = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            cropImageItem = IdentifiableCropImage(image: img)
+        Task {
+            let prepared = await Task.detached(priority: .userInitiated) {
+                Self.preparedCropImage(img, maxPixel: 1_600)
+            }.value
+            cropImageItem = IdentifiableCropImage(image: prepared)
             isPasting = false
         }
     }
@@ -1974,15 +2066,7 @@ struct AddPetWizardView: View {
                         }
                         .disabled(isUsed)
                     }
-                    ColorPicker("", selection: Binding(
-                        get: { Color(hex: themeColorHex) },
-                        set: { newColor in if let hex = newColor.toHex() { themeColorHex = hex } }
-                    ), supportsOpacity: false)
-                    .labelsHidden()
-                    .frame(width: 40, height: 40)
-                    .scaleEffect(1.3)
-                    .clipShape(Circle())
-                    .overlay(Circle().strokeBorder(.white.opacity(0.3), lineWidth: 1))
+                    themeCustomColorButton(size: 40)
                 }
                 HStack(spacing: 8) {
                     RoundedRectangle(cornerRadius: 8)
@@ -2070,9 +2154,11 @@ struct AddPetWizardView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
             .sheet(isPresented: $showCustomPicker) {
-                ColorPicker(l.petWizCustomColorPickerTitle, selection: $customColor, supportsOpacity: false)
-                    .padding(32)
-                    .presentationDetents([.height(320)])
+                GoColorPickerSheet(selectedColor: $customColor) { chosen in
+                    customColor = chosen
+                    selected = "自定义"
+                }
+                .presentationDetents([.medium])
             }
         }
 
@@ -2257,6 +2343,38 @@ struct AddPetWizardView: View {
         }
     }
 
+    private func themeCustomColorButton(size: CGFloat) -> some View {
+        let selectedHex = themeColorHex.uppercased()
+        let isCustom = !PetThemeColor.allCases.contains { $0.hexValue.uppercased() == selectedHex }
+        return Button {
+            showThemeColorSheet = true
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(Color(hex: themeColorHex))
+                    .frame(width: size, height: size)
+                Circle()
+                    .strokeBorder(Color.primary.opacity(0.2), lineWidth: 1)
+                    .frame(width: size, height: size)
+                if isCustom {
+                    Circle()
+                        .strokeBorder(.white, lineWidth: 2)
+                        .frame(width: size, height: size)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: max(10, size * 0.3), weight: .black))
+                        .foregroundStyle(.black)
+                } else {
+                    Image(systemName: "paintpalette.fill")
+                        .font(.system(size: max(12, size * 0.42), weight: .bold))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("自定义主题色")
+    }
+
     private func colorSection(
         title: String,
         items: [(String, String)],
@@ -2408,12 +2526,7 @@ struct AddPetWizardView: View {
 
         insertPetRelatedRecords(pet: pet, displayName: trimmedName)
         modelContext.safeSave()
-
-        // P0 留存：AHA 破壳动画 — 保存成功后播放 3s，并在之后弹出首日承诺 Sheet
-        ahaPetName = trimmedName
-        ahaPetEmoji = speciesEmoji(effectiveSpeciesForData)
-        withAnimation(.easeOut(duration: 0.3)) { showAhaOverlay = true }
-        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        onPetSaved?(pet)
 
         // Q4: 欢呼算结 — 岛屿第一家人成就
         let isFirstPet = !QuestManager.shared.isPetWizardCompleted
@@ -2422,18 +2535,9 @@ struct AddPetWizardView: View {
             QuestManager.shared.addCoconuts(50, emoji: "🎉", reason: "新家人入住欢迎奖励")
         }
 
-        // AHA 动画 3s 后自动收起并推出首日承诺 Sheet
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            withAnimation(.easeInOut(duration: 0.35)) { showAhaOverlay = false }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                isSaving = false
-                pendingDay0Promise = (
-                    name: trimmedName,
-                    species: effectiveSpeciesForData,
-                    emoji: speciesEmoji(effectiveSpeciesForData)
-                )
-            }
-        }
+        isSaving = false
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        onComplete()
     }
 
     /// 生日/纪念日/里程碑/家庭关系等非核心数据；失败时 safeSave 仅打日志，不影响已写入的 Pet
@@ -2532,26 +2636,13 @@ struct AddPetWizardView: View {
             meshCardLabel(l.petWizMesh1).padding(.top, 14).padding(.horizontal, 20)
 
             VStack(alignment: .leading, spacing: 6) {
-                TextField(l.petWizNamePlaceholder, text: $name)
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .multilineTextAlignment(.center)
-                    .textFieldStyle(.plain)
-                    .foregroundStyle(.primary)
-                    .padding(.vertical, 14).padding(.horizontal, 16)
-                    .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(
-                                name.isEmpty ? Color.red.opacity(0.5) :
-                                isNameDuplicate ? Color.orange.opacity(0.7) : Color.goPrimary.opacity(colorScheme == .dark ? 0.55 : 0.4),
-                                lineWidth: 1.5
-                            )
-                    )
-                if isNameDuplicate {
-                    Text(l.humanWizDupNameInline)
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color(hex: "FF6B00")).padding(.leading, 4)
-                }
+                PetWizardNameInputField(
+                    name: $name,
+                    placeholder: l.petWizNamePlaceholder,
+                    duplicateMessage: l.humanWizDupNameInline,
+                    takenNames: normalizedExistingMemberNames,
+                    colorScheme: colorScheme
+                )
             }
             .padding(.horizontal, 20)
 
@@ -2653,7 +2744,7 @@ struct AddPetWizardView: View {
                     .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
 
-                Button { showingCamera = true } label: {
+                Button { presentCamera() } label: {
                     HStack(spacing: 5) {
                         Image(systemName: "camera.fill").font(.system(size: 13, weight: .semibold)).symbolRenderingMode(.monochrome)
                         Text(l.humanWizCamera).font(.system(size: 12, weight: .bold, design: .rounded))
@@ -2798,12 +2889,7 @@ struct AddPetWizardView: View {
                                     }
                                 }.disabled(isUsed)
                             }
-                            ColorPicker("", selection: Binding(
-                                get: { Color(hex: themeColorHex) },
-                                set: { newColor in if let hex = newColor.toHex() { themeColorHex = hex } }
-                            ), supportsOpacity: false)
-                            .labelsHidden().frame(width: 36, height: 36).scaleEffect(1.2).clipShape(Circle())
-                            .overlay(Circle().strokeBorder(Color.black.opacity(0.15), lineWidth: 1))
+                            themeCustomColorButton(size: 36)
                         }
                         .padding(.horizontal, 20)
                     }
@@ -3115,6 +3201,13 @@ struct AddPetWizardView: View {
                 }
             }
         }
+        .sheet(isPresented: showCustomPicker) {
+            GoColorPickerSheet(selectedColor: customColor) { chosen in
+                customColor.wrappedValue = chosen
+                selected.wrappedValue = "自定义"
+            }
+            .presentationDetents([.medium])
+        }
     }
 
     // MARK: - Wizard Bottom Nav Bar
@@ -3376,32 +3469,342 @@ enum PetAgeConverter {
 }
 
 // MARK: - Camera Picker
-struct PetCameraPickerView: UIViewControllerRepresentable {
-    let onCapture: (UIImage) -> Void
+@MainActor
+func requestOhanaCameraAccess(
+    onGranted: @escaping @MainActor () -> Void,
+    onDenied: @escaping @MainActor () -> Void
+) {
+    guard AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) != nil ||
+            AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) != nil ||
+            AVCaptureDevice.default(for: .video) != nil else {
+        onDenied()
+        return
+    }
 
-    func makeUIViewController(context: Context) -> UIImagePickerController {
-        let vc = UIImagePickerController()
-        // 模拟器等环境无相机，直接 .camera 会抛 NSInvalidArgumentException（source type 1 not available）
-        if UIImagePickerController.isSourceTypeAvailable(.camera) {
-            vc.sourceType = .camera
-        } else {
-            vc.sourceType = .photoLibrary
+    switch AVCaptureDevice.authorizationStatus(for: .video) {
+    case .authorized:
+        onGranted()
+    case .notDetermined:
+        AVCaptureDevice.requestAccess(for: .video) { granted in
+            Task { @MainActor in
+                granted ? onGranted() : onDenied()
+            }
         }
-        vc.delegate = context.coordinator
+    case .denied, .restricted:
+        onDenied()
+    @unknown default:
+        onDenied()
+    }
+}
+
+struct PetCameraPickerView: UIViewControllerRepresentable {
+    let maxPixel: CGFloat
+    let onCapture: (UIImage) -> Void
+    let onCancel: () -> Void
+
+    init(
+        maxPixel: CGFloat = 2_200,
+        onCapture: @escaping (UIImage) -> Void,
+        onCancel: @escaping () -> Void = {}
+    ) {
+        self.maxPixel = maxPixel
+        self.onCapture = onCapture
+        self.onCancel = onCancel
+    }
+
+    func makeUIViewController(context: Context) -> OhanaCameraViewController {
+        let vc = OhanaCameraViewController()
+        vc.maxCapturePixel = maxPixel
+        vc.onCapture = onCapture
+        vc.onCancel = onCancel
         return vc
     }
-    func updateUIViewController(_ uvc: UIImagePickerController, context: Context) {}
-    func makeCoordinator() -> Coord { Coord(onCapture: onCapture) }
 
-    class Coord: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        let onCapture: (UIImage) -> Void
-        init(onCapture: @escaping (UIImage) -> Void) { self.onCapture = onCapture }
-        func imagePickerController(_ picker: UIImagePickerController,
-                                   didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
-            if let img = info[.originalImage] as? UIImage { onCapture(img) }
-            picker.dismiss(animated: true)
+    func updateUIViewController(_ uiViewController: OhanaCameraViewController, context: Context) {}
+}
+
+final class OhanaCameraViewController: UIViewController {
+    var maxCapturePixel: CGFloat = 2_200
+    var onCapture: (UIImage) -> Void = { _ in }
+    var onCancel: () -> Void = {}
+
+    private let session = AVCaptureSession()
+    private let photoOutput = AVCapturePhotoOutput()
+    private let sessionQueue = DispatchQueue(label: "ohana.camera.session", qos: .userInitiated)
+    private var didConfigureSession = false
+    private var captureDelegate: PhotoCaptureDelegate?
+    private lazy var previewLayer = AVCaptureVideoPreviewLayer(session: session)
+    private let closeButton = UIButton(type: .system)
+    private let captureButton = UIButton(type: .system)
+    private let unavailableLabel = UILabel()
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
+        configurePreview()
+        configureControls()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        startCamera()
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        stopCamera()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        previewLayer.frame = view.bounds
+    }
+
+    private func configurePreview() {
+        previewLayer.videoGravity = .resizeAspectFill
+        view.layer.insertSublayer(previewLayer, at: 0)
+    }
+
+    private func configureControls() {
+        closeButton.translatesAutoresizingMaskIntoConstraints = false
+        closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
+        closeButton.tintColor = .white
+        closeButton.backgroundColor = UIColor.black.withAlphaComponent(0.36)
+        closeButton.layer.cornerRadius = 22
+        closeButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
+        view.addSubview(closeButton)
+
+        captureButton.translatesAutoresizingMaskIntoConstraints = false
+        captureButton.backgroundColor = .white
+        captureButton.layer.cornerRadius = 34
+        captureButton.layer.borderWidth = 5
+        captureButton.layer.borderColor = UIColor.white.withAlphaComponent(0.35).cgColor
+        captureButton.addTarget(self, action: #selector(captureTapped), for: .touchUpInside)
+        view.addSubview(captureButton)
+
+        unavailableLabel.translatesAutoresizingMaskIntoConstraints = false
+        unavailableLabel.text = "无法打开相机"
+        unavailableLabel.textColor = .white
+        unavailableLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+        unavailableLabel.textAlignment = .center
+        unavailableLabel.isHidden = true
+        view.addSubview(unavailableLabel)
+
+        NSLayoutConstraint.activate([
+            closeButton.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 18),
+            closeButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 14),
+            closeButton.widthAnchor.constraint(equalToConstant: 44),
+            closeButton.heightAnchor.constraint(equalToConstant: 44),
+
+            captureButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            captureButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -30),
+            captureButton.widthAnchor.constraint(equalToConstant: 68),
+            captureButton.heightAnchor.constraint(equalToConstant: 68),
+
+            unavailableLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            unavailableLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            unavailableLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
+            unavailableLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24)
+        ])
+    }
+
+    private func startCamera() {
+        let session = session
+        let output = photoOutput
+        let queue = sessionQueue
+        queue.async { [weak self] in
+            guard let self else { return }
+            if !self.didConfigureSession {
+                guard self.configureSession(session: session, output: output) else {
+                    DispatchQueue.main.async { [weak self] in self?.showUnavailableState() }
+                    return
+                }
+                self.didConfigureSession = true
+            }
+            guard !session.isRunning else { return }
+            session.startRunning()
         }
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { picker.dismiss(animated: true) }
+    }
+
+    private func stopCamera() {
+        let session = session
+        sessionQueue.async {
+            if session.isRunning {
+                session.stopRunning()
+            }
+        }
+    }
+
+    private func configureSession(session: AVCaptureSession, output: AVCapturePhotoOutput) -> Bool {
+        session.beginConfiguration()
+        session.sessionPreset = .photo
+        defer { session.commitConfiguration() }
+
+        guard
+            let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
+                ?? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
+                ?? AVCaptureDevice.default(for: .video),
+            let input = try? AVCaptureDeviceInput(device: device),
+            session.canAddInput(input),
+            session.canAddOutput(output)
+        else {
+            return false
+        }
+
+        session.addInput(input)
+        session.addOutput(output)
+        return true
+    }
+
+    private func showUnavailableState() {
+        unavailableLabel.isHidden = false
+        captureButton.isEnabled = false
+        captureButton.alpha = 0.35
+    }
+
+    @objc private func cancelTapped() {
+        onCancel()
+    }
+
+    @objc private func captureTapped() {
+        captureButton.isEnabled = false
+        UIView.animate(withDuration: 0.12, delay: 0, options: [.curveEaseOut]) {
+            self.captureButton.transform = CGAffineTransform(scaleX: 0.88, y: 0.88)
+        } completion: { _ in
+            UIView.animate(withDuration: 0.18, delay: 0, options: [.curveEaseOut]) {
+                self.captureButton.transform = .identity
+            }
+        }
+
+        let settings = AVCapturePhotoSettings()
+        let delegate = PhotoCaptureDelegate(maxPixel: maxCapturePixel) { [weak self] image in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.captureButton.isEnabled = true
+                if let image {
+                    self.onCapture(image)
+                } else {
+                    self.showUnavailableState()
+                }
+                self.captureDelegate = nil
+            }
+        }
+        captureDelegate = delegate
+        photoOutput.capturePhoto(with: settings, delegate: delegate)
+    }
+
+    private final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
+        let maxPixel: CGFloat
+        let completion: (UIImage?) -> Void
+
+        init(maxPixel: CGFloat, completion: @escaping (UIImage?) -> Void) {
+            self.maxPixel = maxPixel
+            self.completion = completion
+        }
+
+        func photoOutput(
+            _ output: AVCapturePhotoOutput,
+            didFinishProcessingPhoto photo: AVCapturePhoto,
+            error: Error?
+        ) {
+            guard error == nil,
+                  let data = photo.fileDataRepresentation(),
+                  let image = AddPetWizardView.cropReadyImage(from: data, maxPixel: maxPixel) else {
+                completion(nil)
+                return
+            }
+            completion(image)
+        }
+    }
+}
+
+private struct PetWizardNameInputField: View {
+    @Binding var name: String
+    let placeholder: String
+    let duplicateMessage: String
+    let takenNames: Set<String>
+    let colorScheme: ColorScheme
+
+    @State private var draftName: String
+    @State private var commitTask: Task<Void, Never>? = nil
+
+    init(
+        name: Binding<String>,
+        placeholder: String,
+        duplicateMessage: String,
+        takenNames: Set<String>,
+        colorScheme: ColorScheme
+    ) {
+        self._name = name
+        self.placeholder = placeholder
+        self.duplicateMessage = duplicateMessage
+        self.takenNames = takenNames
+        self.colorScheme = colorScheme
+        self._draftName = State(initialValue: name.wrappedValue)
+    }
+
+    private var normalizedDraftName: String {
+        draftName.trimmingCharacters(in: .whitespaces).lowercased()
+    }
+
+    private var isDuplicate: Bool {
+        !normalizedDraftName.isEmpty && takenNames.contains(normalizedDraftName)
+    }
+
+    private var borderColor: Color {
+        if draftName.isEmpty { return Color.red.opacity(0.5) }
+        if isDuplicate { return Color.orange.opacity(0.7) }
+        return Color.goPrimary.opacity(colorScheme == .dark ? 0.55 : 0.4)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            TextField(placeholder, text: $draftName)
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .multilineTextAlignment(.center)
+                .textFieldStyle(.plain)
+                .foregroundStyle(.primary)
+                .autocorrectionDisabled(true)
+                .textInputAutocapitalization(.never)
+                .submitLabel(.done)
+                .padding(.vertical, 14).padding(.horizontal, 16)
+                .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(borderColor, lineWidth: 1.5)
+                )
+                .transaction { $0.animation = nil }
+
+            if isDuplicate {
+                Text(duplicateMessage)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(hex: "FF6B00"))
+                    .padding(.leading, 4)
+            }
+        }
+        .onChange(of: draftName) { _, newValue in
+            scheduleCommit(newValue)
+        }
+        .onChange(of: name) { _, newValue in
+            guard newValue != draftName else { return }
+            draftName = newValue
+        }
+        .onSubmit { commitImmediately() }
+        .onDisappear { commitImmediately() }
+    }
+
+    private func scheduleCommit(_ value: String) {
+        commitTask?.cancel()
+        commitTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            guard !Task.isCancelled, name != value else { return }
+            name = value
+        }
+    }
+
+    private func commitImmediately() {
+        commitTask?.cancel()
+        if name != draftName { name = draftName }
     }
 }
 
@@ -3414,11 +3817,9 @@ struct PetImageCropView: View {
     var silhouetteSystemName: String? = nil
     let onCrop: (UIImage?) -> Void
 
-    /// GO 首页展开卡片尺寸：宽度 = 屏幕宽 - 两侧 7pt，固定高 360pt。
-    /// 头像裁剪使用这个尺寸，确保普通照片在首页展开卡片中可以 1:1 填满；
-    /// 小卡片再按高度等比缩小并左对齐融合。
+    /// 与添加宠物顶部预览卡、Go Focus 首页小卡片保持同一信用卡比例。
     private let cardMargin: CGFloat = 7
-    private let expandedCardHeight: CGFloat = 360
+    private let cardAspectRatio: CGFloat = 1.586
     private let cornerRadius: CGFloat = 24
 
     @Environment(\.colorScheme) private var colorScheme
@@ -3433,16 +3834,16 @@ struct PetImageCropView: View {
 
     private func cropSize(for container: CGSize) -> (w: CGFloat, h: CGFloat) {
         let targetW = max(container.width - cardMargin * 2, 220)
-        let targetAspect = targetW / expandedCardHeight
+        let targetH = targetW / cardAspectRatio
         let availableH = max(container.height - 170, 260)
         let cw: CGFloat
         let ch: CGFloat
-        if expandedCardHeight <= availableH {
+        if targetH <= availableH {
             cw = targetW
-            ch = expandedCardHeight
+            ch = targetH
         } else {
             ch = availableH
-            cw = ch * targetAspect
+            cw = ch * cardAspectRatio
         }
         return (cw, ch)
     }
@@ -3462,7 +3863,7 @@ struct PetImageCropView: View {
             ZStack {
                 Color.black
 
-                Image(uiImage: normalizedImage(image))
+                Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
                     .frame(width: geo.size.width, height: geo.size.height)
@@ -3532,7 +3933,7 @@ struct PetImageCropView: View {
             )
             .onAppear {
                 containerSize = geo.size
-                let img = normalizedImage(image)
+                let img = image
                 let iw = img.size.width, ih = img.size.height
                 guard iw > 0, ih > 0 else { return }
                 let aspectFit = min(geo.size.width / iw, geo.size.height / ih)
@@ -3580,18 +3981,12 @@ struct PetImageCropView: View {
         .ignoresSafeArea(edges: .top)
     }
 
-    private func normalizedImage(_ src: UIImage) -> UIImage {
-        guard src.imageOrientation != .up else { return src }
-        let renderer = UIGraphicsImageRenderer(size: src.size)
-        return renderer.image { _ in src.draw(in: CGRect(origin: .zero, size: src.size)) }
-    }
-
     private func performCrop() {
         let viewSize: CGSize = (containerSize.width > 10 && containerSize.height > 10)
             ? containerSize
             : CGSize(width: ScreenCompat.width, height: max(ScreenCompat.height - 300, 420))
         let (cropW, cropH) = cropSize(for: viewSize)
-        let src = normalizedImage(image)
+        let src = image
         let iw = src.size.width, ih = src.size.height
         guard iw > 0, ih > 0, viewSize.width > 0, viewSize.height > 0 else {
             onCrop(src)
@@ -3622,16 +4017,12 @@ struct PetImageCropView: View {
         let dx = imgOriginX - cropOriginX
         let dy = imgOriginY - cropOriginY
 
-        let screenScale = UIGraphicsImageRendererFormat.default().scale
-        let outW = cropW * screenScale
-        let outH = cropH * screenScale
-
-        // 输出画布中图片的绘制矩形（screenScale 倍率放大）
+        // 输出画布中图片的绘制矩形（点坐标；renderer scale 负责像素倍率）
         let drawRect = CGRect(
-            x: dx * screenScale,
-            y: dy * screenScale,
-            width:  displayW * screenScale,
-            height: displayH * screenScale
+            x: dx,
+            y: dy,
+            width: displayW,
+            height: displayH
         )
 
         // Detect whether the source image has meaningful transparent pixels
@@ -3640,13 +4031,15 @@ struct PetImageCropView: View {
         // photos so they render as full-card images, not pasted subjects.
         let srcHasAlpha = ImageCutoutService.imageHasTransparentPixels(src)
 
+        let screenScale = UIGraphicsImageRendererFormat.default().scale
         let fmt = UIGraphicsImageRendererFormat.default()
         fmt.scale = screenScale
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: outW, height: outH), format: fmt)
+        fmt.opaque = !srcHasAlpha
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: cropW, height: cropH), format: fmt)
         let cropped = renderer.image { _ in
             if !srcHasAlpha {
                 UIColor.black.setFill()
-                UIRectFill(CGRect(x: 0, y: 0, width: outW, height: outH))
+                UIRectFill(CGRect(x: 0, y: 0, width: cropW, height: cropH))
             }
             src.draw(in: drawRect)
         }
@@ -3763,6 +4156,13 @@ struct GoColorPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var pickerColor: Color
 
+    private let swatchHexes: [String] = [
+        "FF3B30", "FF6B3D", "FF9500", "FFCC00", "C8FF00", "7ED957",
+        "34C759", "00C7BE", "00AEEF", "32ADE6", "007AFF", "5856D6",
+        "AF52DE", "BF5AF2", "FF2D55", "FF7AB6", "A2845E", "C7B299",
+        "FFFFFF", "F2F2F7", "D1D1D6", "8E8E93", "3A3A3C", "1C1C1E"
+    ]
+
     init(selectedColor: Binding<Color>, onSelect: @escaping (Color) -> Void) {
         self._selectedColor = selectedColor
         self.onSelect = onSelect
@@ -3793,11 +4193,33 @@ struct GoColorPickerSheet: View {
                     )
                     .padding(.horizontal, 24)
 
-                // 系统 ColorPicker（使用整个色轮）
-                ColorPicker("选择颜色", selection: $pickerColor, supportsOpacity: false)
-                    .labelsHidden()
-                    .scaleEffect(1.8)
-                    .padding(.vertical, 8)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6), spacing: 12) {
+                    ForEach(swatchHexes, id: \.self) { hex in
+                        let color = Color(hex: hex)
+                        let isSelected = pickerColor.toHex()?.uppercased() == hex
+                        Button {
+                            withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
+                                pickerColor = color
+                            }
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(color)
+                                    .frame(height: 42)
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .strokeBorder(.white.opacity(hex == "FFFFFF" ? 0.55 : 0.2), lineWidth: 1)
+                                if isSelected {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 14, weight: .black))
+                                        .foregroundStyle(hex == "FFFFFF" || hex == "F2F2F7" || hex == "FFCC00" || hex == "C8FF00" ? .black : .white)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 24)
 
                 // 确认按钮
                 Button {
