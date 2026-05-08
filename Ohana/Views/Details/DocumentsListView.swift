@@ -12,6 +12,7 @@ struct DocumentsListView: View {
     let pet: Pet
     @Environment(\.modelContext) private var modelContext
     @State private var showingAdd = false
+    @State private var showingInsurance = false
     @State private var editingDoc: PetDocument? = nil
     @State private var detailDoc: PetDocument? = nil
 
@@ -39,7 +40,7 @@ struct DocumentsListView: View {
                         }
                     }
 
-                    PetInsuranceView(pet: pet, embedded: true)
+                    insuranceEntryCard
 
                     Spacer(minLength: 40)
                 }
@@ -60,6 +61,9 @@ struct DocumentsListView: View {
         .sheet(isPresented: $showingAdd) {
             AddDocumentSheet(pet: pet)
         }
+        .sheet(isPresented: $showingInsurance) {
+            PetInsuranceView(pet: pet)
+        }
         .sheet(item: $editingDoc) { doc in
             EditDocumentSheet(doc: doc, pet: pet)
         }
@@ -75,6 +79,45 @@ struct DocumentsListView: View {
                 .foregroundStyle(.primary.opacity(0.45))
             Spacer()
         }
+    }
+
+    private var insuranceEntryCard: some View {
+        Button { showingInsurance = true } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.goPrimary.opacity(0.18))
+                        .frame(width: 42, height: 42)
+                    Image(systemName: "shield.lefthalf.filled")
+                        .font(.system(size: 17, weight: .black))
+                        .foregroundStyle(Color.goPrimary)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("保险保单")
+                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .foregroundStyle(.primary)
+                    Text(insuranceSummary)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .black))
+                    .foregroundStyle(.secondary.opacity(0.7))
+            }
+            .padding(14)
+            .goGlassBackground(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var insuranceSummary: String {
+        let count = pet.insurances.count
+        guard count > 0 else { return "暂无保单，可记录续期、保额和报销" }
+        let active = pet.insurances.filter { $0.isActive && $0.renewalDate >= Date() }.count
+        if active > 0 { return "\(active)份生效中 · 共\(count)份保单" }
+        return "\(count)份保单 · 暂无生效中"
     }
 
     private var emptyState: some View {

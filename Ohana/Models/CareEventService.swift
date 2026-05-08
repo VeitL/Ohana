@@ -44,6 +44,35 @@ enum CareEventService {
 
     @discardableResult
     @MainActor
+    static func recordTreatFeed(
+        pet: Pet,
+        amountGrams: Double,
+        context: ModelContext,
+        executorId: String? = nil,
+        date: Date = Date()
+    ) -> PetCareLog {
+        let log = PetCareLog(
+            date: date,
+            type: .feeding,
+            amountGrams: amountGrams,
+            note: FeedLogMetadata.treatFeedNoteMarker,
+            pet: pet,
+            executorId: executorId
+        )
+        context.insert(log)
+        context.safeSave()
+        CareLedgerService.recordPetCare(
+            log: log,
+            pet: pet,
+            source: .quickAction,
+            coconutDelta: 0,
+            context: context
+        )
+        return log
+    }
+
+    @discardableResult
+    @MainActor
     static func completePlannedFeed(
         pet: Pet,
         reminder: Reminder,

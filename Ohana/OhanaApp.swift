@@ -18,10 +18,13 @@ struct OhanaApp: App {
     private static let bgTaskID = "com.guanchen.li.Ark.reminderRefill"
     @AppStorage("appThemePreference") private var appThemePreference: String = "system"
     @AppStorage("appLanguage") private var appLanguage: String = "zh"
+    @AppStorage(AppCountry.storageKey) private var appCountry: String = AppCountry.detectedCode
+    @AppStorage(AppMeasurementSystem.storageKey) private var appMeasurementSystem: String = AppMeasurementSystem.fallbackCode
     @AppStorage(AppCurrency.storageKey) private var appCurrency: String = AppCurrency.fallbackCode
 
     init() {
         let initStartedAt = CFAbsoluteTimeGetCurrent()
+        AppCountry.ensureInitialized()
         self.container = SharedModelContainer.make()
         OhanaApp.registerBGTasks()
         let initDurationMS = (CFAbsoluteTimeGetCurrent() - initStartedAt) * 1_000
@@ -46,8 +49,9 @@ struct OhanaApp: App {
                 .tint(Color.goPrimary)
                 .preferredColorScheme(preferredScheme)
                 .environment(\.locale, AppLanguage.swiftUIPreferredLocale)
-                .id(AppLanguage.normalize(appLanguage))
+                .onChange(of: appCountry) { _, _ in }
                 .onChange(of: appCurrency) { _, _ in }
+                .onChange(of: appMeasurementSystem) { _, _ in }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
                     OhanaApp.scheduleReminderRefill()
                 }

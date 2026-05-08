@@ -86,12 +86,10 @@ struct WeightHistoryView: View {
                         .foregroundStyle(.primary)
                     if let latest = sortedLogs.first {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text(latest.weightUnit == "g"
-                                 ? String(format: "%.0f", latest.weight)
-                                 : String(format: "%.1f", latest.weight))
+                            Text(displayWeightValue(latest))
                                 .font(.system(size: 44, weight: .black, design: .rounded))
                                 .foregroundStyle(.primary)
-                            Text(latest.weightUnit)
+                            Text(displayWeightUnit(latest))
                                 .font(.system(size: 18, weight: .bold))
                                 .foregroundStyle(.primary.opacity(0.7))
                         }
@@ -120,7 +118,7 @@ struct WeightHistoryView: View {
                 HStack(spacing: 6) {
                     Image(systemName: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
                         .font(.system(size: 11, weight: .bold))
-                    Text(String(format: "%+.3f kg", delta))
+                    Text(displayWeightDelta(delta))
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                 }
                 .foregroundStyle(.primary)
@@ -182,7 +180,7 @@ struct WeightHistoryView: View {
                         Image(systemName: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(delta >= 0 ? Color.goOrange : Color.goTeal)
-                        Text(String(format: "%+.2fkg", delta))
+                        Text(displayWeightDelta(delta))
                             .font(.system(size: 11, weight: .bold, design: .rounded))
                             .foregroundStyle(delta >= 0 ? Color.goOrange : Color.goTeal)
                     }
@@ -276,6 +274,22 @@ struct WeightHistoryView: View {
         }
     }
 
+    private func displayWeightValue(_ log: PetWeightLog) -> String {
+        let formatted = AppMeasurementSystem.formatWeightKilograms(log.weightInKg)
+        return formatted.split(separator: " ").first.map(String.init) ?? formatted
+    }
+
+    private func displayWeightUnit(_ log: PetWeightLog) -> String {
+        let parts = AppMeasurementSystem.formatWeightKilograms(log.weightInKg).split(separator: " ")
+        return parts.dropFirst().first.map(String.init) ?? log.weightUnit
+    }
+
+    private func displayWeightDelta(_ kilograms: Double) -> String {
+        let converted = AppMeasurementSystem.code == "imperial" ? kilograms * 2.2046226218 : kilograms
+        let unit = AppMeasurementSystem.code == "imperial" ? "lb" : "kg"
+        return String(format: "%+.2f %@", converted, unit)
+    }
+
     private func weightRow(log: PetWeightLog) -> some View {
         HStack(spacing: 14) {
             Circle()
@@ -295,12 +309,10 @@ struct WeightHistoryView: View {
 
             VStack(alignment: .trailing, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Text(log.weightUnit == "g"
-                         ? String(format: "%.0f", log.weight)
-                         : String(format: "%.1f", log.weight))
+                    Text(displayWeightValue(log))
                         .font(.system(size: 20, weight: .black, design: .rounded))
                         .foregroundStyle(.primary)
-                    Text(log.weightUnit)
+                    Text(displayWeightUnit(log))
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(.primary.opacity(0.7))
                 }

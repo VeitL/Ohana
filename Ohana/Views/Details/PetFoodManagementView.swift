@@ -77,7 +77,11 @@ private struct FoodReminderSheet: View {
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 24)
-                        TextField("标题", text: $title)
+                        GoDraftTextField(
+                            "标题",
+                            text: $title,
+                            capitalization: .words
+                        )
                             .font(.system(size: 15, weight: .semibold, design: .rounded))
                             .padding(.horizontal, 16).padding(.vertical, 12)
                             .goGlassBackground(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -182,10 +186,12 @@ private struct FoodReminderSheet: View {
                     .padding(.bottom, 40)
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .presentationBackground(.regularMaterial)
+        .goKeyboardDoneToolbar()
     }
 
     private func saveReminder() {
@@ -330,6 +336,7 @@ struct PetFoodManagementView: View {
                     }
                     .padding(.horizontal, 16).padding(.top, 12)
                 }
+                .scrollDismissesKeyboard(.interactively)
 
                 // C3: 达标 / 超量 Toast
                 if showOverdoseToast {
@@ -359,6 +366,14 @@ struct PetFoodManagementView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("关闭") { dismiss() }
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完成") {
+                        GoKeyboard.dismiss()
+                    }
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.goLime)
                 }
             }
             .onAppear {
@@ -524,9 +539,16 @@ struct PetFoodManagementView: View {
                         .padding(.horizontal, 12).padding(.vertical, 8)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .goGlassBackground(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .onChange(of: selectedBrand) { _, _ in
+                            GoKeyboard.dismiss()
+                        }
 
                         if selectedBrand == "自定义品牌" {
-                            TextField("输入自定义品牌名", text: $customBrandInput)
+                            GoDraftTextField(
+                                "输入自定义品牌名",
+                                text: $customBrandInput,
+                                capitalization: .words
+                            )
                                 .font(.system(size: 14, weight: .medium, design: .rounded))
                                 .foregroundStyle(.primary)
                                 .padding(.horizontal, 12).padding(.vertical, 8)
@@ -535,20 +557,30 @@ struct PetFoodManagementView: View {
                     }
 
                     inputRow(icon: "scalemass.fill", label: "规格(kg)", color: .goTeal) {
-                        TextField(pet.restockWeight > 0 ? String(format: "%.1f", pet.restockWeight) : "10.0",
-                                  text: $stockKgInput)
-                            .keyboardType(.decimalPad)
+                        GoDraftTextField(
+                            pet.restockWeight > 0 ? String(format: "%.1f", pet.restockWeight) : "10.0",
+                            text: $stockKgInput,
+                            keyboardType: .decimalPad,
+                            capitalization: .never
+                        )
                             .font(.system(size: 14, weight: .medium, design: .rounded))
                     }
                     inputRow(icon: "fork.knife", label: "每日份量(g)", color: .goYellow) {
-                        TextField(pet.dailyPortionGrams > 0 ? String(format: "%.0f", pet.dailyPortionGrams) : "200",
-                                  text: $dailyGramsInput)
-                            .keyboardType(.decimalPad)
+                        GoDraftTextField(
+                            pet.dailyPortionGrams > 0 ? String(format: "%.0f", pet.dailyPortionGrams) : "200",
+                            text: $dailyGramsInput,
+                            keyboardType: .decimalPad,
+                            capitalization: .never
+                        )
                             .font(.system(size: 14, weight: .medium, design: .rounded))
                     }
                     inputRow(icon: "\(AppCurrency.systemIconName).fill", label: "购买价格(\(AppCurrency.symbol))", color: Color.goPrimary) {
-                        TextField("选填", text: $stockPriceInput)
-                            .keyboardType(.decimalPad)
+                        GoDraftTextField(
+                            "选填",
+                            text: $stockPriceInput,
+                            keyboardType: .decimalPad,
+                            capitalization: .never
+                        )
                             .font(.system(size: 14, weight: .medium, design: .rounded))
                     }
                     if !stockPriceInput.isEmpty, let _ = Double(stockPriceInput.replacingOccurrences(of: ",", with: ".")) {
@@ -576,7 +608,9 @@ struct PetFoodManagementView: View {
                             }
                         }
                     }
-                    Button { saveStock() } label: {
+                    Button {
+                        saveStockAfterKeyboardDismiss()
+                    } label: {
                         Text("保存库存信息")
                             .font(.system(size: 14, weight: .black, design: .rounded))
                             .foregroundStyle(.black)
@@ -684,19 +718,26 @@ struct PetFoodManagementView: View {
             if showFeedInput {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
-                        TextField("克数", text: $feedGramsInput)
-                            .keyboardType(.decimalPad)
+                        GoDraftTextField(
+                            "克数",
+                            text: $feedGramsInput,
+                            keyboardType: .decimalPad,
+                            capitalization: .never
+                        )
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 10).padding(.vertical, 8)
                             .goGlassBackground(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         Text("g").font(.system(size: 13, weight: .bold)).foregroundStyle(.primary.opacity(0.4))
                         Button {
-                            let g = Double(feedGramsInput.replacingOccurrences(of: ",", with: ".")) ?? 0
-                            if g > 0 { quickFeed(grams: g) }
-                            if setAsDefault && g > 0 { defaultFeedGrams = g }
-                            feedGramsInput = ""
-                            withAnimation { showFeedInput = false }
+                            GoKeyboard.dismiss()
+                            DispatchQueue.main.async {
+                                let g = Double(feedGramsInput.replacingOccurrences(of: ",", with: ".")) ?? 0
+                                if g > 0 { quickFeed(grams: g) }
+                                if setAsDefault && g > 0 { defaultFeedGrams = g }
+                                feedGramsInput = ""
+                                withAnimation { showFeedInput = false }
+                            }
                         } label: {
                             Text("记录").font(.system(size: 13, weight: .black)).foregroundStyle(.black)
                                 .padding(.horizontal, 14).padding(.vertical, 8)
@@ -790,19 +831,26 @@ struct PetFoodManagementView: View {
             if showWaterInput {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
-                        TextField("毫升数", text: $waterMlInput)
-                            .keyboardType(.numberPad)
+                        GoDraftTextField(
+                            "毫升数",
+                            text: $waterMlInput,
+                            keyboardType: .numberPad,
+                            capitalization: .never
+                        )
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 10).padding(.vertical, 8)
                             .goGlassBackground(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         Text("ml").font(.system(size: 13, weight: .bold)).foregroundStyle(.primary.opacity(0.4))
                         Button {
-                            let ml = Double(waterMlInput) ?? 0
-                            if ml > 0 { quickWater(ml: ml) }
-                            if setWaterAsDefault && ml > 0 { defaultWaterMl = ml }
-                            waterMlInput = ""
-                            withAnimation { showWaterInput = false }
+                            GoKeyboard.dismiss()
+                            DispatchQueue.main.async {
+                                let ml = Double(waterMlInput) ?? 0
+                                if ml > 0 { quickWater(ml: ml) }
+                                if setWaterAsDefault && ml > 0 { defaultWaterMl = ml }
+                                waterMlInput = ""
+                                withAnimation { showWaterInput = false }
+                            }
                         } label: {
                             Text("记录").font(.system(size: 13, weight: .black)).foregroundStyle(.black)
                                 .padding(.horizontal, 14).padding(.vertical, 8)
@@ -923,8 +971,12 @@ struct PetFoodManagementView: View {
                             .foregroundStyle(.secondary)
                         Spacer()
                         HStack(spacing: 4) {
-                            TextField("0.0", text: $calcWeightKg)
-                                .keyboardType(.decimalPad)
+                            GoDraftTextField(
+                                "0.0",
+                                text: $calcWeightKg,
+                                keyboardType: .decimalPad,
+                                capitalization: .never
+                            )
                                 .font(.system(size: 16, weight: .black, design: .rounded))
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 70)
@@ -1073,6 +1125,13 @@ struct PetFoodManagementView: View {
         stockPriceInput = ""
         stockPayerId = ""
         withAnimation { editingStock = false }
+    }
+
+    private func saveStockAfterKeyboardDismiss() {
+        GoKeyboard.dismiss()
+        DispatchQueue.main.async {
+            saveStock()
+        }
     }
 
     private func quickFeed(grams: Double) {

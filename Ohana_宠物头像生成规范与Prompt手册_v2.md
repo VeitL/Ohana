@@ -291,7 +291,8 @@ teal neckerchief
 | 项目 | 规范 |
 |---|---|
 | 文件格式 | PNG with alpha |
-| 画布尺寸 | `1200x1600` |
+| 正式入库画布尺寸 | `600x800` |
+| 源图目标尺寸 | 直接生成 `600x800` 竖版源图；若生成器返回尺寸略有偏差，后处理仅校正到 `600x800` |
 | 背景 | 最终文件必须为真透明 alpha，不要纯色底、阴影底、渐变底 |
 | 主体 | 全身完整可见，头顶、耳朵、尾巴、脚掌不能裁切 |
 | 主体高度 | alpha bbox 高度约占画布 `92% - 98%` |
@@ -305,12 +306,12 @@ teal neckerchief
 
 用于正式入库的头像不要直接依赖生成器返回的“透明背景预览”。复杂毛绒边缘可能被输出成棋盘格、黑底、灰底或伪透明。正式资产必须走以下流程：
 
-1. 每张正式头像必须逐张独立生成 `1200x1600` 竖版源图，背景指定为完全均匀的纯色 chroma key。默认使用 `#ff00ff`，避免与黑色眼睛、常见毛色和白色眼白冲突。
+1. 每张头像必须逐张独立生成 `600x800` 竖版源图，背景指定为完全均匀的纯色 chroma key。默认使用 `#ff00ff`，避免与黑色眼睛、常见毛色和白色眼白冲突。
 2. Prompt 中必须写明：背景只有一个纯色，无阴影、无渐变、无纹理、无地面、无反射，主体边缘清晰，主体内部不得出现 `#ff00ff`。
 3. 将源图保存到 `tmp/imagegen/<breed>_sources/`，文件名后缀使用 `_chroma.png`。
 4. 用本地透明处理脚本移除色键，输出到 `tmp/imagegen/<breed>_alpha/`。
-5. 验证输出 PNG 必须为 `RGBA`，尺寸为 `1200x1600`，四角 alpha 为 `0`，主体 alpha bbox 高度约占画布 `92% - 98%`，且边缘没有明显色键残留。
-6. 只有通过验证的 alpha PNG 才能复制到 `PetAvatarAssets/`，并使用正式文件名替换旧图。
+5. 验证 alpha 源图必须为 `RGBA`，四角 alpha 为 `0`，主体 alpha bbox 高度约占画布 `92% - 98%`，且边缘没有明显色键残留。
+6. 将通过验证的 alpha 源图校正为 `600x800` RGBA PNG 后，才能复制到 `PetAvatarAssets/`，并使用正式文件名替换旧图。禁止把 `1200x1600` 作为默认中间产物。
 7. 禁止用一张或两张底图批量调色生成整套头像；每个 `gender + coat` 组合都必须由生成模型独立渲染。
 
 透明处理建议命令：
@@ -460,6 +461,7 @@ realistic animal photo, hyper-realistic anatomy, ordinary pet photo, scary, aggr
 | Domestic Longhair | 蓬松长毛、柔软、优雅、亲和 |
 | British Shorthair | 圆脸、厚实短毛、铜眼常见、稳重可爱 |
 | American Shorthair | 健壮、虎斑清晰、友好、自然 |
+| Chinese Li Hua / Dragon Li | 短毛、M 字额纹、鱼骨状狸花虎斑、环尾、机敏、活泼、警觉 |
 | Ragdoll | 蓝眼、重点色、温柔、软萌、安静 |
 | Maine Coon | 大体型、耳尖毛、厚毛、威风但温柔 |
 | Persian | 扁脸、长毛、圆眼、贵气、安静 |
@@ -479,9 +481,9 @@ realistic animal photo, hyper-realistic anatomy, ordinary pet photo, scary, aggr
 
 每张图生成后必须检查：
 
-- [ ] 是否为 `1200x1600` 竖版 PNG。
+- [ ] 正式入库文件是否为 `600x800` 竖版 PNG。
 - [ ] 是否为 `RGBA` 且真透明背景，四角 alpha 为 `0`，不是黑底、灰底、渐变底或棋盘格底。
-- [ ] 是否经过 chroma key 源图生成、本地 alpha 移除和透明验证后再入库。
+- [ ] 是否经过 `600x800` chroma key 源图生成、本地 alpha 移除、透明验证和尺寸校正后再入库。
 - [ ] 主体是否全身完整可见，耳朵、尾巴、脚掌未裁切。
 - [ ] 主体是否占画布高度约 `92% - 98%`，没有过多透明边距。
 - [ ] 是否符合大头小身、短四肢、毛绒玩偶、3D CGI 风格。
@@ -590,10 +592,10 @@ Output: dog_french_bulldog_boy_fawn_black_mask.png
 | 类别 | 毛色组合数 | 性别数 | 预计 PNG 数 |
 |---|---:|---:|---:|
 | 犬类 | 128 | 2 | 258 |
-| 猫类 | 108 | 2 | 218 |
+| 猫类 | 110 | 2 | 222 |
 | 其他 App 入口 standard | 5 | 2 | 10 |
 | `other` 通用入口 standard | 1 | 2 | 2 |
-| 合计 | 242 | 2 | 488 |
+| 合计 | 244 | 2 | 492 |
 
 ## 犬类组合
 
@@ -642,6 +644,7 @@ Output: dog_french_bulldog_boy_fawn_black_mask.png
 | 家长 Domestic Longhair | `black`, `white`, `blue_gray`, `orange_tabby`, `brown_tabby`, `tuxedo`, `calico`, `tortoiseshell` |
 | 英短 British Shorthair | `blue`, `silver_tabby`, `golden_shaded`, `black`, `white`, `cream`, `colorpoint` |
 | 美短 American Shorthair | `silver_tabby`, `brown_tabby`, `black`, `white`, `orange_tabby`, `blue` |
+| 狸花 Chinese Li Hua / Dragon Li | `brown_mackerel_tabby`, `silver_mackerel_tabby` |
 | 布偶 Ragdoll | `seal_point`, `seal_bicolor`, `blue_point`, `blue_bicolor`, `chocolate_point`, `lilac_point`, `flame_point` |
 | 缅因 Maine Coon | `brown_tabby`, `silver_tabby`, `red_tabby`, `black_smoke`, `blue_gray`, `black`, `white`, `calico` |
 | 波斯 Persian | `white`, `black`, `blue`, `cream`, `silver`, `golden`, `himalayan_seal_point`, `calico` |
@@ -717,7 +720,7 @@ Keep the whole batch visually consistent, but make details different across gend
 
 | 项目 | 规范 |
 |---|---|
-| 画布尺寸 | `1200x1600` PNG |
+| 正式入库画布尺寸 | `600x800` PNG |
 | 背景 | 真透明 alpha，不要纯色底、阴影底、渐变底 |
 | 主体高度 | 主体 alpha bbox 高度约占画布 `92% - 98%` |
 | 上下留白 | 顶部和底部各只留约 `2% - 4%` |

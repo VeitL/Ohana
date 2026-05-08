@@ -1153,7 +1153,7 @@ private extension GoDashboardView {
                     }.first
                     goStatMiniCard(
                         icon: "scalemass.fill", iconColor: "4ADE80",
-                        value: lastWeight.map { String(format: "%.1f", $0.1) } ?? "--", unit: "kg",
+                        value: lastWeight.map { AppMeasurementSystem.formatWeightKilograms($0.1) } ?? "--", unit: "",
                         label: lastWeight.map { $0.0 } ?? l.homeQAWeight, onTap: { showIslandWeight = true }
                     )
 
@@ -1168,11 +1168,14 @@ private extension GoDashboardView {
                     )
 
                     // 粮仓
-                    if let urgentPet = pets.filter({ $0.remainingFoodDays > 0 }).min(by: { $0.remainingFoodDays < $1.remainingFoodDays }) {
+                    let foodSnapshots = pets
+                        .map { pet in (pet, FeedStockCalculator.snapshot(for: pet, events: allEvents)) }
+                        .filter { $0.1.remainingDays > 0 }
+                    if let urgentFood = foodSnapshots.min(by: { $0.1.remainingDays < $1.1.remainingDays }) {
                         goStatMiniCard(
-                            icon: "bag.fill", iconColor: urgentPet.remainingFoodDays <= 7 ? "FF4757" : "FB923C",
-                            value: "\(urgentPet.remainingFoodDays)", unit: l.petCardDayUnit,
-                            label: l.goPetFoodPantry(urgentPet.name), onTap: { showingAllFoodManagement = true }
+                            icon: "bag.fill", iconColor: urgentFood.1.remainingDays <= 7 ? "FF4757" : "FB923C",
+                            value: "\(urgentFood.1.remainingDays)", unit: l.petCardDayUnit,
+                            label: l.goPetFoodPantry(urgentFood.0.name), onTap: { showingAllFoodManagement = true }
                         )
                     }
                 }
@@ -1307,6 +1310,16 @@ private extension GoDashboardView {
         withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) { blobPulse = true }
         for pet in pets { StreakManager.refreshStreak(for: pet, context: modelContext) }
         ReminderSchedulingService.compensate(reminders: Array(pendingReminders), context: modelContext)
+        let autoFeedInsertions = pets.reduce(0) { total, pet in
+            total + FeedAutoLogMaterializer.materializeDueLogs(
+                pet: pet,
+                allEvents: allEvents,
+                context: modelContext
+            )
+        }
+        if autoFeedInsertions > 0 {
+            for pet in pets { StreakManager.refreshStreak(for: pet, context: modelContext) }
+        }
 
         // 每日打卡
         let fmt: DateFormatter = { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f }()
@@ -1574,7 +1587,7 @@ private extension GoDashboardView {
             let count = pet.walkLogs.filter { cal.isDateInToday($0.startDate) }.count
             let dist = pet.walkLogs.filter { cal.isDateInToday($0.startDate) }.reduce(0.0) { $0 + $1.distanceMeters }
             if count == 0 { return l.homeWalkNoneToday }
-            let ds = dist >= 1000 ? String(format: "%.1fkm", dist/1000) : String(format: "%.0fm", dist)
+            let ds = AppMeasurementSystem.formatDistanceMeters(dist)
             return l.homeWalkTodayBadge(count: count, dist: ds)
         case "feed":
             let storedGoal = UserDefaults.standard.integer(forKey: "feedGoal_\(pet.id.uuidString)")

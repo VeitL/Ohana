@@ -88,6 +88,7 @@ struct CoconutShopView: View {
             ShopItem(id: "boost_tree_large",      emoji: "🌳", name: "生命树能量 +110",description: "批量注入 110 点能量，比小包更划算",      cost: 95,  category: .boost, isConsumable: true),
             ShopItem(id: "boost_backdate_single", emoji: "📅", name: "补签券 ×1",      description: "获得 1 张昨日补签券，放入百宝箱",        cost: 45,  category: .boost, isConsumable: true),
             ShopItem(id: "boost_backdate_pack",   emoji: "🗓️", name: "补签券 ×3",      description: "获得 3 张昨日补签券，适合连续补签",      cost: 120, category: .boost, isConsumable: true),
+            ShopItem(id: Avatar2DAccess.shopItemId, emoji: "🖼️", name: "2.5D 头像券", description: "额外解锁 1 个新成员的 2.5D 默认头像", cost: 320, category: .boost, isConsumable: true),
         ].map { item in
             var copy = item
             if !item.isConsumable {
@@ -441,6 +442,9 @@ struct CoconutShopView: View {
             let key = "inventory_backdate_1day_count"
             let cur = UserDefaults.standard.integer(forKey: key)
             UserDefaults.standard.set(cur + (item.id == "boost_backdate_pack" ? 3 : 1), forKey: key)
+
+        case Avatar2DAccess.shopItemId:
+            Avatar2DAccess.addExtraPasses(1)
 
         default:
             break

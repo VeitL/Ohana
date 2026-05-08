@@ -474,7 +474,9 @@ struct FocusStackHomeTestView: View {
     @State private var homeCardReorderStartOffsetY: CGFloat = 0
     @State private var homeCardReorderCards: [FocusCard]? = nil
     @State private var homeCardReorderDidMove = false
+    @State private var homeCardPressCandidateId: UUID? = nil
     @State private var suppressNextHomeCardTap = false
+    @State private var homeCardReorderSession = 0
     @State private var homeCardReorderEnabled = false
     @State private var homeCardReorderModeActive = false
     @State private var didRecordHomeFirstFrame = false
@@ -949,7 +951,12 @@ struct FocusStackHomeTestView: View {
         // Collapse wallet hero state when returning from pet/human detail
         .onChange(of: selectedPet)   { _, new in if new == nil { withAnimation(walletAnimation) { isExpanded = false } } }
         .onChange(of: selectedHuman) { _, new in if new == nil { withAnimation(walletAnimation) { isExpanded = false } } }
-        .onChange(of: isExpanded) { _, _ in syncWalkCardSurfaceVisibility() }
+        .onChange(of: isExpanded) { _, expanded in
+            if expanded, homeCardPressCandidateId != nil || homeCardReorderDragId != nil || homeCardReorderCards != nil || homeCardReorderModeActive {
+                resetHomeCardReorderState()
+            }
+            syncWalkCardSurfaceVisibility()
+        }
         .onChange(of: activeCardId) { _, _ in syncWalkCardSurfaceVisibility() }
         .onChange(of: PetWalkingManager.shared.phase) { _, _ in syncWalkCardSurfaceVisibility() }
         .onChange(of: PetWalkingManager.shared.currentPet?.id) { _, _ in syncWalkCardSurfaceVisibility() }
@@ -1291,7 +1298,7 @@ extension FocusStackHomeTestView {
     }
 
     private func homeCardDisplayCards(from source: [FocusCard]) -> [FocusCard] {
-        guard let reorderingCards = homeCardReorderCards else { return source }
+        guard homeCardReorderDragId != nil, let reorderingCards = homeCardReorderCards else { return source }
 
         let sourceById = Dictionary(uniqueKeysWithValues: source.map { ($0.id, $0) })
         let ordered = reorderingCards.compactMap { sourceById[$0.id] }
@@ -1849,6 +1856,11 @@ extension FocusStackHomeTestView {
                 }
             }
             .onChange(of: displayCards.map(\.id)) { _, ids in
+                if let dragging = homeCardReorderDragId, !ids.contains(dragging) {
+                    resetHomeCardReorderState()
+                } else if let candidate = homeCardPressCandidateId, !ids.contains(candidate) {
+                    cancelHomeCardPressCandidate()
+                }
                 if let pendingPromotedHomeCardId,
                    ids.contains(pendingPromotedHomeCardId) {
                     activeCardId = pendingPromotedHomeCardId
@@ -1907,67 +1919,64 @@ extension FocusStackHomeTestView {
         return max(K.stackPeekH, localBottomY)
     }
 
-    private func homeCardReorderGesture(
+    private func homeCardCollapsedInteractionGesture(
         card: FocusCard,
         cards: [FocusCard],
         currentOffsetY: CGFloat,
         collapsedBottomY: CGFloat
     ) -> some Gesture {
-        DragGesture(minimumDistance: 2)
+        DragGesture(minimumDistance: 0, coordinateSpace: .local)
             .onChanged { drag in
-                guard homeCardReorderEnabled, homeCardReorderModeActive, !isExpanded, cards.count > 1 else { return }
-                beginHomeCardReorder(card: card, cards: cards, currentOffsetY: currentOffsetY)
-                updateHomeCardReorder(
-                    cardId: card.id,
-                    cards: cards,
-                    dragTranslationY: drag.translation.height,
-                    collapsedBottomY: collapsedBottomY
-                )
+                guard homeCardReorderEnabled, !isExpanded else { return }
+                if homeCardReorderDragId == nil && homeCardPressCandidateId == nil {
+                    beginHomeCardPressCandidate(card: card, cards: cards, currentOffsetY: currentOffsetY)
+                }
+
+                if homeCardReorderDragId == card.id {
+                    updateHomeCardReorder(
+                        cardId: card.id,
+                        cards: cards,
+                        dragTranslationY: drag.translation.height,
+                        collapsedBottomY: collapsedBottomY
+                    )
+                } else if homeCardPressCandidateId == card.id,
+                          homeCardDragDistance(drag.translation) > 12 {
+                    cancelHomeCardPressCandidate()
+                }
             }
             .onEnded { drag in
-                guard homeCardReorderEnabled, homeCardReorderModeActive, !isExpanded, homeCardReorderDragId == card.id else {
-                    resetHomeCardReorderState()
+                guard homeCardReorderEnabled else {
+                    handleWalletCardTap(card: card, n: cards.count, isHero: false)
                     return
                 }
-                updateHomeCardReorder(
-                    cardId: card.id,
-                    cards: cards,
-                    dragTranslationY: drag.translation.height,
-                    collapsedBottomY: collapsedBottomY
-                )
-                commitHomeCardReorder()
-                resetHomeCardReorderState()
+                guard !isExpanded else {
+                    if homeCardReorderDragId == card.id || homeCardPressCandidateId == card.id || homeCardReorderCards != nil || homeCardReorderModeActive {
+                        resetHomeCardReorderState()
+                    }
+                    return
+                }
+                if homeCardReorderDragId == card.id {
+                    updateHomeCardReorder(
+                        cardId: card.id,
+                        cards: cards,
+                        dragTranslationY: drag.translation.height,
+                        collapsedBottomY: collapsedBottomY
+                    )
+                    commitHomeCardReorder()
+                    resetHomeCardReorderState()
+                } else if homeCardPressCandidateId == card.id {
+                    cancelHomeCardPressCandidate()
+                    if homeCardDragDistance(drag.translation) <= 12 {
+                        handleWalletCardTap(card: card, n: cards.count, isHero: false)
+                    }
+                } else if homeCardDragDistance(drag.translation) <= 12 {
+                    handleWalletCardTap(card: card, n: cards.count, isHero: false)
+                }
             }
     }
 
-    private func enterHomeCardReorderMode() {
-        guard homeCardReorderEnabled, !isExpanded, visibleHomeCards.count > 1 else { return }
-        guard !homeCardReorderModeActive else { return }
-        withAnimation(GoMotion.feedback) {
-            homeCardReorderModeActive = true
-            fabExpanded = false
-        }
-        suppressNextHomeCardTap = true
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-            if homeCardReorderDragId == nil {
-                suppressNextHomeCardTap = false
-            }
-        }
-    }
-
-    private func beginHomeCardReorder(card: FocusCard, cards: [FocusCard], currentOffsetY: CGFloat) {
-        guard homeCardReorderDragId == nil else { return }
-        homeCardReorderDragId = card.id
-        homeCardReorderStartOffsetY = currentOffsetY
-        homeCardReorderCards = cards
-        homeCardReorderDidMove = false
-        withAnimation(walletAnimation) {
-            homeCardReorderDragOffset = homeCardReorderLiftY
-        }
-        suppressNextHomeCardTap = true
-        fabExpanded = false
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    private func homeCardDragDistance(_ translation: CGSize) -> CGFloat {
+        max(abs(translation.width), abs(translation.height))
     }
 
     private func updateHomeCardReorder(
@@ -2040,17 +2049,73 @@ extension FocusStackHomeTestView {
 
     private func resetHomeCardReorderState() {
         let didReorder = homeCardReorderDidMove
+        homeCardReorderSession += 1
+        homeCardPressCandidateId = nil
         homeCardReorderDragId = nil
         homeCardReorderDragOffset = 0
         homeCardReorderStartOffsetY = 0
         homeCardReorderCards = nil
         homeCardReorderDidMove = false
         homeCardReorderModeActive = false
+        suppressNextHomeCardTap = false
         if didReorder {
             UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-            suppressNextHomeCardTap = false
+    }
+
+    private func enterHomeCardReorderMode() {
+        guard homeCardReorderEnabled, !isExpanded, visibleHomeCards.count > 1 else { return }
+        guard !homeCardReorderModeActive else { return }
+        withAnimation(GoMotion.feedback) {
+            homeCardReorderModeActive = true
+            fabExpanded = false
+        }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    private func beginHomeCardPressCandidate(card: FocusCard, cards: [FocusCard], currentOffsetY: CGFloat) {
+        guard cards.count > 1 else { return }
+        homeCardReorderSession += 1
+        let session = homeCardReorderSession
+        homeCardPressCandidateId = card.id
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            guard homeCardReorderSession == session,
+                  homeCardPressCandidateId == card.id,
+                  homeCardReorderDragId == nil,
+                  !isExpanded else { return }
+            homeCardPressCandidateId = nil
+            enterHomeCardReorderMode()
+            beginHomeCardReorder(card: card, cards: cards, currentOffsetY: currentOffsetY)
+        }
+    }
+
+    private func cancelHomeCardPressCandidate() {
+        guard homeCardPressCandidateId != nil else { return }
+        homeCardReorderSession += 1
+        homeCardPressCandidateId = nil
+    }
+
+    private func beginHomeCardReorder(card: FocusCard, cards: [FocusCard], currentOffsetY: CGFloat) {
+        guard homeCardReorderDragId == nil else { return }
+        homeCardReorderDragId = card.id
+        homeCardReorderStartOffsetY = currentOffsetY
+        homeCardReorderCards = cards
+        homeCardReorderDidMove = false
+        homeCardReorderSession += 1
+        let session = homeCardReorderSession
+        withAnimation(walletAnimation) {
+            homeCardReorderDragOffset = homeCardReorderLiftY
+        }
+        fabExpanded = false
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        scheduleHomeCardReorderWatchdog(cardId: card.id, session: session)
+    }
+
+    private func scheduleHomeCardReorderWatchdog(cardId: UUID, session: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+            guard homeCardReorderSession == session,
+                  homeCardReorderDragId == cardId else { return }
+            resetHomeCardReorderState()
         }
     }
 
@@ -2087,7 +2152,7 @@ extension FocusStackHomeTestView {
                 anchor: .top
             )
             .offset(y: offsetY + (isReorderingCard ? homeCardReorderDragOffset : 0))
-            .zIndex(walletZIndex(idx: idx, n: n, isHero: isHero, heroId: heroId, cards: cards))
+            .zIndex(isReorderingCard ? Double(n + 120) : walletZIndex(idx: idx, n: n, isHero: isHero, heroId: heroId, cards: cards))
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(card.name) 的卡片")
             .accessibilityHint(isHero ? "点击返回首页，长按进入基本信息" :
@@ -2096,15 +2161,15 @@ extension FocusStackHomeTestView {
             .if(isExpanded && !isHero && homeCardReorderDragId == nil) { view in
                 view.contextMenu { cardContextMenu(card: card) }
             }
-            .if(!isInteractiveWalkCard) { view in
+            .if(isExpanded && !isInteractiveWalkCard) { view in
                 view.highPriorityGesture(
                     TapGesture()
                         .onEnded { handleWalletCardTap(card: card, n: n, isHero: isHero) }
                 )
             }
-            .if(!isExpanded && homeCardReorderEnabled && homeCardReorderModeActive) { view in
+            .if(!isExpanded && !isInteractiveWalkCard) { view in
                 view.highPriorityGesture(
-                    homeCardReorderGesture(
+                    homeCardCollapsedInteractionGesture(
                         card: card,
                         cards: cards,
                         currentOffsetY: offsetY,
@@ -2112,13 +2177,10 @@ extension FocusStackHomeTestView {
                     )
                 )
             }
-            .onLongPressGesture(minimumDuration: 0.45) {
-                guard !isInteractiveWalkCard else { return }
-                if isHero && isExpanded {
+            .if(isHero && isExpanded && !isInteractiveWalkCard) { view in
+                view.onLongPressGesture(minimumDuration: 0.45) {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     openWalletCardBasicInfo(card)
-                } else if !isExpanded {
-                    enterHomeCardReorderMode()
                 }
             }
             .animation(walletAnimation, value: isExpanded)
@@ -2176,15 +2238,13 @@ extension FocusStackHomeTestView {
     private func handleWalletCardTap(card: FocusCard, n: Int, isHero: Bool) {
         let tapStartedAt = CFAbsoluteTimeGetCurrent()
 
-        if suppressNextHomeCardTap {
-            suppressNextHomeCardTap = false
+        if homeCardReorderDragId != nil || homeCardReorderCards != nil || homeCardReorderModeActive {
+            resetHomeCardReorderState()
             return
         }
 
-        if homeCardReorderModeActive {
-            withAnimation(GoMotion.feedback) {
-                homeCardReorderModeActive = false
-            }
+        if suppressNextHomeCardTap {
+            suppressNextHomeCardTap = false
             return
         }
 
@@ -2221,11 +2281,13 @@ extension FocusStackHomeTestView {
     }
 
     private func collapseWalletToHome() {
+        if homeCardReorderDragId != nil || homeCardReorderCards != nil || homeCardReorderModeActive {
+            resetHomeCardReorderState()
+        }
         withAnimation(walletAnimation) {
             isExpanded = false
             fabExpanded = false
             isExpandedQAEditMode = false
-            homeCardReorderModeActive = false
         }
         if let rosterPreviewCard, activeCardId == rosterPreviewCard.id {
             activeCardId = visibleHomeCards.first(where: { $0.id != rosterPreviewCard.id })?.id

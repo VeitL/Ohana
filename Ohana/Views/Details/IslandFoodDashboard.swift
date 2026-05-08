@@ -231,8 +231,8 @@ struct IslandFoodDashboard: View {
     private var overviewCards: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
             metricCard(title: "今日喂食", value: "\(todayFeedLogs.count)", unit: "次", icon: "fork.knife", accent: Color(hex: "FF8C00"))
-            metricCard(title: "今日总量", value: compactGrams(todayGrams), unit: "g", icon: "scalemass.fill", accent: Color.goLime)
-            metricCard(title: "7 天总量", value: compactGrams(weekGrams), unit: "g", icon: "chart.bar.fill", accent: Color(hex: "80FFEA"))
+            metricCard(title: "今日总量", value: compactFoodWeight(todayGrams), unit: "", icon: "scalemass.fill", accent: Color.goLime)
+            metricCard(title: "7 天总量", value: compactFoodWeight(weekGrams), unit: "", icon: "chart.bar.fill", accent: Color(hex: "80FFEA"))
             metricCard(title: "余粮风险", value: foodRiskValue, unit: foodRiskUnit, icon: "shippingbox.fill", accent: foodRiskAccent)
         }
     }
@@ -260,7 +260,7 @@ struct IslandFoodDashboard: View {
                 Text(todayFeedLogs.isEmpty ? "今天还没开饭" : "今天 \(todayFeedLogs.count) 次")
                     .font(.system(size: 24, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
-                Text("7 天 \(weekFeedLogs.count) 次 · \(compactGrams(weekGrams))g")
+                Text("7 天 \(weekFeedLogs.count) 次 · \(compactFoodWeight(weekGrams))")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.52))
             }
@@ -375,7 +375,7 @@ struct IslandFoodDashboard: View {
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(accent)
                         .lineLimit(1)
-                    Text("今日 \(summary.todayCount) 次 · \(compactGrams(summary.todayGrams))g / 7天 \(summary.weekCount) 次")
+                    Text("今日 \(summary.todayCount) 次 · \(compactFoodWeight(summary.todayGrams)) / 7天 \(summary.weekCount) 次")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(.white.opacity(0.42))
                         .lineLimit(1)
@@ -457,12 +457,8 @@ struct IslandFoodDashboard: View {
         return log.pet?.dailyPortionGrams ?? 0
     }
 
-    private func compactGrams(_ value: Double) -> String {
-        if value >= 1000 {
-            let kg = value / 1000
-            return kg >= 10 ? "\(Int(kg))k" : String(format: "%.1fk", kg)
-        }
-        return "\(Int(value.rounded()))"
+    private func compactFoodWeight(_ value: Double) -> String {
+        AppMeasurementSystem.formatFoodGrams(value)
     }
 
     private var foodRiskValue: String {
@@ -515,7 +511,7 @@ struct IslandFoodDashboard: View {
             guard pet.restockWeight > 0, pet.dailyPortionGrams > 0 else {
                 return "未设置粮仓"
             }
-            return "余粮 \(compactGrams(pet.remainingFoodGrams))g · 可用 \(pet.remainingFoodDays) 天"
+            return "余粮 \(compactFoodWeight(pet.remainingFoodGrams)) · 可用 \(pet.remainingFoodDays) 天"
         case .casual:
             if let days = pet.casualRemainingDays {
                 return "佛系估算 · 约 \(days) 天"

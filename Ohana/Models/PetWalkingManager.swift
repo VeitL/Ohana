@@ -263,10 +263,6 @@ final class PetWalkingManager {
     }
     
     var distanceText: String {
-        let meters = locationManager.totalDistance
-        if meters >= 1000 {
-            return String(format: "%.2f km", meters / 1000)
-        }
-        return String(format: "%.0f m", meters)
+        AppMeasurementSystem.formatDistanceMeters(locationManager.totalDistance, fractionDigits: 2)
     }
 }

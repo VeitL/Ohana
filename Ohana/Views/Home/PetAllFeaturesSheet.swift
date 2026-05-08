@@ -5,13 +5,31 @@
 import SwiftUI
 import SwiftData
 
+enum PetAllFeatureDestination: Hashable {
+    case health
+    case medications
+    case food
+    case hygiene
+    case walks
+    case potty
+    case basicInfo
+    case documents
+    case moments
+    case timeline
+    case achievements
+    case retention
+    case weight
+    case expense
+}
+
 struct PetAllFeaturesSheet: View {
     let pet: Pet
 
     @Environment(\.dismiss) private var dismiss
-    @State private var path = NavigationPath()
+    @State private var path: [PetAllFeatureDestination] = []
 
     private var isDog: Bool { pet.species.lowercased().contains("狗") || pet.species.lowercased().contains("dog") }
+    private var archiveSnapshot: ArchiveMemorySnapshot { ArchiveMemorySnapshot(pet: pet) }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -33,7 +51,7 @@ struct PetAllFeaturesSheet: View {
                                 title: "饮食",
                                 value: todayFeedMetric,
                                 subtitle: foodSub,
-                                destination: .petFood(pet.persistentModelID),
+                                destination: .food,
                                 height: 142
                             )
                             featureTile(
@@ -42,7 +60,7 @@ struct PetAllFeaturesSheet: View {
                                 title: "健康",
                                 value: "\(pet.healthLogs.count)",
                                 subtitle: healthSub,
-                                destination: .petHealth(pet.persistentModelID),
+                                destination: .health,
                                 height: 142
                             )
                         }
@@ -54,7 +72,7 @@ struct PetAllFeaturesSheet: View {
                                 title: "体重",
                                 value: latestWeightText,
                                 subtitle: weightSub,
-                                destination: .petWeight(pet.persistentModelID),
+                                destination: .weight,
                                 height: 156
                             )
                             VStack(spacing: 12) {
@@ -63,14 +81,14 @@ struct PetAllFeaturesSheet: View {
                                     color: Color(hex: "8B5CF6"),
                                     title: "用药",
                                     subtitle: medSub,
-                                    destination: .petMedications(pet.persistentModelID)
+                                    destination: .medications
                                 )
                                 compactFeatureTile(
                                     icon: "bubbles.and.sparkles.fill",
                                     color: Color(hex: "06B6D4"),
                                     title: "清洁护理",
                                     subtitle: hygieneSub,
-                                    destination: .petHygiene(pet.persistentModelID)
+                                    destination: .hygiene
                                 )
                             }
                         }
@@ -83,7 +101,7 @@ struct PetAllFeaturesSheet: View {
                                     title: "遛狗",
                                     value: weekWalkText,
                                     subtitle: walkSub,
-                                    destination: .petWalks(pet.persistentModelID),
+                                    destination: .walks,
                                     height: 138
                                 )
                             }
@@ -93,7 +111,7 @@ struct PetAllFeaturesSheet: View {
                                 title: "便便",
                                 value: todayPottyMetric,
                                 subtitle: pottySub,
-                                destination: .petPotty(pet.persistentModelID),
+                                destination: .potty,
                                 height: 138
                             )
                             featureTile(
@@ -102,7 +120,7 @@ struct PetAllFeaturesSheet: View {
                                 title: "花费",
                                 value: expenseMetric,
                                 subtitle: expenseSub,
-                                destination: .petExpense(pet.persistentModelID),
+                                destination: .expense,
                                 height: 138
                             )
                         }
@@ -123,7 +141,7 @@ struct PetAllFeaturesSheet: View {
                         .foregroundStyle(Color.goLime)
                 }
             }
-            .navigationDestination(for: FMDest.self) { dest in
+            .navigationDestination(for: PetAllFeatureDestination.self) { dest in
                 destView(dest)
             }
         }
@@ -132,41 +150,22 @@ struct PetAllFeaturesSheet: View {
     // MARK: - Destination Views
 
     @ViewBuilder
-    private func destView(_ dest: FMDest) -> some View {
+    private func destView(_ dest: PetAllFeatureDestination) -> some View {
         switch dest {
-        case .petHealth(_):        PetHealthDetailView(pet: pet, isModal: false)
-        case .petMedications(_):   PetMedicationView(pet: pet)
-        case .petFood(_):          PetFoodManagementView(pet: pet)
-        case .petHygiene(_):       PetHygieneDetailView(pet: pet)
-        case .petWalks(_):         WalkSummarySheet(pet: pet)
-        case .petPotty(_):         PottyOverviewView(pet: pet)
-        case .petBasicInfo(_):     PetBasicInfoDetailView(pet: pet)
-        case .petDocuments(_):     DocumentsListView(pet: pet)
-        case .petInsurance(_):     PetInsuranceView(pet: pet)
-        case .petMoments(_):       PetMomentsHubView(pet: pet)
-        case .petTimeline(_):      PetUnifiedTimelineSheet(pet: pet)
-        case .petAchievements(_):  AchievementWallView(pet: pet)
-        case .petRetention(_):     PetRetentionHubView(pet: pet)
-        case .petWeight(_):        WeightHistoryView(pet: pet)
-        case .petExpense(_):       ExpenseHistoryView(pet: pet)
-        // The following FMDest cases are cross-entity / aggregate routes; they
-        // are not reachable from a single-pet sheet. Assert in debug to catch
-        // accidental wiring, fall back to EmptyView in release.
-        case .featureGroup(_):
-            let _ = { assertionFailure("PetAllFeaturesSheet: featureGroup route is unreachable from single-pet sheet") }()
-            EmptyView()
-        case .featureAggregate(_):
-            let _ = { assertionFailure("PetAllFeaturesSheet: featureAggregate route is unreachable from single-pet sheet") }()
-            EmptyView()
-        case .humanWeight(_):
-            let _ = { assertionFailure("PetAllFeaturesSheet: humanWeight route is unreachable from single-pet sheet") }()
-            EmptyView()
-        case .humanExpense(_):
-            let _ = { assertionFailure("PetAllFeaturesSheet: humanExpense route is unreachable from single-pet sheet") }()
-            EmptyView()
-        case .plantsDashboard, .wealthDashboard, .bountyBoard, .familyWeeklyReport, .careLedgerAnalysis, .reminderObservability, .coconutShop, .gacha, .calendar:
-            let _ = { assertionFailure("PetAllFeaturesSheet: island-wide route is unreachable from single-pet sheet") }()
-            EmptyView()
+        case .health:        PetHealthDetailView(pet: pet, isModal: false)
+        case .medications:   PetMedicationView(pet: pet)
+        case .food:          PetFoodManagementView(pet: pet)
+        case .hygiene:       PetHygieneDetailView(pet: pet)
+        case .walks:         WalkSummarySheet(pet: pet)
+        case .potty:         PottyOverviewView(pet: pet)
+        case .basicInfo:     PetBasicInfoDetailView(pet: pet)
+        case .documents:     DocumentsListView(pet: pet)
+        case .moments:       PetMomentsHubView(pet: pet)
+        case .timeline:      PetUnifiedTimelineSheet(pet: pet)
+        case .achievements:  AchievementWallView(pet: pet)
+        case .retention:     PetRetentionHubView(pet: pet)
+        case .weight:        WeightHistoryView(pet: pet)
+        case .expense:       ExpenseHistoryView(pet: pet)
         }
     }
 
@@ -209,14 +208,14 @@ struct PetAllFeaturesSheet: View {
         return "完善基本信息"
     }
     private var documentsSub: String {
-        let n = pet.documents.count
-        return n > 0 ? "\(n)份证件" : "暂无证件"
-    }
-    private var insuranceSub: String {
-        let n = pet.insurances.count
-        if n == 0 { return "暂无保险" }
-        let active = pet.insurances.filter { $0.renewalDate >= Date() }.count
-        return active > 0 ? "\(active)份生效中" : "\(n)份已过期"
+        let documentCount = pet.documents.count
+        let insuranceCount = pet.insurances.count
+        if documentCount > 0 && insuranceCount > 0 {
+            return "\(documentCount)份证件 · \(insuranceCount)份保险"
+        }
+        if documentCount > 0 { return "\(documentCount)份证件" }
+        if insuranceCount > 0 { return "\(insuranceCount)份保险" }
+        return "证件/保险资料"
     }
     private var timelineSub: String {
         let total = pet.photoLogs.count + pet.milestones.count + pet.healthLogs.count + pet.weightLogs.count
@@ -227,14 +226,7 @@ struct PetAllFeaturesSheet: View {
         return n > 0 ? "\(n)个里程碑" : "暂无成就"
     }
     private var retentionSub: String {
-        let score = [
-            !pet.weightLogs.isEmpty || !pet.healthLogs.isEmpty,
-            !pet.photoLogs.isEmpty || !pet.milestones.isEmpty,
-            !pet.expenseLogs.isEmpty,
-            !pet.documents.isEmpty || !pet.insurances.isEmpty || !pet.medications.isEmpty,
-            pet.currentStreak > 0
-        ].filter { $0 }.count
-        return "长期模块 \(score)/5"
+        "长期模块 \(archiveSnapshot.score)/5"
     }
 
     private var todayFeedMetric: String {
@@ -266,9 +258,7 @@ struct PetAllFeaturesSheet: View {
     // MARK: - Bento Builders
 
     private var petFeatureHero: some View {
-        Button {
-            path.append(FMDest.petRetention(pet.persistentModelID))
-        } label: {
+        NavigationLink(value: PetAllFeatureDestination.retention) {
             ZStack(alignment: .topLeading) {
                 MeshGradient(
                     width: 3,
@@ -332,80 +322,75 @@ struct PetAllFeaturesSheet: View {
                     .strokeBorder(.white.opacity(0.16), lineWidth: 1)
             }
             .shadow(color: Color(hex: pet.themeColorHex).opacity(0.28), radius: 22, y: 12)
+            .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         }
         .buttonStyle(.plain)
     }
 
     private var archiveBento: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("档案与记忆", systemImage: "folder.fill")
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(.white.opacity(0.8))
-                Spacer()
-                Text("ARCHIVE")
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(Color.goPrimary.opacity(0.7))
-                    .tracking(2)
-            }
-            .padding(.horizontal, 2)
+        let snapshot = archiveSnapshot
+        return VStack(alignment: .leading, spacing: 12) {
+            sectionHeader(icon: "folder.fill", title: "档案与记忆", label: "\(snapshot.score)/\(snapshot.total)")
 
-            // 第一行：成长档案（综合） + 基本信息
+            HStack(spacing: 12) {
+                featureTile(
+                    icon: snapshot.nextStep.icon,
+                    color: Color.goLime,
+                    title: "档案完整度",
+                    value: "\(snapshot.score)/\(snapshot.total)",
+                    subtitle: "下一步 · \(snapshot.nextStep.title)",
+                    destination: snapshot.nextStep.destination,
+                    height: 156
+                )
+                VStack(spacing: 12) {
+                    compactFeatureTile(
+                        icon: "person.fill",
+                        color: Color(hex: "6B82C4"),
+                        title: "基本信息",
+                        subtitle: basicInfoSub,
+                        destination: .basicInfo
+                    )
+                    compactFeatureTile(
+                        icon: "doc.fill",
+                        color: Color(hex: "94A3B8"),
+                        title: "证件保障",
+                        subtitle: documentsSub,
+                        destination: .documents
+                    )
+                }
+            }
+
             HStack(spacing: 12) {
                 compactFeatureTile(
                     icon: "sparkles.rectangle.stack.fill",
                     color: Color.goPrimary,
                     title: "成长档案",
                     subtitle: retentionSub,
-                    destination: .petRetention(pet.persistentModelID)
+                    destination: .retention
                 )
-                compactFeatureTile(
-                    icon: "person.fill",
-                    color: Color(hex: "6B82C4"),
-                    title: "基本信息",
-                    subtitle: basicInfoSub,
-                    destination: .petBasicInfo(pet.persistentModelID)
-                )
-            }
-            // 第二行：证件 + 保险（拆出来独立入口）
-            HStack(spacing: 12) {
-                compactFeatureTile(
-                    icon: "doc.fill",
-                    color: Color(hex: "94A3B8"),
-                    title: "证件保障",
-                    subtitle: documentsSub,
-                    destination: .petDocuments(pet.persistentModelID)
-                )
-                compactFeatureTile(
-                    icon: "shield.lefthalf.filled",
-                    color: Color(hex: "10B981"),
-                    title: "保险",
-                    subtitle: insuranceSub,
-                    destination: .petInsurance(pet.persistentModelID)
-                )
-            }
-            // 第三行：记忆 — 时间轴 + 重要时刻 + 成就
-            HStack(spacing: 12) {
                 compactFeatureTile(
                     icon: "clock.arrow.circlepath",
                     color: Color(hex: "8B5CF6"),
                     title: "时间轴",
                     subtitle: timelineSub,
-                    destination: .petTimeline(pet.persistentModelID)
+                    destination: .timeline
                 )
+            }
+
+            HStack(spacing: 12) {
                 compactFeatureTile(
                     icon: "sparkles",
                     color: Color(hex: "EC4899"),
                     title: "重要时刻",
                     subtitle: momentsSub,
-                    destination: .petMoments(pet.persistentModelID)
+                    destination: .moments
                 )
                 compactFeatureTile(
                     icon: "trophy.fill",
                     color: Color(hex: "F59E0B"),
                     title: "成就",
                     subtitle: achievementsSub,
-                    destination: .petAchievements(pet.persistentModelID)
+                    destination: .achievements
                 )
             }
         }
@@ -426,13 +411,7 @@ struct PetAllFeaturesSheet: View {
     }
 
     private var archiveScore: Int {
-        [
-            !pet.weightLogs.isEmpty || !pet.healthLogs.isEmpty,
-            !pet.photoLogs.isEmpty || !pet.milestones.isEmpty,
-            !pet.expenseLogs.isEmpty,
-            !pet.documents.isEmpty || !pet.insurances.isEmpty || !pet.medications.isEmpty,
-            pet.currentStreak > 0
-        ].filter { $0 }.count
+        archiveSnapshot.score
     }
 
     private func featureTile(
@@ -441,10 +420,10 @@ struct PetAllFeaturesSheet: View {
         title: String,
         value: String,
         subtitle: String,
-        destination: FMDest,
+        destination: PetAllFeatureDestination,
         height: CGFloat
     ) -> some View {
-        Button { path.append(destination) } label: {
+        NavigationLink(value: destination) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Image(systemName: icon)
@@ -487,6 +466,7 @@ struct PetAllFeaturesSheet: View {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .strokeBorder(.white.opacity(0.11), lineWidth: 1)
             }
+            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -496,9 +476,9 @@ struct PetAllFeaturesSheet: View {
         color: Color,
         title: String,
         subtitle: String,
-        destination: FMDest
+        destination: PetAllFeatureDestination
     ) -> some View {
-        Button { path.append(destination) } label: {
+        NavigationLink(value: destination) {
             VStack(alignment: .leading, spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .black))
@@ -524,6 +504,7 @@ struct PetAllFeaturesSheet: View {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .strokeBorder(.white.opacity(0.09), lineWidth: 1)
             }
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -615,5 +596,113 @@ struct PetAllFeaturesSheet: View {
                 .tracking(2)
         }
         .padding(.bottom, 2)
+    }
+}
+
+enum ArchiveMemoryNextStepKind: Equatable {
+    case basicInfo
+    case documents
+    case moments
+    case weight
+    case retention
+}
+
+struct ArchiveMemoryNextStep {
+    let kind: ArchiveMemoryNextStepKind
+    let title: String
+    let subtitle: String
+    let icon: String
+
+    var destination: PetAllFeatureDestination {
+        switch kind {
+        case .basicInfo:
+            return .basicInfo
+        case .documents:
+            return .documents
+        case .moments:
+            return .moments
+        case .weight:
+            return .weight
+        case .retention:
+            return .retention
+        }
+    }
+}
+
+struct ArchiveMemorySnapshot {
+    let score: Int
+    let total: Int
+    let nextStep: ArchiveMemoryNextStep
+
+    init(pet: Pet) {
+        let hasBasicProfile = Self.hasBasicProfile(pet)
+        let hasHealthOrWeight = !pet.healthLogs.isEmpty || !pet.weightLogs.isEmpty
+        let hasMemory = !pet.photoLogs.isEmpty || !pet.milestones.isEmpty
+        let hasProtection = !pet.documents.isEmpty || !pet.insurances.isEmpty || !pet.medications.isEmpty
+        let hasContinuity = pet.currentStreak > 0 || !pet.milestones.isEmpty
+        let checks = [hasBasicProfile, hasHealthOrWeight, hasMemory, hasProtection, hasContinuity]
+
+        self.score = checks.filter { $0 }.count
+        self.total = checks.count
+        self.nextStep = Self.nextStep(
+            hasBasicProfile: hasBasicProfile,
+            hasDocumentsOrInsurance: !pet.documents.isEmpty || !pet.insurances.isEmpty,
+            hasMemory: hasMemory,
+            hasHealthOrWeight: hasHealthOrWeight
+        )
+    }
+
+    private static func hasBasicProfile(_ pet: Pet) -> Bool {
+        !pet.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !pet.species.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !pet.breed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        pet.birthday != nil &&
+        pet.homeDate != nil
+    }
+
+    private static func nextStep(
+        hasBasicProfile: Bool,
+        hasDocumentsOrInsurance: Bool,
+        hasMemory: Bool,
+        hasHealthOrWeight: Bool
+    ) -> ArchiveMemoryNextStep {
+        if !hasBasicProfile {
+            return ArchiveMemoryNextStep(
+                kind: .basicInfo,
+                title: "完善基础档案",
+                subtitle: "补充生日、品种或到家日",
+                icon: "person.fill"
+            )
+        }
+        if !hasDocumentsOrInsurance {
+            return ArchiveMemoryNextStep(
+                kind: .documents,
+                title: "添加证件/保障",
+                subtitle: "上传疫苗、证件或保险资料",
+                icon: "doc.badge.plus"
+            )
+        }
+        if !hasMemory {
+            return ArchiveMemoryNextStep(
+                kind: .moments,
+                title: "留下第一段回忆",
+                subtitle: "添加照片或重要时刻",
+                icon: "camera.fill"
+            )
+        }
+        if !hasHealthOrWeight {
+            return ArchiveMemoryNextStep(
+                kind: .weight,
+                title: "补一条健康基线",
+                subtitle: "记录体重或健康档案",
+                icon: "scalemass.fill"
+            )
+        }
+        return ArchiveMemoryNextStep(
+            kind: .retention,
+            title: "查看成长档案",
+            subtitle: "回顾长期趋势与照护故事",
+            icon: "sparkles.rectangle.stack.fill"
+        )
     }
 }

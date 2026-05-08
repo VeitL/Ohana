@@ -1,6 +1,6 @@
 # Ohana iOS App 项目文档
 
-> 最后更新: 2026-05-07（首页核心工作台边界 / 物种护理计划 / 异常趋势优先 / 就诊卡片）| Build: ✅ | Tests: ⚠️ 既有隐私/提醒去重用例待修 | Schema: ArkSchemaV38
+> 最后更新: 2026-05-08（喂食管理页 Go Focus Refine / 首页喂食状态统一）| Build: ✅ | Tests: ⚠️ 喂食状态新增用例通过；完整 OhanaTests 仍有既有隐私用例待修 | Schema: ArkSchemaV38
 >
 > **当前默认首页**：GO UI（`FocusStackHomeTestView`）。普通用户固定进入 GO Focus；经典 `OverviewView` 仅保留 `debugEnableClassicHome` 内部兼容入口。首页是唯一核心工作台，只回答“今天谁需要照顾 / 现在最该做什么 / 点一下怎么完成”；卡片展开页放快捷操作，FAB 放二级功能，详情页放深数据。首页卡片堆固定只取前 7 张可显示卡片；宠物/人类“在首页显示”开关位于卡片展开页，切换后同步影响首页卡片堆，满 7 张时会提示先隐藏一张。
 
@@ -16,10 +16,11 @@
 - **全局主色**：`Color.goPrimary` — 浅色 `#FF7600` / 深色 `#C8FF00`，`OhanaApp` 根视图 `.tint(Color.goPrimary)`
 - **UI 规范**：见 `UIRules.md`，所有新页面必须符合规范
 
-### 本地化（简体中文 / English）
+### 本地化（简体中文 / English / Deutsch）
 
 - **策略**：Swift 源码中的用户可见**中文整句**作为 `LocalizedStringKey`；`Ohana/en.lproj/Localizable.strings` 以相同中文为 key、英文为 value。系统语言为 **English** 时使用英文，为 **简体中文** 时显示源码中文（无需 `zh-Hans` 副本）。
 - **语言入口**：`AppLanguage.supported` 是设置页、SwiftUI `Locale`、`DateFormatter` / `NumberFormatter` 的唯一语言清单；新增语言时追加 `Option` 并创建对应 `<lang>.lproj/Localizable.strings`。
+- **当前语言**：设置页支持中文 / English / Deutsch；新增 Go Focus 功能的可见文案应通过 `L10n` / `AppLocalizedText` 提供三语 fallback，并按 `AppLanguage.supported` 扩展更多语言。
 - **隐私文案**：`Ohana/en.lproj/InfoPlist.strings` 覆盖相机/定位说明；`Info.plist` 内保留中文作开发默认值。
 - **工程**：`CFBundleLocalizations` = `en` + `zh-Hans`；Xcode `knownRegions` 含 `zh-Hans`。
 - **批量生成**：`scripts/generate_en_localizable.py --target en --lproj en`（依赖 `deep-translator`，建议使用仓库内 `.venv-l10n`）扫描含汉字的字符串字面量并机翻；新增语言可改 `--target ja --lproj ja` 等参数；进度缓存在 `scripts/.l10n_<target>_cache.json`（已 `.gitignore`），中断后可续跑。
@@ -35,7 +36,7 @@ Ohana/
 │   ├── Localizable.strings   # 英文 UI（key = 源码中的中文）
 │   └── InfoPlist.strings     # 英文隐私描述
 ├── Models/
-│   ├── Pet.swift / PetWeightLog.swift / PetCareLog.swift
+│   ├── Pet.swift / PetWeightLog.swift / PetCareLog.swift # 含 FeedTodayState：喂食今日状态统一计算
 │   ├── PetMedication.swift / PetInsurance.swift / InsuranceClaim.swift
 │   ├── PetPhotoLog.swift / SymptomLog.swift / HeatCycleLog.swift
 │   ├── Human.swift / HumanWeightLog.swift / Plant.swift / PlantCareLog.swift
@@ -77,7 +78,7 @@ Ohana/
 │   ├── Components/
 │   │   ├── FamilyActivityStripView.swift # 今日谁做了什么
 │   │   ├── DutyNudgeComponents.swift     # 指派成员 chip + 催办按钮
-│   │   ├── QuickFeedDetailSheet.swift    # 喂食详情（手动/计划模式）
+│   │   ├── QuickFeedDetailSheet.swift    # Go Focus 喂食管理：今日 / 计划 / 粮仓 / 历史
 │   │   ├── QuickWaterDetailSheet.swift   # 喂水/换水
 │   │   ├── QuickLitterDetailSheet.swift  # 铲屎/换砂
 │   │   ├── QuickPottyDetailSheet.swift   # 便便记录
@@ -130,6 +131,8 @@ Ohana/
 **Event**：`relatedEntityType`（`EntityKind.rawValue`）、`relatedEntityId`、`assigneeId`（任务指派）  
 **Reminder**：`scheduledAt`、`status`、`completedAt`、`completedBy`、`notificationId`  
 **CareLedgerEvent**：`actorKind/actorId`、`subjectKind/subjectId`、`eventKind/actionType`、`source/sourceId`、`occurredAt`、`metadataJSON`，用于统一记录喂食/喂水/吃药/运动/花费/提醒/椰子奖励等行为。
+
+**FeedTodayState**（纯计算 helper，无 SwiftData 迁移）：统一计算宠物今日喂食状态，输入 `Pet`、`allEvents`、每日手动目标餐数，输出今日计划提醒、手动/计划记录、完成进度、下一餐/逾期、今日已喂克数。`QuickFeedDetailSheet`、GO 首页展开态快捷模块、`GoDashboardView` 共用，避免首页与喂食页完成态不一致。
 
 ---
 
@@ -837,6 +840,22 @@ active 宠物 / 人类卡下方复用经典 UI 的 `GoQuickActionCard` 网格样
 
 展开态 FAB 会读取当前快捷模块中已经显示的项目，只展示未显示项目和“全部功能”；用户编辑快捷模块后，FAB 子菜单同步变化。铲屎、护理等一天只应完成一次的项目，今天已打卡时会给出提示并阻止重复打卡。
 
+### 喂食管理 — `QuickFeedDetailSheet`
+
+`QuickFeedDetailSheet` 已从长表单重构为 Go Focus 顶部标签页，默认进入“今日”，主路径是 10 秒内完成一次喂食记录。
+
+顶部标签：
+- **今日**：默认页。`FeedTodayState` 自动聚合手动喂食与计划喂食；有今日计划时按计划提醒计算完成进度，无今日计划时按每日目标餐数计算。顶部 Focus 卡展示完成数、下一餐/已逾期、今日已喂克数、粮仓断粮风险。
+- **计划**：保留 `Event + Reminder` 喂食计划数据；按今天状态显示待完成、已逾期、已完成、未来计划。新增计划保留紧凑表单：时间、克数、保存；删除计划需要二次确认。
+- **粮仓**：保留佛系 / 精准两种模式。顶部先显示品牌、剩余天数/断粮日、提醒状态；“补粮/开包”继续写入 `PetFoodRecord`，有价格时写入 `PetExpenseLog(category: .food)`，断粮提醒复用现有 food stock reminder 事件。
+- **历史**：展示今日记录、近 7 天喂食柱状图、最近 15 条记录；手动和计划记录用 badge 区分，删除记录后同步刷新粮仓提醒。
+
+记录规则：
+- 主 CTA 固定为“记录喂食”。若存在今日待完成或 failed 的计划提醒，优先完成最早一餐；否则写入手动喂食。
+- 快捷克数 chip 来源：宠物默认份量、下一餐/今日计划克数、最近常用克数；仍允许手动输入。
+- `HomeFeedRecordMode` 保留兼容旧数据，但不再作为喂食页可见主控件；首页完成态与喂食页都改由 `FeedTodayState` 判断。
+- 计划喂食写入 `PetCareLog.plannedFeedNotePrefix`，手动喂食写入 `PetCareLog.manualFeedNoteMarker`，用于历史和统计互斥展示。
+
 ### Today Focus 与家庭协作入口
 
 GO UI 折叠态首屏已收敛为 Today Focus：优先回答“今天谁需要照顾、什么最紧急、我点一下能完成什么”。当前模块 offset 为 -20pt，展开卡片时隐藏，避免与 active card 下方快捷模块争抢空间。
@@ -1239,6 +1258,12 @@ introFlow（最多 5 张功能介绍卡）
   - Today Focus 优先展示异常趋势与医疗风险，再展示普通护理任务
   - 护理任务显示上次执行人和时间，降低家庭重复照顾概率
   - 宠物基础信息页新增就诊卡片和给兽医分享摘要
+- [x] **喂食管理页 Go Focus Refine**（2026-05-08 落地）
+  - `QuickFeedDetailSheet` 改为顶部 4 标签：今日 / 计划 / 粮仓 / 历史，默认进入“今日”
+  - `FeedTodayState` 统一计算今日计划、手动记录、完成进度、下一餐、今日克数；喂食页与 GO 首页共用
+  - 首页喂食快捷操作：有待完成/failed 计划时优先完成最早计划，否则写入手动喂食
+  - 粮仓页先展示品牌、剩余天数/断粮日、提醒状态；补粮/开包继续写 `PetFoodRecord`，有价格时写 `PetExpenseLog(category: .food)`
+  - 历史页展示今日记录、近 7 天柱状图、最近 15 条，并用 badge 区分手动/计划记录
 - [x] **护理计划与护理详情统一**（2026-05-05 落地）
   - 护理计划支持全天日程 / 指定时间；非全天时写入用户选择的 time
   - 护理周期只在设置计划页通过天数加减维护，保存后同步 `Event.recurrenceDays` 与 `hygiene_cycle_*`

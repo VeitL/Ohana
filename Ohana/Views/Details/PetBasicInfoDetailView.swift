@@ -15,9 +15,6 @@ struct PetBasicInfoDetailView: View {
 
     @State private var isEditing = false
 
-    @State private var showingDeleteConfirm    = false
-    @State private var deleteConfirmName       = ""
-    @State private var showingClearConfirm     = false
     @State private var showingRainbowBridgeAlert = false
     @State private var showingUndoPassingAlert   = false
     @State private var rainbowBridgeDate         = Date()
@@ -77,21 +74,6 @@ struct PetBasicInfoDetailView: View {
         }
         .navigationTitle("\(pet.name) 的信息")
         .navigationBarTitleDisplayMode(.inline)
-        .alert("确认删除", isPresented: $showingDeleteConfirm) {
-            TextField("输入宠物名字确认", text: $deleteConfirmName)
-            Button("取消", role: .cancel) { deleteConfirmName = "" }
-            Button("删除", role: .destructive) {
-                if deleteConfirmName == pet.name {
-                    deletePetWithCascade(pet)
-                }
-            }
-        } message: { Text("请输入 \"\(pet.name)\" 确认删除。此操作不可撤销。") }
-        .alert("仅清空所有记录", isPresented: $showingClearConfirm) {
-            Button("取消", role: .cancel) {}
-            Button("清空记录", role: .destructive) { clearPetLogs() }
-        } message: {
-            Text("将删除 \(pet.name) 的护理、体重、花费、健康、散步、喂食、清洁、里程碑、用药与相册等记录，并移除日历中该宠物的计划；保留名字、头像、品种与证件/保险档案。此操作不可撤销。")
-        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if isEditing {
@@ -799,41 +781,11 @@ struct PetBasicInfoDetailView: View {
 
     // MARK: - Danger Zone
     private var deleteDangerZone: some View {
-        VStack(spacing: 10) {
-            HStack {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(Color.goRed.opacity(0.7)).font(.system(size: 12))
-                Text("危险区域")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.goRed.opacity(0.7)).tracking(2)
-                Spacer()
-            }
-            Button { showingClearConfirm = true } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "eraser.fill").font(.system(size: 14, weight: .bold))
-                    Text("仅清空所有记录").font(.system(size: 15, weight: .bold, design: .rounded))
-                }
-                .foregroundStyle(Color.goOrange)
-                .frame(maxWidth: .infinity).padding(.vertical, 14)
-                .background(Color.goOrange.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(Color.goOrange.opacity(0.3), lineWidth: 1))
-            }
-            .buttonStyle(.plain)
-            Button { showingDeleteConfirm = true } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "trash.fill").font(.system(size: 14, weight: .bold))
-                    Text("彻底删除 \(pet.name)").font(.system(size: 15, weight: .bold, design: .rounded))
-                }
-                .foregroundStyle(Color.goRed)
-                .frame(maxWidth: .infinity).padding(.vertical, 14)
-                .background(Color.goRed.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(Color.goRed.opacity(0.3), lineWidth: 1))
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.top, 8)
+        PetBasicInfoDangerZone(
+            petName: pet.name,
+            onClear: clearPetLogs,
+            onDelete: { deletePetWithCascade(pet) }
+        )
     }
 
     // MARK: - Delete Helpers
@@ -847,7 +799,6 @@ struct PetBasicInfoDetailView: View {
         removeQuickAccessItems(for: p.id)
         modelContext.delete(p)
         modelContext.safeSave()
-        deleteConfirmName = ""
         dismiss()
     }
 
@@ -1104,6 +1055,174 @@ struct EditableProfileAvatarPicker: View {
             try? await Task.sleep(nanoseconds: 120_000_000)
             cropImageItem = IdentifiableCropImage(image: prepared)
             AppPerformanceMonitor.shared.markEnd("avatar.camera.to.crop", name: "拍照到裁剪页", note: cropSpecies)
+        }
+    }
+}
+
+private struct PetBasicInfoDangerZone: View {
+    let petName: String
+    let onClear: () -> Void
+    let onDelete: () -> Void
+
+    @State private var showingClearConfirm = false
+    @State private var showingDeleteSheet = false
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(Color.goRed.opacity(0.7))
+                    .font(.system(size: 12))
+                Text("危险区域")
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.goRed.opacity(0.7))
+                    .tracking(2)
+                Spacer()
+            }
+
+            Button {
+                showingClearConfirm = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "eraser.fill")
+                        .font(.system(size: 14, weight: .bold))
+                    Text("仅清空所有记录")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                }
+                .foregroundStyle(Color.goOrange)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color.goOrange.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.goOrange.opacity(0.3), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                showingDeleteSheet = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 14, weight: .bold))
+                    Text("彻底删除 \(petName)")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                }
+                .foregroundStyle(Color.goRed)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color.goRed.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.goRed.opacity(0.3), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.top, 8)
+        .alert("仅清空所有记录", isPresented: $showingClearConfirm) {
+            Button("取消", role: .cancel) {}
+            Button("清空记录", role: .destructive) { onClear() }
+        } message: {
+            Text("将删除 \(petName) 的护理、体重、花费、健康、散步、喂食、清洁、里程碑、用药与相册等记录，并移除日历中该宠物的计划；保留名字、头像、品种与证件/保险档案。此操作不可撤销。")
+        }
+        .sheet(isPresented: $showingDeleteSheet) {
+            PetDeleteConfirmationSheet(
+                petName: petName,
+                onCancel: { showingDeleteSheet = false },
+                onDelete: {
+                    showingDeleteSheet = false
+                    onDelete()
+                }
+            )
+            .presentationDetents([.height(380), .medium])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(.regularMaterial)
+        }
+    }
+}
+
+private struct PetDeleteConfirmationSheet: View {
+    let petName: String
+    let onCancel: () -> Void
+    let onDelete: () -> Void
+
+    @State private var confirmName = ""
+
+    private var canDelete: Bool {
+        confirmName.trimmingCharacters(in: .whitespacesAndNewlines) == petName
+    }
+
+    var body: some View {
+        ZStack {
+            ArkBackgroundView()
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(spacing: 12) {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 16, weight: .black))
+                        .foregroundStyle(Color.goRed)
+                        .frame(width: 36, height: 36)
+                        .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("彻底删除 \(petName)")
+                            .font(.system(size: 18, weight: .black, design: .rounded))
+                            .foregroundStyle(.primary)
+                        Text("输入名字后才能继续")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button(action: onCancel) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .black))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 34, height: 34)
+                            .background(Color.primary.opacity(0.08), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("这会删除宠物和所有关联记录，无法撤销。")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(.primary.opacity(0.68))
+                    Text("请输入：\(petName)")
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.goRed.opacity(0.8))
+                }
+
+                TextField("宠物名字", text: $confirmName)
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 13)
+                    .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(canDelete ? Color.goRed.opacity(0.7) : Color.primary.opacity(0.12), lineWidth: 1))
+
+                HStack(spacing: 10) {
+                    Button(action: onCancel) {
+                        Text("取消")
+                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .foregroundStyle(.primary.opacity(0.72))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 13)
+                            .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: onDelete) {
+                        Text("删除")
+                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .foregroundStyle(canDelete ? Color.white : Color.primary.opacity(0.32))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 13)
+                            .background(canDelete ? Color.goRed : Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canDelete)
+                }
+            }
+            .padding(20)
         }
     }
 }

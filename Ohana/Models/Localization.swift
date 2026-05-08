@@ -70,7 +70,23 @@ struct L10n {
     var manageHome: String { tr(zh: "管理主页", en: "Manage Home", de: "Startseite verwalten") }
     var manageHomeModules: String { tr(zh: "管理主页模块", en: "Manage home sections", de: "Startseitenbereiche verwalten") }
     var preferences: String { tr(zh: "偏好设置", en: "Preferences", de: "Einstellungen") }
+    var countryRegion: String { tr(zh: "国家/地区", en: "Country/Region", de: "Land/Region") }
+    var countryDefaultsHint: String {
+        tr(
+            zh: "选择后会应用默认语言、单位和货币，之后仍可单独修改",
+            en: "Applies default language, units, and currency; each can still be changed",
+            de: "Setzt Sprache, Einheiten und Währung vor, bleibt einzeln änderbar"
+        )
+    }
     var language: String { tr(zh: "语言", en: "Language", de: "Sprache") }
+    var measurementUnits: String { tr(zh: "计量单位", en: "Measurement units", de: "Maßeinheiten") }
+    var measurementUnitsHint: String {
+        tr(
+            zh: "用于体重、距离、粮食重量等显示",
+            en: "Used for weight, distance, and food amount displays",
+            de: "Für Gewicht, Distanz und Futtermengen"
+        )
+    }
     var currency: String { tr(zh: "货币", en: "Currency", de: "Währung") }
     var currencyDisplayOnlyHint: String {
         tr(
@@ -246,11 +262,12 @@ struct L10n {
     var addEntityPlantBlurb: String { isEn ? "Water, sun, good vibes only" : "添加绿植花卉" }
 
     // MARK: - Human wizard — mesh card titles
-    var humanWizMesh1: String { isEn ? "HELLO, YOU · 1/5" : "身份信息 · 1/5" }
-    var humanWizMesh2: String { isEn ? "LITTLE PROFILE · 2/5" : "个人档案 · 2/5" }
-    var humanWizMesh3: String { tr(zh: "权限与身份 · 3/5", en: "PERMISSION & IDENTITY · 3/5", de: "RECHTE & IDENTITÄT · 3/5") }
-    var humanWizMesh4: String { isEn ? "BODY & SECRETS · 4/5" : "身体数据 · 4/5" }
-    var humanWizMesh5: String { isEn ? "FINAL BOOP · 5/5" : "确认信息 · 5/5" }
+    var humanWizMesh1: String { tr(zh: "名字 · 1/6", en: "NAME · 1/6", de: "NAME · 1/6") }
+    var humanWizMesh2: String { tr(zh: "个人档案 · 2/6", en: "PROFILE · 2/6", de: "PROFIL · 2/6") }
+    var humanWizMesh3: String { tr(zh: "头像 · 3/6", en: "AVATAR · 3/6", de: "AVATAR · 3/6") }
+    var humanWizMesh4: String { tr(zh: "资料与权限 · 4/6", en: "DETAILS & PERMISSION · 4/6", de: "DETAILS & RECHTE · 4/6") }
+    var humanWizMesh5: String { tr(zh: "身体数据 · 5/6", en: "BODY & PRIVACY · 5/6", de: "KORPER & PRIVATSPHARE · 5/6") }
+    var humanWizMesh6: String { tr(zh: "确认信息 · 6/6", en: "FINAL CHECK · 6/6", de: "ABSCHLUSS · 6/6") }
 
     var humanWizNameLabel: String { isEn ? "Name (required)" : "姓名（必填）" }
     var humanWizNamePlaceholder: String { isEn ? "Their island name" : "输入名字" }
@@ -357,9 +374,9 @@ struct L10n {
 
     // MARK: - Add Pet Wizard
     var petWizMesh1: String { isEn ? "WHO'S THAT CUTIE · 1/6" : "基本信息 · 1/6" }
-    var petWizMesh2: String { isEn ? "PHOTO BOOP · 2/6" : "头像 · 2/6" }
-    var petWizMesh3: String { isEn ? "LIL' BIO · 3/6" : "生物特征 · 3/6" }
-    var petWizMesh4: String { isEn ? "SPOTS & SPARKLE · 4/6" : "外貌与主题色 · 4/6" }
+    var petWizMesh2: String { isEn ? "LIL' BIO · 2/6" : "生物特征 · 2/6" }
+    var petWizMesh3: String { isEn ? "SPOTS & SPARKLE · 3/6" : "外貌与主题色 · 3/6" }
+    var petWizMesh4: String { isEn ? "PHOTO BOOP · 4/6" : "头像 · 4/6" }
     var petWizMesh5: String { isEn ? "VIBE TAGS · 5/6" : "标签 · 5/6" }
     var petWizMesh6: String { isEn ? "ALL SET? · 6/6" : "确认信息 · 6/6" }
 
@@ -717,7 +734,8 @@ struct L10n {
         return isEn ? "\(formatted) this month" : "本月\(formatted)"
     }
     func homeLastWeightKg(_ kg: Double) -> String {
-        isEn ? "Last \(String(format: "%.1f", kg)) kg" : "上次\(String(format: "%.1f", kg))kg"
+        let formatted = AppMeasurementSystem.formatWeightKilograms(kg)
+        return isEn ? "Last \(formatted)" : "上次\(formatted)"
     }
 
     var homeAntiDupFeedTitle: String { isEn ? "Feed again?" : "重复喂食提醒" }
@@ -1066,6 +1084,104 @@ nonisolated struct AppLocalizedText: Hashable {
     }
 }
 
+// MARK: - App measurement system (全局显示单位；不迁移历史数据)
+
+nonisolated enum AppMeasurementSystem {
+    struct Option: Identifiable, Hashable {
+        let code: String
+        let displayName: AppLocalizedText
+        let shortLabel: String
+        let systemIconName: String
+
+        var id: String { code }
+
+        func title(_ languageCode: String = AppLanguage.code) -> String {
+            displayName.resolve(languageCode)
+        }
+    }
+
+    static let storageKey = "appMeasurementSystem"
+    static let fallbackCode = "metric"
+
+    static let supported: [Option] = [
+        Option(
+            code: "metric",
+            displayName: AppLocalizedText(zh: "公制 · kg / cm", en: "Metric · kg / cm", de: "Metrisch · kg / cm"),
+            shortLabel: "kg",
+            systemIconName: "scalemass"
+        ),
+        Option(
+            code: "imperial",
+            displayName: AppLocalizedText(zh: "英制 · lb / in", en: "Imperial · lb / in", de: "Imperial · lb / in"),
+            shortLabel: "lb",
+            systemIconName: "ruler"
+        )
+    ]
+
+    static var code: String {
+        normalize(UserDefaults.standard.string(forKey: storageKey) ?? fallbackCode)
+    }
+
+    static func normalize(_ raw: String) -> String {
+        supported.contains { $0.code == raw } ? raw : fallbackCode
+    }
+
+    static var currentOption: Option {
+        supported.first { $0.code == code } ?? supported[0]
+    }
+
+    static func option(for raw: String) -> Option {
+        supported.first { $0.code == normalize(raw) } ?? supported[0]
+    }
+
+    static func formatWeightKilograms(_ kilograms: Double, fractionDigits: Int = 1) -> String {
+        switch code {
+        case "imperial":
+            let pounds = kilograms * 2.2046226218
+            return "\(formattedNumber(pounds, fractionDigits: fractionDigits)) lb"
+        default:
+            return "\(formattedNumber(kilograms, fractionDigits: fractionDigits)) kg"
+        }
+    }
+
+    static func formatFoodGrams(_ grams: Double, fractionDigits: Int = 0) -> String {
+        switch code {
+        case "imperial":
+            let pounds = grams / 453.59237
+            return pounds >= 1
+                ? "\(formattedNumber(pounds, fractionDigits: 1)) lb"
+                : "\(formattedNumber(grams * 0.0352739619, fractionDigits: 1)) oz"
+        default:
+            return grams >= 1_000
+                ? "\(formattedNumber(grams / 1_000, fractionDigits: 1)) kg"
+                : "\(formattedNumber(grams, fractionDigits: fractionDigits)) g"
+        }
+    }
+
+    static func formatDistanceMeters(_ meters: Double, fractionDigits: Int = 1) -> String {
+        switch code {
+        case "imperial":
+            let miles = meters / 1_609.344
+            return miles >= 0.1
+                ? "\(formattedNumber(miles, fractionDigits: fractionDigits)) mi"
+                : "\(formattedNumber(meters * 3.280839895, fractionDigits: 0)) ft"
+        default:
+            return meters >= 1_000
+                ? "\(formattedNumber(meters / 1_000, fractionDigits: fractionDigits)) km"
+                : "\(formattedNumber(meters, fractionDigits: 0)) m"
+        }
+    }
+
+    private static func formattedNumber(_ value: Double, fractionDigits: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.locale = AppLanguage.effectiveLocale
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = fractionDigits
+        formatter.maximumFractionDigits = fractionDigits
+        return formatter.string(from: NSNumber(value: value)) ?? String(format: "%.\(fractionDigits)f", value)
+    }
+}
+
 // MARK: - App currency (全局真实货币显示；不做汇率换算)
 
 nonisolated enum AppCurrency {
@@ -1127,5 +1243,147 @@ nonisolated enum AppCurrency {
             return format(amount, fractionDigits: 0)
         }
         return amount > 0 ? format(amount, fractionDigits: 1) : format(0, fractionDigits: 0)
+    }
+}
+
+// MARK: - App country / region (国家默认偏好映射)
+
+nonisolated enum AppCountry {
+    struct Option: Identifiable, Hashable {
+        let code: String
+        let displayName: AppLocalizedText
+        let flag: String
+        let defaultLanguageCode: String
+        let defaultCurrencyCode: String
+        let defaultMeasurementSystemCode: String
+
+        var id: String { code }
+
+        func title(_ languageCode: String = AppLanguage.code) -> String {
+            "\(flag) \(displayName.resolve(languageCode))"
+        }
+    }
+
+    static let storageKey = "appCountry"
+    static let fallbackCode = "CN"
+
+    static let supported: [Option] = [
+        Option(
+            code: "CN",
+            displayName: AppLocalizedText(zh: "中国大陆", en: "Mainland China", de: "Festlandchina"),
+            flag: "🇨🇳",
+            defaultLanguageCode: "zh",
+            defaultCurrencyCode: "CNY",
+            defaultMeasurementSystemCode: "metric"
+        ),
+        Option(
+            code: "US",
+            displayName: AppLocalizedText(zh: "美国", en: "United States", de: "Vereinigte Staaten"),
+            flag: "🇺🇸",
+            defaultLanguageCode: "en",
+            defaultCurrencyCode: "USD",
+            defaultMeasurementSystemCode: "imperial"
+        ),
+        Option(
+            code: "DE",
+            displayName: AppLocalizedText(zh: "德国", en: "Germany", de: "Deutschland"),
+            flag: "🇩🇪",
+            defaultLanguageCode: "de",
+            defaultCurrencyCode: "EUR",
+            defaultMeasurementSystemCode: "metric"
+        ),
+        Option(
+            code: "GB",
+            displayName: AppLocalizedText(zh: "英国", en: "United Kingdom", de: "Vereinigtes Königreich"),
+            flag: "🇬🇧",
+            defaultLanguageCode: "en",
+            defaultCurrencyCode: "GBP",
+            defaultMeasurementSystemCode: "imperial"
+        ),
+        Option(
+            code: "JP",
+            displayName: AppLocalizedText(zh: "日本", en: "Japan", de: "Japan"),
+            flag: "🇯🇵",
+            defaultLanguageCode: "en",
+            defaultCurrencyCode: "JPY",
+            defaultMeasurementSystemCode: "metric"
+        ),
+        Option(
+            code: "HK",
+            displayName: AppLocalizedText(zh: "中国香港", en: "Hong Kong", de: "Hongkong"),
+            flag: "🇭🇰",
+            defaultLanguageCode: "zh",
+            defaultCurrencyCode: "HKD",
+            defaultMeasurementSystemCode: "metric"
+        ),
+        Option(
+            code: "TW",
+            displayName: AppLocalizedText(zh: "中国台湾", en: "Taiwan", de: "Taiwan"),
+            flag: "🇹🇼",
+            defaultLanguageCode: "zh",
+            defaultCurrencyCode: "TWD",
+            defaultMeasurementSystemCode: "metric"
+        )
+    ]
+
+    static var code: String {
+        normalize(UserDefaults.standard.string(forKey: storageKey) ?? detectedCode)
+    }
+
+    static var detectedCode: String {
+        let regionCode = Locale.current.region?.identifier.uppercased()
+        if let regionCode, supported.contains(where: { $0.code == regionCode }) {
+            return regionCode
+        }
+
+        let languageCode = Locale.current.language.languageCode?.identifier.lowercased()
+        switch languageCode {
+        case "de":
+            return "DE"
+        case "en":
+            return "US"
+        default:
+            return fallbackCode
+        }
+    }
+
+    static func normalize(_ raw: String) -> String {
+        let upper = raw.uppercased()
+        return supported.contains { $0.code == upper } ? upper : fallbackCode
+    }
+
+    static var currentOption: Option {
+        option(for: code)
+    }
+
+    static func option(for raw: String) -> Option {
+        supported.first { $0.code == normalize(raw) } ?? supported[0]
+    }
+
+    static func ensureInitialized() {
+        let defaults = UserDefaults.standard
+        guard defaults.string(forKey: storageKey) == nil else { return }
+
+        let selected = option(for: detectedCode)
+        defaults.set(selected.code, forKey: storageKey)
+
+        if defaults.object(forKey: "appLanguage") == nil {
+            defaults.set(AppLanguage.normalize(selected.defaultLanguageCode), forKey: "appLanguage")
+        }
+        if defaults.object(forKey: AppCurrency.storageKey) == nil {
+            defaults.set(AppCurrency.normalize(selected.defaultCurrencyCode), forKey: AppCurrency.storageKey)
+        }
+        if defaults.object(forKey: AppMeasurementSystem.storageKey) == nil {
+            defaults.set(AppMeasurementSystem.normalize(selected.defaultMeasurementSystemCode), forKey: AppMeasurementSystem.storageKey)
+        }
+    }
+
+    static func applyDefaults(for countryCode: String) {
+        let selected = option(for: countryCode)
+        let defaults = UserDefaults.standard
+        defaults.set(selected.code, forKey: storageKey)
+        defaults.set(AppLanguage.normalize(selected.defaultLanguageCode), forKey: "appLanguage")
+        defaults.set(AppCurrency.normalize(selected.defaultCurrencyCode), forKey: AppCurrency.storageKey)
+        defaults.set(AppMeasurementSystem.normalize(selected.defaultMeasurementSystemCode), forKey: AppMeasurementSystem.storageKey)
     }
 }

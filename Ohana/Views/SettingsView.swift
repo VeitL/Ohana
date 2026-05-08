@@ -15,6 +15,8 @@ struct SettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @AppStorage("appLanguage") private var appLanguage = "zh"
+    @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
+    @AppStorage(AppMeasurementSystem.storageKey) private var appMeasurementSystem = AppMeasurementSystem.fallbackCode
     @AppStorage(AppCurrency.storageKey) private var appCurrency = AppCurrency.fallbackCode
     @AppStorage("appThemePreference") private var appThemePreference: String = "system"
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
@@ -69,6 +71,12 @@ struct SettingsView: View {
     
     private var accentColor: Color { Color.goPrimary }
     private var l: L10n { L10n(appLanguage) }
+    private var selectedCountry: AppCountry.Option {
+        AppCountry.option(for: appCountry)
+    }
+    private var selectedMeasurementSystem: AppMeasurementSystem.Option {
+        AppMeasurementSystem.option(for: appMeasurementSystem)
+    }
     private var selectedCurrency: AppCurrency.Option {
         AppCurrency.supported.first { $0.code == AppCurrency.normalize(appCurrency) } ?? AppCurrency.supported[0]
     }
@@ -101,8 +109,40 @@ struct SettingsView: View {
                             Button(l.cancel, role: .cancel) {}
                         }
                         
-                        // 语言 / 货币
+                        // 国家 / 语言 / 单位 / 货币
                         settingsSection(title: l.preferences) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "mappin.and.ellipse")
+                                    .foregroundStyle(Color.goPrimary)
+                                    .frame(width: 28)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(l.countryRegion)
+                                        .font(.system(size: 15, weight: .medium))
+                                    Text(l.countryDefaultsHint)
+                                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                                        .foregroundStyle(tertiaryText)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                Spacer()
+                                Menu {
+                                    ForEach(AppCountry.supported) { country in
+                                        Button {
+                                            applyCountryDefaults(country)
+                                        } label: {
+                                            Label(
+                                                country.title(appLanguage),
+                                                systemImage: country.code == selectedCountry.code ? "checkmark" : "flag"
+                                            )
+                                        }
+                                    }
+                                } label: {
+                                    menuValueLabel(selectedCountry.title(appLanguage))
+                                }
+                            }
+                            .foregroundStyle(primaryText)
+
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+
                             HStack {
                                 Image(systemName: "globe")
                                     .foregroundStyle(Color.goPrimary)
@@ -118,6 +158,39 @@ struct SettingsView: View {
                                 .pickerStyle(.menu)
                             }
                             .foregroundStyle(primaryText)
+
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+
+                            HStack(spacing: 12) {
+                                Image(systemName: selectedMeasurementSystem.systemIconName)
+                                    .foregroundStyle(Color.goTeal)
+                                    .frame(width: 28)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(l.measurementUnits)
+                                        .font(.system(size: 15, weight: .medium))
+                                    Text(l.measurementUnitsHint)
+                                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                                        .foregroundStyle(tertiaryText)
+                                }
+                                Spacer()
+                                Menu {
+                                    ForEach(AppMeasurementSystem.supported) { unit in
+                                        Button {
+                                            appMeasurementSystem = unit.code
+                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        } label: {
+                                            Label(
+                                                unit.title(appLanguage),
+                                                systemImage: unit.code == selectedMeasurementSystem.code ? "checkmark" : unit.systemIconName
+                                            )
+                                        }
+                                    }
+                                } label: {
+                                    menuValueLabel(selectedMeasurementSystem.shortLabel)
+                                }
+                            }
+                            .foregroundStyle(primaryText)
+                            .padding(.top, 8)
 
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
 
@@ -504,6 +577,13 @@ struct SettingsView: View {
             .toolbar(.hidden, for: .navigationBar)
         }
         .preferredColorScheme(preferredScheme)
+        .onAppear {
+            AppCountry.ensureInitialized()
+            appCountry = AppCountry.code
+            appMeasurementSystem = AppMeasurementSystem.code
+            appCurrency = AppCurrency.code
+            appLanguage = AppLanguage.code
+        }
         .fullScreenCover(isPresented: $showingFocusStackTest) {
             FocusStackHomeTestViewPreviewWrapper()
                 .preferredColorScheme(preferredScheme)
@@ -736,6 +816,27 @@ struct SettingsView: View {
         .padding(.horizontal, 12).padding(.vertical, 6)
         .background(color.opacity(0.12), in: Capsule())
         .overlay(Capsule().strokeBorder(color.opacity(0.3), lineWidth: 1))
+    }
+
+    private func menuValueLabel(_ text: String) -> some View {
+        HStack(spacing: 5) {
+            Text(text)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.76)
+            Image(systemName: "chevron.down")
+                .font(.system(size: 9, weight: .black))
+        }
+        .foregroundStyle(primaryText)
+    }
+
+    private func applyCountryDefaults(_ country: AppCountry.Option) {
+        AppCountry.applyDefaults(for: country.code)
+        appCountry = country.code
+        appLanguage = AppLanguage.normalize(country.defaultLanguageCode)
+        appMeasurementSystem = AppMeasurementSystem.normalize(country.defaultMeasurementSystemCode)
+        appCurrency = AppCurrency.normalize(country.defaultCurrencyCode)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     // MARK: - Profile Card

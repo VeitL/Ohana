@@ -124,14 +124,22 @@ struct AddDocumentSheet: View {
 
                     // ── 证件名称
                     docRow(icon: "doc.text.fill", iconColor: .goTeal, label: "证件名称") {
-                        TextField(autoTitle, text: $title)
+                        GoDraftTextField(
+                            autoTitle,
+                            text: $title,
+                            capitalization: .words
+                        )
                             .font(.system(size: 15, weight: .medium, design: .rounded))
                             .tint(Color.goTeal)
                     }
 
                     // ── 颁发机构
                     docRow(icon: "building.2.fill", iconColor: .goCardCyan, label: "颁发机构") {
-                        TextField("动物检疫站、宠物医院…", text: $issuingAuthority)
+                        GoDraftTextField(
+                            "动物检疫站、宠物医院…",
+                            text: $issuingAuthority,
+                            capitalization: .words
+                        )
                             .font(.system(size: 15, weight: .medium, design: .rounded))
                             .tint(Color.goCardCyan)
                     }
@@ -163,8 +171,12 @@ struct AddDocumentSheet: View {
                             Toggle("", isOn: $hasCost).tint(Color.goPrimary).labelsHidden()
                             if hasCost {
                                 Text(AppCurrency.symbol).foregroundStyle(.secondary)
-                                TextField("0.00", text: $costText)
-                                    .keyboardType(.decimalPad)
+                                GoDraftTextField(
+                                    "0.00",
+                                    text: $costText,
+                                    keyboardType: .decimalPad,
+                                    capitalization: .never
+                                )
                                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                                     .tint(Color.goPrimary)
                                     .frame(maxWidth: 80)
@@ -306,7 +318,11 @@ struct AddDocumentSheet: View {
 
                     // ── 备注
                     docRow(icon: "note.text", iconColor: .secondary, label: "备注") {
-                        TextField("编号、附加信息…", text: $notes, axis: .vertical)
+                        GoDraftTextField(
+                            "编号、附加信息…",
+                            text: $notes,
+                            axis: .vertical
+                        )
                             .font(.system(size: 14, weight: .medium, design: .rounded))
                             .tint(Color.goPrimary)
                             .lineLimit(2...4)
@@ -315,7 +331,10 @@ struct AddDocumentSheet: View {
                     // ── 证件号码 (护照/登记证)
                     if showDocumentNumber {
                         docRow(icon: "number.circle.fill", iconColor: .goCardCyan, label: selectedCategory == .passport ? "护照号码" : "证件号码") {
-                            TextField("编号", text: $documentNumber)
+                            GoDraftTextField(
+                                "编号",
+                                text: $documentNumber
+                            )
                                 .font(.system(size: 15, weight: .medium, design: .rounded))
                                 .tint(Color.goCardCyan)
                         }
@@ -323,7 +342,13 @@ struct AddDocumentSheet: View {
 
                     Spacer(minLength: 28)
 
-                    Button { saveDocument(); dismiss() } label: {
+                    Button {
+                        GoKeyboard.dismiss()
+                        DispatchQueue.main.async {
+                            saveDocument()
+                            dismiss()
+                        }
+                    } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark")
                             Text("保存证件")
@@ -338,6 +363,7 @@ struct AddDocumentSheet: View {
                 }
                 .padding(16)
             }
+            .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle("添加证件")
             .navigationBarTitleDisplayMode(.inline)
@@ -346,6 +372,14 @@ struct AddDocumentSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完成") {
+                        GoKeyboard.dismiss()
+                    }
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.goLime)
                 }
             }
         }
@@ -640,10 +674,22 @@ struct EditDocumentSheet: View {
                     }
 
                     editRow(icon: "doc.text.fill", iconColor: .goTeal, label: "证件名称") {
-                        TextField("证件名称", text: $title).font(.system(size: 15, weight: .medium, design: .rounded)).tint(Color.goTeal)
+                        GoDraftTextField(
+                            "证件名称",
+                            text: $title,
+                            capitalization: .words
+                        )
+                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .tint(Color.goTeal)
                     }
                     editRow(icon: "building.2.fill", iconColor: .goCardCyan, label: "颁发机构") {
-                        TextField("颁发机构", text: $issuingAuthority).font(.system(size: 15, weight: .medium, design: .rounded)).tint(Color.goCardCyan)
+                        GoDraftTextField(
+                            "颁发机构",
+                            text: $issuingAuthority,
+                            capitalization: .words
+                        )
+                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .tint(Color.goCardCyan)
                     }
                     editRow(icon: "calendar.badge.checkmark", iconColor: .goPrimary, label: "签发日期") {
                         HStack(spacing: 10) {
@@ -668,14 +714,27 @@ struct EditDocumentSheet: View {
                             Toggle("", isOn: $hasCost).tint(Color.goPrimary).labelsHidden()
                             if hasCost {
                                 Text(AppCurrency.symbol).foregroundStyle(.secondary)
-                                TextField("0", text: $costText).keyboardType(.decimalPad)
-                                    .font(.system(size: 15, weight: .semibold)).tint(Color.goPrimary).frame(maxWidth: 80)
+                                GoDraftTextField(
+                                    "0",
+                                    text: $costText,
+                                    keyboardType: .decimalPad,
+                                    capitalization: .never
+                                )
+                                .font(.system(size: 15, weight: .semibold))
+                                .tint(Color.goPrimary)
+                                .frame(maxWidth: 80)
                             }
                         }
                     }
                     editRow(icon: "note.text", iconColor: .secondary, label: "备注") {
-                        TextField("备注…", text: $notes, axis: .vertical)
-                            .font(.system(size: 14, weight: .medium)).tint(Color.goPrimary).lineLimit(2...4)
+                        GoDraftTextField(
+                            "备注…",
+                            text: $notes,
+                            axis: .vertical
+                        )
+                        .font(.system(size: 14, weight: .medium))
+                        .tint(Color.goPrimary)
+                        .lineLimit(2...4)
                     }
 
                     // 附件预览/更换
@@ -740,7 +799,13 @@ struct EditDocumentSheet: View {
 
                     Spacer(minLength: 28)
 
-                    Button { saveChanges(); dismiss() } label: {
+                    Button {
+                        GoKeyboard.dismiss()
+                        DispatchQueue.main.async {
+                            saveChanges()
+                            dismiss()
+                        }
+                    } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark")
                             Text("保存修改")
@@ -755,6 +820,7 @@ struct EditDocumentSheet: View {
                 }
                 .padding(16)
             }
+            .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle("编辑证件")
             .navigationBarTitleDisplayMode(.inline)
@@ -770,6 +836,14 @@ struct EditDocumentSheet: View {
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(Color.goRed)
                     }
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完成") {
+                        GoKeyboard.dismiss()
+                    }
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.goLime)
                 }
             }
         }

@@ -73,14 +73,23 @@ struct AddPetMedicationSheet: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 16) {
                         labeledField("药品名称 *") {
-                            TextField("例：阿莫西林、肠胃宝…", text: $name)
+                            GoDraftTextField(
+                                "例：阿莫西林、肠胃宝…",
+                                text: $name,
+                                capitalization: .words,
+                                autoFocusDelay: 0.25
+                            )
                                 .font(.system(size: 15, weight: .semibold, design: .rounded))
                         }
 
                         labeledField("每次剂量 *") {
                             HStack(spacing: 10) {
-                                TextField("1", text: $doseAmount)
-                                    .keyboardType(.decimalPad)
+                                GoDraftTextField(
+                                    "1",
+                                    text: $doseAmount,
+                                    keyboardType: .decimalPad,
+                                    capitalization: .never
+                                )
                                     .font(.system(size: 18, weight: .black, design: .rounded))
                                     .multilineTextAlignment(.center)
                                     .padding(.vertical, 10)
@@ -140,8 +149,12 @@ struct AddPetMedicationSheet: View {
                                                 }
                                                 .buttonStyle(.plain)
                                             }
-                                            TextField("自定义", text: $customCourseDays)
-                                                .keyboardType(.numberPad)
+                                            GoDraftTextField(
+                                                "自定义",
+                                                text: $customCourseDays,
+                                                keyboardType: .numberPad,
+                                                capitalization: .never
+                                            )
                                                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                                                 .frame(width: 72)
                                                 .padding(.horizontal, 10).padding(.vertical, 8)
@@ -181,8 +194,12 @@ struct AddPetMedicationSheet: View {
                         labeledField("剩余药量（可选）") {
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack {
-                                    TextField("数量", text: $remainingText)
-                                        .keyboardType(.decimalPad)
+                                    GoDraftTextField(
+                                        "数量",
+                                        text: $remainingText,
+                                        keyboardType: .decimalPad,
+                                        capitalization: .never
+                                    )
                                         .font(.system(size: 15, weight: .semibold, design: .rounded))
                                         .padding(12)
                                         .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
@@ -215,13 +232,17 @@ struct AddPetMedicationSheet: View {
                         }
 
                         labeledField("备注（可选）") {
-                            TextField("兽医叮嘱、注意事项…", text: $notes, axis: .vertical)
+                            GoDraftTextField(
+                                "兽医叮嘱、注意事项…",
+                                text: $notes,
+                                axis: .vertical
+                            )
                                 .font(.system(size: 14, weight: .medium, design: .rounded))
                                 .lineLimit(3...6)
                         }
 
                         Button {
-                            save()
+                            saveAfterKeyboardDismiss()
                         } label: {
                             Text(existing == nil ? "开始记录这个疗程 💊" : "保存修改 💊")
                                 .font(.system(size: 17, weight: .black, design: .rounded))
@@ -238,6 +259,7 @@ struct AddPetMedicationSheet: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle(existing == nil ? "添加用药记录" : "编辑用药")
             .navigationBarTitleDisplayMode(.inline)
@@ -247,10 +269,18 @@ struct AddPetMedicationSheet: View {
                         .foregroundStyle(.secondary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { save() }
+                    Button("保存") { saveAfterKeyboardDismiss() }
                         .fontWeight(.bold)
                         .disabled(!canSave)
                         .foregroundStyle(canSave ? Color(hex: "FF5A00") : .secondary)
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完成") {
+                        GoKeyboard.dismiss()
+                    }
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.goLime)
                 }
             }
             .onAppear {
@@ -338,6 +368,13 @@ struct AddPetMedicationSheet: View {
             return "【喂法:\(tag)】" + (n.isEmpty ? "" : "\n\(n)")
         }
         return n
+    }
+
+    private func saveAfterKeyboardDismiss() {
+        GoKeyboard.dismiss()
+        DispatchQueue.main.async {
+            save()
+        }
     }
 
     private func save() {

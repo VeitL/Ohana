@@ -58,9 +58,6 @@ final class PetWalkLog {
     }
     
     var distanceText: String {
-        if distanceMeters >= 1000 {
-            return String(format: "%.1f km", distanceMeters / 1000)
-        }
-        return String(format: "%.0f m", distanceMeters)
+        AppMeasurementSystem.formatDistanceMeters(distanceMeters)
     }
 }

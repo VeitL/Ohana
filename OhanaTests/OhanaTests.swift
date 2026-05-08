@@ -548,11 +548,116 @@ struct OhanaTests {
         context.insert(PetCareLog(date: restock.addingTimeInterval(-60), type: .feeding, amountGrams: 500, pet: pet))
         context.insert(PetCareLog(date: restock.addingTimeInterval(60), type: .feeding, amountGrams: 120, pet: pet))
         context.insert(PetCareLog(date: restock.addingTimeInterval(120), type: .feeding, amountGrams: 0, pet: pet))
+        context.insert(PetCareLog(date: restock.addingTimeInterval(180), type: .feeding, amountGrams: 10, note: FeedLogMetadata.treatFeedNoteMarker, pet: pet))
         try context.save()
 
         #expect(pet.foodConsumedSinceRestock == 170)
         #expect(pet.remainingFoodGrams == 830)
-        #expect(pet.remainingFoodDays == 16)
+        #expect(pet.remainingFoodDays == 4)
+    }
+
+    @MainActor
+    @Test func feedStockCalculatorUsesRecentMainFoodAverageBeforeFallbacks() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 12)
+        let restock = dateForTest(year: 2026, month: 5, day: 1)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.restockDate = restock
+        pet.restockWeight = 2
+        pet.dailyPortionGrams = 60
+        context.insert(pet)
+        context.insert(PetCareLog(date: dateForTest(year: 2026, month: 5, day: 7, hour: 8), type: .feeding, amountGrams: 100, pet: pet))
+        context.insert(PetCareLog(date: dateForTest(year: 2026, month: 5, day: 8, hour: 8), type: .feeding, amountGrams: 50, pet: pet))
+        context.insert(PetCareLog(date: dateForTest(year: 2026, month: 5, day: 8, hour: 9), type: .feeding, amountGrams: 10, note: FeedLogMetadata.treatFeedNoteMarker, pet: pet))
+        let auto = Event(
+            title: "自动喂食器 40g",
+            startDate: now,
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: FeedRuleMetadata.autoFeederEntityType,
+            relatedEntityId: pet.id.uuidString
+        )
+        context.insert(auto)
+        try context.save()
+
+        let snapshot = FeedStockCalculator.snapshot(for: pet, events: [auto], now: now, calendar: calendar)
+
+        #expect(snapshot.consumedGrams == 150)
+        #expect(snapshot.remainingGrams == 1850)
+        #expect(snapshot.estimatedDailyBasis == .recentAverage)
+        #expect(abs(snapshot.estimatedDailyGrams - 75) < 0.001)
+    }
+
+    @MainActor
+    @Test func feedStockCalculatorFallsBackToAutoRulesThenDefaultPortion() async throws {
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 12)
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.restockDate = dateForTest(year: 2026, month: 5, day: 8)
+        pet.restockWeight = 2
+        pet.dailyPortionGrams = 60
+        let auto = Event(
+            title: "自动喂食器 40g",
+            startDate: now,
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: FeedRuleMetadata.autoFeederEntityType,
+            relatedEntityId: pet.id.uuidString
+        )
+
+        let autoEstimate = FeedStockCalculator.snapshot(for: pet, events: [auto], now: now)
+        let defaultEstimate = FeedStockCalculator.snapshot(for: pet, events: [], now: now)
+
+        #expect(autoEstimate.estimatedDailyBasis == .autoRules)
+        #expect(autoEstimate.estimatedDailyGrams == 40)
+        #expect(defaultEstimate.estimatedDailyBasis == .defaultPortion)
+        #expect(defaultEstimate.estimatedDailyGrams == 60)
+    }
+
+    @MainActor
+    @Test func autoFeederMaterializesDueLogsIdempotently() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 21)
+        let pet = Pet(name: "Momo", species: "猫")
+        let auto = Event(
+            title: "自动喂食器 40g",
+            startDate: dateForTest(year: 2026, month: 5, day: 7, hour: 8),
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: FeedRuleMetadata.autoFeederEntityType,
+            relatedEntityId: pet.id.uuidString
+        )
+        auto.recurrenceDays = 1
+        context.insert(pet)
+        context.insert(auto)
+        try context.save()
+
+        let first = FeedAutoLogMaterializer.materializeDueLogs(pet: pet, allEvents: [auto], context: context, now: now, calendar: calendar)
+        let second = FeedAutoLogMaterializer.materializeDueLogs(pet: pet, allEvents: [auto], context: context, now: now, calendar: calendar)
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+
+        #expect(first == 2)
+        #expect(second == 0)
+        #expect(logs.count == 2)
+        #expect(logs.allSatisfy { $0.isAutoFeedLogEntry && $0.amountGrams == 40 })
+    }
+
+    @MainActor
+    @Test func legacyPlannedFeedEventsStayManualReminders() async throws {
+        let pet = Pet(name: "Momo", species: "猫")
+        let event = Event(
+            title: "早餐 45g",
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+
+        let state = FeedRuleState(pet: pet, allEvents: [event])
+
+        #expect(state.manualReminderEvents.count == 1)
+        #expect(state.autoFeederEvents.isEmpty)
     }
 
     @MainActor
@@ -786,10 +891,89 @@ struct OhanaTests {
         #expect(MedicationFrequency.twiceDaily.displayTitle(l: L10n("de")) == "Zweimal täglich")
     }
 
+    @MainActor
+    @Test func archiveMemorySnapshotRecommendsBasicInfoForEmptyProfile() async throws {
+        let pet = Pet(name: "Momo", species: "猫")
+
+        let snapshot = ArchiveMemorySnapshot(pet: pet)
+
+        #expect(snapshot.score == 0)
+        #expect(snapshot.nextStep.kind == .basicInfo)
+    }
+
+    @MainActor
+    @Test func archiveMemorySnapshotRecommendsDocumentsAfterBasicInfo() async throws {
+        let pet = archiveReadyPet()
+
+        let snapshot = ArchiveMemorySnapshot(pet: pet)
+
+        #expect(snapshot.score == 1)
+        #expect(snapshot.nextStep.kind == .documents)
+    }
+
+    @MainActor
+    @Test func archiveMemorySnapshotRecommendsMomentsAfterProtection() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = archiveReadyPet()
+        context.insert(pet)
+        context.insert(PetDocument(title: "疫苗本", category: .vaccine, pet: pet))
+        try context.save()
+
+        let snapshot = ArchiveMemorySnapshot(pet: pet)
+
+        #expect(snapshot.score == 2)
+        #expect(snapshot.nextStep.kind == .moments)
+    }
+
+    @MainActor
+    @Test func archiveMemorySnapshotRecommendsWeightAfterMemory() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = archiveReadyPet()
+        context.insert(pet)
+        context.insert(PetInsurance(companyName: "Ohana Care", pet: pet))
+        context.insert(PetPhotoLog(imageData: Data([1, 2, 3]), note: "first photo", pet: pet))
+        try context.save()
+
+        let snapshot = ArchiveMemorySnapshot(pet: pet)
+
+        #expect(snapshot.score == 3)
+        #expect(snapshot.nextStep.kind == .weight)
+    }
+
+    @MainActor
+    @Test func archiveMemorySnapshotRecommendsRetentionWhenComplete() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = archiveReadyPet()
+        pet.currentStreak = 3
+        context.insert(pet)
+        context.insert(PetDocument(title: "疫苗本", category: .vaccine, pet: pet))
+        context.insert(PetPhotoLog(imageData: Data([1, 2, 3]), note: "first photo", pet: pet))
+        context.insert(PetWeightLog(weight: 4.2, pet: pet))
+        try context.save()
+
+        let snapshot = ArchiveMemorySnapshot(pet: pet)
+
+        #expect(snapshot.score == 5)
+        #expect(snapshot.nextStep.kind == .retention)
+    }
+
     private func makeInMemoryContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV37.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func archiveReadyPet() -> Pet {
+        Pet(
+            name: "Momo",
+            species: "猫",
+            breed: "狸花猫",
+            birthday: dateForTest(year: 2023, month: 4, day: 2),
+            homeDate: dateForTest(year: 2024, month: 1, day: 3)
+        )
     }
 
     private func dateForTest(

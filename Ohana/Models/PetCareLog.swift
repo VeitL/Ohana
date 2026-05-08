@@ -119,9 +119,19 @@ final class PetCareLog {
         careType == .feeding && note.hasPrefix(Self.plannedFeedNotePrefix)
     }
 
+    /// 是否为「自动喂食器」产生的喂食记录
+    var isAutoFeedLogEntry: Bool {
+        careType == .feeding && note.hasPrefix(FeedLogMetadata.autoFeedNotePrefix)
+    }
+
+    /// 是否为零食记录；零食进入摄入统计，但不扣主粮库存
+    var isTreatFeedLogEntry: Bool {
+        careType == .feeding && note.hasPrefix(FeedLogMetadata.treatFeedNoteMarker)
+    }
+
     /// 是否为「手动记录」喂食（含旧数据 note 为空）
     var isManualFeedLogEntry: Bool {
-        careType == .feeding && !isPlannedFeedLogEntry
+        careType == .feeding && !isPlannedFeedLogEntry && !isAutoFeedLogEntry && !isTreatFeedLogEntry
     }
 }
 
@@ -170,13 +180,11 @@ struct FeedTodayState {
     }
 
     var feedScheduleEvents: [Event] {
-        allEvents
-            .filter {
-                ($0.relatedEntityType == EntityKind.pet.rawValue || $0.relatedEntityType == "pet") &&
-                $0.relatedEntityId == pet.id.uuidString &&
-                $0.eventType == EventType.foodChange.rawValue
-            }
-            .sorted { $0.startDate < $1.startDate }
+        FeedRuleState(pet: pet, allEvents: allEvents, now: now, calendar: calendar).manualReminderEvents
+    }
+
+    var autoFeederEvents: [Event] {
+        FeedRuleState(pet: pet, allEvents: allEvents, now: now, calendar: calendar).autoFeederEvents
     }
 
     var todayPlanReminders: [Reminder] {
@@ -231,8 +239,16 @@ struct FeedTodayState {
             .sorted { $0.date > $1.date }
     }
 
+    var mainFoodTodayLogs: [PetCareLog] {
+        allTodayLogs.filter { FeedLogMetadata.isMainFoodLog($0) }
+    }
+
+    var treatTodayLogs: [PetCareLog] {
+        allTodayLogs.filter { FeedLogMetadata.isTreatLog($0) }
+    }
+
     var completedCount: Int {
-        hasTodayPlan ? completedTodayPlanReminders.count : manualTodayLogs.count
+        hasTodayPlan ? completedTodayPlanReminders.count : mainFoodTodayLogs.count
     }
 
     var targetCount: Int {
@@ -254,6 +270,18 @@ struct FeedTodayState {
     var todayFeedGrams: Double {
         allTodayLogs.reduce(0) { total, log in
             total + (log.amountGrams > 0 ? log.amountGrams : pet.dailyPortionGrams)
+        }
+    }
+
+    var todayMainFoodGrams: Double {
+        mainFoodTodayLogs.reduce(0) { total, log in
+            total + FeedStockCalculator.effectiveMainFoodAmount(for: log, pet: pet)
+        }
+    }
+
+    var todayTreatGrams: Double {
+        treatTodayLogs.reduce(0) { total, log in
+            total + max(0, log.amountGrams)
         }
     }
 }

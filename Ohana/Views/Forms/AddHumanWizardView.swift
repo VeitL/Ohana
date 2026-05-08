@@ -15,11 +15,12 @@ import Foundation
 // MARK: - Human wizard steps
 
 private enum HumanWizardStep: Int, CaseIterable {
-    case identity = 0   // 名字 + 头像
-    case profile  = 1   // 生日 + 血型
-    case family   = 2   // 权限 + 性别/身份 + 国籍
-    case body     = 3   // 身高体重 + 隐私
-    case confirm  = 4   // 主题色 + 确认
+    case identity = 0   // 名字
+    case profile  = 1   // 性别/身份 + 生日 + 血型
+    case avatar   = 2   // 头像确认
+    case family   = 3   // 权限 + 国籍
+    case body     = 4   // 身高体重 + 隐私
+    case confirm  = 5   // 主题色 + 确认
 }
 
 // MARK: - AddHumanWizardView
@@ -39,6 +40,7 @@ struct AddHumanWizardView: View {
     // ── Identity
     @State private var name            = ""
     @State private var avatarImageData: Data? = nil
+    @State private var usesAutomaticAvatarAsset = true
     @State private var photosPickerItem: PhotosPickerItem? = nil
     @State private var showingCamera   = false
     @State private var showCameraPermissionAlert = false
@@ -171,13 +173,33 @@ struct AddHumanWizardView: View {
         HumanProfileOptions.genderOptions.contains { $0.key == gender }
     }
 
+    private var canUseAutomatic2DAvatar: Bool {
+        Avatar2DAccess.hasAccess(kind: .human, existingCount: existingHumans.count)
+    }
+
+    private var avatar2DStatusText: String {
+        if Avatar2DAccess.usesFreeSlot(kind: .human, existingCount: existingHumans.count) {
+            return l.tr(zh: "首个人类成员默认使用 2.5D 头像。", en: "The first human member gets a 2.5D avatar by default.", de: "Das erste menschliche Mitglied erhält standardmäßig einen 2.5D-Avatar.")
+        }
+        if Avatar2DAccess.extraPassCount > 0 {
+            return l.tr(zh: "将使用 1 张已购买的 2.5D 头像券。", en: "This will use 1 purchased 2.5D avatar pass.", de: "Dies nutzt 1 gekauften 2.5D-Avatar-Pass.")
+        }
+        return l.tr(zh: "更多 2.5D 头像需要在椰子商店购买解锁。", en: "More 2.5D avatars require an unlock from the Coconut Shop.", de: "Weitere 2.5D-Avatare müssen im Kokosnuss-Shop freigeschaltet werden.")
+    }
+
     // MARK: - Body
 
     var body: some View {
         wizardMainColumn
-            .onAppear { scheduleAvatarDecode() }
+            .onAppear {
+                refreshAutomaticAvatarAssetData()
+                scheduleAvatarDecode()
+            }
             .onChange(of: avatarImageData)    { _, _ in scheduleAvatarDecode() }
             .onChange(of: photosPickerItem)   { _, item in handlePhotosPicker(item) }
+            .onChange(of: gender)             { _, _ in refreshAutomaticAvatarAssetData() }
+            .onChange(of: birthday)           { _, _ in refreshAutomaticAvatarAssetData() }
+            .onChange(of: hasBirthday)        { _, _ in refreshAutomaticAvatarAssetData() }
             .onChange(of: cropImageItem)      { _, new in
                 guard new == nil else { return }
                 DispatchQueue.main.async { wizardTabViewRemountID += 1 }
@@ -220,6 +242,7 @@ struct AddHumanWizardView: View {
                             if let cropped {
                                 let hasAlpha = ImageCutoutService.imageHasTransparentPixels(cropped)
                                 let optimized = AddPetWizardView.optimizedAvatarAsset(cropped, preserveAlpha: hasAlpha)
+                                usesAutomaticAvatarAsset = false
                                 avatarImageData = hasAlpha
                                     ? optimized.pngData()
                                     : optimized.jpegData(compressionQuality: 0.88)
@@ -311,9 +334,10 @@ struct AddHumanWizardView: View {
         TabView(selection: $wizardPageIndex) {
             pagedCard { card1Identity }.tag(0)
             pagedCard { card2Profile }.tag(1)
-            pagedCard { card3Family }.tag(2)
-            pagedCard { card4Body }.tag(3)
-            pagedCard { card5Confirm }.tag(4)
+            pagedCard { card3Avatar }.tag(2)
+            pagedCard { card4Family }.tag(3)
+            pagedCard { card5Body }.tag(4)
+            pagedCard { card6Confirm }.tag(5)
         }
         .id(wizardTabViewRemountID)
         .tabViewStyle(.page(indexDisplayMode: .never))
@@ -361,7 +385,7 @@ struct AddHumanWizardView: View {
             .textCase(.uppercase)
     }
 
-    // MARK: - Card 1: Identity (Name + Avatar)
+    // MARK: - Card 1: Identity (Name)
 
     private var card1Identity: some View {
         ScrollView(showsIndicators: false) {
@@ -396,37 +420,57 @@ struct AddHumanWizardView: View {
                     }
                 }
 
-                // Avatar photo
-                VStack(spacing: 10) {
-                    cardSectionLabel(l.humanWizAvatarPhoto)
-                    HStack(spacing: 10) {
-                        PhotosPicker(selection: $photosPickerItem, matching: .images) {
-                            avatarActionButton(icon: "photo.on.rectangle", label: l.humanWizPhotoLibrary)
-                        }
-                        Button { presentCamera() } label: {
-                            avatarActionButton(icon: "camera.fill", label: l.humanWizCamera)
-                        }
-                        Button { pastePasteboardImage() } label: {
-                            avatarActionButton(icon: "clipboard.fill", label: l.humanWizPasteSubject, accent: .goYellow)
-                        }
-                    }
-                    Text(l.humanWizPasteHint)
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary.opacity(0.5))
-                }
-
                 Spacer(minLength: 20)
             }
             .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 16)
         }
     }
 
-    // MARK: - Card 2: Profile (Birthday + Blood type)
+    // MARK: - Card 2: Profile (Gender + Birthday + Blood type)
 
     private var card2Profile: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 22) {
                 meshCardLabel(l.humanWizMesh2).padding(.top, 14).padding(.horizontal, 20)
+
+                // Gender / identity
+                VStack(alignment: .leading, spacing: 10) {
+                    cardSectionLabel(l.humanWizGenderLabel)
+                    LazyVGrid(
+                        columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2),
+                        spacing: 8
+                    ) {
+                        ForEach(genderOptions, id: \.key) { opt in
+                            Button {
+                                gender = opt.key
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            } label: {
+                                VStack(spacing: 8) {
+                                    HumanSilhouetteView(gender: opt.key, accent: gender == opt.key ? .arkInk : accentColor)
+                                        .frame(width: 42, height: 48)
+                                    Text(l.humanGenderDisplay(opt.key))
+                                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                                        .foregroundStyle(gender == opt.key ? Color.arkInk : .primary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(
+                                    gender == opt.key ? Color.goPrimary : Color.primary.opacity(0.07),
+                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .strokeBorder(gender == opt.key ? Color.goPrimary : .clear, lineWidth: 1.5)
+                                )
+                                .scaleEffect(gender == opt.key ? 0.97 : 1.0)
+                                .animation(.spring(response: 0.25), value: gender)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                Divider().opacity(0.15)
 
                 // Birthday（滚轮在 Sheet 内，需点「完成」确认）
                 VStack(alignment: .leading, spacing: 10) {
@@ -536,57 +580,46 @@ struct AddHumanWizardView: View {
         }
     }
 
-    // MARK: - Card 3: Family (Role + Nationality + Notes)
+    // MARK: - Card 3: Avatar
 
-    private var card3Family: some View {
+    private var card3Avatar: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 18) {
+                meshCardLabel(l.humanWizMesh3).padding(.top, 14).padding(.horizontal, 20)
+
+                VStack(spacing: 10) {
+                    cardSectionLabel(l.humanWizAvatarPhoto)
+                    HStack(spacing: 10) {
+                        PhotosPicker(selection: $photosPickerItem, matching: .images) {
+                            avatarActionButton(icon: "photo.on.rectangle", label: l.humanWizPhotoLibrary)
+                        }
+                        Button { presentCamera() } label: {
+                            avatarActionButton(icon: "camera.fill", label: l.humanWizCamera)
+                        }
+                    }
+                    Text(avatar2DStatusText)
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(canUseAutomatic2DAvatar ? Color.goPrimary.opacity(0.85) : .secondary.opacity(0.65))
+                }
+
+                Spacer(minLength: 20)
+            }
+            .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 16)
+        }
+    }
+
+    // MARK: - Card 4: Family (Role + Nationality + Notes)
+
+    private var card4Family: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 22) {
-                meshCardLabel(l.humanWizMesh3).padding(.top, 14).padding(.horizontal, 20)
+                meshCardLabel(l.humanWizMesh4).padding(.top, 14).padding(.horizontal, 20)
 
                 // Permission
                 VStack(alignment: .leading, spacing: 10) {
                     cardSectionLabel(l.humanWizRolePermsLabel)
                     roleOption("owner", title: l.humanWizRoleOwnerTitle, desc: l.humanWizRoleOwnerDesc, icon: "crown.fill")
                     roleOption("member", title: l.humanWizRoleMemberTitle, desc: l.humanWizRoleMemberDesc, icon: "person.fill")
-                }
-
-                Divider().opacity(0.15)
-
-                // Gender / identity
-                VStack(alignment: .leading, spacing: 10) {
-                    cardSectionLabel(l.humanWizGenderLabel)
-                    LazyVGrid(
-                        columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2),
-                        spacing: 8
-                    ) {
-                        ForEach(genderOptions, id: \.key) { opt in
-                            Button {
-                                gender = opt.key
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            } label: {
-                                VStack(spacing: 8) {
-                                    HumanSilhouetteView(gender: opt.key, accent: gender == opt.key ? .arkInk : accentColor)
-                                        .frame(width: 42, height: 48)
-                                    Text(l.humanGenderDisplay(opt.key))
-                                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                                        .foregroundStyle(gender == opt.key ? Color.arkInk : .primary)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(
-                                    gender == opt.key ? Color.goPrimary : Color.primary.opacity(0.07),
-                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .strokeBorder(gender == opt.key ? Color.goPrimary : .clear, lineWidth: 1.5)
-                                )
-                                .scaleEffect(gender == opt.key ? 0.97 : 1.0)
-                                .animation(.spring(response: 0.25), value: gender)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
                 }
 
                 Divider().opacity(0.15)
@@ -749,12 +782,12 @@ struct AddHumanWizardView: View {
         }
     }
 
-    // MARK: - Card 4: Body data + Privacy
+    // MARK: - Card 5: Body data + Privacy
 
-    private var card4Body: some View {
+    private var card5Body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 22) {
-                meshCardLabel(l.humanWizMesh4).padding(.top, 14).padding(.horizontal, 20)
+                meshCardLabel(l.humanWizMesh5).padding(.top, 14).padding(.horizontal, 20)
 
                 // Height
                 VStack(alignment: .leading, spacing: 8) {
@@ -797,12 +830,12 @@ struct AddHumanWizardView: View {
         }
     }
 
-    // MARK: - Card 5: Theme + Role + Confirm
+    // MARK: - Card 6: Theme + Role + Confirm
 
-    private var card5Confirm: some View {
+    private var card6Confirm: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 22) {
-                meshCardLabel(l.humanWizMesh5).padding(.top, 14).padding(.horizontal, 20)
+                meshCardLabel(l.humanWizMesh6).padding(.top, 14).padding(.horizontal, 20)
 
                 // Theme color
                 VStack(alignment: .leading, spacing: 12) {
@@ -1106,6 +1139,22 @@ struct AddHumanWizardView: View {
         }
     }
 
+    private func refreshAutomaticAvatarAssetData() {
+        guard usesAutomaticAvatarAsset else { return }
+        guard canUseAutomatic2DAvatar else {
+            avatarImageData = nil
+            return
+        }
+        avatarImageData = automaticHumanAvatarData()
+    }
+
+    private func automaticHumanAvatarData() -> Data? {
+        HumanAvatarAssetCatalog.avatarData(
+            gender: isGenderReady ? gender : "非二元",
+            birthday: hasBirthday ? birthday : nil
+        )
+    }
+
     private func scheduleAvatarDecode() {
         guard let data = avatarImageData, !data.isEmpty else {
             decodedAvatar = nil; decodedAvatarTransparent = false; return
@@ -1150,10 +1199,9 @@ struct AddHumanWizardView: View {
         } else {
             human.city = residenceCity
         }
-        human.avatarImageData = avatarImageData ?? HumanAvatarAssetCatalog.avatarData(
-            gender: gender,
-            birthday: hasBirthday ? birthday : nil
-        )
+        let shouldUseAutomaticAvatar = usesAutomaticAvatarAsset && canUseAutomatic2DAvatar
+        let finalAvatarData = shouldUseAutomaticAvatar ? automaticHumanAvatarData() : avatarImageData
+        human.avatarImageData = finalAvatarData
         human.themeColorHex   = themeColorHex
         human.shouldShowOnHome = true
         human.mbti = mbti.trimmingCharacters(in: .whitespaces).uppercased()
@@ -1166,6 +1214,9 @@ struct AddHumanWizardView: View {
         human.setPrivate(.expense, privateExpense)
 
         modelContext.insert(human)
+        if shouldUseAutomaticAvatar, finalAvatarData != nil {
+            Avatar2DAccess.consumeIfNeeded(kind: .human, existingCount: existingHumans.count)
+        }
 
         if let w = Double(weightText), w > 0 {
             let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")

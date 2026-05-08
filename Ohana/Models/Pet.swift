@@ -329,23 +329,15 @@ final class Pet {
     }
 
     var remainingFoodGrams: Double {
-        guard foodTrackingMode == .precise else { return 0 }
-        guard restockWeight > 0 else { return 0 }
-        return max(0, (restockWeight * 1000) - foodConsumedSinceRestock)
+        FeedStockCalculator.snapshot(for: self).remainingGrams
     }
 
     var foodConsumedSinceRestock: Double {
-        guard let restockDate else { return 0 }
-        return careLogs
-            .filter { $0.careType == .feeding && $0.date >= restockDate }
-            .reduce(0) { total, log in
-                total + (log.amountGrams > 0 ? log.amountGrams : dailyPortionGrams)
-            }
+        FeedStockCalculator.mainConsumedSinceRestock(for: self)
     }
     
     var remainingFoodDays: Int {
-        guard dailyPortionGrams > 0 else { return 0 }
-        return Int(remainingFoodGrams / dailyPortionGrams)
+        FeedStockCalculator.snapshot(for: self).remainingDays
     }
     
     var remainingFoodPercent: Double {
@@ -354,8 +346,7 @@ final class Pet {
     }
     
     var estimatedRunOutDate: Date? {
-        guard remainingFoodDays > 0 else { return nil }
-        return Calendar.current.date(byAdding: .day, value: remainingFoodDays, to: Date())
+        FeedStockCalculator.snapshot(for: self).runOutDate
     }
     
     var genderSymbol: String {

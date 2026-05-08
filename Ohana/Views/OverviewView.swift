@@ -1331,11 +1331,11 @@ struct OverviewView: View {
                     let totalWithWeight = weightSeries.count
                     let allLatestWeights: [(String, Double)] = pets.compactMap { p in
                         guard let w = p.weightLogs.sorted(by: { $0.date > $1.date }).first else { return nil }
-                        return (p.name, w.weight)
+                        return (p.name, w.weightInKg)
                     }
                     let weightValueStr = allLatestWeights.isEmpty
                         ? "--"
-                        : allLatestWeights.map { "\($0.0) \(String(format: "%.1f", $0.1))" }.joined(separator: " · ")
+                        : allLatestWeights.map { "\($0.0) \(AppMeasurementSystem.formatWeightKilograms($0.1))" }.joined(separator: " · ")
                     let weightSubtitle = totalWithWeight == 0 ? "暂无数据" : weightSeries.map { $0.0 }.joined(separator: " · ")
                     let totalWeight = allLatestWeights.reduce(0.0) { $0 + $1.1 }
                     IslandStatCard(
@@ -1343,8 +1343,8 @@ struct OverviewView: View {
                         title: "体重",
                         value: allLatestWeights.isEmpty
                             ? "--"
-                            : String(format: "%.1f", totalWeight),
-                        unit: allLatestWeights.isEmpty ? "" : "kg",
+                            : AppMeasurementSystem.formatWeightKilograms(totalWeight),
+                        unit: "",
                         subtitle: allLatestWeights.count > 1 ? weightValueStr : weightSubtitle,
                         accentColor: .goTeal,
                         avatarEmojis: (pets.map { $0.avatarEmoji } + humans.filter { $0.shouldShowOnHome }.map { $0.avatarEmoji }),
@@ -2800,7 +2800,7 @@ struct OverviewView: View {
             switch item.actionType {
             case "humanWeight":
                 if let last = human.weightLogs.max(by: { $0.date < $1.date }) {
-                    return String(format: "%.1fkg", last.weight)
+                    return AppMeasurementSystem.formatWeightKilograms(last.weight)
                 }
                 return nil
             case "humanWorkout":
@@ -2829,7 +2829,7 @@ struct OverviewView: View {
             let count = pet.walkLogs.filter { cal.isDateInToday($0.startDate) }.count
             let dist = pet.walkLogs.filter { cal.isDateInToday($0.startDate) }.reduce(0.0) { $0 + $1.distanceMeters }
             if count == 0 { return "今日未遛" }
-            let distStr = dist >= 1000 ? String(format: "%.1fkm", dist / 1000) : String(format: "%.0fm", dist)
+            let distStr = AppMeasurementSystem.formatDistanceMeters(dist)
             return "今日 \(count)次 · \(distStr)"
         case "feed":
             if HomeFeedRecordMode.isPlanned(for: pid) {
@@ -2879,7 +2879,7 @@ struct OverviewView: View {
             return monthTotal > 0 ? "本月 \(AppCurrency.format(monthTotal, fractionDigits: 0))" : nil
         case "weight":
             if let last = pet.weightLogs.sorted(by: { $0.date < $1.date }).last {
-                return "上次 \(String(format: "%.1f", last.weight))kg"
+                return "上次 \(AppMeasurementSystem.formatWeightKilograms(last.weightInKg))"
             }
             return nil
         case "waterChange":

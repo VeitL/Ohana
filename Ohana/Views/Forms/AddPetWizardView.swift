@@ -121,6 +121,18 @@ struct AddPetWizardView: View {
     
     // MARK: - Computed helpers
     private var accentColor: Color { Color(hex: themeColorHex) }
+    private var canUseAutomatic2DAvatar: Bool {
+        Avatar2DAccess.hasAccess(kind: .pet, existingCount: existingPets.count)
+    }
+    private var avatar2DStatusText: String {
+        if Avatar2DAccess.usesFreeSlot(kind: .pet, existingCount: existingPets.count) {
+            return wizardL10n.tr(zh: "第一只宠物默认使用 2.5D 头像。", en: "The first pet gets a 2.5D avatar by default.", de: "Das erste Haustier erhält standardmäßig einen 2.5D-Avatar.")
+        }
+        if Avatar2DAccess.extraPassCount > 0 {
+            return wizardL10n.tr(zh: "将使用 1 张已购买的 2.5D 头像券。", en: "This will use 1 purchased 2.5D avatar pass.", de: "Dies nutzt 1 gekauften 2.5D-Avatar-Pass.")
+        }
+        return wizardL10n.tr(zh: "更多 2.5D 头像需要在椰子商店购买解锁。", en: "More 2.5D avatars require an unlock from the Coconut Shop.", de: "Weitere 2.5D-Avatare müssen im Kokosnuss-Shop freigeschaltet werden.")
+    }
     private var themeUIColorBinding: Binding<Color> {
         Binding(
             get: { Color(hex: themeColorHex) },
@@ -218,6 +230,10 @@ struct AddPetWizardView: View {
 
     private func refreshAutomaticAvatarAssetData() {
         guard usesAutomaticAvatarAsset else { return }
+        guard canUseAutomatic2DAvatar else {
+            avatarImageData = nil
+            return
+        }
         avatarImageData = PetAvatarAssetCatalog.avatarData(
             species: effectiveSpeciesForData,
             breed: effectiveBreedForAvatar,
@@ -360,9 +376,9 @@ struct AddPetWizardView: View {
     private var wizardPagedContent: some View {
         TabView(selection: $wizardPageIndex) {
             pagedCard(index: 0, content: { wizardCard1BasicInfo }).tag(0)
-            pagedCard(index: 1, content: { wizardCard2Avatar }).tag(1)
-            pagedCard(index: 2, content: { wizardCard3Bio }).tag(2)
-            pagedCard(index: 3, content: { wizardCard4Appearance }).tag(3)
+            pagedCard(index: 1, content: { wizardCard3Bio }).tag(1)
+            pagedCard(index: 2, content: { wizardCard4Appearance }).tag(2)
+            pagedCard(index: 3, content: { wizardCard2Avatar }).tag(3)
             pagedCard(index: 4, content: { wizardCard5Tags }).tag(4)
             pagedCard(index: 5, content: { wizardCard6Confirm }).tag(5)
         }
@@ -742,7 +758,13 @@ struct AddPetWizardView: View {
                         .font(.system(size: 13, weight: .semibold))
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(.primary.opacity(0.4))
-                    TextField(l.petWizBreedSearchPh, text: $breedSearch)
+                    GoDraftTextField(
+                        l.petWizBreedSearchPh,
+                        text: $breedSearch,
+                        commitDelayNanoseconds: 220_000_000,
+                        submitLabel: .search,
+                        capitalization: .never
+                    )
                         .font(.system(size: 14, weight: .medium, design: .rounded))
                         .foregroundStyle(.primary)
                     if !breedSearch.isEmpty {
@@ -891,7 +913,7 @@ struct AddPetWizardView: View {
                             .font(.system(size: 48, weight: .bold))
                             .symbolRenderingMode(.monochrome)
                             .foregroundStyle(.primary.opacity(0.35))
-                        Text(l.petWizAvatarHint)
+                        Text(avatar2DStatusText)
                             .font(.system(size: 12, weight: .medium, design: .rounded))
                             .foregroundStyle(.primary.opacity(0.35))
                     }
@@ -906,27 +928,10 @@ struct AddPetWizardView: View {
                         lineWidth: 1.5
                     )
             )
-            .onTapGesture { pastePasteboardImage() }
             .animation(GoMotion.hero, value: avatarImageData != nil)
 
-            // 三个操作按钮
+            // 操作按钮：只保留相册与拍照
             HStack(spacing: 10) {
-                Button { pastePasteboardImage() } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: hasPasteboardImage ? "doc.on.clipboard.fill" : "doc.on.clipboard")
-                            .font(.system(size: 13, weight: .semibold))
-                            .symbolRenderingMode(.monochrome)
-                        Text(hasPasteboardImage ? l.humanWizPasteSubject : l.petWizClipboardEmpty)
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                    }
-                    .foregroundStyle(hasPasteboardImage ? .black : .primary.opacity(0.7))
-                    .frame(maxWidth: .infinity).padding(.vertical, 12)
-                    .background(
-                        hasPasteboardImage ? Color(hex: "FF5A00") : Color.white.opacity(0.08),
-                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    )
-                }.buttonStyle(.plain)
-
                 PhotosPicker(selection: $photosPickerItem, matching: .images) {
                     HStack(spacing: 5) {
                         Image(systemName: "photo.on.rectangle.angled")
@@ -952,6 +957,10 @@ struct AddPetWizardView: View {
                 }.buttonStyle(.plain)
             }
 
+            Text(avatar2DStatusText)
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(canUseAutomatic2DAvatar ? Color.goPrimary.opacity(0.85) : .primary.opacity(0.48))
+
             if avatarImageData != nil {
                 Button {
                     usesAutomaticAvatarAsset = true
@@ -964,7 +973,7 @@ struct AddPetWizardView: View {
                 }
             }
 
-            ProTipSection()
+            Spacer(minLength: 0)
         }
         .padding(20)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
@@ -1443,7 +1452,13 @@ struct AddPetWizardView: View {
         return VStack(spacing: 12) {
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(.primary.opacity(0.6))
-                TextField(l.petWizBreedSearchPrompt, text: $breedSearch)
+                GoDraftTextField(
+                    l.petWizBreedSearchPrompt,
+                    text: $breedSearch,
+                    commitDelayNanoseconds: 220_000_000,
+                    submitLabel: .search,
+                    capitalization: .never
+                )
                     .foregroundStyle(.primary)
                     .font(.system(size: 15, weight: .medium, design: .rounded))
                 if !breedSearch.isEmpty {
@@ -2567,7 +2582,8 @@ struct AddPetWizardView: View {
 
         isSaving = true
         let finalBreed = isCustomBreed ? customBreedText : breed
-        let finalAvatarImageData = usesAutomaticAvatarAsset
+        let shouldUseAutomaticAvatar = usesAutomaticAvatarAsset && canUseAutomatic2DAvatar
+        let finalAvatarImageData = shouldUseAutomaticAvatar
             ? PetAvatarAssetCatalog.avatarData(
                 species: effectiveSpeciesForData,
                 breed: finalBreed,
@@ -2594,6 +2610,9 @@ struct AddPetWizardView: View {
         pet.cardStyleRaw = cardStyle
         pet.personalityTagsRaw = selectedPersonalityTagIds.joined(separator: ",")
         modelContext.insert(pet)
+        if shouldUseAutomaticAvatar, finalAvatarImageData != nil {
+            Avatar2DAccess.consumeIfNeeded(kind: .pet, existingCount: existingPets.count)
+        }
 
         // 先单独持久化 Pet：若后续事件/里程碑等写入失败，用户仍能在首页看到新宠物
         do {
@@ -2805,19 +2824,9 @@ struct AddPetWizardView: View {
     private var wizardCard2Avatar: some View {
         let l = wizardL10n
         return VStack(alignment: .leading, spacing: 14) {
-            meshCardLabel(l.petWizMesh2).padding(.top, 14).padding(.horizontal, 20)
+            meshCardLabel(l.petWizMesh4).padding(.top, 14).padding(.horizontal, 20)
 
             HStack(spacing: 8) {
-                Button { pastePasteboardImage() } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: hasPasteboardImage ? "doc.on.clipboard.fill" : "doc.on.clipboard").font(.system(size: 13, weight: .semibold)).symbolRenderingMode(.monochrome)
-                        Text(hasPasteboardImage ? l.humanWizPasteSubject : l.petWizClipboardEmpty).font(.system(size: 12, weight: .bold, design: .rounded))
-                    }
-                    .foregroundStyle(hasPasteboardImage ? Color.arkInk : Color.primary.opacity(0.85))
-                    .frame(maxWidth: .infinity).padding(.vertical, 11)
-                    .background(hasPasteboardImage ? Color.goPrimary : Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                }.buttonStyle(.plain)
-
                 PhotosPicker(selection: $photosPickerItem, matching: .images) {
                     HStack(spacing: 5) {
                         Image(systemName: "photo.on.rectangle.angled").font(.system(size: 13, weight: .semibold)).symbolRenderingMode(.monochrome)
@@ -2840,6 +2849,12 @@ struct AddPetWizardView: View {
             }
             .padding(.horizontal, 20)
 
+            Text(avatar2DStatusText)
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(canUseAutomatic2DAvatar ? Color.goPrimary.opacity(0.85) : Color.primary.opacity(0.48))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+
             if avatarImageData != nil {
                 Button {
                     usesAutomaticAvatarAsset = true
@@ -2849,8 +2864,7 @@ struct AddPetWizardView: View {
                 }.padding(.horizontal, 20)
             }
 
-            ProTipSection()
-                .padding(.horizontal, 20)
+            Spacer(minLength: 0)
 
             Spacer()
         }
@@ -2860,7 +2874,7 @@ struct AddPetWizardView: View {
     private var wizardCard3Bio: some View {
         let l = wizardL10n
         return VStack(alignment: .leading, spacing: 14) {
-            meshCardLabel(l.petWizMesh3).padding(.top, 14).padding(.horizontal, 20)
+            meshCardLabel(l.petWizMesh2).padding(.top, 14).padding(.horizontal, 20)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(l.petWizGender).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(.secondary)
@@ -2944,7 +2958,7 @@ struct AddPetWizardView: View {
         let coatPatterns = PetCoatPattern.patterns(forBreed: bi)
 
         return VStack(alignment: .leading, spacing: 0) {
-            meshCardLabel(l.petWizMesh4).padding(.top, 14).padding(.horizontal, 20).padding(.bottom, 14)
+            meshCardLabel(l.petWizMesh3).padding(.top, 14).padding(.horizontal, 20).padding(.bottom, 14)
 
             // 可滚动区域：内容超出卡片高度时可上下滑，底部留白让圆角可见
             ScrollView(.vertical, showsIndicators: false) {
@@ -3353,6 +3367,35 @@ struct AddPetWizardView: View {
         return NavigationStack {
             ScrollView {
                 LazyVStack(spacing: 6) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 13, weight: .semibold))
+                            .symbolRenderingMode(.monochrome)
+                            .foregroundStyle(.primary.opacity(0.45))
+                        GoDraftTextField(
+                            l.petWizBreedSearchPrompt,
+                            text: $breedSearch,
+                            commitDelayNanoseconds: 220_000_000,
+                            submitLabel: .search,
+                            capitalization: .never
+                        )
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(.primary)
+                        if !breedSearch.isEmpty {
+                            Button { breedSearch = "" } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .symbolRenderingMode(.monochrome)
+                                    .foregroundStyle(.primary.opacity(0.55))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .padding(.bottom, 6)
+
                     Button {
                         breed = ""; isCustomBreed = false; customBreedText = ""
                         showBreedPickerSheet = false
@@ -3396,10 +3439,25 @@ struct AddPetWizardView: View {
                 }
                 .padding(.horizontal, 16).padding(.vertical, 8)
             }
-            .searchable(text: $breedSearch, prompt: l.petWizBreedSearchPrompt)
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle(l.petWizBreedSheetTitle)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(l.done) { showBreedPickerSheet = false } } }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(l.done) {
+                        GoKeyboard.dismiss()
+                        showBreedPickerSheet = false
+                    }
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button(l.done) {
+                        GoKeyboard.dismiss()
+                    }
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.goLime)
+                }
+            }
         }
         .presentationDetents([.large])
     }

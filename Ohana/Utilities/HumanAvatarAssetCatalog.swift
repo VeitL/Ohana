@@ -73,3 +73,65 @@ enum HumanAvatarAssetCatalog {
         }
     }
 }
+
+enum Avatar2DAccess {
+    enum Kind {
+        case human
+        case pet
+    }
+
+    private static let freeHumanUsedKey = "avatar2d_free_human_used"
+    private static let freePetUsedKey = "avatar2d_free_pet_used"
+    static let extraPassInventoryKey = "inventory_avatar2d_extra_count"
+    static let shopItemId = "boost_avatar2d_extra"
+
+    static func hasAccess(kind: Kind, existingCount: Int) -> Bool {
+        freeSlotAvailable(kind: kind, existingCount: existingCount) || extraPassCount > 0
+    }
+
+    static func requiresPurchase(kind: Kind, existingCount: Int) -> Bool {
+        !hasAccess(kind: kind, existingCount: existingCount)
+    }
+
+    static func usesFreeSlot(kind: Kind, existingCount: Int) -> Bool {
+        freeSlotAvailable(kind: kind, existingCount: existingCount)
+    }
+
+    static func consumeIfNeeded(kind: Kind, existingCount: Int) {
+        if freeSlotAvailable(kind: kind, existingCount: existingCount) {
+            markFreeSlotUsed(kind: kind)
+            return
+        }
+
+        let passes = extraPassCount
+        if passes > 0 {
+            UserDefaults.standard.set(passes - 1, forKey: extraPassInventoryKey)
+        }
+    }
+
+    static func addExtraPasses(_ count: Int) {
+        guard count > 0 else { return }
+        UserDefaults.standard.set(extraPassCount + count, forKey: extraPassInventoryKey)
+    }
+
+    static var extraPassCount: Int {
+        UserDefaults.standard.integer(forKey: extraPassInventoryKey)
+    }
+
+    private static func freeSlotAvailable(kind: Kind, existingCount: Int) -> Bool {
+        existingCount == 0 && !UserDefaults.standard.bool(forKey: freeUsedKey(kind))
+    }
+
+    private static func markFreeSlotUsed(kind: Kind) {
+        UserDefaults.standard.set(true, forKey: freeUsedKey(kind))
+    }
+
+    private static func freeUsedKey(_ kind: Kind) -> String {
+        switch kind {
+        case .human:
+            return freeHumanUsedKey
+        case .pet:
+            return freePetUsedKey
+        }
+    }
+}

@@ -162,10 +162,7 @@ struct WalkTrackingCard: View {
     }
 
     private var distanceText: String {
-        let d = locationMgr.totalDistance
-        return d >= 1000
-            ? String(format: "%.1f km", d / 1000)
-            : String(format: "%.0f m", d)
+        AppMeasurementSystem.formatDistanceMeters(locationMgr.totalDistance)
     }
 
     // MARK: - Always Permission Banner
@@ -600,9 +597,7 @@ struct WalkTrackingCard: View {
     }
 
     private func distanceText(_ meters: Double) -> String {
-        meters >= 1000
-            ? String(format: "%.2f km", meters / 1000)
-            : String(format: "%.0f m", meters)
+        AppMeasurementSystem.formatDistanceMeters(meters, fractionDigits: 2)
     }
 
     private func weeklyGoalDisplay(_ km: Double) -> String {

@@ -264,13 +264,17 @@ struct PetMilestoneListView: View {
 
                         // Emoji + 标题
                         HStack(spacing: 12) {
-                            TextField("🎉", text: $newEmoji)
+                            GoDraftTextField("🎉", text: $newEmoji)
                                 .font(.system(size: 28))
                                 .multilineTextAlignment(.center)
                                 .frame(width: 56, height: 56)
                                 .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
                                 .foregroundStyle(.primary)
-                            TextField("里程碑标题", text: $newTitle)
+                            GoDraftTextField(
+                                "里程碑标题",
+                                text: $newTitle,
+                                capitalization: .sentences
+                            )
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.primary)
                                 .tint(Color.goPrimary)
@@ -323,7 +327,11 @@ struct PetMilestoneListView: View {
                         .buttonStyle(.plain)
 
                         // 备注
-                        TextField("备注（可选）", text: $newNotes, axis: .vertical)
+                        GoDraftTextField(
+                            "备注（可选）",
+                            text: $newNotes,
+                            axis: .vertical
+                        )
                             .font(.system(size: 14))
                             .foregroundStyle(.primary)
                             .tint(Color.goPrimary)
@@ -375,25 +383,29 @@ struct PetMilestoneListView: View {
                     }
                     .padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 8)
                 }
+                .scrollDismissesKeyboard(.interactively)
 
                 // 保存按钮（渐变）
                 Button {
-                    guard !newTitle.isEmpty else { return }
-                    let m = PetMilestone(
-                        date: newDate,
-                        title: newTitle,
-                        emoji: newEmoji.isEmpty ? "🎉" : newEmoji,
-                        notes: newNotes,
-                        pet: pet,
-                        photoData: newPhotoData,
-                        location: newLocation
-                    )
-                    modelContext.insert(m)
-                    modelContext.safeSave()
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    newTitle = ""; newEmoji = "🎉"; newNotes = ""; newLocation = ""
-                    newPhotoData = nil; newPhotoItem = nil
-                    showAddSheet = false
+                    GoKeyboard.dismiss()
+                    DispatchQueue.main.async {
+                        guard !newTitle.isEmpty else { return }
+                        let m = PetMilestone(
+                            date: newDate,
+                            title: newTitle,
+                            emoji: newEmoji.isEmpty ? "🎉" : newEmoji,
+                            notes: newNotes,
+                            pet: pet,
+                            photoData: newPhotoData,
+                            location: newLocation
+                        )
+                        modelContext.insert(m)
+                        modelContext.safeSave()
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        newTitle = ""; newEmoji = "🎉"; newNotes = ""; newLocation = ""
+                        newPhotoData = nil; newPhotoItem = nil
+                        showAddSheet = false
+                    }
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark").font(.system(size: 14, weight: .black))
@@ -418,6 +430,7 @@ struct PetMilestoneListView: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .presentationBackground(.regularMaterial)
+        .goKeyboardDoneToolbar()
         .sheet(isPresented: $showingLocationPicker) {
             MapLocationPickerSheet(selectedLocation: $newLocation)
         }
@@ -432,6 +445,7 @@ struct MapLocationPickerSheet: View {
     @State private var searchText = ""
     @State private var results: [MKMapItem] = []
     @State private var isSearching = false
+    @State private var searchTask: Task<Void, Never>? = nil
 
     var body: some View {
         NavigationStack {
@@ -444,13 +458,22 @@ struct MapLocationPickerSheet: View {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.secondary)
-                        TextField("搜索地点、医院、公园…", text: $searchText)
+                        GoDraftTextField(
+                            "搜索地点、医院、公园…",
+                            text: $searchText,
+                            commitDelayNanoseconds: 220_000_000,
+                            submitLabel: .search,
+                            capitalization: .never
+                        )
                             .foregroundStyle(.primary)
                             .tint(Color.goYellow)
-                            .submitLabel(.search)
-                            .onSubmit { performSearch() }
                         if !searchText.isEmpty {
-                            Button { searchText = ""; results = [] } label: {
+                            Button {
+                                searchTask?.cancel()
+                                searchText = ""
+                                results = []
+                                isSearching = false
+                            } label: {
                                 Image(systemName: "xmark.circle.fill")
                                     .foregroundStyle(.secondary)
                             }
@@ -518,27 +541,59 @@ struct MapLocationPickerSheet: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     if !searchText.isEmpty {
-                        Button("搜索") { performSearch() }
+                        Button("搜索") {
+                            GoKeyboard.dismiss()
+                            performSearch()
+                        }
                             .foregroundStyle(Color.goYellow)
                             .fontWeight(.bold)
                     }
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完成") {
+                        GoKeyboard.dismiss()
+                    }
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.goLime)
+                }
             }
             .onChange(of: searchText) { _, new in
-                if new.count >= 2 { performSearch() }
-                else if new.isEmpty { results = [] }
+                queueSearch(for: new)
+            }
+            .onDisappear {
+                searchTask?.cancel()
             }
         }
     }
 
-    private func performSearch() {
-        guard !searchText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+    private func queueSearch(for rawQuery: String) {
+        searchTask?.cancel()
+        let query = rawQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard query.count >= 2 else {
+            isSearching = false
+            if query.isEmpty {
+                results = []
+            }
+            return
+        }
+        searchTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard !Task.isCancelled else { return }
+            performSearch(query: query)
+        }
+    }
+
+    private func performSearch(query rawQuery: String? = nil) {
+        let query = (rawQuery ?? searchText).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return }
         isSearching = true
         let req = MKLocalSearch.Request()
-        req.naturalLanguageQuery = searchText
+        req.naturalLanguageQuery = query
         let search = MKLocalSearch(request: req)
         search.start { resp, _ in
             DispatchQueue.main.async {
+                guard searchText.trimmingCharacters(in: .whitespacesAndNewlines) == query else { return }
                 isSearching = false
                 results = resp?.mapItems ?? []
             }

@@ -216,11 +216,15 @@ struct AddExpenseSheet: View {
             ToolbarItemGroup(placement: .keyboard) {
                 Button(l.done) {
                     inputFocused = false
+                    GoKeyboard.dismiss()
                 }
                 Spacer()
                 if canSave {
                     Button(l.quickExpenseKeyboardSave) {
-                        saveExpense()
+                        GoKeyboard.dismiss()
+                        DispatchQueue.main.async {
+                            saveExpense()
+                        }
                     }
                     .fontWeight(.bold)
                     .disabled(isSaving)
@@ -277,9 +281,13 @@ struct AddExpenseSheet: View {
                 Text(AppCurrency.symbol)
                     .font(OhanaFont.metric(size: 28, .black))
                     .foregroundStyle(petThemeColor)
-                TextField("0", text: $amountInput)
-                    .keyboardType(.decimalPad)
-                    .focused($inputFocused)
+                GoDraftTextField(
+                    "0",
+                    text: $amountInput,
+                    keyboardType: .decimalPad,
+                    capitalization: .never,
+                    autoFocusDelay: 0.25
+                )
                     .textFieldStyle(.plain)
                     .font(OhanaFont.metric(size: 52, .black))
                     .foregroundStyle(primaryText)
@@ -492,7 +500,10 @@ struct AddExpenseSheet: View {
                     }
 
                     infoRow(icon: "note.text", label: l.quickExpenseNote) {
-                        TextField(l.quickExpenseOptional, text: $noteInput)
+                        GoDraftTextField(
+                            l.quickExpenseOptional,
+                            text: $noteInput
+                        )
                             .font(OhanaFont.subheadline(.semibold))
                             .foregroundStyle(primaryText)
                             .multilineTextAlignment(.trailing)
@@ -536,6 +547,7 @@ struct AddExpenseSheet: View {
             if hasSavedMedicalExpense {
                 Button {
                     inputFocused = false
+                    GoKeyboard.dismiss()
                     showClaimSheet = true
                 } label: {
                     primaryActionContent(icon: "shield.checkered", title: l.quickExpenseApplyClaim)
@@ -543,7 +555,10 @@ struct AddExpenseSheet: View {
                 .buttonStyle(.plain)
             } else {
                 Button {
-                    saveExpense()
+                    GoKeyboard.dismiss()
+                    DispatchQueue.main.async {
+                        saveExpense()
+                    }
                 } label: {
                     primaryActionContent(icon: "checkmark.circle.fill", title: isSaving ? l.quickExpenseSaving : bottomSaveTitle)
                         .opacity(canSave ? 1 : 0.45)
@@ -943,6 +958,7 @@ struct AddExpenseSheet: View {
         guard canSave, let amount = parsedAmount, amount > 0 else { return }
         isSaving = true
         inputFocused = false
+        GoKeyboard.dismiss()
 
         let payerId = selectedPayerId.flatMap { id in
             humans.contains(where: { $0.id.uuidString == id }) ? id : nil

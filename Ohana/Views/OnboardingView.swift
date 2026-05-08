@@ -2,12 +2,11 @@
 //  OnboardingView.swift
 //  Ohana
 //
-//  首次启动引导 — GO UI 主题重设计
-//  设计规范：深蓝渐变背景 + 浮动色球 + 荧光绿主色 + 玻璃卡片
+//  首次启动引导 — Go Focus setup
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - Ohana App Icon Shape (matches SVG in design system)
 
@@ -22,7 +21,7 @@ private struct OhanaIconView: View {
 
             HeartbeatPath()
                 .stroke(Color.goLime, style: StrokeStyle(lineWidth: size * 0.063,
-                                                          lineCap: .round, lineJoin: .round))
+                                                         lineCap: .round, lineJoin: .round))
                 .frame(width: size * 0.531, height: size * 0.25)
 
             Circle()
@@ -58,6 +57,120 @@ private struct OhanaIconView: View {
     }
 }
 
+private struct OnboardingCompanionStage: View {
+    var isActive: Bool
+    var focusMode: Bool = false
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let mainSize = min(width * (focusMode ? 0.46 : 0.42), 150)
+            let sideSize = min(width * 0.3, 112)
+
+            ZStack(alignment: .bottom) {
+                RoundedRectangle(cornerRadius: 34, style: .continuous)
+                    .fill(Color(hex: "FFFFFF").opacity(0.62))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 34, style: .continuous)
+                            .strokeBorder(Color.arkInk.opacity(0.06), lineWidth: 1)
+                    )
+                    .shadow(color: Color(hex: "0C1640").opacity(0.08), radius: 18, y: 10)
+
+                Capsule()
+                    .fill(Color(hex: "0C1640").opacity(0.08))
+                    .frame(width: width * 0.66, height: 22)
+                    .blur(radius: 10)
+                    .offset(y: -18)
+
+                petBubble(
+                    species: "狗",
+                    coat: Color(hex: "D9944A"),
+                    eye: Color(hex: "4A2C17"),
+                    size: mainSize,
+                    rotation: focusMode ? -2 : -5
+                )
+                .offset(x: focusMode ? -34 : -46, y: isActive ? -20 : -12)
+                .zIndex(2)
+
+                petBubble(
+                    species: "猫",
+                    coat: Color(hex: "F1E5D0"),
+                    eye: Color(hex: "3A6EA5"),
+                    size: sideSize,
+                    rotation: focusMode ? 5 : 8
+                )
+                .offset(x: focusMode ? 62 : 72, y: isActive ? -42 : -34)
+                .zIndex(1)
+
+                if !focusMode {
+                    petBubble(
+                        species: "兔子",
+                        coat: Color(hex: "F7D9E5"),
+                        eye: Color(hex: "9B3A60"),
+                        size: sideSize * 0.82,
+                        rotation: -8
+                    )
+                    .offset(x: -118, y: isActive ? -60 : -50)
+                    .zIndex(0)
+                }
+
+                HStack(spacing: 8) {
+                    stageBadge(icon: "fork.knife", label: focusMode ? "40g" : "+1")
+                    stageBadge(icon: "bell.fill", label: "09:00")
+                    stageBadge(icon: "bolt.fill", label: "+🥥")
+                }
+                .offset(y: -18)
+                .zIndex(3)
+            }
+            .animation(GoMotion.hero, value: isActive)
+        }
+    }
+
+    private func petBubble(
+        species: String,
+        coat: Color,
+        eye: Color,
+        size: CGFloat,
+        rotation: Double
+    ) -> some View {
+        ZStack {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color(hex: "FFFFFF"), coat.opacity(0.28)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: coat.opacity(0.28), radius: 18, y: 10)
+
+            PetSilhouetteView(
+                species: species,
+                coatColor: coat,
+                eyeColor: eye,
+                isAnimationEnabled: false
+            )
+            .padding(size * 0.08)
+        }
+        .frame(width: size, height: size)
+        .rotationEffect(.degrees(rotation))
+    }
+
+    private func stageBadge(icon: String, label: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .black))
+            Text(label)
+                .font(OhanaFont.caption2(.black))
+        }
+        .foregroundStyle(Color.arkInk)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 7)
+        .background(Color.goLime.opacity(0.92), in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.arkInk.opacity(0.08), lineWidth: 1))
+    }
+}
+
 // MARK: - OnboardingView
 
 struct OnboardingView: View {
@@ -77,146 +190,39 @@ struct OnboardingView: View {
         case firstPet = 2
     }
 
-    private struct IntroCard: Identifiable {
-        let id: String
-        let label: String
-        let title: String
-        let subtitle: String
-        let icon: String
-        let color: Color
-        let labelForeground: Color
-        let iconForeground: Color
-        let bullets: [String]
-        let mockRows: [String]
-    }
-
     @State private var step: FlowStep = .intro
-    @State private var introPage: Int = 0
     /// 每次进入「添加人类」步骤刷新，避免从欢迎页返回后残留半填状态
     @State private var humanWizardSessionId = UUID()
     @State private var petWizardSessionId = UUID()
 
-    @State private var blobPulse = false
     @State private var iconPulse = false
 
-    private var isEnglish: Bool { AppLanguage.normalize(appLanguage) == "en" }
+    private var languageCode: String { AppLanguage.normalize(appLanguage) }
     private var shouldReduceWork: Bool {
         powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
     }
 
-    private var introCards: [IntroCard] {
-        [
-        IntroCard(
-            id: "home",
-            label: isEnglish ? "HOME" : "首页",
-            title: isEnglish ? "One home for every family member" : "把宠物和家人的状态放在一个首页",
-            subtitle: isEnglish ? "Wallet-style cards show who needs attention, what changed, and where to jump next." : "像钱包一样的卡片堆，直接看到谁需要照顾、今天发生了什么、下一步去哪。",
-            icon: "rectangle.stack.fill",
-            color: Color(hex: "5B6AFF"),
-            labelForeground: .white,
-            iconForeground: .white,
-            bullets: isEnglish ? ["Pet, human, and plant cards", "Tap to expand full details", "No spreadsheet-style chaos"] : ["宠物、家人、植物统一管理", "点击卡片展开完整信息", "不用在多个表格里找记录"],
-            mockRows: isEnglish ? ["Mochi · walk due", "Lilo · water changed", "Family · 2 helpers"] : ["Mochi · 今天待遛", "Lilo · 换水已完成", "家人 · 2 位协作者"]
-        ),
-        IntroCard(
-            id: "quick",
-            label: isEnglish ? "QUICK LOGS" : "快速记录",
-            title: isEnglish ? "Log care in seconds" : "喂食、喂水、铲屎、逗玩几秒完成",
-            subtitle: isEnglish ? "Daily actions stay lightweight, with the current device owner automatically recorded as the executor." : "日常照顾不需要填长表单，执行者会自动绑定为当前手机使用者。",
-            icon: "bolt.heart.fill",
-            color: Color.goLime,
-            labelForeground: Color.arkInk,
-            iconForeground: Color.arkInk,
-            bullets: isEnglish ? ["Feed, water, litter, play", "Weight and health records", "Executor saved automatically"] : ["喂食/喂水/换水/铲屎/便便/逗玩", "体重、护理、健康也能快速记录", "自动记录是谁做的"],
-            mockRows: isEnglish ? ["Feed +1", "Water changed", "Weight 5.2 kg"] : ["喂食 +1", "换水完成", "体重 5.2 kg"]
-        ),
-        IntroCard(
-            id: "calendar",
-            label: isEnglish ? "CALENDAR" : "日历提醒",
-            title: isEnglish ? "Never lose the next important date" : "疫苗、用药、生日和护理计划不再靠脑子记",
-            subtitle: isEnglish ? "Pet-specific calendars keep reminders and history tied to the right companion." : "日程会和对应宠物绑定，打开宠物日历只看它相关的安排。",
-            icon: "calendar.badge.clock",
-            color: Color.goTeal,
-            labelForeground: .white,
-            iconForeground: .white,
-            bullets: isEnglish ? ["Vaccines and medication", "Food stock and care plans", "Filter by pet"] : ["疫苗、用药、生日提醒", "粮仓和护理计划", "按宠物查看相关日程"],
-            mockRows: isEnglish ? ["Vaccine · Apr 30", "Medication · tonight", "Food stock · 6 days"] : ["疫苗 · 4月30日", "用药 · 今晚", "粮仓 · 还能吃 6 天"]
-        ),
-        IntroCard(
-            id: "family",
-            label: isEnglish ? "FAMILY" : "家庭协作",
-            title: isEnglish ? "Know who paid and who helped" : "谁照顾了、谁花了钱，都有记录",
-            subtitle: isEnglish ? "Shared care logs, payer tracking, and collaboration modules make multi-person households clearer." : "多人家庭里，照顾记录和花费支付者都会保留下来，减少重复沟通。",
-            icon: "person.2.fill",
-            color: Color(hex: "FF6B9D"),
-            labelForeground: .white,
-            iconForeground: .white,
-            bullets: isEnglish ? ["Payer saved for expenses", "Human collaboration when needed", "Clear family history"] : ["花费可记录支付者", "多人时显示家庭协作", "家庭记录更清楚"],
-            mockRows: isEnglish ? ["Paid by Alex · 32", "Litter by Jamie", "Care streak · 8 days"] : ["Alex 支付 · 32", "Jamie 铲屎", "连续照顾 · 8 天"]
-        ),
-        IntroCard(
-            id: "oasis",
-            label: isEnglish ? "REWARDS" : "绿洲奖励",
-            title: isEnglish ? "Make consistency visible" : "把坚持照顾变成可见的成长",
-            subtitle: isEnglish ? "Care actions earn coconuts, streaks, and Oasis progress without turning chores into noise." : "完成照顾会获得椰子、连续打卡和绿洲成长，让家务变得更有反馈。",
-            icon: "sparkles",
-            color: Color(hex: "FFB020"),
-            labelForeground: Color.arkInk,
-            iconForeground: Color.arkInk,
-            bullets: isEnglish ? ["Coconut rewards", "Streak feedback", "Oasis growth"] : ["椰子奖励", "连续打卡反馈", "绿洲成长"],
-            mockRows: isEnglish ? ["Coconuts +12", "Streak 8", "Oasis level 3"] : ["椰子 +12", "连续 8 天", "绿洲等级 3"]
-        )
-        ]
-    }
-
-    private var isLastIntroPage: Bool {
-        introPage >= introCards.count - 1
+    private func localized(zh: String, en: String, de: String) -> String {
+        AppLocalizedText(zh: zh, en: en, de: de).resolve(languageCode)
     }
 
     // MARK: - Body
 
     var body: some View {
         ZStack {
-            // ── Background: navy gradient + animated blobs
             LinearGradient(
-                colors: [Color(hex: "2D4ECC"), Color(hex: "1A2E8A"), Color(hex: "0C1640")],
-                startPoint: .top, endPoint: .bottom
+                colors: [Color(hex: "F7F9EF"), Color(hex: "EAF0FF")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
 
-            GeometryReader { geo in
-                ZStack {
-                    Circle()
-                        .fill(Color.goLime)
-                        .frame(width: 260, height: 260)
-                        .blur(radius: 80).opacity(0.18)
-                        .offset(x: blobPulse ? -50 : -70, y: blobPulse ? -60 : -80)
-                    Circle()
-                        .fill(Color(hex: "5B6AFF"))
-                        .frame(width: 300, height: 300)
-                        .blur(radius: 90).opacity(0.35)
-                        .offset(x: blobPulse ? geo.size.width - 80 : geo.size.width - 100,
-                                y: blobPulse ? 180 : 220)
-                    Circle()
-                        .fill(Color(hex: "A855F7"))
-                        .frame(width: 240, height: 240)
-                        .blur(radius: 90).opacity(0.25)
-                        .offset(x: blobPulse ? -40 : -60,
-                                y: blobPulse ? geo.size.height * 0.6 : geo.size.height * 0.55)
-                }
-            }
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
-
-            // ── Content
             content
         }
         .onAppear {
             if shouldReduceWork {
-                blobPulse = false
                 iconPulse = false
             } else {
-                withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) { blobPulse = true }
                 withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) { iconPulse = true }
             }
             if !isReplay && !currentActiveHumanId.isEmpty && !hasOnboarded {
@@ -250,11 +256,11 @@ struct OnboardingView: View {
 
     private var progressBar: some View {
         HStack(spacing: 8) {
-            ForEach(0..<3, id: \.self) { i in
+            ForEach(0 ..< 3, id: \.self) { i in
                 Capsule()
-                    .fill(i <= step.rawValue ? Color.goLime : Color.white.opacity(0.15))
+                    .fill(i <= step.rawValue ? Color.goLime : Color.arkInk.opacity(0.12))
                     .frame(width: i == step.rawValue ? 28 : nil, height: 4)
-                    .animation(.spring(response: 0.4), value: step)
+                    .animation(GoMotion.feedback, value: step)
             }
         }
     }
@@ -266,7 +272,7 @@ struct OnboardingView: View {
                 GoIslandWizardBackdrop()
                 AddHumanWizardView(
                     onComplete: {
-                        withAnimation(.spring(response: 0.45, dampingFraction: 0.84)) {
+                        withAnimation(GoMotion.page) {
                             step = .firstPet
                         }
                     },
@@ -276,15 +282,15 @@ struct OnboardingView: View {
                 )
                 .id(humanWizardSessionId)
             }
-            .navigationTitle(isEnglish ? "Family Member" : "家庭成员")
+            .navigationTitle(localized(zh: "家庭成员", en: "Family Member", de: "Familienmitglied"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.88)) { step = .intro }
+                        withAnimation(GoMotion.page) { step = .intro }
                     } label: {
-                        Text(isEnglish ? "Back" : "返回")
+                        Text(localized(zh: "返回", en: "Back", de: "Zuruck"))
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
                             .foregroundStyle(Color.goLime)
                     }
@@ -296,187 +302,80 @@ struct OnboardingView: View {
     // MARK: - Intro flow
 
     private var introFlow: some View {
-        VStack(spacing: 0) {
-            progressBar
-                .padding(.horizontal, 28)
-                .padding(.top, 54)
-                .padding(.bottom, 14)
-
-            VStack(spacing: 7) {
-                OhanaIconView(size: 46)
-                    .scaleEffect(iconPulse ? 1.04 : 1.0)
-                    .shadow(color: Color.goLime.opacity(iconPulse ? 0.34 : 0.18), radius: 24)
-
-                Text(isEnglish ? "Welcome to Ohana" : "欢迎来到 Ohana")
-                    .font(.system(size: 27, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                Text(isEnglish ? "Swipe through the essentials, then set up your family." : "先看完核心功能，再开始建立你的家庭。")
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.55))
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-            }
-            .padding(.horizontal, 24)
-
-            TabView(selection: $introPage) {
-                ForEach(Array(introCards.enumerated()), id: \.element.id) { index, card in
-                    introFeatureCard(card)
-                        .tag(index)
-                        .padding(.horizontal, 24)
-                }
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(maxHeight: 470)
-            .padding(.top, 14)
-
-            introPageIndicator
-                .padding(.top, 4)
-
-            Spacer(minLength: 12)
-
-            ctaArea
-                .padding(.horizontal, 24)
-                .padding(.bottom, 42)
-        }
-    }
-
-    private func introFeatureCard(_ card: IntroCard) -> some View {
-        VStack(spacing: 14) {
-            HStack {
-                Text(card.label)
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .tracking(1.5)
-                    .foregroundStyle(card.labelForeground)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(card.color, in: Capsule())
-                Spacer()
-                Image(systemName: card.icon)
-                    .font(.system(size: 18, weight: .black))
-                    .foregroundStyle(card.iconForeground)
-                    .frame(width: 42, height: 42)
-                    .background(card.color, in: Circle())
-                    .shadow(color: card.color.opacity(0.35), radius: 14, y: 7)
-            }
-
-            VStack(alignment: .leading, spacing: 9) {
-                Text(card.title)
-                    .font(.system(size: 21, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.leading)
-                    .lineSpacing(1)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.82)
-
-                Text(card.subtitle)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.62))
-                    .multilineTextAlignment(.leading)
-                    .lineSpacing(2)
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            introMockScreenshot(card)
-
-            VStack(spacing: 8) {
-                ForEach(card.bullets, id: \.self) { bullet in
-                    HStack(spacing: 10) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(card.color)
-                        Text(bullet)
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.78))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.78)
+        GeometryReader { proxy in
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    HStack {
+                        OhanaIconView(size: 38)
                         Spacer()
+                        progressBar
                     }
-                }
-            }
-            .padding(12)
-            .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(.white.opacity(0.12), lineWidth: 1)
-            )
-        }
-        .frame(maxWidth: .infinity)
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(.ultraThinMaterial)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .strokeBorder(.white.opacity(0.18), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.22), radius: 24, y: 14)
-    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 54)
 
-    private func introMockScreenshot(_ card: IntroCard) -> some View {
-        VStack(spacing: 10) {
-            HStack(alignment: .bottom, spacing: 10) {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [card.color.opacity(0.92), card.color.mix(with: .black, by: 0.34)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                    Spacer(minLength: 14)
+
+                    OnboardingCompanionStage(isActive: iconPulse && !shouldReduceWork)
+                        .frame(height: min(260, proxy.size.height * 0.32))
+                        .padding(.horizontal, 20)
+
+                    VStack(spacing: 10) {
+                        Text(localized(
+                            zh: "照顾，一眼看懂",
+                            en: "Care at a glance",
+                            de: "Pflege auf einen Blick"
+                        ))
+                        .font(OhanaFont.largeTitle(.black))
+                        .foregroundStyle(Color.arkInk)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.78)
+
+                        Text(localized(
+                            zh: "给家人、宠物和日常记录一个清爽首页。",
+                            en: "One calm home for family, pets, and daily logs.",
+                            de: "Ein ruhiger Ort für Familie, Tiere und tägliche Einträge."
+                        ))
+                        .font(OhanaFont.body(.semibold))
+                        .foregroundStyle(Color.arkInk.opacity(0.58))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.horizontal, 34)
+                    .padding(.top, 8)
+
+                    VStack(spacing: 10) {
+                        onboardingStepRow(
+                            icon: "person.2.fill",
+                            title: localized(zh: "添加家人", en: "Add people", de: "Menschen"),
+                            subtitle: localized(zh: "谁在照顾", en: "Who helps", de: "Wer hilft"),
+                            tint: Color.goBlue
                         )
-                    )
-                    .frame(width: 82, height: 116)
-                    .overlay(alignment: .topLeading) {
-                        Image(systemName: card.icon)
-                            .font(.system(size: 20, weight: .black))
-                            .foregroundStyle(card.iconForeground)
-                            .padding(13)
+                        onboardingStepRow(
+                            icon: "pawprint.fill",
+                            title: localized(zh: "添加宠物", en: "Add pets", de: "Tiere"),
+                            subtitle: localized(zh: "生成快捷照护", en: "Quick care ready", de: "Schnelle Pflege"),
+                            tint: Color(hex: "F59E0B")
+                        )
+                        onboardingStepRow(
+                            icon: "bolt.heart.fill",
+                            title: localized(zh: "完成第一次打卡", en: "First check-in", de: "Erster Check-in"),
+                            subtitle: localized(zh: "马上得到反馈", en: "Instant feedback", de: "Sofort Feedback"),
+                            tint: Color.goLime,
+                            usesFilledTint: true
+                        )
                     }
-                    .overlay(alignment: .bottomLeading) {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Capsule().fill(.white.opacity(0.86)).frame(width: 44, height: 6)
-                            Capsule().fill(.white.opacity(0.42)).frame(width: 58, height: 5)
-                        }
-                        .padding(13)
-                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 22)
 
-                VStack(spacing: 7) {
-                    ForEach(Array(card.mockRows.enumerated()), id: \.offset) { index, row in
-                        HStack(spacing: 8) {
-                            Image(systemName: index == 0 ? "checkmark.circle.fill" : index == 1 ? "clock.fill" : "sparkles")
-                                .font(.system(size: 12, weight: .black))
-                                .foregroundStyle(index == 0 ? card.color : .white.opacity(0.65))
-                                .frame(width: 18)
-                            Text(row)
-                                .font(.system(size: 12, weight: .black, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.86))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.75)
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 8)
-                        .background(.white.opacity(index == 0 ? 0.14 : 0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    }
+                    Spacer(minLength: 18)
+
+                    ctaArea
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 42)
                 }
-            }
-        }
-        .padding(12)
-        .background(Color(hex: "07112F").opacity(0.72), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .strokeBorder(.white.opacity(0.1), lineWidth: 1)
-        )
-    }
-
-    private var introPageIndicator: some View {
-        HStack(spacing: 7) {
-            ForEach(introCards.indices, id: \.self) { index in
-                Capsule()
-                    .fill(index == introPage ? Color.goLime : Color.white.opacity(0.22))
-                    .frame(width: index == introPage ? 24 : 7, height: 7)
-                    .animation(.spring(response: 0.35, dampingFraction: 0.78), value: introPage)
+                .frame(minHeight: proxy.size.height)
             }
         }
     }
@@ -487,134 +386,183 @@ struct OnboardingView: View {
         VStack(spacing: 12) {
             Button(action: advanceFromWelcome) {
                 HStack(spacing: 8) {
-                    Text(isLastIntroPage ? (isEnglish ? "Continue" : "继续") : (isEnglish ? "Next" : "下一张"))
-                        .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(Color(hex: "1A1A2E"))
+                    Text(localized(zh: "开始设置", en: "Start setup", de: "Einrichten"))
+                        .font(OhanaFont.title3(.black))
+                        .foregroundStyle(Color.arkInk)
                     Image(systemName: "arrow.right")
                         .font(.system(size: 14, weight: .black))
-                        .foregroundStyle(Color(hex: "1A1A2E"))
+                        .foregroundStyle(Color.arkInk)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 17)
-                .background(Color.goLime, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color.goLime, in: Capsule())
             }
 
-            if !isLastIntroPage {
-                Button(isEnglish ? "Skip intro" : "跳过介绍") {
+            if isReplay {
+                Button(localized(zh: "关闭", en: "Close", de: "Schliessen")) {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    startProfileSetup()
+                    onReplayFinished?()
                 }
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.62))
+                .font(OhanaFont.subheadline(.bold))
+                .foregroundStyle(Color.arkInk.opacity(0.58))
             } else {
-                Text(isEnglish ? "Local-first · No account · Data stays on your device" : "完全本地存储 · 无账号 · 数据只在你的设备上")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.28))
-                    .multilineTextAlignment(.center)
+                Text(localized(
+                    zh: "本地优先 · 无需账号",
+                    en: "Local-first · No account",
+                    de: "Lokal zuerst · Kein Konto"
+                ))
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(Color.arkInk.opacity(0.36))
+                .multilineTextAlignment(.center)
             }
         }
+    }
+
+    private func onboardingStepRow(
+        icon: String,
+        title: String,
+        subtitle: String,
+        tint: Color,
+        usesFilledTint: Bool = false
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .black))
+                .foregroundStyle(usesFilledTint ? Color.arkInk : tint)
+                .frame(width: 34, height: 34)
+                .background(usesFilledTint ? tint : tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+            Text(title)
+                .font(OhanaFont.headline(.black))
+                .foregroundStyle(Color.arkInk)
+                .lineLimit(1)
+
+            Spacer(minLength: 8)
+
+            Text(subtitle)
+                .font(OhanaFont.caption(.bold))
+                .foregroundStyle(Color.arkInk.opacity(0.46))
+                .lineLimit(1)
+                .minimumScaleFactor(0.74)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Color(hex: "FFFFFF").opacity(0.72), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.arkInk.opacity(0.06), lineWidth: 1)
+        )
     }
 
     // MARK: - Optional first pet
 
     private var petChoiceFlow: some View {
-        VStack(spacing: 0) {
-            progressBar
-                .padding(.horizontal, 28)
-                .padding(.top, 60)
-                .padding(.bottom, 34)
+        GeometryReader { proxy in
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    HStack {
+                        OhanaIconView(size: 38)
+                        Spacer()
+                        progressBar
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 54)
 
-            Spacer(minLength: 0)
+                    Spacer(minLength: 20)
 
-            ZStack {
-                Circle()
-                    .fill(Color.goLime.opacity(iconPulse ? 0.22 : 0.12))
-                    .frame(width: 220, height: 220)
-                    .blur(radius: 42)
-                Text("🐾")
-                    .font(.system(size: 92))
-                    .scaleEffect(iconPulse ? 1.08 : 0.96)
-                Text(isEnglish ? "First Companion" : "第一个伙伴")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(Color.goLime, in: Capsule())
-                    .offset(x: 66, y: 80)
-            }
-            .padding(.bottom, 22)
+                    OnboardingCompanionStage(isActive: iconPulse && !shouldReduceWork, focusMode: true)
+                        .frame(height: 250)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 12)
 
-            VStack(spacing: 12) {
-                Text(isEnglish ? "Bring your first pet onto the island?" : "要把第一个宠物接上岛吗？")
-                    .font(.system(size: 28, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                Text(isEnglish ? "This step is optional. Ohana prepares quick record entries, while feeding and water-change plans appear only after you set them up." : "这一步不是强制的。添加后，Ohana 会准备快捷记录入口；喂食、换水等计划只会在你主动设置后出现。")
-                    .font(.system(size: 15, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.62))
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(3)
-            }
-            .padding(.horizontal, 34)
-
-            VStack(spacing: 10) {
-                onboardingMiniTip(icon: "bolt.fill", text: isEnglish ? "Species-aware quick actions" : "生成物种专属快捷操作")
-                onboardingMiniTip(icon: "calendar", text: isEnglish ? "Add birthdays, vaccines, and care reminders later" : "生日、疫苗和护理提醒可继续完善")
-                onboardingMiniTip(icon: "sparkles", text: isEnglish ? "Complete a first light log on Home to see coconut rewards" : "进入首页后完成第一次轻量打卡，马上看到椰子奖励")
-            }
-            .padding(18)
-            .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(.white.opacity(0.12), lineWidth: 1))
-            .padding(.horizontal, 24)
-            .padding(.top, 26)
-
-            Spacer(minLength: 0)
-
-            VStack(spacing: 12) {
-                Button {
-                    petWizardSessionId = UUID()
-                    step = .firstPet
-                    showPetWizard = true
-                } label: {
-                    Label(isEnglish ? "Add First Pet" : "添加第一个宠物", systemImage: "pawprint.fill")
-                        .font(.system(size: 17, weight: .black, design: .rounded))
+                    VStack(spacing: 12) {
+                        Text(localized(
+                            zh: "添加第一个宠物？",
+                            en: "Add your first pet?",
+                            de: "Erstes Tier hinzufugen?"
+                        ))
+                        .font(OhanaFont.largeTitle(.black))
                         .foregroundStyle(Color.arkInk)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 17)
-                        .background(Color.goLime, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                }
+                        .multilineTextAlignment(.center)
+                        Text(localized(
+                            zh: "添加后，首页马上出现快捷照护入口。",
+                            en: "Quick care actions appear on Home right away.",
+                            de: "Schnelle Pflege erscheint direkt auf der Startseite."
+                        ))
+                        .font(OhanaFont.body(.semibold))
+                        .foregroundStyle(Color.arkInk.opacity(0.58))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                    }
+                    .padding(.horizontal, 34)
 
-                Button(isEnglish ? "Enter Home First" : "先进入首页") {
-                    finishOnboarding()
-                }
-                .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.68))
-            }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 42)
-        }
-        .sheet(isPresented: $showPetWizard) {
-            NavigationStack {
-                ZStack {
-                    GoIslandWizardBackdrop()
-                    AddPetWizardView {
-                        showPetWizard = false
-                        finishOnboarding()
+                    VStack(spacing: 10) {
+                        onboardingMiniTip(
+                            icon: "bolt.fill",
+                            text: localized(zh: "物种专属快捷操作", en: "Species-aware actions", de: "Aktionen nach Tierart")
+                        )
+                        onboardingMiniTip(
+                            icon: "calendar",
+                            text: localized(zh: "生日、疫苗之后再补", en: "Add dates later", de: "Termine spater erganzen")
+                        )
+                        onboardingMiniTip(
+                            icon: "sparkles",
+                            text: localized(zh: "首次打卡有椰子反馈", en: "First log earns feedback", de: "Erster Eintrag gibt Feedback")
+                        )
                     }
-                    .id(petWizardSessionId)
-                }
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button(isEnglish ? "Later" : "稍后") {
-                            showPetWizard = false
+                    .padding(.horizontal, 24)
+                    .padding(.top, 22)
+
+                    Spacer(minLength: 20)
+
+                    VStack(spacing: 12) {
+                        Button {
+                            petWizardSessionId = UUID()
+                            step = .firstPet
+                            showPetWizard = true
+                        } label: {
+                            Label(localized(zh: "添加第一个宠物", en: "Add First Pet", de: "Erstes Tier"), systemImage: "pawprint.fill")
+                                .font(OhanaFont.title3(.black))
+                                .foregroundStyle(Color.arkInk)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 17)
+                                .background(Color.goLime, in: Capsule())
                         }
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.goLime)
+
+                        Button(localized(zh: "先进入首页", en: "Enter Home First", de: "Erst zur Startseite")) {
+                            finishOnboarding()
+                        }
+                        .font(OhanaFont.subheadline(.bold))
+                        .foregroundStyle(Color.arkInk.opacity(0.58))
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 42)
+                }
+                .frame(minHeight: proxy.size.height)
+            }
+            .sheet(isPresented: $showPetWizard) {
+                NavigationStack {
+                    ZStack {
+                        GoIslandWizardBackdrop()
+                        AddPetWizardView {
+                            showPetWizard = false
+                            finishOnboarding()
+                        }
+                        .id(petWizardSessionId)
+                    }
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button(localized(zh: "稍后", en: "Later", de: "Spater")) {
+                                showPetWizard = false
+                            }
+                            .font(OhanaFont.headline(.semibold))
+                            .foregroundStyle(Color.goLime)
+                        }
                     }
                 }
+                .presentationDetents([.large])
+                .interactiveDismissDisabled(false)
             }
-            .presentationDetents([.large])
-            .interactiveDismissDisabled(false)
         }
     }
 
@@ -624,29 +572,32 @@ struct OnboardingView: View {
         HStack(spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 13, weight: .black))
-                .foregroundStyle(Color.goLime)
+                .foregroundStyle(Color.goBlue)
                 .frame(width: 24)
             Text(text)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.78))
+                .font(OhanaFont.callout(.bold))
+                .foregroundStyle(Color.arkInk.opacity(0.72))
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
             Spacer()
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(Color(hex: "FFFFFF").opacity(0.72), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.arkInk.opacity(0.06), lineWidth: 1)
+        )
     }
 
     private func advanceFromWelcome() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        if isLastIntroPage {
-            startProfileSetup()
-        } else {
-            withAnimation(.spring(response: 0.38, dampingFraction: 0.82)) {
-                introPage = min(introPage + 1, introCards.count - 1)
-            }
-        }
+        startProfileSetup()
     }
 
     private func startProfileSetup() {
         humanWizardSessionId = UUID()
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) { step = .profile }
+        withAnimation(GoMotion.page) { step = .profile }
     }
 
     private func finishOnboarding() {

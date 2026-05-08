@@ -1052,9 +1052,12 @@ struct AddMedicationSheet: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @Query private var allMeds: [HumanMedication]
+    @Query private var allEvents: [Event]
 
     @State private var name = ""
-    @State private var dosage = ""
+    @State private var doseForm: HumanMedicationDoseForm = .tablet
+    @State private var doseAmount = ""
+    @State private var doseUnit = "片"
     @State private var frequency: MedicationFrequency = .daily
     @State private var customNote = ""
     @State private var doseMinutes = HumanMedicationSchedulePlan.defaultDoseMinutes(for: .daily)
@@ -1073,7 +1076,48 @@ struct AddMedicationSheet: View {
         case name, dosage, customNote, notes
     }
 
+    private enum HumanMedicationDoseForm: String, CaseIterable, Identifiable {
+        case tablet
+        case liquid
+        case powder
+        case injection
+        case other
+
+        var id: String { rawValue }
+
+        func title(l: L10n) -> String {
+            switch self {
+            case .tablet:
+                return l.tr(zh: "片剂", en: "Tablet", de: "Tablette")
+            case .liquid:
+                return l.tr(zh: "液体", en: "Liquid", de: "Flüssig")
+            case .powder:
+                return l.tr(zh: "粉剂", en: "Powder", de: "Pulver")
+            case .injection:
+                return l.tr(zh: "注射", en: "Injection", de: "Injektion")
+            case .other:
+                return l.tr(zh: "其他", en: "Other", de: "Andere")
+            }
+        }
+
+        var unitOptions: [String] {
+            switch self {
+            case .tablet:
+                return ["片", "粒", "mg"]
+            case .liquid:
+                return ["ml", "滴"]
+            case .powder:
+                return ["mg", "g", "勺"]
+            case .injection:
+                return ["ml", "IU"]
+            case .other:
+                return ["单位", "mg", "ml"]
+            }
+        }
+    }
+
     private let colorOptions = ["FF4757", "FF8C42", "FFF44F", "00D4AA", "4895EF", "9B5DE5", "4338FF"]
+    private let humanMedicationEntityType = "human_medication"
 
     private var l: L10n { L10n(appLanguage) }
     private var primaryText: Color { Color.ohanaPrimaryText }
@@ -1083,6 +1127,11 @@ struct AddMedicationSheet: View {
     private var controlStroke: Color { Color.ohanaCardStroke }
     private var canSave: Bool { !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     private var isEditing: Bool { editing != nil }
+    private var composedDosage: String {
+        let amount = doseAmount.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !amount.isEmpty else { return "" }
+        return "\(amount) \(doseUnit)"
+    }
 
     var body: some View {
         ZStack {
@@ -1093,6 +1142,7 @@ struct AddMedicationSheet: View {
                     header
                     basicInfoCard
                     frequencyCard
+                    dateCard
 
                     if frequency.isManualEntry {
                         manualModeCard
@@ -1115,6 +1165,7 @@ struct AddMedicationSheet: View {
                 .padding(.top, 20)
                 .padding(.horizontal, 16)
             }
+            .scrollDismissesKeyboard(.interactively)
         }
         .safeAreaInset(edge: .bottom) { footerBar }
         .toolbar {
@@ -1122,10 +1173,14 @@ struct AddMedicationSheet: View {
                 Spacer()
                 Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
                     focusedField = nil
+                    GoKeyboard.dismiss()
                 }
                 if canSave {
                     Button(l.tr(zh: "保存", en: "Save", de: "Sichern")) {
-                        save()
+                        GoKeyboard.dismiss()
+                        DispatchQueue.main.async {
+                            save()
+                        }
                     }
                     .fontWeight(.bold)
                 }
@@ -1185,18 +1240,74 @@ struct AddMedicationSheet: View {
             VStack(alignment: .leading, spacing: 14) {
                 cardHeader(icon: "pills.fill", color: Color(hex: colorHex), title: l.tr(zh: "药物信息", en: "Medication", de: "Medikament"))
                 fieldRow(icon: "textformat", label: l.tr(zh: "药品名称", en: "Name", de: "Name")) {
-                    TextField(l.tr(zh: "如：维生素 D", en: "e.g. Vitamin D", de: "z. B. Vitamin D"), text: $name)
+                    GoDraftTextField(
+                        l.tr(zh: "如：维生素 D", en: "e.g. Vitamin D", de: "z. B. Vitamin D"),
+                        text: $name,
+                        capitalization: .words,
+                        autoFocusDelay: 0.25
+                    )
                         .font(OhanaFont.body())
                         .foregroundStyle(primaryText)
-                        .focused($focusedField, equals: .name)
-                        .submitLabel(.next)
-                        .onSubmit { focusedField = .dosage }
                 }
-                fieldRow(icon: "scalemass", label: l.tr(zh: "剂量", en: "Dose", de: "Dosis")) {
-                    TextField(l.tr(zh: "如：1 片、500 mg", en: "e.g. 1 tablet, 500 mg", de: "z. B. 1 Tablette, 500 mg"), text: $dosage)
-                        .font(OhanaFont.body())
+                VStack(alignment: .leading, spacing: 10) {
+                    Label(l.tr(zh: "剂型", en: "Form", de: "Form"), systemImage: "pills")
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(secondaryText)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(HumanMedicationDoseForm.allCases) { form in
+                                let selected = doseForm == form
+                                Button {
+                                    endEditing()
+                                    withAnimation(GoMotion.feedback) {
+                                        doseForm = form
+                                        if !form.unitOptions.contains(doseUnit) {
+                                            doseUnit = form.unitOptions[0]
+                                        }
+                                    }
+                                } label: {
+                                    Text(form.title(l: l))
+                                        .font(OhanaFont.caption(.bold))
+                                        .foregroundStyle(selected ? Color.arkInk : primaryText)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .goSelectableSurface(isSelected: selected, tint: Color.goPrimary, in: Capsule())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+                fieldRow(icon: "scalemass", label: l.tr(zh: "每次剂量", en: "Dose per time", de: "Dosis pro Einnahme")) {
+                    GoDraftTextField(
+                        l.tr(zh: "数值", en: "Amount", de: "Menge"),
+                        text: $doseAmount,
+                        keyboardType: .decimalPad
+                    )
+                    .font(OhanaFont.body())
+                    .foregroundStyle(primaryText)
+
+                    Spacer(minLength: 8)
+
+                    Menu {
+                        ForEach(doseForm.unitOptions, id: \.self) { unit in
+                            Button(unit) {
+                                endEditing()
+                                doseUnit = unit
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(doseUnit)
+                                .font(OhanaFont.callout(.bold))
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(OhanaFont.caption(.bold))
+                        }
                         .foregroundStyle(primaryText)
-                        .focused($focusedField, equals: .dosage)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Color.primary.opacity(0.08), in: Capsule())
+                    }
                 }
             }
         }
@@ -1215,11 +1326,54 @@ struct AddMedicationSheet: View {
                 }
                 if frequency == .custom {
                     fieldRow(icon: "text.bubble", label: l.tr(zh: "自定义说明", en: "Custom note", de: "Eigene Notiz")) {
-                        TextField(l.tr(zh: "说明服药规则", en: "Describe the rule", de: "Regel beschreiben"), text: $customNote)
+                        GoDraftTextField(
+                            l.tr(zh: "说明服药规则", en: "Describe the rule", de: "Regel beschreiben"),
+                            text: $customNote
+                        )
                             .font(OhanaFont.body())
                             .foregroundStyle(primaryText)
-                            .focused($focusedField, equals: .customNote)
                     }
+                }
+            }
+        }
+    }
+
+    private var dateCard: some View {
+        sheetCard {
+            VStack(alignment: .leading, spacing: 14) {
+                cardHeader(icon: "calendar", color: Color.goBlue, title: l.tr(zh: "日期", en: "Dates", de: "Daten"))
+                HStack {
+                    Label(l.tr(zh: "开始日期", en: "Start date", de: "Startdatum"), systemImage: "calendar")
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(secondaryText)
+                    Spacer()
+                    DatePicker("", selection: $startDate, displayedComponents: .date)
+                        .labelsHidden()
+                        .simultaneousGesture(TapGesture().onEnded { endEditing() })
+                }
+                .padding(12)
+                .background(controlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+                Toggle(isOn: $hasEndDate) {
+                    Label(l.tr(zh: "设置结束日期", en: "Set end date", de: "Enddatum setzen"), systemImage: "calendar.badge.checkmark")
+                        .font(OhanaFont.callout(.bold))
+                        .foregroundStyle(primaryText)
+                }
+                .tint(Color.goTeal)
+                .onChange(of: hasEndDate) { _, _ in endEditing() }
+
+                if hasEndDate {
+                    HStack {
+                        Label(l.tr(zh: "结束日期", en: "End date", de: "Enddatum"), systemImage: "calendar.badge.minus")
+                            .font(OhanaFont.caption(.bold))
+                            .foregroundStyle(secondaryText)
+                        Spacer()
+                        DatePicker("", selection: $endDate, in: startDate..., displayedComponents: .date)
+                            .labelsHidden()
+                            .simultaneousGesture(TapGesture().onEnded { endEditing() })
+                    }
+                    .padding(12)
+                    .background(controlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
             }
         }
@@ -1238,6 +1392,7 @@ struct AddMedicationSheet: View {
                         Spacer()
                         DatePicker("", selection: doseTimeBinding(index), displayedComponents: .hourAndMinute)
                             .labelsHidden()
+                            .simultaneousGesture(TapGesture().onEnded { endEditing() })
                     }
                     .padding(12)
                     .background(controlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -1252,6 +1407,7 @@ struct AddMedicationSheet: View {
                             HStack(spacing: 8) {
                                 ForEach(weekdayOptions, id: \.0) { weekday, label in
                                     Button {
+                                        endEditing()
                                         withAnimation(GoMotion.feedback) { weeklyWeekday = weekday }
                                     } label: {
                                         Text(label)
@@ -1370,32 +1526,7 @@ struct AddMedicationSheet: View {
     private var moreCard: some View {
         sheetCard {
             VStack(alignment: .leading, spacing: 14) {
-                cardHeader(icon: "calendar", color: Color.goBlue, title: l.tr(zh: "日期与备注", en: "Dates and notes", de: "Daten und Notizen"))
-                HStack {
-                    Label(l.tr(zh: "开始日期", en: "Start date", de: "Startdatum"), systemImage: "calendar")
-                        .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(secondaryText)
-                    Spacer()
-                    DatePicker("", selection: $startDate, displayedComponents: .date)
-                        .labelsHidden()
-                }
-                Toggle(isOn: $hasEndDate) {
-                    Label(l.tr(zh: "设置结束日期", en: "Set end date", de: "Enddatum setzen"), systemImage: "calendar.badge.checkmark")
-                        .font(OhanaFont.callout(.bold))
-                        .foregroundStyle(primaryText)
-                }
-                .tint(Color.goTeal)
-
-                if hasEndDate {
-                    HStack {
-                        Label(l.tr(zh: "结束日期", en: "End date", de: "Enddatum"), systemImage: "calendar.badge.minus")
-                            .font(OhanaFont.caption(.bold))
-                            .foregroundStyle(secondaryText)
-                        Spacer()
-                        DatePicker("", selection: $endDate, in: startDate..., displayedComponents: .date)
-                            .labelsHidden()
-                    }
-                }
+                cardHeader(icon: "slider.horizontal.3", color: Color.goBlue, title: l.tr(zh: "更多", en: "More", de: "Mehr"))
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text(l.tr(zh: "标签颜色", en: "Color", de: "Farbe"))
@@ -1422,11 +1553,13 @@ struct AddMedicationSheet: View {
                     Label(l.tr(zh: "备注", en: "Notes", de: "Notizen"), systemImage: "note.text")
                         .font(OhanaFont.caption(.bold))
                         .foregroundStyle(secondaryText)
-                    TextEditor(text: $notes)
+                    GoDraftTextEditor(
+                        l.tr(zh: "备注", en: "Notes", de: "Notizen"),
+                        text: $notes,
+                        minHeight: 74
+                    )
                         .font(OhanaFont.body())
                         .foregroundStyle(primaryText)
-                        .scrollContentBackground(.hidden)
-                        .focused($focusedField, equals: .notes)
                         .frame(height: 74)
                         .padding(10)
                         .background(controlFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -1438,7 +1571,12 @@ struct AddMedicationSheet: View {
 
     private var footerBar: some View {
         VStack(spacing: 0) {
-            Button { save() } label: {
+            Button {
+                GoKeyboard.dismiss()
+                DispatchQueue.main.async {
+                    save()
+                }
+            } label: {
                 Text(isEditing ? l.tr(zh: "保存修改", en: "Save changes", de: "Änderungen sichern") : l.tr(zh: "保存药物", en: "Save medication", de: "Medikament sichern"))
                     .font(OhanaFont.headline(.bold))
                     .foregroundStyle(Color.arkInk)
@@ -1487,6 +1625,7 @@ struct AddMedicationSheet: View {
     private func frequencyChip(_ freq: MedicationFrequency) -> some View {
         let selected = frequency == freq
         return Button {
+            endEditing()
             withAnimation(GoMotion.feedback) { frequency = freq }
         } label: {
             Text(freq.displayTitle(l: l))
@@ -1568,10 +1707,15 @@ struct AddMedicationSheet: View {
         }
     }
 
+    private func endEditing() {
+        focusedField = nil
+        GoKeyboard.dismiss()
+    }
+
     private func loadEditing() {
         guard let med = editing else { return }
         name = med.name
-        dosage = med.dosage
+        loadDosage(med.dosage)
         frequency = med.frequency
         customNote = med.customFrequencyNote
         let loadedMinutes = HumanMedicationSchedulePlan.doseMinutes(for: med)
@@ -1584,6 +1728,53 @@ struct AddMedicationSheet: View {
         colorHex = med.colorHex
         notes = HumanMedicationScheduleMetadata.visibleNotes(from: med.notes)
         isActive = med.isActive
+    }
+
+    private func loadDosage(_ raw: String) {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            doseForm = .tablet
+            doseAmount = ""
+            doseUnit = "片"
+            return
+        }
+
+        let allUnits = Array(Set(HumanMedicationDoseForm.allCases.flatMap(\.unitOptions)))
+            .sorted { $0.count > $1.count }
+        if let unit = allUnits.first(where: { trimmed.hasSuffix($0) }) {
+            doseUnit = unit
+            doseForm = inferredDoseForm(for: unit)
+            doseAmount = trimmed
+                .dropLast(unit.count)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return
+        }
+
+        let parts = trimmed.split(separator: " ", maxSplits: 1).map(String.init)
+        if parts.count == 2, allUnits.contains(parts[1]) {
+            doseAmount = parts[0]
+            doseUnit = parts[1]
+            doseForm = inferredDoseForm(for: parts[1])
+        } else {
+            doseForm = .other
+            doseAmount = trimmed
+            doseUnit = "单位"
+        }
+    }
+
+    private func inferredDoseForm(for unit: String) -> HumanMedicationDoseForm {
+        switch unit {
+        case "片", "粒":
+            return .tablet
+        case "ml", "滴":
+            return .liquid
+        case "mg", "g", "勺":
+            return .powder
+        case "IU":
+            return .injection
+        default:
+            return .other
+        }
     }
 
     private func save() {
@@ -1602,7 +1793,7 @@ struct AddMedicationSheet: View {
 
         if let med = editing {
             med.name = cleanedName
-            med.dosage = dosage.trimmingCharacters(in: .whitespacesAndNewlines)
+            med.dosage = composedDosage
             med.frequency = frequency
             med.customFrequencyNote = frequency == .custom ? customNote.trimmingCharacters(in: .whitespacesAndNewlines) : ""
             med.firstDoseTime = firstDoseTime
@@ -1616,7 +1807,7 @@ struct AddMedicationSheet: View {
             let med = HumanMedication(
                 humanId: human.id.uuidString,
                 name: cleanedName,
-                dosage: dosage.trimmingCharacters(in: .whitespacesAndNewlines),
+                dosage: composedDosage,
                 frequency: frequency,
                 firstDoseTime: firstDoseTime,
                 startDate: startDate,
@@ -1631,18 +1822,71 @@ struct AddMedicationSheet: View {
         }
 
         modelContext.safeSave()
+        syncCalendarEvents(for: savedMed)
+        modelContext.safeSave()
         scheduleHumanMedicationReminders(overrideMeds: mergedMeds(including: savedMed))
         dismiss()
     }
 
     private func deleteMedication() {
         guard let med = editing else { return }
+        removeCalendarEvents(for: med.id)
         modelContext.delete(med)
         modelContext.safeSave()
         scheduleHumanMedicationReminders(overrideMeds: allMeds.filter {
             $0.humanId == human.id.uuidString && $0.id != med.id
         })
         dismiss()
+    }
+
+    private func syncCalendarEvents(for med: HumanMedication) {
+        removeCalendarEvents(for: med.id)
+        guard med.isActive, !frequency.isManualEntry else { return }
+
+        let calendar = Calendar.current
+        let firstDay = firstScheduledDay(calendar: calendar)
+        let sortedMinutes = HumanMedicationScheduleMetadata.normalizedDoseMinutes(
+            doseMinutes.isEmpty ? HumanMedicationSchedulePlan.defaultDoseMinutes(for: frequency) : doseMinutes
+        )
+
+        for (index, minute) in sortedMinutes.enumerated() {
+            guard let start = HumanMedicationSchedulePlan.date(on: firstDay, minuteOfDay: minute, calendar: calendar) else { continue }
+            let event = Event(
+                title: calendarEventTitle(for: med, doseIndex: index, totalDoses: sortedMinutes.count),
+                startDate: start,
+                eventType: EventType.medication.rawValue,
+                relatedEntityType: humanMedicationEntityType,
+                relatedEntityId: med.id.uuidString
+            )
+            event.recurrenceDays = frequency == .weekly ? 7 : 1
+            event.recurrenceEndDate = hasEndDate ? calendar.startOfDay(for: endDate) : nil
+            event.assigneeId = human.id.uuidString
+            modelContext.insert(event)
+        }
+    }
+
+    private func firstScheduledDay(calendar: Calendar) -> Date {
+        let start = calendar.startOfDay(for: startDate)
+        guard frequency == .weekly else { return start }
+        let startWeekday = calendar.component(.weekday, from: start)
+        let delta = (weeklyWeekday - startWeekday + 7) % 7
+        return calendar.date(byAdding: .day, value: delta, to: start) ?? start
+    }
+
+    private func calendarEventTitle(for med: HumanMedication, doseIndex: Int, totalDoses: Int) -> String {
+        let doseSuffix = totalDoses > 1
+            ? l.tr(zh: " · 第 \(doseIndex + 1) 次", en: " · Dose \(doseIndex + 1)", de: " · Dosis \(doseIndex + 1)")
+            : ""
+        let dosageSuffix = med.dosage.isEmpty ? "" : " · \(med.dosage)"
+        return "💊 \(human.name) · \(med.name)\(dosageSuffix)\(doseSuffix)"
+    }
+
+    private func removeCalendarEvents(for medicationId: UUID) {
+        for event in allEvents where
+            event.relatedEntityType == humanMedicationEntityType &&
+            event.relatedEntityId == medicationId.uuidString {
+            modelContext.delete(event)
+        }
     }
 
     private func mergedMeds(including savedMed: HumanMedication) -> [HumanMedication] {
