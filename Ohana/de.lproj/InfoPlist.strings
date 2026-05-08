@@ -1,0 +1,3 @@
+/* Localized Info.plist strings (German) */
+"NSCameraUsageDescription" = "Wird verwendet, um Fotos in Moments aufzunehmen und in deiner Mediathek zu speichern.";
+"NSLocationWhenInUseUsageDescription" = "Wird verwendet, um deinen aktuellen Standort in Moments hinzuzufügen.";

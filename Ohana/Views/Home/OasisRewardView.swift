@@ -51,6 +51,7 @@ struct OasisRewardView: View {
     @State private var lastLevel: TreeLevel = .lv1
     @State private var isInjecting: Bool = false
     @State private var levelUpPulse         = false
+    @State private var levelUpBadgeVisible  = false
     @State private var harvestBubbleBounce  = false
     @State private var justHarvested        = false
     // 任务7：环境光晕 + 采摘飞出
@@ -392,9 +393,9 @@ struct OasisRewardView: View {
                     }
                 )
                 .shadow(color: Color.goPrimary.opacity(glowBreathing ? 0.45 : 0.15), radius: glowBreathing ? 24 : 10, x: 0, y: 0)
-                .scaleEffect(levelUpPulse ? 1.12 : treeScale)
-                .animation(.spring(response: 0.4, dampingFraction: 0.5), value: levelUpPulse)
-                .animation(.spring(response: 0.4, dampingFraction: 0.5), value: treeScale)
+                .scaleEffect(levelUpPulse ? 1.22 : treeScale)
+                .animation(GoMotion.fab, value: levelUpPulse)
+                .animation(GoMotion.hero, value: treeScale)
                 .padding(.bottom, 28)
 
                 // Harvest bubble
@@ -403,7 +404,7 @@ struct OasisRewardView: View {
                         guard treeMgr.harvestDailyPassiveIncome() else { return }
                         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                         withAnimation(.spring(response: 0.3)) { justHarvested = true }
-                        spawnEnergyParticles()
+                        spawnEnergyParticles(count: 10)
                         flyCoconut = false
                         flyOpacity = 1
                         withAnimation(.spring(response: 0.55, dampingFraction: 0.6).delay(0.05)) {
@@ -454,6 +455,24 @@ struct OasisRewardView: View {
                     .allowsHitTesting(false)
             }
 
+            if levelUpBadgeVisible {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 12, weight: .black))
+                    Text("升级 · Lv.\(treeMgr.treeLevel.rawValue)")
+                        .font(.system(size: 13, weight: .black, design: .rounded))
+                }
+                .foregroundStyle(.black)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Color.goPrimary, in: Capsule())
+                .shadow(color: Color.goPrimary.opacity(0.55), radius: 16, x: 0, y: 6)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(.top, 54)
+                .transition(.scale.combined(with: .opacity))
+                .allowsHitTesting(false)
+            }
+
             // Level badge pill (top-left)
             HStack(spacing: 5) {
                 Text("Lv.\(treeMgr.treeLevel.rawValue) · \(treeMgr.treeLevel.displayName)")
@@ -477,7 +496,12 @@ struct OasisRewardView: View {
                 glowBreathing = true
             }
         }
-        .onChange(of: treeMgr.treeLevel) { _, _ in justHarvested = !treeMgr.canHarvestToday }
+        .onChange(of: treeMgr.treeLevel) { oldLevel, newLevel in
+            justHarvested = !treeMgr.canHarvestToday
+            if newLevel.rawValue > oldLevel.rawValue {
+                triggerLevelUpFeedback()
+            }
+        }
     }
 
     // MARK: - Progress Card
@@ -567,12 +591,9 @@ struct OasisRewardView: View {
                 withAnimation { isInjecting = false }
             }
             if treeMgr.injectEnergy(cost: 10) {
-                spawnEnergyParticles()
+                spawnEnergyParticles(count: 10)
                 if treeMgr.treeLevel != beforeLevel {
-                    withAnimation { levelUpPulse = true }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                        withAnimation { levelUpPulse = false }
-                    }
+                    triggerLevelUpFeedback()
                 }
             } else {
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
@@ -1192,15 +1213,35 @@ struct OasisRewardView: View {
         }
     }
 
-    private func spawnEnergyParticles() {
-        energyParticles = (0..<8).map { _ in EnergyParticle() }
+    private func triggerLevelUpFeedback() {
+        guard !levelUpPulse else { return }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        spawnEnergyParticles(count: 22)
+        withAnimation(GoMotion.fab) {
+            levelUpPulse = true
+            levelUpBadgeVisible = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+            withAnimation(GoMotion.hero) {
+                levelUpPulse = false
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.35) {
+            withAnimation(GoMotion.quick) {
+                levelUpBadgeVisible = false
+            }
+        }
+    }
+
+    private func spawnEnergyParticles(count: Int = 8) {
+        energyParticles = (0..<count).map { _ in EnergyParticle() }
         for i in energyParticles.indices {
-            withAnimation(.easeOut(duration: Double.random(in: 0.8...1.4)).delay(Double(i) * 0.06)) {
+            withAnimation(.easeOut(duration: Double.random(in: 0.85...1.55)).delay(Double(i) * 0.035)) {
                 energyParticles[i].offsetY  = CGFloat.random(in: -180 ... -80)
                 energyParticles[i].opacity  = 0
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.75) {
             energyParticles.removeAll()
         }
     }

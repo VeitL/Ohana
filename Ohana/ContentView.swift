@@ -17,6 +17,7 @@ struct ContentView: View {
     @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
     @AppStorage("appUIStyle") private var appUIStyle: String = "go"
+    @AppStorage("debugEnableClassicHome") private var debugEnableClassicHome: Bool = false
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @State private var showingRequiredHumanProfile = false
     @State private var homeResetToken = UUID()
@@ -31,8 +32,8 @@ struct ContentView: View {
             }
             NavigationStack {
                 Group {
-                    if appUIStyle == "go" {
-                        FocusStackHomeTestView(
+                    if debugEnableClassicHome && appUIStyle == "classic" {
+                        OverviewView(
                             selectedPet: $selectedPet,
                             selectedHuman: $selectedHuman,
                             selectedPlant: $selectedPlant,
@@ -40,7 +41,7 @@ struct ContentView: View {
                             heroNS: heroNS
                         )
                     } else {
-                        OverviewView(
+                        FocusStackHomeTestView(
                             selectedPet: $selectedPet,
                             selectedHuman: $selectedHuman,
                             selectedPlant: $selectedPlant,
@@ -72,8 +73,22 @@ struct ContentView: View {
             }
             .id(homeResetToken)
 
+            if hasOnboarded && !showingRequiredHumanProfile {
+                GlobalWalkBanner()
+                    .zIndex(80)
+            }
         }
-        .onAppear(perform: reconcileHumanProfileRequirement)
+        .onAppear {
+            if !debugEnableClassicHome, appUIStyle != "go" {
+                appUIStyle = "go"
+            }
+            reconcileHumanProfileRequirement()
+        }
+        .onChange(of: appUIStyle) { _, newValue in
+            if !debugEnableClassicHome, newValue != "go" {
+                appUIStyle = "go"
+            }
+        }
         .onChange(of: hasOnboarded) { _, _ in
             reconcileHumanProfileRequirement()
         }

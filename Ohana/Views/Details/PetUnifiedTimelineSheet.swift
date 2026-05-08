@@ -78,7 +78,7 @@ struct PetUnifiedTimelineSheet: View {
             summaryPill(icon: "figure.walk", count: typeGroups["walk"]?.count ?? 0, color: .goPrimary)
             summaryPill(icon: "drop.fill", count: typeGroups["potty"]?.count ?? 0, color: .goOrange)
             summaryPill(icon: "heart.text.clipboard", count: typeGroups["health"]?.count ?? 0, color: .goTeal)
-            summaryPill(icon: "yensign.circle.fill", count: typeGroups["expense"]?.count ?? 0, color: .goYellow)
+            summaryPill(icon: "\(AppCurrency.systemIconName).fill", count: typeGroups["expense"]?.count ?? 0, color: .goYellow)
             summaryPill(icon: "scalemass.fill", count: typeGroups["weight"]?.count ?? 0, color: .goTeal)
         }
     }

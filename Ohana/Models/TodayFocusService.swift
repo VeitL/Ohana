@@ -82,7 +82,7 @@ enum TodayFocusService {
     static func statusText(for content: Content) -> String {
         switch content {
         case .quest:
-            return "点一下完成"
+            return "去打卡"
         case .negative(let signal):
             return signal.severity == .critical ? "紧急" : "需要关注"
         case .memory:
@@ -117,7 +117,13 @@ enum TodayFocusService {
             return walkLogs.contains { $0.pet?.id == petId && calendar.isDate($0.startDate, inSameDayAs: now) }
         }
         if quest.id == "q_potty", let petId = quest.targetPetId {
-            return pottyLogs.contains { $0.pet?.id == petId && calendar.isDate($0.date, inSameDayAs: now) }
+            let pottyDone = pottyLogs.contains { $0.pet?.id == petId && calendar.isDate($0.date, inSameDayAs: now) }
+            let litterDone = careLogs.contains {
+                $0.careType == .litter
+                    && $0.pet?.id == petId
+                    && calendar.isDate($0.date, inSameDayAs: now)
+            }
+            return pottyDone || litterDone
         }
         if quest.id.hasPrefix("q_play_"), let petId = quest.targetPetId {
             let playedToday = careLogs.contains {

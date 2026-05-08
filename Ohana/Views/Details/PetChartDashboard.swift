@@ -221,13 +221,13 @@ struct PetChartDashboard: View {
         }.reduce(0) { $0 + $1.amount }
         let monthly = last6MonthExpense()
         return VStack(alignment: .leading, spacing: 10) {
-            cardHeader(icon: "yensign.circle", title: "花费", accent: .goYellow) {
+            cardHeader(icon: AppCurrency.systemIconName, title: "花费", accent: .goYellow) {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.primary.opacity(0.25))
             }
             HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text("¥\(Int(monthTotal))")
+                Text(AppCurrency.format(monthTotal, fractionDigits: 0))
                     .font(.system(size: 34, weight: .black, design: .rounded)).foregroundStyle(.primary)
                     .minimumScaleFactor(0.6).lineLimit(1)
             }
@@ -312,4 +312,3 @@ struct PetChartDashboard: View {
         }
     }
 }
-

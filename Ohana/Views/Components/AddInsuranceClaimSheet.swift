@@ -73,7 +73,7 @@ struct AddInsuranceClaimSheet: View {
                                     .font(.system(size: 13, weight: .medium, design: .rounded))
                                     .foregroundStyle(.secondary)
                                 Spacer()
-                                Text("保额 \(insurance.coverageAmount > 0 ? String(format: "¥%.0f", insurance.coverageAmount) : "—")")
+                                Text("保额 \(insurance.coverageAmount > 0 ? AppCurrency.format(insurance.coverageAmount, fractionDigits: 0) : "—")")
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundStyle(.secondary)
                             }
@@ -115,7 +115,7 @@ struct AddInsuranceClaimSheet: View {
                                             Text(exp.note.isEmpty ? exp.expenseCategory.rawValue : exp.note)
                                                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                                                 .foregroundStyle(.primary)
-                                            Text("\(exp.date.formatted(.dateTime.month().day())) · ¥\(String(format: "%.0f", exp.amount))")
+                                            Text("\(exp.date.formatted(.dateTime.month().day())) · \(AppCurrency.format(exp.amount, fractionDigits: 0))")
                                                 .font(.system(size: 11, weight: .regular, design: .rounded))
                                                 .foregroundStyle(.secondary)
                                         }
@@ -247,7 +247,7 @@ struct AddInsuranceClaimSheet: View {
                 .foregroundStyle(.primary)
             Spacer()
             HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text("¥")
+                Text(AppCurrency.symbol)
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goPrimary)
                 TextField(placeholder, text: text)
@@ -279,17 +279,27 @@ struct AddInsuranceClaimSheet: View {
 
         // 若直接标记为已报销，写负值 ExpenseLog
         if initialStatus == .approved && claimedDouble > 0 {
+            let approvedDate = Date()
+            claim.approvedAt = approvedDate
             let productName = insurance.productName.isEmpty ? insurance.companyName : insurance.productName
+            let note = InsuranceReimbursementExpenseWriter.reimbursementNote(productName: productName)
             let payerId = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-            let expense = PetExpenseLog(
-                date: Date(),
-                amount: -claimedDouble,
-                category: .insurancePremium,
-                note: "保险报销到账：\(productName)",
-                pet: pet,
-                executorId: payerId
-            )
-            modelContext.insert(expense)
+            if InsuranceReimbursementExpenseWriter.shouldInsertReimbursementLog(
+                existingLogs: pet.expenseLogs,
+                date: approvedDate,
+                amount: claimedDouble,
+                note: note
+            ) {
+                let expense = PetExpenseLog(
+                    date: approvedDate,
+                    amount: -claimedDouble,
+                    category: .insurancePremium,
+                    note: note,
+                    pet: pet,
+                    executorId: payerId
+                )
+                modelContext.insert(expense)
+            }
         }
 
         modelContext.safeSave()
@@ -336,7 +346,7 @@ private struct ExpenseLinkPickerSheet: View {
                                                 .foregroundStyle(.secondary)
                                         }
                                         Spacer()
-                                        Text(String(format: "¥%.0f", exp.amount))
+                                        Text(AppCurrency.format(exp.amount, fractionDigits: 0))
                                             .font(.system(size: 14, weight: .black, design: .rounded))
                                         if selectedId == exp.id.uuidString {
                                             Image(systemName: "checkmark.circle.fill")

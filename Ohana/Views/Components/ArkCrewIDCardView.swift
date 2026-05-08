@@ -26,6 +26,7 @@ struct ArkCrewIDCardView: View {
     @State private var glowFlash = false
     @State private var cardScale: CGFloat = 1.0
     @State private var cardRotation: Double = 0
+    @State private var showWalkSummaryPanel = false
 
     @AppStorage("appLanguage") private var appLanguage = "zh"
     private var l: L10n { L10n(appLanguage) }
@@ -39,6 +40,14 @@ struct ArkCrewIDCardView: View {
             binding.wrappedValue.toggle()
         } else {
             _isFlipped.toggle()
+        }
+    }
+
+    private func setFlipped(_ value: Bool) {
+        if let binding = isFlipped {
+            binding.wrappedValue = value
+        } else {
+            _isFlipped = value
         }
     }
     
@@ -60,6 +69,15 @@ struct ArkCrewIDCardView: View {
         .onChange(of: flipped) { _, newFlipped in
             withAnimation(.easeInOut(duration: 0.42)) {
                 cardRotation = newFlipped ? 180 : 0
+            }
+        }
+        .onChange(of: PetWalkingManager.shared.phase) { _, newPhase in
+            if case .finished = newPhase,
+               PetWalkingManager.shared.currentPet?.id == pet.id {
+                showWalkSummaryPanel = true
+                setFlipped(true)
+            } else if case .idle = newPhase {
+                showWalkSummaryPanel = false
             }
         }
         .onAppear { cardRotation = flipped ? 180 : 0 }
@@ -918,6 +936,8 @@ struct ArkCrewIDCardView: View {
                 // 停止
                 Button {
                     mgr.stop(modelContext: modelContext, household: cardHouseholds.first)
+                    showWalkSummaryPanel = true
+                    setFlipped(true)
                     UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                 } label: {
                     Label(l.petCardEndWalk, systemImage: "stop.fill")
@@ -968,6 +988,154 @@ struct ArkCrewIDCardView: View {
         .padding(.vertical, 8)
     }
 
+    private var walkSummaryPanel: some View {
+        let elapsed = walkSummaryElapsed
+        let distance = walkSummaryDistance
+        let poop = walkSummaryPoopCount
+        let coconuts = walkSummaryCoconuts
+
+        return ZStack {
+            LinearGradient(
+                colors: [Color(hex: "12264A"), Color(hex: "07111F")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.goPrimary.opacity(0.16))
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 18, weight: .black))
+                            .foregroundStyle(Color.goPrimary)
+                    }
+                    .frame(width: 34, height: 34)
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("遛狗完成")
+                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.goPrimary)
+                        Text("\(pet.name) 到家啦")
+                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    Button { closeWalkSummaryPanel() } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 26, weight: .bold))
+                            .foregroundStyle(.white.opacity(0.72))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("关闭遛狗总结")
+                }
+                .padding(.horizontal, 22)
+                .padding(.top, 18)
+
+                HStack(spacing: 8) {
+                    walkSummaryStatCell(value: formatElapsed(elapsed), label: "时长", accent: .goPrimary)
+                    walkSummaryStatCell(value: walkSummaryDistanceText(distance), label: "距离", accent: .goTeal)
+                    walkSummaryStatCell(value: "\(poop)次", label: "便便", accent: .goYellow)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 14)
+
+                HStack(spacing: 10) {
+                    Image(systemName: "map.fill")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Color.goBlue)
+                        .frame(width: 30, height: 30)
+                        .background(Color.goBlue.opacity(0.16), in: Circle())
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("本次记录已保存")
+                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text(coconuts > 0 ? "奖励 +\(coconuts)🥥 已入账" : "距离不足 20m，保留记录不发奖励")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.48))
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+
+                Spacer(minLength: 10)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+    }
+
+    private func walkSummaryStatCell(value: String, label: String, accent: Color) -> some View {
+        VStack(spacing: 4) {
+            Text(value)
+                .font(.system(size: 13, weight: .black, design: .rounded))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+            Text(label)
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .foregroundStyle(accent)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 9)
+        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private var latestWalkSummaryLog: PetWalkLog? {
+        pet.walkLogs.sorted { $0.startDate > $1.startDate }.first
+    }
+
+    private var walkSummaryElapsed: TimeInterval {
+        if case .finished(let elapsed, _) = PetWalkingManager.shared.phase,
+           PetWalkingManager.shared.currentPet?.id == pet.id {
+            return elapsed
+        }
+        return latestWalkSummaryLog?.durationSeconds ?? 0
+    }
+
+    private var walkSummaryDistance: Double {
+        if let log = latestWalkSummaryLog, log.distanceMeters > 0 {
+            return log.distanceMeters
+        }
+        return LocationManager.shared.totalDistance
+    }
+
+    private var walkSummaryPoopCount: Int {
+        if case .finished(_, let poopCount) = PetWalkingManager.shared.phase,
+           PetWalkingManager.shared.currentPet?.id == pet.id {
+            return poopCount
+        }
+        return PetWalkingManager.shared.poopCount
+    }
+
+    private var walkSummaryCoconuts: Int {
+        latestWalkSummaryLog?.coconutsEarned ?? 0
+    }
+
+    private func walkSummaryDistanceText(_ meters: Double) -> String {
+        meters >= 1000
+            ? String(format: "%.2f km", meters / 1000)
+            : String(format: "%.0f m", meters)
+    }
+
+    private func closeWalkSummaryPanel() {
+        withAnimation(GoMotion.feedback) {
+            setFlipped(false)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            showWalkSummaryPanel = false
+            PetWalkingManager.shared.reset()
+        }
+    }
+
     // MARK: - Card Back（Read-Only Dashboard）
     // Sheet 状态（仅保留长按详情跳转）
     @State private var showWeightSheet  = false
@@ -999,9 +1167,17 @@ struct ArkCrewIDCardView: View {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
                 .fill(Color.clear)
                 .contentShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-                .onTapGesture { toggleFlip() }
+                .onTapGesture {
+                    if showWalkSummaryPanel {
+                        closeWalkSummaryPanel()
+                    } else {
+                        toggleFlip()
+                    }
+                }
 
-            if isActiveWalk {
+            if showWalkSummaryPanel && PetWalkingManager.shared.currentPet?.id == pet.id {
+                walkSummaryPanel
+            } else if isActiveWalk {
                 // ── 遛狗活动中：使用 walkLivePanel 替换普通仪表盘
                 walkLivePanel
             } else {
@@ -2329,22 +2505,26 @@ enum QACardType: String, CaseIterable, Codable {
 
     /// 根据物种返回可用的卡片类型
     static func available(for species: String) -> [QACardType] {
-        switch species {
-        case "狗":
+        let s = species.lowercased()
+        if species.contains("狗") || s.contains("dog") {
             return [.walk, .feed, .water, .potty, .care, .play, .health, .expense, .weight]
-        case "猫":
-            return [.litter, .feed, .water, .potty, .play, .care, .health, .expense, .weight]
-        case "鱼", "热带鱼", "金鱼", "锦鲤":
-            return [.feed, .waterChange, .filterClean, .play, .health, .expense]
-        case "鸟", "鹦鹉", "文鸟", "鸽子":
-            return [.feed, .water, .cageCleaning, .freeFlight, .play, .health, .expense, .weight]
-        case "兔子", "仓鼠", "龙猫", "豚鼠":
-            return [.feed, .water, .litter, .care, .play, .health, .expense, .weight]
-        case "蜥蜴", "蛇", "龟", "变色龙", "壁虎":
-            return [.feed, .misting, .substrateChange, .play, .health, .expense, .weight]
-        default:
-            return [.feed, .water, .play, .care, .health, .expense, .weight]
         }
+        if species.contains("猫") || s.contains("cat") {
+            return [.litter, .feed, .water, .potty, .play, .care, .health, .expense, .weight]
+        }
+        if species.contains("鱼") || species.contains("锦鲤") || species.contains("金鱼") || s.contains("fish") || s.contains("koi") {
+            return [.feed, .waterChange, .filterClean, .play, .health, .expense]
+        }
+        if species.contains("鸟") || species.contains("鹦鹉") || species.contains("文鸟") || s.contains("bird") || s.contains("parrot") {
+            return [.feed, .water, .cageCleaning, .freeFlight, .play, .health, .expense, .weight]
+        }
+        if species.contains("兔") || species.contains("仓鼠") || species.contains("龙猫") || species.contains("豚鼠") || s.contains("rabbit") || s.contains("hamster") {
+            return [.feed, .water, .litter, .care, .play, .health, .expense, .weight]
+        }
+        if species.contains("爬") || species.contains("蜥") || species.contains("蛇") || species.contains("龟") || species.contains("守宫") || species.contains("壁虎") || s.contains("reptile") || s.contains("lizard") || s.contains("snake") || s.contains("turtle") || s.contains("gecko") {
+            return [.feed, .misting, .substrateChange, .play, .health, .expense, .weight]
+        }
+        return [.feed, .water, .play, .care, .health, .expense, .weight]
     }
 }
 
@@ -2894,7 +3074,7 @@ struct SpeciesCheckInGrid: View {
                     return c.year == comps.year && c.month == comps.month
                 }
                 .reduce(0.0) { $0 + $1.amount }
-            return total > 0 ? "本月 ¥\(Int(total))" : "暂无支出"
+            return total > 0 ? "本月 \(AppCurrency.format(total, fractionDigits: 0))" : "暂无支出"
         case .litter:
             let n = pet.careLogs.filter { $0.type == CareType.litter.rawValue && cal.isDateInToday($0.date) }.count
             return n > 0 ? "今日 \(n) 次" : "今日未铲"

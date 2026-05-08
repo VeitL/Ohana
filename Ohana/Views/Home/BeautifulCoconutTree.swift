@@ -3,10 +3,10 @@
 //  Ohana
 //
 //  SwiftUI 精确翻译 React/Framer Motion 版椰子树
-//  - 固定椰子坐标（9个）+ 呼吸发光 + 采摘交互
+//  - 固定椰子坐标 + 呼吸发光 + 采摘交互
 //  - 藤蔓 trim 生长动画（Lv5+）
 //  - 升级冲击波特效
-//  - 整体 scale 随等级变化
+//  - 每级改变树干、树冠、花果和光效层级
 //
 
 import SwiftUI
@@ -19,27 +19,47 @@ struct TreeLevelConfig {
     let scale: Double
     let leafCount: Int
     let coconutCount: Int
+    let flowerCount: Int
+    let trunkHeight: CGFloat
+    let trunkWidth: CGFloat
+    let leafWidth: CGFloat
+    let leafHeight: CGFloat
+    let crownOffset: CGFloat
+    let auraTier: Int
+    let rootCount: Int
 }
 
 private let treeLevelConfigs: [TreeLevelConfig] = [
-    .init(level: 1,  name: "破土新芽", scale: 0.4, leafCount: 2,  coconutCount: 0),
-    .init(level: 2,  name: "稚嫩幼苗", scale: 0.5, leafCount: 4,  coconutCount: 0),
-    .init(level: 3,  name: "茁壮小树", scale: 0.6, leafCount: 6,  coconutCount: 0),
-    .init(level: 4,  name: "青葱树冠", scale: 0.7, leafCount: 8,  coconutCount: 0),
-    .init(level: 5,  name: "初结硕果", scale: 0.8, leafCount: 10, coconutCount: 1),
-    .init(level: 6,  name: "丰收之树", scale: 0.9, leafCount: 12, coconutCount: 3),
-    .init(level: 7,  name: "绿洲明珠", scale: 1.0, leafCount: 14, coconutCount: 5),
-    .init(level: 8,  name: "繁星树冠", scale: 1.1, leafCount: 16, coconutCount: 7),
-    .init(level: 9,  name: "生命之源", scale: 1.2, leafCount: 16, coconutCount: 9),
-    .init(level: 10, name: "永恒神树", scale: 1.3, leafCount: 16, coconutCount: 9),
+    .init(level: 1,  name: "破土新芽", scale: 0.54, leafCount: 2,  coconutCount: 0,  flowerCount: 0,  trunkHeight: 54,  trunkWidth: 14, leafWidth: 50,  leafHeight: 34, crownOffset: 7,  auraTier: 0, rootCount: 0),
+    .init(level: 2,  name: "稚嫩幼苗", scale: 0.60, leafCount: 4,  coconutCount: 0,  flowerCount: 0,  trunkHeight: 86,  trunkWidth: 16, leafWidth: 64,  leafHeight: 40, crownOffset: 5,  auraTier: 0, rootCount: 1),
+    .init(level: 3,  name: "茁壮小树", scale: 0.68, leafCount: 6,  coconutCount: 0,  flowerCount: 3,  trunkHeight: 114, trunkWidth: 20, leafWidth: 76,  leafHeight: 48, crownOffset: 2,  auraTier: 0, rootCount: 2),
+    .init(level: 4,  name: "青葱树冠", scale: 0.76, leafCount: 8,  coconutCount: 0,  flowerCount: 5,  trunkHeight: 136, trunkWidth: 23, leafWidth: 88,  leafHeight: 54, crownOffset: 0,  auraTier: 0, rootCount: 3),
+    .init(level: 5,  name: "初结硕果", scale: 0.84, leafCount: 10, coconutCount: 1,  flowerCount: 6,  trunkHeight: 154, trunkWidth: 27, leafWidth: 98,  leafHeight: 60, crownOffset: -2, auraTier: 0, rootCount: 4),
+    .init(level: 6,  name: "丰收之树", scale: 0.92, leafCount: 13, coconutCount: 3,  flowerCount: 8,  trunkHeight: 168, trunkWidth: 31, leafWidth: 108, leafHeight: 66, crownOffset: -4, auraTier: 1, rootCount: 5),
+    .init(level: 7,  name: "绿洲明珠", scale: 1.00, leafCount: 16, coconutCount: 5,  flowerCount: 10, trunkHeight: 180, trunkWidth: 35, leafWidth: 118, leafHeight: 72, crownOffset: -6, auraTier: 1, rootCount: 6),
+    .init(level: 8,  name: "繁星树冠", scale: 1.07, leafCount: 19, coconutCount: 7,  flowerCount: 12, trunkHeight: 190, trunkWidth: 39, leafWidth: 128, leafHeight: 78, crownOffset: -8, auraTier: 2, rootCount: 7),
+    .init(level: 9,  name: "生命之源", scale: 1.14, leafCount: 21, coconutCount: 10, flowerCount: 15, trunkHeight: 198, trunkWidth: 43, leafWidth: 138, leafHeight: 84, crownOffset: -10, auraTier: 3, rootCount: 8),
+    .init(level: 10, name: "永恒神树", scale: 1.20, leafCount: 22, coconutCount: 12, flowerCount: 18, trunkHeight: 206, trunkWidth: 47, leafWidth: 148, leafHeight: 90, crownOffset: -12, auraTier: 4, rootCount: 9),
 ]
 
-// 9 个椰子固定坐标（相对树冠中心，对应 React 源码）
+// 椰子固定坐标（相对树冠中心）
 private let cocoPositions: [(x: CGFloat, y: CGFloat)] = [
     (-25, 15), (25, 10), (0, 30),
     (-45, -5), (40, -15), (-15, 45),
-    (15, 45), (-35, 25), (35, 25)
+    (15, 45), (-35, 25), (35, 25),
+    (-58, 14), (58, 2), (0, -8)
 ]
+
+private let blossomPositions: [(x: CGFloat, y: CGFloat)] = [
+    (-48, -34), (48, -38), (-8, -58),
+    (-66, -10), (66, -14), (-26, 18),
+    (28, 18), (-82, 18), (82, 14),
+    (-48, 42), (48, 40), (0, 50),
+    (-96, -2), (96, -8), (-14, -80),
+    (20, -78), (-72, 46), (74, 42)
+]
+
+private let maxLeafSlots = 22
 
 // MARK: - BeautifulCoconutTree
 
@@ -60,11 +80,11 @@ struct BeautifulCoconutTree: View {
     }
     private var isMax: Bool { level >= 10 }
     private var glowColor: Color { isMax ? Color(hex: "FBBF24") : Color.goPrimary }
+    private var sproutCount: Int { max(1, min(level, 4)) }
 
-    // React 源码固定参数
-    private let trunkH: CGFloat = 180
-    private var trunkW: CGFloat { CGFloat(24 + level * 2) }
-    private let bend:   CGFloat = 30
+    private var trunkH: CGFloat { cfg.trunkHeight }
+    private var trunkW: CGFloat { cfg.trunkWidth }
+    private var bend: CGFloat { CGFloat(12 + min(level, 9) * 3) }
 
     private func leafColor(index i: Int) -> Color {
         if isMax { return i % 2 == 0 ? Color(hex: "00FFD1") : Color(hex: "0284C7") }
@@ -83,13 +103,13 @@ struct BeautifulCoconutTree: View {
 
             // ── 升级冲击波（在树冠中心位置）
             if burstKey > 0 {
-                Circle()
-                    .stroke(glowColor, lineWidth: 4)
-                    .frame(width: 20, height: 20)
-                    .scaleEffect(shockwaveScale)
-                    .opacity(shockwaveOpacity)
+                LevelUpBurstView(
+                    progress: shockwaveScale,
+                    opacity: shockwaveOpacity,
+                    glowColor: glowColor
+                )
                     .offset(x: bend + trunkW * 0.4,
-                            y: -(trunkH * CGFloat(cfg.scale)))
+                            y: -trunkH + cfg.crownOffset)
                     .allowsHitTesting(false)
             }
 
@@ -97,15 +117,44 @@ struct BeautifulCoconutTree: View {
             if level >= 7 {
                 Ellipse()
                     .fill(Color(hex: "0EA5E9").opacity(0.6))
-                    .frame(width: trunkW * 6, height: trunkW * 2)
+                    .frame(width: max(CGFloat(130), trunkW * 6.2), height: trunkW * 2)
                     .blur(radius: 12)
-                    .animation(.spring(response: 1.5), value: level)
+                    .animation(GoMotion.hero, value: level)
             }
 
             Ellipse()
                 .fill(isMax ? Color(hex: "0F172A") : Color(hex: "271A14"))
-                .frame(width: trunkW * 5, height: trunkW * 1.6)
-                .animation(.spring(response: 1.5), value: level)
+                .frame(width: max(CGFloat(72), trunkW * 5.2), height: max(CGFloat(18), trunkW * 1.45))
+                .animation(GoMotion.hero, value: level)
+
+            if cfg.rootCount > 0 {
+                ZStack {
+                    ForEach(0..<cfg.rootCount, id: \.self) { i in
+                        let direction: CGFloat = i.isMultiple(of: 2) ? -1 : 1
+                        Capsule()
+                            .fill(isMax ? Color(hex: "334155") : Color(hex: "4A2B16"))
+                            .frame(width: CGFloat(38 + i * 8), height: max(CGFloat(3), trunkW * 0.13))
+                            .rotationEffect(.degrees(direction * Double(8 + i * 2)))
+                            .offset(x: direction * CGFloat(8 + i * 4), y: CGFloat(i % 3) * 2)
+                            .opacity(0.88)
+                    }
+                }
+                .offset(x: bend * 0.18, y: 1)
+                .allowsHitTesting(false)
+            }
+
+            if level <= 4 {
+                ForEach(0..<sproutCount, id: \.self) { i in
+                    GroundSproutView(color: leafColor(index: i))
+                        .scaleEffect(0.58 + CGFloat(i) * 0.14)
+                        .offset(
+                            x: (CGFloat(i) - CGFloat(sproutCount - 1) / 2) * 36,
+                            y: -3
+                        )
+                        .opacity(0.85)
+                        .allowsHitTesting(false)
+                }
+            }
 
             // ── 树干
             TrunkShape(trunkWidth: Double(trunkW), trunkHeight: Double(trunkH), bend: Double(bend))
@@ -118,7 +167,7 @@ struct BeautifulCoconutTree: View {
                     )
                 )
                 .frame(width: trunkW * 4 + bend + 40, height: trunkH + 10)
-                .animation(.spring(response: 1.5, dampingFraction: 0.7), value: level)
+                .animation(GoMotion.hero, value: level)
 
             // ── 藤蔓（Lv5+，trim 生长动画）
             if level >= 5 {
@@ -126,7 +175,7 @@ struct BeautifulCoconutTree: View {
                     .trim(from: 0, to: vineProgress)
                     .stroke(
                         Color(hex: "84CC16"),
-                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                        style: StrokeStyle(lineWidth: max(CGFloat(3), trunkW * 0.11), lineCap: .round)
                     )
                     .frame(width: trunkW * 4 + bend + 40, height: trunkH + 10)
                     .shadow(color: Color(hex: "84CC16").opacity(0.6), radius: 4)
@@ -136,47 +185,91 @@ struct BeautifulCoconutTree: View {
 
             // ── 神圣光环 (Divine Halo, Lv6+)
             if level >= 6 {
-                DivineHaloView(isSwaying: isSwaying)
-                    .offset(x: bend + trunkW * 0.4, y: -(trunkH))
+                DivineHaloView(
+                    isSwaying: isSwaying,
+                    tier: cfg.auraTier,
+                    size: 184 + CGFloat(cfg.auraTier) * 30
+                )
+                    .offset(x: bend + trunkW * 0.4, y: -trunkH - 8)
             }
 
             // ── 树冠（树叶 + 椰子，摇摆）
             ZStack {
+                // 后层树叶让高等级树冠更饱满
+                if level >= 6 {
+                    ForEach(0..<maxLeafSlots, id: \.self) { i in
+                        let isActive = i < cfg.leafCount && i % 2 == 1
+                        let angle: Double = cfg.leafCount > 1
+                            ? -168 + Double(i) * (336.0 / Double(max(1, cfg.leafCount - 1)))
+                            : -150
+                        LeafShape()
+                            .fill(leafColor(index: i + 1).opacity(0.72))
+                            .frame(width: cfg.leafWidth * 0.72, height: cfg.leafHeight * 0.78)
+                            .scaleEffect(isActive ? 1.0 : 0.001, anchor: .topLeading)
+                            .rotationEffect(.degrees(angle + 9), anchor: .topLeading)
+                            .offset(x: -6, y: 10)
+                            .opacity(isActive ? 0.55 : 0)
+                            .animation(
+                                GoMotion.hero.delay(isActive ? Double(i) * 0.025 : 0),
+                                value: cfg.leafCount
+                            )
+                            .allowsHitTesting(false)
+                    }
+                }
+
                 // 树叶（扇形，originX/Y=0 对应 React style.origin）
-                ForEach(0..<16, id: \.self) { i in
+                ForEach(0..<maxLeafSlots, id: \.self) { i in
                     let isActive = i < cfg.leafCount
                     let angle: Double = cfg.leafCount > 1
-                        ? -150 + Double(i) * (300.0 / Double(max(1, cfg.leafCount - 1)))
+                        ? -160 + Double(i) * (320.0 / Double(max(1, cfg.leafCount - 1)))
                         : -150
                     LeafShape()
                         .fill(leafColor(index: i))
-                        .frame(width: 100, height: 60)
-                        .scaleEffect(isActive ? (isMax ? 1.3 : 1.0) : 0.001,
+                        .frame(width: cfg.leafWidth, height: cfg.leafHeight)
+                        .scaleEffect(isActive ? (isMax ? 1.08 : 1.0) : 0.001,
                                      anchor: .topLeading)
                         .rotationEffect(.degrees(angle), anchor: .topLeading)
                         .opacity(isActive ? 0.95 : 0)
                         .animation(
-                            .spring(response: 1.5, dampingFraction: 0.6)
+                            GoMotion.hero
                                 .delay(isActive ? Double(i) * 0.05 : 0),
                             value: cfg.leafCount
                         )
                         .allowsHitTesting(false)
                 }
 
-                // 椰子（固定坐标，9 个槽位）
-                ForEach(0..<9, id: \.self) { i in
+                // 花朵/能量结晶，3 级后开始出现
+                ForEach(0..<blossomPositions.count, id: \.self) { i in
+                    if i < cfg.flowerCount {
+                        let pos = blossomPositions[i]
+                        let bloomScale = min(CGFloat(1.18), max(CGFloat(0.62), cfg.leafWidth / 120))
+                        BlossomView(index: i, isMax: isMax)
+                            .offset(x: pos.x * bloomScale, y: pos.y * bloomScale)
+                            .scaleEffect(level >= 8 ? 1.0 : 0.82)
+                            .transition(.scale.combined(with: .opacity))
+                            .animation(
+                                GoMotion.fab.delay(0.25 + Double(i) * 0.035),
+                                value: cfg.flowerCount
+                            )
+                            .allowsHitTesting(false)
+                    }
+                }
+
+                // 椰子（固定坐标）
+                ForEach(0..<cocoPositions.count, id: \.self) { i in
                     if i < cfg.coconutCount {
                         let pos = cocoPositions[i]
                         let isHarvested = harvestedCoconuts.contains(i)
+                        let positionScale = min(CGFloat(1.22), max(CGFloat(0.72), cfg.leafWidth / 108))
                         InteractiveCoconut(
                             index: i,
                             isMax: isMax,
                             isHarvested: isHarvested,
                             onTap: { onHarvest?(i) }
                         )
-                        .offset(x: pos.x, y: pos.y)
+                        .offset(x: pos.x * positionScale, y: pos.y * positionScale)
                         .animation(
-                            .spring(response: 1.0, dampingFraction: 0.6)
+                            GoMotion.fab
                                 .delay(0.5 + Double(i) * 0.1),
                             value: cfg.coconutCount
                         )
@@ -195,7 +288,7 @@ struct BeautifulCoconutTree: View {
             }
             // 树冠对齐树干顶端（对应 React animate.x/y）
             .offset(x: bend + trunkW * 0.4,
-                    y: -(trunkH - (level == 1 ? 5 : 0)))
+                    y: -trunkH + cfg.crownOffset)
             // 持续摇摆
             .rotationEffect(.degrees(isSwaying ? 2 : -2), anchor: .bottom)
             .animation(
@@ -204,12 +297,12 @@ struct BeautifulCoconutTree: View {
             )
             // 注入能量脉冲
             .scaleEffect(isInjecting ? 1.1 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isInjecting)
+            .animation(GoMotion.feedback, value: isInjecting)
         }
         // 整体 scale 随等级变化（React 源码 animate.scale）
         .scaleEffect(CGFloat(cfg.scale))
-        .animation(.spring(response: 1.5, dampingFraction: 0.7), value: cfg.scale)
-        .frame(width: 260, height: 320)
+        .animation(GoMotion.hero, value: cfg.scale)
+        .frame(width: 300, height: 348)
         .onAppear {
             isSwaying = true
             if level >= 5 {
@@ -235,10 +328,101 @@ struct BeautifulCoconutTree: View {
         burstKey += 1
         shockwaveScale = 0
         shockwaveOpacity = 1
-        withAnimation(.easeOut(duration: 1.5)) {
-            shockwaveScale = 25
+        withAnimation(.easeOut(duration: 1.35)) {
+            shockwaveScale = 1
             shockwaveOpacity = 0
         }
+    }
+}
+
+// MARK: - Upgrade / Growth Details
+
+private struct LevelUpBurstView: View {
+    let progress: CGFloat
+    let opacity: Double
+    let glowColor: Color
+
+    private let sparkAngles: [Double] = [0, 24, 52, 82, 116, 148, 180, 214, 246, 278, 310, 336]
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<3, id: \.self) { i in
+                Circle()
+                    .stroke(
+                        glowColor.opacity(0.82 - Double(i) * 0.18),
+                        lineWidth: CGFloat(4 - i)
+                    )
+                    .frame(width: CGFloat(30 + i * 18), height: CGFloat(30 + i * 18))
+                    .scaleEffect(1 + progress * CGFloat(5 + i * 3))
+                    .opacity(opacity)
+            }
+
+            ForEach(0..<sparkAngles.count, id: \.self) { i in
+                let radians = sparkAngles[i] * .pi / 180
+                let distance = CGFloat(28 + (i % 4) * 7) + progress * CGFloat(96 + (i % 3) * 18)
+                Capsule()
+                    .fill(i.isMultiple(of: 2) ? glowColor : Color.goYellow)
+                    .frame(width: 3, height: CGFloat(12 + (i % 3) * 5))
+                    .rotationEffect(.degrees(sparkAngles[i] + 90))
+                    .offset(
+                        x: CGFloat(cos(radians)) * distance,
+                        y: CGFloat(sin(radians)) * distance
+                    )
+                    .opacity(opacity)
+            }
+        }
+        .blendMode(.screen)
+        .allowsHitTesting(false)
+    }
+}
+
+private struct GroundSproutView: View {
+    let color: Color
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Capsule()
+                .fill(Color(hex: "4A2B16"))
+                .frame(width: 5, height: 24)
+            LeafShape()
+                .fill(color)
+                .frame(width: 34, height: 20)
+                .rotationEffect(.degrees(-34), anchor: .topLeading)
+                .offset(x: -6, y: -13)
+            LeafShape()
+                .fill(color.opacity(0.82))
+                .frame(width: 30, height: 18)
+                .rotationEffect(.degrees(146), anchor: .topLeading)
+                .offset(x: 8, y: -12)
+        }
+        .frame(width: 42, height: 34)
+    }
+}
+
+private struct BlossomView: View {
+    let index: Int
+    let isMax: Bool
+
+    private var petalColor: Color {
+        if isMax { return index.isMultiple(of: 2) ? Color(hex: "FDE68A") : Color(hex: "67E8F9") }
+        return index.isMultiple(of: 2) ? Color(hex: "F9A8D4") : Color(hex: "FDE68A")
+    }
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<5, id: \.self) { i in
+                Capsule()
+                    .fill(petalColor)
+                    .frame(width: 5, height: 12)
+                    .offset(y: -5)
+                    .rotationEffect(.degrees(Double(i) * 72))
+            }
+            Circle()
+                .fill(isMax ? Color.goPrimary : Color.goYellow)
+                .frame(width: 5, height: 5)
+        }
+        .frame(width: 18, height: 18)
+        .shadow(color: petalColor.opacity(isMax ? 0.75 : 0.35), radius: isMax ? 5 : 2)
     }
 }
 
@@ -448,17 +632,50 @@ struct SunbeamsView: View {
 
 struct DivineHaloView: View {
     var isSwaying: Bool
+    var tier: Int = 1
+    var size: CGFloat = 240
+
     var body: some View {
-        Circle()
-            .strokeBorder(
-                AngularGradient(colors: [Color(hex: "00FFD1"), Color(hex: "C8FF00"), Color(hex: "00FFD1")], center: .center),
-                style: StrokeStyle(lineWidth: 1.5, dash: [6, 10])
-            )
-            .frame(width: 240, height: 240)
-            .rotationEffect(.degrees(isSwaying ? 360 : 0))
-            .animation(.linear(duration: 25).repeatForever(autoreverses: false), value: isSwaying)
-            .opacity(0.8)
-            .allowsHitTesting(false)
+        ZStack {
+            Circle()
+                .strokeBorder(
+                    AngularGradient(
+                        colors: [Color(hex: "00FFD1"), Color(hex: "C8FF00"), Color(hex: "00FFD1")],
+                        center: .center
+                    ),
+                    style: StrokeStyle(lineWidth: 1.5 + CGFloat(tier) * 0.25, dash: [6, 10])
+                )
+                .frame(width: size, height: size)
+
+            if tier >= 2 {
+                Circle()
+                    .stroke(Color.goPrimary.opacity(0.32), lineWidth: 1)
+                    .frame(width: size * 0.72, height: size * 0.72)
+            }
+
+            if tier >= 3 {
+                Circle()
+                    .stroke(Color.goYellow.opacity(0.28), style: StrokeStyle(lineWidth: 1, dash: [2, 8]))
+                    .frame(width: size * 1.18, height: size * 1.18)
+            }
+
+            if tier >= 4 {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.goPrimary.opacity(0.18), Color.goYellow.opacity(0.08), .clear],
+                            center: .center,
+                            startRadius: 8,
+                            endRadius: size * 0.72
+                        )
+                    )
+                    .frame(width: size * 1.28, height: size * 1.28)
+            }
+        }
+        .rotationEffect(.degrees(isSwaying ? 360 : 0))
+        .animation(.linear(duration: 25).repeatForever(autoreverses: false), value: isSwaying)
+        .opacity(0.72 + min(Double(tier), 4) * 0.06)
+        .allowsHitTesting(false)
     }
 }
 
@@ -486,21 +703,38 @@ struct RunesView: View {
 
 struct StardustView: View {
     @State private var animate = false
+
+    private let dust: [(x: CGFloat, h: CGFloat, startY: CGFloat, endY: CGFloat, duration: Double, delay: Double)] = [
+        (-96, 8, -112, 138, 2.5, 0.0),
+        (-70, 12, -96, 148, 3.4, 0.6),
+        (-44, 6, -120, 132, 2.8, 1.2),
+        (-18, 10, -88, 152, 3.8, 0.3),
+        (8, 7, -132, 142, 2.6, 1.5),
+        (32, 11, -104, 156, 3.2, 0.9),
+        (58, 5, -118, 136, 2.7, 1.8),
+        (82, 9, -92, 150, 3.7, 0.4),
+        (104, 12, -126, 140, 3.0, 1.1),
+        (-112, 7, -86, 154, 3.5, 1.6),
+        (0, 13, -140, 126, 2.9, 0.8),
+        (116, 6, -110, 146, 3.3, 2.0)
+    ]
+
     var body: some View {
         ZStack {
-            ForEach(0..<12, id: \.self) { i in
+            ForEach(0..<dust.count, id: \.self) { i in
+                let item = dust[i]
                 Capsule()
                     .fill(Color.white)
-                    .frame(width: 2, height: CGFloat.random(in: 4...12))
+                    .frame(width: 2, height: item.h)
                     .opacity(animate ? 0.1 : 0.8)
                     .offset(
-                        x: CGFloat.random(in: -100...100),
-                        y: animate ? 150 : -100
+                        x: item.x,
+                        y: animate ? item.endY : item.startY
                     )
                     .animation(
-                        .linear(duration: Double.random(in: 2...4))
+                        .linear(duration: item.duration)
                             .repeatForever(autoreverses: false)
-                            .delay(Double.random(in: 0...2)),
+                            .delay(item.delay),
                         value: animate
                     )
             }

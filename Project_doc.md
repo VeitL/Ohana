@@ -1,8 +1,8 @@
 # Ohana iOS App 项目文档
 
-> 最后更新: 2026-05-07（GO 首页密度微调 / 自定义颜色直接色块矩阵 / 首屏头像与首击稳定化 / 护理计划与日历筛选落地）| Build: ✅ | Tests: ⚠️ 既有隐私/提醒去重用例待修 | Schema: ArkSchemaV38
+> 最后更新: 2026-05-07（首页核心工作台边界 / 物种护理计划 / 异常趋势优先 / 就诊卡片）| Build: ✅ | Tests: ⚠️ 既有隐私/提醒去重用例待修 | Schema: ArkSchemaV38
 >
-> **当前默认首页**：GO UI（`FocusStackHomeTestView`）。仅保留 GO UI + 经典 `OverviewView`；Material UI 已于 2026-04-24 移除。首页卡片堆固定只取前 7 张可显示卡片；宠物/人类“在首页显示”开关位于卡片展开页，切换后同步影响首页卡片堆，满 7 张时会提示先隐藏一张。
+> **当前默认首页**：GO UI（`FocusStackHomeTestView`）。普通用户固定进入 GO Focus；经典 `OverviewView` 仅保留 `debugEnableClassicHome` 内部兼容入口。首页是唯一核心工作台，只回答“今天谁需要照顾 / 现在最该做什么 / 点一下怎么完成”；卡片展开页放快捷操作，FAB 放二级功能，详情页放深数据。首页卡片堆固定只取前 7 张可显示卡片；宠物/人类“在首页显示”开关位于卡片展开页，切换后同步影响首页卡片堆，满 7 张时会提示先隐藏一张。
 
 ---
 
@@ -54,7 +54,7 @@ Ohana/
 │   ├── OhanaDesignSystem.swift      # CoconutBalanceCapsule + OhanaFont + goTranslucentCard 等
 │   ├── ArkBackgroundView.swift      # AppBackgroundStyle / OhanaAppBackground 全局背景
 │   ├── Home/
-│   │   ├── FocusStackHomeTestView.swift # GO UI 默认首页：Wallet 卡片堆（前 7 张可显示卡）+ Today Focus 横滑任务 + 展开态快捷模块 + FAB
+│   │   ├── FocusStackHomeTestView.swift # GO UI 默认首页：Wallet 卡片堆（前 7 张可显示卡）+ Today Focus 一键任务 + 展开态快捷模块 + FAB
 │   │   ├── FocusMoodQuestStrip.swift    # 旧 GO UI 心情 + 任务白卡组件，部分路径仍可复用
 │   │   ├── EmptyStateWelcomeCard.swift  # GO UI 空态欢迎卡
 │   │   ├── FunctionMenuSheet.swift      # GO UI 功能分类 sheet + FMDest / FeatureGroup / PetFeature
@@ -193,12 +193,12 @@ Ohana/
 
 ## 四、首页架构总览
 
-**`ContentView.swift`** 读 `@AppStorage("appUIStyle")` 决定首页：
+**`ContentView.swift`** 默认固定进入 GO Focus 首页：
 
-| 值 | 首页 | 状态 |
+| 条件 | 首页 | 状态 |
 |---|---|---|
-| `"go"`（默认） | `FocusStackHomeTestView` | **当前主路径**，详见第二十三·B 节 |
-| `""` 或其它 | `OverviewView` | 经典 UI，详情如下；大量组件仍在 GO UI 外被复用 |
+| 普通用户路径 | `FocusStackHomeTestView` | **当前唯一主路径**，详见第二十三·B 节 |
+| `debugEnableClassicHome == true && appUIStyle == "classic"` | `OverviewView` | 内部兼容/回归入口；设置页不再暴露经典 UI 切换 |
 
 > Material UI 已于 2026-04-24 删除（`MaterialDashboardView.swift`、`isMaterial` 分支清理为 `false`、Settings 选项卡移除）。`MaterialDesignTestView.swift` 作为设计系统展示页保留。
 
@@ -412,10 +412,9 @@ ForEach(orderedSections)     // 受 HomeSectionManageSheet 控制（顺序 + 显
 
 ## 十·A、家庭周报升级
 
-**`FamilyWeeklyReportDashboardView.swift`** 是全家庭多宠周报入口，替代单宠周报作为 GO 首页家庭协作卡的主周报页面。
+**`FamilyWeeklyReportDashboardView.swift`** 是全家庭多宠周报入口。2026-05-07 起家庭协作不再作为首页折叠态卡片展示，避免首页超载。
 
 入口：
-- `FocusStackHomeTestView.familyCollaborationCard` → “周报”
 - GO 首页 FAB / `FunctionMenuSheet` → **家庭协作** → **家庭周报** 分段（仅人类成员数 > 1 时显示）
 
 能力：
@@ -725,7 +724,6 @@ ZStack
 │   ├── goFocusHeader(safeT: safeAreaTop)
 │   ├── TodayFocusCard                          // 今天谁需要照顾 / 什么最紧急 / 一点完成；本次再上移 10pt，当前 offset -20pt
 │   ├── firstSuccessCheckInCard                 // 新用户首次快捷打卡闭环（按需）
-│   ├── familyCollaborationCard                 // 家庭协作：谁做了什么 / 指派待办 / 催办 / 周报
 │   └── walletCardStack(cards:)                 // 仅 collapsed 显示，底部锚定
 ├── expandedWalletLayer(cards:geo:)             // isExpanded == true 时根层绝对定位
 │   ├── active FocusWalletCardView              // safeAreaTop + 76pt
@@ -844,21 +842,33 @@ active 宠物 / 人类卡下方复用经典 UI 的 `GoQuickActionCard` 网格样
 GO UI 折叠态首屏已收敛为 Today Focus：优先回答“今天谁需要照顾、什么最紧急、我点一下能完成什么”。当前模块 offset 为 -20pt，展开卡片时隐藏，避免与 active card 下方快捷模块争抢空间。
 
 **`TodayFocusCard`**：
-- 数据来自 `IslandQuestEngine.todayQuests(pets:reminders:plants:events:)`
+- 数据来自 `IslandQuestEngine.todayQuests(pets:reminders:plants:events:humans:)`
 - 传入 `activePet: todayFocusActivePet`
 - 多个任务横向分页显示，底部使用自定义页点；卡片按钮为“去完成”，完成后短暂显示“已完成”并划走。
 - 完成回调走 `completeQuestInFocusStack(_:)`，继续发放椰子奖励并写入现有照护日志/账本路径。
+- 异常趋势 / 医疗风险优先于普通任务：`IslandNegativeFeedback` 聚合疫苗/驱虫/体重/症状/证件风险，以及食欲下降、便便异常、饮水异常等趋势信号。
+- 新宠默认护理计划通过 `CarePlanCalendarSync.ensureDefaultPlans(for:context:)` 写入 `Event`；基础信息页保存时也会刷新物种/品种对应计划。Today Focus 只读取今天到期且尚未完成的计划任务。
+- 护理任务 subtitle 会显示“上次由谁完成 / 多久前”或“今天还缺什么”，避免多人家庭重复照顾。
 - 已遛狗会自动视作今日陪玩已完成，避免每个宠物每天都生成重复陪玩任务；无任务时显示庆祝卡。
 - 右侧绿洲入口 `onTapOasis` 打开 `OasisRewardView`
+
+**默认护理计划**：
+- 狗：喂食 / 饮水 / 遛狗 / 体外驱虫 / 体内驱虫 / 疫苗复查 / 毛发护理。
+- 猫：喂食 / 饮水 / 铲屎 / 陪玩 / 体重 / 毛球与毛发护理。
+- 鱼：喂食 / 换水 / 过滤检查 / 水温检查。
+- 鸟：喂食 / 饮水 / 清理鸟笼 / 放飞互动 / 体重。
+- 兔子：喂食 / 饮水 / 清理厕所 / 毛发护理 / 体重。
+- 爬宠：喂食 / 补水保湿 / 温湿度检查 / 环境清洁 / 蜕皮观察。
+- 非每日任务从下一周期开始到期，避免新宠加入当天把 Today Focus 塞满；品种/毛发关键词会调整毛发护理间隔，蛇/龟等爬宠会调整喂食间隔。
 
 **新用户 3 分钟成功体验**：
 - `OnboardingView.finishOnboarding()` 设置 `ohana_show_first_success_card = true`
 - 首页显示 `firstSuccessCheckInCard(pet:)`，引导完成第一次“喂食 +🥥”
 - 成功后写入喂食记录、触发椰子奖励动画，并设置 `ohana_first_quick_checkin_completed = true`
 
-**家庭协作卡**：
-- `familyCollaborationCard(pet:)` 显示在 Today Focus 下方
-- 仅当人类成员数 `humans.count > 1` 时显示；单人家庭隐藏，避免制造无意义协作噪音。
+**家庭协作路径**：
+- 首页折叠态不再显示 `familyCollaborationCard(pet:)`；家庭协作改走 FAB / 周报 / 详情页，保持首页只回答三件事。
+- 仅当人类成员数 `humans.count > 1` 时显示家庭协作入口；单人家庭隐藏，避免制造无意义协作噪音。
 - `FamilyActivityStripView(style: .compact)`：今日谁照顾了当前宠物
 - `assignedPendingReminders(for:)`：读取当前宠物今日内已指派 `Event.assigneeId` 的 pending reminders
 - `AssigneeChip` + `NudgeButton`：展示负责人并提供本地催办反馈
@@ -866,13 +876,18 @@ GO UI 折叠态首屏已收敛为 Today Focus：优先回答“今天谁需要�
 
 **任务完成处理**（`completeQuestInFocusStack`）：
 - `q_feed_*` → `.feeding` PetCareLog（`dailyPortionGrams` + `manualFeedNoteMarker`）
-- `q_water_*`（非植物）→ `.waterChange` PetCareLog
+- `q_water_*`（非植物）→ `.watering` PetCareLog
 - `q_walk` → `PetWalkingManager.shared.start(pet:)`
-- `q_potty` → `.perfectPoop` PetPottyLog
+- `q_potty` → 猫/兔写入 `.litter` PetCareLog；其它宠物写入 `.perfectPoop` PetPottyLog
 - `q_water_plant` / `q_fertilize_plant` → 更新植物日期 + `PlantCareLog`
 - `q_reminder` → `showingCalendar = true`
 - 用药任务 → `PetMedicationDoseLogging.recordDose`
+- `q_event_*` → 标记对应 `Event` 当日 occurrence 已完成
 - 除 `q_walk` 外，完成后均 `QuestManager.shared.addCoconuts(amt, title: "岛屿任务")`
+
+**就诊卡片**：
+- `PetBasicInfoDetailView` 读取态新增“就诊卡片”，汇总疫苗、过敏、当前用药、近期症状、保险、最近体重、芯片号。
+- 使用系统 `ShareLink` 生成给兽医看的文本摘要；深数据仍保留在健康、保险、文档详情页。
 
 ### FAB（右下角悬浮按钮）— `homeFabOverlay`
 
@@ -1036,7 +1051,7 @@ Zoom 目标页。背景 = 宠物主题渐变（与卡片正面无缝转场）。
 
 | 文件 | 角色 |
 |---|---|
-| `Views/Home/FocusStackHomeTestView.swift` | GO 首页：Wallet 卡片堆 / Today Focus / 家庭协作卡 / 展开态快捷模块 / header / FAB / 空状态 / 遗留 bloom 路径 |
+| `Views/Home/FocusStackHomeTestView.swift` | GO 首页：Wallet 卡片堆 / Today Focus 一键任务 / 展开态快捷模块 / header / FAB / 空状态 / 显式排序模式 |
 | `Views/OnboardingView.swift` | 首次启动引导：App Store 截图式功能介绍 / 人类建档 / 首宠添加选择 |
 | `Views/Home/FocusMoodQuestStrip.swift` | 心情 + 任务 TabView pager 白卡 |
 | `Views/Home/EmptyStateWelcomeCard.swift` | 冷启动欢迎卡 |
@@ -1169,7 +1184,7 @@ introFlow（最多 5 张功能介绍卡）
   - 辅助方法 `BountyTask.loadAll()` / `pendingAssignedCount(for:)`
 - [x] **日历任务指派 + 首页协作卡**（2026-04-26 落地）
   - `AddEventView` 新增 `AssigneePickerRow`，保存时写入 `Event.assigneeId`
-  - `FocusStackHomeTestView.familyCollaborationCard` 在 GO 首页展示家庭协作摘要
+  - `FocusStackHomeTestView.familyCollaborationCard` 曾用于 GO 首页家庭协作摘要；2026-05-07 后首页折叠态不再展示，家庭协作改走 FAB / 周报 / 详情页
   - 已指派、今日内的 pending reminders 展示负责人 `AssigneeChip`
   - `NudgeButton` 提供本地催办反馈；周报入口打开 `FamilyWeeklyReportDashboardView`
 - [x] **家庭周报系统化升级**（2026-04-26 落地）
@@ -1185,7 +1200,7 @@ introFlow（最多 5 张功能介绍卡）
   - 展示通知权限、系统待发数量、App 内 pending / overdue / failed / completed 统计
   - 汇总提醒调度账本，并列出高风险提醒
 - [x] **GO 首页家庭协作显示条件与执行人/支付者绑定**（2026-04-27 落地）
-  - 家庭协作模块仅在人类成员数 > 1 时显示
+  - 家庭协作模块仅在人类成员数 > 1 时显示；2026-05-07 起不再塞入首页折叠态
   - 快速打卡、体重、护理、健康等记录默认绑定当前手机使用者为执行人
   - 添加花费新增“支付者”选项，花费详情页显示支付者/保险到账来源
 - [x] **GO 首页 FAB 稳定化与宠物日历筛选**（2026-04-27 落地）
@@ -1209,6 +1224,21 @@ introFlow（最多 5 张功能介绍卡）
   - 首页卡片堆露出间隔调整为原来的 90%，底部位置保持不变，因此卡片堆顶端随总高度下移
   - 毛色 / 瞳色 / 主题色的“自定义”入口改为直接打开带确认按钮的 GO 色块矩阵，不再二次点击系统圆形 ColorPicker
   - 首页卡片头像缓存首屏同步下采样，启动稳定期短暂禁用排序手势，避免首屏头像延迟和首次点击被排序手势吞掉
+- [x] **GO Focus 主路径、状态文案与动画层级统一**（2026-05-07 落地）
+  - 普通用户首页固定为 GO Focus；经典 `OverviewView` 仅保留 `debugEnableClassicHome` 内部兼容入口
+  - 设置页移除经典 / GO 双卡切换，改为 GO Focus 当前状态卡
+  - 添加宠物与裁剪页减少教程式长文案，改成“可用 / 未检测到图片 / 卡片取景”等短状态
+  - 新增 `GoMotion`：页面转场、卡片 hero、FAB、轻反馈统一动画 token，首页卡片、Today Focus、颜色选择与设置卡片开始复用
+- [x] **首页核心工作台、性能诊断与头像链路稳定化**（2026-05-07 落地）
+  - 首页折叠态只保留 Today Focus 一键任务与首成功引导，家庭协作摘要不再塞进首页；家庭协作走 FAB / 详情页
+  - 设置页开发者工具新增“性能诊断面板”，记录 App init、启动到首页首帧、首页头像解码、卡片点击延迟、粘贴/相册/拍照到裁剪页耗时
+  - 添加宠物、添加人类、基础信息页头像来源统一先做轻量预处理：限制到 1600px、修正方向、保留透明 PNG，再进入裁剪页
+  - 首页卡片排序改为显式模式：普通状态点击永远优先展开；长按只进入排序状态，进入后再拖动排序
+- [x] **物种护理计划、异常趋势与就诊卡片**（2026-05-07 落地）
+  - 添加宠物后按物种/品种自动写入默认护理计划 Event；Today Focus 从今天到期的计划中生成可一键完成任务
+  - Today Focus 优先展示异常趋势与医疗风险，再展示普通护理任务
+  - 护理任务显示上次执行人和时间，降低家庭重复照顾概率
+  - 宠物基础信息页新增就诊卡片和给兽医分享摘要
 - [x] **护理计划与护理详情统一**（2026-05-05 落地）
   - 护理计划支持全天日程 / 指定时间；非全天时写入用户选择的 time
   - 护理周期只在设置计划页通过天数加减维护，保存后同步 `Event.recurrenceDays` 与 `hygiene_cycle_*`

@@ -219,10 +219,30 @@ struct IslandNegativeSignal: Identifiable {
     let title: String
     let detail: String
     let severity: Severity
+    let petId: UUID?
+    let healthAlertType: HealthAlert.AlertType?
 
     enum Severity {
         case warning       // 黄色 - 可缓冲
         case critical      // 红色 - 紧急
+    }
+
+    init(
+        iconName: String,
+        emoji: String,
+        title: String,
+        detail: String,
+        severity: Severity,
+        petId: UUID? = nil,
+        healthAlertType: HealthAlert.AlertType? = nil
+    ) {
+        self.iconName = iconName
+        self.emoji = emoji
+        self.title = title
+        self.detail = detail
+        self.severity = severity
+        self.petId = petId
+        self.healthAlertType = healthAlertType
     }
 }
 
@@ -232,6 +252,40 @@ struct IslandNegativeFeedback {
         var result: [IslandNegativeSignal] = []
         let cal = Calendar.current
         let now = Date()
+
+        // 0. 健康异常引擎：疫苗/驱虫/体重/症状/证件等风险优先进入 Today Focus。
+        let clinicalAlerts = PetHealthAlertEngine.shared.scanAlerts(pets: pets)
+            .filter { alert in
+                switch alert.type {
+                case .noCheckIn, .noWalk, .noPotty:
+                    return false
+                default:
+                    return true
+                }
+            }
+        for alert in clinicalAlerts.prefix(2) {
+            result.append(IslandNegativeSignal(
+                iconName: iconName(for: alert),
+                emoji: alert.emoji,
+                title: "\(alert.petName)：\(alert.title)",
+                detail: alert.detail,
+                severity: alert.severity == .urgent ? .critical : .warning,
+                petId: alert.petId,
+                healthAlertType: alert.type
+            ))
+        }
+
+        for pet in pets where !pet.hasPassedAway {
+            if let signal = appetiteTrendSignal(for: pet, calendar: cal, now: now) {
+                result.append(signal)
+            }
+            if let signal = abnormalPottyTrendSignal(for: pet, calendar: cal, now: now) {
+                result.append(signal)
+            }
+            if let signal = drinkingTrendSignal(for: pet, calendar: cal, now: now) {
+                result.append(signal)
+            }
+        }
 
         // 1. 连断打卡：以真实照护日志为准，避免派生 streak 字段未同步时误报。
         let brokenStreakPets = pets.filter { pet in
@@ -333,5 +387,105 @@ struct IslandNegativeFeedback {
         }
 
         return false
+    }
+
+    private static func iconName(for alert: HealthAlert) -> String {
+        switch alert.type {
+        case .vaccineExpired, .vaccineExpiringSoon:
+            return "syringe.fill"
+        case .dewormingDue:
+            return "pills.fill"
+        case .weightGainAlert, .weightLossAlert:
+            return "scalemass.fill"
+        case .checkupOverdue, .activeSymptom:
+            return "cross.case.fill"
+        case .documentExpiringSoon:
+            return "doc.badge.clock.fill"
+        case .drinkingWeightAlert:
+            return "drop.triangle.fill"
+        case .lowActivityAlert:
+            return "chart.line.downtrend.xyaxis"
+        case .heatCycleAlert:
+            return "heart.text.square.fill"
+        case .pregnancyCountdown:
+            return "figure.2.and.child.holdinghands"
+        case .noCheckIn, .noPotty, .noWalk:
+            return "exclamationmark.triangle.fill"
+        }
+    }
+
+    private static func appetiteTrendSignal(for pet: Pet, calendar: Calendar, now: Date) -> IslandNegativeSignal? {
+        let feedLogs = pet.careLogs.filter { $0.careType == .feeding && $0.amountGrams > 0 }
+        guard feedLogs.count >= 4 else { return nil }
+        let recent = dailyAverageAmount(feedLogs, amount: \.amountGrams, daysAgo: 0..<3, calendar: calendar, now: now)
+        let previous = dailyAverageAmount(feedLogs, amount: \.amountGrams, daysAgo: 3..<6, calendar: calendar, now: now)
+        guard previous > 0, recent > 0, recent < previous * 0.65 else { return nil }
+        return IslandNegativeSignal(
+            iconName: "fork.knife.circle.fill",
+            emoji: "🍽️",
+            title: "\(pet.name) 食欲下降",
+            detail: "近 3 天喂食量比前 3 天低约 \(Int((1 - recent / previous) * 100))%，建议观察精神和便便",
+            severity: .warning
+        )
+    }
+
+    private static func abnormalPottyTrendSignal(for pet: Pet, calendar: Calendar, now: Date) -> IslandNegativeSignal? {
+        let start = calendar.date(byAdding: .day, value: -3, to: now) ?? now
+        let abnormal = pet.pottyLogs.filter {
+            $0.date >= start && ($0.pottyType == .softPoop || $0.pottyType == .liquidPoop)
+        }
+        guard abnormal.count >= 2 else { return nil }
+        return IslandNegativeSignal(
+            iconName: "exclamationmark.triangle.fill",
+            emoji: "🚽",
+            title: "\(pet.name) 便便异常",
+            detail: "近 3 天记录到 \(abnormal.count) 次软便/水便，建议留意饮食变化",
+            severity: abnormal.contains { $0.pottyType == .liquidPoop } ? .critical : .warning
+        )
+    }
+
+    private static func drinkingTrendSignal(for pet: Pet, calendar: Calendar, now: Date) -> IslandNegativeSignal? {
+        let waterLogs = pet.careLogs.filter { $0.careType == .watering && $0.amountMl > 0 }
+        guard waterLogs.count >= 4 else { return nil }
+        let recent = dailyAverageAmount(waterLogs, amount: \.amountMl, daysAgo: 0..<3, calendar: calendar, now: now)
+        let previous = dailyAverageAmount(waterLogs, amount: \.amountMl, daysAgo: 3..<6, calendar: calendar, now: now)
+        guard previous > 0, recent > 0 else { return nil }
+        if recent > previous * 1.7 {
+            return IslandNegativeSignal(
+                iconName: "drop.triangle.fill",
+                emoji: "💧",
+                title: "\(pet.name) 喝水增多",
+                detail: "近 3 天饮水量明显高于之前，建议结合体重和尿尿观察",
+                severity: .warning
+            )
+        }
+        if recent < previous * 0.45 {
+            return IslandNegativeSignal(
+                iconName: "drop.triangle.fill",
+                emoji: "💧",
+                title: "\(pet.name) 喝水减少",
+                detail: "近 3 天饮水量明显偏低，建议检查水碗和精神状态",
+                severity: .warning
+            )
+        }
+        return nil
+    }
+
+    private static func dailyAverageAmount(
+        _ logs: [PetCareLog],
+        amount: KeyPath<PetCareLog, Double>,
+        daysAgo: Range<Int>,
+        calendar: Calendar,
+        now: Date
+    ) -> Double {
+        let values = daysAgo.map { dayOffset -> Double in
+            guard let day = calendar.date(byAdding: .day, value: -dayOffset, to: now) else { return 0 }
+            return logs
+                .filter { calendar.isDate($0.date, inSameDayAs: day) }
+                .reduce(0) { $0 + $1[keyPath: amount] }
+        }
+        let nonZero = values.filter { $0 > 0 }
+        guard !nonZero.isEmpty else { return 0 }
+        return nonZero.reduce(0, +) / Double(nonZero.count)
     }
 }

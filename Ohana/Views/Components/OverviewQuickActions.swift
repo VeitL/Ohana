@@ -17,7 +17,8 @@ enum QuickActionPickerCatalog {
         let colorHex: String
     }
 
-    private static let all: [Option] = [
+    private static var all: [Option] {
+        [
         Option(id: "walk", label: "遛狗", icon: "figure.walk", colorHex: "C8FF00"),
         Option(id: "feed", label: "喂食", icon: "fork.knife", colorHex: "FFDD44"),
         Option(id: "water", label: "喂水", icon: "drop.fill", colorHex: "00D4AA"),
@@ -25,7 +26,7 @@ enum QuickActionPickerCatalog {
         Option(id: "litter", label: "铲屎", icon: "trash.fill", colorHex: "5B6AFF"),
         Option(id: "groom", label: "护理", icon: "scissors", colorHex: "FF8C42"),
         Option(id: "health", label: "健康", icon: "heart.fill", colorHex: "FF4757"),
-        Option(id: "expense", label: "花费", icon: "yensign.circle", colorHex: "A78BFA"),
+        Option(id: "expense", label: "花费", icon: AppCurrency.systemIconName, colorHex: "A78BFA"),
         Option(id: "weight", label: "体重", icon: "scalemass.fill", colorHex: "80FFEA"),
         Option(id: "play", label: "陪玩", icon: "tennisball.fill", colorHex: "FF6B6B"),
         Option(id: "moment", label: "记录", icon: "camera.circle.fill", colorHex: "FF6B9D"),
@@ -35,7 +36,8 @@ enum QuickActionPickerCatalog {
         Option(id: "freeFlight", label: "放飞", icon: "bird.fill", colorHex: "06D6A0"),
         Option(id: "misting", label: "喷水", icon: "cloud.drizzle.fill", colorHex: "118AB2"),
         Option(id: "substrateChange", label: "换垫材", icon: "leaf.fill", colorHex: "07DB8B"),
-    ]
+        ]
+    }
 
     /// 当前物种可出现的 actionType 集合（与 ArkCrewIDCardView.QACardType.available 一致）
     static func allowedActionTypeIds(forSpecies species: String) -> Set<String> {

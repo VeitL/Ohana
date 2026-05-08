@@ -150,7 +150,7 @@ private struct DocumentDetailRow: View {
                     infoChip(icon: "clock", text: expiry.formatted(.dateTime.year().month().day()), color: expiryColor)
                 }
                 if doc.cost > 0 {
-                    infoChip(icon: "yensign.circle", text: String(format: "¥%.0f", doc.cost))
+                    infoChip(icon: AppCurrency.systemIconName, text: AppCurrency.format(doc.cost, fractionDigits: 0))
                 }
             }
 

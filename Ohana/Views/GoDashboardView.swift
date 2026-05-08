@@ -61,6 +61,7 @@ struct GoDashboardView: View {
     @State private var quickExpenseDetailPet: Pet? = nil
     @State private var quickWalkDetailPet: Pet? = nil
     @State private var quickHealthDetailPet: Pet? = nil
+    @State private var quickPetMedicationPet: Pet? = nil
     @State private var quickGroomDetailPet: Pet? = nil
     @State private var feedSheetItem: (pet: Pet, actionType: String)? = nil
     @State private var feedDetailPet: Pet? = nil
@@ -92,6 +93,7 @@ struct GoDashboardView: View {
     @State private var isCardDragging = false
     @State private var activeHumanId: UUID? = nil
     @State private var showWalkFullScreen = false
+    @State private var todayFocusWalkPet: Pet? = nil
     @State private var walkMinimized = false
     @State private var lastWalkPhase: WalkPhase = .idle
     @State private var showingAntiRepeatAlert = false
@@ -275,7 +277,7 @@ struct GoDashboardView: View {
         .islandToastOverlay()
         .onAppear { onAppearSetup() }
         .onChange(of: PetWalkingManager.shared.phase) { _, newPhase in
-            if newPhase == .idle {
+            if case .idle = newPhase {
                 showWalkFullScreen = false
                 walkMinimized = false
             }
@@ -968,6 +970,10 @@ private extension GoDashboardView {
             NavigationStack { PetHealthDetailView(pet: pet, isModal: true) }
                 .presentationDetents([.large]).presentationDragIndicator(.visible)
         }
+        .sheet(item: $quickPetMedicationPet) { pet in
+            NavigationStack { PetMedicationView(pet: pet) }
+                .presentationDetents([.large]).presentationDragIndicator(.visible)
+        }
         .sheet(item: $quickGroomDetailPet) { pet in
             NavigationStack { PetHygieneDetailView(pet: pet) }
                 .presentationDetents([.large]).presentationDragIndicator(.visible)
@@ -1156,8 +1162,8 @@ private extension GoDashboardView {
                         .filter { Calendar.current.isDate($0.date, equalTo: Date(), toGranularity: .month) }
                         .reduce(0.0) { $0 + $1.amount }
                     goStatMiniCard(
-                        icon: "yensign.circle.fill", iconColor: "FFDD44",
-                        value: "¥\(Int(monthExpense))", unit: "",
+                        icon: "\(AppCurrency.systemIconName).fill", iconColor: "FFDD44",
+                        value: AppCurrency.format(monthExpense, fractionDigits: 0), unit: "",
                         label: l.goThisMonthExpense, onTap: { showIslandExpense = true }
                     )
 
@@ -1549,6 +1555,19 @@ private extension GoDashboardView {
 
     func countTextForAction(_ item: QuickActionItem) -> String? {
         let cal = Calendar.current
+        if item.entityKind == .human,
+           let hid = item.entityId,
+           let human = humans.first(where: { $0.id == hid }) {
+            guard !isHumanQuickActionPrivate(item, human: human) else { return nil }
+            switch item.actionType {
+            case "humanWeight":
+                guard let last = human.weightLogs.max(by: { $0.date < $1.date }) else { return nil }
+                return l.homeLastWeightKg(last.weight)
+            default:
+                return nil
+            }
+        }
+
         guard let pid = item.petId, let pet = pets.first(where: { $0.id == pid }) else { return nil }
         switch item.actionType {
         case "walk":
@@ -1578,7 +1597,7 @@ private extension GoDashboardView {
             return total > 0 ? l.homeExpenseMonthCNY(Int(total)) : nil
         case "weight":
             if let last = pet.weightLogs.sorted(by: { $0.date < $1.date }).last {
-                return l.homeLastWeightKg(last.weight)
+                return l.homeLastWeightKg(last.weightInKg)
             }
             return nil
         default: return nil
@@ -1851,63 +1870,61 @@ private extension GoDashboardView {
     @MainActor
     func completeIslandQuest(_ quest: IslandQuest) {
         if quest.id.hasPrefix("q_feed_") {
-            if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) { applyAction("feed", pet: p) }
+            if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) { feedDetailPet = p }
         } else if quest.id.hasPrefix("q_water_") && !quest.id.hasPrefix("q_water_plant") {
-            if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) { applyAction("water", pet: p) }
+            if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) {
+                waterDetailModeRaw = QuickWaterDetailSheet.WaterMode.drink.rawValue
+                waterDetailPet = p
+            }
         } else {
             switch quest.id {
             case "q_walk":
-                if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) { applyAction("walk", pet: p) }
+                if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) { todayFocusWalkPet = p }
             case "q_potty":
-                if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) { applyAction("potty", pet: p) }
+                if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) {
+                    if p.species.contains("猫") || p.species.contains("兔") {
+                        litterDetailPet = p
+                    } else {
+                        pottyDetailPet = p
+                    }
+                }
             case let id where id.hasPrefix("q_play_"):
-                if let petId = quest.targetPetId, let p = pets.first(where: { $0.id == petId }) { applyAction("play", pet: p) }
+                if let petId = quest.targetPetId, let p = pets.first(where: { $0.id == petId }) { playDetailPet = p }
             case let id where id.hasPrefix("q_weight_"):
                 if let petId = quest.targetPetId, let p = pets.first(where: { $0.id == petId }) {
                     quickWeightPet = p
-                    return
                 }
             case let id where id.hasPrefix("q_moment_"):
                 if let petId = quest.targetPetId, let p = pets.first(where: { $0.id == petId }) {
                     showMomentPet = p
-                    return
                 }
             case "q_water_plant":
-                if let id = quest.targetPlantId, let pl = plants.first(where: { $0.id == id }) { completePlantWatering(pl) }
+                if let id = quest.targetPlantId, let pl = plants.first(where: { $0.id == id }) { selectedPlant = pl }
             case "q_fertilize_plant":
-                if let id = quest.targetPlantId, let pl = plants.first(where: { $0.id == id }) { completePlantFertilizing(pl) }
+                if let id = quest.targetPlantId, let pl = plants.first(where: { $0.id == id }) { selectedPlant = pl }
+            case "q_visit":
+                if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) {
+                    selectedPetTab = .overview
+                    selectedPet = p
+                } else if let p = pets.first {
+                    selectedPetTab = .overview
+                    selectedPet = p
+                }
             case "q_reminder": showingCalendar = true
             default:
-                if let mid = IslandQuestEngine.medicationId(fromQuestId: quest.id) {
+                if let eventId = IslandQuestEngine.eventId(fromQuestId: quest.id),
+                   allEvents.contains(where: { $0.id == eventId }) {
+                    showingCalendar = true
+                } else if let mid = IslandQuestEngine.medicationId(fromQuestId: quest.id) {
                     for p in pets {
-                        if let med = p.medications.first(where: { $0.id == mid }) {
-                            PetMedicationDoseLogging.recordDose(medication: med, pet: p, modelContext: modelContext)
-                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        if p.medications.contains(where: { $0.id == mid }) {
+                            quickPetMedicationPet = p
                             break
                         }
                     }
                 }
             }
         }
-        let amt = IslandQuestEngine.coconutReward(forQuestId: quest.id)
-        if amt > 0 && quest.id != "q_walk" {
-            QuestManager.shared.addCoconuts(amt, title: l.homeIslandQuestRewardTitle)
-            rewardCoconutAmount = amt; showRewardCoconut = true
-        }
-    }
-
-    @MainActor func completePlantWatering(_ plant: Plant) {
-        plant.lastWateredDate = Date()
-        let log = PlantCareLog(date: Date(), careType: .watering); log.plant = plant; modelContext.insert(log)
-        modelContext.insert(Event(title: l.homePlantWaterEventTitle(plantName: plant.name), startDate: Date(), isAllDay: false, eventType: EventType.watering.rawValue, relatedEntityType: EntityKind.plant.rawValue, relatedEntityId: plant.id.uuidString))
-        modelContext.safeSave()
-    }
-
-    @MainActor func completePlantFertilizing(_ plant: Plant) {
-        plant.lastFertilizedDate = Date()
-        let log = PlantCareLog(date: Date(), careType: .fertilizing); log.plant = plant; modelContext.insert(log)
-        modelContext.insert(Event(title: l.homePlantFertilizeEventTitle(plantName: plant.name), startDate: Date(), isAllDay: false, eventType: EventType.fertilizing.rawValue, relatedEntityType: EntityKind.plant.rawValue, relatedEntityId: plant.id.uuidString))
-        modelContext.safeSave()
     }
 
     func showToast(_ pet: Pet, message: String, emoji: String, duration: Double = 1.5) {
@@ -1961,6 +1978,9 @@ private extension GoDashboardView {
             .fullScreenCover(isPresented: $showIslandWealth) { IslandWealthDashboardView() }
             .fullScreenCover(isPresented: $showingAllFoodManagement) { AllPetsFoodOverviewSheet() }
             .fullScreenCover(isPresented: $showOasisReward) { OasisRewardView() }
+            .fullScreenCover(item: $todayFocusWalkPet) { pet in
+                WalkTrackingFullScreen(pet: pet)
+            }
             .fullScreenCover(isPresented: $showWalkFullScreen, onDismiss: {
                 if PetWalkingManager.shared.phase != .idle { walkMinimized = true }
             }) {

@@ -18,6 +18,112 @@ struct HomeFamilyCollaborationCard: View {
         humans.count > 1
     }
 
+    private struct ActivitySnapshot {
+        let title: String
+        let executorId: String?
+        let date: Date
+        let iconName: String
+        let accent: Color
+    }
+
+    private var latestActivity: ActivitySnapshot? {
+        var entries: [ActivitySnapshot] = []
+        entries += pet.careLogs.map {
+            ActivitySnapshot(
+                title: $0.careType.label,
+                executorId: $0.executorId,
+                date: $0.date,
+                iconName: $0.careType.systemIconName,
+                accent: Color(hex: $0.careType.accentColorHex)
+            )
+        }
+        entries += pet.pottyLogs.map {
+            ActivitySnapshot(
+                title: $0.pottyType.rawValue,
+                executorId: $0.executorId,
+                date: $0.date,
+                iconName: $0.pottyType.systemIconName,
+                accent: Color.goYellow
+            )
+        }
+        entries += pet.walkLogs.map {
+            ActivitySnapshot(
+                title: "遛狗",
+                executorId: $0.executorId,
+                date: $0.startDate,
+                iconName: "figure.walk",
+                accent: Color.goPrimary
+            )
+        }
+        return entries.max { $0.date < $1.date }
+    }
+
+    private var missingTodayText: String {
+        let missing = expectedTodayCare.filter { !$0.done }.map { $0.label }
+        guard !missing.isEmpty else { return "今天基础照护已完成" }
+        return "今天还缺：" + missing.prefix(3).joined(separator: "、")
+    }
+
+    private var expectedTodayCare: [(label: String, done: Bool)] {
+        let cal = Calendar.current
+        let lowerSpecies = pet.species.lowercased()
+        let isDog = pet.species.contains("狗") || lowerSpecies.contains("dog")
+        let isCat = pet.species.contains("猫") || lowerSpecies.contains("cat")
+        let isFish = pet.species.contains("鱼") || lowerSpecies.contains("fish")
+        let isBird = pet.species.contains("鸟") || lowerSpecies.contains("bird")
+        let isRabbit = pet.species.contains("兔") || lowerSpecies.contains("rabbit")
+        let isReptile = pet.species.contains("爬") || pet.species.contains("龟") || pet.species.contains("蛇") || pet.species.contains("蜥") || pet.species.contains("守宫") || lowerSpecies.contains("reptile")
+
+        func careDone(_ type: CareType) -> Bool {
+            pet.careLogs.contains { $0.careType == type && cal.isDateInToday($0.date) }
+        }
+        func pottyDone() -> Bool {
+            pet.pottyLogs.contains { cal.isDateInToday($0.date) } || careDone(.litter)
+        }
+
+        if isFish {
+            return [
+                ("喂食", careDone(.feeding)),
+                ("换水", careDone(.waterChange)),
+                ("过滤", careDone(.filterClean))
+            ]
+        }
+        if isBird {
+            return [
+                ("喂食", careDone(.feeding)),
+                ("饮水", careDone(.watering)),
+                ("清鸟笼", careDone(.cageCleaning)),
+                ("放飞", careDone(.freeFlight))
+            ]
+        }
+        if isReptile {
+            return [
+                ("喂食", careDone(.feeding)),
+                ("保湿", careDone(.misting)),
+                ("环境", careDone(.substrateChange))
+            ]
+        }
+        if isDog {
+            return [
+                ("喂食", careDone(.feeding)),
+                ("饮水", careDone(.watering)),
+                ("遛狗", pet.walkLogs.contains { cal.isDateInToday($0.startDate) })
+            ]
+        }
+        if isCat || isRabbit {
+            return [
+                ("喂食", careDone(.feeding)),
+                ("饮水", careDone(.watering)),
+                ("厕所", pottyDone())
+            ]
+        }
+        return [
+            ("喂食", careDone(.feeding)),
+            ("饮水", careDone(.watering)),
+            ("互动", careDone(.play))
+        ]
+    }
+
     private var assignedReminders: [Reminder] {
         let petId = pet.id.uuidString
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date())) ?? Date()
@@ -75,10 +181,17 @@ struct HomeFamilyCollaborationCard: View {
 
     private var card: some View {
         VStack(alignment: .leading, spacing: 10) {
+            topStatusRow
+
+            Text(missingTodayText)
+                .font(.system(size: 12, weight: .black, design: .rounded))
+                .foregroundStyle(.primary.opacity(0.82))
+                .lineLimit(1)
+
             FamilyActivityStripView(pet: pet, style: .compact, onExpand: onOpenActivity)
 
             if assignedReminders.isEmpty {
-                Text("今天还没有指派给具体成员的待办。添加日历事件时可选择“指派给”，家人就能看到任务归属。")
+                Text("没有指派待办时，任何家人完成打卡都会更新上次照护状态。")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(.primary.opacity(0.55))
                     .lineLimit(2)
@@ -93,6 +206,81 @@ struct HomeFamilyCollaborationCard: View {
         }
         .padding(14)
         .background(cardBackground(Color.goPrimary))
+    }
+
+    private var topStatusRow: some View {
+        HStack(spacing: 8) {
+            if let latestActivity {
+                statusPill(
+                    iconName: latestActivity.iconName,
+                    title: "\(actorName(for: latestActivity.executorId)) · \(latestActivity.title)",
+                    subtitle: relativeTime(from: latestActivity.date),
+                    tint: latestActivity.accent
+                )
+            } else {
+                statusPill(
+                    iconName: "person.2.fill",
+                    title: "还没有照护记录",
+                    subtitle: "完成一次打卡后同步",
+                    tint: Color.goBlue
+                )
+            }
+
+            statusPill(
+                iconName: assignedReminders.isEmpty ? "checklist" : "person.crop.circle.badge.clock",
+                title: assignedReminders.isEmpty ? "无人指派" : "已指派 \(assignedReminders.count) 个",
+                subtitle: assignedReminders.first.map { $0.scheduledAt.formatted(.dateTime.hour().minute()) } ?? "家人可直接接手",
+                tint: assignedReminders.isEmpty ? Color.goTeal : Color.goYellow
+            )
+        }
+    }
+
+    private func statusPill(iconName: String, title: String, subtitle: String, tint: Color) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: iconName)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(tint)
+                .frame(width: 24, height: 24)
+                .background(tint.opacity(0.13), in: Circle())
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary.opacity(0.82))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                Text(subtitle)
+                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.primary.opacity(0.45))
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, minHeight: 42)
+        .background(tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(tint.opacity(0.18), lineWidth: 1)
+        )
+    }
+
+    private func actorName(for id: String?) -> String {
+        guard let id, let human = humans.first(where: { $0.id.uuidString == id }) else {
+            return "家人"
+        }
+        return human.name.isEmpty ? "家人" : human.name
+    }
+
+    private func relativeTime(from date: Date) -> String {
+        let cal = Calendar.current
+        let now = Date()
+        if cal.isDate(date, inSameDayAs: now) {
+            let minutes = max(1, Int(now.timeIntervalSince(date) / 60))
+            if minutes < 60 { return "\(minutes)分钟前" }
+            return "\(minutes / 60)小时前"
+        }
+        let days = max(1, cal.dateComponents([.day], from: cal.startOfDay(for: date), to: cal.startOfDay(for: now)).day ?? 1)
+        return "\(days)天前"
     }
 
     private func assignedReminderRow(_ reminder: Reminder) -> some View {

@@ -217,11 +217,11 @@ struct AddHealthRecordSheet: View {
                         // 费用
                         fieldCard {
                             HStack {
-                                Image(systemName: "yensign.circle")
+                                Image(systemName: AppCurrency.systemIconName)
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(Color.goYellow)
                                     .frame(width: 22)
-                                TextField("费用（可选）", text: $cost)
+                                TextField("费用（\(AppCurrency.symbol)，可选）", text: $cost)
                                     .keyboardType(.decimalPad)
                                     .font(.system(size: 15, weight: .medium, design: .rounded))
                                     .foregroundStyle(.primary)

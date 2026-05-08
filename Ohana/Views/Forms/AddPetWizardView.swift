@@ -10,6 +10,7 @@ import SwiftData
 import PhotosUI
 import AVFoundation
 import ImageIO
+import Foundation
 
 // MARK: - Steps enum
 private enum WizardStep: Int, CaseIterable {
@@ -44,6 +45,7 @@ struct AddPetWizardView: View {
     @State private var isCustomBreed = false
     @State private var customBreedText = ""
     @State private var avatarImageData: Data? = nil
+    @State private var usesAutomaticAvatarAsset = true
     @State private var photosPickerItem: PhotosPickerItem? = nil
     @State private var showingCamera = false
     @State private var showCameraPermissionAlert = false
@@ -112,7 +114,7 @@ struct AddPetWizardView: View {
     @State private var walletDecodedAvatar: UIImage? = nil
     @State private var walletDecodedAvatarTransparent: Bool = false
 
-    private let speciesOptions = ["狗", "猫", "兔子", "仓鼠", "鸟", "其他"]
+    private let speciesOptions = ["狗", "猫", "鱼", "鸟", "兔子", "爬宠", "仓鼠", "其他"]
     @AppStorage("appLanguage") private var appLanguage = "zh"
     private var wizardL10n: L10n { L10n(appLanguage) }
     private let totalSteps = WizardStep.allCases.count
@@ -175,11 +177,61 @@ struct AddPetWizardView: View {
         return list.first { $0.name == breed }
     }
 
+    private var effectiveBreedForAvatar: String {
+        if isCustomBreed {
+            return customBreedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return breed.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func appearanceCoatColors(for breedInfo: BreedInfo?) -> [CoatColor] {
+        if let avatarCoats = PetAvatarAssetCatalog.coatColors(species: species, breed: effectiveBreedForAvatar) {
+            return avatarCoats
+        }
+        return breedInfo?.coatColors ?? PetBreedDatabase.genericCoatColors
+    }
+
+    private func appearanceEyeColors(for breedInfo: BreedInfo?, coatColor: String) -> [EyeColor] {
+        if let avatarEyes = PetAvatarAssetCatalog.eyeColors(species: species, breed: effectiveBreedForAvatar, coatColor: coatColor) {
+            return avatarEyes
+        }
+        return PetBreedDatabase.refinedEyeColors(breed: breedInfo, coatColor: coatColor)
+    }
+
+    private func defaultAppearanceSelection(for breedInfo: BreedInfo) -> (coat: String, eye: String) {
+        if let defaultAppearance = PetAvatarAssetCatalog.defaultAppearance(species: species, breed: breedInfo.name) {
+            return (defaultAppearance.coatName, defaultAppearance.eyeName)
+        }
+        return (breedInfo.coatColors.first?.name ?? "", breedInfo.eyeColors.first?.name ?? "")
+    }
+
+    private func selectBreed(_ breedInfo: BreedInfo) {
+        breed = breedInfo.name
+        isCustomBreed = false
+        customBreedText = ""
+        themeColorHex = breedInfo.suggestedThemeHex
+        let defaultSelection = defaultAppearanceSelection(for: breedInfo)
+        coatColor = defaultSelection.coat
+        eyeColor = defaultSelection.eye
+        refreshAutomaticAvatarAssetData()
+    }
+
+    private func refreshAutomaticAvatarAssetData() {
+        guard usesAutomaticAvatarAsset else { return }
+        avatarImageData = PetAvatarAssetCatalog.avatarData(
+            species: effectiveSpeciesForData,
+            breed: effectiveBreedForAvatar,
+            gender: gender,
+            coatColor: coatColor,
+            eyeColor: eyeColor
+        )
+    }
+
     /// 品种或自定义品种名变化时，丢弃当前品种不允许的毛色 / 瞳色 / 渐变花纹（例如德牧不应保留「银渐层」）。
     private func clampAppearanceSelectionToBreed() {
         let bi = selectedBreedInfo
-        let coatList = bi?.coatColors ?? PetBreedDatabase.genericCoatColors
-        let eyeList = PetBreedDatabase.refinedEyeColors(breed: bi, coatColor: coatColor)
+        let coatList = appearanceCoatColors(for: bi)
+        let eyeList = appearanceEyeColors(for: bi, coatColor: coatColor)
         let coatNames = Set(coatList.map(\.name))
         let eyeNames = Set(eyeList.map(\.name))
         let allowedPatterns = Set(PetCoatPattern.patterns(forBreed: bi).map(\.displayName))
@@ -194,6 +246,7 @@ struct AddPetWizardView: View {
         if eyeColor != "自定义" && !eyeColor.isEmpty, !eyeNames.contains(eyeColor) {
             eyeColor = eyeList.first?.name ?? ""
         }
+        refreshAutomaticAvatarAssetData()
     }
 
     /// 写入模型与年龄换算用的物种文案（「其他」时用自定义输入）
@@ -291,16 +344,16 @@ struct AddPetWizardView: View {
         .padding(.top, 8)
         .padding(.bottom, 6)
         // 不在 `name` 上套弹簧动画：每个按键都会触发布局+动画，输入会明显卡顿
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: breed)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: customBreedText)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: avatarImageData?.count)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: hasBirthday)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: birthday)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: hasHomeDate)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: homeDate)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: coatColor)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: eyeColor)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: themeColorHex)
+        .animation(GoMotion.feedback, value: breed)
+        .animation(GoMotion.feedback, value: customBreedText)
+        .animation(GoMotion.feedback, value: avatarImageData?.count)
+        .animation(GoMotion.feedback, value: hasBirthday)
+        .animation(GoMotion.feedback, value: birthday)
+        .animation(GoMotion.feedback, value: hasHomeDate)
+        .animation(GoMotion.feedback, value: homeDate)
+        .animation(GoMotion.feedback, value: coatColor)
+        .animation(GoMotion.feedback, value: eyeColor)
+        .animation(GoMotion.feedback, value: themeColorHex)
     }
 
     /// 分页：`TabView` 恢复左右滑动；外貌卡内毛/瞳色块使用 `wrappingGrid`，避免横向 `ScrollView` 与分页手势冲突。
@@ -347,7 +400,7 @@ struct AddPetWizardView: View {
 
     private func wizardPageDotButton(index i: Int) -> some View {
         Button {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+            withAnimation(GoMotion.feedback) {
                 wizardPageIndex = i
             }
         } label: {
@@ -356,7 +409,7 @@ struct AddPetWizardView: View {
                 .frame(width: i == wizardPageIndex ? 20 : 6, height: 6)
         }
         .buttonStyle(.plain)
-        .animation(.spring(response: 0.3), value: wizardPageIndex)
+        .animation(GoMotion.feedback, value: wizardPageIndex)
     }
 
     @ViewBuilder
@@ -410,12 +463,16 @@ struct AddPetWizardView: View {
     private func handlePhotosPickerItemChanged(_ item: PhotosPickerItem?) {
         Task {
             guard let item else { return }
+            let startedAt = CFAbsoluteTimeGetCurrent()
             if let data = try? await item.loadTransferable(type: Data.self) {
                 let resized = await Task.detached(priority: .userInitiated) {
                     Self.cropReadyImage(from: data, maxPixel: 1_600)
                 }.value
                 await MainActor.run {
-                    if let img = resized { cropImageItem = IdentifiableCropImage(image: img) }
+                    if let img = resized {
+                        cropImageItem = IdentifiableCropImage(image: img)
+                        AppPerformanceMonitor.shared.record("相册到裁剪页", startedAt: startedAt)
+                    }
                 }
             }
         }
@@ -431,7 +488,10 @@ struct AddPetWizardView: View {
 
     private var addPetWizardLifecyclePartA: some View {
         addPetWizardStackCore
-            .onAppear { scheduleWalletAvatarDecode() }
+            .onAppear {
+                refreshAutomaticAvatarAssetData()
+                scheduleWalletAvatarDecode()
+            }
             .onChange(of: cropImageItem) { _, new in remountWizardPagerIfCropDismissed(new) }
             .onChange(of: wizardPageIndex) { _, new in clampWizardPageIndex(new) }
             .onChange(of: avatarImageData) { _, _ in scheduleWalletAvatarDecode() }
@@ -445,6 +505,8 @@ struct AddPetWizardView: View {
             .onChange(of: isCustomBreed) { _, _ in clampAppearanceSelectionToBreed() }
             .onChange(of: customBreedText) { _, _ in clampAppearanceSelectionToBreed() }
             .onChange(of: coatColor) { _, _ in clampAppearanceSelectionToBreed() }
+            .onChange(of: eyeColor) { _, _ in refreshAutomaticAvatarAssetData() }
+            .onChange(of: gender) { _, _ in refreshAutomaticAvatarAssetData() }
     }
 
     var body: some View {
@@ -452,10 +514,11 @@ struct AddPetWizardView: View {
         .fullScreenCover(isPresented: $showingCamera, onDismiss: {
             if let img = pendingCapturedAvatarImage {
                 pendingCapturedAvatarImage = nil
-                cropImageItem = IdentifiableCropImage(image: img)
+                prepareCapturedAvatarForCrop(img)
             }
         }) {
             PetCameraPickerView(maxPixel: 1_600) { img in
+                AppPerformanceMonitor.shared.markStart("avatar.camera.to.crop")
                 pendingCapturedAvatarImage = img
                 showingCamera = false
             } onCancel: {
@@ -473,6 +536,7 @@ struct AddPetWizardView: View {
                             // must be saved as PNG so isTransparentPNG detection stays accurate.
                             let hasAlpha = ImageCutoutService.imageHasTransparentPixels(cropped)
                             let optimized = Self.optimizedAvatarAsset(cropped, preserveAlpha: hasAlpha)
+                            usesAutomaticAvatarAsset = false
                             avatarImageData = hasAlpha
                                 ? optimized.pngData()
                                 : optimized.jpegData(compressionQuality: 0.88)
@@ -606,7 +670,7 @@ struct AddPetWizardView: View {
                             .background(species == sp ? Color.goPrimary : Color.primary.opacity(0.08),
                                         in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                             .scaleEffect(species == sp ? 0.95 : 1.0)
-                            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: species)
+                            .animation(GoMotion.feedback, value: species)
                         }.buttonStyle(.plain)
                     }
                 }.padding(.horizontal, 2)
@@ -642,7 +706,7 @@ struct AddPetWizardView: View {
 
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                withAnimation(.spring(response: 0.38, dampingFraction: 0.82)) {
+                withAnimation(GoMotion.feedback) {
                     isBreedPickerExpanded.toggle()
                 }
             } label: {
@@ -710,7 +774,7 @@ struct AddPetWizardView: View {
                                 breedSearch = ""
                                 isCustomBreed = false
                                 customBreedText = ""
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                                withAnimation(GoMotion.feedback) {
                                     isBreedPickerExpanded = false
                                 }
                             } label: {
@@ -739,19 +803,14 @@ struct AddPetWizardView: View {
                                         isCustomBreed = true
                                         breedSearch = ""
                                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                                            withAnimation(.easeOut(duration: 0.25)) {
+                                            withAnimation(GoMotion.quick) {
                                                 proxy.scrollTo("wizardCustomBreedField", anchor: .bottom)
                                             }
                                         }
                                     } else {
-                                        breed = info.name
-                                        isCustomBreed = false
-                                        customBreedText = ""
                                         breedSearch = ""
-                                        themeColorHex = info.suggestedThemeHex
-                                        coatColor = info.coatColors.first?.name ?? ""
-                                        eyeColor = info.eyeColors.first?.name ?? ""
-                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                                        selectBreed(info)
+                                        withAnimation(GoMotion.feedback) {
                                             isBreedPickerExpanded = false
                                         }
                                     }
@@ -848,7 +907,7 @@ struct AddPetWizardView: View {
                     )
             )
             .onTapGesture { pastePasteboardImage() }
-            .animation(.spring(response: 0.4), value: avatarImageData != nil)
+            .animation(GoMotion.hero, value: avatarImageData != nil)
 
             // 三个操作按钮
             HStack(spacing: 10) {
@@ -894,7 +953,10 @@ struct AddPetWizardView: View {
             }
 
             if avatarImageData != nil {
-                Button { avatarImageData = nil } label: {
+                Button {
+                    usesAutomaticAvatarAsset = true
+                    refreshAutomaticAvatarAssetData()
+                } label: {
                     Text(l.petWizRemoveAvatar)
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(.primary.opacity(0.4))
@@ -939,7 +1001,7 @@ struct AddPetWizardView: View {
                             }.buttonStyle(.plain)
                         }.frame(height: 44)
                     }
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: gender)
+                    .animation(GoMotion.feedback, value: gender)
                 }
                 .padding(14)
                 .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -1009,10 +1071,8 @@ struct AddPetWizardView: View {
     private var digitalTwinSection: some View {
         let l = wizardL10n
         let bi = selectedBreedInfo
-        let coatItems = (bi?.coatColors.map { ($0.name, $0.hex) }) ?? [
-            ("白色", "FFFFFF"), ("黑色", "1C1C1E"), ("棕色", "8B4513"), ("金色", "FFD700"), ("灰色", "8E8E93"),
-        ]
-        let eyeItems = PetBreedDatabase.refinedEyeColors(breed: bi, coatColor: coatColor).map { ($0.name, $0.hex) }
+        let coatItems = appearanceCoatColors(for: bi).map { ($0.name, $0.hex) }
+        let eyeItems = appearanceEyeColors(for: bi, coatColor: coatColor).map { ($0.name, $0.hex) }
         let patternItems = PetCoatPattern.patterns(forBreed: bi)
         return VStack(alignment: .leading, spacing: 16) {
             bentoLabel(l.petWizBentoAppearance)
@@ -1053,7 +1113,7 @@ struct AddPetWizardView: View {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .strokeBorder(.white.opacity(0.2), lineWidth: 1)
                     )
-                    .animation(.spring(response: 0.3), value: themeColorHex)
+                    .animation(GoMotion.feedback, value: themeColorHex)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(l.petWizCardThemeCaption).font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(.primary.opacity(0.7))
@@ -1066,7 +1126,7 @@ struct AddPetWizardView: View {
                 ForEach(PetThemeColor.allCases, id: \.rawValue) { tc in
                     let tcHex = tc.hexValue
                     let isUsed = usedThemeColorHexes.contains(tcHex.uppercased())
-                    Button { if !isUsed { withAnimation(.spring(response: 0.3)) { themeColorHex = tcHex } } } label: {
+                    Button { if !isUsed { withAnimation(GoMotion.feedback) { themeColorHex = tcHex } } } label: {
                         ZStack {
                             Circle().fill(tc.color.opacity(isUsed ? 0.3 : 1.0)).frame(width: 40, height: 40)
                             if themeColorHex.uppercased() == tcHex.uppercased() {
@@ -1311,7 +1371,7 @@ struct AddPetWizardView: View {
                     Capsule()
                         .strokeBorder(highlight ? Color.clear : Color.primary.opacity(0.1), lineWidth: 1)
                 )
-                .animation(.spring(response: 0.3), value: nameOk)
+                .animation(GoMotion.feedback, value: nameOk)
             }
             .buttonStyle(ScaleButtonStyle())
             .disabled(trimmed.isEmpty || isNameDuplicate || isSaving)
@@ -1406,10 +1466,7 @@ struct AddPetWizardView: View {
                                     withAnimation { proxy.scrollTo("customBreedField", anchor: .bottom) }
                                 }
                             } else {
-                                breed = b.name; isCustomBreed = false; customBreedText = ""
-                                themeColorHex = b.suggestedThemeHex
-                                coatColor = b.coatColors.first?.name ?? ""
-                                eyeColor = b.eyeColors.first?.name ?? ""
+                                selectBreed(b)
                             }
                         } label: {
                             HStack {
@@ -1455,7 +1512,10 @@ struct AddPetWizardView: View {
 
             // ── 清除（有头像时出现）
             if avatarImageData != nil {
-                Button { avatarImageData = nil } label: {
+                Button {
+                    usesAutomaticAvatarAsset = true
+                    refreshAutomaticAvatarAssetData()
+                } label: {
                     Text("使用默认首字母头像")
                         .font(.system(size: 13, weight: .medium, design: .rounded))
                         .foregroundStyle(.primary.opacity(0.5))
@@ -1566,10 +1626,10 @@ struct AddPetWizardView: View {
 
                         // 中：文字
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(hasPasteboardImage ? "立刻粘贴剪贴板图片" : "从剪贴板粘贴抠图")
+                            Text(hasPasteboardImage ? "剪贴板图片" : "粘贴主体")
                                 .font(.system(size: 16, weight: .black, design: .rounded))
                                 .foregroundStyle(hasPasteboardImage ? .black : .white.opacity(0.6))
-                            Text(hasPasteboardImage ? "检测到剪贴板有图 · 点击直达裁剪" : "先在相册长按宠物主体并拷贝")
+                            Text(hasPasteboardImage ? "可用" : "未检测到图片")
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
                                 .foregroundStyle(hasPasteboardImage ? .black.opacity(0.65) : .white.opacity(0.35))
                         }
@@ -1714,6 +1774,7 @@ struct AddPetWizardView: View {
             return
         }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        let startedAt = CFAbsoluteTimeGetCurrent()
         // 显示短暂加载态，让用户感知响应
         isPasting = true
         Task {
@@ -1721,7 +1782,19 @@ struct AddPetWizardView: View {
                 Self.preparedCropImage(img, maxPixel: 1_600)
             }.value
             cropImageItem = IdentifiableCropImage(image: prepared)
+            AppPerformanceMonitor.shared.record("粘贴到裁剪页", startedAt: startedAt)
             isPasting = false
+        }
+    }
+
+    private func prepareCapturedAvatarForCrop(_ image: UIImage) {
+        Task {
+            let prepared = await Task.detached(priority: .userInitiated) {
+                Self.preparedCropImage(image, maxPixel: 1_600)
+            }.value
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            cropImageItem = IdentifiableCropImage(image: prepared)
+            AppPerformanceMonitor.shared.markEnd("avatar.camera.to.crop", name: "拍照到裁剪页")
         }
     }
 
@@ -1966,7 +2039,7 @@ struct AddPetWizardView: View {
     private var resolvedCoatColor: Color {
         if coatColor == "自定义" { return customCoatUIColor }
         let bi = selectedBreedInfo
-        let coatItems = bi?.coatColors ?? PetBreedDatabase.genericCoatColors
+        let coatItems = appearanceCoatColors(for: bi)
         if let found = coatItems.first(where: { $0.name == coatColor }) { return found.color }
         // 检查图案（须为当前品种允许的花色）
         if let pattern = PetCoatPattern.patterns(forBreed: bi).first(where: { $0.displayName == coatColor }) {
@@ -1983,7 +2056,7 @@ struct AddPetWizardView: View {
     }
     private var resolvedEyeColor: Color {
         if eyeColor == "自定义" { return customEyeUIColor }
-        let eyeItems = PetBreedDatabase.refinedEyeColors(breed: selectedBreedInfo, coatColor: coatColor)
+        let eyeItems = appearanceEyeColors(for: selectedBreedInfo, coatColor: coatColor)
         if let found = eyeItems.first(where: { $0.name == eyeColor }) { return found.color }
         return Color(hex: "6B3A2A") // fallback 棕色
     }
@@ -1995,8 +2068,8 @@ struct AddPetWizardView: View {
     private var stepAppearance: some View {
         let l = wizardL10n
         let bi = selectedBreedInfo
-        let coatItems = (bi?.coatColors.map { ($0.name, $0.hex) }) ?? PetBreedDatabase.genericCoatColors.map { ($0.name, $0.hex) }
-        let eyeItems = PetBreedDatabase.refinedEyeColors(breed: bi, coatColor: coatColor).map { ($0.name, $0.hex) }
+        let coatItems = appearanceCoatColors(for: bi).map { ($0.name, $0.hex) }
+        let eyeItems = appearanceEyeColors(for: bi, coatColor: coatColor).map { ($0.name, $0.hex) }
         let coatPatterns = PetCoatPattern.patterns(forBreed: bi)
         let breedSubtitle = breed.isEmpty ? l.petSpeciesLabel(species) : breed
 
@@ -2012,13 +2085,13 @@ struct AddPetWizardView: View {
                     onTapCoat: { showCoatSheet = true },
                     onTapEye:  { showEyeSheet  = true }
                 )
-                .animation(.easeInOut(duration: 0.3), value: resolvedCoatColor.description)
-                .animation(.easeInOut(duration: 0.3), value: resolvedEyeColor.description)
+                .animation(GoMotion.quick, value: resolvedCoatColor.description)
+                .animation(GoMotion.quick, value: resolvedEyeColor.description)
 
                 // 操作提示
                 HStack(spacing: 16) {
                     Label {
-                        Text(l.petWizTapBodyCoat)
+                        Text("毛色")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
                             .foregroundStyle(.secondary)
                     } icon: {
@@ -2027,7 +2100,7 @@ struct AddPetWizardView: View {
                             .frame(width: 10, height: 10)
                     }
                     Label {
-                        Text(l.petWizTapEyeColor)
+                        Text("瞳色")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
                             .foregroundStyle(.secondary)
                     } icon: {
@@ -2166,7 +2239,7 @@ struct AddPetWizardView: View {
         private func colorCell(name: String, hex: String, isPattern: Bool) -> some View {
             let isSelected = selected == name
             Button {
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                withAnimation(GoMotion.feedback) {
                     selected = name
                 }
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -2205,7 +2278,7 @@ struct AddPetWizardView: View {
         private var customCell: some View {
             let isSelected = selected == "自定义"
             return Button {
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) { selected = "自定义" }
+                withAnimation(GoMotion.feedback) { selected = "自定义" }
                 showCustomPicker = true
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
             } label: {
@@ -2482,7 +2555,8 @@ struct AddPetWizardView: View {
     private func speciesEmoji(_ sp: String) -> String {
         switch sp {
         case "狗": return "🐕"; case "猫": return "🐈"; case "兔子": return "🐇"
-        case "仓鼠": return "🐹"; case "鸟": return "🦜"; default: return "🐾"
+        case "鱼": return "🐟"; case "鸟": return "🦜"; case "爬宠": return "🦎"
+        case "仓鼠": return "🐹"; default: return "🐾"
         }
     }
 
@@ -2493,6 +2567,15 @@ struct AddPetWizardView: View {
 
         isSaving = true
         let finalBreed = isCustomBreed ? customBreedText : breed
+        let finalAvatarImageData = usesAutomaticAvatarAsset
+            ? PetAvatarAssetCatalog.avatarData(
+                species: effectiveSpeciesForData,
+                breed: finalBreed,
+                gender: gender,
+                coatColor: coatColor,
+                eyeColor: eyeColor
+            )
+            : avatarImageData
         let pet = Pet(
             name: trimmedName, species: effectiveSpeciesForData, breed: finalBreed,
             birthday: hasBirthday ? birthday : nil,
@@ -2501,7 +2584,7 @@ struct AddPetWizardView: View {
             themeColorHex: themeColorHex,
             homeDate: hasHomeDate ? homeDate : nil
         )
-        pet.avatarImageData = avatarImageData
+        pet.avatarImageData = finalAvatarImageData
         pet.passportNumber = passportNumber
         pet.microchipID = microchipID
         pet.birthCountry = birthCountry
@@ -2525,6 +2608,7 @@ struct AddPetWizardView: View {
         }
 
         insertPetRelatedRecords(pet: pet, displayName: trimmedName)
+        CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: modelContext)
         modelContext.safeSave()
         onPetSaved?(pet)
 
@@ -2677,7 +2761,7 @@ struct AddPetWizardView: View {
                                 in: RoundedRectangle(cornerRadius: 12, style: .continuous)
                             )
                             .scaleEffect(species == sp ? 0.96 : 1.0)
-                            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: species)
+                            .animation(GoMotion.feedback, value: species)
                         }.buttonStyle(.plain)
                     }
                 }
@@ -2757,7 +2841,10 @@ struct AddPetWizardView: View {
             .padding(.horizontal, 20)
 
             if avatarImageData != nil {
-                Button { avatarImageData = nil } label: {
+                Button {
+                    usesAutomaticAvatarAsset = true
+                    refreshAutomaticAvatarAssetData()
+                } label: {
                     Text(l.petWizRemoveAvatarShort).font(.system(size: 12, weight: .medium, design: .rounded)).foregroundStyle(Color.primary.opacity(0.55)).frame(maxWidth: .infinity)
                 }.padding(.horizontal, 20)
             }
@@ -2852,8 +2939,8 @@ struct AddPetWizardView: View {
     private var wizardCard4Appearance: some View {
         let l = wizardL10n
         let bi = selectedBreedInfo
-        let coatItems = (bi?.coatColors.map { ($0.name, $0.hex) }) ?? PetBreedDatabase.genericCoatColors.map { ($0.name, $0.hex) }
-        let eyeItems = PetBreedDatabase.refinedEyeColors(breed: bi, coatColor: coatColor).map { ($0.name, $0.hex) }
+        let coatItems = appearanceCoatColors(for: bi).map { ($0.name, $0.hex) }
+        let eyeItems = appearanceEyeColors(for: bi, coatColor: coatColor).map { ($0.name, $0.hex) }
         let coatPatterns = PetCoatPattern.patterns(forBreed: bi)
 
         return VStack(alignment: .leading, spacing: 0) {
@@ -2878,7 +2965,7 @@ struct AddPetWizardView: View {
                             ForEach(PetThemeColor.allCases, id: \.rawValue) { tc in
                                 let tcHex = tc.hexValue
                                 let isUsed = usedThemeColorHexes.contains(tcHex.uppercased())
-                                Button { if !isUsed { withAnimation(.spring(response: 0.3)) { themeColorHex = tcHex } } } label: {
+                                Button { if !isUsed { withAnimation(GoMotion.feedback) { themeColorHex = tcHex } } } label: {
                                     ZStack {
                                         Circle().fill(tc.color.opacity(isUsed ? 0.3 : 1.0)).frame(width: 36, height: 36)
                                         if themeColorHex.uppercased() == tcHex.uppercased() {
@@ -3218,7 +3305,7 @@ struct AddPetWizardView: View {
         let isLastPage = wizardPageIndex == 5
         return HStack(spacing: 12) {
             if wizardPageIndex > 0 {
-                Button { withAnimation(.spring(response: 0.38)) { wizardPageIndex -= 1 } } label: {
+                Button { withAnimation(GoMotion.feedback) { wizardPageIndex -= 1 } } label: {
                     Image(systemName: "chevron.left").font(.system(size: 16, weight: .bold)).symbolRenderingMode(.monochrome)
                         .foregroundStyle(.primary).frame(width: 48, height: 48)
                         .background(Color.primary.opacity(0.1), in: Circle())
@@ -3245,7 +3332,7 @@ struct AddPetWizardView: View {
                 }
                 .buttonStyle(ScaleButtonStyle()).disabled(trimmed.isEmpty || isNameDuplicate || isSaving)
             } else {
-                Button { withAnimation(.spring(response: 0.38)) { wizardPageIndex += 1 } } label: {
+                Button { withAnimation(GoMotion.feedback) { wizardPageIndex += 1 } } label: {
                     HStack(spacing: 6) {
                         Text(l.petWizNext).font(.system(size: 15, weight: .bold, design: .rounded))
                         Image(systemName: "chevron.right").font(.system(size: 14, weight: .bold)).symbolRenderingMode(.monochrome)
@@ -3286,7 +3373,7 @@ struct AddPetWizardView: View {
                         let isSelected = (isOther && isCustomBreed) || (!isCustomBreed && breed == b.name)
                         Button {
                             if isOther { breed = "其他"; isCustomBreed = true }
-                            else { breed = b.name; isCustomBreed = false; customBreedText = ""; themeColorHex = b.suggestedThemeHex; coatColor = b.coatColors.first?.name ?? ""; eyeColor = b.eyeColors.first?.name ?? ""; showBreedPickerSheet = false }
+                            else { selectBreed(b); showBreedPickerSheet = false }
                         } label: {
                             HStack {
                                 Text(b.name)
@@ -3902,9 +3989,12 @@ struct PetImageCropView: View {
 
                 VStack {
                     Spacer()
-                    Text("双指缩放 · 拖动调整位置")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.45))
+                    Label("卡片取景", systemImage: "crop")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(.black.opacity(0.22), in: Capsule())
                         .padding(.bottom, 104)
                 }
                 .allowsHitTesting(false)
@@ -4198,7 +4288,7 @@ struct GoColorPickerSheet: View {
                         let color = Color(hex: hex)
                         let isSelected = pickerColor.toHex()?.uppercased() == hex
                         Button {
-                            withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
+                            withAnimation(GoMotion.feedback) {
                                 pickerColor = color
                             }
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -4348,7 +4438,7 @@ private struct AhaHatchOverlay: View {
                 crackPhase = 1.0
             }
             // 阶段 3：宠物弹出（1.1 ~ 1.7s）
-            withAnimation(.spring(response: 0.55, dampingFraction: 0.55).delay(1.1)) {
+            withAnimation(GoMotion.fab.delay(1.1)) {
                 petScale = 1.0
                 petOpacity = 1.0
             }

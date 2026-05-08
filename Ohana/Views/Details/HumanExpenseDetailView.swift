@@ -52,7 +52,7 @@ struct HumanExpenseDetailView: View {
                         .font(OhanaFont.caption(.bold))
                         .foregroundStyle(.primary.opacity(0.5))
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text("¥")
+                        Text(AppCurrency.symbol)
                             .font(OhanaFont.title3(.bold))
                             .foregroundStyle(Color.goPrimary)
                         Text(String(format: "%.2f", totalAmount))
@@ -73,7 +73,7 @@ struct HumanExpenseDetailView: View {
                 // List
                 if myExpenses.isEmpty {
                     VStack(spacing: 12) {
-                        Image(systemName: "yensign.circle")
+                        Image(systemName: AppCurrency.systemIconName)
                             .font(OhanaFont.metric(size: 48))
                             .foregroundStyle(.primary.opacity(0.2))
                         Text("暂无花费记录")
@@ -132,7 +132,7 @@ struct HumanExpenseDetailView: View {
             }
             Spacer()
 
-            Text("-¥\(String(format: "%.2f", log.amount))")
+            Text(AppCurrency.format(-abs(log.amount), fractionDigits: 2))
                 .font(OhanaFont.callout(.bold))
                 .foregroundStyle(Color.goRed)
         }

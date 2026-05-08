@@ -18,19 +18,32 @@ struct QuickWaterDetailSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("appLanguage") private var appLanguage = "zh"
 
     @State private var waterModeRaw: String = "drink"
 
+    private var l: L10n { L10n(appLanguage) }
     private var themeColor: Color { Color(hex: pet.themeColorHex) }
     private var isDark: Bool { colorScheme == .dark }
     /// 深色：非「本页宠物数据主色」的控件强调统一荧光绿
     private var chromeTint: Color { isDark ? Color.goPrimary : themeColor }
+    private let waterChangeTint = Color(hex: CareType.waterChange.accentColorHex)
+    private let filterCleanTint = Color(hex: CareType.filterClean.accentColorHex)
 
     enum WaterMode: String, CaseIterable {
         case drink = "drink"
         case change = "change"
         var label: String { self == .drink ? "喂水" : "换水" }
         var icon: String { self == .drink ? "💧" : "🪣" }
+    }
+
+    private struct WaterQualityBucket: Identifiable {
+        let id: String
+        let label: String
+        let waterChanges: Int
+        let filterCleans: Int
+
+        var total: Int { waterChanges + filterCleans }
     }
 
     private var currentMode: WaterMode {
@@ -75,19 +88,56 @@ struct QuickWaterDetailSheet: View {
     private var petKey: String { pet.id.uuidString }
 
     private var lastWaterChange: PetCareLog? {
-        pet.careLogs.filter { $0.type == CareType.waterChange.rawValue }.sorted { $0.date > $1.date }.first
+        waterChangeLogs.first
     }
     private var lastFilterClean: PetCareLog? {
-        pet.careLogs.filter { $0.type == CareType.filterClean.rawValue }.sorted { $0.date > $1.date }.first
+        filterCleanLogs.first
+    }
+    private var waterChangeLogs: [PetCareLog] {
+        pet.careLogs.filter { $0.type == CareType.waterChange.rawValue }.sorted { $0.date > $1.date }
+    }
+    private var filterCleanLogs: [PetCareLog] {
+        pet.careLogs.filter { $0.type == CareType.filterClean.rawValue }.sorted { $0.date > $1.date }
     }
     private var changeRecentLogs: [PetCareLog] {
         pet.careLogs.filter {
             $0.type == CareType.waterChange.rawValue || $0.type == CareType.filterClean.rawValue
         }.sorted { $0.date > $1.date }.prefix(10).map { $0 }
     }
+    private var waterElapsedDays: Int {
+        daysSinceDate(lastWaterChange?.date ?? waterChangeAnchorDate)
+    }
+    private var filterCleanElapsedDays: Int? {
+        lastFilterClean.map { daysSinceDate($0.date) }
+    }
+    private var filterReplaceElapsedDays: Int? {
+        lastFilterClean.map { daysSinceDate($0.date) }
+    }
+    private var daysUntilWaterChange: Int { waterIntervalDays - waterElapsedDays }
+    private var daysUntilFilterClean: Int? { filterCleanElapsedDays.map { filterCleanIntervalDays - $0 } }
+    private var daysUntilFilterReplace: Int? { filterReplaceElapsedDays.map { filterReplaceIntervalDays - $0 } }
+    private var waterChangesLast30Days: Int { recentCount(type: .waterChange, days: 30) }
+    private var filterCleansLast30Days: Int { recentCount(type: .filterClean, days: 30) }
+    private var waterQualityBuckets: [WaterQualityBucket] {
+        let cal = Calendar.current
+        let startToday = cal.startOfDay(for: Date())
+        return (0..<6).reversed().compactMap { offset in
+            guard let bucketStart = cal.date(byAdding: .day, value: -offset * 5, to: startToday),
+                  let bucketEnd = cal.date(byAdding: .day, value: 5, to: bucketStart) else { return nil }
+            let waterCount = waterChangeLogs.filter { $0.date >= bucketStart && $0.date < bucketEnd }.count
+            let filterCount = filterCleanLogs.filter { $0.date >= bucketStart && $0.date < bucketEnd }.count
+            let day = cal.component(.day, from: bucketStart)
+            return WaterQualityBucket(
+                id: "\(Int(bucketStart.timeIntervalSince1970))",
+                label: "\(day)",
+                waterChanges: waterCount,
+                filterCleans: filterCount
+            )
+        }
+    }
     private func daysSince(_ log: PetCareLog?) -> Int? {
         guard let l = log else { return nil }
-        return Calendar.current.dateComponents([.day], from: l.date, to: Date()).day
+        return daysSinceDate(l.date)
     }
 
     var body: some View {
@@ -293,9 +343,229 @@ struct QuickWaterDetailSheet: View {
     // MARK: - Change Content
     private var changeContent: some View {
         VStack(spacing: 20) {
+            waterQualityDataCard
             waterChangeCard
             filterCard
             changeHistoryCard
+        }
+    }
+
+    private var waterQualityDataCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                Image(systemName: "chart.xyaxis.line")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(chromeTint)
+                Text(l.tr(zh: "水质数据", en: "Water data", de: "Wasserdaten"))
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Text(l.tr(zh: "近 30 天", en: "30 days", de: "30 Tage"))
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.primary.opacity(0.06), in: Capsule())
+            }
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                waterQualityMetric(
+                    title: l.tr(zh: "下次换水", en: "Next water change", de: "Nächster Wasserwechsel"),
+                    value: dueText(daysUntil: daysUntilWaterChange),
+                    subtitle: l.tr(
+                        zh: "已过 \(waterElapsedDays)/\(waterIntervalDays) 天",
+                        en: "\(waterElapsedDays)/\(waterIntervalDays) days elapsed",
+                        de: "\(waterElapsedDays)/\(waterIntervalDays) Tage vergangen"
+                    ),
+                    icon: "arrow.2.circlepath",
+                    tint: waterChangeTint,
+                    isOverdue: daysUntilWaterChange < 0
+                )
+
+                waterQualityMetric(
+                    title: l.tr(zh: "滤材清洗", en: "Filter clean", de: "Filter reinigen"),
+                    value: optionalDueText(daysUntilFilterClean),
+                    subtitle: filterCleanElapsedDays.map {
+                        l.tr(
+                            zh: "已过 \($0)/\(filterCleanIntervalDays) 天",
+                            en: "\($0)/\(filterCleanIntervalDays) days elapsed",
+                            de: "\($0)/\(filterCleanIntervalDays) Tage vergangen"
+                        )
+                    } ?? l.tr(zh: "清理一次后开始追踪", en: "Track after first clean", de: "Nach erster Reinigung verfolgen"),
+                    icon: "sparkles",
+                    tint: filterCleanTint,
+                    isOverdue: (daysUntilFilterClean ?? 1) < 0
+                )
+
+                waterQualityMetric(
+                    title: l.tr(zh: "记录次数", en: "Logged actions", de: "Einträge"),
+                    value: "\(waterChangesLast30Days + filterCleansLast30Days)",
+                    subtitle: l.tr(
+                        zh: "换水 \(waterChangesLast30Days) · 滤材 \(filterCleansLast30Days)",
+                        en: "Water \(waterChangesLast30Days) · Filter \(filterCleansLast30Days)",
+                        de: "Wasser \(waterChangesLast30Days) · Filter \(filterCleansLast30Days)"
+                    ),
+                    icon: "number",
+                    tint: chromeTint,
+                    isOverdue: false
+                )
+
+                waterQualityMetric(
+                    title: l.tr(zh: "滤芯更换", en: "Filter replace", de: "Filterwechsel"),
+                    value: optionalDueText(daysUntilFilterReplace),
+                    subtitle: l.tr(zh: "按上次清理估算", en: "Estimated from last clean", de: "Aus letzter Reinigung geschätzt"),
+                    icon: "calendar.badge.clock",
+                    tint: filterCleanTint,
+                    isOverdue: (daysUntilFilterReplace ?? 1) < 0
+                )
+            }
+
+            VStack(spacing: 12) {
+                cycleProgressRow(
+                    title: l.tr(zh: "换水周期", en: "Water change cycle", de: "Wasserwechsel-Zyklus"),
+                    elapsedDays: waterElapsedDays,
+                    intervalDays: waterIntervalDays,
+                    tint: waterChangeTint
+                )
+                cycleProgressRow(
+                    title: l.tr(zh: "滤材清洗周期", en: "Filter clean cycle", de: "Filterreinigungs-Zyklus"),
+                    elapsedDays: filterCleanElapsedDays,
+                    intervalDays: filterCleanIntervalDays,
+                    tint: filterCleanTint
+                )
+            }
+
+            waterQualityActivityBars
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    private func waterQualityMetric(
+        title: String,
+        value: String,
+        subtitle: String,
+        icon: String,
+        tint: Color,
+        isOverdue: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(tint)
+                Text(title)
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+            }
+            Text(value)
+                .font(.system(size: 17, weight: .black, design: .rounded))
+                .foregroundStyle(isOverdue ? Color.goRed : .primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+            Text(subtitle)
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.82)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func cycleProgressRow(
+        title: String,
+        elapsedDays: Int?,
+        intervalDays: Int,
+        tint: Color
+    ) -> some View {
+        let safeInterval = max(intervalDays, 1)
+        let elapsed = max(elapsedDays ?? 0, 0)
+        let progress = min(Double(elapsed) / Double(safeInterval), 1)
+        let status = elapsedDays.map {
+            l.tr(zh: "\($0)/\(safeInterval) 天", en: "\($0)/\(safeInterval) days", de: "\($0)/\(safeInterval) Tage")
+        } ?? l.tr(zh: "未记录", en: "No record", de: "Kein Eintrag")
+
+        return VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Text(status)
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(elapsed >= safeInterval ? Color.goRed : .secondary)
+            }
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.primary.opacity(0.07))
+                    Capsule()
+                        .fill(tint.opacity(elapsed >= safeInterval ? 0.95 : 0.72))
+                        .frame(width: max(6, proxy.size.width * progress))
+                }
+            }
+            .frame(height: 7)
+        }
+    }
+
+    private var waterQualityActivityBars: some View {
+        let maxTotal = max(waterQualityBuckets.map(\.total).max() ?? 0, 1)
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Text(l.tr(zh: "记录分布", en: "Activity spread", de: "Verteilung"))
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                Spacer()
+                waterQualityLegend(l.tr(zh: "换水", en: "Water", de: "Wasser"), color: waterChangeTint)
+                waterQualityLegend(l.tr(zh: "滤材", en: "Filter", de: "Filter"), color: filterCleanTint)
+            }
+
+            HStack(alignment: .bottom, spacing: 8) {
+                ForEach(waterQualityBuckets) { bucket in
+                    VStack(spacing: 6) {
+                        ZStack(alignment: .bottom) {
+                            Capsule()
+                                .fill(Color.primary.opacity(0.07))
+                                .frame(width: 13, height: 52)
+
+                            VStack(spacing: 2) {
+                                Spacer(minLength: 0)
+                                if bucket.filterCleans > 0 {
+                                    Capsule()
+                                        .fill(filterCleanTint.opacity(0.78))
+                                        .frame(width: 13, height: bucketHeight(bucket.filterCleans, maxTotal: maxTotal))
+                                }
+                                if bucket.waterChanges > 0 {
+                                    Capsule()
+                                        .fill(waterChangeTint.opacity(0.88))
+                                        .frame(width: 13, height: bucketHeight(bucket.waterChanges, maxTotal: maxTotal))
+                                }
+                            }
+                            .frame(width: 13, height: 52)
+                        }
+                        Text(bucket.label)
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .foregroundStyle(.secondary.opacity(0.85))
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+
+    private func waterQualityLegend(_ title: String, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(color.opacity(0.9))
+                .frame(width: 6, height: 6)
+            Text(title)
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -569,6 +839,42 @@ struct QuickWaterDetailSheet: View {
             .foregroundStyle(isOverdue ? Color.goRed : .primary)
             .padding(.horizontal, 10).padding(.vertical, 4)
             .background((isOverdue ? Color.goRed : themeColor).opacity(0.12), in: Capsule())
+    }
+
+    private func daysSinceDate(_ date: Date) -> Int {
+        let cal = Calendar.current
+        let start = cal.startOfDay(for: date)
+        let today = cal.startOfDay(for: Date())
+        return max(0, cal.dateComponents([.day], from: start, to: today).day ?? 0)
+    }
+
+    private func recentCount(type: CareType, days: Int) -> Int {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
+        return pet.careLogs.filter { $0.type == type.rawValue && $0.date >= cutoff }.count
+    }
+
+    private func dueText(daysUntil: Int) -> String {
+        if daysUntil > 0 {
+            return l.tr(zh: "还剩 \(daysUntil) 天", en: "\(daysUntil)d left", de: "noch \(daysUntil) T.")
+        }
+        if daysUntil == 0 {
+            return l.tr(zh: "今天到期", en: "Due today", de: "Heute fällig")
+        }
+        let overdueDays = abs(daysUntil)
+        return l.tr(zh: "逾期 \(overdueDays) 天", en: "\(overdueDays)d overdue", de: "\(overdueDays) T. überfällig")
+    }
+
+    private func optionalDueText(_ daysUntil: Int?) -> String {
+        guard let daysUntil else {
+            return l.tr(zh: "未记录", en: "No record", de: "Kein Eintrag")
+        }
+        return dueText(daysUntil: daysUntil)
+    }
+
+    private func bucketHeight(_ count: Int, maxTotal: Int) -> CGFloat {
+        guard count > 0 else { return 0 }
+        let ratio = CGFloat(count) / CGFloat(max(maxTotal, 1))
+        return max(5, min(52, 52 * ratio))
     }
 
     private func migrateLegacyWaterModeIfNeeded() {

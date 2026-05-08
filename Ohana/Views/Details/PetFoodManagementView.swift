@@ -546,7 +546,7 @@ struct PetFoodManagementView: View {
                             .keyboardType(.decimalPad)
                             .font(.system(size: 14, weight: .medium, design: .rounded))
                     }
-                    inputRow(icon: "yensign.circle.fill", label: "购买价格(¥)", color: Color.goPrimary) {
+                    inputRow(icon: "\(AppCurrency.systemIconName).fill", label: "购买价格(\(AppCurrency.symbol))", color: Color.goPrimary) {
                         TextField("选填", text: $stockPriceInput)
                             .keyboardType(.decimalPad)
                             .font(.system(size: 14, weight: .medium, design: .rounded))

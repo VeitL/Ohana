@@ -40,9 +40,9 @@ enum PetTimelineItemsBuilder {
         }
         for e in pet.expenseLogs {
             list.append(UnifiedLogItem(id: e.id, date: e.date, type: "expense",
-                title: "¥\(Int(e.amount)) · \(e.note.isEmpty ? e.category : e.note)",
+                title: "\(AppCurrency.format(e.amount, fractionDigits: 0)) · \(e.note.isEmpty ? e.category : e.note)",
                 subtitle: e.category,
-                iconName: "yensign.circle.fill", color: .goYellow))
+                iconName: "\(AppCurrency.systemIconName).fill", color: .goYellow))
         }
         for w in pet.weightLogs {
             list.append(UnifiedLogItem(id: w.id, date: w.date, type: "weight",

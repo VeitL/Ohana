@@ -130,7 +130,7 @@ enum CareLedgerStatsService {
         case .walk:
             return "figure.walk"
         case .expense:
-            return ExpenseCategory(rawValue: event.actionType)?.systemIconName ?? "yensign.circle"
+            return ExpenseCategory(rawValue: event.actionType)?.systemIconName ?? AppCurrency.systemIconName
         case .hygiene:
             return HygieneType(rawValue: event.actionType)?.systemIconName ?? "sparkles"
         case .health:

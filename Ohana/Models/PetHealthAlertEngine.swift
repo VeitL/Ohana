@@ -165,19 +165,24 @@ final class PetHealthAlertEngine {
 
     private func checkWeight(pet: Pet, now: Date, cal: Calendar) -> [HealthAlert] {
         let sorted = pet.weightLogs.sorted { $0.date > $1.date }
-        guard sorted.count >= 2 else { return [] }
-        let latest = sorted[0].weight
-        let prev   = sorted[1].weight
-        guard prev > 0 else { return [] }
-        let changePct = (latest - prev) / prev * 100
+        guard sorted.count >= 2, let latestLog = sorted.first else { return [] }
+        let cutoff = cal.date(byAdding: .day, value: -30, to: now) ?? now
+        let baselineLog = sorted
+            .filter { $0.date >= cutoff }
+            .last ?? sorted[1]
+        let latest = latestLog.weightInKg
+        let baseline = baselineLog.weightInKg
+        guard baseline > 0 else { return [] }
+        let changePct = (latest - baseline) / baseline * 100
+        let days = max(1, cal.dateComponents([.day], from: baselineLog.date, to: latestLog.date).day ?? 1)
 
         if changePct >= 10 {
             return [HealthAlert(
                 id: UUID(), petId: pet.id, petName: pet.name, petEmoji: pet.avatarEmoji,
                 type: .weightGainAlert,
                 title: "体重明显增加",
-                detail: String(format: "最近体重增加了 %.1f%%（%.1f → %.1f kg），需注意饮食控制。", changePct, prev, latest),
-                severity: .warning,
+                detail: String(format: "近 %d 天体重增加了 %.1f%%（%.1f → %.1f kg），需注意饮食控制。", days, changePct, baseline, latest),
+                severity: changePct >= 15 ? .urgent : .warning,
                 generatedAt: now
             )]
         } else if changePct <= -10 {
@@ -185,8 +190,8 @@ final class PetHealthAlertEngine {
                 id: UUID(), petId: pet.id, petName: pet.name, petEmoji: pet.avatarEmoji,
                 type: .weightLossAlert,
                 title: "体重明显减轻",
-                detail: String(format: "最近体重减少了 %.1f%%（%.1f → %.1f kg），建议排查健康原因。", abs(changePct), prev, latest),
-                severity: .warning,
+                detail: String(format: "近 %d 天体重减少了 %.1f%%（%.1f → %.1f kg），建议排查健康原因。", days, abs(changePct), baseline, latest),
+                severity: changePct <= -15 ? .urgent : .warning,
                 generatedAt: now
             )]
         }

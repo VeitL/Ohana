@@ -489,7 +489,7 @@ struct PetHealthDetailView: View {
                         Spacer()
                         VStack(alignment: .trailing, spacing: 3) {
                             if log.cost > 0 {
-                                Text("¥\(Int(log.cost))")
+                                Text(AppCurrency.format(log.cost, fractionDigits: 0))
                                     .font(.system(size: 13, weight: .bold, design: .rounded))
                                     .foregroundStyle(.primary.opacity(0.7))
                             }

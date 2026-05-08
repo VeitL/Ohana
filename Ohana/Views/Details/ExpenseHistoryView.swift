@@ -122,7 +122,7 @@ struct ExpenseHistoryView: View {
                         .font(.system(size: 16, weight: .black, design: .rounded))
                         .foregroundStyle(.primary.opacity(0.6))
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text("¥\(Int(rangeTotal))")
+                        Text(AppCurrency.format(rangeTotal, fractionDigits: 0))
                             .font(.system(size: 44, weight: .black, design: .rounded))
                             .foregroundStyle(.primary)
                             .contentTransition(.numericText())
@@ -198,7 +198,7 @@ struct ExpenseHistoryView: View {
                                 Text("\(pct)%")
                                     .font(.system(size: 10, weight: .bold, design: .rounded))
                                     .foregroundStyle(.primary.opacity(0.4))
-                                Text("¥\(Int(amount))")
+                                Text(AppCurrency.format(amount, fractionDigits: 0))
                                     .font(.system(size: 11, weight: .black, design: .rounded))
                                     .foregroundStyle(Color.goYellow)
                             }
@@ -211,7 +211,7 @@ struct ExpenseHistoryView: View {
                                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                                     .foregroundStyle(Color(hex: "4ECDC4"))
                                 Spacer()
-                                Text("-¥\(Int(rangeTotalReimbursed))")
+                                Text(AppCurrency.format(-rangeTotalReimbursed, fractionDigits: 0))
                                     .font(.system(size: 11, weight: .black, design: .rounded))
                                     .foregroundStyle(Color(hex: "4ECDC4"))
                             }
@@ -342,7 +342,7 @@ struct ExpenseHistoryView: View {
 
             Spacer()
 
-            Text(isReimbursement ? "-¥\(Int(abs(log.amount)))" : "¥\(Int(log.amount))")
+            Text(AppCurrency.format(log.amount, fractionDigits: 0))
                 .font(.system(size: 18, weight: .black, design: .rounded))
                 .foregroundStyle(accentColor)
 
@@ -385,7 +385,7 @@ struct ExpenseHistoryView: View {
                     // 金额大输入框
                     VStack(spacing: 4) {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text("¥")
+                            Text(AppCurrency.symbol)
                                 .font(.system(size: 36, weight: .black, design: .rounded))
                                 .foregroundStyle(Color.goYellow)
                             TextField("0", text: $newAmount)
@@ -396,7 +396,7 @@ struct ExpenseHistoryView: View {
                         .padding(.horizontal, 24).padding(.vertical, 20)
                         .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
                         .padding(.horizontal, 24)
-                        Text("金额 (元)")
+                        Text("金额 (\(AppCurrency.code))")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.primary.opacity(0.4))
                     }

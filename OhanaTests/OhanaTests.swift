@@ -581,9 +581,165 @@ struct OhanaTests {
         #expect(!quests.contains { $0.id.hasPrefix("q_play_") })
     }
 
+    @Test func humanMedicationScheduleMetadataRoundTripsAndHidesNotes() async throws {
+        let metadata = HumanMedicationScheduleMetadata(doseMinutes: [20 * 60, 8 * 60, 8 * 60], weeklyWeekday: 5)
+        let notes = HumanMedicationScheduleMetadata.composeNotes(visibleNotes: "饭后服用", metadata: metadata)
+        let parsed = HumanMedicationScheduleMetadata.parse(from: notes)
+
+        #expect(parsed?.doseMinutes == [8 * 60, 20 * 60])
+        #expect(parsed?.weeklyWeekday == 5)
+        #expect(HumanMedicationScheduleMetadata.visibleNotes(from: notes) == "饭后服用")
+        #expect(!HumanMedicationScheduleMetadata.visibleNotes(from: notes).contains("ohana-human-medication-schedule"))
+    }
+
+    @Test func humanMedicationScheduleGeneratesFixedWeeklyAndManualDoses() async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let thursday = dateForTest(year: 2026, month: 5, day: 7, hour: 10, minute: 0)
+
+        let twice = HumanMedication(
+            humanId: UUID().uuidString,
+            name: "Vitamin",
+            dosage: "1",
+            frequency: .twiceDaily,
+            startDate: thursday
+        )
+        twice.notes = HumanMedicationScheduleMetadata.composeNotes(
+            visibleNotes: "",
+            metadata: HumanMedicationScheduleMetadata(doseMinutes: [8 * 60, 20 * 60])
+        )
+        #expect(HumanMedicationSchedulePlan.doses(on: thursday, for: twice, calendar: calendar).count == 2)
+
+        let weekly = HumanMedication(
+            humanId: UUID().uuidString,
+            name: "Weekly",
+            dosage: "1",
+            frequency: .weekly,
+            startDate: thursday
+        )
+        weekly.notes = HumanMedicationScheduleMetadata.composeNotes(
+            visibleNotes: "",
+            metadata: HumanMedicationScheduleMetadata(doseMinutes: [9 * 60], weeklyWeekday: 5)
+        )
+        #expect(HumanMedicationSchedulePlan.doses(on: thursday, for: weekly, calendar: calendar).count == 1)
+        #expect(HumanMedicationSchedulePlan.doses(on: dateForTest(year: 2026, month: 5, day: 8), for: weekly, calendar: calendar).isEmpty)
+
+        let manual = HumanMedication(
+            humanId: UUID().uuidString,
+            name: "As needed",
+            dosage: "1",
+            frequency: .asNeeded,
+            startDate: thursday
+        )
+        #expect(HumanMedicationSchedulePlan.doses(on: thursday, for: manual, calendar: calendar).isEmpty)
+    }
+
+    @Test func humanMedicationScheduleFallsBackToLegacyFirstDoseTime() async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let day = dateForTest(year: 2026, month: 5, day: 7)
+        let firstDose = dateForTest(year: 2026, month: 5, day: 7, hour: 9, minute: 30)
+        let med = HumanMedication(
+            humanId: UUID().uuidString,
+            name: "Legacy",
+            dosage: "1",
+            frequency: .twiceDaily,
+            firstDoseTime: firstDose,
+            startDate: day
+        )
+
+        #expect(HumanMedicationSchedulePlan.doseMinutes(for: med, calendar: calendar) == [9 * 60 + 30, 21 * 60 + 30])
+    }
+
+    @MainActor
+    @Test func humanMedicationDoseLogStoreUpsertsScheduledMinute() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let humanId = UUID().uuidString
+        let medicationId = UUID().uuidString
+        let scheduled = dateForTest(year: 2026, month: 5, day: 7, hour: 8, minute: 0)
+
+        let first = HumanMedicationLogStore.applyDoseStatus(
+            humanId: humanId,
+            medicationId: medicationId,
+            scheduledTime: scheduled,
+            status: .taken,
+            existingLogs: [],
+            context: context
+        )
+        #expect(first.didChange)
+        #expect(first.shouldRecordLedgerEvent)
+        try context.save()
+
+        let logs = try context.fetch(FetchDescriptor<HumanMedicationLog>())
+        let second = HumanMedicationLogStore.applyDoseStatus(
+            humanId: humanId,
+            medicationId: medicationId,
+            scheduledTime: scheduled.addingTimeInterval(12),
+            status: .taken,
+            existingLogs: logs,
+            context: context
+        )
+        #expect(!second.didChange)
+        #expect(!second.shouldRecordLedgerEvent)
+        #expect(try context.fetch(FetchDescriptor<HumanMedicationLog>()).count == 1)
+
+        let third = HumanMedicationLogStore.applyDoseStatus(
+            humanId: humanId,
+            medicationId: medicationId,
+            scheduledTime: scheduled,
+            status: .skipped,
+            existingLogs: logs,
+            context: context
+        )
+        #expect(third.didChange)
+        #expect(third.shouldRecordLedgerEvent)
+        #expect(third.log?.status == .skipped)
+        #expect(try context.fetch(FetchDescriptor<HumanMedicationLog>()).count == 1)
+    }
+
+    @MainActor
+    @Test func humanMedicationDisplayGroupsAndFrequencyLocalization() async throws {
+        let now = dateForTest(year: 2026, month: 5, day: 7)
+        let humanId = UUID().uuidString
+        let current = HumanMedication(humanId: humanId, name: "Current", frequency: .daily, startDate: now)
+        let future = HumanMedication(humanId: humanId, name: "Future", frequency: .daily, startDate: dateForTest(year: 2026, month: 5, day: 8))
+        let ended = HumanMedication(humanId: humanId, name: "Ended", frequency: .daily, startDate: dateForTest(year: 2026, month: 5, day: 1), endDate: dateForTest(year: 2026, month: 5, day: 2))
+        let stopped = HumanMedication(humanId: humanId, name: "Stopped", frequency: .daily, startDate: now)
+        stopped.isActive = false
+        let manual = HumanMedication(humanId: humanId, name: "Manual", frequency: .asNeeded, startDate: now)
+
+        #expect(HumanMedicationSchedulePlan.displayGroup(for: current, now: now) == .current)
+        #expect(HumanMedicationSchedulePlan.displayGroup(for: future, now: now) == .notStarted)
+        #expect(HumanMedicationSchedulePlan.displayGroup(for: ended, now: now) == .ended)
+        #expect(HumanMedicationSchedulePlan.displayGroup(for: stopped, now: now) == .stopped)
+        #expect(HumanMedicationSchedulePlan.displayGroup(for: manual, now: now) == .manual)
+        #expect(MedicationFrequency.twiceDaily.displayTitle(l: L10n("zh")) == "每天两次")
+        #expect(MedicationFrequency.twiceDaily.displayTitle(l: L10n("en")) == "Twice daily")
+        #expect(MedicationFrequency.twiceDaily.displayTitle(l: L10n("de")) == "Zweimal täglich")
+    }
+
     private func makeInMemoryContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV37.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func dateForTest(
+        year: Int,
+        month: Int,
+        day: Int,
+        hour: Int = 0,
+        minute: Int = 0
+    ) -> Date {
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.timeZone = TimeZone(secondsFromGMT: 0)
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+        return components.date ?? Date(timeIntervalSince1970: 0)
     }
 }

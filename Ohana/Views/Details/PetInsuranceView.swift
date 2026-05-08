@@ -170,10 +170,10 @@ struct PetInsuranceView: View {
 
                     HStack(spacing: 0) {
                         statCell(label: "年费",
-                                 value: ins.annualPremium > 0 ? String(format: "¥%.0f", ins.annualPremium) : "—")
+                                 value: ins.annualPremium > 0 ? AppCurrency.format(ins.annualPremium, fractionDigits: 0) : "—")
                         Divider().frame(height: 32).opacity(0.2)
                         statCell(label: "保额",
-                                 value: ins.coverageAmount > 0 ? String(format: "¥%.0f", ins.coverageAmount) : "—")
+                                 value: ins.coverageAmount > 0 ? AppCurrency.format(ins.coverageAmount, fractionDigits: 0) : "—")
                         Divider().frame(height: 32).opacity(0.2)
                         statCell(label: "续期",
                                  value: ins.renewalDate.formatted(.dateTime.year().month().day()))
@@ -394,7 +394,7 @@ struct AddPetInsuranceSheet: View {
 
             // 金额输入行
             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("¥")
+                Text(AppCurrency.symbol)
                     .font(.system(size: 20, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goPrimary)
                 TextField("0.00", text: $premiumInput)
@@ -413,16 +413,16 @@ struct AddPetInsuranceSheet: View {
                 let basePerPeriod = paymentFrequency.periodAmount(fromAnnual: annualPremiumDouble)
                 VStack(alignment: .leading, spacing: 3) {
                     if premiumMode == .monthly {
-                        Text("年总保费：¥\(String(format: "%.2f", annualPremiumDouble))")
+                        Text("年总保费：\(AppCurrency.format(annualPremiumDouble, fractionDigits: 2))")
                             .font(.system(size: 12, weight: .medium, design: .rounded))
                             .foregroundStyle(.secondary)
                     }
                     HStack(spacing: 4) {
-                        Text("每期缴纳：¥\(String(format: "%.2f", basePerPeriod + other))")
+                        Text("每期缴纳：\(AppCurrency.format(basePerPeriod + other, fractionDigits: 2))")
                             .font(.system(size: 12, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.goPrimary)
                         if other > 0 {
-                            Text("（含其他费用 ¥\(String(format: "%.2f", other))）")
+                            Text("（含其他费用 \(AppCurrency.format(other, fractionDigits: 2))）")
                                 .font(.system(size: 11, weight: .regular, design: .rounded))
                                 .foregroundStyle(.secondary)
                         }
@@ -448,7 +448,7 @@ struct AddPetInsuranceSheet: View {
             if showOtherFee {
                 HStack(spacing: 8) {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text("¥")
+                        Text(AppCurrency.symbol)
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(.secondary)
                         TextField("0.00", text: $otherFeeInput)
@@ -592,7 +592,7 @@ struct AddPetInsuranceSheet: View {
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                     let other = Double(otherFeeInput.replacingOccurrences(of: ",", with: ".")) ?? 0
                     let perPeriod = paymentFrequency.periodAmount(fromAnnual: annualPremiumDouble) + other
-                    Text("每期 ¥\(String(format: "%.2f", perPeriod)) · 按\(paymentFrequency.rawValue)写入花费")
+                    Text("每期 \(AppCurrency.format(perPeriod, fractionDigits: 2)) · 按\(paymentFrequency.rawValue)写入花费")
                         .font(.system(size: 12, weight: .regular, design: .rounded))
                         .foregroundStyle(.secondary)
                 }
@@ -729,7 +729,7 @@ struct AddPetInsuranceSheet: View {
         let name = ins.productName.isEmpty ? ins.companyName : ins.productName
 
         // 计算所有付款日期
-        let dates = paymentDates(for: ins, calendar: cal)
+        let dates = InsurancePaymentSchedule.dates(for: ins, calendar: cal)
         let payerId = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
 
         for (index, payDate) in dates.enumerated() {
@@ -762,51 +762,6 @@ struct AddPetInsuranceSheet: View {
         }
     }
 
-    /// 计算从 startDate 到 renewalDate 的所有付款日期
-    private func paymentDates(for ins: PetInsurance, calendar cal: Calendar) -> [Date] {
-        var dates: [Date] = []
-        let end = ins.renewalDate
-
-        switch ins.paymentFrequency {
-        case .once:
-            dates.append(ins.startDate)
-
-        case .annual:
-            var d = ins.startDate
-            while d <= end {
-                dates.append(d)
-                d = cal.date(byAdding: .year, value: 1, to: d) ?? d
-            }
-
-        case .monthly:
-            // 找到 startDate 当月或次月的 paymentDay
-            var d = firstPaymentDate(from: ins.startDate, day: ins.paymentDayOfMonth, calendar: cal, component: .month, componentValue: 1)
-            while d <= end {
-                dates.append(d)
-                d = cal.date(byAdding: .month, value: 1, to: d) ?? d
-            }
-
-        case .quarterly:
-            var d = firstPaymentDate(from: ins.startDate, day: ins.paymentDayOfMonth, calendar: cal, component: .month, componentValue: 3)
-            while d <= end {
-                dates.append(d)
-                d = cal.date(byAdding: .month, value: 3, to: d) ?? d
-            }
-        }
-        return dates
-    }
-
-    /// 找到从 referenceDate 起第一个满足「当月或之后最近一期 paymentDay 日」的日期
-    private func firstPaymentDate(from reference: Date, day: Int, calendar cal: Calendar, component: Calendar.Component, componentValue: Int) -> Date {
-        var comps = cal.dateComponents([.year, .month], from: reference)
-        comps.day = day
-        if let candidate = cal.date(from: comps), candidate >= reference {
-            return candidate
-        }
-        // 当月付款日已过，往后推一期
-        comps.month = (comps.month ?? 1) + componentValue
-        return cal.date(from: comps) ?? reference
-    }
 }
 
 // MARK: - Premium Input Mode

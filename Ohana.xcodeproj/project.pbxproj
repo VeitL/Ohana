@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4FDA09112F7B0001004B725F /* HumanAvatarAssets in Resources */ = {isa = PBXBuildFile; fileRef = 4FDA09102F7B0001004B725F /* HumanAvatarAssets */; };
+		4FDA09012F7A0001004B725F /* PetAvatarAssets in Resources */ = {isa = PBXBuildFile; fileRef = 4FDA09002F7A0001004B725F /* PetAvatarAssets */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		4FDA023F2F54E0D6004B725F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +32,8 @@
 		4FDA02312F54E0D4004B725F /* Ohana.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ohana.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4FDA023E2F54E0D6004B725F /* OhanaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OhanaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4FDA02482F54E0D6004B725F /* OhanaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OhanaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4FDA09102F7B0001004B725F /* HumanAvatarAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = HumanAvatarAssets; sourceTree = "<group>"; };
+		4FDA09002F7A0001004B725F /* PetAvatarAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = PetAvatarAssets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -89,6 +96,8 @@
 			isa = PBXGroup;
 			children = (
 				4FDA02332F54E0D4004B725F /* Ohana */,
+				4FDA09102F7B0001004B725F /* HumanAvatarAssets */,
+				4FDA09002F7A0001004B725F /* PetAvatarAssets */,
 				4FDA02412F54E0D6004B725F /* OhanaTests */,
 				4FDA024B2F54E0D6004B725F /* OhanaUITests */,
 				4FDA02322F54E0D4004B725F /* Products */,
@@ -206,6 +215,7 @@
 				en,
 				Base,
 				"zh-Hans",
+				de,
 			);
 			mainGroup = 4FDA02282F54E0D4004B725F;
 			minimizedProjectReferenceProxies = 1;
@@ -226,6 +236,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4FDA09112F7B0001004B725F /* HumanAvatarAssets in Resources */,
+				4FDA09012F7A0001004B725F /* PetAvatarAssets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

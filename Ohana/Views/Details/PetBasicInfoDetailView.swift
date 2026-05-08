@@ -6,6 +6,7 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import Foundation
 
 struct PetBasicInfoDetailView: View {
     let pet: Pet
@@ -50,7 +51,7 @@ struct PetBasicInfoDetailView: View {
     @State private var eThemeColorHex = ""
     @State private var eAvatarImageData: Data? = nil
 
-    private let speciesOptions = ["狗", "猫", "兔子", "仓鼠", "鸟", "其他"]
+    private let speciesOptions = ["狗", "猫", "鱼", "鸟", "兔子", "爬宠", "仓鼠", "其他"]
     private let themePresets: [(String, String)] = [
         ("FF6B6B","coral"), ("4ECDC4","ocean"), ("B8A9C9","lavender"),
         ("95E1D3","mint"), ("F38181","sunset"), ("AA96DA","berry"),
@@ -159,6 +160,7 @@ struct PetBasicInfoDetailView: View {
                 }
                 infoRow(label: "过敏原", value: pet.allergies.isEmpty ? "无记录" : pet.allergies)
             }
+            vetVisitSummaryCard
             infoSection(title: "证件信息", icon: "doc.badge.fill", iconColor: Color.goYellow) {
                 infoRow(label: "护照编号", value: pet.passportNumber.isEmpty ? "未填写" : pet.passportNumber)
                 if let expiry = pet.passportExpiryDate {
@@ -596,6 +598,118 @@ struct PetBasicInfoDetailView: View {
         }
     }
 
+    // MARK: - Vet Visit Summary
+    private var vetVisitSummaryCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "cross.case.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Color.goRed)
+                Text("就诊卡片")
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary)
+                Spacer()
+                ShareLink(item: vetVisitSummaryText) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "square.and.arrow.up")
+                        Text("给兽医")
+                    }
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.arkInk)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(Color.goPrimary, in: Capsule())
+                }
+            }
+
+            VStack(spacing: 8) {
+                compactSummaryRow("疫苗", vaccineSummaryText)
+                compactSummaryRow("过敏", pet.allergies.isEmpty ? "无记录" : pet.allergies)
+                compactSummaryRow("用药中", activeMedicationSummaryText)
+                compactSummaryRow("近期症状", recentSymptomSummaryText)
+                compactSummaryRow("保险", insuranceSummaryText)
+                compactSummaryRow("最近体重", recentWeightSummaryText)
+            }
+        }
+        .padding(16)
+        .goTranslucentCard(cornerRadius: 20)
+    }
+
+    private func compactSummaryRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text(label)
+                .font(.system(size: 12, weight: .black, design: .rounded))
+                .foregroundStyle(.primary.opacity(0.46))
+                .frame(width: 58, alignment: .leading)
+            Text(value)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(.primary.opacity(0.82))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .lineLimit(2)
+        }
+    }
+
+    private var vaccineSummaryText: String {
+        let latest = pet.healthLogs
+            .filter { $0.healthLogType == .vaccine }
+            .sorted { $0.date > $1.date }
+            .first
+        guard let latest else { return "未记录" }
+        let name = latest.note.isEmpty ? "疫苗" : latest.note
+        if let expiry = latest.expirationDate {
+            return "\(name) · 有效至 \(expiry.formatted(.dateTime.year().month().day()))"
+        }
+        return "\(name) · \(latest.date.formatted(.dateTime.year().month().day()))"
+    }
+
+    private var activeMedicationSummaryText: String {
+        let meds = pet.medications.filter(\.isActiveToday)
+        guard !meds.isEmpty else { return "无进行中用药" }
+        return meds.prefix(3)
+            .map { "\($0.name.isEmpty ? "未命名药品" : $0.name)（\($0.dosage.isEmpty ? "按医嘱" : $0.dosage)）" }
+            .joined(separator: "、")
+    }
+
+    private var recentSymptomSummaryText: String {
+        let recent = pet.symptomLogs
+            .sorted { $0.date > $1.date }
+            .prefix(3)
+        guard !recent.isEmpty else { return "近况无症状记录" }
+        return recent
+            .map { "\($0.symptomName)（\($0.severity.label)）" }
+            .joined(separator: "、")
+    }
+
+    private var insuranceSummaryText: String {
+        let active = pet.insurances.filter(\.isActive)
+        guard let first = active.sorted(by: { $0.renewalDate < $1.renewalDate }).first else { return "未登记保险" }
+        let name = first.productName.isEmpty ? (first.companyName.isEmpty ? "保险" : first.companyName) : first.productName
+        return "\(name) · \(first.renewalStatusLabel)"
+    }
+
+    private var recentWeightSummaryText: String {
+        guard let latest = pet.weightLogs.sorted(by: { $0.date > $1.date }).first else { return "未记录体重" }
+        let value = latest.weightUnit == "g"
+            ? "\(Int(latest.weight))g"
+            : String(format: "%.2fkg", latest.weight)
+        return "\(value) · \(latest.date.formatted(.dateTime.year().month().day()))"
+    }
+
+    private var vetVisitSummaryText: String {
+        """
+        \(pet.name) 就诊摘要
+        物种/品种：\(pet.species) / \(pet.breed.isEmpty ? "未填写" : pet.breed)
+        年龄：\(pet.ageText)
+        过敏：\(pet.allergies.isEmpty ? "无记录" : pet.allergies)
+        疫苗：\(vaccineSummaryText)
+        用药中：\(activeMedicationSummaryText)
+        近期症状：\(recentSymptomSummaryText)
+        保险：\(insuranceSummaryText)
+        最近体重：\(recentWeightSummaryText)
+        芯片号：\(pet.microchipID.isEmpty ? "未登记" : pet.microchipID)
+        """
+    }
+
     // MARK: - Rainbow Bridge Section
     @ViewBuilder
     private var rainbowBridgeSection: some View {
@@ -789,6 +903,7 @@ struct PetBasicInfoDetailView: View {
         pet.lineageInfo = eLineageInfo; pet.notes = eNotes
         pet.themeColorHex = eThemeColorHex
         pet.avatarImageData = eAvatarImageData
+        CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: modelContext)
         modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
@@ -870,10 +985,11 @@ struct EditableProfileAvatarPicker: View {
         .fullScreenCover(isPresented: $showingCamera, onDismiss: {
             if let img = pendingCapturedAvatarImage {
                 pendingCapturedAvatarImage = nil
-                cropImageItem = IdentifiableCropImage(image: img)
+                prepareCapturedAvatarForCrop(img)
             }
         }) {
             PetCameraPickerView(maxPixel: 1_600) { img in
+                AppPerformanceMonitor.shared.markStart("avatar.camera.to.crop")
                 pendingCapturedAvatarImage = img
                 showingCamera = false
             } onCancel: {
@@ -939,6 +1055,7 @@ struct EditableProfileAvatarPicker: View {
     private func handlePhotosPickerItemChanged(_ item: PhotosPickerItem?) {
         Task {
             guard let item else { return }
+            let startedAt = CFAbsoluteTimeGetCurrent()
             if let data = try? await item.loadTransferable(type: Data.self) {
                 let resized = await Task.detached(priority: .userInitiated) {
                     AddPetWizardView.cropReadyImage(from: data, maxPixel: 1_600)
@@ -946,6 +1063,7 @@ struct EditableProfileAvatarPicker: View {
                 await MainActor.run {
                     if let resized {
                         cropImageItem = IdentifiableCropImage(image: resized)
+                        AppPerformanceMonitor.shared.record("相册到裁剪页", startedAt: startedAt, note: cropSpecies)
                     }
                 }
             }
@@ -966,13 +1084,26 @@ struct EditableProfileAvatarPicker: View {
             return
         }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        let startedAt = CFAbsoluteTimeGetCurrent()
         isPasting = true
         Task {
             let prepared = await Task.detached(priority: .userInitiated) {
                 AddPetWizardView.preparedCropImage(img, maxPixel: 1_600)
             }.value
             cropImageItem = IdentifiableCropImage(image: prepared)
+            AppPerformanceMonitor.shared.record("粘贴到裁剪页", startedAt: startedAt, note: cropSpecies)
             isPasting = false
+        }
+    }
+
+    private func prepareCapturedAvatarForCrop(_ image: UIImage) {
+        Task {
+            let prepared = await Task.detached(priority: .userInitiated) {
+                AddPetWizardView.preparedCropImage(image, maxPixel: 1_600)
+            }.value
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            cropImageItem = IdentifiableCropImage(image: prepared)
+            AppPerformanceMonitor.shared.markEnd("avatar.camera.to.crop", name: "拍照到裁剪页", note: cropSpecies)
         }
     }
 }

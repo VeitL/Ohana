@@ -538,7 +538,7 @@ final class SynergyEngine {
             if let top = humanSpend.values.max(by: { $0.1 < $1.1 }) {
                 results.append(SynergyBrief(
                     emojis: [top.0.avatarEmoji, "💸"],
-                    headline: String(format: "¥%.0f 首席提款机", top.1),
+                    headline: "\(AppCurrency.format(top.1, fractionDigits: 0)) 首席提款机",
                     subtext: "\(top.0.name) 本月最豪 💳",
                     accentColor: Self.rgb(255, 71, 87)
                 ))

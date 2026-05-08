@@ -54,3 +54,107 @@ final class HumanMedicationLog {
         set { statusRaw = newValue.rawValue }
     }
 }
+
+struct HumanMedicationDoseLogUpdate {
+    let log: HumanMedicationLog?
+    let previousStatus: HumanMedicationStatus?
+    let didChange: Bool
+
+    var shouldRecordLedgerEvent: Bool {
+        guard didChange, let log else { return false }
+        return log.status != .pending
+    }
+}
+
+enum HumanMedicationLogStore {
+    static func sameScheduledMinute(_ lhs: Date, _ rhs: Date, calendar: Calendar = .current) -> Bool {
+        calendar.isDate(lhs, equalTo: rhs, toGranularity: .minute)
+    }
+
+    static func matchingLog(
+        in logs: [HumanMedicationLog],
+        humanId: String,
+        medicationId: String,
+        scheduledTime: Date,
+        calendar: Calendar = .current
+    ) -> HumanMedicationLog? {
+        logs.first {
+            $0.humanId == humanId &&
+            $0.medicationId == medicationId &&
+            sameScheduledMinute($0.scheduledTime, scheduledTime, calendar: calendar)
+        }
+    }
+
+    @MainActor
+    static func applyDoseStatus(
+        humanId: String,
+        medicationId: String,
+        scheduledTime: Date,
+        status: HumanMedicationStatus,
+        existingLogs: [HumanMedicationLog],
+        context: ModelContext,
+        calendar: Calendar = .current
+    ) -> HumanMedicationDoseLogUpdate {
+        let matching = matchingLog(
+            in: existingLogs,
+            humanId: humanId,
+            medicationId: medicationId,
+            scheduledTime: scheduledTime,
+            calendar: calendar
+        ) ?? fetchMatchingLog(
+            humanId: humanId,
+            medicationId: medicationId,
+            scheduledTime: scheduledTime,
+            context: context,
+            calendar: calendar
+        )
+
+        guard let log = matching else {
+            guard status != .pending else {
+                return HumanMedicationDoseLogUpdate(log: nil, previousStatus: nil, didChange: false)
+            }
+            let log = HumanMedicationLog(
+                humanId: humanId,
+                medicationId: medicationId,
+                scheduledTime: scheduledTime,
+                status: status,
+                recordedTime: Date()
+            )
+            context.insert(log)
+            return HumanMedicationDoseLogUpdate(log: log, previousStatus: nil, didChange: true)
+        }
+
+        let previous = log.status
+        guard previous != status else {
+            return HumanMedicationDoseLogUpdate(log: log, previousStatus: previous, didChange: false)
+        }
+
+        log.status = status
+        log.recordedTime = status == .pending ? nil : Date()
+        return HumanMedicationDoseLogUpdate(log: log, previousStatus: previous, didChange: true)
+    }
+
+    @MainActor
+    private static func fetchMatchingLog(
+        humanId: String,
+        medicationId: String,
+        scheduledTime: Date,
+        context: ModelContext,
+        calendar: Calendar
+    ) -> HumanMedicationLog? {
+        var descriptor = FetchDescriptor<HumanMedicationLog>(
+            predicate: #Predicate<HumanMedicationLog> { log in
+                log.humanId == humanId && log.medicationId == medicationId
+            }
+        )
+        descriptor.fetchLimit = 128
+        let logs = (try? context.fetch(descriptor)) ?? []
+        return matchingLog(
+            in: logs,
+            humanId: humanId,
+            medicationId: medicationId,
+            scheduledTime: scheduledTime,
+            calendar: calendar
+        )
+    }
+}

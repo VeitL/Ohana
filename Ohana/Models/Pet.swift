@@ -267,6 +267,8 @@ final class Pet {
         case "狗": return "dog.fill"
         case "猫": return "cat.fill"
         case "兔子": return "hare.fill"
+        case "鱼": return "fish.fill"
+        case "爬宠": return "lizard.fill"
         case "仓鼠": return "circle.fill"
         case "鸟": return "bird.fill"
         default: return "pawprint.fill"
@@ -368,7 +370,9 @@ final class Pet {
         switch species {
         case "狗": return "🐕"
         case "猫": return "🐈"
+        case "鱼": return "🐟"
         case "兔子": return "🐇"
+        case "爬宠": return "🦎"
         case "仓鼠": return "🐹"
         case "鸟": return "🦜"
         default: return "🐾"

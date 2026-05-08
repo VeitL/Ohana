@@ -219,7 +219,7 @@ struct FunctionMenuSheet: View {
                                 }
                             }
                         } header: {
-                            fmSectionHeader(icon: "wrench.and.screwdriver.fill", title: "工具与奖励", label: "TOOLS")
+                            fmSectionHeader(icon: "wrench.and.screwdriver.fill", title: "核心工具", label: "TOOLS")
                         }
                         .listRowBackground(rowBackground)
                     }
@@ -370,14 +370,6 @@ struct FunctionMenuSheet: View {
                       subtitle: wealthSubtitle,
                       icon: "creditcard.fill", color: Color(hex: "EAB308"),
                       destination: .wealthDashboard),
-            ToolEntry(id: "shop", title: "商店",
-                      subtitle: shopSubtitle,
-                      icon: "bag.fill", color: Color(hex: "F472B6"),
-                      destination: .coconutShop),
-            ToolEntry(id: "gacha", title: "扭蛋",
-                      subtitle: "随机奖励 · 限定皮肤",
-                      icon: "gift.fill", color: Color(hex: "C084FC"),
-                      destination: .gacha),
             ToolEntry(id: "plants", title: "植物",
                       subtitle: plantsSubtitle,
                       icon: "leaf.fill", color: Color(hex: "22C55E"),

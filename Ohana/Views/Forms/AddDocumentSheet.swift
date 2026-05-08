@@ -47,8 +47,6 @@ struct AddDocumentSheet: View {
     @State private var costText: String = ""
     @State private var hasCost: Bool = false
     @State private var selectedPayerId: String? = nil
-    // N2: 保险月付标记
-    @State private var isMonthlyInsurance: Bool = false
     // B4: 自动预填名称
     private var autoTitle: String { "\(pet.name)\(selectedCategory.rawValue)" }
     private var showDocumentNumber: Bool { selectedCategory == .passport || selectedCategory == .registration }
@@ -160,11 +158,11 @@ struct AddDocumentSheet: View {
                         }
                     }
 
-                    docRow(icon: "yensign.circle.fill", iconColor: .goPrimary, label: "花费记账") {
+                    docRow(icon: "\(AppCurrency.systemIconName).fill", iconColor: .goPrimary, label: "花费记账") {
                         HStack(spacing: 8) {
                             Toggle("", isOn: $hasCost).tint(Color.goPrimary).labelsHidden()
                             if hasCost {
-                                Text("¥").foregroundStyle(.secondary)
+                                Text(AppCurrency.symbol).foregroundStyle(.secondary)
                                 TextField("0.00", text: $costText)
                                     .keyboardType(.decimalPad)
                                     .font(.system(size: 15, weight: .semibold, design: .rounded))
@@ -239,12 +237,6 @@ struct AddDocumentSheet: View {
                                     }
                                 }
                             }
-                        }
-                    }
-
-                    if hasCost && selectedCategory == .insurance {
-                        docRow(icon: "repeat", iconColor: .goPrimary, label: "按月付款") {
-                            Toggle("", isOn: $isMonthlyInsurance).tint(Color.goPrimary).labelsHidden()
                         }
                     }
 
@@ -497,24 +489,24 @@ struct AddDocumentSheet: View {
         doc.cost = amount
         let expenseDate = issueDate.isAfterToday ? Date() : (hasIssueDate ? issueDate : Date())
         if amount > 0 {
-            let expCat: ExpenseCategory = selectedCategory == .insurance ? .other : .medical
             let payerId = selectedPayerId.flatMap { id in
                 humans.contains(where: { $0.id.uuidString == id }) ? id : nil
             }
-            if selectedCategory == .insurance && isMonthlyInsurance {
-                // N2: 保险月付 — 生成未来12个月支出记录
-                for i in 0..<12 {
-                    if let monthDate = Calendar.current.date(byAdding: .month, value: i, to: expenseDate) {
-                        let expense = PetExpenseLog(date: monthDate, amount: amount,
-                                                    category: expCat, note: "\(doc.title)（月付）", pet: pet,
-                                                    executorId: payerId)
-                        modelContext.insert(expense)
-                    }
-                }
-            } else {
-                let expense = PetExpenseLog(date: expenseDate, amount: amount,
-                                            category: expCat, note: doc.title, pet: pet,
-                                            executorId: payerId)
+            for plan in DocumentExpenseSyncPlanner.plannedExpenses(
+                documentCategory: selectedCategory,
+                amount: amount,
+                date: expenseDate,
+                note: doc.title,
+                payerId: payerId
+            ) {
+                let expense = PetExpenseLog(
+                    date: plan.date,
+                    amount: plan.amount,
+                    category: plan.category,
+                    note: plan.note,
+                    pet: pet,
+                    executorId: plan.payerId
+                )
                 modelContext.insert(expense)
             }
         }
@@ -671,11 +663,11 @@ struct EditDocumentSheet: View {
                             }
                         }
                     }
-                    editRow(icon: "yensign.circle.fill", iconColor: .goPrimary, label: "花费") {
+                    editRow(icon: "\(AppCurrency.systemIconName).fill", iconColor: .goPrimary, label: "花费") {
                         HStack(spacing: 8) {
                             Toggle("", isOn: $hasCost).tint(Color.goPrimary).labelsHidden()
                             if hasCost {
-                                Text("¥").foregroundStyle(.secondary)
+                                Text(AppCurrency.symbol).foregroundStyle(.secondary)
                                 TextField("0", text: $costText).keyboardType(.decimalPad)
                                     .font(.system(size: 15, weight: .semibold)).tint(Color.goPrimary).frame(maxWidth: 80)
                             }

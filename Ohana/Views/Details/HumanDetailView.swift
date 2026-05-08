@@ -852,6 +852,7 @@ struct EditHumanSheet: View {
     @State private var hasBirthday = false
     @State private var bloodType: String = ""
     @State private var role: String = "owner"
+    @State private var gender: String = "不透露"
     @State private var notes: String = ""
     @State private var nationality: String = ""
     @State private var city: String = ""
@@ -882,9 +883,15 @@ struct EditHumanSheet: View {
                 formField("城市", text: $city)
                 
                 Picker("角色", selection: $role) {
-                    Text("主人").tag("owner")
-                    Text("编辑").tag("editor")
-                    Text("查看").tag("viewer")
+                    Text("管理者").tag("owner")
+                    Text("成员").tag("member")
+                }
+                .pickerStyle(.segmented)
+
+                Picker("性别/身份", selection: $gender) {
+                    ForEach(HumanProfileOptions.genderOptions, id: \.key) { option in
+                        Text(HumanGenderIdentity.title(for: option.key)).tag(option.key)
+                    }
                 }
                 .pickerStyle(.segmented)
                 
@@ -926,8 +933,9 @@ struct EditHumanSheet: View {
             birthday = human.birthday ?? Date()
             hasBirthday = human.birthday != nil
             bloodType = human.bloodType
-            role = human.role
-            notes = human.notes
+            role = HumanProfileOptions.normalizedRole(human.role)
+            gender = human.genderRaw.isEmpty ? "不透露" : human.genderRaw
+            notes = HumanProfileOptions.visibleNoteParts(from: human.notes).joined(separator: "｜")
             nationality = human.nationality
             city = human.city
             // FIX 1: 加载隐私设置
@@ -956,8 +964,12 @@ struct EditHumanSheet: View {
         human.avatarEmoji = avatarEmoji.isEmpty ? "👤" : avatarEmoji
         human.birthday = hasBirthday ? birthday : nil
         human.bloodType = bloodType
-        human.role = role
-        human.notes = notes
+        human.role = HumanProfileOptions.normalizedRole(role)
+        var noteParts = ["性别:\(HumanProfileOptions.normalizedGender(gender))"]
+        noteParts.append(contentsOf: preservedRelationshipMetadataParts)
+        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedNotes.isEmpty { noteParts.append(trimmedNotes) }
+        human.notes = noteParts.joined(separator: "｜")
         human.nationality = nationality
         human.city = city
         // FIX 1: 保存隐私设置
@@ -969,6 +981,13 @@ struct EditHumanSheet: View {
         human.setPrivate(.expense, privateExpense)
         modelContext.safeSave()
         dismiss()
+    }
+
+    private var preservedRelationshipMetadataParts: [String] {
+        human.notes
+            .split(separator: "｜", omittingEmptySubsequences: false)
+            .map(String.init)
+            .filter { $0.hasPrefix("关系:") }
     }
 
     private func editPrivacyRow(_ title: String, binding: Binding<Bool>) -> some View {

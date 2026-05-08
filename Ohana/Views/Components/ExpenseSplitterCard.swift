@@ -43,7 +43,7 @@ struct ExpenseSplitterCard: View {
         guard let top = payers.first, let debtor = owes.first else {
             return results.isEmpty ? "暂无记录" : "大家花费相当，无需结算 🎉"
         }
-        return "\(debtor.name) 需向 \(top.name) 支付 ¥\(Int(abs(debtor.balance)))"
+        return "\(debtor.name) 需向 \(top.name) 支付 \(AppCurrency.format(abs(debtor.balance), fractionDigits: 0))"
     }
 
     var body: some View {
@@ -57,7 +57,7 @@ struct ExpenseSplitterCard: View {
                     .foregroundStyle(.primary)
                 Spacer()
                 if totalExpense > 0 {
-                    Text("人均 ¥\(Int(totalExpense / max(1, Double(humans.count))))")
+                    Text("人均 \(AppCurrency.format(totalExpense / max(1, Double(humans.count)), fractionDigits: 0))")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(.primary.opacity(0.4))
                         .padding(.horizontal, 10).padding(.vertical, 5)
@@ -105,13 +105,13 @@ struct ExpenseSplitterCard: View {
                 Text(r.name)
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(.primary)
-                Text("实付 ¥\(Int(r.paid))")
+                Text("实付 \(AppCurrency.format(r.paid, fractionDigits: 0))")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.primary.opacity(0.35))
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
-                Text(isPositive ? "应收 ¥\(Int(r.balance))" : "应付 ¥\(Int(abs(r.balance)))")
+                Text(isPositive ? "应收 \(AppCurrency.format(r.balance, fractionDigits: 0))" : "应付 \(AppCurrency.format(abs(r.balance), fractionDigits: 0))")
                     .font(.system(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(isPositive ? Color.goPrimary : Color.goRed)
                 Text(isPositive ? "垫付较多" : "少付了")

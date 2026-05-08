@@ -275,3 +275,88 @@ enum PetTagGreeting {
         }
     }
 }
+
+// MARK: - 标签驱动的轻量行为偏好
+
+internal enum PetPersonalityBehavior {
+    internal static func priorityBonus(for actionType: String, pet: Pet) -> Int {
+        let tags = Set(pet.personalityTagIdList)
+        guard !tags.isEmpty else { return 0 }
+
+        switch actionType {
+        case "play":
+            return score(tags, [
+                "energetic": 5, "playful": 5, "toy": 5, "curious": 3,
+                "mischief": 3, "social": 2, "sunny": 2, "smart": 1
+            ])
+        case "walk":
+            return score(tags, [
+                "energetic": 5, "brave": 3, "social": 3, "guardian": 2,
+                "escape_artist": 2, "curious": 2, "loyal": 1
+            ])
+        case "feed":
+            return score(tags, [
+                "foodie": 5, "greedy": 5, "foodthief": 4, "trainable": 2,
+                "spoiled": 1
+            ])
+        case "groom", "litter", "waterChange", "filterClean":
+            return score(tags, [
+                "clean": 5, "gentle": 2, "quiet": 2, "anxious": 1
+            ])
+        case "moment":
+            return score(tags, [
+                "photogenic": 5, "drama": 3, "mischief": 3, "curious": 2,
+                "snuggler": 2, "social": 2, "vocal": 1, "chatty": 1
+            ])
+        case "weight":
+            return score(tags, [
+                "foodie": 2, "greedy": 2, "lazy": 2, "sleepy": 1,
+                "chill": 1
+            ])
+        case "water":
+            return score(tags, [
+                "energetic": 2, "playful": 2, "clean": 1
+            ])
+        default:
+            return 0
+        }
+    }
+
+    internal static func prioritized<T>(
+        _ values: [T],
+        actionType: (T) -> String,
+        stableRank: (T) -> Int,
+        pet: Pet
+    ) -> [T] {
+        values.sorted { lhs, rhs in
+            let lhsScore = priorityBonus(for: actionType(lhs), pet: pet)
+            let rhsScore = priorityBonus(for: actionType(rhs), pet: pet)
+            if lhsScore != rhsScore { return lhsScore > rhsScore }
+            return stableRank(lhs) < stableRank(rhs)
+        }
+    }
+
+    internal static func preferredPet(
+        from pets: [Pet],
+        actionType: String,
+        calendar: Calendar = .current,
+        now: Date = Date(),
+        isAlreadyDone: (Pet) -> Bool
+    ) -> Pet? {
+        pets
+            .enumerated()
+            .filter { !isAlreadyDone($0.element) }
+            .sorted { lhs, rhs in
+                let lhsScore = priorityBonus(for: actionType, pet: lhs.element)
+                let rhsScore = priorityBonus(for: actionType, pet: rhs.element)
+                if lhsScore != rhsScore { return lhsScore > rhsScore }
+                return lhs.offset < rhs.offset
+            }
+            .first?
+            .element
+    }
+
+    private static func score(_ tags: Set<String>, _ weights: [String: Int]) -> Int {
+        tags.reduce(0) { partial, tag in partial + (weights[tag] ?? 0) }
+    }
+}

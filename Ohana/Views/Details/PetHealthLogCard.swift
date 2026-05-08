@@ -80,7 +80,7 @@ struct PetHealthLogCard: View {
                             .font(.system(size: 11, weight: .medium, design: .rounded))
                             .foregroundStyle(.primary.opacity(0.4))
                         if log.cost > 0 {
-                            Text("¥\(Int(log.cost))")
+                            Text(AppCurrency.format(log.cost, fractionDigits: 0))
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundStyle(Color.goYellow)
                         }
@@ -212,7 +212,7 @@ struct HealthLogListView: View {
                     .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(.primary.opacity(0.5))
                 if log.cost > 0 {
-                    Text("¥\(Int(log.cost))")
+                    Text(AppCurrency.format(log.cost, fractionDigits: 0))
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.goYellow)
                 }

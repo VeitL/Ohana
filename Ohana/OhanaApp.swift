@@ -8,6 +8,9 @@
 import SwiftUI
 import SwiftData
 import BackgroundTasks
+import Foundation
+
+let ohanaProcessStartTime = CFAbsoluteTimeGetCurrent()
 
 @main
 struct OhanaApp: App {
@@ -15,10 +18,17 @@ struct OhanaApp: App {
     private static let bgTaskID = "com.guanchen.li.Ark.reminderRefill"
     @AppStorage("appThemePreference") private var appThemePreference: String = "system"
     @AppStorage("appLanguage") private var appLanguage: String = "zh"
+    @AppStorage(AppCurrency.storageKey) private var appCurrency: String = AppCurrency.fallbackCode
 
     init() {
+        let initStartedAt = CFAbsoluteTimeGetCurrent()
         self.container = SharedModelContainer.make()
         OhanaApp.registerBGTasks()
+        let initDurationMS = (CFAbsoluteTimeGetCurrent() - initStartedAt) * 1_000
+        Task { @MainActor in
+            AppPerformanceMonitor.shared.record("App init", valueMS: initDurationMS, note: "ModelContainer + BGTask")
+            AppPerformanceMonitor.shared.record("进程到 App init 完成", startedAt: ohanaProcessStartTime)
+        }
     }
     
     private var preferredScheme: ColorScheme? {
@@ -36,6 +46,8 @@ struct OhanaApp: App {
                 .tint(Color.goPrimary)
                 .preferredColorScheme(preferredScheme)
                 .environment(\.locale, AppLanguage.swiftUIPreferredLocale)
+                .id(AppLanguage.normalize(appLanguage))
+                .onChange(of: appCurrency) { _, _ in }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
                     OhanaApp.scheduleReminderRefill()
                 }

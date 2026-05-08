@@ -15,9 +15,8 @@ struct SettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @AppStorage("appLanguage") private var appLanguage = "zh"
+    @AppStorage(AppCurrency.storageKey) private var appCurrency = AppCurrency.fallbackCode
     @AppStorage("appThemePreference") private var appThemePreference: String = "system"
-    @AppStorage("appBackgroundStyle") private var appBackgroundStyle: String = AppBackgroundStyle.goIsland.rawValue
-    @AppStorage("appUIStyle") private var appUIStyle: String = "go"
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
     @AppStorage("userNickname") private var userNickname = ""
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
@@ -68,12 +67,11 @@ struct SettingsView: View {
         colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.08)
     }
     
-    private var isMaterial: Bool { false }
-    private var matBg:      Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
-    private var matSurface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
-    private var matAccent: Color { Color(hex: "FF7600") }
-
     private var accentColor: Color { Color.goPrimary }
+    private var l: L10n { L10n(appLanguage) }
+    private var selectedCurrency: AppCurrency.Option {
+        AppCurrency.supported.first { $0.code == AppCurrency.normalize(appCurrency) } ?? AppCurrency.supported[0]
+    }
 
     var body: some View {
         NavigationStack {
@@ -91,25 +89,25 @@ struct SettingsView: View {
                         }
                         
                         // 昵称
-                        settingsSection(title: "个人信息") {
-                            settingsRow(icon: "person.fill", title: "昵称", subtitle: userNickname.isEmpty ? "未设置" : userNickname) {
+                        settingsSection(title: l.personalInfo) {
+                            settingsRow(icon: "person.fill", title: l.nickname, subtitle: userNickname.isEmpty ? l.notSet : userNickname) {
                                 editingNickname = userNickname
                                 showingNicknameEdit = true
                             }
                         }
-                        .alert("修改昵称", isPresented: $showingNicknameEdit) {
-                            TextField("输入昵称", text: $editingNickname)
-                            Button("保存") { userNickname = editingNickname }
-                            Button("取消", role: .cancel) {}
+                        .alert(l.editNickname, isPresented: $showingNicknameEdit) {
+                            TextField(l.enterNickname, text: $editingNickname)
+                            Button(l.save) { userNickname = editingNickname }
+                            Button(l.cancel, role: .cancel) {}
                         }
                         
-                        // 语言
-                        settingsSection(title: "偏好设置") {
+                        // 语言 / 货币
+                        settingsSection(title: l.preferences) {
                             HStack {
                                 Image(systemName: "globe")
                                     .foregroundStyle(Color.goPrimary)
                                     .frame(width: 28)
-                                Text("语言")
+                                Text(l.language)
                                     .font(.system(size: 15, weight: .medium))
                                 Spacer()
                                 Picker("", selection: $appLanguage) {
@@ -120,85 +118,62 @@ struct SettingsView: View {
                                 .pickerStyle(.menu)
                             }
                             .foregroundStyle(primaryText)
+
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+
+                            HStack {
+                                Image(systemName: selectedCurrency.systemIconName)
+                                    .foregroundStyle(Color.goYellow)
+                                    .frame(width: 28)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(l.currency)
+                                        .font(.system(size: 15, weight: .medium))
+                                    Text(l.currencyDisplayOnlyHint)
+                                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                                        .foregroundStyle(tertiaryText)
+                                }
+                                Spacer()
+                                Menu {
+                                    ForEach(AppCurrency.supported) { currency in
+                                        Button {
+                                            appCurrency = currency.code
+                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        } label: {
+                                            Label(
+                                                currency.displayName,
+                                                systemImage: currency.code == selectedCurrency.code ? "checkmark" : currency.systemIconName
+                                            )
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 5) {
+                                        Text(selectedCurrency.displayName)
+                                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                                        Image(systemName: "chevron.down")
+                                            .font(.system(size: 9, weight: .black))
+                                    }
+                                    .foregroundStyle(primaryText)
+                                }
+                            }
+                            .foregroundStyle(primaryText)
+                            .padding(.top, 8)
                             
                             // 外观主题
                             HStack {
                                 Image(systemName: "circle.lefthalf.filled")
                                     .foregroundStyle(accentColor)
                                     .frame(width: 28)
-                                Text("外观主题")
+                                Text(l.appearance)
                                     .font(.system(size: 15, weight: .medium))
                                 Spacer()
                                 Picker("", selection: $appThemePreference) {
-                                    Text("跟随系统").tag("system")
-                                    Text("浅色模式").tag("light")
-                                    Text("深色模式").tag("dark")
+                                    Text(l.themeSystem).tag("system")
+                                    Text(l.themeLight).tag("light")
+                                    Text(l.themeDark).tag("dark")
                                 }
                                 .pickerStyle(.menu)
                             }
                             .foregroundStyle(primaryText)
-                            .padding(.top, 8)
-
-                            // UI 风格
-                            VStack(alignment: .leading, spacing: 10) {
-                                HStack {
-                                    Image(systemName: "paintbrush.pointed.fill")
-                                        .foregroundStyle(Color.goPrimary)
-                                        .frame(width: 28)
-                                    Text("UI 风格")
-                                        .font(.system(size: 15, weight: .medium))
-                                        .foregroundStyle(primaryText)
-                                    Spacer()
-                                }
-
-                                HStack(spacing: 10) {
-                                    UIStyleCard(
-                                        title: "经典",
-                                        subtitle: "iOS 26 液态玻璃",
-                                        icon: "sparkles",
-                                        accentColor: Color.goPrimary,
-                                        bgColors: [Color(hex: "0A0A0C"), Color(hex: "141FAE")],
-                                        isSelected: appUIStyle == "classic",
-                                        onTap: { appUIStyle = "classic" }
-                                    )
-                                    UIStyleCard(
-                                        title: "GO UI",
-                                        subtitle: "蓝色步数运动风",
-                                        icon: "figure.walk",
-                                        accentColor: Color(hex: "22D3EE"),
-                                        bgColors: [Color(hex: "3B5BDB"), Color(hex: "0F1640")],
-                                        isSelected: appUIStyle == "go",
-                                        onTap: { appUIStyle = "go" }
-                                    )
-                                }
-                            }
-                            .padding(.top, 8)
-
-                        // 背景风格
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Image(systemName: "sparkles")
-                                        .foregroundStyle(Color.goPrimary)
-                                        .frame(width: 28)
-                                    Text("背景风格")
-                                        .font(.system(size: 15, weight: .medium))
-                                    Spacer()
-                                }
-                                .foregroundStyle(primaryText)
-
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 10) {
-                                        ForEach(AppBackgroundStyle.allCases) { style in
-                                            BackgroundStyleCard(
-                                                style: style,
-                                                isSelected: appBackgroundStyle == style.rawValue,
-                                                onTap: { appBackgroundStyle = style.rawValue }
-                                            )
-                                        }
-                                    }
-                                    .padding(.horizontal, 2)
-                                }
-                            }
                             .padding(.top, 8)
 
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
@@ -206,14 +181,14 @@ struct SettingsView: View {
 
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
 
-                            settingsRow(icon: "sparkles.tv", title: "查看引导页", subtitle: "重新播放首次启动引导，方便测试") {
+                            settingsRow(icon: "sparkles.tv", title: l.replayOnboarding, subtitle: l.replayOnboardingSubtitle) {
                                 showingOnboardingReplay = true
                             }
                         }
                         
                         // 通知
-                        settingsSection(title: "通知") {
-                            settingsRow(icon: "bell.badge", title: "通知权限", subtitle: "管理系统级通知授权") {
+                        settingsSection(title: l.notifications) {
+                            settingsRow(icon: "bell.badge", title: l.notificationPermission, subtitle: l.manageNotification) {
                                 if let url = URL(string: UIApplication.openSettingsURLString) {
                                     UIApplication.shared.open(url)
                                 }
@@ -422,6 +397,37 @@ struct SettingsView: View {
                                             .font(.system(size: 15, weight: .semibold, design: .rounded))
                                             .foregroundStyle(primaryText)
                                         Text("App UI 规范 · 寒蝉字体 · 控件示例")
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(tertiaryText)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(tertiaryText.opacity(0.6))
+                                }
+                                .padding(.vertical, 8)
+                            }
+                            .buttonStyle(.plain)
+
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+
+                            NavigationLink {
+                                PerformanceDiagnosticsView()
+                            } label: {
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .fill(Color.goPrimary.opacity(0.12))
+                                            .frame(width: 32, height: 32)
+                                        Image(systemName: "speedometer")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundStyle(Color.goPrimary)
+                                    }
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("性能诊断面板")
+                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                            .foregroundStyle(primaryText)
+                                        Text("启动 · 首页首帧 · 头像 · 点击 · 相机链路")
                                             .font(.system(size: 11, weight: .medium))
                                             .foregroundStyle(tertiaryText)
                                     }
@@ -770,26 +776,16 @@ struct SettingsView: View {
     // MARK: - Settings Section
     private func settingsSection<Content: View>(title: String, @ViewBuilder content: @escaping () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            if isMaterial {
-                Text(title)
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(Color.goPrimary)
+                    .frame(width: 3, height: 14)
+                Text(title.uppercased())
+                    .font(OhanaFont.caption2(.bold))
                     .foregroundStyle(tertiaryText)
-                    .padding(.horizontal, 12).padding(.vertical, 5)
-                    .background(matSurface, in: Capsule())
-                    .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
-                    .padding(.leading, 4)
-            } else {
-                HStack(spacing: 8) {
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(Color.goPrimary)
-                        .frame(width: 3, height: 14)
-                    Text(title.uppercased())
-                        .font(OhanaFont.caption2(.bold))
-                        .foregroundStyle(tertiaryText)
-                        .tracking(1.2)
-                }
-                .padding(.leading, 2)
+                    .tracking(1.2)
             }
+            .padding(.leading, 2)
 
             glassCard {
                 VStack(spacing: 0) {
@@ -915,11 +911,7 @@ struct SettingsView: View {
     // MARK: - Glass Card Helper
     @ViewBuilder
     private func glassCard<C: View>(@ViewBuilder content: () -> C) -> some View {
-        if isMaterial {
-            content()
-                .background(matSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .shadow(color: .black.opacity(0.04), radius: 12, x: 0, y: 4)
-        } else if reduceTransparency {
+        if reduceTransparency {
             content()
                 .background(Color(.systemBackground).opacity(0.95))
                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -938,115 +930,151 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - Background Style Card（背景风格预览卡）
-private struct BackgroundStyleCard: View {
-    let style: AppBackgroundStyle
-    let isSelected: Bool
-    let onTap: () -> Void
+private struct PerformanceDiagnosticsView: View {
+    @ObservedObject private var monitor = AppPerformanceMonitor.shared
+    @Environment(\.colorScheme) private var colorScheme
 
-    var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: 6) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(style.previewColors[0])
-                        .frame(width: 64, height: 48)
-                    // 两个小光球预览
-                    Circle()
-                        .fill(style.previewColors.count > 1 ? style.previewColors[1] : .clear)
-                        .frame(width: 20)
-                        .blur(radius: 6)
-                        .offset(x: -10, y: -6)
-                    Circle()
-                        .fill(style.previewColors.count > 2 ? style.previewColors[2] : .clear)
-                        .frame(width: 16)
-                        .blur(radius: 5)
-                        .offset(x: 10, y: 8)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(isSelected ? Color.goPrimary : .white.opacity(0.15), lineWidth: isSelected ? 2 : 1)
-                )
-
-                Text(style.displayName)
-                    .font(.system(size: 10, weight: isSelected ? .bold : .medium, design: .rounded))
-                    .foregroundStyle(isSelected ? Color.goPrimary : .primary.opacity(0.6))
-            }
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .animation(.spring(response: 0.28, dampingFraction: 0.82), value: isSelected)
+    private var primaryText: Color {
+        colorScheme == .dark ? .white : Color(hex: "0D1026")
     }
-}
 
-// MARK: - UI Style Card（UI 风格预览卡）
-private struct UIStyleCard: View {
-    let title: String
-    let subtitle: String
-    let icon: String
-    let accentColor: Color
-    let bgColors: [Color]
-    let isSelected: Bool
-    let onTap: () -> Void
+    private var secondaryText: Color {
+        colorScheme == .dark ? .white.opacity(0.68) : Color(hex: "3B4266").opacity(0.72)
+    }
 
     var body: some View {
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 8) {
-                // Preview thumbnail
-                ZStack(alignment: .bottomLeading) {
-                    LinearGradient(
-                        colors: bgColors,
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    // Mock card strips
-                    VStack(spacing: 4) {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(.white.opacity(0.15))
-                            .frame(height: 10)
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(.white.opacity(0.10))
-                            .frame(height: 6)
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(accentColor.opacity(0.5))
-                            .frame(height: 6)
+        ZStack {
+            OhanaAppBackground()
+
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("性能诊断")
+                            .font(.system(size: 30, weight: .black, design: .rounded))
+                            .foregroundStyle(primaryText)
+                        Text("用于验收启动、首页、头像、点击和相机链路。数值越低越好。")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(secondaryText)
                     }
-                    .padding(8)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
 
-                    Image(systemName: icon)
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(accentColor)
-                        .padding(6)
-                }
-                .frame(height: 60)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(
-                            isSelected ? accentColor : .white.opacity(0.15),
-                            lineWidth: isSelected ? 2 : 1
-                        )
-                )
+                    HStack(spacing: 10) {
+                        metricSummaryCard(title: "样本", value: "\(monitor.samples.count)", icon: "chart.bar.fill")
+                        metricSummaryCard(title: "最近", value: latestMetricText, icon: "timer")
+                    }
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(.system(size: 11, weight: isSelected ? .bold : .semibold))
-                        .foregroundStyle(isSelected ? accentColor : .primary)
-                    Text(subtitle)
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    VStack(spacing: 0) {
+                        if monitor.samples.isEmpty {
+                            VStack(spacing: 10) {
+                                Image(systemName: "speedometer")
+                                    .font(.system(size: 28, weight: .semibold))
+                                    .foregroundStyle(Color.goPrimary)
+                                Text("还没有性能样本")
+                                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                                    .foregroundStyle(primaryText)
+                                Text("回到首页、点击卡片或进入头像裁剪后，这里会记录链路耗时。")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(secondaryText)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 36)
+                        } else {
+                            ForEach(monitor.samples) { sample in
+                                performanceSampleRow(sample)
+                                if sample.id != monitor.samples.last?.id {
+                                    OhanaDashedDivider(color: .white.opacity(0.12))
+                                }
+                            }
+                        }
+                    }
+                    .padding(14)
+                    .background(Color.black.opacity(colorScheme == .dark ? 0.22 : 0.08),
+                                in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+                    )
+
+                    Button {
+                        monitor.clear()
+                    } label: {
+                        Label("清空样本", systemImage: "trash")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.arkInk)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(monitor.samples.isEmpty)
+                    .opacity(monitor.samples.isEmpty ? 0.45 : 1)
                 }
+                .padding(.horizontal, 18)
+                .padding(.top, 22)
+                .padding(.bottom, 42)
             }
-            .padding(10)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(.white.opacity(isSelected ? 0.08 : 0.04))
-            )
         }
-        .buttonStyle(ScaleButtonStyle())
-        .animation(.spring(response: 0.28, dampingFraction: 0.82), value: isSelected)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
+    }
+
+    private var latestMetricText: String {
+        guard let sample = monitor.samples.first else { return "—" }
+        return formatMS(sample.valueMS)
+    }
+
+    private func metricSummaryCard(title: String, value: String, icon: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Color.goPrimary)
+                .frame(width: 28, height: 28)
+                .background(Color.goPrimary.opacity(0.16), in: Circle())
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(secondaryText)
+                Text(value)
+                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .foregroundStyle(primaryText)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity)
+        .background(.white.opacity(colorScheme == .dark ? 0.08 : 0.18),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func performanceSampleRow(_ sample: AppPerformanceMonitor.Sample) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(sample.name)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(primaryText)
+                if let note = sample.note, !note.isEmpty {
+                    Text(note)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(secondaryText)
+                }
+                Text(sample.timestamp.formatted(date: .omitted, time: .standard))
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(secondaryText.opacity(0.7))
+            }
+            Spacer(minLength: 8)
+            Text(formatMS(sample.valueMS))
+                .font(.system(size: 14, weight: .black, design: .rounded))
+                .foregroundStyle(sample.valueMS > 1_000 ? Color.goRed : Color.goPrimary)
+        }
+        .padding(.vertical, 10)
+    }
+
+    private func formatMS(_ value: Double) -> String {
+        if value >= 1_000 {
+            return String(format: "%.2fs", value / 1_000)
+        }
+        return String(format: "%.0fms", value)
     }
 }
 

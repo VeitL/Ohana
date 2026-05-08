@@ -31,6 +31,125 @@ enum HumanPrivateField: String, CaseIterable, Identifiable {
     }
 }
 
+nonisolated enum HumanProfileOptions {
+    static let permissionRoles: [(key: String, title: String, description: String, icon: String)] = [
+        ("owner", "管理者", "可管理家庭资料与核心设置", "crown.fill"),
+        ("member", "成员", "可进行日常记录与照护打卡", "person.fill")
+    ]
+
+    static let genderOptions: [(key: String, icon: String)] = [
+        ("女", "♀"),
+        ("男", "♂"),
+        ("非二元", "⚧"),
+        ("不透露", "•")
+    ]
+
+    static func normalizedRole(_ raw: String) -> String {
+        raw == "owner" ? "owner" : "member"
+    }
+
+    static func normalizedGender(_ raw: String) -> String {
+        switch raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "male", "man", "boy", "男":
+            return "男"
+        case "female", "woman", "girl", "女":
+            return "女"
+        case "nonbinary", "non-binary", "nb", "非二元":
+            return "非二元"
+        case "prefer not to say", "private", "unknown", "不透露", "未知":
+            return "不透露"
+        case "":
+            return ""
+        default:
+            return raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
+    static func visibleNoteParts(from notes: String) -> [String] {
+        notes
+            .split(separator: "｜", omittingEmptySubsequences: false)
+            .map(String.init)
+            .filter { !$0.hasPrefix("性别:") && !$0.hasPrefix("关系:") }
+    }
+
+    static func genderMetadata(from notes: String) -> String {
+        metadataValue(prefix: "性别:", from: notes).map(normalizedGender) ?? ""
+    }
+
+    private static func metadataValue(prefix: String, from notes: String) -> String? {
+        guard let range = notes.range(of: prefix) else { return nil }
+        let tail = notes[range.upperBound...]
+        let value = tail.split(separator: "｜", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? ""
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+nonisolated enum HumanPermissionRole {
+    static func title(for raw: String) -> String {
+        switch HumanProfileOptions.normalizedRole(raw) {
+        case "owner":
+            return "管理者"
+        default:
+            return "成员"
+        }
+    }
+
+    static func description(for raw: String) -> String {
+        switch HumanProfileOptions.normalizedRole(raw) {
+        case "owner":
+            return "可管理家庭资料与核心设置"
+        default:
+            return "可进行日常记录与照护打卡"
+        }
+    }
+
+    static func icon(for raw: String) -> String {
+        switch HumanProfileOptions.normalizedRole(raw) {
+        case "owner":
+            return "crown.fill"
+        default:
+            return "person.fill"
+        }
+    }
+}
+
+nonisolated enum HumanGenderIdentity {
+    static func title(for raw: String) -> String {
+        let normalized = HumanProfileOptions.normalizedGender(raw)
+        switch normalized {
+        case "女", "男", "非二元", "不透露":
+            return normalized
+        default:
+            return normalized.isEmpty ? "未填写" : normalized
+        }
+    }
+
+    static func icon(for raw: String) -> String {
+        switch HumanProfileOptions.normalizedGender(raw) {
+        case "女":
+            return "♀"
+        case "男":
+            return "♂"
+        case "非二元":
+            return "⚧"
+        default:
+            return "•"
+        }
+    }
+
+    static func fallbackAvatarEmoji(for raw: String) -> String {
+        switch HumanProfileOptions.normalizedGender(raw) {
+        case "女":
+            return "👩"
+        case "男":
+            return "👨"
+        default:
+            return "👤"
+        }
+    }
+}
+
 @Model
 final class Human {
     var id: UUID
@@ -76,7 +195,7 @@ final class Human {
         self.bloodType = bloodType
         self.avatarEmoji = avatarEmoji
         self.avatarImageData = nil
-        self.role = role
+        self.role = HumanProfileOptions.normalizedRole(role)
         self.appleUserIdentifier = ""
         self.notes = ""
         self.createdAt = Date()
@@ -155,20 +274,11 @@ final class Human {
     }
     
     var roleText: String {
-        switch role {
-        case "owner": return "主人"
-        case "editor": return "编辑"
-        case "viewer": return "查看"
-        default: return role
-        }
+        HumanPermissionRole.title(for: role)
     }
 
     var genderRaw: String {
-        let marker = "性别:"
-        guard let range = notes.range(of: marker) else { return "" }
-        let tail = notes[range.upperBound...]
-        let value = tail.split(separator: "｜", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? ""
-        return value.trimmingCharacters(in: .whitespacesAndNewlines)
+        HumanProfileOptions.genderMetadata(from: notes)
     }
 
     // MARK: - 隐私控制（FIX 1）

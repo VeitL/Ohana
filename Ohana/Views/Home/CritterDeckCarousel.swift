@@ -809,13 +809,8 @@ struct HumanIDCardView: View {
 
                         // 胶囊信息
                         VStack(alignment: .trailing, spacing: 4) {
-                            // 角色 + 性别胶囊（从 notes 解析性别）
-                            let genderText: String = {
-                                if let r = human.notes.range(of: "性别:") {
-                                    return String(human.notes[r.upperBound...].prefix(while: { $0 != "｜" && $0 != "\n" }))
-                                }
-                                return ""
-                            }()
+                            // 权限 + 性别/身份
+                            let genderText = HumanGenderIdentity.title(for: human.genderRaw)
                             humanFrontPill("\(human.roleText)\(genderText.isEmpty ? "" : " · \(genderText)")")
                             // 年龄称号
                             if !human.ageText.isEmpty {

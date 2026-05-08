@@ -6,26 +6,14 @@
 //  替换原先的 HomeHighlightDeck 水平滑动卡组：
 //  按优先级智能选出"今天最该做的 1 件事"，单卡呈现 + 微动效。
 //
-//  优先级：未完成委托 > 负反馈（警告） > 记忆碎片 > 全部完成庆祝 > 岛屿探访
+//  优先级：异常趋势/医疗风险 > 未完成委托 > 记忆碎片 > 全部完成庆祝 > 岛屿探访
 //
 //  v2 实时响应：内部 @Query 监听 PetCareLog / PetWalkLog / PetPottyLog，
-//  打卡后无需父视图手动刷新；完成时粒子爆破消失。
+//  用户在对应打卡/记录页保存后无需父视图手动刷新。
 //
 
 import SwiftUI
 import SwiftData
-
-// MARK: - Particle data
-
-private struct Particle: Identifiable {
-    let id = UUID()
-    var offset: CGSize
-    var scale: CGFloat
-    var opacity: Double
-    var color: Color
-    var angle: Double      // radians
-    var speed: CGFloat     // distance to travel
-}
 
 // MARK: - TodayFocusCard
 
@@ -35,6 +23,7 @@ struct TodayFocusCard: View {
     let quests: [IslandQuest]        // passed from parent; isCompleted may be stale
     let activePet: Pet?
     var onCompleteQuest: (IslandQuest) -> Void = { _ in }
+    var onTapNegativeSignal: (IslandNegativeSignal) -> Void = { _ in }
     var onTapMemory: () -> Void = {}
     var onTapOasis: () -> Void = {}
 
@@ -45,10 +34,8 @@ struct TodayFocusCard: View {
 
     @State private var bounceEmoji = false
     @State private var pulse: CGFloat = 0
-    @State private var particles: [Particle] = []
-    @State private var burstActive = false
-    @State private var completingQuestId: String?
     @State private var selectedFocusIndex = 0
+    @State private var skippedFocusKeys: Set<String> = TodayFocusCard.loadSkippedFocusKeys()
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -69,10 +56,18 @@ struct TodayFocusCard: View {
     }
 
     private var pendingQuests: [IslandQuest] {
-        refreshedQuests.filter { !$0.isCompleted }
+        refreshedQuests.filter { !$0.isCompleted && !skippedFocusKeys.contains(questSkipKey($0)) }
+    }
+
+    private var negativeSignals: [IslandNegativeSignal] {
+        IslandNegativeFeedback.signals(pets: pets, plants: plants)
+            .filter { !skippedFocusKeys.contains(negativeSkipKey($0)) }
     }
 
     private var focusCards: [TodayFocusService.Content] {
+        if !negativeSignals.isEmpty {
+            return negativeSignals.prefix(2).map { .negative($0) } + pendingQuests.map { .quest($0) }
+        }
         if !pendingQuests.isEmpty {
             return pendingQuests.map { .quest($0) }
         }
@@ -89,6 +84,9 @@ struct TodayFocusCard: View {
     }
 
     private var focusStatusText: String {
+        if case .negative = content {
+            return TodayFocusService.statusText(for: content)
+        }
         let pending = pendingQuests.count
         if pending > 0 {
             return "\(pending)/\(max(refreshedQuests.count, pending)) 个任务"
@@ -137,16 +135,6 @@ struct TodayFocusCard: View {
                     ))
             }
 
-            // Particle burst overlay
-            if burstActive {
-                ForEach(particles) { p in
-                    Circle()
-                        .fill(p.color)
-                        .frame(width: 8 * p.scale, height: 8 * p.scale)
-                        .offset(p.offset)
-                        .opacity(p.opacity)
-                }
-            }
         }
         .onAppear {
             guard !shouldReduceWork else { return }
@@ -157,7 +145,7 @@ struct TodayFocusCard: View {
                 selectedFocusIndex = max(0, count - 1)
             }
         }
-        .animation(.spring(response: 0.42, dampingFraction: 0.82), value: contentIdentity)
+        .animation(GoMotion.hero, value: contentIdentity)
     }
 
     // MARK: - Card switcher
@@ -199,7 +187,6 @@ struct TodayFocusCard: View {
 
     private func questCard(_ q: IslandQuest) -> some View {
         let accent = Color.goPrimary
-        let isCompleting = completingQuestId == q.id
         return HStack(spacing: 14) {
             iconBubble(emoji: q.emoji, accent: accent)
 
@@ -216,41 +203,28 @@ struct TodayFocusCard: View {
 
             Spacer(minLength: 6)
 
-            Button {
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                if completesInline(q) {
-                    withAnimation(.spring(response: 0.26, dampingFraction: 0.82)) {
-                        completingQuestId = q.id
-                    }
-                    fireBurst(accent: accent)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-                        onCompleteQuest(q)
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-                        if completingQuestId == q.id { completingQuestId = nil }
-                    }
-                } else {
+            VStack(spacing: 6) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     onCompleteQuest(q)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 12, weight: .black))
+                        Text("去完成")
+                            .font(.system(size: 13, weight: .black, design: .rounded))
+                    }
+                    .foregroundStyle(Color.arkInk)
+                    .padding(.horizontal, 14).padding(.vertical, 10)
+                    .background(accent, in: Capsule())
                 }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: isCompleting ? "checkmark.circle.fill" : "arrow.right")
-                        .font(.system(size: 12, weight: .black))
-                    Text(isCompleting ? "已完成" : "去完成")
-                        .font(.system(size: 13, weight: .black, design: .rounded))
-                }
-                .foregroundStyle(Color.arkInk)
-                .padding(.horizontal, 14).padding(.vertical, 10)
-                .background(accent, in: Capsule())
+                .buttonStyle(.plain)
+
+                skipButton(for: .quest(q), accent: accent)
             }
-            .buttonStyle(.plain)
-            .disabled(isCompleting)
         }
         .padding(14)
         .background(cardBackground(accent))
-        .offset(x: isCompleting ? 360 : 0)
-        .opacity(isCompleting ? 0 : 1)
-        .animation(.spring(response: 0.46, dampingFraction: 0.86), value: isCompleting)
     }
 
     // MARK: - Negative signal card
@@ -281,12 +255,22 @@ struct TodayFocusCard: View {
 
             Spacer(minLength: 6)
 
-            Text(s.severity == .critical ? "立即处理" : "去快捷打卡")
-                .font(.system(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(Color.arkInk)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
-                .background(accent, in: Capsule())
+            VStack(spacing: 6) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    onTapNegativeSignal(s)
+                } label: {
+                    Text(s.severity == .critical ? "立即处理" : "去快捷打卡")
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.arkInk)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
+                        .background(accent, in: Capsule())
+                }
+                .buttonStyle(.plain)
+
+                skipButton(for: .negative(s), accent: accent)
+            }
         }
         .padding(14)
         .background(cardBackground(accent))
@@ -347,11 +331,11 @@ struct TodayFocusCard: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("今日任务已清空")
+                Text(skippedFocusKeys.isEmpty ? "今日任务已清空" : "今天已暂时跳过")
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                Text("没有需要处理的任务，安心享受今天")
+                Text(skippedFocusKeys.isEmpty ? "没有需要处理的任务，安心享受今天" : "跳过的卡明天会自动回来")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(.primary.opacity(0.55))
                     .lineLimit(2)
@@ -359,8 +343,14 @@ struct TodayFocusCard: View {
 
             Spacer(minLength: 6)
 
-            Button { onTapOasis() } label: {
-                Text("去绿洲")
+            Button {
+                if skippedFocusKeys.isEmpty {
+                    onTapOasis()
+                } else {
+                    restoreSkippedFocusCards()
+                }
+            } label: {
+                Text(skippedFocusKeys.isEmpty ? "去绿洲" : "恢复")
                     .font(.system(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 14).padding(.vertical, 10)
@@ -425,7 +415,7 @@ struct TodayFocusCard: View {
                 Capsule()
                     .fill(idx == selected ? Color.goPrimary : Color.primary.opacity(0.18))
                     .frame(width: idx == selected ? 16 : 5, height: 5)
-                    .animation(.spring(response: 0.25, dampingFraction: 0.8), value: selected)
+                    .animation(GoMotion.feedback, value: selected)
             }
         }
         .frame(maxWidth: .infinity)
@@ -433,23 +423,79 @@ struct TodayFocusCard: View {
     }
 
     private var contentIdentity: String {
-        focusCards.map(contentKey).joined(separator: "|")
+        focusCards.map(contentKey).joined(separator: "|") + "|skipped:\(skippedFocusKeys.sorted().joined(separator: ","))"
     }
 
     private func contentKey(_ content: TodayFocusService.Content) -> String {
         switch content {
-        case .quest(let q): return "quest-\(q.id)"
-        case .negative(let s): return "negative-\(s.title)"
-        case .memory(let m): return "memory-\(m.headline)"
+        case .quest(let q): return questSkipKey(q)
+        case .negative(let s): return negativeSkipKey(s)
+        case .memory(let m): return "memory:\(m.headline)"
         case .celebrate: return "celebrate"
         case .welcome: return "welcome"
         }
     }
 
-    private func completesInline(_ quest: IslandQuest) -> Bool {
-        if quest.id == "q_walk" || quest.id == "q_reminder" { return false }
-        if quest.id.hasPrefix("q_weight_") || quest.id.hasPrefix("q_moment_") { return false }
-        return true
+    private func questSkipKey(_ quest: IslandQuest) -> String {
+        "quest:\(quest.id)"
+    }
+
+    private func negativeSkipKey(_ signal: IslandNegativeSignal) -> String {
+        if let petId = signal.petId, let alertType = signal.healthAlertType {
+            return "negative:health:\(petId.uuidString):\(alertType.rawValue)"
+        }
+        return "negative:\(signal.title)|\(signal.detail)"
+    }
+
+    private func skipButton(for content: TodayFocusService.Content, accent: Color) -> some View {
+        Button {
+            skipFocusCard(content)
+        } label: {
+            Text("跳过")
+                .font(.system(size: 10, weight: .black, design: .rounded))
+                .foregroundStyle(.primary.opacity(0.58))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color.primary.opacity(0.06), in: Capsule())
+                .overlay(Capsule().strokeBorder(accent.opacity(0.18), lineWidth: 0.8))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("跳过这张 Today Focus 卡")
+    }
+
+    private func skipFocusCard(_ content: TodayFocusService.Content) {
+        let key = contentKey(content)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        withAnimation(GoMotion.hero) {
+            _ = skippedFocusKeys.insert(key)
+        }
+        persistSkippedFocusKeys()
+        let nextCount = focusCards.count
+        if selectedFocusIndex >= nextCount {
+            selectedFocusIndex = max(0, nextCount - 1)
+        }
+    }
+
+    private func restoreSkippedFocusCards() {
+        withAnimation(GoMotion.hero) {
+            skippedFocusKeys.removeAll()
+            selectedFocusIndex = 0
+        }
+        UserDefaults.standard.removeObject(forKey: Self.skippedStorageKey())
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    private func persistSkippedFocusKeys() {
+        UserDefaults.standard.set(Array(skippedFocusKeys), forKey: Self.skippedStorageKey())
+    }
+
+    private static func loadSkippedFocusKeys() -> Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: skippedStorageKey()) ?? [])
+    }
+
+    private static func skippedStorageKey() -> String {
+        let day = Int(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970)
+        return "todayFocus.skipped.\(day)"
     }
 
     private func cardBackground(_ accent: Color) -> some View {
@@ -458,42 +504,6 @@ struct TodayFocusCard: View {
                 .fill(.thinMaterial)
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(accent.opacity(0.25), lineWidth: 1)
-        }
-    }
-
-    // MARK: - Particle burst
-
-    private func fireBurst(accent: Color) {
-        let colors: [Color] = [accent, .goYellow, .goLime, .white, accent.opacity(0.6)]
-        let count = 18
-        particles = (0..<count).map { i in
-            let angle = Double(i) * (2 * .pi / Double(count)) + Double.random(in: -0.3...0.3)
-            let speed = CGFloat.random(in: 55...130)
-            return Particle(
-                offset: .zero,
-                scale: CGFloat.random(in: 0.7...1.6),
-                opacity: 1,
-                color: colors[i % colors.count],
-                angle: angle,
-                speed: speed
-            )
-        }
-        burstActive = true
-
-        withAnimation(.easeOut(duration: 0.55)) {
-            for i in particles.indices {
-                particles[i].offset = CGSize(
-                    width: cos(particles[i].angle) * particles[i].speed,
-                    height: sin(particles[i].angle) * particles[i].speed
-                )
-                particles[i].opacity = 0
-                particles[i].scale = 0.2
-            }
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            burstActive = false
-            particles = []
         }
     }
 }

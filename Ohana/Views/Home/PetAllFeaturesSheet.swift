@@ -260,9 +260,7 @@ struct PetAllFeaturesSheet: View {
 
     private var expenseMetric: String {
         let total = pet.expenseLogs.reduce(0.0) { $0 + $1.amount }
-        if total >= 10_000 { return String(format: "¥%.0fk", total / 1000) }
-        if total >= 100 { return String(format: "¥%.0f", total) }
-        return total > 0 ? String(format: "¥%.1f", total) : "¥0"
+        return AppCurrency.formatCompact(total)
     }
 
     // MARK: - Bento Builders

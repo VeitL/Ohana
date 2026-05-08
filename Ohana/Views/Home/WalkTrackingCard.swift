@@ -328,19 +328,21 @@ struct WalkTrackingCard: View {
                         .background(.black.opacity(0.46), in: Capsule())
                         .padding(8)
                 }
-        } else if coords.count >= 2, let region = routeRegion(for: coords) {
+        } else if !coords.isEmpty, let region = routeRegion(for: coords) {
             Map(initialPosition: .region(region)) {
-                MapPolyline(coordinates: coords)
-                    .stroke(Color.goPrimary, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+                if coords.count >= 2 {
+                    MapPolyline(coordinates: coords)
+                        .stroke(Color.goPrimary, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+                }
                 if let first = coords.first {
-                    Annotation("出发", coordinate: first) {
+                    Annotation(coords.count >= 2 ? "出发" : "位置", coordinate: first) {
                         Circle()
                             .fill(Color.goPrimary)
                             .frame(width: 16, height: 16)
                             .overlay(Circle().fill(Color.arkInk).frame(width: 6, height: 6))
                     }
                 }
-                if let last = coords.last {
+                if coords.count >= 2, let last = coords.last {
                     Annotation("到家", coordinate: last) {
                         Circle()
                             .fill(Color.goRed)
@@ -354,7 +356,7 @@ struct WalkTrackingCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .clipped()
             .overlay(alignment: .bottomLeading) {
-                Label("本次轨迹", systemImage: "map.fill")
+                Label(coords.count >= 2 ? "本次轨迹" : "本次定位", systemImage: "map.fill")
                     .font(OhanaFont.caption2(.bold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 9)
@@ -523,7 +525,10 @@ struct WalkTrackingCard: View {
     }
 
     private var latestWalk: PetWalkLog? {
-        pet.walkLogs.sorted { $0.startDate > $1.startDate }.first
+        if mgr.lastCompletedPetId == pet.id, let completed = mgr.lastCompletedWalk {
+            return completed
+        }
+        return pet.walkLogs.sorted { $0.startDate > $1.startDate }.first
     }
 
     private var finishedElapsed: TimeInterval {
@@ -565,6 +570,11 @@ struct WalkTrackingCard: View {
     }
 
     private func routeCoordinates(for walk: PetWalkLog?) -> [CLLocationCoordinate2D] {
+        if mgr.lastCompletedPetId == pet.id,
+           !mgr.lastCompletedRouteCoordinates.isEmpty {
+            return mgr.lastCompletedRouteCoordinates
+        }
+
         guard let data = walk?.routeLocationsData,
               let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Double]]
         else { return [] }

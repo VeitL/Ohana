@@ -89,7 +89,7 @@ struct WeeklyReportCard: View {
                 statBubble(emoji: "📏", value: distanceFormatted, label: "距离")
                 statBubble(emoji: "⏱️", value: durationFormatted, label: "时长")
                 statBubble(emoji: "💩", value: "\(weekPotties.count)", label: "便便")
-                statBubble(emoji: "💰", value: "¥\(Int(weekExpenses))", label: "花费")
+                statBubble(emoji: "💰", value: AppCurrency.format(weekExpenses, fractionDigits: 0), label: "花费")
                 statBubble(emoji: "⚖️", value: latestWeight, label: "体重")
             }
             
@@ -255,7 +255,7 @@ struct WeeklyReportCard: View {
                 posterStat(emoji: "📏", value: distanceFormatted, label: "距离")
                 posterStat(emoji: "⏱️", value: durationFormatted, label: "时长")
                 posterStat(emoji: "💩", value: "\(weekPotties.count)次", label: "便便")
-                posterStat(emoji: "💰", value: "¥\(Int(weekExpenses))", label: "花费")
+                posterStat(emoji: "💰", value: AppCurrency.format(weekExpenses, fractionDigits: 0), label: "花费")
                 posterStat(emoji: "⚖️", value: latestWeight, label: "体重")
             }
             .padding(.horizontal, 16)

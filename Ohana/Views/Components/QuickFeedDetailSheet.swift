@@ -810,7 +810,7 @@ struct QuickFeedDetailSheet: View {
             if includeDailyPortion {
                 stockInputRow(icon: "fork.knife", label: "每日份量(g)", color: .goYellow, placeholder: pet.dailyPortionGrams > 0 ? String(format: "%.0f", pet.dailyPortionGrams) : "200", text: $dailyGramsInput)
             }
-            stockInputRow(icon: "yensign.circle.fill", label: "购买价格(¥)", color: themeColor, placeholder: "选填", text: $stockPriceInput)
+            stockInputRow(icon: "\(AppCurrency.systemIconName).fill", label: "购买价格(\(AppCurrency.symbol))", color: themeColor, placeholder: "选填", text: $stockPriceInput)
 
             if !stockPriceInput.isEmpty, let _ = Double(stockPriceInput.replacingOccurrences(of: ",", with: ".")) {
                 VStack(alignment: .leading, spacing: 6) {
@@ -1435,7 +1435,7 @@ struct QuickFeedDetailSheet: View {
             noteParts.append(String(format: "%.1fkg", kg))
         }
         if let price = Double(stockPriceInput.replacingOccurrences(of: ",", with: ".")), price > 0 {
-            noteParts.append(String(format: "¥%.0f", price))
+            noteParts.append(AppCurrency.format(price, fractionDigits: 0))
         }
         record.notes = noteParts.joined(separator: " · ")
         modelContext.insert(record)

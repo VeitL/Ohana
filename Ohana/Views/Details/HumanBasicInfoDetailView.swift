@@ -47,6 +47,7 @@ struct HumanBasicInfoDetailView: View {
     private let themePresets = ["4338FF", "C8FF00", "38BDF8", "EC4899", "F97316", "EF4444", "14B8A6", "A855F7", "FACC15", "64748B"]
     private let bloodTypeOptions = ["未填写", "A", "B", "AB", "O"]
     private let mbtiOptions = ["未填写", "INTJ", "INTP", "ENTJ", "ENTP", "INFJ", "INFP", "ENFJ", "ENFP", "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP"]
+    private let genderOptions = HumanProfileOptions.genderOptions
 
     var body: some View {
         ZStack {
@@ -180,12 +181,7 @@ struct HumanBasicInfoDetailView: View {
     }
 
     private func roleLabel(for role: String) -> String {
-        switch role {
-        case "owner": return "主人"
-        case "editor": return "编辑"
-        case "viewer": return "查看"
-        default: return role
-        }
+        HumanPermissionRole.title(for: role)
     }
 
     private func humanAgeText(for birthday: Date) -> String {
@@ -197,8 +193,8 @@ struct HumanBasicInfoDetailView: View {
         VStack(spacing: 16) {
             infoSection(title: "基本信息", icon: "person.fill", iconColor: Color.goPrimary) {
                 infoRow(label: "名字", value: human.name)
-                infoRow(label: "角色", value: human.roleText)
-                infoRow(label: "性别", value: human.genderRaw.isEmpty ? "未填写" : human.genderRaw)
+                infoRow(label: "权限", value: human.roleText)
+                infoRow(label: "性别/身份", value: HumanGenderIdentity.title(for: human.genderRaw))
                 if let birthday = human.birthday {
                     infoRow(label: "生日", value: birthday.formatted(.dateTime.year().month().day()))
                     infoRow(label: "星座", value: Human.westernZodiacChinese(for: birthday))
@@ -257,27 +253,26 @@ struct HumanBasicInfoDetailView: View {
                 editField("头像 Emoji", text: $eAvatarEmoji)
                 Divider().opacity(0.1)
                 HStack {
-                    editLabel("角色")
+                    editLabel("权限")
                     Spacer()
                     Picker("", selection: $eRole) {
-                        Text("主人").tag("owner")
-                        Text("编辑").tag("editor")
-                        Text("查看").tag("viewer")
+                        Text("管理者").tag("owner")
+                        Text("成员").tag("member")
                     }
                     .pickerStyle(.segmented)
                     .frame(maxWidth: 180)
                 }
                 Divider().opacity(0.1)
                 HStack {
-                    editLabel("性别")
+                    editLabel("性别/身份")
                     Spacer()
                     Picker("", selection: $eGender) {
-                        Text("男").tag("male")
-                        Text("女").tag("female")
-                        Text("未知").tag("")
+                        ForEach(genderOptions, id: \.key) { option in
+                            Text(HumanGenderIdentity.title(for: option.key)).tag(option.key)
+                        }
                     }
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 180)
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: 180, alignment: .trailing)
                 }
                 Divider().opacity(0.1)
                 Toggle(isOn: $eHasBirthday) {
@@ -570,10 +565,7 @@ struct HumanBasicInfoDetailView: View {
     }
 
     private var visibleNoteParts: [String] {
-        human.notes
-            .split(separator: "｜", omittingEmptySubsequences: false)
-            .map(String.init)
-            .filter { !$0.hasPrefix("性别:") && !$0.hasPrefix("关系:") }
+        HumanProfileOptions.visibleNoteParts(from: human.notes)
     }
 
     private var preservedMetadataParts: [String] {
@@ -587,8 +579,8 @@ struct HumanBasicInfoDetailView: View {
         eName = human.name
         eAvatarImageData = human.avatarImageData
         eAvatarEmoji = human.avatarEmoji
-        eRole = human.role
-        eGender = human.genderRaw
+        eRole = HumanProfileOptions.normalizedRole(human.role)
+        eGender = human.genderRaw.isEmpty ? "不透露" : human.genderRaw
         eBirthday = human.birthday ?? Date()
         eHasBirthday = human.birthday != nil
         eBloodType = human.bloodType
@@ -616,7 +608,7 @@ struct HumanBasicInfoDetailView: View {
         human.name = eName.trimmingCharacters(in: .whitespacesAndNewlines)
         human.avatarImageData = eAvatarImageData
         human.avatarEmoji = eAvatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "👤" : eAvatarEmoji
-        human.role = eRole
+        human.role = HumanProfileOptions.normalizedRole(eRole)
         human.birthday = eHasBirthday ? eBirthday : nil
         human.bloodType = eBloodType.trimmingCharacters(in: .whitespacesAndNewlines)
         human.heightCm = Double(eHeightText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
@@ -627,7 +619,7 @@ struct HumanBasicInfoDetailView: View {
         human.shouldShowOnHome = eShouldShowOnHome
 
         var noteParts: [String] = []
-        if !eGender.isEmpty { noteParts.append("性别:\(eGender)") }
+        if !eGender.isEmpty { noteParts.append("性别:\(HumanProfileOptions.normalizedGender(eGender))") }
         noteParts.append(contentsOf: preservedMetadataParts)
         let trimmedNotes = eNotes.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedNotes.isEmpty { noteParts.append(trimmedNotes) }

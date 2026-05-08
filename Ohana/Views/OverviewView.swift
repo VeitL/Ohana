@@ -80,6 +80,7 @@ struct OverviewView: View {
     @State private var quickExpenseDetailPet: Pet? = nil
     @State private var quickWalkDetailPet: Pet? = nil
     @State private var quickHealthDetailPet: Pet? = nil
+    @State private var quickPetMedicationPet: Pet? = nil
     @State private var quickGroomDetailPet: Pet? = nil
     // task46: 喂食/喂水长按弹窗
     @State private var feedSheetItem: (pet: Pet, actionType: String)? = nil
@@ -151,6 +152,7 @@ struct OverviewView: View {
     @State private var showingFamilyStripFull = false
     // 巡岛前置全屏卡
     @State private var showWalkFullScreen = false
+    @State private var todayFocusWalkPet: Pet? = nil
     @State private var walkMinimized = false
     @State private var lastWalkPhase: WalkPhase = .idle
     /// 首页 ScrollView 内容顶部在滚动坐标系中的 minY（上滑为负 → 用于顶栏渐隐）
@@ -578,6 +580,9 @@ struct OverviewView: View {
                     onMinimize: { walkMinimized = true }
                 )
             }
+        }
+        .fullScreenCover(item: $todayFocusWalkPet) { pet in
+            WalkTrackingFullScreen(pet: pet)
         }
         .onChange(of: PetWalkingManager.shared.phase) { _, newPhase in
             if newPhase == .idle {
@@ -1374,9 +1379,9 @@ struct OverviewView: View {
                     }.reduce(0.0) { $0 + $1.amount }
                     let petExpenseSeries = petExpenseSeriesData
                     IslandStatCard(
-                        icon: "yensign.circle.fill",
+                        icon: "\(AppCurrency.systemIconName).fill",
                         title: "本月花费",
-                        value: "¥\(Int(monthTotal))",
+                        value: AppCurrency.format(monthTotal, fractionDigits: 0),
                         unit: "",
                         subtitle: petExpenseSeries.isEmpty ? "暂无花费" : petExpenseSeries.map { $0.0 }.joined(separator: " · "),
                         accentColor: .goYellow,
@@ -2053,6 +2058,13 @@ struct OverviewView: View {
             .sheet(item: $quickHealthDetailPet) { pet in
                 NavigationStack {
                     PetHealthDetailView(pet: pet, isModal: true)
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
+            .sheet(item: $quickPetMedicationPet) { pet in
+                NavigationStack {
+                    PetMedicationView(pet: pet)
                 }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
@@ -2864,7 +2876,7 @@ struct OverviewView: View {
             let monthTotal = pet.expenseLogs
                 .filter { cal.isDate($0.date, equalTo: now, toGranularity: .month) }
                 .reduce(0.0) { $0 + $1.amount }
-            return monthTotal > 0 ? "本月 ¥\(String(format: "%.0f", monthTotal))" : nil
+            return monthTotal > 0 ? "本月 \(AppCurrency.format(monthTotal, fractionDigits: 0))" : nil
         case "weight":
             if let last = pet.weightLogs.sorted(by: { $0.date < $1.date }).last {
                 return "上次 \(String(format: "%.1f", last.weight))kg"
@@ -2902,115 +2914,76 @@ struct OverviewView: View {
         return pet.themeColorHex
     }
 
-    /// 岛屿委托轮播「完成打卡」：与 Bento 同路径，避免数据分叉
+    /// 岛屿委托轮播「去完成」：只打开对应打卡/记录入口，实际完成由目标页面保存。
     @MainActor
     private func completeIslandQuest(_ quest: IslandQuest) {
         if quest.id.hasPrefix("q_feed_") {
             if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) {
-                applyAction("feed", pet: p)
+                feedDetailPet = p
             }
         } else if quest.id.hasPrefix("q_water_") && !quest.id.hasPrefix("q_water_plant") {
             if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) {
-                applyAction("water", pet: p)
+                waterDetailModeRaw = QuickWaterDetailSheet.WaterMode.drink.rawValue
+                waterDetailPet = p
             }
         } else {
             switch quest.id {
             case "q_walk":
                 if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) {
-                    applyAction("walk", pet: p)
+                    todayFocusWalkPet = p
                 }
             case "q_potty":
                 if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) {
-                    applyAction("potty", pet: p)
+                    if p.species.contains("猫") || p.species.contains("兔") {
+                        litterDetailPet = p
+                    } else {
+                        pottyDetailPet = p
+                    }
                 }
             case let id where id.hasPrefix("q_play_"):
                 if let petId = quest.targetPetId, let p = pets.first(where: { $0.id == petId }) {
-                    applyAction("play", pet: p)
+                    playDetailPet = p
                 }
             case let id where id.hasPrefix("q_weight_"):
                 if let petId = quest.targetPetId, let p = pets.first(where: { $0.id == petId }) {
                     quickWeightPet = p
-                    return
                 }
             case let id where id.hasPrefix("q_moment_"):
                 if let petId = quest.targetPetId, let p = pets.first(where: { $0.id == petId }) {
                     showMomentPet = p
-                    return
                 }
             case "q_water_plant":
                 if let id = quest.targetPlantId, let pl = plants.first(where: { $0.id == id }) {
-                    completePlantWatering(pl)
+                    selectedPlant = pl
                 }
             case "q_fertilize_plant":
                 if let id = quest.targetPlantId, let pl = plants.first(where: { $0.id == id }) {
-                    completePlantFertilizing(pl)
+                    selectedPlant = pl
                 }
             case "q_visit":
-                IslandQuestEngine.markVisited()
                 if let id = quest.targetPetId, let p = pets.first(where: { $0.id == id }) {
+                    selectedPetTab = .overview
                     selectedPet = p
                 } else if let p = pets.first {
+                    selectedPetTab = .overview
                     selectedPet = p
                 }
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
             case "q_reminder":
                 showingCalendar = true
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             default:
-                if let mid = IslandQuestEngine.medicationId(fromQuestId: quest.id) {
+                if let eventId = IslandQuestEngine.eventId(fromQuestId: quest.id),
+                   allEvents.contains(where: { $0.id == eventId }) {
+                    showingCalendar = true
+                } else if let mid = IslandQuestEngine.medicationId(fromQuestId: quest.id) {
                     for p in pets {
-                        if let med = p.medications.first(where: { $0.id == mid }) {
-                            PetMedicationDoseLogging.recordDose(medication: med, pet: p, modelContext: modelContext)
-                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        if p.medications.contains(where: { $0.id == mid }) {
+                            quickPetMedicationPet = p
                             break
                         }
                     }
                 }
             }
         }
-        let amt = IslandQuestEngine.coconutReward(forQuestId: quest.id)
-        if amt > 0 && quest.id != "q_walk" {
-            QuestManager.shared.addCoconuts(amt, title: l.homeIslandQuestRewardTitle)
-            triggerCoconutReward(amount: amt, label: nil)
-        }
-    }
-
-    @MainActor
-    private func completePlantWatering(_ plant: Plant) {
-        plant.lastWateredDate = Date()
-        let log = PlantCareLog(date: Date(), careType: .watering)
-        log.plant = plant
-        modelContext.insert(log)
-        let event = Event(
-            title: "💧 给 \(plant.name) 浇水",
-            startDate: Date(),
-            isAllDay: false,
-            eventType: EventType.watering.rawValue,
-            relatedEntityType: EntityKind.plant.rawValue,
-            relatedEntityId: plant.id.uuidString
-        )
-        modelContext.insert(event)
-        modelContext.safeSave()
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-    }
-
-    @MainActor
-    private func completePlantFertilizing(_ plant: Plant) {
-        plant.lastFertilizedDate = Date()
-        let log = PlantCareLog(date: Date(), careType: .fertilizing)
-        log.plant = plant
-        modelContext.insert(log)
-        let event = Event(
-            title: "🌿 给 \(plant.name) 施肥",
-            startDate: Date(),
-            isAllDay: false,
-            eventType: EventType.fertilizing.rawValue,
-            relatedEntityType: EntityKind.plant.rawValue,
-            relatedEntityId: plant.id.uuidString
-        )
-        modelContext.insert(event)
-        modelContext.safeSave()
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     private func handleAction(_ item: QuickActionItem) {

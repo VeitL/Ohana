@@ -13,10 +13,11 @@ import SwiftData
 import MapKit
 
 struct GlobalWalkBanner: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Household.createdAt) private var households: [Household]
 
-    @State private var isMinimized = false
+    @State private var isMinimized = true
     @State private var showSummaryCard = false       // 结束后翻到背面
     @State private var summaryRotation: Double = 0   // 翻转角度
     @State private var isStopped = false             // B2: 结束状态，隐藏展开卡
@@ -27,6 +28,15 @@ struct GlobalWalkBanner: View {
 
     private var mgr: PetWalkingManager { PetWalkingManager.shared }
     private let flipCardHeight: CGFloat = 272
+    private var shouldShowFloatingControl: Bool {
+        isActive && !mgr.isWalkCardExpandedSurfaceVisible
+    }
+    private var walkPanelFill: Color {
+        colorScheme == .dark ? Color(hex: "10180F") : Color(hex: "F7FAEF")
+    }
+    private var walkPanelStroke: Color {
+        colorScheme == .dark ? Color.white.opacity(0.14) : Color.arkInk.opacity(0.08)
+    }
 
     private var isActive: Bool {
         switch mgr.phase {
@@ -39,7 +49,7 @@ struct GlobalWalkBanner: View {
         GeometryReader { geo in
             ZStack(alignment: .bottomTrailing) {
                 // ── 展开大卡片（遛狗中，结束后立即隐藏）
-                if isActive, !isMinimized, !isStopped, let pet = mgr.currentPet {
+                if shouldShowFloatingControl, !isMinimized, !isStopped, let pet = mgr.currentPet {
                     expandedCard(pet: pet)
                         .frame(height: flipCardHeight)
                         .padding(.horizontal, 16)
@@ -50,7 +60,7 @@ struct GlobalWalkBanner: View {
                 }
 
                 // ── 最小化气泡（可拖动，B1: 用 GestureState）
-                if isActive, isMinimized, !isStopped, let pet = mgr.currentPet {
+                if shouldShowFloatingControl, isMinimized, !isStopped, let pet = mgr.currentPet {
                     draggableBubble(pet: pet, geo: geo)
                         .zIndex(999)
                 }
@@ -65,6 +75,22 @@ struct GlobalWalkBanner: View {
             .animation(.easeInOut(duration: 0.15), value: isStopped)
         }
         .ignoresSafeArea(edges: .bottom)
+        .allowsHitTesting(shouldShowFloatingControl || showSummaryCard)
+        .onChange(of: mgr.phase) { _, phase in
+            if case .idle = phase {
+                isMinimized = true
+                showSummaryCard = false
+                summaryRotation = 0
+                isStopped = false
+            }
+        }
+        .onChange(of: mgr.isWalkCardExpandedSurfaceVisible) { _, isVisible in
+            if isVisible {
+                isMinimized = true
+                showSummaryCard = false
+                isStopped = false
+            }
+        }
     }
 
     // MARK: - 最小化气泡（B1: GestureState 消除幻影，drawingGroup 避免卡顿）
@@ -225,16 +251,32 @@ struct GlobalWalkBanner: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 20).padding(.vertical, 14)
         }
-        .goGlassBackground(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .background(walkPanelFill, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(walkPanelStroke, lineWidth: 1)
+        }
         .shadow(color: .black.opacity(0.25), radius: 16, x: 0, y: 6)
     }
 
     // MARK: - 结束后翻转详情卡（B2 重写）
     private func summaryFlipCard(pet: Pet, geo: GeometryProxy) -> some View {
-        let elapsed = mgr.elapsedTime
-        let distance = LocationManager.shared.totalDistance
-        let poop = mgr.poopCount
-        let latestWalk = pet.walkLogs.sorted { $0.startDate > $1.startDate }.first
+        let elapsed: TimeInterval = {
+            if case .finished(let elapsed, _) = mgr.phase, mgr.currentPet?.id == pet.id {
+                return elapsed
+            }
+            return mgr.elapsedTime
+        }()
+        let latestWalk = mgr.lastCompletedPetId == pet.id
+            ? mgr.lastCompletedWalk
+            : pet.walkLogs.sorted { $0.startDate > $1.startDate }.first
+        let distance = latestWalk?.distanceMeters ?? LocationManager.shared.totalDistance
+        let poop: Int = {
+            if case .finished(_, let poopCount) = mgr.phase, mgr.currentPet?.id == pet.id {
+                return poopCount
+            }
+            return mgr.poopCount
+        }()
         let showBack = summaryRotation >= 90
 
         return ZStack {
@@ -247,7 +289,11 @@ struct GlobalWalkBanner: View {
         }
         .frame(maxWidth: .infinity, minHeight: flipCardHeight, maxHeight: flipCardHeight)
         .rotation3DEffect(.degrees(summaryRotation), axis: (x: 0, y: 1, z: 0), perspective: 0.75)
-        .goGlassBackground(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .background(walkPanelFill, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(walkPanelStroke, lineWidth: 1)
+        }
         .shadow(color: .black.opacity(0.25), radius: 16, x: 0, y: 6)
         .padding(.horizontal, 16)
         .padding(.bottom, safeBottom(geo) + 160)
@@ -299,6 +345,7 @@ struct GlobalWalkBanner: View {
             }
             .padding(.horizontal, 18).padding(.top, 12)
 
+            let coords = routeCoordinates(for: latestWalk, pet: pet)
             Group {
                 if let walk = latestWalk, let data = walk.mapSnapshotData, let ui = UIImage(data: data) {
                     Button {
@@ -324,6 +371,46 @@ struct GlobalWalkBanner: View {
                             )
                     }
                     .buttonStyle(.plain)
+                } else if !coords.isEmpty, let region = routeRegion(for: coords) {
+                    Map(initialPosition: .region(region)) {
+                        if coords.count >= 2 {
+                            MapPolyline(coordinates: coords)
+                                .stroke(Color.goPrimary, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+                        }
+                        if let first = coords.first {
+                            Annotation(coords.count >= 2 ? "出发" : "位置", coordinate: first) {
+                                Circle()
+                                    .fill(Color.goPrimary)
+                                    .frame(width: 16, height: 16)
+                                    .overlay(Circle().fill(Color.arkInk).frame(width: 6, height: 6))
+                            }
+                        }
+                        if coords.count >= 2, let last = coords.last {
+                            Annotation("到家", coordinate: last) {
+                                Circle()
+                                    .fill(Color.goRed)
+                                    .frame(width: 18, height: 18)
+                                    .overlay(Circle().fill(.white).frame(width: 7, height: 7))
+                            }
+                        }
+                    }
+                    .mapStyle(.standard(elevation: .flat))
+                    .allowsHitTesting(false)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 108)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        HStack(spacing: 4) {
+                            Image(systemName: "map.fill").font(.system(size: 11, weight: .bold))
+                            Text(coords.count >= 2 ? "本次轨迹" : "本次定位")
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .background(.black.opacity(0.45), in: Capsule())
+                        .padding(8),
+                        alignment: .bottomTrailing
+                    )
                 } else {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(.white.opacity(0.06))
@@ -401,5 +488,35 @@ struct GlobalWalkBanner: View {
         let s = Int(t)
         if s >= 3600 { return String(format: "%d:%02d:%02d", s / 3600, (s % 3600) / 60, s % 60) }
         return String(format: "%02d:%02d", s / 60, s % 60)
+    }
+
+    private func routeCoordinates(for walk: PetWalkLog?, pet: Pet) -> [CLLocationCoordinate2D] {
+        if mgr.lastCompletedPetId == pet.id,
+           !mgr.lastCompletedRouteCoordinates.isEmpty {
+            return mgr.lastCompletedRouteCoordinates
+        }
+
+        guard let data = walk?.routeLocationsData,
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Double]]
+        else { return [] }
+        return arr.compactMap { dict in
+            guard let lat = dict["lat"], let lon = dict["lon"] else { return nil }
+            return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+        }
+    }
+
+    private func routeRegion(for coords: [CLLocationCoordinate2D]) -> MKCoordinateRegion? {
+        guard !coords.isEmpty else { return nil }
+        let lats = coords.map(\.latitude)
+        let lons = coords.map(\.longitude)
+        let center = CLLocationCoordinate2D(
+            latitude: (lats.min()! + lats.max()!) / 2,
+            longitude: (lons.min()! + lons.max()!) / 2
+        )
+        let span = MKCoordinateSpan(
+            latitudeDelta: max(0.008, (lats.max()! - lats.min()!) * 1.6),
+            longitudeDelta: max(0.008, (lons.max()! - lons.min()!) * 1.6)
+        )
+        return MKCoordinateRegion(center: center, span: span)
     }
 }

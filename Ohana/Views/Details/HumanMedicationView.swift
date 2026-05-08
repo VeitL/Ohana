@@ -8,11 +8,15 @@ import SwiftData
 import Charts
 
 struct DailyDoseItem: Identifiable, Hashable {
-    let id = UUID()
     let medication: HumanMedication
     let scheduledTime: Date
     let doseIndex: Int
     var log: HumanMedicationLog?
+
+    var id: String {
+        let minuteKey = Int(scheduledTime.timeIntervalSince1970 / 60)
+        return "\(medication.id.uuidString)-\(minuteKey)-\(doseIndex)"
+    }
 }
 
 private struct MedicationAdherenceDay: Identifiable {
@@ -39,6 +43,7 @@ struct HumanMedicationView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @Query private var allMeds: [HumanMedication]
     @Query private var allLogs: [HumanMedicationLog]
 
@@ -51,14 +56,20 @@ struct HumanMedicationView: View {
         allMeds.filter { $0.humanId == human.id.uuidString }
             .sorted { $0.createdAt > $1.createdAt }
     }
+    private var currentMeds: [HumanMedication] { meds(in: .current) }
+    private var manualMeds: [HumanMedication] { meds(in: .manual) }
+    private var notStartedMeds: [HumanMedication] { meds(in: .notStarted) }
+    private var endedMeds: [HumanMedication] { meds(in: .ended) }
+    private var stoppedMeds: [HumanMedication] { meds(in: .stopped) }
     private var activeMeds: [HumanMedication] { myMeds.filter { $0.isActive } }
-    private var inactiveMeds: [HumanMedication] { myMeds.filter { !$0.isActive } }
+    private var inactiveMeds: [HumanMedication] { stoppedMeds }
 
     private var primaryText: Color { Color.ohanaPrimaryText }
     private var secondaryText: Color { Color.ohanaSecondaryText }
     private var tertiaryText: Color { Color.ohanaTertiaryText }
     private var dividerColor: Color { Color.ohanaDivider }
     private var controlFill: Color { Color.ohanaControlFill }
+    private var l: L10n { L10n(appLanguage) }
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isPrivacyLocked: Bool { human.isPrivate(.medication, viewedBy: activeHumanId) }
 
@@ -101,38 +112,40 @@ struct HumanMedicationView: View {
     }
     
     private var todayScheduleItems: [DailyDoseItem] {
-        var items: [DailyDoseItem] = []
+        HumanMedicationSchedulePlan
+            .doses(on: Date(), medications: myMeds)
+            .map { dose in
+                let existingLog = HumanMedicationLogStore.matchingLog(
+                    in: todayLogs,
+                    humanId: human.id.uuidString,
+                    medicationId: dose.medication.id.uuidString,
+                    scheduledTime: dose.scheduledTime
+                )
+                return DailyDoseItem(
+                    medication: dose.medication,
+                    scheduledTime: dose.scheduledTime,
+                    doseIndex: dose.doseIndex,
+                    log: existingLog
+                )
+            }
+    }
+
+    private var pendingScheduleItems: [DailyDoseItem] {
+        todayScheduleItems.filter { $0.log?.status != .taken && $0.log?.status != .skipped }
+    }
+
+    private var overdueItems: [DailyDoseItem] {
         let now = Date()
-        let calendar = Calendar.current
-        let startOfToday = calendar.startOfDay(for: now)
+        return pendingScheduleItems.filter { $0.scheduledTime < now }
+    }
 
-        for med in activeMeds {
-            let dosesPerDay = med.frequency.dosesPerDay
-            guard dosesPerDay > 0 else { continue } // 按需不参与静态排表
+    private var nextPendingItem: DailyDoseItem? {
+        let now = Date()
+        return pendingScheduleItems.first { $0.scheduledTime >= now } ?? overdueItems.first
+    }
 
-            if med.frequency == .weekly {
-                let daysSinceStart = calendar.dateComponents([.day], from: med.startDate, to: startOfToday).day ?? 0
-                if daysSinceStart % 7 != 0 { continue }
-            }
-            
-            let intervalHours = 24.0 / Double(dosesPerDay)
-            var baseComponents = calendar.dateComponents([.year, .month, .day], from: now)
-            let timeComponents = calendar.dateComponents([.hour, .minute], from: med.firstDoseTime)
-            baseComponents.hour = timeComponents.hour ?? 8
-            baseComponents.minute = timeComponents.minute ?? 0
-            baseComponents.second = 0
-            guard let baseTime = calendar.date(from: baseComponents) else { continue }
-            
-            for doseIdx in 0..<dosesPerDay {
-                let fireDate = baseTime.addingTimeInterval(Double(doseIdx) * intervalHours * 3600)
-                let existingLog = todayLogs.first(where: { 
-                    $0.medicationId == med.id.uuidString && 
-                    calendar.isDate($0.scheduledTime, equalTo: fireDate, toGranularity: .minute)
-                })
-                items.append(DailyDoseItem(medication: med, scheduledTime: fireDate, doseIndex: doseIdx, log: existingLog))
-            }
-        }
-        return items.sorted { $0.scheduledTime < $1.scheduledTime }
+    private func meds(in group: HumanMedicationDisplayGroup) -> [HumanMedication] {
+        myMeds.filter { HumanMedicationSchedulePlan.displayGroup(for: $0) == group }
     }
 
     var body: some View {
@@ -143,7 +156,7 @@ struct HumanMedicationView: View {
                 medicationContent
             }
         }
-        .navigationTitle("吃药提醒")
+        .navigationTitle(l.tr(zh: "吃药提醒", en: "Medication", de: "Medikamente"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             // 隐私开关（leading）
@@ -186,21 +199,14 @@ struct HumanMedicationView: View {
                     HumanPrivateDataNotice(human: human, field: .medication)
                         .padding(.horizontal, 16)
 
-                    // ── 汇总 Bento
-                    summaryBento
+                    todayFocusCard
                         .padding(.horizontal, 16)
 
                     overviewMetricGrid
                         .padding(.horizontal, 16)
 
-                    if !myMeds.isEmpty {
-                        adherenceChartCard
-                            .padding(.horizontal, 16)
-                    }
-
-                    // ── 今日时间表
                     if !todayScheduleItems.isEmpty {
-                        sectionLabel("今日时间表")
+                        sectionLabel(l.tr(zh: "今日时间表", en: "Today", de: "Heute"))
                         UltimateGlassCard {
                             VStack(spacing: 0) {
                                 ForEach(Array(todayScheduleItems.enumerated()), id: \.element.id) { index, item in
@@ -215,22 +221,49 @@ struct HumanMedicationView: View {
                         .padding(.horizontal, 16)
                     }
 
-                    // ── 当前用药
-                    if !activeMeds.isEmpty {
-                        sectionLabel("当前用药")
-                        ForEach(activeMeds) { med in
+                    if !manualMeds.isEmpty {
+                        sectionLabel(l.tr(zh: "按需与自定义", en: "Manual medication", de: "Manuelle Medikamente"))
+                        ForEach(manualMeds) { med in
+                            manualMedicationRow(med)
+                                .padding(.horizontal, 16)
+                        }
+                    }
+
+                    if !currentMeds.isEmpty {
+                        sectionLabel(l.tr(zh: "当前用药", en: "Current", de: "Aktuell"))
+                        ForEach(currentMeds) { med in
                             medicationRow(med)
                                 .padding(.horizontal, 16)
                         }
                     }
 
-                    // ── 已停药
-                    if !inactiveMeds.isEmpty {
-                        sectionLabel("已停药")
-                        ForEach(inactiveMeds) { med in
+                    if !notStartedMeds.isEmpty {
+                        sectionLabel(l.tr(zh: "尚未开始", en: "Not started", de: "Noch nicht gestartet"))
+                        ForEach(notStartedMeds) { med in
                             medicationRow(med)
                                 .padding(.horizontal, 16)
                         }
+                    }
+
+                    if !endedMeds.isEmpty {
+                        sectionLabel(l.tr(zh: "已结束", en: "Ended", de: "Beendet"))
+                        ForEach(endedMeds) { med in
+                            medicationRow(med)
+                                .padding(.horizontal, 16)
+                        }
+                    }
+
+                    if !stoppedMeds.isEmpty {
+                        sectionLabel(l.tr(zh: "已停药", en: "Stopped", de: "Pausiert"))
+                        ForEach(stoppedMeds) { med in
+                            medicationRow(med)
+                                .padding(.horizontal, 16)
+                        }
+                    }
+
+                    if !myMeds.isEmpty {
+                        adherenceChartCard
+                            .padding(.horizontal, 16)
                     }
 
                     if myMeds.isEmpty {
@@ -262,7 +295,7 @@ struct HumanMedicationView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "plus")
                             .font(.system(size: 16, weight: .black))
-                        Text("添加药物")
+                        Text(l.tr(zh: "添加药物", en: "Add medication", de: "Medikament hinzufügen"))
                             .font(.system(size: 16, weight: .black, design: .rounded))
                     }
                     .foregroundStyle(Color.arkInk)
@@ -296,7 +329,7 @@ struct HumanMedicationView: View {
                 Text(human.name)
                     .font(OhanaFont.headline(.bold))
                     .foregroundStyle(.primary)
-                Text("用药管理")
+                Text(l.tr(zh: "用药管理", en: "Medication", de: "Medikamente"))
                     .font(OhanaFont.caption())
                     .foregroundStyle(.secondary)
             }
@@ -309,7 +342,7 @@ struct HumanMedicationView: View {
                     Text("\(todayDone)/\(todayTotal)")
                         .font(OhanaFont.metric(size: 20))
                         .foregroundStyle(todayDone == todayTotal ? Color.goTeal : Color.goPrimary)
-                    Text("今日服药")
+                    Text(l.tr(zh: "今日服药", en: "Today", de: "Heute"))
                         .font(OhanaFont.caption2(.bold))
                         .foregroundStyle(.secondary)
                 }
@@ -326,10 +359,10 @@ struct HumanMedicationView: View {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(Color.goYellow)
-                Text("吃药提醒仅本人可见")
+                Text(l.tr(zh: "吃药提醒仅本人可见", en: "Medication is private", de: "Medikamente sind privat"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(primaryText)
-                Text("当前家庭成员无权查看用药计划、剂量和服药记录。")
+                Text(l.tr(zh: "当前家庭成员无权查看用药计划、剂量和服药记录。", en: "This household member cannot view medication plans, doses, or logs.", de: "Dieses Haushaltsmitglied kann Medikamentenpläne, Dosen oder Protokolle nicht sehen."))
                     .font(OhanaFont.callout())
                     .foregroundStyle(secondaryText)
                     .multilineTextAlignment(.center)
@@ -342,17 +375,17 @@ struct HumanMedicationView: View {
 
     // MARK: - Summary Bento
 
-    private var summaryBento: some View {
+    private var todayFocusCard: some View {
         UltimateGlassCard {
             HStack(spacing: 18) {
                 medicationProgressRing
 
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 6) {
-                        Image(systemName: "sparkles")
+                        Image(systemName: overdueItems.isEmpty ? "pills.fill" : "exclamationmark.triangle.fill")
                             .font(OhanaFont.caption(.black))
-                            .foregroundStyle(Color.goPrimary)
-                        Text("OVERVIEW")
+                            .foregroundStyle(overdueItems.isEmpty ? Color.goPrimary : Color.goRed)
+                        Text(l.tr(zh: "TODAY FOCUS", en: "TODAY FOCUS", de: "HEUTE"))
                             .font(OhanaFont.caption(.black))
                             .tracking(1.2)
                             .foregroundStyle(tertiaryText)
@@ -369,8 +402,8 @@ struct HumanMedicationView: View {
                         .lineLimit(2)
 
                     HStack(spacing: 8) {
-                        overviewPill("\(activeMeds.count) 个当前用药", color: Color.goRed)
-                        overviewPill("\(sevenDayCompletionRate)% 七日完成", color: Color.goPrimary)
+                        overviewPill(l.tr(zh: "\(currentMeds.count) 个固定用药", en: "\(currentMeds.count) scheduled", de: "\(currentMeds.count) geplant"), color: Color.goRed)
+                        overviewPill(l.tr(zh: "\(sevenDayCompletionRate)% 七日完成", en: "\(sevenDayCompletionRate)% 7-day", de: "\(sevenDayCompletionRate)% 7 Tage"), color: Color.goPrimary)
                     }
                 }
 
@@ -384,24 +417,24 @@ struct HumanMedicationView: View {
         HStack(spacing: 10) {
             overviewMetricCard(
                 icon: "checkmark.seal.fill",
-                label: "今日已服",
+                label: l.tr(zh: "今日已服", en: "Taken", de: "Genommen"),
                 value: "\(todayTakenCount)",
                 suffix: todayPlannedCount > 0 ? "/\(todayPlannedCount)" : "",
                 color: Color.goTeal
             )
             overviewMetricCard(
                 icon: "forward.fill",
-                label: "已跳过",
+                label: l.tr(zh: "已跳过", en: "Skipped", de: "Übersprungen"),
                 value: "\(todaySkippedCount)",
-                suffix: "次",
+                suffix: l.tr(zh: "次", en: "", de: ""),
                 color: Color.goOrange
             )
             overviewMetricCard(
-                icon: "calendar.badge.clock",
-                label: "即将结束",
-                value: "\(endingSoonCount)",
-                suffix: "个",
-                color: Color.goYellow
+                icon: overdueItems.isEmpty ? "clock.badge.checkmark" : "exclamationmark.triangle.fill",
+                label: overdueItems.isEmpty ? l.tr(zh: "待记录", en: "Pending", de: "Offen") : l.tr(zh: "已超时", en: "Overdue", de: "Überfällig"),
+                value: "\(overdueItems.isEmpty ? pendingScheduleItems.count : overdueItems.count)",
+                suffix: l.tr(zh: "次", en: "", de: ""),
+                color: overdueItems.isEmpty ? Color.goYellow : Color.goRed
             )
         }
     }
@@ -423,7 +456,7 @@ struct HumanMedicationView: View {
                 Text(todayPlannedCount == 0 ? "--" : "\(Int((todayCompletion * 100).rounded()))%")
                     .font(OhanaFont.metric(size: 26))
                     .foregroundStyle(primaryText)
-                Text("今日")
+                Text(l.tr(zh: "今日", en: "Today", de: "Heute"))
                     .font(OhanaFont.caption2(.black))
                     .foregroundStyle(tertiaryText)
             }
@@ -440,16 +473,39 @@ struct HumanMedicationView: View {
     }
 
     private var todayOverviewTitle: String {
-        if todayPlannedCount == 0 { return activeMeds.isEmpty ? "还没有服药计划" : "今日没有固定剂量" }
-        if todayTakenCount == todayPlannedCount { return "今日服药已完成" }
-        if todayResolvedCount == todayPlannedCount { return "今日记录已处理" }
-        return "还剩 \(max(0, todayPlannedCount - todayResolvedCount)) 次待记录"
+        if todayPlannedCount == 0 {
+            return myMeds.isEmpty
+                ? l.tr(zh: "还没有服药计划", en: "No medication plan yet", de: "Noch kein Medikamentenplan")
+                : l.tr(zh: "今日没有固定剂量", en: "No scheduled doses today", de: "Heute keine geplanten Dosen")
+        }
+        if !overdueItems.isEmpty {
+            return l.tr(zh: "\(overdueItems.count) 次用药已超时", en: "\(overdueItems.count) dose(s) overdue", de: "\(overdueItems.count) Dosis überfällig")
+        }
+        if todayTakenCount == todayPlannedCount {
+            return l.tr(zh: "今日服药已完成", en: "Medication done today", de: "Heute abgeschlossen")
+        }
+        if todayResolvedCount == todayPlannedCount {
+            return l.tr(zh: "今日记录已处理", en: "All doses handled", de: "Alle Dosen erledigt")
+        }
+        if let nextPendingItem {
+            return l.tr(
+                zh: "下一次 \(nextPendingItem.scheduledTime.formatted(date: .omitted, time: .shortened))",
+                en: "Next at \(nextPendingItem.scheduledTime.formatted(date: .omitted, time: .shortened))",
+                de: "Nächste um \(nextPendingItem.scheduledTime.formatted(date: .omitted, time: .shortened))"
+            )
+        }
+        return l.tr(zh: "还剩 \(max(0, todayPlannedCount - todayResolvedCount)) 次待记录", en: "\(max(0, todayPlannedCount - todayResolvedCount)) left today", de: "\(max(0, todayPlannedCount - todayResolvedCount)) heute offen")
     }
 
     private var todayOverviewSubtitle: String {
-        if todayPlannedCount == 0 { return "添加药物后，这里会展示今日进度、七日趋势和待处理剂量。" }
-        let skipped = todaySkippedCount > 0 ? " · 跳过 \(todaySkippedCount)" : ""
-        return "已服 \(todayTakenCount)/\(todayPlannedCount)\(skipped) · 长按快捷操作可直接回到这里。"
+        if todayPlannedCount == 0 {
+            if !manualMeds.isEmpty {
+                return l.tr(zh: "按需药物可在下方手动记录一次。", en: "As-needed medication can be logged below.", de: "Bedarfsmedikamente kannst du unten manuell protokollieren.")
+            }
+            return l.tr(zh: "添加药物后，这里会展示今日进度和待处理剂量。", en: "Add medication to see today's progress and pending doses.", de: "Füge Medikamente hinzu, um Fortschritt und offene Dosen zu sehen.")
+        }
+        let skipped = todaySkippedCount > 0 ? l.tr(zh: " · 跳过 \(todaySkippedCount)", en: " · skipped \(todaySkippedCount)", de: " · übersprungen \(todaySkippedCount)") : ""
+        return l.tr(zh: "已服 \(todayTakenCount)/\(todayPlannedCount)\(skipped)", en: "Taken \(todayTakenCount)/\(todayPlannedCount)\(skipped)", de: "Genommen \(todayTakenCount)/\(todayPlannedCount)\(skipped)")
     }
 
     private var endingSoonCount: Int {
@@ -467,24 +523,7 @@ struct HumanMedicationView: View {
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: day)
 
-        return myMeds.reduce(0) { total, med in
-            let medStart = calendar.startOfDay(for: med.startDate)
-            guard startOfDay >= medStart else { return total }
-            if let endDate = med.endDate,
-               startOfDay > calendar.startOfDay(for: endDate) {
-                return total
-            }
-
-            let dosesPerDay = med.frequency.dosesPerDay
-            guard dosesPerDay > 0 else { return total }
-
-            if med.frequency == .weekly {
-                let daysSinceStart = calendar.dateComponents([.day], from: medStart, to: startOfDay).day ?? 0
-                return daysSinceStart % 7 == 0 ? total + dosesPerDay : total
-            }
-
-            return total + dosesPerDay
-        }
+        return HumanMedicationSchedulePlan.plannedDoseCount(on: startOfDay, medications: myMeds, calendar: calendar)
     }
 
     private var adherenceChartCard: some View {
@@ -492,10 +531,10 @@ struct HumanMedicationView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("近 7 天服药趋势")
+                        Text(l.tr(zh: "近 7 天服药趋势", en: "7-day medication trend", de: "7-Tage-Verlauf"))
                             .font(OhanaFont.headline(.bold))
                             .foregroundStyle(primaryText)
-                        Text("计划剂量与已完成剂量对比")
+                        Text(l.tr(zh: "计划剂量与已完成剂量对比", en: "Planned doses vs completed doses", de: "Geplante und erledigte Dosen"))
                             .font(OhanaFont.caption())
                             .foregroundStyle(secondaryText)
                     }
@@ -506,7 +545,7 @@ struct HumanMedicationView: View {
                         Text("\(sevenDayCompletionRate)%")
                             .font(OhanaFont.metric(size: 24))
                             .foregroundStyle(Color.goPrimary)
-                        Text("完成率")
+                        Text(l.tr(zh: "完成率", en: "Done", de: "Erledigt"))
                             .font(OhanaFont.caption2(.bold))
                             .foregroundStyle(secondaryText)
                     }
@@ -515,19 +554,19 @@ struct HumanMedicationView: View {
                 Chart {
                     ForEach(adherenceDays) { item in
                         BarMark(
-                            x: .value("日期", item.dayLabel),
-                            y: .value("剂量", item.planned)
+                            x: .value(l.tr(zh: "日期", en: "Date", de: "Datum"), item.dayLabel),
+                            y: .value(l.tr(zh: "剂量", en: "Dose", de: "Dosis"), item.planned)
                         )
                         .foregroundStyle(controlFill)
-                        .position(by: .value("类型", "计划"))
+                        .position(by: .value(l.tr(zh: "类型", en: "Type", de: "Typ"), l.tr(zh: "计划", en: "Planned", de: "Geplant")))
                         .cornerRadius(5)
 
                         BarMark(
-                            x: .value("日期", item.dayLabel),
-                            y: .value("剂量", item.taken)
+                            x: .value(l.tr(zh: "日期", en: "Date", de: "Datum"), item.dayLabel),
+                            y: .value(l.tr(zh: "剂量", en: "Dose", de: "Dosis"), item.taken)
                         )
                         .foregroundStyle(Color.goPrimary.gradient)
-                        .position(by: .value("类型", "已服"))
+                        .position(by: .value(l.tr(zh: "类型", en: "Type", de: "Typ"), l.tr(zh: "已服", en: "Taken", de: "Genommen")))
                         .cornerRadius(5)
                     }
                 }
@@ -546,10 +585,10 @@ struct HumanMedicationView: View {
                 }
 
                 HStack(spacing: 14) {
-                    chartLegendDot(color: secondaryText.opacity(0.55), label: "计划")
-                    chartLegendDot(color: .goPrimary, label: "已服")
+                    chartLegendDot(color: secondaryText.opacity(0.55), label: l.tr(zh: "计划", en: "Planned", de: "Geplant"))
+                    chartLegendDot(color: .goPrimary, label: l.tr(zh: "已服", en: "Taken", de: "Genommen"))
                     Spacer()
-                    Text("按每日频率自动估算计划剂量")
+                    Text(l.tr(zh: "按药物排程计算计划剂量", en: "Planned doses follow the medication schedule", de: "Geplante Dosen folgen dem Zeitplan"))
                         .font(OhanaFont.caption2())
                         .foregroundStyle(tertiaryText)
                 }
@@ -610,46 +649,35 @@ struct HumanMedicationView: View {
     private func scheduleRow(_ item: DailyDoseItem) -> some View {
         let isTaken = item.log?.status == .taken
         let isSkipped = item.log?.status == .skipped
+        let isResolved = isTaken || isSkipped
+        let isOverdue = !isResolved && item.scheduledTime < Date()
+        let tint = isTaken ? Color.goTeal : (isSkipped ? Color.goOrange : (isOverdue ? Color.goRed : Color.goPrimary))
         
         return HStack(spacing: 16) {
-            // Time
-            VStack(alignment: .trailing) {
+            VStack(alignment: .trailing, spacing: 4) {
                 Text(item.scheduledTime, style: .time)
                     .font(OhanaFont.callout(.bold))
-                    .foregroundStyle((isTaken || isSkipped) ? tertiaryText : primaryText)
+                    .foregroundStyle(isResolved ? tertiaryText : primaryText)
+                Text(doseStatusText(item))
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(tint)
             }
-            .frame(width: 52, alignment: .trailing)
+            .frame(width: 62, alignment: .trailing)
             
-            // Interaction Checkmark
-            Button {
-                toggleDoseStatus(item)
-            } label: {
-                ZStack {
-                    Circle()
-                        .strokeBorder(doseStatusColor(item.log?.status), lineWidth: 2)
-                        .frame(width: 28, height: 28)
-                        .background(
-                            Circle().fill((isTaken || isSkipped) ? doseStatusColor(item.log?.status) : Color.clear)
-                        )
-                    if isTaken {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.black)
-                    } else if isSkipped {
-                        Image(systemName: "minus")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.black)
-                    }
-                }
+            ZStack {
+                Circle()
+                    .fill(tint.opacity(0.14))
+                    .frame(width: 34, height: 34)
+                Image(systemName: doseStatusIcon(item))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(tint)
             }
-            .buttonStyle(.plain)
             
-            // Info
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.medication.name)
                     .font(OhanaFont.headline(.semibold))
-                    .foregroundStyle((isTaken || isSkipped) ? secondaryText : primaryText)
-                    .strikethrough(isTaken || isSkipped, color: secondaryText)
+                    .foregroundStyle(isResolved ? secondaryText : primaryText)
+                    .strikethrough(isResolved, color: secondaryText)
                 if !item.medication.dosage.isEmpty {
                     Text(item.medication.dosage)
                         .font(OhanaFont.caption())
@@ -659,39 +687,72 @@ struct HumanMedicationView: View {
             
             Spacer()
 
-            Button {
-                setDoseStatus(isSkipped ? .pending : .skipped, for: item)
-            } label: {
-                Text(isSkipped ? "已跳过" : "跳过")
-                    .font(OhanaFont.caption(.bold))
-                    .foregroundStyle(isSkipped ? Color.goOrange : secondaryText)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background((isSkipped ? Color.goOrange : controlFill).opacity(isSkipped ? 0.16 : 1), in: Capsule())
+            HStack(spacing: 8) {
+                Button {
+                    setDoseStatus(isTaken ? .pending : .taken, for: item)
+                } label: {
+                    Text(isTaken ? l.tr(zh: "撤回", en: "Undo", de: "Zurück") : l.tr(zh: "已服", en: "Taken", de: "Genommen"))
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(isTaken ? secondaryText : Color.arkInk)
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 7)
+                        .background(isTaken ? controlFill : Color.goTeal, in: Capsule())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    setDoseStatus(isSkipped ? .pending : .skipped, for: item)
+                } label: {
+                    Text(isSkipped ? l.tr(zh: "撤回", en: "Undo", de: "Zurück") : l.tr(zh: "跳过", en: "Skip", de: "Überspr."))
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(isSkipped ? Color.goOrange : secondaryText)
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 7)
+                        .background((isSkipped ? Color.goOrange : controlFill).opacity(isSkipped ? 0.16 : 1), in: Capsule())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 16)
     }
 
-    private func toggleDoseStatus(_ item: DailyDoseItem) {
-        setDoseStatus(item.log?.status == .taken ? .pending : .taken, for: item)
+    private func doseStatusText(_ item: DailyDoseItem) -> String {
+        switch item.log?.status {
+        case .taken:
+            return l.tr(zh: "已服", en: "Taken", de: "Genommen")
+        case .skipped:
+            return l.tr(zh: "已跳过", en: "Skipped", de: "Überspr.")
+        default:
+            return item.scheduledTime < Date()
+                ? l.tr(zh: "已超时", en: "Overdue", de: "Überfällig")
+                : l.tr(zh: "待记录", en: "Pending", de: "Offen")
+        }
+    }
+
+    private func doseStatusIcon(_ item: DailyDoseItem) -> String {
+        switch item.log?.status {
+        case .taken:
+            return "checkmark"
+        case .skipped:
+            return "minus"
+        default:
+            return item.scheduledTime < Date() ? "exclamationmark" : "clock"
+        }
     }
 
     private func setDoseStatus(_ status: HumanMedicationStatus, for item: DailyDoseItem) {
-        withAnimation(.spring(response: 0.3)) {
-            let log = item.log ?? HumanMedicationLog(
+        withAnimation(GoMotion.feedback) {
+            let update = HumanMedicationLogStore.applyDoseStatus(
                 humanId: human.id.uuidString,
                 medicationId: item.medication.id.uuidString,
-                scheduledTime: item.scheduledTime
+                scheduledTime: item.scheduledTime,
+                status: status,
+                existingLogs: allLogs,
+                context: modelContext
             )
-            if item.log == nil { modelContext.insert(log) }
 
-            log.status = status
-            log.recordedTime = status == .pending ? nil : Date()
-
-            if status != .pending {
+            if update.shouldRecordLedgerEvent, let log = update.log {
                 CareLedgerService.record(
                     occurredAt: log.recordedTime ?? Date(),
                     actorKind: .human,
@@ -728,11 +789,11 @@ struct HumanMedicationView: View {
     }
 
     private func doseToastMessage(_ status: HumanMedicationStatus, medicationName: String) -> String {
-        let name = medicationName.isEmpty ? "药物" : medicationName
+        let name = medicationName.isEmpty ? l.tr(zh: "药物", en: "Medication", de: "Medikament") : medicationName
         switch status {
-        case .taken: return "✅ 已记录 \(name)"
-        case .skipped: return "⏭ 已跳过 \(name)"
-        case .pending: return "↩️ 已恢复待记录"
+        case .taken: return l.tr(zh: "已记录 \(name)", en: "Logged \(name)", de: "\(name) protokolliert")
+        case .skipped: return l.tr(zh: "已跳过 \(name)", en: "Skipped \(name)", de: "\(name) übersprungen")
+        case .pending: return l.tr(zh: "已恢复待记录", en: "Back to pending", de: "Wieder offen")
         }
     }
 
@@ -743,91 +804,210 @@ struct HumanMedicationView: View {
 
     // MARK: - Medication Row
 
-    private func medicationRow(_ med: HumanMedication) -> some View {
-        Button { editingMed = med } label: {
-            UltimateGlassCard {
-                HStack(spacing: 14) {
-                    // Color dot + icon
-                    ZStack {
-                        Circle()
-                            .fill(Color(hex: med.colorHex).opacity(0.2))
-                            .frame(width: 48, height: 48)
-                        Image(systemName: "pills.fill")
-                            .font(OhanaFont.title3(.bold))
-                            .foregroundStyle(Color(hex: med.colorHex))
-                    }
+    private func manualMedicationRow(_ med: HumanMedication) -> some View {
+        UltimateGlassCard {
+            HStack(spacing: 14) {
+                medicationIcon(for: med)
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
-                            Text(med.name.isEmpty ? "未命名药物" : med.name)
-                                .font(OhanaFont.callout(.bold))
-                                .foregroundStyle(primaryText)
-                            if !med.isActive {
-                                Text("已停")
-                                    .font(OhanaFont.caption2(.bold))
-                                    .foregroundStyle(Color.goOrange)
-                                    .padding(.horizontal, 6).padding(.vertical, 2)
-                                    .background(Color.goOrange.opacity(0.15), in: Capsule())
-                            }
-                        }
-                        HStack(spacing: 6) {
-                            Text(med.frequency.emoji + " " + med.frequency.rawValue)
-                                .font(OhanaFont.caption())
-                                .foregroundStyle(secondaryText)
-                            if !med.dosage.isEmpty {
-                                Text("·")
-                                    .foregroundStyle(tertiaryText)
-                                Text(med.dosage)
-                                    .font(OhanaFont.caption())
-                                    .foregroundStyle(secondaryText)
-                            }
-                        }
-                        // 服药时间
-                        HStack(spacing: 4) {
-                            Image(systemName: "clock")
-                                .font(OhanaFont.caption2())
-                                .foregroundStyle(tertiaryText)
-                            Text(med.firstDoseTime, style: .time)
-                                .font(OhanaFont.caption(.semibold))
-                                .foregroundStyle(Color(hex: med.colorHex))
-                            if let days = med.daysRemaining {
-                                Text("· 剩 \(days) 天")
-                                    .font(OhanaFont.caption())
-                                    .foregroundStyle(days <= 3 ? Color.goRed : tertiaryText)
-                            } else {
-                                Text("· 长期")
-                                    .font(OhanaFont.caption())
-                                    .foregroundStyle(tertiaryText)
-                            }
-                        }
-                    }
-
-                    Spacer()
-
-                    // Toggle active
-                    Button {
-                        withAnimation(.spring(response: 0.3)) {
-                            med.isActive.toggle()
-                            modelContext.safeSave()
-                            scheduleHumanMedicationReminders(overrideMeds: nil)
-                            toastMessage = med.isActive ? "✅ \(med.name) 已恢复" : "⏸ \(med.name) 已停药"
-                            showToast = true
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                                withAnimation { showToast = false }
-                            }
-                        }
-                    } label: {
-                        Image(systemName: med.isActive ? "checkmark.circle.fill" : "pause.circle.fill")
-                            .font(OhanaFont.title3(.bold))
-                            .foregroundStyle(med.isActive ? Color.goTeal : Color.goOrange)
-                    }
-                    .buttonStyle(.plain)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(med.name.isEmpty ? l.tr(zh: "未命名药物", en: "Unnamed medication", de: "Unbenanntes Medikament") : med.name)
+                        .font(OhanaFont.callout(.bold))
+                        .foregroundStyle(primaryText)
+                    Text(manualMedicationSubtitle(med))
+                        .font(OhanaFont.caption())
+                        .foregroundStyle(secondaryText)
+                        .lineLimit(2)
                 }
-                .padding(14)
+
+                Spacer()
+
+                Button {
+                    recordManualDose(for: med)
+                } label: {
+                    Text(l.tr(zh: "记录一次", en: "Log", de: "Eintragen"))
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(Color.arkInk)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.goPrimary, in: Capsule())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    editingMed = med
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(OhanaFont.callout(.bold))
+                        .foregroundStyle(secondaryText)
+                        .frame(width: 34, height: 34)
+                        .background(controlFill, in: Circle())
+                }
+                .buttonStyle(.plain)
             }
+            .padding(14)
         }
         .goGlassBackground(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .buttonStyle(.plain)
+    }
+
+    private func recordManualDose(for med: HumanMedication) {
+        let item = DailyDoseItem(medication: med, scheduledTime: Date(), doseIndex: 0, log: nil)
+        setDoseStatus(.taken, for: item)
+    }
+
+    private func manualMedicationSubtitle(_ med: HumanMedication) -> String {
+        let frequencyTitle = med.frequency.displayTitle(l: l)
+        let dose = med.dosage.trimmingCharacters(in: .whitespacesAndNewlines)
+        if dose.isEmpty { return frequencyTitle }
+        return "\(frequencyTitle) · \(dose)"
+    }
+
+    private func medicationRow(_ med: HumanMedication) -> some View {
+        UltimateGlassCard {
+            HStack(spacing: 14) {
+                medicationIcon(for: med)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(med.name.isEmpty ? l.tr(zh: "未命名药物", en: "Unnamed medication", de: "Unbenanntes Medikament") : med.name)
+                            .font(OhanaFont.callout(.bold))
+                            .foregroundStyle(primaryText)
+                        medicationStateBadge(for: med)
+                    }
+                    HStack(spacing: 6) {
+                        Text(med.frequency.displayTitle(l: l))
+                            .font(OhanaFont.caption())
+                            .foregroundStyle(secondaryText)
+                        if !med.dosage.isEmpty {
+                            Text("·")
+                                .foregroundStyle(tertiaryText)
+                            Text(med.dosage)
+                                .font(OhanaFont.caption())
+                                .foregroundStyle(secondaryText)
+                        }
+                    }
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .font(OhanaFont.caption2())
+                            .foregroundStyle(tertiaryText)
+                        Text(scheduleSummary(for: med))
+                            .font(OhanaFont.caption(.semibold))
+                            .foregroundStyle(Color(hex: med.colorHex))
+                            .lineLimit(1)
+                        if let days = med.daysRemaining, HumanMedicationSchedulePlan.displayGroup(for: med) == .current {
+                            Text(l.tr(zh: "· 剩 \(max(0, days)) 天", en: "· \(max(0, days)) d left", de: "· \(max(0, days)) T übrig"))
+                                .font(OhanaFont.caption())
+                                .foregroundStyle(days <= 3 ? Color.goRed : tertiaryText)
+                        } else if med.endDate == nil && HumanMedicationSchedulePlan.displayGroup(for: med) == .current {
+                            Text(l.tr(zh: "· 长期", en: "· long-term", de: "· langfristig"))
+                                .font(OhanaFont.caption())
+                                .foregroundStyle(tertiaryText)
+                        }
+                    }
+                }
+
+                Spacer()
+
+                Button {
+                    editingMed = med
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(OhanaFont.callout(.bold))
+                        .foregroundStyle(secondaryText)
+                        .frame(width: 34, height: 34)
+                        .background(controlFill, in: Circle())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    toggleMedicationActive(med)
+                } label: {
+                    Image(systemName: med.isActive ? "pause.circle.fill" : "play.circle.fill")
+                        .font(OhanaFont.title3(.bold))
+                        .foregroundStyle(med.isActive ? Color.goOrange : Color.goTeal)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(14)
+        }
+        .goGlassBackground(RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    private func medicationIcon(for med: HumanMedication) -> some View {
+        ZStack {
+            Circle()
+                .fill(Color(hex: med.colorHex).opacity(0.2))
+                .frame(width: 48, height: 48)
+            Image(systemName: "pills.fill")
+                .font(OhanaFont.title3(.bold))
+                .foregroundStyle(Color(hex: med.colorHex))
+        }
+    }
+
+    private func medicationStateBadge(for med: HumanMedication) -> some View {
+        let group = HumanMedicationSchedulePlan.displayGroup(for: med)
+        let text: String
+        let color: Color
+        switch group {
+        case .current:
+            text = l.tr(zh: "当前", en: "Current", de: "Aktuell")
+            color = .goTeal
+        case .manual:
+            text = l.tr(zh: "手动", en: "Manual", de: "Manuell")
+            color = .goPrimary
+        case .notStarted:
+            text = l.tr(zh: "未开始", en: "Not started", de: "Geplant")
+            color = .goYellow
+        case .ended:
+            text = l.tr(zh: "已结束", en: "Ended", de: "Beendet")
+            color = .goOrange
+        case .stopped:
+            text = l.tr(zh: "已停", en: "Stopped", de: "Pausiert")
+            color = .goOrange
+        }
+        return Text(text)
+            .font(OhanaFont.caption2(.bold))
+            .foregroundStyle(color)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(color.opacity(0.15), in: Capsule())
+    }
+
+    private func scheduleSummary(for med: HumanMedication) -> String {
+        if med.frequency.isManualEntry {
+            return l.tr(zh: "手动记录", en: "Manual log", de: "Manuell")
+        }
+        let minutes = HumanMedicationSchedulePlan.doseMinutes(for: med)
+        let timeText = minutes.compactMap {
+            HumanMedicationSchedulePlan.date(on: Date(), minuteOfDay: $0)?.formatted(date: .omitted, time: .shortened)
+        }.joined(separator: " / ")
+        if med.frequency == .weekly {
+            let weekday = HumanMedicationScheduleMetadata.parse(from: med.notes)?.weeklyWeekday
+                ?? Calendar.current.component(.weekday, from: med.startDate)
+            return "\(weekdayLabel(weekday)) · \(timeText)"
+        }
+        return timeText
+    }
+
+    private func weekdayLabel(_ weekday: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = AppLanguage.effectiveLocale
+        let symbols = formatter.shortWeekdaySymbols ?? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        return symbols[max(0, min(6, weekday - 1))]
+    }
+
+    private func toggleMedicationActive(_ med: HumanMedication) {
+        withAnimation(GoMotion.feedback) {
+            med.isActive.toggle()
+            modelContext.safeSave()
+            scheduleHumanMedicationReminders(overrideMeds: nil)
+            toastMessage = med.isActive
+                ? l.tr(zh: "\(med.name) 已恢复", en: "\(med.name) resumed", de: "\(med.name) fortgesetzt")
+                : l.tr(zh: "\(med.name) 已停药", en: "\(med.name) stopped", de: "\(med.name) pausiert")
+            showToast = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                withAnimation(GoMotion.quick) { showToast = false }
+            }
+        }
     }
 
     // MARK: - Empty State
@@ -839,8 +1019,12 @@ struct HumanMedicationView: View {
                     Circle().fill(Color.goRed.opacity(0.12)).frame(width: 72, height: 72)
                     Image(systemName: "pills").font(.system(size: 32)).foregroundStyle(Color.goRed)
                 }
-                Text("还没有添加药物").font(OhanaFont.title3(.bold)).foregroundStyle(primaryText)
-                Text("点击下方按钮添加第一个服药提醒").font(OhanaFont.callout()).foregroundStyle(secondaryText)
+                Text(l.tr(zh: "还没有添加药物", en: "No medication yet", de: "Noch keine Medikamente"))
+                    .font(OhanaFont.title3(.bold))
+                    .foregroundStyle(primaryText)
+                Text(l.tr(zh: "添加第一个服药提醒，今天的待处理剂量会显示在这里。", en: "Add the first medication reminder to see today's doses here.", de: "Füge die erste Erinnerung hinzu, um heutige Dosen hier zu sehen."))
+                    .font(OhanaFont.callout())
+                    .foregroundStyle(secondaryText)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 32)
@@ -866,245 +1050,415 @@ struct AddMedicationSheet: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @Query private var allMeds: [HumanMedication]
 
     @State private var name = ""
     @State private var dosage = ""
     @State private var frequency: MedicationFrequency = .daily
     @State private var customNote = ""
-    @State private var firstDoseTime = Calendar.current.date(bySettingHour: 8, minute: 0, second: 0, of: Date()) ?? Date()
+    @State private var doseMinutes = HumanMedicationSchedulePlan.defaultDoseMinutes(for: .daily)
+    @State private var weeklyWeekday = Calendar.current.component(.weekday, from: Date())
     @State private var startDate = Date()
     @State private var hasEndDate = false
     @State private var endDate = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
     @State private var colorHex = "FF4757"
     @State private var notes = ""
+    @State private var isActive = true
+    @State private var showMore = false
+    @State private var showDeleteConfirmation = false
+    @FocusState private var focusedField: FocusField?
 
-    private let colorOptions: [(String, String)] = [
-        ("goRed", "FF4757"),
-        ("goOrange", "FF8C42"),
-        ("goYellow", "FFF44F"),
-        ("goLime", "C8FF00"),
-        ("goTeal", "00D4AA"),
-        ("goBlue", "4895EF"),
-        ("goPurple", "9B5DE5"),
-        ("goPrimary", "4338FF"),
-    ]
+    private enum FocusField: Hashable {
+        case name, dosage, customNote, notes
+    }
 
+    private let colorOptions = ["FF4757", "FF8C42", "FFF44F", "00D4AA", "4895EF", "9B5DE5", "4338FF"]
+
+    private var l: L10n { L10n(appLanguage) }
     private var primaryText: Color { Color.ohanaPrimaryText }
     private var secondaryText: Color { Color.ohanaSecondaryText }
     private var tertiaryText: Color { Color.ohanaTertiaryText }
     private var controlFill: Color { Color.ohanaControlFill }
     private var controlStroke: Color { Color.ohanaCardStroke }
+    private var canSave: Bool { !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    private var isEditing: Bool { editing != nil }
 
     var body: some View {
         ZStack {
             ArkBackgroundView().ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    // Title
-                    HStack {
-                        Text(editing == nil ? "添加药物提醒" : "编辑药物")
-                            .font(OhanaFont.title2(.bold))
-                            .foregroundStyle(primaryText)
-                        Spacer()
-                        Button { dismiss() } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(OhanaFont.title2())
-                                .foregroundStyle(tertiaryText)
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 24)
+                VStack(spacing: 16) {
+                    header
+                    basicInfoCard
+                    frequencyCard
 
-                    // Card 1: Basic Info
-                    UltimateGlassCard {
-                        VStack(alignment: .leading, spacing: 16) {
-                            cardHeader(icon: "pills.fill", color: Color(hex: colorHex), title: "药物信息")
-                            fieldRow(icon: "textformat", label: "药品名称") {
-                                TextField("如：阿莫西林、维生素C", text: $name)
-                                    .font(OhanaFont.body())
-                                    .foregroundStyle(primaryText)
-                            }
-                            fieldRow(icon: "scalemass", label: "剂量") {
-                                TextField("如：1片、500mg", text: $dosage)
-                                    .font(OhanaFont.body())
-                                    .foregroundStyle(primaryText)
-                            }
-                        }
-                        .padding(16)
-                    }
-                    .padding(.horizontal, 16)
-
-                    // Card 2: Schedule
-                    UltimateGlassCard {
-                        VStack(alignment: .leading, spacing: 16) {
-                            cardHeader(icon: "clock.fill", color: Color.goTeal, title: "服药时间")
-
-                            // Frequency Picker
-                            VStack(alignment: .leading, spacing: 8) {
-                                Label("频率", systemImage: "repeat")
-                                    .font(OhanaFont.caption(.bold))
-                                    .foregroundStyle(secondaryText)
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 8) {
-                                        ForEach(MedicationFrequency.allCases) { freq in
-                                            Button {
-                                                withAnimation(.spring(response: 0.25)) { frequency = freq }
-                                            } label: {
-                                                HStack(spacing: 4) {
-                                                    Text(freq.emoji)
-                                                    Text(freq.rawValue)
-                                                        .font(OhanaFont.caption(.bold))
-                                                }
-                                                .foregroundStyle(frequency == freq ? Color.arkInk : primaryText)
-                                                .padding(.horizontal, 12).padding(.vertical, 7)
-                                                .background(frequency == freq ? Color.goTeal : controlFill, in: Capsule())
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
-                                    }
-                                }
-                            }
-
-                            if frequency == .custom {
-                                fieldRow(icon: "text.bubble", label: "自定义说明") {
-                                    TextField("说明服药频率", text: $customNote)
-                                        .font(OhanaFont.body())
-                                        .foregroundStyle(primaryText)
-                                }
-                            }
-
-                            // First dose time
-                            HStack {
-                                Label("第一次服药时间", systemImage: "clock")
-                                    .font(OhanaFont.caption(.bold))
-                                    .foregroundStyle(secondaryText)
-                                Spacer()
-                                DatePicker("", selection: $firstDoseTime, displayedComponents: .hourAndMinute)
-                                    .labelsHidden()
-                            }
-
-                            // Date range
-                            HStack {
-                                Label("开始日期", systemImage: "calendar")
-                                    .font(OhanaFont.caption(.bold))
-                                    .foregroundStyle(secondaryText)
-                                Spacer()
-                                DatePicker("", selection: $startDate, displayedComponents: .date)
-                                    .labelsHidden()
-                            }
-
-                            Toggle(isOn: $hasEndDate) {
-                                Label("设置结束日期", systemImage: "calendar.badge.checkmark")
-                                    .font(OhanaFont.callout(.bold))
-                                    .foregroundStyle(primaryText)
-                            }
-                            .tint(Color.goTeal)
-
-                            if hasEndDate {
-                                HStack {
-                                    Label("结束日期", systemImage: "calendar.badge.minus")
-                                        .font(OhanaFont.caption(.bold))
-                                        .foregroundStyle(secondaryText)
-                                    Spacer()
-                                    DatePicker("", selection: $endDate, in: startDate..., displayedComponents: .date)
-                                        .labelsHidden()
-                                }
-                            }
-                        }
-                        .padding(16)
-                    }
-                    .padding(.horizontal, 16)
-
-                    // Card 3: Color & Notes
-                    UltimateGlassCard {
-                        VStack(alignment: .leading, spacing: 16) {
-                            cardHeader(icon: "paintpalette.fill", color: Color(hex: colorHex), title: "颜色 & 备注")
-
-                            // Color picker
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("标签颜色")
-                                    .font(OhanaFont.caption(.bold))
-                                    .foregroundStyle(secondaryText)
-                                HStack(spacing: 10) {
-                                    ForEach(colorOptions, id: \.1) { option in
-                                        Button {
-                                            withAnimation(.spring(response: 0.25)) { colorHex = option.1 }
-                                        } label: {
-                                            Circle()
-                                                .fill(Color(hex: option.1))
-                                                .frame(width: 30, height: 30)
-                                                .overlay(
-                                                    Circle().strokeBorder(primaryText, lineWidth: colorHex == option.1 ? 2.5 : 0)
-                                                )
-                                                .scaleEffect(colorHex == option.1 ? 1.15 : 1.0)
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                    Spacer()
-                                }
-                            }
-
-                            // Notes
-                            VStack(alignment: .leading, spacing: 6) {
-                                Label("备注", systemImage: "note.text")
-                                    .font(OhanaFont.caption(.bold))
-                                    .foregroundStyle(secondaryText)
-                                TextEditor(text: $notes)
-                                    .font(OhanaFont.body())
-                                    .foregroundStyle(primaryText)
-                                    .scrollContentBackground(.hidden)
-                                    .frame(height: 60)
-                                    .padding(10)
-                                    .background(controlFill, in: RoundedRectangle(cornerRadius: 10))
-                                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(controlStroke, lineWidth: 1))
-                            }
-                        }
-                        .padding(16)
-                    }
-                    .padding(.horizontal, 16)
-
-                    // Delete button if editing
-                    if let med = editing {
-                        Button {
-                            modelContext.delete(med)
-                            modelContext.safeSave()
-                            scheduleHumanMedicationReminders(overrideMeds: allMeds.filter {
-                                $0.humanId == human.id.uuidString && $0.id != med.id
-                            })
-                            dismiss()
-                        } label: {
-                            Label("删除这条药物记录", systemImage: "trash")
-                                .font(OhanaFont.callout(.semibold))
-                                .foregroundStyle(Color.goRed)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                                .background(Color.goRed.opacity(0.1), in: Capsule())
-                                .overlay(Capsule().strokeBorder(Color.goRed.opacity(0.3), lineWidth: 1))
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 16)
+                    if frequency.isManualEntry {
+                        manualModeCard
+                    } else {
+                        scheduleCard
+                        previewCard
                     }
 
-                    // Save button
-                    Button { save() } label: {
-                        Text(editing == nil ? "保存药物提醒" : "更新")
-                            .font(OhanaFont.headline(.bold))
-                            .foregroundStyle(Color.arkInk)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(name.isEmpty ? Color.goPrimary.opacity(0.4) : Color.goPrimary, in: Capsule())
+                    if isEditing {
+                        editingStateCard
                     }
-                    .buttonStyle(.plain)
-                    .disabled(name.isEmpty)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 40)
+
+                    moreToggle
+                    if showMore {
+                        moreCard
+                    }
+
+                    Spacer(minLength: 110)
+                }
+                .padding(.top, 20)
+                .padding(.horizontal, 16)
+            }
+        }
+        .safeAreaInset(edge: .bottom) { footerBar }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
+                    focusedField = nil
+                }
+                if canSave {
+                    Button(l.tr(zh: "保存", en: "Save", de: "Sichern")) {
+                        save()
+                    }
+                    .fontWeight(.bold)
                 }
             }
         }
-        .onAppear { loadEditing() }
+        .alert(l.tr(zh: "删除药物计划？", en: "Delete medication plan?", de: "Medikamentenplan löschen?"), isPresented: $showDeleteConfirmation) {
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) { }
+            Button(l.tr(zh: "删除", en: "Delete", de: "Löschen"), role: .destructive) {
+                deleteMedication()
+            }
+        } message: {
+            Text(l.tr(zh: "只会删除这个药物计划，历史服药记录会保留。", en: "Only this medication plan will be deleted. Past dose logs stay saved.", de: "Nur dieser Plan wird gelöscht. Frühere Einnahmen bleiben gespeichert."))
+        }
+        .onAppear {
+            loadEditing()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                focusedField = .name
+            }
+        }
+        .onChange(of: frequency) { _, newValue in
+            applyDefaults(for: newValue)
+        }
+        .onChange(of: startDate) { _, newValue in
+            if frequency == .weekly {
+                weeklyWeekday = Calendar.current.component(.weekday, from: newValue)
+            }
+            if endDate < newValue {
+                endDate = newValue
+            }
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(isEditing ? l.tr(zh: "编辑药物", en: "Edit medication", de: "Medikament bearbeiten") : l.tr(zh: "添加药物", en: "Add medication", de: "Medikament hinzufügen"))
+                    .font(OhanaFont.title2(.bold))
+                    .foregroundStyle(primaryText)
+                Text(l.tr(zh: "先设好药名、频率和时间。", en: "Set the name, frequency, and time first.", de: "Lege zuerst Name, Häufigkeit und Zeit fest."))
+                    .font(OhanaFont.caption())
+                    .foregroundStyle(secondaryText)
+            }
+            Spacer()
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(secondaryText)
+                    .frame(width: 36, height: 36)
+                    .background(controlFill, in: Circle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var basicInfoCard: some View {
+        sheetCard {
+            VStack(alignment: .leading, spacing: 14) {
+                cardHeader(icon: "pills.fill", color: Color(hex: colorHex), title: l.tr(zh: "药物信息", en: "Medication", de: "Medikament"))
+                fieldRow(icon: "textformat", label: l.tr(zh: "药品名称", en: "Name", de: "Name")) {
+                    TextField(l.tr(zh: "如：维生素 D", en: "e.g. Vitamin D", de: "z. B. Vitamin D"), text: $name)
+                        .font(OhanaFont.body())
+                        .foregroundStyle(primaryText)
+                        .focused($focusedField, equals: .name)
+                        .submitLabel(.next)
+                        .onSubmit { focusedField = .dosage }
+                }
+                fieldRow(icon: "scalemass", label: l.tr(zh: "剂量", en: "Dose", de: "Dosis")) {
+                    TextField(l.tr(zh: "如：1 片、500 mg", en: "e.g. 1 tablet, 500 mg", de: "z. B. 1 Tablette, 500 mg"), text: $dosage)
+                        .font(OhanaFont.body())
+                        .foregroundStyle(primaryText)
+                        .focused($focusedField, equals: .dosage)
+                }
+            }
+        }
+    }
+
+    private var frequencyCard: some View {
+        sheetCard {
+            VStack(alignment: .leading, spacing: 12) {
+                cardHeader(icon: "repeat", color: Color.goTeal, title: l.tr(zh: "频率", en: "Frequency", de: "Häufigkeit"))
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(MedicationFrequency.allCases) { freq in
+                            frequencyChip(freq)
+                        }
+                    }
+                }
+                if frequency == .custom {
+                    fieldRow(icon: "text.bubble", label: l.tr(zh: "自定义说明", en: "Custom note", de: "Eigene Notiz")) {
+                        TextField(l.tr(zh: "说明服药规则", en: "Describe the rule", de: "Regel beschreiben"), text: $customNote)
+                            .font(OhanaFont.body())
+                            .foregroundStyle(primaryText)
+                            .focused($focusedField, equals: .customNote)
+                    }
+                }
+            }
+        }
+    }
+
+    private var scheduleCard: some View {
+        sheetCard {
+            VStack(alignment: .leading, spacing: 14) {
+                cardHeader(icon: "clock.fill", color: Color.goPrimary, title: l.tr(zh: "服药时间", en: "Dose times", de: "Einnahmezeiten"))
+
+                ForEach(Array(doseMinutes.enumerated()), id: \.offset) { index, _ in
+                    HStack {
+                        Label(doseTimeLabel(index), systemImage: "clock")
+                            .font(OhanaFont.caption(.bold))
+                            .foregroundStyle(secondaryText)
+                        Spacer()
+                        DatePicker("", selection: doseTimeBinding(index), displayedComponents: .hourAndMinute)
+                            .labelsHidden()
+                    }
+                    .padding(12)
+                    .background(controlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+
+                if frequency == .weekly {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(l.tr(zh: "每周哪一天", en: "Day of week", de: "Wochentag"))
+                            .font(OhanaFont.caption(.bold))
+                            .foregroundStyle(secondaryText)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(weekdayOptions, id: \.0) { weekday, label in
+                                    Button {
+                                        withAnimation(GoMotion.feedback) { weeklyWeekday = weekday }
+                                    } label: {
+                                        Text(label)
+                                            .font(OhanaFont.caption(.bold))
+                                            .foregroundStyle(weeklyWeekday == weekday ? Color.arkInk : primaryText)
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 8)
+                                            .background(weeklyWeekday == weekday ? Color.goPrimary : controlFill, in: Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var previewCard: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "bell.badge.fill")
+                .font(OhanaFont.callout(.bold))
+                .foregroundStyle(Color.goYellow)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(l.tr(zh: "接下来提醒", en: "Next reminders", de: "Nächste Erinnerungen"))
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(primaryText)
+                Text(previewText)
+                    .font(OhanaFont.caption())
+                    .foregroundStyle(secondaryText)
+                    .lineLimit(2)
+            }
+            Spacer()
+        }
+        .padding(14)
+        .background(Color.goYellow.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.goYellow.opacity(0.28), lineWidth: 1))
+    }
+
+    private var manualModeCard: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "hand.tap.fill")
+                .font(OhanaFont.callout(.bold))
+                .foregroundStyle(Color.goPrimary)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(l.tr(zh: "手动记录", en: "Manual logging", de: "Manuell eintragen"))
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(primaryText)
+                Text(l.tr(zh: "按需和自定义药物不会自动生成固定提醒，可在管理页记录一次。", en: "As-needed and custom medications do not create fixed reminders. Log them from the management page.", de: "Bedarfs- und eigene Medikamente erzeugen keine festen Erinnerungen. Trage sie auf der Verwaltungsseite ein."))
+                    .font(OhanaFont.caption())
+                    .foregroundStyle(secondaryText)
+                    .lineLimit(3)
+            }
+            Spacer()
+        }
+        .padding(14)
+        .background(Color.goPrimary.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.goPrimary.opacity(0.24), lineWidth: 1))
+    }
+
+    private var editingStateCard: some View {
+        sheetCard {
+            VStack(alignment: .leading, spacing: 12) {
+                cardHeader(icon: isActive ? "pause.circle.fill" : "play.circle.fill", color: isActive ? Color.goOrange : Color.goTeal, title: l.tr(zh: "药物状态", en: "Medication status", de: "Status"))
+                Button {
+                    withAnimation(GoMotion.feedback) { isActive.toggle() }
+                } label: {
+                    Label(
+                        isActive ? l.tr(zh: "标记为停药", en: "Mark as stopped", de: "Als pausiert markieren") : l.tr(zh: "恢复用药", en: "Resume medication", de: "Fortsetzen"),
+                        systemImage: isActive ? "pause.circle" : "play.circle"
+                    )
+                    .font(OhanaFont.callout(.bold))
+                    .foregroundStyle(isActive ? Color.goOrange : Color.goTeal)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background((isActive ? Color.goOrange : Color.goTeal).opacity(0.12), in: Capsule())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    showDeleteConfirmation = true
+                } label: {
+                    Label(l.tr(zh: "删除药物计划", en: "Delete plan", de: "Plan löschen"), systemImage: "trash")
+                        .font(OhanaFont.callout(.bold))
+                        .foregroundStyle(Color.goRed)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.goRed.opacity(0.10), in: Capsule())
+                        .overlay(Capsule().strokeBorder(Color.goRed.opacity(0.28), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var moreToggle: some View {
+        Button {
+            withAnimation(GoMotion.feedback) { showMore.toggle() }
+        } label: {
+            HStack {
+                Label(l.tr(zh: "更多", en: "More", de: "Mehr"), systemImage: "ellipsis.circle")
+                    .font(OhanaFont.callout(.bold))
+                    .foregroundStyle(primaryText)
+                Spacer()
+                Image(systemName: showMore ? "chevron.up" : "chevron.down")
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(secondaryText)
+            }
+            .padding(14)
+            .background(controlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var moreCard: some View {
+        sheetCard {
+            VStack(alignment: .leading, spacing: 14) {
+                cardHeader(icon: "calendar", color: Color.goBlue, title: l.tr(zh: "日期与备注", en: "Dates and notes", de: "Daten und Notizen"))
+                HStack {
+                    Label(l.tr(zh: "开始日期", en: "Start date", de: "Startdatum"), systemImage: "calendar")
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(secondaryText)
+                    Spacer()
+                    DatePicker("", selection: $startDate, displayedComponents: .date)
+                        .labelsHidden()
+                }
+                Toggle(isOn: $hasEndDate) {
+                    Label(l.tr(zh: "设置结束日期", en: "Set end date", de: "Enddatum setzen"), systemImage: "calendar.badge.checkmark")
+                        .font(OhanaFont.callout(.bold))
+                        .foregroundStyle(primaryText)
+                }
+                .tint(Color.goTeal)
+
+                if hasEndDate {
+                    HStack {
+                        Label(l.tr(zh: "结束日期", en: "End date", de: "Enddatum"), systemImage: "calendar.badge.minus")
+                            .font(OhanaFont.caption(.bold))
+                            .foregroundStyle(secondaryText)
+                        Spacer()
+                        DatePicker("", selection: $endDate, in: startDate..., displayedComponents: .date)
+                            .labelsHidden()
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(l.tr(zh: "标签颜色", en: "Color", de: "Farbe"))
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(secondaryText)
+                    HStack(spacing: 10) {
+                        ForEach(colorOptions, id: \.self) { hex in
+                            Button {
+                                withAnimation(GoMotion.feedback) { colorHex = hex }
+                            } label: {
+                                Circle()
+                                    .fill(Color(hex: hex))
+                                    .frame(width: 30, height: 30)
+                                    .overlay(Circle().strokeBorder(primaryText, lineWidth: colorHex == hex ? 2.5 : 0))
+                                    .scaleEffect(colorHex == hex ? 1.12 : 1.0)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Spacer()
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Label(l.tr(zh: "备注", en: "Notes", de: "Notizen"), systemImage: "note.text")
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(secondaryText)
+                    TextEditor(text: $notes)
+                        .font(OhanaFont.body())
+                        .foregroundStyle(primaryText)
+                        .scrollContentBackground(.hidden)
+                        .focused($focusedField, equals: .notes)
+                        .frame(height: 74)
+                        .padding(10)
+                        .background(controlFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(controlStroke, lineWidth: 1))
+                }
+            }
+        }
+    }
+
+    private var footerBar: some View {
+        VStack(spacing: 0) {
+            Button { save() } label: {
+                Text(isEditing ? l.tr(zh: "保存修改", en: "Save changes", de: "Änderungen sichern") : l.tr(zh: "保存药物", en: "Save medication", de: "Medikament sichern"))
+                    .font(OhanaFont.headline(.bold))
+                    .foregroundStyle(Color.arkInk)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(canSave ? Color.goPrimary : Color.goPrimary.opacity(0.35), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(!canSave)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 12)
+        }
+        .background(.ultraThinMaterial)
+    }
+
+    private func sheetCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(16)
+            .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private func cardHeader(icon: String, color: Color, title: String) -> some View {
@@ -1123,12 +1477,94 @@ struct AddMedicationSheet: View {
             Label(label, systemImage: icon)
                 .font(OhanaFont.caption(.bold))
                 .foregroundStyle(secondaryText)
-            HStack {
-                content()
+            HStack { content() }
+                .padding(12)
+                .background(controlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(controlStroke, lineWidth: 1))
+        }
+    }
+
+    private func frequencyChip(_ freq: MedicationFrequency) -> some View {
+        let selected = frequency == freq
+        return Button {
+            withAnimation(GoMotion.feedback) { frequency = freq }
+        } label: {
+            Text(freq.displayTitle(l: l))
+                .font(OhanaFont.caption(.bold))
+                .foregroundStyle(selected ? Color.arkInk : primaryText)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .goSelectableSurface(isSelected: selected, tint: Color.goTeal, in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func doseTimeLabel(_ index: Int) -> String {
+        if doseMinutes.count == 1 {
+            return l.tr(zh: "服药时间", en: "Dose time", de: "Einnahmezeit")
+        }
+        return l.tr(zh: "第 \(index + 1) 次", en: "Dose \(index + 1)", de: "Dosis \(index + 1)")
+    }
+
+    private func doseTimeBinding(_ index: Int) -> Binding<Date> {
+        Binding(
+            get: {
+                let minute = doseMinutes.indices.contains(index) ? doseMinutes[index] : 8 * 60
+                return dateFromMinute(minute)
+            },
+            set: { newDate in
+                guard doseMinutes.indices.contains(index) else { return }
+                doseMinutes[index] = HumanMedicationSchedulePlan.minuteOfDay(from: newDate)
+                doseMinutes = HumanMedicationScheduleMetadata.normalizedDoseMinutes(doseMinutes)
             }
-            .padding(12)
-            .background(controlFill, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(controlStroke, lineWidth: 1))
+        )
+    }
+
+    private var weekdayOptions: [(Int, String)] {
+        let formatter = DateFormatter()
+        formatter.locale = AppLanguage.effectiveLocale
+        let symbols = formatter.shortWeekdaySymbols ?? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        return (1...7).map { ($0, symbols[$0 - 1]) }
+    }
+
+    private var previewText: String {
+        let dates = previewDates().prefix(3)
+        guard !dates.isEmpty else {
+            return l.tr(zh: "当前设置不会生成未来提醒。", en: "This setup will not create future reminders.", de: "Diese Einstellung erzeugt keine zukünftigen Erinnerungen.")
+        }
+        return dates
+            .map { $0.formatted(date: .abbreviated, time: .shortened) }
+            .joined(separator: " · ")
+    }
+
+    private func previewDates() -> [Date] {
+        guard !frequency.isManualEntry else { return [] }
+        let now = Date()
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: now)
+        return (0..<14).flatMap { offset -> [Date] in
+            guard let day = calendar.date(byAdding: .day, value: offset, to: start) else { return [] }
+            guard calendar.startOfDay(for: day) >= calendar.startOfDay(for: startDate) else { return [] }
+            if hasEndDate, calendar.startOfDay(for: day) > calendar.startOfDay(for: endDate) { return [] }
+            if frequency == .weekly, calendar.component(.weekday, from: day) != weeklyWeekday { return [] }
+            return doseMinutes.compactMap { HumanMedicationSchedulePlan.date(on: day, minuteOfDay: $0) }
+        }
+        .filter { $0 > now }
+        .sorted()
+    }
+
+    private func dateFromMinute(_ minute: Int) -> Date {
+        HumanMedicationSchedulePlan.date(on: Date(), minuteOfDay: minute) ?? Date()
+    }
+
+    private func applyDefaults(for frequency: MedicationFrequency) {
+        if frequency.isManualEntry {
+            doseMinutes = []
+        } else {
+            doseMinutes = HumanMedicationSchedulePlan.defaultDoseMinutes(for: frequency)
+        }
+        if frequency == .weekly {
+            weeklyWeekday = Calendar.current.component(.weekday, from: startDate)
         }
     }
 
@@ -1138,45 +1574,74 @@ struct AddMedicationSheet: View {
         dosage = med.dosage
         frequency = med.frequency
         customNote = med.customFrequencyNote
-        firstDoseTime = med.firstDoseTime
+        let loadedMinutes = HumanMedicationSchedulePlan.doseMinutes(for: med)
+        doseMinutes = loadedMinutes.isEmpty ? HumanMedicationSchedulePlan.defaultDoseMinutes(for: med.frequency) : loadedMinutes
+        weeklyWeekday = HumanMedicationScheduleMetadata.parse(from: med.notes)?.weeklyWeekday
+            ?? Calendar.current.component(.weekday, from: med.startDate)
         startDate = med.startDate
         hasEndDate = med.endDate != nil
         endDate = med.endDate ?? Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
         colorHex = med.colorHex
-        notes = med.notes
+        notes = HumanMedicationScheduleMetadata.visibleNotes(from: med.notes)
+        isActive = med.isActive
     }
 
     private func save() {
+        let cleanedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanedName.isEmpty else { return }
+
+        let metadata: HumanMedicationScheduleMetadata? = frequency.isManualEntry
+            ? nil
+            : HumanMedicationScheduleMetadata(
+                doseMinutes: doseMinutes.isEmpty ? HumanMedicationSchedulePlan.defaultDoseMinutes(for: frequency) : doseMinutes,
+                weeklyWeekday: frequency == .weekly ? weeklyWeekday : nil
+            )
+        let firstDoseTime = dateFromMinute(metadata?.doseMinutes.first ?? 8 * 60)
+        let savedNotes = HumanMedicationScheduleMetadata.composeNotes(visibleNotes: notes, metadata: metadata)
         let savedMed: HumanMedication
+
         if let med = editing {
-            med.name = name
-            med.dosage = dosage
+            med.name = cleanedName
+            med.dosage = dosage.trimmingCharacters(in: .whitespacesAndNewlines)
             med.frequency = frequency
-            med.customFrequencyNote = customNote
+            med.customFrequencyNote = frequency == .custom ? customNote.trimmingCharacters(in: .whitespacesAndNewlines) : ""
             med.firstDoseTime = firstDoseTime
             med.startDate = startDate
             med.endDate = hasEndDate ? endDate : nil
             med.colorHex = colorHex
-            med.notes = notes
+            med.notes = savedNotes
+            med.isActive = isActive
             savedMed = med
         } else {
             let med = HumanMedication(
                 humanId: human.id.uuidString,
-                name: name,
-                dosage: dosage,
+                name: cleanedName,
+                dosage: dosage.trimmingCharacters(in: .whitespacesAndNewlines),
                 frequency: frequency,
                 firstDoseTime: firstDoseTime,
                 startDate: startDate,
                 endDate: hasEndDate ? endDate : nil,
                 colorHex: colorHex,
-                notes: notes
+                notes: savedNotes
             )
-            med.customFrequencyNote = customNote
+            med.customFrequencyNote = frequency == .custom ? customNote.trimmingCharacters(in: .whitespacesAndNewlines) : ""
+            med.isActive = isActive
             modelContext.insert(med)
             savedMed = med
         }
+
         modelContext.safeSave()
         scheduleHumanMedicationReminders(overrideMeds: mergedMeds(including: savedMed))
+        dismiss()
+    }
+
+    private func deleteMedication() {
+        guard let med = editing else { return }
+        modelContext.delete(med)
+        modelContext.safeSave()
+        scheduleHumanMedicationReminders(overrideMeds: allMeds.filter {
+            $0.humanId == human.id.uuidString && $0.id != med.id
+        })
         dismiss()
     }
 

@@ -9,40 +9,40 @@ import SwiftUI
 
 struct HomeFirstSuccessCard: View {
     let pet: Pet
-    var onComplete: () -> Void
+    var onFeed: () -> Void
+    var onPlay: () -> Void
+    var onMoment: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color.goPrimary.opacity(0.18))
-                    .frame(width: 44, height: 44)
-                Image(systemName: "sparkles")
-                    .font(.system(size: 18, weight: .black))
-                    .foregroundStyle(Color.goPrimary)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.goPrimary.opacity(0.18))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 18, weight: .black))
+                        .foregroundStyle(Color.goPrimary)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("3 分钟成功体验")
+                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text("选一个 10 秒动作，马上看到反馈和椰子奖励。")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.62))
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: 8)
             }
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text("3 分钟成功体验")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                Text("陪 \(pet.name) 玩一会儿，完成第一次轻量打卡并看到椰子奖励。")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.62))
-                    .lineLimit(2)
+            HStack(spacing: 8) {
+                actionButton("喂食", icon: "fork.knife", action: onFeed)
+                actionButton("陪玩", icon: "tennisball.fill", action: onPlay)
+                actionButton("照片", icon: "camera.fill", action: onMoment)
             }
-
-            Spacer(minLength: 8)
-
-            Button(action: onComplete) {
-                Text("陪玩 +🥥")
-                    .font(.system(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color.goPrimary, in: Capsule())
-            }
-            .buttonStyle(.plain)
         }
         .padding(14)
         .background(
@@ -57,5 +57,21 @@ struct HomeFirstSuccessCard: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(Color.goPrimary.opacity(0.28), lineWidth: 1)
         )
+    }
+
+    private func actionButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .black))
+                Text(title)
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+            }
+            .foregroundStyle(Color.arkInk)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(Color.goPrimary, in: Capsule())
+        }
+        .buttonStyle(.plain)
     }
 }

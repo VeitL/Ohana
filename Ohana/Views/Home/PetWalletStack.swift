@@ -100,9 +100,13 @@ enum HomeCardVisibility {
     static let hiddenPetIDsKey = "hiddenHomePetIDs.v1"
     static let maxVisibleCards = 7
 
-    static func isPetVisible(_ pet: Pet, raw: String? = nil) -> Bool {
+    static func isPetIDVisible(_ id: UUID, raw: String? = nil) -> Bool {
         !hiddenPetIDs(from: raw ?? UserDefaults.standard.string(forKey: hiddenPetIDsKey) ?? "")
-            .contains(pet.id.uuidString)
+            .contains(id.uuidString)
+    }
+
+    static func isPetVisible(_ pet: Pet, raw: String? = nil) -> Bool {
+        isPetIDVisible(pet.id, raw: raw)
     }
 
     static func visibleCardCount(pets: [Pet], humans: [Human], raw: String? = nil) -> Int {
@@ -835,8 +839,10 @@ struct WalletPetCardDraftFront: View {
             if isTransparent {
                 Image(uiImage: img)
                     .resizable()
-                    .scaledToFill()
-                    .frame(width: w, height: h)
+                    .scaledToFit()
+                    .frame(width: w * 0.50, height: h * 0.96, alignment: .bottom)
+                    .frame(width: w * 0.52, height: h, alignment: .bottomLeading)
+                    .offset(x: w * 0.015)
                     .shadow(color: .white.opacity(0.50), radius: 3, x: 0, y: 0)
                     .shadow(color: .black.opacity(0.30), radius: 18, x: 0, y: 12)
             } else {
@@ -890,8 +896,16 @@ struct HumanSilhouetteView: View {
     let gender: String
     var accent: Color = .white.opacity(0.8)
 
+    private var normalizedGender: String {
+        HumanProfileOptions.normalizedGender(gender)
+    }
+
     private var isFemale: Bool {
-        gender == "女" || gender.lowercased().contains("female")
+        normalizedGender == "女"
+    }
+
+    private var isNeutral: Bool {
+        normalizedGender != "女" && normalizedGender != "男"
     }
 
     var body: some View {
@@ -942,6 +956,11 @@ struct HumanSilhouetteView: View {
                         path.closeSubpath()
                     }
                     .fill(accent)
+                } else if isNeutral {
+                    Capsule(style: .continuous)
+                        .fill(accent)
+                        .frame(width: w * 0.48, height: h * 0.46)
+                        .position(x: cx, y: h * 0.64)
                 } else {
                     RoundedRectangle(cornerRadius: w * 0.12, style: .continuous)
                         .fill(accent)

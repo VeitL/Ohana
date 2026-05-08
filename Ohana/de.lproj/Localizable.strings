@@ -1,0 +1,31 @@
+/*
+  German localizations for Ohana.
+  New Go Focus features should prefer `L10n.tr(_:)`, `L10n.tr(zh:en:de:extras:)`,
+  or `AppLocalizedText` so adding another language only requires extending
+  `AppLanguage.supported` and adding translations for the new language code.
+*/
+
+"Ohana" = "Ohana";
+"首页" = "Start";
+"植物" = "Pflanzen";
+"日历" = "Kalender";
+"图鉴" = "Team";
+"绿洲" = "Oase";
+"设置" = "Einstellungen";
+"偏好设置" = "Einstellungen";
+"语言" = "Sprache";
+"货币" = "Währung";
+"外观主题" = "Darstellung";
+"背景风格" = "Hintergrundstil";
+"通知" = "Benachrichtigungen";
+"关于" = "Über";
+"宠物管理" = "Haustierverwaltung";
+"保存" = "Speichern";
+"取消" = "Abbrechen";
+"确认" = "Bestätigen";
+"完成" = "Fertig";
+"搜索" = "Suchen";
+"狗" = "Hund";
+"猫" = "Katze";
+"兔子" = "Kaninchen";
+"仓鼠" = "Hamster";

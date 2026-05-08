@@ -50,10 +50,106 @@ struct FamilyWeeklyReportDashboardView: View {
         return grouped.map { ($0.key, $0.value.count) }.sorted { $0.1 > $1.1 }.first
     }
 
+    private var mostActiveDay: ActiveDayStat? {
+        let cal = Calendar.current
+        let grouped = Dictionary(grouping: allEntries) { cal.startOfDay(for: $0.date) }
+        return grouped
+            .map { ActiveDayStat(date: $0.key, count: $0.value.count) }
+            .sorted {
+                if $0.count == $1.count { return $0.date > $1.date }
+                return $0.count > $1.count
+            }
+            .first
+    }
+
+    private var weekPhotoMemories: [PhotoMemory] {
+        activePets.flatMap { pet in
+            pet.photoLogs
+                .filter { weekInterval.contains($0.date) }
+                .map {
+                    PhotoMemory(
+                        id: $0.id,
+                        petName: pet.name,
+                        imageData: $0.imageData,
+                        note: $0.note,
+                        date: $0.date
+                    )
+                }
+        }
+        .sorted { $0.date > $1.date }
+    }
+
+    private var weekWeightTrends: [WeightTrend] {
+        activePets.compactMap { pet in
+            let logs = pet.weightLogs
+                .filter { $0.date < weekInterval.end }
+                .sorted { $0.date < $1.date }
+            guard let latest = logs.last else { return nil }
+            let baseline = logs.last { $0.date < weekInterval.start } ?? logs.dropLast().last
+            guard let baseline else { return nil }
+            let days = max(1, Calendar.current.dateComponents([.day], from: baseline.date, to: latest.date).day ?? 1)
+            return WeightTrend(
+                id: pet.id,
+                petName: pet.name,
+                latestKg: latest.weight,
+                deltaKg: latest.weight - baseline.weight,
+                days: days
+            )
+        }
+    }
+
+    private var healthAlerts: [HealthAlert] {
+        PetHealthAlertEngine.shared.scanAlerts(pets: activePets)
+    }
+
+    private var storyHeadline: String {
+        if allEntries.isEmpty { return "这周还在等待第一条照护故事" }
+        if let pet = topPet { return "\(pet.name) 这周被好好照顾了 \(pet.count) 次" }
+        return "这周的家庭照护已经留下记录"
+    }
+
+    private var storyBody: String {
+        guard !allEntries.isEmpty else {
+            return "完成一次喂食、陪玩、照片或健康记录后，周报会自动整理成可分享的家庭故事。"
+        }
+        let leader = rankedMembers.first.map { "\($0.name) 照顾最多" } ?? "照护记录已同步"
+        let day = mostActiveDay.map { "\($0.date.formatted(.dateTime.weekday(.wide))) 最活跃" } ?? "每天都有记录"
+        return "\(leader)，\(day)。\(weightStoryText) \(photoStoryText) \(healthStoryText)"
+    }
+
+    private var weightStoryText: String {
+        guard let trend = weekWeightTrends.max(by: { abs($0.deltaKg) < abs($1.deltaKg) }) else {
+            return "体重趋势还缺少连续记录。"
+        }
+        if abs(trend.deltaKg) < 0.05 {
+            return "\(trend.petName) 体重稳定在 \(String(format: "%.1fkg", trend.latestKg))。"
+        }
+        let sign = trend.deltaKg > 0 ? "+" : ""
+        return "\(trend.petName) 近 \(trend.days) 天体重 \(sign)\(String(format: "%.1fkg", trend.deltaKg))。"
+    }
+
+    private var photoStoryText: String {
+        guard let memory = weekPhotoMemories.first else {
+            return "本周还没有照片回忆。"
+        }
+        return "最新回忆是 \(memory.petName) 的照片。"
+    }
+
+    private var healthStoryText: String {
+        guard let first = healthAlerts.first else {
+            return "健康提醒正常。"
+        }
+        let urgentCount = healthAlerts.filter { $0.severity == .urgent }.count
+        if urgentCount > 0 {
+            return "\(urgentCount) 项紧急健康提醒：\(first.title)。"
+        }
+        return "\(healthAlerts.count) 项健康提醒待留意：\(first.title)。"
+    }
+
     private var shareText: String {
         let leader = rankedMembers.first.map { "\($0.emoji) \($0.name) \($0.count) 次" } ?? "暂无"
         let petLine = topPet.map { "\($0.name) 被照顾 \($0.count) 次" } ?? "暂无宠物记录"
-        return "Ohana 本周家庭周报\n总照护 \(allEntries.count) 次\n本周之星：\(leader)\n最受关注：\(petLine)"
+        return "Ohana 本周家庭周报\n\(storyHeadline)\n\(storyBody)\n总照护 \(allEntries.count) 次\n本周之星：\(leader)\n最受关注：\(petLine)"
     }
 
     var body: some View {
@@ -62,8 +158,10 @@ struct FamilyWeeklyReportDashboardView: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
                     headerCard
+                    weeklyStoryCard
                     memberRankingCard
                     petCoverageCard
+                    memoryAndHealthCard
                     recentActivityCard
                     previousWeeksCard
                 }
@@ -106,6 +204,44 @@ struct FamilyWeeklyReportDashboardView: View {
         .goTranslucentCard(cornerRadius: 22)
     }
 
+    private var weeklyStoryCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            sectionHeader("本周故事", icon: "sparkles.rectangle.stack.fill")
+            VStack(alignment: .leading, spacing: 6) {
+                Text(storyHeadline)
+                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                Text(storyBody)
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .lineSpacing(3)
+            }
+
+            HStack(spacing: 8) {
+                storyPill(
+                    icon: "crown.fill",
+                    title: rankedMembers.first?.name ?? "暂无",
+                    subtitle: "照顾最多",
+                    color: .goPrimary
+                )
+                storyPill(
+                    icon: "calendar.badge.clock",
+                    title: mostActiveDay.map { $0.date.formatted(.dateTime.weekday(.abbreviated)) } ?? "暂无",
+                    subtitle: "最活跃日",
+                    color: .goTeal
+                )
+                storyPill(
+                    icon: "photo.fill",
+                    title: "\(weekPhotoMemories.count)",
+                    subtitle: "照片回忆",
+                    color: .goYellow
+                )
+            }
+        }
+        .padding(16)
+        .goTranslucentCard(cornerRadius: 22)
+    }
+
     private var memberRankingCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("成员贡献排行", icon: "person.2.fill")
@@ -126,6 +262,54 @@ struct FamilyWeeklyReportDashboardView: View {
                         }
                         Spacer()
                     }
+                }
+            }
+        }
+        .padding(16)
+        .goTranslucentCard(cornerRadius: 22)
+    }
+
+    private var memoryAndHealthCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("成长回忆与健康提醒", icon: "heart.text.square.fill")
+            if let memory = weekPhotoMemories.first {
+                HStack(spacing: 12) {
+                    if let image = UIImage(data: memory.imageData), image.size != .zero {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 58, height: 58)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    } else {
+                        Image(systemName: "photo.fill")
+                            .font(.system(size: 20, weight: .black))
+                            .foregroundStyle(Color.goPrimary)
+                            .frame(width: 58, height: 58)
+                            .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("\(memory.petName) 的本周回忆")
+                            .font(.system(size: 14, weight: .black, design: .rounded))
+                        Text(memory.note.isEmpty ? memory.date.formatted(.dateTime.weekday().hour().minute()) : memory.note)
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                    Spacer()
+                }
+            } else {
+                emptyText("本周还没有照片回忆，下一次记录照片后会出现在这里")
+            }
+
+            if healthAlerts.isEmpty {
+                statusLine(icon: "checkmark.seal.fill", text: "本周没有紧急健康提醒", color: .goTeal)
+            } else {
+                ForEach(healthAlerts.prefix(3)) { alert in
+                    statusLine(
+                        icon: alert.severity == .urgent ? "exclamationmark.triangle.fill" : "bell.badge.fill",
+                        text: "\(alert.petName)：\(alert.title)",
+                        color: alert.severity == .urgent ? .goRed : .goOrange
+                    )
                 }
             }
         }
@@ -226,6 +410,42 @@ struct FamilyWeeklyReportDashboardView: View {
         }
     }
 
+    private func storyPill(icon: String, title: String, subtitle: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .black))
+                .foregroundStyle(color)
+            Text(title)
+                .font(.system(size: 13, weight: .black, design: .rounded))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+            Text(subtitle)
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(color.opacity(0.11), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func statusLine(icon: String, text: String, color: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .black))
+                .foregroundStyle(color)
+                .frame(width: 20)
+            Text(text)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            Spacer()
+        }
+        .padding(.vertical, 7)
+        .padding(.horizontal, 10)
+        .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
     private func emptyText(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 12, weight: .medium, design: .rounded))
@@ -284,4 +504,25 @@ private struct MemberStat: Identifiable {
     let emoji: String
     var count: Int
     var coconuts: Int
+}
+
+private struct ActiveDayStat {
+    let date: Date
+    let count: Int
+}
+
+private struct WeightTrend: Identifiable {
+    let id: UUID
+    let petName: String
+    let latestKg: Double
+    let deltaKg: Double
+    let days: Int
+}
+
+private struct PhotoMemory: Identifiable {
+    let id: UUID
+    let petName: String
+    let imageData: Data
+    let note: String
+    let date: Date
 }

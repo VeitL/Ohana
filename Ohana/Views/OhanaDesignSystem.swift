@@ -10,6 +10,16 @@ import SwiftUI
 import UIKit
 #endif
 
+// MARK: - GO Motion Tokens
+enum GoMotion {
+    static let page: Animation = .interactiveSpring(response: 0.5, dampingFraction: 0.82, blendDuration: 0.55)
+    static let hero: Animation = .spring(response: 0.36, dampingFraction: 0.84)
+    static let fab: Animation = .spring(response: 0.35, dampingFraction: 0.72)
+    static let feedback: Animation = .spring(response: 0.28, dampingFraction: 0.82)
+    static let quick: Animation = .easeOut(duration: 0.22)
+    static let reduced: Animation = .easeOut(duration: 0.16)
+}
+
 // MARK: - Global Coconut Balance Capsule
 struct CoconutBalanceCapsule: View {
     @State private var questManager = QuestManager.shared
@@ -29,7 +39,7 @@ struct CoconutBalanceCapsule: View {
                 .font(OhanaFont.caption2(.black))
                 .foregroundStyle(.black)
                 .contentTransition(.numericText())
-                .animation(.spring(response: 0.4), value: questManager.coconutCount)
+                .animation(GoMotion.feedback, value: questManager.coconutCount)
         }
         .padding(.horizontal, 7).padding(.vertical, 4)
         .frame(height: 26)
@@ -49,8 +59,8 @@ struct CoconutBalanceCapsule: View {
                     .allowsHitTesting(false)
             }
         }
-        .animation(.spring(response: 0.28, dampingFraction: 0.62), value: pulse)
-        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: floatingDelta)
+        .animation(GoMotion.feedback, value: pulse)
+        .animation(GoMotion.feedback, value: floatingDelta)
     }
 
     var body: some View {
@@ -68,16 +78,16 @@ struct CoconutBalanceCapsule: View {
             guard delta > 0 else { return }
             floatingDelta = delta
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            withAnimation(.spring(response: 0.24, dampingFraction: 0.55)) {
+            withAnimation(GoMotion.feedback) {
                 pulse = true
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.72)) {
+                withAnimation(GoMotion.feedback) {
                     pulse = false
                 }
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.05) {
-                withAnimation(.easeOut(duration: 0.18)) {
+                withAnimation(GoMotion.quick) {
                     floatingDelta = nil
                 }
             }
@@ -497,7 +507,7 @@ struct GoBottomTabBar: View {
         HStack(spacing: 0) {
             ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    withAnimation(GoMotion.feedback) {
                         selectedIndex = index
                     }
                 } label: {
@@ -759,7 +769,7 @@ struct CoconutRewardModifier: ViewModifier {
                         .scaleEffect(phase == .bouncing ? 1.0 : 0.2)
                         .opacity(phase == .flying ? 0 : 1)
                         .offset(y: phase == .flying ? -300 : 0)
-                        .animation(.spring(response: 0.45, dampingFraction: 0.55), value: phase)
+                        .animation(GoMotion.fab, value: phase)
 
                     if phase == .bouncing {
                         Text("+\(amount) 🥥")
@@ -783,7 +793,7 @@ struct CoconutRewardModifier: ViewModifier {
         }
         .onChange(of: trigger) { _, newVal in
             guard newVal else { return }
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.5)) { phase = .bouncing }
+            withAnimation(GoMotion.fab) { phase = .bouncing }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
                 withAnimation(.easeIn(duration: 0.4)) { phase = .flying }

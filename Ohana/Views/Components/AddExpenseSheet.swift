@@ -2,19 +2,32 @@
 //  AddExpenseSheet.swift
 //  Ohana
 //
-//  花费快捷添加 Sheet — 参考 GenericWeightEntrySheet 风格
-//  （ArkBackgroundView 背景 + 手动 Header + SF Symbol 分类图标）
+//  花费快捷添加 Sheet — Go Focus 快速记账
 //
 
 import SwiftUI
 import SwiftData
+import Foundation
+import PhotosUI
+import UniformTypeIdentifiers
+
+private struct ExpenseReceiptAttachment: Identifiable, Equatable {
+    let id = UUID()
+    var data: Data
+    var filename: String
+    var isImage: Bool
+}
 
 struct AddExpenseSheet: View {
     let pet: Pet
     var preselectedPayerId: String? = nil
+    var onSaved: (() -> Void)? = nil
+    var onRewarded: ((Int) -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("appLanguage") private var appLanguage = "zh"
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @FocusState private var inputFocused: Bool
 
@@ -23,22 +36,87 @@ struct AddExpenseSheet: View {
     @State private var noteInput = ""
     @State private var date = Date()
     @State private var selectedPayerId: String? = nil
+    @State private var showMore = false
+    @State private var isSaving = false
+    @State private var receiptAttachments: [ExpenseReceiptAttachment] = []
+    @State private var photoPickerItems: [PhotosPickerItem] = []
+    @State private var showingCamera = false
+    @State private var showCameraPermissionAlert = false
+    @State private var showingFilePicker = false
+    @State private var pendingCapturedImage: UIImage? = nil
+    @State private var previewReceipt: ExpenseReceiptAttachment? = nil
 
     // 报销申请快捷入口
     @State private var savedExpenseId: String? = nil
-    @State private var showClaimToast = false
     @State private var showClaimSheet = false
+
+    private var l: L10n { L10n(appLanguage) }
 
     private var petThemeColor: Color {
         Color(hex: pet.themeColorHex.isEmpty ? "C8FF00" : pet.themeColorHex)
     }
+
+    private var primaryText: Color {
+        colorScheme == .dark ? .white : .black
+    }
+
+    private var secondaryText: Color {
+        colorScheme == .dark ? .white.opacity(0.72) : .black.opacity(0.62)
+    }
+
+    private var tertiaryText: Color {
+        colorScheme == .dark ? .white.opacity(0.46) : .black.opacity(0.42)
+    }
+
+    private var cardSurface: Color {
+        colorScheme == .dark ? .white.opacity(0.06) : .black.opacity(0.055)
+    }
+
+    private var panelStroke: Color {
+        colorScheme == .dark ? .white.opacity(0.10) : .black.opacity(0.08)
+    }
+
+    private var parsedAmount: Double? {
+        Double(amountInput.replacingOccurrences(of: ",", with: "."))
+    }
+
     private var isAmountValid: Bool {
-        guard let v = Double(amountInput.replacingOccurrences(of: ",", with: ".")), v > 0 else { return false }
+        guard let v = parsedAmount, v > 0 else { return false }
         return true
     }
+
+    private var canSave: Bool {
+        isAmountValid && !isSaving && !hasSavedMedicalExpense
+    }
+
+    private var hasSavedMedicalExpense: Bool {
+        savedExpenseId != nil
+    }
+
     // 该宠物的活跃保单（用于报销快捷入口）
     private var activeInsurances: [PetInsurance] {
-        (pet.insurances).filter { $0.isActive }
+        pet.insurances.filter { $0.isActive }
+    }
+
+    private var quickAmounts: [Double] {
+        var values: [Double] = []
+        let positiveLogs = pet.expenseLogs
+            .filter { $0.amount > 0 }
+            .sorted { $0.date > $1.date }
+
+        appendUniqueAmounts(
+            positiveLogs
+                .filter { $0.expenseCategory == selectedCategory }
+                .map { roundedCurrency($0.amount) },
+            into: &values
+        )
+        appendUniqueAmounts(
+            positiveLogs
+                .map { roundedCurrency($0.amount) },
+            into: &values
+        )
+        appendUniqueAmounts(defaultAmounts(for: selectedCategory), into: &values)
+        return Array(values.prefix(4))
     }
 
     // MARK: - Body
@@ -48,186 +126,36 @@ struct AddExpenseSheet: View {
             ArkBackgroundView()
 
             VStack(spacing: 0) {
-                // Header
-                HStack(alignment: .center) {
-                    // 宠物头像 + 标题
-                    HStack(spacing: 10) {
-                        ZStack {
-                            Circle()
-                                .fill(petThemeColor.opacity(0.25))
-                                .frame(width: 36, height: 36)
-                            if let data = pet.avatarImageData, let img = UIImage(data: data) {
-                                Image(uiImage: img)
-                                    .resizable().scaledToFill()
-                                    .frame(width: 36, height: 36)
-                                    .clipShape(Circle())
-                            } else {
-                                Text(pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji)
-                                    .font(.system(size: 18))
-                            }
-                        }
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("记录花费")
-                                .font(.system(size: 17, weight: .black, design: .rounded))
-                                .foregroundStyle(.primary)
-                            Text(pet.name)
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    Spacer()
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 22))
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-                .padding(.bottom, 16)
+                header
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 16) {
-                        // 大金额输入
-                        HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text("¥")
-                                .font(.system(size: 28, weight: .black, design: .rounded))
-                                .foregroundStyle(petThemeColor)
-                            TextField("0.00", text: $amountInput)
-                                .keyboardType(.decimalPad)
-                                .focused($inputFocused)
-                                .font(.system(size: 44, weight: .black, design: .rounded))
-                                .foregroundStyle(.primary)
-                                .minimumScaleFactor(0.45)
+                        amountEntry
+                        quickAmountStrip
+                        categoryStrip
+                        payerSection
+                        receiptSection
+                        if selectedCategory == .insurancePremium {
+                            insurancePolicyNotice
                         }
-                        .padding(.horizontal, 20)
+                        moreSection
 
-                        GoDashedDivider().padding(.horizontal, 16)
-
-                        // 分类选择（SF Symbol 图标）
-                        VStack(alignment: .leading, spacing: 8) {
-                            sectionLabel(icon: "tag.fill", title: "分类")
-                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                                ForEach(ExpenseCategory.allCases, id: \.rawValue) { cat in
-                                    Button { selectedCategory = cat } label: {
-                                        VStack(spacing: 6) {
-                                            Image(systemName: cat.systemIconName)
-                                                .font(.system(size: 20, weight: .semibold))
-                                                .foregroundStyle(selectedCategory == cat ? Color.arkInk : .primary.opacity(0.6))
-                                                .frame(width: 36, height: 36)
-                                                .background(
-                                                    selectedCategory == cat ? petThemeColor : Color.primary.opacity(0.08),
-                                                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                )
-                                            Text(cat.rawValue)
-                                                .font(.system(size: 11, weight: .bold, design: .rounded))
-                                                .foregroundStyle(selectedCategory == cat ? .primary : .secondary)
-                                                .lineLimit(1)
-                                        }
-                                        .frame(maxWidth: .infinity)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
+                        if hasSavedMedicalExpense {
+                            claimHintCard
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
                         }
-                        .padding(.horizontal, 20)
-
-                        GoDashedDivider().padding(.horizontal, 16)
-
-                        // 支付者
-                        if !humans.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                sectionLabel(icon: "person.fill", title: "支付者")
-                                    .padding(.horizontal, 20)
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 12) {
-                                        // 未指定
-                                        payerAvatar(id: nil, color: petThemeColor, label: "未指定") {
-                                            Image(systemName: "questionmark")
-                                                .font(.system(size: 14, weight: .bold))
-                                                .foregroundStyle(selectedPayerId == nil ? Color.arkInk : .primary.opacity(0.4))
-                                        }
-                                        // 家庭成员
-                                        ForEach(humans) { human in
-                                            let hid = human.id.uuidString
-                                            let hColor = humanThemeColor(human)
-                                            payerAvatar(id: hid, color: hColor, label: human.name) {
-                                                if let data = human.avatarImageData, let img = UIImage(data: data) {
-                                                    Image(uiImage: img)
-                                                        .resizable().scaledToFill()
-                                                        .frame(width: 38, height: 38)
-                                                        .clipShape(Circle())
-                                                } else {
-                                                    Text(human.avatarEmoji).font(.system(size: 18))
-                                                }
-                                            }
-                                        }
-                                    }
-                                    .padding(.horizontal, 20)
-                                }
-                            }
-
-                            GoDashedDivider().padding(.horizontal, 16)
-                        }
-
-                        if let payerName = selectedPayerName {
-                            infoRow(icon: "creditcard.fill", label: "这笔钱由") {
-                                Text(payerName)
-                                    .font(.system(size: 13, weight: .black, design: .rounded))
-                                    .foregroundStyle(petThemeColor)
-                            }
-                        }
-
-                        // 日期行
-                        infoRow(icon: "calendar", label: "日期") {
-                            DatePicker("", selection: $date, in: ...Date(), displayedComponents: [.date])
-                                .datePickerStyle(.compact)
-                                .labelsHidden()
-                                .tint(petThemeColor)
-                        }
-
-                        // 备注行
-                        infoRow(icon: "note.text", label: "备注") {
-                            TextField("可选", text: $noteInput)
-                                .font(.system(size: 13, weight: .medium, design: .rounded))
-                                .multilineTextAlignment(.trailing)
-                        }
-
-                        // 保存按钮
-                        Button { saveExpense() } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 16, weight: .bold))
-                                Text("保存花费")
-                                    .font(.system(size: 15, weight: .black, design: .rounded))
-                            }
-                            .foregroundStyle(.black)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(
-                                isAmountValid ? petThemeColor : petThemeColor.opacity(0.35),
-                                in: RoundedRectangle(cornerRadius: 14)
-                            )
-                        }
-                        .disabled(!isAmountValid)
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 12)
                     }
+                    .padding(.bottom, 18)
                 }
+                .scrollDismissesKeyboard(.interactively)
+
+                bottomActionBar
             }
         }
         .presentationBackground(.clear)
-        .presentationDetents([.fraction(0.70), .large])
+        .presentationDetents([.fraction(0.64), .large])
         .presentationDragIndicator(.visible)
-        .overlay(alignment: .bottom) {
-            if showClaimToast {
-                claimToastBanner
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .padding(.bottom, 16)
-            }
-        }
+        .presentationContentInteraction(.scrolls)
         .sheet(isPresented: $showClaimSheet) {
             if let firstInsurance = activeInsurances.first {
                 AddInsuranceClaimSheet(
@@ -237,124 +165,821 @@ struct AddExpenseSheet: View {
                 )
             }
         }
+        .fullScreenCover(isPresented: $showingCamera, onDismiss: {
+            if let image = pendingCapturedImage {
+                appendReceiptImage(image)
+                pendingCapturedImage = nil
+            }
+        }) {
+            PetCameraPickerView { image in
+                pendingCapturedImage = image
+                showingCamera = false
+            } onCancel: {
+                showingCamera = false
+            }
+        }
+        .fullScreenCover(item: $previewReceipt) { receipt in
+            if let image = UIImage(data: receipt.data) {
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .ignoresSafeArea()
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Button { previewReceipt = nil } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 28, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .padding(16)
+                            }
+                        }
+                        Spacer()
+                    }
+                }
+            }
+        }
+        .fileImporter(
+            isPresented: $showingFilePicker,
+            allowedContentTypes: [UTType.pdf, UTType.image, UTType.data]
+        ) { result in
+            handleReceiptFileImport(result)
+        }
+        .alert(l.quickExpenseCameraUnavailable, isPresented: $showCameraPermissionAlert) {
+            Button(l.done, role: .cancel) {}
+        } message: {
+            Text(l.quickExpenseCameraPermissionMessage)
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Button(l.done) {
+                    inputFocused = false
+                }
+                Spacer()
+                if canSave {
+                    Button(l.quickExpenseKeyboardSave) {
+                        saveExpense()
+                    }
+                    .fontWeight(.bold)
+                    .disabled(isSaving)
+                }
+            }
+        }
         .onAppear {
-            guard !humans.isEmpty else { selectedPayerId = nil; return }
-            if let pid = preselectedPayerId, humans.contains(where: { $0.id.uuidString == pid }) {
-                selectedPayerId = pid
-            } else {
-                let stored = UserDefaults.standard.string(forKey: "currentActiveHumanId") ?? ""
-                selectedPayerId = (!stored.isEmpty && humans.contains(where: { $0.id.uuidString == stored }))
-                    ? stored : humans.first?.id.uuidString
+            configureInitialPayer()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                inputFocused = true
+            }
+        }
+        .animation(GoMotion.feedback, value: selectedCategory)
+        .animation(GoMotion.feedback, value: showMore)
+        .animation(GoMotion.feedback, value: hasSavedMedicalExpense)
+    }
+
+    // MARK: - Sections
+
+    private var header: some View {
+        HStack(alignment: .center) {
+            HStack(spacing: 10) {
+                petAvatar(size: 38)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(l.quickExpenseTitle)
+                        .font(OhanaFont.title3(.black))
+                        .foregroundStyle(primaryText)
+                    Text(pet.name)
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(secondaryText)
+                }
+            }
+            Spacer()
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .black))
+                    .foregroundStyle(primaryText)
+                    .frame(width: 36, height: 36)
+                    .background(primaryText.opacity(0.08), in: Circle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 18)
+        .padding(.bottom, 14)
+    }
+
+    private var amountEntry: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel(icon: "\(AppCurrency.systemIconName).fill", title: l.quickExpenseAmount)
+                .padding(.horizontal, 20)
+
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(AppCurrency.symbol)
+                    .font(OhanaFont.metric(size: 28, .black))
+                    .foregroundStyle(petThemeColor)
+                TextField("0", text: $amountInput)
+                    .keyboardType(.decimalPad)
+                    .focused($inputFocused)
+                    .textFieldStyle(.plain)
+                    .font(OhanaFont.metric(size: 52, .black))
+                    .foregroundStyle(primaryText)
+                    .minimumScaleFactor(0.45)
+                    .disabled(hasSavedMedicalExpense)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .background(cardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(panelStroke, lineWidth: 1)
+            }
+            .padding(.horizontal, 20)
+        }
+    }
+
+    private var quickAmountStrip: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel(icon: "bolt.fill", title: l.quickExpenseCommonAmounts)
+                .padding(.horizontal, 20)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(quickAmounts, id: \.self) { amount in
+                        Button {
+                            applyQuickAmount(amount)
+                        } label: {
+                            Text("\(AppCurrency.symbol)\(displayAmount(amount))")
+                                .font(OhanaFont.subheadline(.black))
+                                .foregroundStyle(isQuickAmountSelected(amount) ? Color.arkInk : primaryText)
+                                .padding(.horizontal, 15)
+                                .padding(.vertical, 10)
+                                .goSelectableSurface(
+                                    isSelected: isQuickAmountSelected(amount),
+                                    tint: petThemeColor,
+                                    in: Capsule()
+                                )
+                        }
+                        .disabled(hasSavedMedicalExpense)
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 20)
             }
         }
     }
 
-    // MARK: - Claim Toast Banner
-
-    private var claimToastBanner: some View {
-        Button {
-            showClaimToast = false
-            showClaimSheet = true
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "shield.checkered")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(Color.arkInk)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("申请保险报销")
-                        .font(.system(size: 13, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.arkInk)
-                    Text("向 \(activeInsurances.first?.productName ?? "保险公司") 提交报销申请")
-                        .font(.system(size: 11, weight: .regular, design: .rounded))
-                        .foregroundStyle(Color.arkInk.opacity(0.7))
+    private var categoryStrip: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel(icon: "tag.fill", title: l.quickExpenseCategory)
+                .padding(.horizontal, 20)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(ExpenseCategory.allCases, id: \.rawValue) { category in
+                        categoryChip(category)
+                    }
                 }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.arkInk.opacity(0.7))
+                .padding(.horizontal, 20)
             }
-            .padding(.horizontal, 16).padding(.vertical, 12)
-            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14))
-            .padding(.horizontal, 20)
         }
+    }
+
+    @ViewBuilder
+    private var payerSection: some View {
+        if humans.count > 1 {
+            VStack(alignment: .leading, spacing: 8) {
+                sectionLabel(icon: "person.fill", title: l.quickExpensePayer)
+                    .padding(.horizontal, 20)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        payerChip(id: nil, name: l.quickExpenseUnspecified, color: petThemeColor) {
+                            Image(systemName: "questionmark")
+                                .font(.system(size: 13, weight: .black))
+                                .foregroundStyle(selectedPayerId == nil ? Color.arkInk : secondaryText)
+                        }
+                        ForEach(humans) { human in
+                            payerChip(
+                                id: human.id.uuidString,
+                                name: human.name,
+                                color: humanThemeColor(human)
+                            ) {
+                                humanAvatar(human, size: 24)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+            }
+        } else if let human = humans.first {
+            infoRow(icon: "creditcard.fill", label: l.quickExpensePayer) {
+                HStack(spacing: 6) {
+                    humanAvatar(human, size: 24)
+                    Text(human.name)
+                        .font(OhanaFont.subheadline(.black))
+                        .foregroundStyle(primaryText)
+                }
+            }
+        }
+    }
+
+    private var receiptSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                sectionLabel(icon: "paperclip", title: l.quickExpenseReceipt)
+                if !receiptAttachments.isEmpty {
+                    Text(l.quickExpenseReceiptCount(receiptAttachments.count))
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(petThemeColor)
+                }
+            }
+            .padding(.horizontal, 20)
+
+            HStack(spacing: 10) {
+                receiptActionButton(icon: "camera.fill", title: l.quickExpenseCamera) {
+                    presentCamera()
+                }
+
+                PhotosPicker(selection: $photoPickerItems, maxSelectionCount: 6, matching: .images) {
+                    receiptActionContent(icon: "photo.fill", title: l.quickExpensePhotos)
+                }
+                .buttonStyle(.plain)
+                .disabled(hasSavedMedicalExpense)
+                .onChange(of: photoPickerItems) { _, items in
+                    Task { await handleReceiptPhotoItems(items) }
+                }
+
+                receiptActionButton(icon: "doc.fill", title: l.quickExpenseFile) {
+                    showingFilePicker = true
+                }
+            }
+            .padding(.horizontal, 20)
+
+            if !receiptAttachments.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(receiptAttachments) { receipt in
+                            receiptAttachmentChip(receipt)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
+    private var insurancePolicyNotice: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "shield.checkered")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(petThemeColor)
+                .frame(width: 30, height: 30)
+                .background(petThemeColor.opacity(0.14), in: Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(l.quickExpenseInsuranceSingleTitle)
+                    .font(OhanaFont.callout(.bold))
+                    .foregroundStyle(primaryText)
+                Text(activeInsurances.isEmpty ? l.quickExpenseInsuranceSingleNoPolicy : l.quickExpenseInsuranceSingleWithPolicy)
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(tertiaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(cardSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(.horizontal, 20)
+    }
+
+    private var moreSection: some View {
+        VStack(spacing: 10) {
+            Button {
+                withAnimation(GoMotion.feedback) {
+                    showMore.toggle()
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "ellipsis.circle.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(tertiaryText)
+                    Text(l.quickExpenseMore)
+                        .font(OhanaFont.callout(.bold))
+                        .foregroundStyle(primaryText)
+                    Spacer()
+                    Text(moreSummary)
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(tertiaryText)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 11, weight: .black))
+                        .foregroundStyle(tertiaryText)
+                        .rotationEffect(.degrees(showMore ? 180 : 0))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(cardSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .disabled(hasSavedMedicalExpense)
+            .buttonStyle(.plain)
+            .padding(.horizontal, 20)
+
+            if showMore {
+                VStack(spacing: 10) {
+                    infoRow(icon: "calendar", label: l.quickExpenseDate) {
+                        DatePicker("", selection: $date, in: ...Date(), displayedComponents: [.date])
+                            .datePickerStyle(.compact)
+                            .labelsHidden()
+                            .tint(petThemeColor)
+                            .disabled(hasSavedMedicalExpense)
+                    }
+
+                    infoRow(icon: "note.text", label: l.quickExpenseNote) {
+                        TextField(l.quickExpenseOptional, text: $noteInput)
+                            .font(OhanaFont.subheadline(.semibold))
+                            .foregroundStyle(primaryText)
+                            .multilineTextAlignment(.trailing)
+                            .textFieldStyle(.plain)
+                            .disabled(hasSavedMedicalExpense)
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
+    private var claimHintCard: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(Color.goTeal)
+                .frame(width: 34, height: 34)
+                .background(Color.goTeal.opacity(0.14), in: Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(l.quickExpenseMedicalRecorded)
+                    .font(OhanaFont.subheadline(.black))
+                    .foregroundStyle(primaryText)
+                Text(l.quickExpenseSubmitToInsurer(activeInsurances.first?.productName ?? l.quickExpenseInsuranceCompany))
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(secondaryText)
+            }
+            Spacer()
+        }
+        .padding(14)
+        .background(Color.goTeal.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.goTeal.opacity(0.26), lineWidth: 1)
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private var bottomActionBar: some View {
+        VStack(spacing: 8) {
+            if hasSavedMedicalExpense {
+                Button {
+                    inputFocused = false
+                    showClaimSheet = true
+                } label: {
+                    primaryActionContent(icon: "shield.checkered", title: l.quickExpenseApplyClaim)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Button {
+                    saveExpense()
+                } label: {
+                    primaryActionContent(icon: "checkmark.circle.fill", title: isSaving ? l.quickExpenseSaving : bottomSaveTitle)
+                        .opacity(canSave ? 1 : 0.45)
+                }
+                .disabled(!canSave)
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 12)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(panelStroke)
+                .frame(height: 1)
+        }
+    }
+
+    // MARK: - Reusable Views
+
+    private func receiptActionButton(icon: String, title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            receiptActionContent(icon: icon, title: title)
+        }
+        .disabled(hasSavedMedicalExpense)
         .buttonStyle(.plain)
     }
 
-    // MARK: - Sub-views
+    private func receiptActionContent(icon: String, title: String) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .black))
+            Text(title)
+                .font(OhanaFont.caption(.black))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .foregroundStyle(primaryText)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(cardSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(panelStroke, lineWidth: 1)
+        }
+    }
+
+    private func receiptAttachmentChip(_ receipt: ExpenseReceiptAttachment) -> some View {
+        HStack(spacing: 8) {
+            if receipt.isImage, let image = UIImage(data: receipt.data) {
+                Button { previewReceipt = receipt } label: {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 34, height: 34)
+                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            } else {
+                Image(systemName: "doc.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(petThemeColor)
+                    .frame(width: 34, height: 34)
+                    .background(petThemeColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            }
+
+            Text(receiptLabel(receipt))
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(primaryText)
+                .lineLimit(1)
+                .frame(maxWidth: 130, alignment: .leading)
+
+            Button {
+                withAnimation(GoMotion.feedback) {
+                    receiptAttachments.removeAll { $0.id == receipt.id }
+                }
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(tertiaryText)
+            }
+            .accessibilityLabel(l.quickExpenseRemoveReceipt)
+            .buttonStyle(.plain)
+            .disabled(hasSavedMedicalExpense)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(cardSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(panelStroke, lineWidth: 1)
+        }
+    }
+
+    private func primaryActionContent(icon: String, title: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .bold))
+            Text(title)
+                .font(OhanaFont.callout(.black))
+        }
+        .foregroundStyle(Color.arkInk)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(petThemeColor, in: Capsule())
+    }
+
+    private func categoryChip(_ category: ExpenseCategory) -> some View {
+        let isSelected = selectedCategory == category
+        return Button {
+            withAnimation(GoMotion.feedback) {
+                selectedCategory = category
+            }
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: category.systemIconName)
+                    .font(.system(size: 13, weight: .black))
+                Text(l.expenseCategoryTitle(category))
+                    .font(OhanaFont.subheadline(.black))
+            }
+            .foregroundStyle(isSelected ? Color.arkInk : primaryText)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 10)
+            .goSelectableSurface(isSelected: isSelected, tint: petThemeColor, in: Capsule())
+        }
+        .disabled(hasSavedMedicalExpense)
+        .buttonStyle(.plain)
+    }
+
+    private func payerChip<Avatar: View>(
+        id: String?,
+        name: String,
+        color: Color,
+        @ViewBuilder avatar: () -> Avatar
+    ) -> some View {
+        let isSelected = selectedPayerId == id
+        return Button {
+            withAnimation(GoMotion.feedback) {
+                selectedPayerId = id
+            }
+        } label: {
+            HStack(spacing: 7) {
+                avatar()
+                    .frame(width: 24, height: 24)
+                    .background((isSelected ? color : color.opacity(0.16)), in: Circle())
+                Text(name)
+                    .font(OhanaFont.subheadline(.black))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(isSelected ? Color.arkInk : primaryText)
+            .padding(.leading, 8)
+            .padding(.trailing, 13)
+            .padding(.vertical, 8)
+            .goSelectableSurface(isSelected: isSelected, tint: color, in: Capsule())
+        }
+        .disabled(hasSavedMedicalExpense)
+        .buttonStyle(.plain)
+    }
 
     private func sectionLabel(icon: String, title: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.primary.opacity(0.4))
+                .foregroundStyle(tertiaryText)
             Text(title)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.4))
+                .font(OhanaFont.caption(.bold))
+                .foregroundStyle(tertiaryText)
         }
     }
 
-    private func infoRow<Trailing: View>(icon: String, label: String, @ViewBuilder trailing: () -> Trailing) -> some View {
+    private func infoRow<Trailing: View>(
+        icon: String,
+        label: String,
+        @ViewBuilder trailing: () -> Trailing
+    ) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.primary.opacity(0.4))
+                .foregroundStyle(tertiaryText)
             Text(label)
-                .font(.system(size: 14, weight: .medium, design: .rounded))
-                .foregroundStyle(.primary)
+                .font(OhanaFont.callout(.semibold))
+                .foregroundStyle(primaryText)
             Spacer()
             trailing()
         }
-        .padding(.horizontal, 14).padding(.vertical, 10)
-        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(cardSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .padding(.horizontal, 20)
     }
 
     @ViewBuilder
-    private func payerAvatar<Content: View>(id: String?, color: Color, label: String, @ViewBuilder content: () -> Content) -> some View {
-        let isSelected = selectedPayerId == id
-        Button { selectedPayerId = id } label: {
-            VStack(spacing: 4) {
-                ZStack {
-                    Circle()
-                        .fill(isSelected ? color : color.opacity(0.18))
-                        .frame(width: 38, height: 38)
-                    content()
-                    if isSelected {
-                        Circle().strokeBorder(.white, lineWidth: 2).frame(width: 38, height: 38)
-                    }
-                }
-                Text(label)
-                    .font(.system(size: 9, weight: .semibold, design: .rounded))
-                    .foregroundStyle(isSelected ? .primary : .secondary)
-                    .lineLimit(1)
-                    .frame(maxWidth: 56)
+    private func petAvatar(size: CGFloat) -> some View {
+        ZStack {
+            Circle()
+                .fill(petThemeColor.opacity(0.22))
+                .frame(width: size, height: size)
+            if let data = pet.avatarImageData, let img = UIImage(data: data) {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            } else {
+                Text(pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji)
+                    .font(.system(size: size * 0.48))
             }
         }
-        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func humanAvatar(_ human: Human, size: CGFloat) -> some View {
+        if let data = human.avatarImageData, let img = UIImage(data: data) {
+            Image(uiImage: img)
+                .resizable()
+                .scaledToFill()
+                .frame(width: size, height: size)
+                .clipShape(Circle())
+        } else {
+            Text(human.avatarEmoji)
+                .font(.system(size: size * 0.62))
+                .frame(width: size, height: size)
+        }
     }
 
     // MARK: - Helpers
+
+    private var moreSummary: String {
+        if noteInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return Calendar.current.isDateInToday(date) ? l.quickExpenseToday : date.formatted(.dateTime.month().day())
+        }
+        return l.quickExpenseHasNote
+    }
+
+    private var bottomSaveTitle: String {
+        return l.quickExpenseSave
+    }
+
+    private func configureInitialPayer() {
+        guard !humans.isEmpty else {
+            selectedPayerId = nil
+            return
+        }
+        if let pid = preselectedPayerId, humans.contains(where: { $0.id.uuidString == pid }) {
+            selectedPayerId = pid
+        } else {
+            let stored = UserDefaults.standard.string(forKey: "currentActiveHumanId") ?? ""
+            selectedPayerId = (!stored.isEmpty && humans.contains(where: { $0.id.uuidString == stored }))
+                ? stored
+                : humans.first?.id.uuidString
+        }
+    }
+
+    private func applyQuickAmount(_ amount: Double) {
+        guard !hasSavedMedicalExpense else { return }
+        amountInput = amountInputString(amount)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    private func isQuickAmountSelected(_ amount: Double) -> Bool {
+        guard let parsedAmount else { return false }
+        return abs(roundedCurrency(parsedAmount) - roundedCurrency(amount)) < 0.01
+    }
+
+    private func defaultAmounts(for category: ExpenseCategory) -> [Double] {
+        switch category {
+        case .food: return [20, 50, 100]
+        case .treats: return [10, 20, 50]
+        case .medical: return [100, 300, 800]
+        case .grooming: return [80, 150, 300]
+        case .toys: return [20, 50, 100]
+        case .insurancePremium: return [60, 120, 300]
+        case .other: return [20, 100, 300]
+        }
+    }
+
+    private func appendUniqueAmounts(_ candidates: [Double], into values: inout [Double]) {
+        for amount in candidates where amount > 0 {
+            let rounded = roundedCurrency(amount)
+            if !values.contains(where: { abs($0 - rounded) < 0.01 }) {
+                values.append(rounded)
+            }
+            if values.count >= 4 { return }
+        }
+    }
+
+    private func roundedCurrency(_ amount: Double) -> Double {
+        (amount * 100).rounded() / 100
+    }
+
+    private func displayAmount(_ amount: Double) -> String {
+        let rounded = roundedCurrency(amount)
+        if abs(rounded - rounded.rounded()) < 0.01 {
+            return "\(Int(rounded.rounded()))"
+        }
+        return String(format: "%.2f", rounded)
+    }
+
+    private func amountInputString(_ amount: Double) -> String {
+        displayAmount(amount)
+    }
 
     private func humanThemeColor(_ human: Human) -> Color {
         let hex = human.themeColor
         return hex.count == 6 ? Color(hex: hex) : Color.goPrimary
     }
 
-    private var selectedPayerName: String? {
-        guard let selectedPayerId else { return nil }
-        return humans.first(where: { $0.id.uuidString == selectedPayerId })?.name
+    private func receiptLabel(_ receipt: ExpenseReceiptAttachment) -> String {
+        let cleaned = receipt.filename.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !cleaned.isEmpty { return cleaned }
+        return receipt.isImage ? l.quickExpenseImage : l.quickExpenseFile
+    }
+
+    private func receiptDrafts() -> [ExpenseReceiptAttachmentDraft] {
+        receiptAttachments.map {
+            ExpenseReceiptAttachmentDraft(data: $0.data, filename: $0.filename, isImage: $0.isImage)
+        }
+    }
+
+    private func presentCamera() {
+        guard !hasSavedMedicalExpense else { return }
+        inputFocused = false
+        requestOhanaCameraAccess {
+            showingCamera = true
+        } onDenied: {
+            showCameraPermissionAlert = true
+        }
+    }
+
+    private func appendReceiptImage(_ image: UIImage) {
+        let data = image.jpegData(compressionQuality: 0.85) ?? Data()
+        let attachment = ExpenseReceiptAttachment(
+            data: data,
+            filename: "receipt_\(receiptAttachments.count + 1).jpg",
+            isImage: true
+        )
+        withAnimation(GoMotion.feedback) {
+            receiptAttachments.append(attachment)
+        }
+    }
+
+    @MainActor
+    private func handleReceiptPhotoItems(_ items: [PhotosPickerItem]) async {
+        guard !items.isEmpty else { return }
+        for item in items {
+            if let data = try? await item.loadTransferable(type: Data.self) {
+                let attachment = ExpenseReceiptAttachment(
+                    data: data,
+                    filename: "receipt_\(receiptAttachments.count + 1).jpg",
+                    isImage: true
+                )
+                withAnimation(GoMotion.feedback) {
+                    receiptAttachments.append(attachment)
+                }
+            }
+        }
+        photoPickerItems = []
+    }
+
+    private func handleReceiptFileImport(_ result: Result<URL, Error>) {
+        guard case .success(let url) = result else { return }
+        inputFocused = false
+        _ = url.startAccessingSecurityScopedResource()
+        defer { url.stopAccessingSecurityScopedResource() }
+
+        guard let data = try? Data(contentsOf: url) else { return }
+        let type = UTType(filenameExtension: url.pathExtension)
+        let isImage = type?.conforms(to: .image) ?? false
+        let attachment = ExpenseReceiptAttachment(
+            data: data,
+            filename: url.lastPathComponent,
+            isImage: isImage
+        )
+        withAnimation(GoMotion.feedback) {
+            receiptAttachments.append(attachment)
+        }
+    }
+
+    private func receiptDocumentCategory() -> DocumentCategory {
+        switch selectedCategory {
+        case .medical:
+            return .medical
+        case .insurancePremium:
+            return .insurance
+        default:
+            return .other
+        }
+    }
+
+    private func receiptDocumentTitle(note: String) -> String {
+        if !note.isEmpty { return note }
+        return "\(pet.name) · \(l.expenseCategoryTitle(selectedCategory)) \(l.quickExpenseReceipt)"
     }
 
     private func saveExpense() {
-        guard let amount = Double(amountInput.replacingOccurrences(of: ",", with: ".")) else { return }
+        guard canSave, let amount = parsedAmount, amount > 0 else { return }
+        isSaving = true
+        inputFocused = false
+
         let payerId = selectedPayerId.flatMap { id in
             humans.contains(where: { $0.id.uuidString == id }) ? id : nil
         }
-        let log = PetExpenseLog(date: date, amount: amount, category: selectedCategory, note: noteInput, pet: pet, executorId: payerId)
+        let cleanNote = noteInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let log = PetExpenseLog(
+            date: date,
+            amount: amount,
+            category: selectedCategory,
+            note: cleanNote,
+            pet: pet,
+            executorId: payerId
+        )
         modelContext.insert(log)
+
+        if !receiptAttachments.isEmpty {
+            let document = ExpenseReceiptDocumentBuilder.makeDocument(
+                title: receiptDocumentTitle(note: cleanNote),
+                category: receiptDocumentCategory(),
+                cost: amount,
+                date: log.date,
+                visibleNote: cleanNote,
+                linkedExpenseLogId: log.id.uuidString,
+                attachments: receiptDrafts(),
+                pet: pet
+            )
+            modelContext.insert(document)
+            for attachment in document.attachments {
+                modelContext.insert(attachment)
+            }
+        }
+
         modelContext.safeSave()
+
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         let reward = QuestManager.shared.awardAction(type: .expense, pet: pet, context: modelContext)
+        let rewardDelta = CareLedgerService.rewardDelta(reward)
         CareLedgerService.record(
             occurredAt: log.date,
             actorKind: payerId == nil ? .unknown : .human,
@@ -365,21 +990,20 @@ struct AddExpenseSheet: View {
             actionType: selectedCategory.rawValue,
             amountValue: amount,
             amountUnit: "currency",
-            note: noteInput,
+            note: cleanNote,
             source: .detail,
             legacyModelName: "PetExpenseLog",
             legacyModelId: log.id.uuidString,
-            coconutDelta: CareLedgerService.rewardDelta(reward),
-            context: modelContext
+            coconutDelta: rewardDelta,
+            context: modelContext,
+            save: true
         )
+        onSaved?()
+        onRewarded?(rewardDelta)
 
-        // 若是医疗类且宠物有活跃保险，显示报销快捷入口 Toast（3 秒后自动隐藏）
-        if selectedCategory == .medical && !activeInsurances.isEmpty {
+        if selectedCategory == .medical, !activeInsurances.isEmpty {
             savedExpenseId = log.id.uuidString
-            withAnimation(.easeInOut(duration: 0.3)) { showClaimToast = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
-                withAnimation(.easeInOut(duration: 0.3)) { showClaimToast = false }
-            }
+            isSaving = false
         } else {
             dismiss()
         }

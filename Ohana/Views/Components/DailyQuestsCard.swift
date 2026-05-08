@@ -26,7 +26,8 @@ struct IslandQuestEngine {
         pets: [Pet],
         reminders: [Reminder],
         plants: [Plant] = [],
-        events: [Event] = []
+        events: [Event] = [],
+        humans: [Human] = []
     ) -> [IslandQuest] {
         let cal = Calendar.current
         let now = Date()
@@ -55,45 +56,57 @@ struct IslandQuestEngine {
             }
         }
 
+        // ── 物种/品种默认护理计划：添加宠物后写入 Event，这里只取今天到期且尚未完成的项目。
+        for quest in carePlanQuests(from: events, pets: activePets, humans: humans, calendar: cal, now: now) {
+            guard quests.count < 3 else { break }
+            if !quests.contains(where: { $0.id == quest.id }) {
+                quests.append(quest)
+            }
+        }
+
         // ── 轻量互动：每天最多一次家庭级陪玩引导；遛狗也视为已互动，避免给每只宠物轮流派发陪玩任务。
         let hasAnyPlayEquivalentToday = activePets.contains { pet in
             pet.careLogs.contains { $0.careType == .play && cal.isDateInToday($0.date) }
                 || pet.walkLogs.contains { cal.isDateInToday($0.startDate) }
         }
-        if quests.count < 3, !hasAnyPlayEquivalentToday, let pet = activePets.first {
+        if quests.count < 3,
+           !hasAnyPlayEquivalentToday,
+           let pet = PetPersonalityBehavior.preferredPet(from: activePets, actionType: "play", isAlreadyDone: { _ in false }) {
             quests.append(IslandQuest(
                 id: "q_play_\(pet.id.uuidString)",
                 emoji: "🎾",
                 title: "陪 \(pet.name) 玩一会儿",
-                subtitle: "轻松互动，不是固定照护计划",
+                subtitle: personalitySubtitle(for: "play", pet: pet, fallback: "轻松互动，不是固定照护计划"),
                 isCompleted: false,
                 targetPetId: pet.id,
                 targetPlantId: nil
             ))
         }
 
-        if quests.count < 3, let pet = activePets.first(where: { p in
-            !p.weightLogs.contains { cal.isDateInToday($0.date) }
-        }) {
+        if quests.count < 3,
+           let pet = PetPersonalityBehavior.preferredPet(from: activePets, actionType: "weight", calendar: cal, now: now, isAlreadyDone: { p in
+               p.weightLogs.contains { cal.isDateInToday($0.date) }
+           }) {
             quests.append(IslandQuest(
                 id: "q_weight_\(pet.id.uuidString)",
                 emoji: "⚖️",
                 title: "记录 \(pet.name) 的体重",
-                subtitle: "建立健康趋势，从第一条数据开始",
+                subtitle: personalitySubtitle(for: "weight", pet: pet, fallback: "建立健康趋势，从第一条数据开始"),
                 isCompleted: false,
                 targetPetId: pet.id,
                 targetPlantId: nil
             ))
         }
 
-        if quests.count < 3, let pet = activePets.first(where: { p in
-            !p.photoLogs.contains { cal.isDateInToday($0.date) }
-        }) {
+        if quests.count < 3,
+           let pet = PetPersonalityBehavior.preferredPet(from: activePets, actionType: "moment", calendar: cal, now: now, isAlreadyDone: { p in
+               p.photoLogs.contains { cal.isDateInToday($0.date) }
+           }) {
             quests.append(IslandQuest(
                 id: "q_moment_\(pet.id.uuidString)",
                 emoji: "📝",
                 title: "记录 \(pet.name) 的日常",
-                subtitle: "写一句话或加一张照片，留下今天",
+                subtitle: personalitySubtitle(for: "moment", pet: pet, fallback: "写一句话或加一张照片，留下今天"),
                 isCompleted: false,
                 targetPetId: pet.id,
                 targetPlantId: nil
@@ -152,6 +165,247 @@ struct IslandQuestEngine {
         return UUID(uuidString: String(id.dropFirst(prefix.count)))
     }
 
+    /// 解析委托 ID 是否为日历护理计划（`q_event_<UUID>`）
+    static func eventId(fromQuestId id: String) -> UUID? {
+        let prefix = "q_event_"
+        guard id.hasPrefix(prefix) else { return nil }
+        return UUID(uuidString: String(id.dropFirst(prefix.count)))
+    }
+
+    private enum RoutineKind {
+        case feeding
+        case watering
+        case walk
+        case potty
+        case play
+        case weight
+        case generic
+    }
+
+    private static func personalitySubtitle(for actionType: String, pet: Pet, fallback: String) -> String {
+        guard PetPersonalityBehavior.priorityBonus(for: actionType, pet: pet) > 0 else { return fallback }
+        let tags = Set(pet.personalityTagIdList)
+        switch actionType {
+        case "play":
+            if tags.contains("energetic") || tags.contains("playful") || tags.contains("toy") {
+                return "按 \(pet.name) 的性格，今天更适合主动陪玩"
+            }
+            if tags.contains("shy") || tags.contains("anxious") || tags.contains("gentle") {
+                return "用温柔一点的方式陪 \(pet.name) 放松"
+            }
+        case "weight":
+            if tags.contains("foodie") || tags.contains("greedy") || tags.contains("lazy") {
+                return "结合性格标签，体重趋势值得持续观察"
+            }
+        case "moment":
+            if tags.contains("photogenic") || tags.contains("drama") {
+                return "\(pet.name) 今天也很适合留下一张照片"
+            }
+            if tags.contains("mischief") || tags.contains("curious") {
+                return "记录一下 \(pet.name) 今天的新发现"
+            }
+        default:
+            break
+        }
+        return fallback
+    }
+
+    private static func carePlanQuests(
+        from events: [Event],
+        pets: [Pet],
+        humans: [Human],
+        calendar: Calendar,
+        now: Date
+    ) -> [IslandQuest] {
+        let petById = Dictionary(uniqueKeysWithValues: pets.map { ($0.id.uuidString, $0) })
+        return events
+            .filter { event in
+                event.relatedEntityType == EntityKind.pet.rawValue
+                    && event.isActionableTask
+                    && eventOccursToday(event, calendar: calendar, now: now)
+            }
+            .compactMap { event -> IslandQuest? in
+                guard let pet = petById[event.relatedEntityId] else { return nil }
+                let kind = routineKind(for: event)
+                if isRoutineDoneToday(kind, pet: pet, calendar: calendar, now: now) {
+                    return nil
+                }
+                let id = questId(for: kind, event: event, pet: pet)
+                return IslandQuest(
+                    id: id,
+                    emoji: emoji(for: kind, event: event),
+                    title: event.title,
+                    subtitle: routineSubtitle(for: kind, pet: pet, humans: humans, calendar: calendar, now: now),
+                    isCompleted: false,
+                    targetPetId: pet.id,
+                    targetPlantId: nil
+                )
+            }
+            .sorted { lhs, rhs in
+                carePlanPriority(lhs.id) < carePlanPriority(rhs.id)
+            }
+    }
+
+    private static func eventOccursToday(_ event: Event, calendar: Calendar, now: Date) -> Bool {
+        let today = calendar.startOfDay(for: now)
+        let start = calendar.startOfDay(for: event.startDate)
+        if event.recurrenceDays <= 0 {
+            return calendar.isDate(event.startDate, inSameDayAs: now) && !event.isOccurrenceMarkedComplete(on: today)
+        }
+        guard start <= today else { return false }
+        if let end = event.recurrenceEndDate, calendar.startOfDay(for: end) < today { return false }
+        let elapsed = calendar.dateComponents([.day], from: start, to: today).day ?? 0
+        return elapsed % max(1, event.recurrenceDays) == 0 && !event.isOccurrenceMarkedComplete(on: today)
+    }
+
+    private static func routineKind(for event: Event) -> RoutineKind {
+        let text = "\(event.title) \(event.eventType)".lowercased()
+        if text.contains("喂食") || text.contains("feed") { return .feeding }
+        if text.contains("饮水") || text.contains("喂水") || text.contains("补充饮水") { return .watering }
+        if text.contains("遛") || text.contains("walk") { return .walk }
+        if text.contains("铲") || text.contains("厕所") || text.contains("便") || text.contains("litter") { return .potty }
+        if text.contains("陪玩") || text.contains("互动") || text.contains("play") || text.contains("放飞") { return .play }
+        if text.contains("体重") || text.contains("weight") { return .weight }
+        return .generic
+    }
+
+    private static func questId(for kind: RoutineKind, event: Event, pet: Pet) -> String {
+        switch kind {
+        case .feeding:
+            return "q_feed_\(pet.id.uuidString)"
+        case .watering:
+            return "q_water_\(pet.id.uuidString)"
+        case .walk:
+            return "q_walk"
+        case .potty:
+            return "q_potty"
+        case .play:
+            return "q_play_\(pet.id.uuidString)"
+        case .weight:
+            return "q_weight_\(pet.id.uuidString)"
+        case .generic:
+            return "q_event_\(event.id.uuidString)"
+        }
+    }
+
+    private static func emoji(for kind: RoutineKind, event: Event) -> String {
+        switch kind {
+        case .feeding: return "🍽️"
+        case .watering: return "💧"
+        case .walk: return "🚶"
+        case .potty: return "🧹"
+        case .play: return "🎾"
+        case .weight: return "⚖️"
+        case .generic: return event.emoji
+        }
+    }
+
+    private static func carePlanPriority(_ id: String) -> Int {
+        if id.hasPrefix("q_med_") { return 0 }
+        if id.hasPrefix("q_feed_") { return 1 }
+        if id.hasPrefix("q_water_") { return 2 }
+        if id == "q_walk" || id == "q_potty" { return 3 }
+        if id.hasPrefix("q_event_") { return 4 }
+        return 5
+    }
+
+    private static func isRoutineDoneToday(_ kind: RoutineKind, pet: Pet, calendar: Calendar, now: Date) -> Bool {
+        switch kind {
+        case .feeding:
+            return pet.careLogs.contains { $0.careType == .feeding && calendar.isDate($0.date, inSameDayAs: now) }
+        case .watering:
+            return pet.careLogs.contains { $0.careType == .watering && calendar.isDate($0.date, inSameDayAs: now) }
+        case .walk:
+            return pet.walkLogs.contains { calendar.isDate($0.startDate, inSameDayAs: now) }
+        case .potty:
+            return pet.pottyLogs.contains { calendar.isDate($0.date, inSameDayAs: now) }
+                || pet.careLogs.contains { $0.careType == .litter && calendar.isDate($0.date, inSameDayAs: now) }
+        case .play:
+            return pet.careLogs.contains { $0.careType == .play && calendar.isDate($0.date, inSameDayAs: now) }
+        case .weight:
+            return pet.weightLogs.contains { calendar.isDate($0.date, inSameDayAs: now) }
+        case .generic:
+            return false
+        }
+    }
+
+    private static func routineSubtitle(
+        for kind: RoutineKind,
+        pet: Pet,
+        humans: [Human],
+        calendar: Calendar,
+        now: Date
+    ) -> String {
+        let fallback: String
+        switch kind {
+        case .feeding: fallback = "今天还缺喂食"
+        case .watering: fallback = "今天还缺饮水记录"
+        case .walk: fallback = "今天还缺遛狗"
+        case .potty: fallback = "今天还缺厕所/便便记录"
+        case .play: fallback = "今天还缺互动陪伴"
+        case .weight: fallback = "今天还缺体重记录"
+        case .generic: fallback = "按计划完成后，家人都能看到状态"
+        }
+
+        guard let last = lastRoutineActor(for: kind, pet: pet) else { return fallback }
+        let actor = humanDisplayName(id: last.executorId, humans: humans)
+        return "上次由 \(actor) · \(relativeTime(from: last.date, to: now, calendar: calendar))"
+    }
+
+    private static func lastRoutineActor(for kind: RoutineKind, pet: Pet) -> (date: Date, executorId: String?)? {
+        switch kind {
+        case .feeding:
+            return pet.careLogs
+                .filter { $0.careType == .feeding }
+                .map { (date: $0.date, executorId: $0.executorId) }
+                .max { $0.date < $1.date }
+        case .watering:
+            return pet.careLogs
+                .filter { $0.careType == .watering }
+                .map { (date: $0.date, executorId: $0.executorId) }
+                .max { $0.date < $1.date }
+        case .walk:
+            return pet.walkLogs
+                .map { (date: $0.startDate, executorId: $0.executorId) }
+                .max { $0.date < $1.date }
+        case .potty:
+            let potty = pet.pottyLogs
+                .map { (date: $0.date, executorId: $0.executorId) }
+            let litter = pet.careLogs
+                .filter { $0.careType == .litter }
+                .map { (date: $0.date, executorId: $0.executorId) }
+            return (potty + litter).max { $0.date < $1.date }
+        case .play:
+            return pet.careLogs
+                .filter { $0.careType == .play }
+                .map { (date: $0.date, executorId: $0.executorId) }
+                .max { $0.date < $1.date }
+        case .weight:
+            return pet.weightLogs
+                .map { (date: $0.date, executorId: $0.executorId) }
+                .max { $0.date < $1.date }
+        case .generic:
+            return nil
+        }
+    }
+
+    private static func humanDisplayName(id: String?, humans: [Human]) -> String {
+        guard let id, let human = humans.first(where: { $0.id.uuidString == id }) else {
+            return "家人"
+        }
+        return human.name.isEmpty ? "家人" : human.name
+    }
+
+    private static func relativeTime(from date: Date, to now: Date, calendar: Calendar) -> String {
+        if calendar.isDate(date, inSameDayAs: now) {
+            let minutes = max(1, Int(now.timeIntervalSince(date) / 60))
+            if minutes < 60 { return "\(minutes) 分钟前" }
+            return "\(minutes / 60) 小时前"
+        }
+        let days = max(1, calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: now)).day ?? 1)
+        return "\(days) 天前"
+    }
+
     static func allCompleted(quests: [IslandQuest]) -> Bool {
         !quests.isEmpty && quests.allSatisfy { $0.isCompleted }
     }
@@ -169,6 +423,7 @@ struct IslandQuestEngine {
             if id.hasPrefix("q_play_")  { return 2 }
             if id.hasPrefix("q_weight_") { return 2 }
             if id.hasPrefix("q_moment_") { return 1 }
+            if id.hasPrefix("q_event_") { return 1 }
             return 1
         }
     }

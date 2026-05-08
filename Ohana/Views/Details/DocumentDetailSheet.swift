@@ -39,6 +39,10 @@ struct DocumentDetailSheet: View {
         doc.attachments.filter { !$0.isImage }.map { ($0.data, $0.filename) }
     }
 
+    private var visibleNotes: String {
+        ExpenseReceiptMetadata.visibleNotes(from: doc.notes)
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -98,11 +102,13 @@ struct DocumentDetailSheet: View {
                                 Divider()
                             }
                             if doc.cost > 0 {
-                                infoRow(icon: "yensign.circle", label: "花费", value: String(format: "¥%.2f", doc.cost))
-                                Divider()
+                                infoRow(icon: AppCurrency.systemIconName, label: "花费", value: AppCurrency.format(doc.cost, fractionDigits: 2))
+                                if !visibleNotes.isEmpty {
+                                    Divider()
+                                }
                             }
-                            if !doc.notes.isEmpty {
-                                infoRow(icon: "note.text", label: "备注", value: doc.notes)
+                            if !visibleNotes.isEmpty {
+                                infoRow(icon: "note.text", label: "备注", value: visibleNotes)
                             }
                         }
                         .goGlassBackground(RoundedRectangle(cornerRadius: 16, style: .continuous))

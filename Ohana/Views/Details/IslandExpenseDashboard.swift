@@ -246,7 +246,7 @@ struct IslandExpenseDashboard: View {
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
                                 .foregroundStyle(.primary.opacity(0.3))
                         } else {
-                            Text("¥\(Int(totalAmount))")
+                            Text(AppCurrency.format(totalAmount, fractionDigits: 0))
                                 .font(.system(size: 16, weight: .black, design: .rounded))
                                 .foregroundStyle(.primary)
                             Text(timeRange.rawValue == "全部" ? "累计" : "本\(timeRange.rawValue)")
@@ -282,7 +282,7 @@ struct IslandExpenseDashboard: View {
                                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                                     .foregroundStyle(Color(hex: "4ECDC4"))
                                 Spacer()
-                                Text("-¥\(Int(totalReimbursed))")
+                                Text(AppCurrency.format(-totalReimbursed, fractionDigits: 0))
                                     .font(.system(size: 10, weight: .black, design: .rounded))
                                     .foregroundStyle(Color(hex: "4ECDC4"))
                             }
@@ -342,7 +342,7 @@ struct IslandExpenseDashboard: View {
                     .font(.system(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                Text("¥\(top.total.formatted(.number.precision(.fractionLength(0))))")
+                Text(AppCurrency.format(top.total, fractionDigits: 0))
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundStyle(.primary.opacity(0.85))
             } else {
@@ -428,7 +428,7 @@ struct IslandExpenseDashboard: View {
                         }
                     }
                     .frame(height: 10)
-                    Text("¥\(Int(summary.total))")
+                    Text(AppCurrency.format(summary.total, fractionDigits: 0))
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(summary.color)
                         .frame(width: 48, alignment: .trailing)
@@ -474,7 +474,7 @@ struct IslandExpenseDashboard: View {
                                 }
                             }
                             .frame(height: 10)
-                            Text("¥\(Int(summary.total))")
+                            Text(AppCurrency.format(summary.total, fractionDigits: 0))
                                 .font(.system(size: 11, weight: .bold, design: .rounded))
                                 .foregroundStyle(summary.color)
                                 .frame(width: 48, alignment: .trailing)
@@ -526,7 +526,7 @@ struct IslandExpenseDashboard: View {
             .frame(width: 130, height: 130)
 
             VStack(spacing: 2) {
-                Text("¥\(Int(totalAmount))")
+                Text(AppCurrency.format(totalAmount, fractionDigits: 0))
                     .font(.title3.bold())
                     .foregroundStyle(.primary)
                 Text("总计")

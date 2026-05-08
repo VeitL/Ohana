@@ -52,7 +52,7 @@ extension MedicationReminderService {
 
 extension PetMedicationFrequency {
     /// 每日应服次数（asNeeded / custom = 0 表示按需，不自动调度）
-    var dosesPerDay: Int {
+    nonisolated var dosesPerDay: Int {
         switch self {
         case .daily:             return 1
         case .twiceDaily:        return 2
@@ -66,7 +66,7 @@ extension PetMedicationFrequency {
 }
 
 extension MedicationFrequency {
-    var dosesPerDay: Int {
+    nonisolated var dosesPerDay: Int {
         switch self {
         case .daily: return 1
         case .twiceDaily: return 2
@@ -228,8 +228,6 @@ final class MedicationReminderService {
     // MARK: - 调度单个人的用药通知
 
     func scheduleHumanMedicationReminders(for human: Human, meds: [HumanMedication], context: ModelContext? = nil) {
-        let activeMeds = meds.filter { $0.isActiveToday }
-
         let prefix = "humanmedreminder_\(human.id.uuidString)"
         center.getPendingNotificationRequests { requests in
             let ids = requests
@@ -237,75 +235,56 @@ final class MedicationReminderService {
                 .filter { $0.hasPrefix(prefix) }
             self.center.removePendingNotificationRequests(withIdentifiers: ids)
 
-            for med in activeMeds {
+            for med in meds {
                 self.scheduleRemindersForHumanMedication(med, human: human, context: context)
             }
         }
     }
 
     private func scheduleRemindersForHumanMedication(_ med: HumanMedication, human: Human, context: ModelContext?) {
-        let dosesPerDay = med.frequency.dosesPerDay
-        guard dosesPerDay > 0 else { return }
-
-        let intervalHours = 24.0 / Double(dosesPerDay)
-        let calendar = Calendar.current
         let now = Date()
+        let doses = HumanMedicationSchedulePlan.futureDoses(for: med, from: now, days: 14)
+        guard !doses.isEmpty else { return }
 
-        var baseComponents = calendar.dateComponents([.year, .month, .day], from: now)
-        let timeComponents = calendar.dateComponents([.hour, .minute], from: med.firstDoseTime)
-        baseComponents.hour = timeComponents.hour ?? 8
-        baseComponents.minute = timeComponents.minute ?? 0
-        baseComponents.second = 0
-        guard let baseTime = calendar.date(from: baseComponents) else { return }
+        let l = L10n.current
+        let hidesMedicationDetail = human.privateFields.contains(HumanPrivateField.medication.rawValue)
 
-        var scheduled = 0
-        let maxNotifications = 14 * dosesPerDay
+        for dose in doses {
+            let fireDate = dose.scheduledTime
+            let content = UNMutableNotificationContent()
+            content.title = l.tr(zh: "吃药提醒", en: "Medication reminder", de: "Medikamentenerinnerung")
+            content.body = hidesMedicationDetail
+                ? l.tr(zh: "该记录已设为隐私，请打开 Ohana 查看。", en: "This medication is private. Open Ohana to view it.", de: "Dieser Eintrag ist privat. Öffne Ohana, um ihn anzusehen.")
+                : "\(med.name) · \(med.dosage)"
+            content.sound = .default
+            content.userInfo = [
+                "humanMedicationId": med.id.uuidString,
+                "humanId": human.id.uuidString
+            ]
+            content.categoryIdentifier = "HUMAN_MED_REMINDER"
 
-        outerLoop: for day in 0..<14 {
-            guard let dayDate = calendar.date(byAdding: .day, value: day, to: baseTime) else { continue }
+            let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+            let minuteKey = Int(fireDate.timeIntervalSince1970 / 60)
+            let identifier = "humanmedreminder_\(human.id.uuidString)_\(med.id.uuidString)_m\(minuteKey)_i\(dose.doseIndex)"
+            let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
 
-            if med.frequency == .weekly {
-                let daysSinceStart = calendar.dateComponents([.day], from: med.startDate, to: dayDate).day ?? 0
-                if daysSinceStart % 7 != 0 { continue }
-            }
-
-            for doseIdx in 0..<dosesPerDay {
-                let fireDate = dayDate.addingTimeInterval(Double(doseIdx) * intervalHours * 3600)
-                guard fireDate > now else { continue }
-                if let endDate = med.endDate, fireDate > endDate { break outerLoop }
-
-                let content = UNMutableNotificationContent()
-                content.title = "💊 吃药提醒"
-                content.body = "\(med.name) · \(med.dosage)"
-                content.sound = .default
-                content.userInfo = [
-                    "humanMedicationId": med.id.uuidString,
-                    "humanId": human.id.uuidString
-                ]
-                content.categoryIdentifier = "HUMAN_MED_REMINDER"
-
-                let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
-                let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-                let identifier = "humanmedreminder_\(human.id.uuidString)_\(med.id.uuidString)_d\(day)_i\(doseIdx)"
-                let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
-
-                let humanId = human.id.uuidString
-                let medicationId = med.id.uuidString
-                let medicationName = med.name
-                let contextBox = MedicationReminderContextBox(context)
-                center.add(request) { error in
-                    self.recordMedicationScheduleResult(
-                        contextBox: contextBox,
-                        subjectKind: .human,
-                        subjectId: humanId,
-                        medicationId: medicationId,
-                        medicationName: medicationName,
-                        actionType: error == nil ? "medicationScheduleSuccess" : "medicationScheduleFailed",
-                        metadataJSON: error.map { "{\"notificationId\":\"\(identifier)\",\"error\":\"\($0.localizedDescription.replacingOccurrences(of: "\"", with: "\\\""))\"}" } ?? "{\"notificationId\":\"\(identifier)\",\"scheduledAt\":\(fireDate.timeIntervalSince1970)}"
-                    )
-                }
-                scheduled += 1
-                if scheduled >= maxNotifications { break outerLoop }
+            let humanId = human.id.uuidString
+            let medicationId = med.id.uuidString
+            let medicationName = hidesMedicationDetail
+                ? l.tr(zh: "隐私用药", en: "Private medication", de: "Privates Medikament")
+                : med.name
+            let contextBox = MedicationReminderContextBox(context)
+            center.add(request) { error in
+                self.recordMedicationScheduleResult(
+                    contextBox: contextBox,
+                    subjectKind: .human,
+                    subjectId: humanId,
+                    medicationId: medicationId,
+                    medicationName: medicationName,
+                    actionType: error == nil ? "medicationScheduleSuccess" : "medicationScheduleFailed",
+                    metadataJSON: error.map { "{\"notificationId\":\"\(identifier)\",\"error\":\"\($0.localizedDescription.replacingOccurrences(of: "\"", with: "\\\""))\"}" } ?? "{\"notificationId\":\"\(identifier)\",\"scheduledAt\":\(fireDate.timeIntervalSince1970)}"
+                )
             }
         }
     }

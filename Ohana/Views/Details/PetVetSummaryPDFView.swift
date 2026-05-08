@@ -51,6 +51,21 @@ struct PetVetSummaryPDFView: View {
     private var recentHealthLogs: [PetHealthLog] {
         pet.healthLogs.sorted { $0.date > $1.date }.prefix(8).map { $0 }
     }
+    private var activeMedications: [PetMedication] {
+        pet.medications.filter(\.isActiveToday).sorted { $0.createdAt > $1.createdAt }
+    }
+    private var recentSymptoms: [SymptomLog] {
+        pet.symptomLogs.sorted { $0.date > $1.date }.prefix(3).map { $0 }
+    }
+    private var activeInsurance: PetInsurance? {
+        pet.insurances.filter(\.isActive).sorted { $0.renewalDate < $1.renewalDate }.first
+    }
+    private var keyDocuments: [PetDocument] {
+        pet.documents
+            .sorted { ($0.expiryDate ?? .distantFuture) < ($1.expiryDate ?? .distantFuture) }
+            .prefix(3)
+            .map { $0 }
+    }
     private var weightLogs3Mo: [PetWeightLog] {
         let cutoff = Calendar.current.date(byAdding: .month, value: -3, to: Date())!
         return pet.weightLogs.filter { $0.date >= cutoff }.sorted { $0.date < $1.date }
@@ -151,16 +166,68 @@ struct PetVetSummaryPDFView: View {
 
     // MARK: - 过敏 & 备注
     private var pdfAllergyNotes: some View {
-        let notes = pet.notes.isEmpty ? "暂无备注" : pet.notes
         return VStack(alignment: .leading, spacing: 6) {
-            Text("特殊说明 & 备注")
+            Text("就诊速览")
                 .font(.system(size: 11, weight: .black)).foregroundStyle(.gray).tracking(1)
-            Text(notes)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Color(hex: "1A1A2E").opacity(0.75))
-                .fixedSize(horizontal: false, vertical: true)
-                .lineLimit(4)
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 6) {
+                pdfSummaryCell("过敏史", pet.allergies.isEmpty ? "无记录" : pet.allergies)
+                pdfSummaryCell("用药中", medicationSummaryText)
+                pdfSummaryCell("最近症状", symptomSummaryText)
+                pdfSummaryCell("保险", insuranceSummaryText)
+                pdfSummaryCell("关键文档", documentSummaryText)
+                pdfSummaryCell("备注", pet.notes.isEmpty ? "暂无备注" : pet.notes)
+            }
         }
+    }
+
+    private func pdfSummaryCell(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundStyle(.gray.opacity(0.65))
+            Text(value)
+                .font(.system(size: 9.5, weight: .medium))
+                .foregroundStyle(Color(hex: "1A1A2E").opacity(0.78))
+                .lineLimit(2)
+                .minimumScaleFactor(0.78)
+        }
+        .frame(maxWidth: .infinity, minHeight: 38, alignment: .topLeading)
+        .padding(7)
+        .background(Color.gray.opacity(0.045), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var medicationSummaryText: String {
+        guard !activeMedications.isEmpty else { return "无进行中用药" }
+        return activeMedications.prefix(3)
+            .map { "\($0.name.isEmpty ? "未命名药品" : $0.name) · \($0.dosage.isEmpty ? "按医嘱" : $0.dosage)" }
+            .joined(separator: "；")
+    }
+
+    private var symptomSummaryText: String {
+        guard !recentSymptoms.isEmpty else { return "近况无症状记录" }
+        return recentSymptoms
+            .map { "\($0.symptomName)（\($0.severity.label)，\($0.date.formatted(.dateTime.month().day()))）" }
+            .joined(separator: "；")
+    }
+
+    private var insuranceSummaryText: String {
+        guard let activeInsurance else { return "未登记保险" }
+        let name = activeInsurance.productName.isEmpty
+            ? (activeInsurance.companyName.isEmpty ? "保险" : activeInsurance.companyName)
+            : activeInsurance.productName
+        let number = activeInsurance.policyNumber.isEmpty ? "" : " · \(activeInsurance.policyNumber)"
+        return "\(name)\(number) · \(activeInsurance.renewalStatusLabel)"
+    }
+
+    private var documentSummaryText: String {
+        guard !keyDocuments.isEmpty else { return "未上传关键文档" }
+        return keyDocuments.map { doc in
+            let title = doc.title.isEmpty ? doc.category : doc.title
+            if let expiry = doc.expiryDate {
+                return "\(title) 至 \(expiry.formatted(.dateTime.year().month().day()))"
+            }
+            return title
+        }.joined(separator: "；")
     }
 
     // MARK: - 健康记录表

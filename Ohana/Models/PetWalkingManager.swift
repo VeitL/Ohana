@@ -28,6 +28,10 @@ final class PetWalkingManager {
     var elapsedTime: TimeInterval = 0
     var poopCount: Int = 0
     var showSummary: Bool = false
+    var isWalkCardExpandedSurfaceVisible: Bool = false
+    var lastCompletedPetId: UUID?
+    var lastCompletedWalk: PetWalkLog?
+    var lastCompletedRouteCoordinates: [CLLocationCoordinate2D] = []
 
     private var pausedElapsed: TimeInterval = 0  // 暂停前已累计时间
     private var resumeTime: Date?                // 最近一次 resume/start 时间
@@ -46,6 +50,10 @@ final class PetWalkingManager {
         resumeTime = Date()
         poopCount = 0
         showSummary = false
+        isWalkCardExpandedSurfaceVisible = false
+        lastCompletedPetId = nil
+        lastCompletedWalk = nil
+        lastCompletedRouteCoordinates = []
         
         locationManager.startTracking()
         startTimer()
@@ -82,7 +90,6 @@ final class PetWalkingManager {
         
         let elapsed = elapsedTime
         let poop = poopCount
-        phase = .finished(elapsed: elapsed, poopCount: poop)
         
         guard let pet = currentPet else { return }
 
@@ -94,13 +101,19 @@ final class PetWalkingManager {
         // 保存遛狗记录
         let walkLog = PetWalkLog(startDate: startTime ?? Date(), pet: pet, executorId: executorId)
         walkLog.endDate = Date()
-        walkLog.distanceMeters = locationManager.totalDistance
+        let distanceMeters = locationManager.totalDistance
+        walkLog.distanceMeters = distanceMeters
         
         let routeLocations = locationManager.routeLocationsForPersistence()
+        let routeCoordinates = routeLocations.map(\.coordinate)
         let coordinates = routeLocations.map {
             ["lat": $0.coordinate.latitude, "lon": $0.coordinate.longitude]
         }
         walkLog.routeLocationsData = try? JSONSerialization.data(withJSONObject: coordinates)
+
+        lastCompletedPetId = pet.id
+        lastCompletedWalk = walkLog
+        lastCompletedRouteCoordinates = routeCoordinates
         
         generateMapSnapshot(for: walkLog, routeLocations: routeLocations, modelContext: modelContext)
         
@@ -112,14 +125,14 @@ final class PetWalkingManager {
         
         // N2/Phase54: 遛狗椰子奖励（距离 < 20m 不发放奖励，日志正常保存）
         let minimumRewardDistance: Double = 20.0
-        let earnedCoconuts = locationManager.totalDistance >= minimumRewardDistance
-            ? PetWalkLog.coconuts(for: locationManager.totalDistance)
+        let earnedCoconuts = distanceMeters >= minimumRewardDistance
+            ? PetWalkLog.coconuts(for: distanceMeters)
             : 0
         walkLog.coconutsEarned = earnedCoconuts
-        let isTooShortForReward = locationManager.totalDistance < minimumRewardDistance
+        let isTooShortForReward = distanceMeters < minimumRewardDistance
         if !isTooShortForReward {
             QuestManager.shared.awardAction(
-                type: .walk(distanceMeters: locationManager.totalDistance),
+                type: .walk(distanceMeters: distanceMeters),
                 pet: pet,
                 context: modelContext
             )
@@ -138,6 +151,7 @@ final class PetWalkingManager {
         modelContext.insert(walkLog)
         modelContext.safeSave()
 
+        phase = .finished(elapsed: elapsed, poopCount: poop)
         showSummary = true
     }
     
@@ -150,6 +164,10 @@ final class PetWalkingManager {
         resumeTime = nil
         poopCount = 0
         showSummary = false
+        isWalkCardExpandedSurfaceVisible = false
+        lastCompletedPetId = nil
+        lastCompletedWalk = nil
+        lastCompletedRouteCoordinates = []
     }
     
     func addPoop() {

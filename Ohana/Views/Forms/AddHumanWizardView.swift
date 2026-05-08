@@ -10,15 +10,16 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import Foundation
 
 // MARK: - Human wizard steps
 
 private enum HumanWizardStep: Int, CaseIterable {
     case identity = 0   // 名字 + 头像
     case profile  = 1   // 生日 + 血型
-    case family   = 2   // 家庭角色 + 国籍
+    case family   = 2   // 权限 + 性别/身份 + 国籍
     case body     = 3   // 身高体重 + 隐私
-    case confirm  = 4   // 主题色 + 权限 + 确认
+    case confirm  = 4   // 主题色 + 确认
 }
 
 // MARK: - AddHumanWizardView
@@ -53,8 +54,7 @@ struct AddHumanWizardView: View {
     @State private var showBirthdayPickerSheet = false
     @State private var birthdayPickerDraft     = Date()
 
-    // ── Family（国籍 / 现居地：列表选择，写入 Human.nationality / Human.city）
-    @State private var familyRole           = ""
+    // ── Family（权限 / 性别身份 / 国籍 / 现居地：写入 role / notes / Human.nationality / Human.city）
     @State private var nationalityCountry   = ""
     @State private var residenceCountry     = ""
     @State private var residenceCity        = ""
@@ -92,11 +92,7 @@ struct AddHumanWizardView: View {
         "INTJ", "INTP", "ENTJ", "ENTP", "INFJ", "INFP", "ENFJ", "ENFP",
         "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP"
     ]
-    private let genderOptions  = [("男", "♂️"), ("女", "♀️")]
-    private let familyRoleOptions = [
-        "爸爸","妈妈","爷爷","奶奶","外公","外婆",
-        "哥哥","姐姐","弟弟","妹妹","朋友","伴侣","自己"
-    ]
+    private let genderOptions = HumanProfileOptions.genderOptions
     private let themeColorOptions: [(hex: String, label: String)] = [
         ("C8FF00","青柠"), ("FF7600","橙色"), ("5B6AFF","靛蓝"),
         ("FF6B9D","粉色"), ("00E5C8","青色"), ("A855F7","紫色"),
@@ -112,17 +108,13 @@ struct AddHumanWizardView: View {
     private let walletCardCorner: CGFloat = 24
 
     private func fallbackAvatarEmoji(for gender: String) -> String {
-        switch gender {
-        case "男": return "👨"
-        case "女": return "👩"
-        default: return "👤"
-        }
+        HumanGenderIdentity.fallbackAvatarEmoji(for: gender)
     }
 
-    /// 顶卡脚注：关系 · 国籍 · 现居 · 年龄（仅「岁」，不含月；星座单独显示在卡上）
+    /// 顶卡脚注：身份 · 国籍 · 现居 · 年龄（仅「岁」，不含月；星座单独显示在卡上）
     private var draftWalletSubtitle: String {
         var parts: [String] = []
-        if !familyRole.isEmpty { parts.append(l.humanFamilyRoleDisplay(familyRole)) }
+        if !gender.isEmpty { parts.append(l.humanGenderDisplay(gender)) }
         if !nationalityCountry.isEmpty {
             parts.append(l.isEn ? "From \(nationalityCountry)" : "国籍 \(nationalityCountry)")
         }
@@ -175,6 +167,10 @@ struct AddHumanWizardView: View {
             || existingHumans.map { $0.name.trimmingCharacters(in: .whitespaces).lowercased() }.contains(c)
     }
 
+    private var isGenderReady: Bool {
+        HumanProfileOptions.genderOptions.contains { $0.key == gender }
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -200,10 +196,11 @@ struct AddHumanWizardView: View {
             .fullScreenCover(isPresented: $showingCamera, onDismiss: {
                 if let img = pendingCapturedAvatarImage {
                     pendingCapturedAvatarImage = nil
-                    cropImageItem = IdentifiableCropImage(image: img)
+                    prepareCapturedAvatarForCrop(img)
                 }
             }) {
                 PetCameraPickerView(maxPixel: 1_600) { img in
+                    AppPerformanceMonitor.shared.markStart("avatar.camera.to.crop")
                     pendingCapturedAvatarImage = img
                     showingCamera = false
                 } onCancel: {
@@ -300,7 +297,6 @@ struct AddHumanWizardView: View {
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: gender)
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: avatarImageData?.count)
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: themeColorHex)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: familyRole)
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: nationalityCountry)
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: residenceCountry)
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: residenceCity)
@@ -417,48 +413,6 @@ struct AddHumanWizardView: View {
                     Text(l.humanWizPasteHint)
                         .font(.system(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(.secondary.opacity(0.5))
-                }
-
-                Divider().opacity(0.15)
-
-                // Gender silhouette
-                VStack(alignment: .leading, spacing: 10) {
-                    cardSectionLabel(l.humanWizGenderLabel)
-                    HStack(spacing: 10) {
-                        ForEach(genderOptions, id: \.0) { opt in
-                            Button {
-                                gender = gender == opt.0 ? "" : opt.0
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            } label: {
-                                VStack(spacing: 8) {
-                                    HumanSilhouetteView(gender: opt.0, accent: gender == opt.0 ? .arkInk : accentColor)
-                                        .frame(width: 42, height: 48)
-                                    Text(l.humanGenderDisplay(opt.0))
-                                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                                        .foregroundStyle(gender == opt.0 ? Color.arkInk : .primary)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                    .background(
-                                        gender == opt.0
-                                            ? Color.goPrimary
-                                            : Color.primary.opacity(0.07),
-                                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                            .strokeBorder(
-                                                gender == opt.0
-                                                    ? Color.goPrimary : .clear,
-                                                lineWidth: 1.5
-                                            )
-                                    )
-                                    .scaleEffect(gender == opt.0 ? 0.97 : 1.0)
-                                    .animation(.spring(response: 0.25), value: gender)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
                 }
 
                 Spacer(minLength: 20)
@@ -589,28 +543,46 @@ struct AddHumanWizardView: View {
             VStack(spacing: 22) {
                 meshCardLabel(l.humanWizMesh3).padding(.top, 14).padding(.horizontal, 20)
 
-                // Family role grid
+                // Permission
                 VStack(alignment: .leading, spacing: 10) {
-                    cardSectionLabel(l.humanWizFamilyRoleLabel)
+                    cardSectionLabel(l.humanWizRolePermsLabel)
+                    roleOption("owner", title: l.humanWizRoleOwnerTitle, desc: l.humanWizRoleOwnerDesc, icon: "crown.fill")
+                    roleOption("member", title: l.humanWizRoleMemberTitle, desc: l.humanWizRoleMemberDesc, icon: "person.fill")
+                }
+
+                Divider().opacity(0.15)
+
+                // Gender / identity
+                VStack(alignment: .leading, spacing: 10) {
+                    cardSectionLabel(l.humanWizGenderLabel)
                     LazyVGrid(
-                        columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4),
+                        columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2),
                         spacing: 8
                     ) {
-                        ForEach(familyRoleOptions, id: \.self) { opt in
+                        ForEach(genderOptions, id: \.key) { opt in
                             Button {
-                                familyRole = familyRole == opt ? "" : opt
+                                gender = opt.key
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             } label: {
-                                Text(l.humanFamilyRoleDisplay(opt))
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                                    .foregroundStyle(familyRole == opt ? Color.arkInk : .primary)
-                                    .frame(maxWidth: .infinity).padding(.vertical, 10)
-                                    .background(
-                                        familyRole == opt ? Color.goPrimary : Color.primary.opacity(0.08),
-                                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    )
-                                    .scaleEffect(familyRole == opt ? 0.96 : 1.0)
-                                    .animation(.spring(response: 0.22), value: familyRole)
+                                VStack(spacing: 8) {
+                                    HumanSilhouetteView(gender: opt.key, accent: gender == opt.key ? .arkInk : accentColor)
+                                        .frame(width: 42, height: 48)
+                                    Text(l.humanGenderDisplay(opt.key))
+                                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                                        .foregroundStyle(gender == opt.key ? Color.arkInk : .primary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(
+                                    gender == opt.key ? Color.goPrimary : Color.primary.opacity(0.07),
+                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .strokeBorder(gender == opt.key ? Color.goPrimary : .clear, lineWidth: 1.5)
+                                )
+                                .scaleEffect(gender == opt.key ? 0.97 : 1.0)
+                                .animation(.spring(response: 0.25), value: gender)
                             }
                             .buttonStyle(.plain)
                         }
@@ -872,23 +844,13 @@ struct AddHumanWizardView: View {
 
                 Divider().opacity(0.15)
 
-                // Role
-                VStack(alignment: .leading, spacing: 10) {
-                    cardSectionLabel(l.humanWizRolePermsLabel)
-                    roleOption("owner",  title: l.humanWizRoleOwnerTitle,  desc: l.humanWizRoleOwnerDesc,   icon: "crown.fill")
-                    roleOption("editor", title: l.humanWizRoleEditorTitle, desc: l.humanWizRoleEditorDesc, icon: "pencil")
-                    roleOption("viewer", title: l.humanWizRoleViewerTitle, desc: l.humanWizRoleViewerDesc, icon: "eye.fill")
-                }
-
-                Divider().opacity(0.15)
-
                 // Summary tags
                 VStack(alignment: .leading, spacing: 8) {
                     cardSectionLabel(l.humanWizSummaryLabel)
                     FlowTagRow(
                         tags: [
-                            gender.isEmpty ? nil : l.humanGenderDisplay(gender),
-                            familyRole.isEmpty ? nil : l.humanFamilyRoleDisplay(familyRole),
+                            isGenderReady ? l.humanGenderDisplay(gender) : nil,
+                            HumanProfileOptions.normalizedRole(role) == "owner" ? l.humanWizRoleOwnerTitle : l.humanWizRoleMemberTitle,
                             bloodType.isEmpty ? nil : l.humanWizBloodTag(bloodType),
                             nationalityCountry.isEmpty ? nil : l.humanWizNationalityTag(nationalityCountry),
                             residenceTagText,
@@ -905,8 +867,9 @@ struct AddHumanWizardView: View {
 
                 let trimmedName = name.trimmingCharacters(in: .whitespaces)
                 let confirmNameOk = !trimmedName.isEmpty && !isNameDuplicate
+                let confirmOk = confirmNameOk && isGenderReady
                 Button {
-                    guard confirmNameOk else {
+                    guard confirmOk else {
                         if isNameDuplicate { showDuplicateNameAlert = true }
                         return
                     }
@@ -914,18 +877,18 @@ struct AddHumanWizardView: View {
                     saveHuman()
                 } label: {
                     HStack(spacing: 8) {
-                        Text(trimmedName.isEmpty ? l.humanWizNeedName : isNameDuplicate ? l.humanWizNameTakenBtn : l.humanWizJoinIsland)
+                        Text(trimmedName.isEmpty ? l.humanWizNeedName : isNameDuplicate ? l.humanWizNameTakenBtn : !isGenderReady ? l.humanWizNeedGender : l.humanWizJoinIsland)
                             .font(.system(size: 16, weight: .black, design: .rounded))
-                        Image(systemName: confirmNameOk ? "checkmark.circle.fill" : "lock.fill")
+                        Image(systemName: confirmOk ? "checkmark.circle.fill" : "lock.fill")
                             .font(.system(size: 15, weight: .bold))
                             .symbolRenderingMode(.monochrome)
                     }
-                    .foregroundStyle(confirmNameOk ? Color.arkInk : .secondary)
+                    .foregroundStyle(confirmOk ? Color.arkInk : .secondary)
                     .frame(maxWidth: .infinity).padding(.vertical, 15)
-                    .background(confirmNameOk ? Color.goPrimary : Color.primary.opacity(0.12), in: Capsule())
+                    .background(confirmOk ? Color.goPrimary : Color.primary.opacity(0.12), in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
-                .disabled(!confirmNameOk)
+                .disabled(!confirmOk)
                 .padding(.top, 4)
 
                 Spacer(minLength: 20)
@@ -1046,15 +1009,18 @@ struct AddHumanWizardView: View {
     }
 
     private func roleOption(_ key: String, title: String, desc: String, icon: String) -> some View {
-        Button { role = key; UIImpactFeedbackGenerator(style: .light).impactOccurred() } label: {
+        let normalizedKey = HumanProfileOptions.normalizedRole(key)
+        let isSelected = HumanProfileOptions.normalizedRole(role) == normalizedKey
+
+        return Button { role = normalizedKey; UIImpactFeedbackGenerator(style: .light).impactOccurred() } label: {
             HStack(spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(role == key ? accentColor.opacity(0.2) : Color.primary.opacity(0.08))
+                        .fill(isSelected ? accentColor.opacity(0.2) : Color.primary.opacity(0.08))
                         .frame(width: 38, height: 38)
                     Image(systemName: icon)
                         .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(role == key ? accentColor : .secondary)
+                        .foregroundStyle(isSelected ? accentColor : .secondary)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
@@ -1065,7 +1031,7 @@ struct AddHumanWizardView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                if role == key {
+                if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(accentColor)
@@ -1073,12 +1039,12 @@ struct AddHumanWizardView: View {
             }
             .padding(14)
             .background(
-                role == key ? accentColor.opacity(0.08) : Color.primary.opacity(0.06),
+                isSelected ? accentColor.opacity(0.08) : Color.primary.opacity(0.06),
                 in: RoundedRectangle(cornerRadius: 14, style: .continuous)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(role == key ? accentColor.opacity(0.4) : .clear, lineWidth: 1.5)
+                    .strokeBorder(isSelected ? accentColor.opacity(0.4) : .clear, lineWidth: 1.5)
             )
         }
         .buttonStyle(.plain)
@@ -1090,6 +1056,7 @@ struct AddHumanWizardView: View {
     private func handlePhotosPicker(_ item: PhotosPickerItem?) {
         Task {
             guard let item else { return }
+            let startedAt = CFAbsoluteTimeGetCurrent()
             if let data = try? await item.loadTransferable(type: Data.self) {
                 let ui = await Task.detached(priority: .userInitiated) {
                     AddPetWizardView.cropReadyImage(from: data, maxPixel: 1_600)
@@ -1097,6 +1064,7 @@ struct AddHumanWizardView: View {
                 await MainActor.run {
                     if let ui {
                         cropImageItem = IdentifiableCropImage(image: ui)
+                        AppPerformanceMonitor.shared.record("相册到裁剪页", startedAt: startedAt, note: "人类头像")
                     }
                 }
             }
@@ -1117,15 +1085,24 @@ struct AddHumanWizardView: View {
             return
         }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        let startedAt = CFAbsoluteTimeGetCurrent()
         Task {
             let prepared = await Task.detached(priority: .userInitiated) {
-                AddPetWizardView.preparedCropImage(image, maxPixel: 900)
+                AddPetWizardView.preparedCropImage(image, maxPixel: 1_600)
             }.value
-            let hasAlpha = ImageCutoutService.imageHasTransparentPixels(prepared)
-            let optimized = AddPetWizardView.optimizedAvatarAsset(prepared, preserveAlpha: hasAlpha)
-            avatarImageData = hasAlpha
-                ? optimized.pngData()
-                : optimized.jpegData(compressionQuality: 0.88)
+            cropImageItem = IdentifiableCropImage(image: prepared)
+            AppPerformanceMonitor.shared.record("粘贴到裁剪页", startedAt: startedAt, note: "人类头像")
+        }
+    }
+
+    private func prepareCapturedAvatarForCrop(_ image: UIImage) {
+        Task {
+            let prepared = await Task.detached(priority: .userInitiated) {
+                AddPetWizardView.preparedCropImage(image, maxPixel: 1_600)
+            }.value
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            cropImageItem = IdentifiableCropImage(image: prepared)
+            AppPerformanceMonitor.shared.markEnd("avatar.camera.to.crop", name: "拍照到裁剪页", note: "人类头像")
         }
     }
 
@@ -1150,17 +1127,17 @@ struct AddHumanWizardView: View {
     private func saveHuman() {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
+        guard isGenderReady else { return }
 
         let human = Human(
             name: trimmed,
             birthday: hasBirthday ? birthday : nil,
             bloodType: bloodType,
             avatarEmoji: fallbackAvatarEmoji(for: gender),
-            role: role
+            role: HumanProfileOptions.normalizedRole(role)
         )
         var parts: [String] = []
-        if !gender.isEmpty { parts.append("性别:\(gender)") }
-        if !familyRole.isEmpty { parts.append("关系:\(familyRole)") }
+        parts.append("性别:\(HumanProfileOptions.normalizedGender(gender))")
         if !notes.isEmpty { parts.append(notes) }
         human.notes = parts.joined(separator: "｜")
         human.nationality = nationalityCountry
@@ -1173,7 +1150,10 @@ struct AddHumanWizardView: View {
         } else {
             human.city = residenceCity
         }
-        human.avatarImageData = avatarImageData
+        human.avatarImageData = avatarImageData ?? HumanAvatarAssetCatalog.avatarData(
+            gender: gender,
+            birthday: hasBirthday ? birthday : nil
+        )
         human.themeColorHex   = themeColorHex
         human.shouldShowOnHome = true
         human.mbti = mbti.trimmingCharacters(in: .whitespaces).uppercased()

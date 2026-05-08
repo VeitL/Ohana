@@ -2,7 +2,7 @@
 //  Localization.swift
 //  Ohana
 //
-//  多语言支持：中/英切换，"ohana" 不翻译
+//  多语言支持：语言注册表 + fallback 文案解析，"ohana" 不翻译
 //
 
 import Foundation
@@ -15,45 +15,90 @@ struct L10n {
     }
 
     var isEn: Bool { lang == "en" }
+    var isDe: Bool { lang == "de" }
+
+    func text(_ value: AppLocalizedText) -> String {
+        value.resolve(lang)
+    }
+
+    func tr(
+        zh: String,
+        en: String,
+        de: String? = nil,
+        extras: [String: String] = [:]
+    ) -> String {
+        AppLocalizedText(zh: zh, en: en, de: de, extras: extras).resolve(lang)
+    }
+
+    func tr(
+        _ translations: [String: String],
+        fallbackCode: String = AppLanguage.fallbackCode
+    ) -> String {
+        AppLocalizedText(translations: translations, fallbackCode: fallbackCode).resolve(lang)
+    }
 
     // MARK: - Dock / Tab
-    var tabHome: String { isEn ? "Home" : "首页" }
-    var tabPlant: String { isEn ? "Plants" : "植物" }
-    var tabCalendar: String { isEn ? "Calendar" : "日历" }
-    var tabCrew: String { isEn ? "Crew" : "图鉴" }
-    var tabOasis: String { isEn ? "Oasis" : "绿洲" }
+    var tabHome: String { tr(zh: "首页", en: "Home", de: "Start") }
+    var tabPlant: String { tr(zh: "植物", en: "Plants", de: "Pflanzen") }
+    var tabCalendar: String { tr(zh: "日历", en: "Calendar", de: "Kalender") }
+    var tabCrew: String { tr(zh: "图鉴", en: "Crew", de: "Team") }
+    var tabOasis: String { tr(zh: "绿洲", en: "Oasis", de: "Oase") }
 
     // MARK: - Global Header
     func greeting(_ text: String) -> String { text } // greeting 已由逻辑生成
-    var ohanaCrew: String { isEn ? "Ohana Crew" : "Ohana 图鉴" }
+    var ohanaCrew: String { tr(zh: "Ohana 图鉴", en: "Ohana Crew", de: "Ohana Team") }
 
     // MARK: - Greeting hints
-    func morningHint(_ name: String) -> String { isEn ? "Take \(name) for a morning walk" : "带 \(name) 早晨出去走走吧" }
-    func eveningHint(_ name: String) -> String { isEn ? "Golden hour — walk \(name) 🌇" : "黄金时段，带 \(name) 散个步 🌇" }
-    func defaultHint(_ name: String) -> String { isEn ? "\(name) is waiting for you" : "\(name) 在等你呢" }
+    func morningHint(_ name: String) -> String {
+        tr(zh: "带 \(name) 早晨出去走走吧", en: "Take \(name) for a morning walk", de: "Geh morgens mit \(name) spazieren")
+    }
+    func eveningHint(_ name: String) -> String {
+        tr(zh: "黄金时段，带 \(name) 散个步 🌇", en: "Golden hour — walk \(name) 🌇", de: "Goldene Stunde — geh mit \(name) raus 🌇")
+    }
+    func defaultHint(_ name: String) -> String {
+        tr(zh: "\(name) 在等你呢", en: "\(name) is waiting for you", de: "\(name) wartet auf dich")
+    }
 
-    var goodMorning: String { isEn ? "Good morning" : "早上好" }
-    var goodAfternoon: String { isEn ? "Good afternoon" : "下午好" }
-    var goodEvening: String { isEn ? "Good evening" : "晚上好" }
-    var goodNight: String { isEn ? "Good night" : "晚安" }
+    var goodMorning: String { tr(zh: "早上好", en: "Good morning", de: "Guten Morgen") }
+    var goodAfternoon: String { tr(zh: "下午好", en: "Good afternoon", de: "Guten Tag") }
+    var goodEvening: String { tr(zh: "晚上好", en: "Good evening", de: "Guten Abend") }
+    var goodNight: String { tr(zh: "晚安", en: "Good night", de: "Gute Nacht") }
 
     // MARK: - Settings
-    var settings: String { isEn ? "Settings" : "设置" }
-    var addMember: String { isEn ? "Add Member" : "添加成员" }
-    var manageHome: String { isEn ? "Manage Home" : "管理主页" }
-    var manageHomeModules: String { isEn ? "Manage home sections" : "管理主页模块" }
-    var preferences: String { isEn ? "Preferences" : "偏好设置" }
-    var language: String { isEn ? "Language" : "语言" }
-    var appearance: String { isEn ? "Appearance" : "外观主题" }
-    var backgroundStyle: String { isEn ? "Background Style" : "背景风格" }
-    var notifications: String { isEn ? "Notifications" : "通知" }
-    var about: String { isEn ? "About" : "关于" }
-    var petManagement: String { isEn ? "Pet Management" : "宠物管理" }
-    var clearAllData: String { isEn ? "Clear All Data" : "清除所有数据" }
-    var notificationPermission: String { isEn ? "Notification Permission" : "通知权限" }
-    var manageNotification: String { isEn ? "Manage notification settings" : "管理通知设置" }
-    var deviceIdentity: String { isEn ? "Device Identity" : "设备身份" }
-    var nickname: String { isEn ? "Nickname" : "昵称" }
+    var settings: String { tr(zh: "设置", en: "Settings", de: "Einstellungen") }
+    var addMember: String { tr(zh: "添加成员", en: "Add Member", de: "Mitglied hinzufügen") }
+    var manageHome: String { tr(zh: "管理主页", en: "Manage Home", de: "Startseite verwalten") }
+    var manageHomeModules: String { tr(zh: "管理主页模块", en: "Manage home sections", de: "Startseitenbereiche verwalten") }
+    var preferences: String { tr(zh: "偏好设置", en: "Preferences", de: "Einstellungen") }
+    var language: String { tr(zh: "语言", en: "Language", de: "Sprache") }
+    var currency: String { tr(zh: "货币", en: "Currency", de: "Währung") }
+    var currencyDisplayOnlyHint: String {
+        tr(
+            zh: "只影响显示格式，不进行汇率换算",
+            en: "Only changes display format; no exchange conversion",
+            de: "Ändert nur die Anzeige, keine Umrechnung"
+        )
+    }
+    var appearance: String { tr(zh: "外观主题", en: "Appearance", de: "Darstellung") }
+    var themeSystem: String { tr(zh: "跟随系统", en: "System", de: "System") }
+    var themeLight: String { tr(zh: "浅色模式", en: "Light", de: "Hell") }
+    var themeDark: String { tr(zh: "深色模式", en: "Dark", de: "Dunkel") }
+    var replayOnboarding: String { tr(zh: "查看引导页", en: "Replay onboarding", de: "Einführung ansehen") }
+    var replayOnboardingSubtitle: String {
+        tr(zh: "重新播放首次启动引导，方便测试", en: "Replay the first-launch guide for testing", de: "Startanleitung zum Testen erneut anzeigen")
+    }
+    var personalInfo: String { tr(zh: "个人信息", en: "Profile", de: "Profil") }
+    var notSet: String { tr(zh: "未设置", en: "Not set", de: "Nicht festgelegt") }
+    var editNickname: String { tr(zh: "修改昵称", en: "Edit nickname", de: "Spitznamen ändern") }
+    var enterNickname: String { tr(zh: "输入昵称", en: "Enter nickname", de: "Spitznamen eingeben") }
+    var notifications: String { tr(zh: "通知", en: "Notifications", de: "Benachrichtigungen") }
+    var about: String { tr(zh: "关于", en: "About", de: "Über") }
+    var petManagement: String { tr(zh: "宠物管理", en: "Pet Management", de: "Haustierverwaltung") }
+    var clearAllData: String { tr(zh: "清除所有数据", en: "Clear All Data", de: "Alle Daten löschen") }
+    var notificationPermission: String { tr(zh: "通知权限", en: "Notification Permission", de: "Benachrichtigungen") }
+    var manageNotification: String { tr(zh: "管理通知设置", en: "Manage notification settings", de: "Benachrichtigungseinstellungen verwalten") }
+    var deviceIdentity: String { tr(zh: "设备身份", en: "Device Identity", de: "Geräteidentität") }
+    var nickname: String { tr(zh: "昵称", en: "Nickname", de: "Spitzname") }
 
     // MARK: - Pet Detail
     var edit: String { isEn ? "Edit" : "编辑" }
@@ -66,6 +111,66 @@ struct L10n {
     func validUntil(_ date: String) -> String { isEn ? "Valid until \(date)" : "有效至 \(date)" }
     var weight: String { isEn ? "Weight" : "体重" }
     var expense: String { isEn ? "Expense" : "花费" }
+    var quickExpenseTitle: String { tr(zh: "快速记账", en: "Quick expense", de: "Schnelle Ausgabe") }
+    var quickExpenseAmount: String { tr(zh: "金额", en: "Amount", de: "Betrag") }
+    var quickExpenseCommonAmounts: String { tr(zh: "常用金额", en: "Common amounts", de: "Häufige Beträge") }
+    var quickExpenseCategory: String { tr(zh: "分类", en: "Category", de: "Kategorie") }
+    var quickExpensePayer: String { tr(zh: "支付者", en: "Payer", de: "Zahlende Person") }
+    var quickExpenseUnspecified: String { tr(zh: "未指定", en: "Unspecified", de: "Nicht angegeben") }
+    var quickExpenseMore: String { tr(zh: "更多", en: "More", de: "Mehr") }
+    var quickExpenseToday: String { tr(zh: "今天", en: "Today", de: "Heute") }
+    var quickExpenseHasNote: String { tr(zh: "有备注", en: "Has note", de: "Mit Notiz") }
+    var quickExpenseDate: String { tr(zh: "日期", en: "Date", de: "Datum") }
+    var quickExpenseNote: String { tr(zh: "备注", en: "Note", de: "Notiz") }
+    var quickExpenseOptional: String { tr(zh: "可选", en: "Optional", de: "Optional") }
+    var quickExpenseSave: String { tr(zh: "保存花费", en: "Save expense", de: "Ausgabe speichern") }
+    var quickExpenseSaving: String { tr(zh: "保存中", en: "Saving", de: "Speichert") }
+    var quickExpenseKeyboardSave: String { tr(zh: "保存", en: "Save", de: "Speichern") }
+    var quickExpenseMedicalRecorded: String { tr(zh: "医疗花费已记录", en: "Medical expense saved", de: "Medizinische Ausgabe gespeichert") }
+    func quickExpenseSubmitToInsurer(_ name: String) -> String {
+        tr(zh: "可以继续提交给 \(name)", en: "You can submit it to \(name)", de: "Du kannst sie bei \(name) einreichen")
+    }
+    var quickExpenseInsuranceCompany: String { tr(zh: "保险公司", en: "insurer", de: "Versicherung") }
+    var quickExpenseApplyClaim: String { tr(zh: "已记录 · 申请报销", en: "Saved · Claim", de: "Gespeichert · Erstattung") }
+    var quickExpenseReceipt: String { tr(zh: "凭证", en: "Receipt", de: "Beleg") }
+    func quickExpenseReceiptCount(_ count: Int) -> String {
+        tr(zh: "\(count) 个附件", en: "\(count) attachment\(count == 1 ? "" : "s")", de: "\(count) Anhang\(count == 1 ? "" : "e")")
+    }
+    var quickExpenseCamera: String { tr(zh: "拍照", en: "Camera", de: "Kamera") }
+    var quickExpensePhotos: String { tr(zh: "相册", en: "Photos", de: "Fotos") }
+    var quickExpenseFile: String { tr(zh: "文件", en: "File", de: "Datei") }
+    var quickExpenseRemoveReceipt: String { tr(zh: "移除凭证", en: "Remove receipt", de: "Beleg entfernen") }
+    var quickExpenseImage: String { tr(zh: "图片", en: "Image", de: "Bild") }
+    var quickExpenseCameraUnavailable: String { tr(zh: "无法打开相机", en: "Camera unavailable", de: "Kamera nicht verfügbar") }
+    var quickExpenseCameraPermissionMessage: String {
+        tr(zh: "请在系统设置中允许 Ohana 访问相机。", en: "Allow Ohana to access the camera in system settings.", de: "Erlaube Ohana den Kamerazugriff in den Systemeinstellungen.")
+    }
+    var quickExpenseInsuranceSingleTitle: String { tr(zh: "单笔保险费", en: "Single insurance expense", de: "Einzelne Versicherungszahlung") }
+    var quickExpenseInsuranceSingleWithPolicy: String {
+        tr(zh: "长期扣款请在保单页管理，避免重复生成。", en: "Manage recurring payments on the policy page to avoid duplicates.", de: "Wiederkehrende Zahlungen bitte in der Police verwalten, um Duplikate zu vermeiden.")
+    }
+    var quickExpenseInsuranceSingleNoPolicy: String {
+        tr(zh: "这里可以先补记一笔保险费；长期计划请从保单页创建。", en: "Use this for one insurance payment; create long-term plans from the policy page.", de: "Hier nur eine Zahlung erfassen; langfristige Pläne in der Police anlegen.")
+    }
+    func expenseCategoryTitle(_ category: ExpenseCategory) -> String {
+        switch category {
+        case .food: return tr(zh: "食物", en: "Food", de: "Futter")
+        case .treats: return tr(zh: "零食", en: "Treats", de: "Snacks")
+        case .medical: return tr(zh: "医疗", en: "Medical", de: "Medizin")
+        case .grooming: return tr(zh: "美容", en: "Grooming", de: "Pflege")
+        case .toys: return tr(zh: "玩具", en: "Toys", de: "Spielzeug")
+        case .insurancePremium: return tr(zh: "保险费", en: "Insurance", de: "Versicherung")
+        case .other: return tr(zh: "其他", en: "Other", de: "Sonstiges")
+        }
+    }
+    func insuranceFrequencyTitle(_ frequency: InsurancePaymentFrequency) -> String {
+        switch frequency {
+        case .monthly: return tr(zh: "按月", en: "Monthly", de: "Monatlich")
+        case .quarterly: return tr(zh: "按季", en: "Quarterly", de: "Vierteljährlich")
+        case .annual: return tr(zh: "按年", en: "Yearly", de: "Jährlich")
+        case .once: return tr(zh: "一次性", en: "Once", de: "Einmalig")
+        }
+    }
     var thisMonth: String { isEn ? "This month" : "本月" }
     var patrol: String { isEn ? "Patrol" : "巡岛" }
     var potty: String { isEn ? "Potty" : "噗噗" }
@@ -91,29 +196,31 @@ struct L10n {
     var deleteMember: String { isEn ? "Delete Member" : "删除成员" }
 
     // MARK: - Common
-    var save: String { isEn ? "Save" : "保存" }
-    var cancel: String { isEn ? "Cancel" : "取消" }
-    var confirm: String { isEn ? "Confirm" : "确认" }
-    var done: String { isEn ? "Done" : "完成" }
-    var search: String { isEn ? "Search" : "搜索" }
-    func searchPlaceholder(_ text: String) -> String { isEn ? "Search \(text)..." : "搜索\(text)..." }
-    var times: String { isEn ? "times" : "次" }
-    var types: String { isEn ? "types" : "种" }
-    var items: String { isEn ? "items" : "条" }
+    var save: String { tr(zh: "保存", en: "Save", de: "Speichern") }
+    var cancel: String { tr(zh: "取消", en: "Cancel", de: "Abbrechen") }
+    var confirm: String { tr(zh: "确认", en: "Confirm", de: "Bestätigen") }
+    var done: String { tr(zh: "完成", en: "Done", de: "Fertig") }
+    var search: String { tr(zh: "搜索", en: "Search", de: "Suchen") }
+    func searchPlaceholder(_ text: String) -> String {
+        tr(zh: "搜索\(text)...", en: "Search \(text)...", de: "\(text) suchen...")
+    }
+    var times: String { tr(zh: "次", en: "times", de: "Mal") }
+    var types: String { tr(zh: "种", en: "types", de: "Arten") }
+    var items: String { tr(zh: "条", en: "items", de: "Einträge") }
 
     // MARK: - Pet Species
-    var dog: String { isEn ? "Dog" : "狗" }
-    var cat: String { isEn ? "Cat" : "猫" }
-    var rabbit: String { isEn ? "Rabbit" : "兔子" }
-    var hamster: String { isEn ? "Hamster" : "仓鼠" }
+    var dog: String { tr(zh: "狗", en: "Dog", de: "Hund") }
+    var cat: String { tr(zh: "猫", en: "Cat", de: "Katze") }
+    var rabbit: String { tr(zh: "兔子", en: "Rabbit", de: "Kaninchen") }
+    var hamster: String { tr(zh: "仓鼠", en: "Hamster", de: "Hamster") }
 
     // MARK: - Calendar
-    var monthView: String { isEn ? "Month" : "月视图" }
-    var listView: String { isEn ? "List" : "列表" }
-    var addEvent: String { isEn ? "Add Event" : "添加事件" }
+    var monthView: String { tr(zh: "月视图", en: "Month", de: "Monat") }
+    var listView: String { tr(zh: "列表", en: "List", de: "Liste") }
+    var addEvent: String { tr(zh: "添加事件", en: "Add Event", de: "Termin hinzufügen") }
 
     // MARK: - Oasis
-    var oasis: String { isEn ? "Oasis" : "绿洲" }
+    var oasis: String { tr(zh: "绿洲", en: "Oasis", de: "Oase") }
 
     // MARK: - Crew Roster
     func searchCrewPlaceholder() -> String { isEn ? "Search island residents..." : "搜索岛民..." }
@@ -141,7 +248,7 @@ struct L10n {
     // MARK: - Human wizard — mesh card titles
     var humanWizMesh1: String { isEn ? "HELLO, YOU · 1/5" : "身份信息 · 1/5" }
     var humanWizMesh2: String { isEn ? "LITTLE PROFILE · 2/5" : "个人档案 · 2/5" }
-    var humanWizMesh3: String { isEn ? "FAMILY VIBES · 3/5" : "家庭角色 · 3/5" }
+    var humanWizMesh3: String { tr(zh: "权限与身份 · 3/5", en: "PERMISSION & IDENTITY · 3/5", de: "RECHTE & IDENTITÄT · 3/5") }
     var humanWizMesh4: String { isEn ? "BODY & SECRETS · 4/5" : "身体数据 · 4/5" }
     var humanWizMesh5: String { isEn ? "FINAL BOOP · 5/5" : "确认信息 · 5/5" }
 
@@ -155,7 +262,7 @@ struct L10n {
     var humanWizEmojiAvatar: String { isEn ? "Or pick an emoji face" : "或选择 Emoji 头像" }
     var humanWizDupNameInline: String { isEn ? "That name's taken — try another!" : "名字已被占用，请换一个" }
 
-    var humanWizGenderLabel: String { isEn ? "Gender (optional)" : "性别（可选）" }
+    var humanWizGenderLabel: String { tr(zh: "性别/身份（必选）", en: "Gender / identity (required)", de: "Geschlecht / Identität (erforderlich)") }
     var humanWizBirthdayLabel: String { isEn ? "Birthday (optional)" : "生日（可选）" }
     var humanWizBirthdayHint: String { isEn ? "Tap to spin the wheel, then hit Done ✓" : "点按选择日期，滚轮选好后点「完成」" }
     var humanWizBloodLabel: String { isEn ? "Blood type (optional)" : "血型（可选）" }
@@ -164,7 +271,6 @@ struct L10n {
     func humanWizBloodTag(_ type: String) -> String { isEn ? "Type \(type)" : "血型 \(type)" }
     func humanWizNationalityTag(_ country: String) -> String { isEn ? "From \(country)" : "国籍 \(country)" }
 
-    var humanWizFamilyRoleLabel: String { isEn ? "Role at home (optional)" : "在家庭中的角色（可选）" }
     var humanWizNationalityLabel: String { isEn ? "Nationality (optional)" : "国籍（可选）" }
     var humanWizNationalityHint: String { isEn ? "Passport country from the list — or skip" : "从列表选择护照国籍，可不填" }
     var humanWizResidenceLabel: String { isEn ? "Where you live (optional)" : "现居地（可选）" }
@@ -188,19 +294,22 @@ struct L10n {
     var humanWizPrivacyExpense: String { isEn ? "Spending" : "花费记录" }
 
     var humanWizThemeLabel: String { isEn ? "Accent color" : "主题颜色" }
-    var humanWizRolePermsLabel: String { isEn ? "Device role" : "设备权限" }
+    var humanWizRolePermsLabel: String { tr(zh: "权限", en: "Permission", de: "Berechtigung") }
     var humanWizSummaryLabel: String { isEn ? "Cozy recap" : "信息摘要" }
-    var humanWizSummaryEmpty: String { isEn ? "No extras yet — totally fine!" : "还没有填写任何可选信息，完全没问题！" }
+    var humanWizSummaryEmpty: String { tr(zh: "选择权限和性别/身份后会出现在这里", en: "Pick permission and identity to preview them here", de: "Wähle Berechtigung und Identität für die Vorschau") }
 
-    var humanWizRoleOwnerTitle: String { isEn ? "Captain" : "主人" }
-    var humanWizRoleOwnerDesc: String { isEn ? "Runs the whole island" : "家庭管理者，拥有所有权限" }
-    var humanWizRoleEditorTitle: String { isEn ? "First mate" : "编辑" }
-    var humanWizRoleEditorDesc: String { isEn ? "Can log & edit everything" : "可以添加和编辑所有记录" }
-    var humanWizRoleViewerTitle: String { isEn ? "Lookout" : "仅查看" }
-    var humanWizRoleViewerDesc: String { isEn ? "Browse-only, no edits" : "只能浏览信息，无法编辑" }
+    var humanWizRoleOwnerTitle: String { tr(zh: "管理者", en: "Admin", de: "Verwaltung") }
+    var humanWizRoleOwnerDesc: String { tr(zh: "管理家庭资料与核心设置", en: "Manages home profile and core settings", de: "Verwaltet Haushalt und zentrale Einstellungen") }
+    var humanWizRoleMemberTitle: String { tr(zh: "成员", en: "Member", de: "Mitglied") }
+    var humanWizRoleMemberDesc: String { tr(zh: "日常记录与照护打卡", en: "Daily logs and care check-ins", de: "Alltagsnotizen und Pflege-Check-ins") }
+    var humanWizRoleEditorTitle: String { humanWizRoleMemberTitle }
+    var humanWizRoleEditorDesc: String { humanWizRoleMemberDesc }
+    var humanWizRoleViewerTitle: String { humanWizRoleMemberTitle }
+    var humanWizRoleViewerDesc: String { humanWizRoleMemberDesc }
 
     var humanWizJoinIsland: String { isEn ? "Hop onto Ohana Isle!" : "加入 Ohana 岛" }
     var humanWizNeedName: String { isEn ? "Name first, please" : "请先填写名字" }
+    var humanWizNeedGender: String { tr(zh: "请选择性别/身份", en: "Pick gender / identity", de: "Identität auswählen") }
     var humanWizNameTakenBtn: String { isEn ? "Name taken" : "名字已被占用" }
     var humanWizBirthdaySheetTitle: String { isEn ? "Pick a birthday" : "选择生日" }
     var humanWizBirthdayEventSuffix: String { isEn ? "'s birthday 🎂" : " 的生日 🎂" }
@@ -214,29 +323,11 @@ struct L10n {
     }
 
     func humanGenderDisplay(_ key: String) -> String {
-        switch key {
-        case "男": return isEn ? "Guy" : "男"
-        case "女": return isEn ? "Gal" : "女"
-        case "非二元": return isEn ? "They / them" : "非二元"
-        default: return key
-        }
-    }
-
-    func humanFamilyRoleDisplay(_ key: String) -> String {
-        switch key {
-        case "爸爸": return isEn ? "Dad" : "爸爸"
-        case "妈妈": return isEn ? "Mom" : "妈妈"
-        case "爷爷": return isEn ? "Grandpa" : "爷爷"
-        case "奶奶": return isEn ? "Grandma" : "奶奶"
-        case "外公": return isEn ? "Grandpa (M)" : "外公"
-        case "外婆": return isEn ? "Grandma (M)" : "外婆"
-        case "哥哥": return isEn ? "Big bro" : "哥哥"
-        case "姐姐": return isEn ? "Big sis" : "姐姐"
-        case "弟弟": return isEn ? "Lil bro" : "弟弟"
-        case "妹妹": return isEn ? "Lil sis" : "妹妹"
-        case "朋友": return isEn ? "Bestie" : "朋友"
-        case "伴侣": return isEn ? "Partner" : "伴侣"
-        case "自己": return isEn ? "Me" : "自己"
+        switch HumanProfileOptions.normalizedGender(key) {
+        case "男": return tr(zh: "男", en: "Man", de: "Mann")
+        case "女": return tr(zh: "女", en: "Woman", de: "Frau")
+        case "非二元": return tr(zh: "非二元", en: "Non-binary", de: "Nichtbinär")
+        case "不透露": return tr(zh: "不透露", en: "Prefer not to say", de: "Keine Angabe")
         default: return key
         }
     }
@@ -622,7 +713,8 @@ struct L10n {
         isEn ? "\(n)× today" : "今日\(n)次"
     }
     func homeExpenseMonthCNY(_ amount: Int) -> String {
-        isEn ? "¥\(amount) this month" : "本月¥\(amount)"
+        let formatted = AppCurrency.format(Double(amount), fractionDigits: 0)
+        return isEn ? "\(formatted) this month" : "本月\(formatted)"
     }
     func homeLastWeightKg(_ kg: Double) -> String {
         isEn ? "Last \(String(format: "%.1f", kg)) kg" : "上次\(String(format: "%.1f", kg))kg"
@@ -824,7 +916,7 @@ struct L10n {
 
 // MARK: - App language (与设置页 `appLanguage` / `@AppStorage` 同步)
 
-enum AppLanguage {
+nonisolated enum AppLanguage {
     struct Option: Identifiable, Hashable {
         let code: String
         let displayName: String
@@ -850,6 +942,13 @@ enum AppLanguage {
             localeIdentifier: "en_US",
             swiftUILocaleIdentifier: "en",
             lprojName: "en"
+        ),
+        Option(
+            code: "de",
+            displayName: "Deutsch",
+            localeIdentifier: "de_DE",
+            swiftUILocaleIdentifier: "de",
+            lprojName: "de"
         )
     ]
 
@@ -861,7 +960,9 @@ enum AppLanguage {
     }
 
     static var isEnglish: Bool { code == "en" }
+    static var isGerman: Bool { code == "de" }
     static var usesChineseDateFormat: Bool { code == "zh" }
+    static var supportedCodes: Set<String> { Set(supported.map(\.code)) }
 
     static func normalize(_ raw: String) -> String {
         supported.contains { $0.code == raw } ? raw : fallbackCode
@@ -877,7 +978,14 @@ enum AppLanguage {
     }
 
     static var compactMonthDayFormat: String {
-        usesChineseDateFormat ? "M月d日" : "MMM d"
+        switch code {
+        case "zh":
+            return "M月d日"
+        case "de":
+            return "d. MMM"
+        default:
+            return "MMM d"
+        }
     }
 
     static var fullMonthYearFormat: String {
@@ -885,7 +993,14 @@ enum AppLanguage {
     }
 
     static var dailyReportDateFormat: String {
-        usesChineseDateFormat ? "M月d日 EEEE" : "EEEE, MMM d"
+        switch code {
+        case "zh":
+            return "M月d日 EEEE"
+        case "de":
+            return "EEEE, d. MMM"
+        default:
+            return "EEEE, MMM d"
+        }
     }
 
     /// SwiftUI `Text` 等查 `Localizable.strings` 时使用，与 `en.lproj` / `zh-Hans` 资源一致。
@@ -900,5 +1015,117 @@ enum AppLanguage {
         f.timeZone = .current
         f.dateFormat = "yyyy-MM-dd"
         return f.string(from: Calendar.current.startOfDay(for: Date()))
+    }
+}
+
+// MARK: - Localized text value
+
+nonisolated struct AppLocalizedText: Hashable {
+    let translations: [String: String]
+    let fallbackCode: String
+
+    init(
+        zh: String,
+        en: String? = nil,
+        de: String? = nil,
+        extras: [String: String] = [:],
+        fallbackCode: String = AppLanguage.fallbackCode
+    ) {
+        var values = extras
+        values["zh"] = zh
+        if let en { values["en"] = en }
+        if let de { values["de"] = de }
+
+        self.translations = values
+        self.fallbackCode = AppLanguage.normalize(fallbackCode)
+    }
+
+    init(
+        translations: [String: String],
+        fallbackCode: String = AppLanguage.fallbackCode
+    ) {
+        self.translations = translations
+        self.fallbackCode = AppLanguage.normalize(fallbackCode)
+    }
+
+    func resolve(_ rawLanguageCode: String = AppLanguage.code) -> String {
+        let code = AppLanguage.normalize(rawLanguageCode)
+        if let value = translations[code], !value.isEmpty {
+            return value
+        }
+        if let fallback = translations[fallbackCode], !fallback.isEmpty {
+            return fallback
+        }
+        return translations.values.first { !$0.isEmpty } ?? ""
+    }
+
+    var missingSupportedLanguageCodes: [String] {
+        AppLanguage.supported
+            .map(\.code)
+            .filter { translations[$0]?.isEmpty ?? true }
+    }
+}
+
+// MARK: - App currency (全局真实货币显示；不做汇率换算)
+
+nonisolated enum AppCurrency {
+    struct Option: Identifiable, Hashable {
+        let code: String
+        let displayName: String
+        let symbol: String
+        let localeIdentifier: String
+        let systemIconName: String
+
+        var id: String { code }
+    }
+
+    static let storageKey = "appCurrency"
+    static let fallbackCode = "CNY"
+
+    static let supported: [Option] = [
+        Option(code: "CNY", displayName: "CNY · ¥", symbol: "¥", localeIdentifier: "zh_CN", systemIconName: "yensign.circle"),
+        Option(code: "USD", displayName: "USD · $", symbol: "$", localeIdentifier: "en_US", systemIconName: "dollarsign.circle"),
+        Option(code: "EUR", displayName: "EUR · €", symbol: "€", localeIdentifier: "de_DE", systemIconName: "eurosign.circle"),
+        Option(code: "GBP", displayName: "GBP · £", symbol: "£", localeIdentifier: "en_GB", systemIconName: "sterlingsign.circle"),
+        Option(code: "JPY", displayName: "JPY · ¥", symbol: "¥", localeIdentifier: "ja_JP", systemIconName: "yensign.circle"),
+        Option(code: "HKD", displayName: "HKD · HK$", symbol: "HK$", localeIdentifier: "zh_HK", systemIconName: "dollarsign.circle"),
+        Option(code: "TWD", displayName: "TWD · NT$", symbol: "NT$", localeIdentifier: "zh_TW", systemIconName: "dollarsign.circle")
+    ]
+
+    static var code: String {
+        normalize(UserDefaults.standard.string(forKey: storageKey) ?? fallbackCode)
+    }
+
+    static func normalize(_ raw: String) -> String {
+        let upper = raw.uppercased()
+        return supported.contains { $0.code == upper } ? upper : fallbackCode
+    }
+
+    static var currentOption: Option {
+        supported.first { $0.code == code } ?? supported[0]
+    }
+
+    static var symbol: String { currentOption.symbol }
+    static var systemIconName: String { currentOption.systemIconName }
+
+    static func format(_ amount: Double, fractionDigits: Int = 0) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.locale = Locale(identifier: currentOption.localeIdentifier)
+        formatter.currencyCode = currentOption.code
+        formatter.currencySymbol = currentOption.symbol
+        formatter.minimumFractionDigits = fractionDigits
+        formatter.maximumFractionDigits = fractionDigits
+        return formatter.string(from: NSNumber(value: amount)) ?? "\(currentOption.symbol)\(amount)"
+    }
+
+    static func formatCompact(_ amount: Double) -> String {
+        if amount >= 10_000 {
+            return "\(symbol)\(String(format: "%.0fk", amount / 1_000))"
+        }
+        if amount >= 100 {
+            return format(amount, fractionDigits: 0)
+        }
+        return amount > 0 ? format(amount, fractionDigits: 1) : format(0, fractionDigits: 0)
     }
 }

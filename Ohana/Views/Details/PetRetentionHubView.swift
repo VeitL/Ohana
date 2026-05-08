@@ -11,6 +11,11 @@ import SwiftUI
 struct PetRetentionHubView: View {
     let pet: Pet
 
+    private var weekInterval: DateInterval {
+        Calendar.current.dateInterval(of: .weekOfYear, for: Date())
+            ?? DateInterval(start: Date().addingTimeInterval(-6 * 86_400), duration: 7 * 86_400)
+    }
+
     private var latestWeightText: String {
         guard let latest = pet.weightLogs.sorted(by: { $0.date < $1.date }).last else { return "暂无" }
         return String(format: "%.1fkg", latest.weight)
@@ -54,6 +59,49 @@ struct PetRetentionHubView: View {
         }.count
     }
 
+    private var weekCareDates: [Date] {
+        let care = pet.careLogs.filter { weekInterval.contains($0.date) }.map(\.date)
+        let potty = pet.pottyLogs.filter { weekInterval.contains($0.date) }.map(\.date)
+        let walks = pet.walkLogs.filter { weekInterval.contains($0.startDate) }.map(\.startDate)
+        let health = pet.healthLogs.filter { weekInterval.contains($0.date) }.map(\.date)
+        let photos = pet.photoLogs.filter { weekInterval.contains($0.date) }.map(\.date)
+        return care + potty + walks + health + photos
+    }
+
+    private var weekActiveDays: Int {
+        let cal = Calendar.current
+        return Set(weekCareDates.map { cal.startOfDay(for: $0) }).count
+    }
+
+    private var latestWeekPhoto: PetPhotoLog? {
+        pet.photoLogs
+            .filter { weekInterval.contains($0.date) }
+            .sorted { $0.date > $1.date }
+            .first
+    }
+
+    private var weeklyWeightStory: String {
+        let logs = pet.weightLogs
+            .filter { $0.date < weekInterval.end }
+            .sorted { $0.date < $1.date }
+        guard let latest = logs.last else { return "还没有体重记录" }
+        let baseline = logs.last { $0.date < weekInterval.start } ?? logs.dropLast().last
+        guard let baseline else { return String(format: "最新 %.1fkg", latest.weight) }
+        let delta = latest.weight - baseline.weight
+        if abs(delta) < 0.05 { return String(format: "稳定在 %.1fkg", latest.weight) }
+        let sign = delta > 0 ? "+" : ""
+        return "\(sign)\(String(format: "%.1fkg", delta))"
+    }
+
+    private var weeklyArchiveStory: String {
+        if weekCareDates.isEmpty {
+            return "完成喂食、陪玩、照片或健康记录后，这里会沉淀成 \(pet.name) 的每周成长故事。"
+        }
+        let activeText = weekActiveDays > 0 ? "本周 \(weekActiveDays) 天有照护记录" : "本周已有照护记录"
+        let photoText = latestWeekPhoto == nil ? "还缺一张本周照片" : "留下了新的照片回忆"
+        return "\(activeText)，\(photoText)，体重 \(weeklyWeightStory)。"
+    }
+
     private var medicalRecordCount: Int {
         pet.healthLogs.filter { log in
             [.vaccine, .medication, .dewormingInternal, .dewormingExternal, .surgery, .dental, .checkup, .emergency].contains(log.healthLogType)
@@ -92,6 +140,7 @@ struct PetRetentionHubView: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
                     heroCard
+                    weeklyStoryCard
                     insightStrip
                     sectionTitle("长期留存模块")
                     retentionCard(
@@ -114,8 +163,8 @@ struct PetRetentionHubView: View {
                         icon: "chart.pie.fill",
                         accent: .goYellow,
                         title: "花费统计",
-                        value: "¥\(Int(monthExpense))",
-                        subtitle: "本月预测约 ¥\(Int(projectedMonthlyExpense)) · 共 \(pet.expenseLogs.count) 条记录",
+                        value: AppCurrency.format(monthExpense, fractionDigits: 0),
+                        subtitle: "本月预测约 \(AppCurrency.format(projectedMonthlyExpense, fractionDigits: 0)) · 共 \(pet.expenseLogs.count) 条记录",
                         destination: ExpenseHistoryView(pet: pet)
                     )
                     retentionCard(
@@ -162,6 +211,33 @@ struct PetRetentionHubView: View {
         .goTranslucentCard(cornerRadius: 22)
     }
 
+    private var weeklyStoryCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("这周的 \(pet.name)", systemImage: "sparkles")
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Text("\(weekInterval.start.formatted(.dateTime.month().day()))-\(weekInterval.end.formatted(.dateTime.month().day()))")
+                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+
+            Text(weeklyArchiveStory)
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundStyle(.secondary)
+                .lineSpacing(3)
+
+            HStack(spacing: 8) {
+                archiveStoryPill(icon: "calendar.badge.checkmark", title: "\(weekActiveDays)天", subtitle: "活跃照护", color: .goTeal)
+                archiveStoryPill(icon: "scalemass.fill", title: weeklyWeightStory, subtitle: "体重趋势", color: .goPrimary)
+                archiveStoryPill(icon: "photo.fill", title: latestWeekPhoto == nil ? "暂无" : "已记录", subtitle: "照片回忆", color: .goYellow)
+            }
+        }
+        .padding(16)
+        .goTranslucentCard(cornerRadius: 22)
+    }
+
     private var insightStrip: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle("本周建议")
@@ -187,6 +263,25 @@ struct PetRetentionHubView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 9)
         .background(color.opacity(0.12), in: Capsule())
+    }
+
+    private func archiveStoryPill(icon: String, title: String, subtitle: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .black))
+                .foregroundStyle(color)
+            Text(title)
+                .font(.system(size: 13, weight: .black, design: .rounded))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+            Text(subtitle)
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(color.opacity(0.11), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func sectionTitle(_ title: String) -> some View {

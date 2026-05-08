@@ -192,18 +192,18 @@ struct InsurancePolicyDetailSheet: View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
             bentoCell(icon: "creditcard.fill", label: "年费",
                       value: insurance.annualPremium > 0
-                        ? String(format: "¥%.0f", insurance.annualPremium) : "—",
+                        ? AppCurrency.format(insurance.annualPremium, fractionDigits: 0) : "—",
                       accent: "4FC3F7")
             bentoCell(icon: "shield.fill", label: "保额",
                       value: insurance.coverageAmount > 0
-                        ? String(format: "¥%.0f", insurance.coverageAmount) : "—",
+                        ? AppCurrency.format(insurance.coverageAmount, fractionDigits: 0) : "—",
                       accent: "81C784")
             bentoCell(icon: "repeat.circle.fill", label: "付款频次",
                       value: insurance.paymentFrequency.rawValue,
                       accent: "FFB74D")
             bentoCell(icon: "arrow.down.circle.fill", label: "已报销",
                       value: totalApproved > 0
-                        ? String(format: "¥%.0f", totalApproved) : "暂无",
+                        ? AppCurrency.format(totalApproved, fractionDigits: 0) : "暂无",
                       accent: "4ECDC4")
         }
     }
@@ -256,8 +256,8 @@ struct InsurancePolicyDetailSheet: View {
             } else {
                 // 汇总行
                 HStack(spacing: 16) {
-                    summaryPill(label: "已申请", value: String(format: "¥%.0f", totalClaimed), hex: "FFD93D")
-                    summaryPill(label: "已到账", value: String(format: "¥%.0f", totalApproved), hex: "4ECDC4")
+                    summaryPill(label: "已申请", value: AppCurrency.format(totalClaimed, fractionDigits: 0), hex: "FFD93D")
+                    summaryPill(label: "已到账", value: AppCurrency.format(totalApproved, fractionDigits: 0), hex: "4ECDC4")
                 }
                 ForEach(sortedClaims) { claim in
                     claimRow(claim)
@@ -319,7 +319,7 @@ struct InsurancePolicyDetailSheet: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 3) {
-                Text(String(format: "¥%.0f", claim.claimedAmount))
+                Text(AppCurrency.format(claim.claimedAmount, fractionDigits: 0))
                     .font(.system(size: 13, weight: .black, design: .rounded))
                 Text(claim.claimStatus.rawValue)
                     .font(.system(size: 10, weight: .bold, design: .rounded))
@@ -359,20 +359,29 @@ struct InsurancePolicyDetailSheet: View {
         claim.statusRaw = status.rawValue
         if status == .approved && claim.approvedAmount == 0 {
             claim.approvedAmount = claim.claimedAmount
-            claim.approvedAt = Date()
+            let approvedDate = Date()
+            claim.approvedAt = approvedDate
             // 写入负值 PetExpenseLog 代表报销到账
             if let claimPet = insurance.pet {
                 let productName = insurance.productName.isEmpty ? insurance.companyName : insurance.productName
+                let note = InsuranceReimbursementExpenseWriter.reimbursementNote(productName: productName)
                 let payerId = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-                let expense = PetExpenseLog(
-                    date: Date(),
-                    amount: -claim.approvedAmount,
-                    category: .insurancePremium,
-                    note: "保险报销到账：\(productName)",
-                    pet: claimPet,
-                    executorId: payerId
-                )
-                modelContext.insert(expense)
+                if InsuranceReimbursementExpenseWriter.shouldInsertReimbursementLog(
+                    existingLogs: claimPet.expenseLogs,
+                    date: approvedDate,
+                    amount: claim.approvedAmount,
+                    note: note
+                ) {
+                    let expense = PetExpenseLog(
+                        date: approvedDate,
+                        amount: -claim.approvedAmount,
+                        category: .insurancePremium,
+                        note: note,
+                        pet: claimPet,
+                        executorId: payerId
+                    )
+                    modelContext.insert(expense)
+                }
             }
         }
         modelContext.safeSave()

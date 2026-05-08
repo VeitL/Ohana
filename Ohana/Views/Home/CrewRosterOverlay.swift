@@ -313,10 +313,14 @@ private struct PetSquareCard: View {
     let onTap: () -> Void
 
     @Environment(\.modelContext) private var modelContext
-    @State private var isPressed = false
+    @Query(sort: \Pet.createdAt) private var allPets: [Pet]
+    @Query(sort: \Human.createdAt) private var allHumans: [Human]
+    @State private var isDeletePressing = false
+    @State private var deletePressCandidate = false
+    @State private var deletePressToken = UUID()
+    @State private var suppressTapUntil = Date.distantPast
     @State private var showDeleteAlert = false
-    @State private var deleteConfirmName = ""
-    @State private var showNameMismatch = false
+    @State private var showHomeStackFullAlert = false
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
 
     private var themeColor: Color { Color(hex: pet.themeColorHex.isEmpty ? "4338FF" : pet.themeColorHex) }
@@ -329,47 +333,45 @@ private struct PetSquareCard: View {
     }
 
     var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: 6) {
-                cardFace
-                homeVisibilityLabel(isShown: isShownOnHome)
+        VStack(spacing: 8) {
+            cardFace
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .onTapGesture {
+                guard Date() >= suppressTapUntil else { return }
+                onTap()
             }
-        }
-        .buttonStyle(.plain)
-        .scaleEffect(isPressed ? 0.95 : 1.0)
-        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isPressed)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
-        .simultaneousGesture(
-            LongPressGesture(minimumDuration: 0.7).onEnded { _ in
-                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                deleteConfirmName = ""
-                showNameMismatch = false
-                showDeleteAlert = true
-            }
-        )
-        .alert("删除 \(pet.name)？", isPresented: $showDeleteAlert) {
-            TextField("输入宠物名字确认", text: $deleteConfirmName)
-            Button("取消", role: .cancel) { deleteConfirmName = "" }
-            Button("删除", role: .destructive) {
-                if deleteConfirmName == pet.name {
-                    let petIdStr = pet.id.uuidString
-                    if let allEvents = try? modelContext.fetch(FetchDescriptor<Event>()) {
-                        for event in allEvents where event.relatedEntityId == petIdStr {
-                            modelContext.delete(event)
-                        }
-                    }
-                    modelContext.delete(pet)
-                    modelContext.safeSave()
-                } else {
-                    showNameMismatch = true
+            .scaleEffect(isDeletePressing ? 0.97 : 1.0)
+            .rotationEffect(.degrees(isDeletePressing ? -1.35 : 0))
+            .animation(isDeletePressing ? .easeInOut(duration: 0.09).repeatForever(autoreverses: true) : .spring(response: 0.22, dampingFraction: 0.82), value: isDeletePressing)
+            .overlay(alignment: .topTrailing) {
+                if isDeletePressing {
+                    deletePreviewBadge
+                        .padding(7)
+                        .transition(.scale(scale: 0.82).combined(with: .opacity))
                 }
             }
+            .onLongPressGesture(
+                minimumDuration: 0.7,
+                maximumDistance: 12,
+                pressing: updateDeletePressFeedback,
+                perform: triggerDeleteAlert
+            )
+            homeVisibilityToggle
+        }
+        .alert("删除 \(pet.name)？", isPresented: $showDeleteAlert) {
+            Button("取消", role: .cancel) {}
+            Button("删除", role: .destructive) {
+                let petIdStr = pet.id.uuidString
+                if let allEvents = try? modelContext.fetch(FetchDescriptor<Event>()) {
+                    for event in allEvents where event.relatedEntityId == petIdStr {
+                        modelContext.delete(event)
+                    }
+                }
+                modelContext.delete(pet)
+                modelContext.safeSave()
+            }
         } message: {
-            Text(showNameMismatch ? "❌ 输入名称不匹配，请重新输入 \"\(pet.name)\"" : "请输入 \"\(pet.name)\" 确认删除。此操作不可撤销。")
+            Text("确定要删除 \(pet.name) 吗？此操作不可撤销。")
         }
     }
 
@@ -444,25 +446,98 @@ private struct PetSquareCard: View {
             .overlay(Capsule().strokeBorder(textColor.opacity(0.12), lineWidth: 0.5))
     }
 
-    private func homeVisibilityLabel(isShown: Bool) -> some View {
-        HStack {
-            Spacer(minLength: 0)
-            Text(isShown ? "首页显示" : "首页隐藏")
+    private var homeVisibilityBinding: Binding<Bool> {
+        Binding(
+            get: { isShownOnHome },
+            set: { newValue in
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                if newValue,
+                   !HomeCardVisibility.canShowPet(pet, pets: allPets, humans: allHumans, raw: hiddenHomePetIDsRaw) {
+                    showHomeStackFullAlert = true
+                    return
+                }
+                hiddenHomePetIDsRaw = HomeCardVisibility.rawBySettingPet(pet, visible: newValue, raw: hiddenHomePetIDsRaw)
+            }
+        )
+    }
+
+    private var homeVisibilityToggle: some View {
+        HStack(spacing: 6) {
+            Image(systemName: isShownOnHome ? "house.fill" : "house.slash.fill")
+                .font(.system(size: 11, weight: .black))
+                .foregroundStyle(isShownOnHome ? Color.goLime : Color.white.opacity(0.45))
+                .frame(width: 16)
+            Text(isShownOnHome ? "首页显示" : "不在首页")
                 .font(.system(size: 10, weight: .black, design: .rounded))
-                .foregroundStyle(isShown ? Color.arkInk : Color.white.opacity(0.62))
+                .foregroundStyle(.white.opacity(isShownOnHome ? 0.86 : 0.52))
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 4)
-                .background(
-                    isShown ? Color.goLime : Color.white.opacity(0.08),
-                    in: Capsule()
-                )
-                .overlay(
-                    Capsule().strokeBorder(isShown ? Color.clear : Color.white.opacity(0.12), lineWidth: 0.5)
-                )
+            Toggle("", isOn: homeVisibilityBinding)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .tint(Color.goLime)
+                .scaleEffect(0.62)
+                .frame(width: 34, height: 22)
         }
-        .frame(maxWidth: .infinity, alignment: .trailing)
+        .padding(.leading, 9)
+        .padding(.trailing, 7)
+        .padding(.vertical, 4)
+        .background(Color.white.opacity(0.07), in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
+        .fixedSize(horizontal: true, vertical: false)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityLabel("首页显示")
+        .accessibilityValue(isShownOnHome ? "开启" : "关闭")
+        .alert("首页卡片堆已满", isPresented: $showHomeStackFullAlert) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text("首页最多显示 \(HomeCardVisibility.maxVisibleCards) 张卡片。请先隐藏一张成员卡片，再显示 \(pet.name)。")
+        }
+    }
+
+    private var deletePreviewBadge: some View {
+        Image(systemName: "trash.fill")
+            .font(.system(size: 12, weight: .black))
+            .foregroundStyle(.white)
+            .frame(width: 28, height: 28)
+            .background(Color.goRed, in: Circle())
+            .shadow(color: Color.goRed.opacity(0.45), radius: 8, y: 3)
+    }
+
+    private func updateDeletePressFeedback(_ pressing: Bool) {
+        if pressing {
+            let token = UUID()
+            deletePressToken = token
+            deletePressCandidate = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.62) {
+                guard deletePressCandidate, deletePressToken == token else { return }
+                suppressTapUntil = Date().addingTimeInterval(1.1)
+                withAnimation(.easeInOut(duration: 0.09).repeatForever(autoreverses: true)) {
+                    isDeletePressing = true
+                }
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }
+        } else {
+            deletePressCandidate = false
+            deletePressToken = UUID()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+                guard !showDeleteAlert else { return }
+                withAnimation(.spring(response: 0.2, dampingFraction: 0.84)) {
+                    isDeletePressing = false
+                }
+            }
+        }
+    }
+
+    private func triggerDeleteAlert() {
+        suppressTapUntil = Date().addingTimeInterval(1.1)
+        deletePressCandidate = false
+        deletePressToken = UUID()
+        withAnimation(.spring(response: 0.18, dampingFraction: 0.82)) {
+            isDeletePressing = false
+        }
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        showDeleteAlert = true
     }
 
     @ViewBuilder
@@ -733,8 +808,15 @@ private struct HumanSquareCard: View {
     let onTap: () -> Void
 
     @Environment(\.modelContext) private var modelContext
-    @State private var isPressed = false
+    @Query(sort: \Pet.createdAt) private var allPets: [Pet]
+    @Query(sort: \Human.createdAt) private var allHumans: [Human]
+    @State private var isDeletePressing = false
+    @State private var deletePressCandidate = false
+    @State private var deletePressToken = UUID()
+    @State private var suppressTapUntil = Date.distantPast
     @State private var showDeleteAlert = false
+    @State private var showHomeStackFullAlert = false
+    @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
 
     private var themeColor: Color { Color(hex: human.themeColor) }
     private var companionshipDays: Int {
@@ -742,26 +824,31 @@ private struct HumanSquareCard: View {
     }
 
     var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: 6) {
-                cardFace
-                homeVisibilityLabel(isShown: human.shouldShowOnHome)
+        VStack(spacing: 8) {
+            cardFace
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .onTapGesture {
+                guard Date() >= suppressTapUntil else { return }
+                onTap()
             }
+            .scaleEffect(isDeletePressing ? 0.97 : 1.0)
+            .rotationEffect(.degrees(isDeletePressing ? -1.35 : 0))
+            .animation(isDeletePressing ? .easeInOut(duration: 0.09).repeatForever(autoreverses: true) : .spring(response: 0.22, dampingFraction: 0.82), value: isDeletePressing)
+            .overlay(alignment: .topTrailing) {
+                if isDeletePressing {
+                    deletePreviewBadge
+                        .padding(7)
+                        .transition(.scale(scale: 0.82).combined(with: .opacity))
+                }
+            }
+            .onLongPressGesture(
+                minimumDuration: 0.7,
+                maximumDistance: 12,
+                pressing: updateDeletePressFeedback,
+                perform: triggerDeleteAlert
+            )
+            homeVisibilityToggle
         }
-        .buttonStyle(.plain)
-        .scaleEffect(isPressed ? 0.95 : 1.0)
-        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isPressed)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
-        .simultaneousGesture(
-            LongPressGesture(minimumDuration: 0.7).onEnded { _ in
-                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                showDeleteAlert = true
-            }
-        )
         .alert("删除 \(human.name)？", isPresented: $showDeleteAlert) {
             Button("取消", role: .cancel) { }
             Button("删除", role: .destructive) {
@@ -874,25 +961,99 @@ private struct HumanSquareCard: View {
             .overlay(Capsule().strokeBorder(textColor.opacity(0.12), lineWidth: 0.5))
     }
 
-    private func homeVisibilityLabel(isShown: Bool) -> some View {
-        HStack {
-            Spacer(minLength: 0)
-            Text(isShown ? "首页显示" : "首页隐藏")
+    private var homeVisibilityBinding: Binding<Bool> {
+        Binding(
+            get: { human.shouldShowOnHome },
+            set: { newValue in
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                if newValue,
+                   !HomeCardVisibility.canShowHuman(human, pets: allPets, humans: allHumans, raw: hiddenHomePetIDsRaw) {
+                    showHomeStackFullAlert = true
+                    return
+                }
+                human.shouldShowOnHome = newValue
+                modelContext.safeSave()
+            }
+        )
+    }
+
+    private var homeVisibilityToggle: some View {
+        HStack(spacing: 6) {
+            Image(systemName: human.shouldShowOnHome ? "house.fill" : "house.slash.fill")
+                .font(.system(size: 11, weight: .black))
+                .foregroundStyle(human.shouldShowOnHome ? Color.goLime : Color.white.opacity(0.45))
+                .frame(width: 16)
+            Text(human.shouldShowOnHome ? "首页显示" : "不在首页")
                 .font(.system(size: 10, weight: .black, design: .rounded))
-                .foregroundStyle(isShown ? Color.arkInk : Color.white.opacity(0.62))
+                .foregroundStyle(.white.opacity(human.shouldShowOnHome ? 0.86 : 0.52))
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 4)
-                .background(
-                    isShown ? Color.goLime : Color.white.opacity(0.08),
-                    in: Capsule()
-                )
-                .overlay(
-                    Capsule().strokeBorder(isShown ? Color.clear : Color.white.opacity(0.12), lineWidth: 0.5)
-                )
+            Toggle("", isOn: homeVisibilityBinding)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .tint(Color.goLime)
+                .scaleEffect(0.62)
+                .frame(width: 34, height: 22)
         }
-        .frame(maxWidth: .infinity, alignment: .trailing)
+        .padding(.leading, 9)
+        .padding(.trailing, 7)
+        .padding(.vertical, 4)
+        .background(Color.white.opacity(0.07), in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
+        .fixedSize(horizontal: true, vertical: false)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityLabel("首页显示")
+        .accessibilityValue(human.shouldShowOnHome ? "开启" : "关闭")
+        .alert("首页卡片堆已满", isPresented: $showHomeStackFullAlert) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text("首页最多显示 \(HomeCardVisibility.maxVisibleCards) 张卡片。请先隐藏一张成员卡片，再显示 \(human.name)。")
+        }
+    }
+
+    private var deletePreviewBadge: some View {
+        Image(systemName: "trash.fill")
+            .font(.system(size: 12, weight: .black))
+            .foregroundStyle(.white)
+            .frame(width: 28, height: 28)
+            .background(Color.goRed, in: Circle())
+            .shadow(color: Color.goRed.opacity(0.45), radius: 8, y: 3)
+    }
+
+    private func updateDeletePressFeedback(_ pressing: Bool) {
+        if pressing {
+            let token = UUID()
+            deletePressToken = token
+            deletePressCandidate = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.62) {
+                guard deletePressCandidate, deletePressToken == token else { return }
+                suppressTapUntil = Date().addingTimeInterval(1.1)
+                withAnimation(.easeInOut(duration: 0.09).repeatForever(autoreverses: true)) {
+                    isDeletePressing = true
+                }
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }
+        } else {
+            deletePressCandidate = false
+            deletePressToken = UUID()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+                guard !showDeleteAlert else { return }
+                withAnimation(.spring(response: 0.2, dampingFraction: 0.84)) {
+                    isDeletePressing = false
+                }
+            }
+        }
+    }
+
+    private func triggerDeleteAlert() {
+        suppressTapUntil = Date().addingTimeInterval(1.1)
+        deletePressCandidate = false
+        deletePressToken = UUID()
+        withAnimation(.spring(response: 0.18, dampingFraction: 0.82)) {
+            isDeletePressing = false
+        }
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        showDeleteAlert = true
     }
 
     @ViewBuilder
@@ -1034,7 +1195,6 @@ private struct HumanSquareCard: View {
 
 private struct PlantTallCard: View {
     let plant: Plant
-    @State private var isPressed = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -1087,13 +1247,6 @@ private struct PlantTallCard: View {
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(.white.opacity(0.08), lineWidth: 1)
-        )
-        .scaleEffect(isPressed ? 0.95 : 1.0)
-        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isPressed)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
         )
     }
 }

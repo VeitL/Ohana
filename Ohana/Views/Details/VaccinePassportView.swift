@@ -178,7 +178,7 @@ private struct VaccineRow: View {
                             .foregroundStyle(.primary.opacity(0.4))
                     }
                     if log.cost > 0 {
-                        Label(String(format: "¥%.0f", log.cost), systemImage: "yensign.circle")
+                        Label(AppCurrency.format(log.cost, fractionDigits: 0), systemImage: AppCurrency.systemIconName)
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.primary.opacity(0.4))
                     }
@@ -353,9 +353,9 @@ struct AddVaccineSheet: View {
                         // 费用
                         fieldCard {
                             HStack {
-                                Image(systemName: "yensign.circle")
+                                Image(systemName: AppCurrency.systemIconName)
                                     .foregroundStyle(Color.goYellow).frame(width: 22)
-                                TextField("费用（可选）", text: $costText)
+                                TextField("费用（\(AppCurrency.symbol)，可选）", text: $costText)
                                     .keyboardType(.decimalPad)
                                     .font(.system(size: 15, weight: .medium, design: .rounded))
                                     .foregroundStyle(.primary)
