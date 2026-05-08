@@ -146,3 +146,114 @@ enum HomeFeedRecordMode: String {
         UserDefaults.standard.set(mode.rawValue, forKey: storageKey(petId: petId))
     }
 }
+
+// MARK: - Feed Today State
+struct FeedTodayState {
+    let pet: Pet
+    let allEvents: [Event]
+    let manualGoalCount: Int
+    let now: Date
+    let calendar: Calendar
+
+    init(
+        pet: Pet,
+        allEvents: [Event],
+        manualGoalCount: Int,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) {
+        self.pet = pet
+        self.allEvents = allEvents
+        self.manualGoalCount = max(manualGoalCount, 1)
+        self.now = now
+        self.calendar = calendar
+    }
+
+    var feedScheduleEvents: [Event] {
+        allEvents
+            .filter {
+                ($0.relatedEntityType == EntityKind.pet.rawValue || $0.relatedEntityType == "pet") &&
+                $0.relatedEntityId == pet.id.uuidString &&
+                $0.eventType == EventType.foodChange.rawValue
+            }
+            .sorted { $0.startDate < $1.startDate }
+    }
+
+    var todayPlanReminders: [Reminder] {
+        feedScheduleEvents
+            .flatMap(\.reminders)
+            .filter { calendar.isDate($0.scheduledAt, inSameDayAs: now) }
+            .sorted { $0.scheduledAt < $1.scheduledAt }
+    }
+
+    var pendingTodayPlanReminders: [Reminder] {
+        todayPlanReminders.filter { $0.isPending || $0.isFailed }
+    }
+
+    var completedTodayPlanReminders: [Reminder] {
+        todayPlanReminders.filter { $0.isCompleted }
+    }
+
+    var nextPendingReminder: Reminder? {
+        pendingTodayPlanReminders.first
+    }
+
+    var hasTodayPlan: Bool {
+        !todayPlanReminders.isEmpty
+    }
+
+    var manualTodayLogs: [PetCareLog] {
+        pet.careLogs
+            .filter {
+                $0.careType == .feeding &&
+                $0.isManualFeedLogEntry &&
+                calendar.isDate($0.date, inSameDayAs: now)
+            }
+            .sorted { $0.date > $1.date }
+    }
+
+    var plannedTodayLogs: [PetCareLog] {
+        pet.careLogs
+            .filter {
+                $0.careType == .feeding &&
+                $0.isPlannedFeedLogEntry &&
+                calendar.isDate($0.date, inSameDayAs: now)
+            }
+            .sorted { $0.date > $1.date }
+    }
+
+    var allTodayLogs: [PetCareLog] {
+        pet.careLogs
+            .filter {
+                $0.careType == .feeding &&
+                calendar.isDate($0.date, inSameDayAs: now)
+            }
+            .sorted { $0.date > $1.date }
+    }
+
+    var completedCount: Int {
+        hasTodayPlan ? completedTodayPlanReminders.count : manualTodayLogs.count
+    }
+
+    var targetCount: Int {
+        hasTodayPlan ? max(todayPlanReminders.count, 1) : manualGoalCount
+    }
+
+    var progress: Double {
+        min(1, Double(completedCount) / Double(targetCount))
+    }
+
+    var isComplete: Bool {
+        completedCount >= targetCount
+    }
+
+    var hasOverduePlan: Bool {
+        pendingTodayPlanReminders.contains { $0.isFailed || $0.scheduledAt < now }
+    }
+
+    var todayFeedGrams: Double {
+        allTodayLogs.reduce(0) { total, log in
+            total + (log.amountGrams > 0 ? log.amountGrams : pet.dailyPortionGrams)
+        }
+    }
+}

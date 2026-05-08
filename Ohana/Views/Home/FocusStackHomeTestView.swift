@@ -2788,78 +2788,12 @@ extension FocusStackHomeTestView {
         }
     }
 
-    private func expandedIsPlannedFeedReminder(_ reminder: Reminder, petIdStr: String) -> Bool {
-        guard reminder.event?.relatedEntityId == petIdStr else { return false }
-        let evType = reminder.event?.eventType ?? ""
-        if evType == EventType.foodChange.rawValue { return true }
-        if evType == EventType.daily.rawValue || evType == EventType.task.rawValue {
-            let title = (reminder.event?.title ?? "").lowercased()
-            return ["喂食", "吃饭", "喂"].contains { title.contains($0) }
-        }
-        return false
-    }
-
-    private func expandedPetHasPlannedFeedSchedules(_ pet: Pet) -> Bool {
-        let petIdStr = pet.id.uuidString
-        let petKind = EntityKind.pet.rawValue
-        let foodChange = EventType.foodChange.rawValue
-        var descriptor = FetchDescriptor<Event>(
-            predicate: #Predicate<Event> { event in
-                (event.relatedEntityType == petKind || event.relatedEntityType == "pet")
-                && event.relatedEntityId == petIdStr
-                && event.eventType == foodChange
-            }
-        )
-        descriptor.fetchLimit = 1
-        return ((try? modelContext.fetch(descriptor))?.isEmpty == false)
-    }
-
     private func expandedPendingFeedReminderForPlannedMode(pet: Pet) -> Reminder? {
-        guard HomeFeedRecordMode.isPlanned(for: pet.id) else { return nil }
-        let petIdStr = pet.id.uuidString
-        let cal = Calendar.current
-        return pendingReminders.first {
-            cal.isDateInToday($0.scheduledAt) && expandedIsPlannedFeedReminder($0, petIdStr: petIdStr)
-        }
-    }
-
-    private func expandedHasFailedPlannedFeedToday(pet: Pet) -> Bool {
-        guard HomeFeedRecordMode.isPlanned(for: pet.id) else { return false }
-        let petIdStr = pet.id.uuidString
-        let cal = Calendar.current
-        let start = cal.startOfDay(for: Date())
-        let end = cal.date(byAdding: .day, value: 1, to: start) ?? Date()
-        var descriptor = FetchDescriptor<Reminder>(
-            predicate: #Predicate<Reminder> { reminder in
-                reminder.status == "failed" &&
-                reminder.scheduledAt >= start &&
-                reminder.scheduledAt < end
-            },
-            sortBy: [SortDescriptor(\.scheduledAt)]
-        )
-        descriptor.fetchLimit = 24
-        let failedReminders = (try? modelContext.fetch(descriptor)) ?? []
-        return failedReminders.contains {
-            cal.isDateInToday($0.scheduledAt) && expandedIsPlannedFeedReminder($0, petIdStr: petIdStr)
-        }
+        expandedFeedTodayState(for: pet).nextPendingReminder
     }
 
     private func expandedFeedAppearsComplete(for pet: Pet) -> Bool {
-        let cal = Calendar.current
-        if HomeFeedRecordMode.isPlanned(for: pet.id) {
-            guard expandedPetHasPlannedFeedSchedules(pet) else { return false }
-            if expandedHasFailedPlannedFeedToday(pet: pet) { return false }
-            return expandedPendingFeedReminderForPlannedMode(pet: pet) == nil
-        }
-
-        let storedGoal = UserDefaults.standard.integer(forKey: "feedGoal_\(pet.id.uuidString)")
-        let goal = storedGoal > 0 ? storedGoal : 3
-        let manualCount = pet.careLogs.filter {
-            cal.isDateInToday($0.date)
-                && $0.type == CareType.feeding.rawValue
-                && $0.isManualFeedLogEntry
-        }.count
-        return manualCount >= goal
+        expandedFeedTodayState(for: pet).isComplete
     }
 
     @discardableResult
@@ -2883,11 +2817,7 @@ extension FocusStackHomeTestView {
 
     private func performExpandedFeedCheckIn(pet: Pet, executorId: String?) {
         let performFeed = {
-            if HomeFeedRecordMode.isPlanned(for: pet.id) {
-                if self.completeExpandedPlannedFeedFromHome(pet: pet) { return }
-                self.expandedQuickFeedDetailPet = pet
-                return
-            }
+            if self.completeExpandedPlannedFeedFromHome(pet: pet) { return }
 
             let coconutBefore = QuestManager.shared.coconutCount
             _ = CareEventService.recordManualFeed(
@@ -2919,6 +2849,12 @@ extension FocusStackHomeTestView {
         } else {
             performFeed()
         }
+    }
+
+    private func expandedFeedTodayState(for pet: Pet) -> FeedTodayState {
+        let storedGoal = UserDefaults.standard.integer(forKey: "feedGoal_\(pet.id.uuidString)")
+        let goal = storedGoal > 0 ? storedGoal : 3
+        return FeedTodayState(pet: pet, allEvents: allEvents, manualGoalCount: goal)
     }
 
     private func applyExpandedQuickAction(_ actionType: String, pet: Pet) {

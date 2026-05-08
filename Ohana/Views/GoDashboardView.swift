@@ -1577,9 +1577,10 @@ private extension GoDashboardView {
             let ds = dist >= 1000 ? String(format: "%.1fkm", dist/1000) : String(format: "%.0fm", dist)
             return l.homeWalkTodayBadge(count: count, dist: ds)
         case "feed":
-            let goal = max(UserDefaults.standard.integer(forKey: "feedGoal_\(pet.id.uuidString)"), 3)
-            let count = pet.careLogs.filter { $0.type == CareType.feeding.rawValue && cal.isDateInToday($0.date) && $0.isManualFeedLogEntry }.count
-            return l.homeFeedMealsProgress(current: count, goal: goal)
+            let storedGoal = UserDefaults.standard.integer(forKey: "feedGoal_\(pet.id.uuidString)")
+            let goal = storedGoal > 0 ? storedGoal : 3
+            let state = FeedTodayState(pet: pet, allEvents: allEvents, manualGoalCount: goal)
+            return l.homeFeedMealsProgress(current: state.completedCount, goal: state.targetCount)
         case "water":
             let count = pet.careLogs.filter { $0.type == CareType.watering.rawValue && cal.isDateInToday($0.date) }.count
             return count > 0 ? l.homeTimesToday(count) : nil
@@ -1623,25 +1624,15 @@ private extension GoDashboardView {
     }
 
     func feedQuickActionAppearsComplete(for pet: Pet) -> Bool {
-        let cal = Calendar.current
-        if HomeFeedRecordMode.isPlanned(for: pet.id) {
-            if !petHasPlannedFeedSchedules(pet) { return false }
-            return pendingFeedReminderForPlannedMode(pet: pet) == nil
-        }
-        let goal = max(UserDefaults.standard.integer(forKey: "feedGoal_\(pet.id.uuidString)"), 3)
-        return pet.careLogs.filter { cal.isDateInToday($0.date) && $0.type == CareType.feeding.rawValue && $0.isManualFeedLogEntry }.count >= goal
-    }
-
-    func petHasPlannedFeedSchedules(_ pet: Pet) -> Bool {
-        let id = pet.id.uuidString
-        return allEvents.contains { $0.relatedEntityId == id && $0.eventType == EventType.foodChange.rawValue }
+        let storedGoal = UserDefaults.standard.integer(forKey: "feedGoal_\(pet.id.uuidString)")
+        let goal = storedGoal > 0 ? storedGoal : 3
+        return FeedTodayState(pet: pet, allEvents: allEvents, manualGoalCount: goal).isComplete
     }
 
     func pendingFeedReminderForPlannedMode(pet: Pet) -> Reminder? {
-        guard HomeFeedRecordMode.isPlanned(for: pet.id) else { return nil }
-        let petIdStr = pet.id.uuidString
-        let cal = Calendar.current
-        return pendingReminders.first { cal.isDateInToday($0.scheduledAt) && $0.event?.relatedEntityId == petIdStr && $0.event?.eventType == EventType.foodChange.rawValue }
+        let storedGoal = UserDefaults.standard.integer(forKey: "feedGoal_\(pet.id.uuidString)")
+        let goal = storedGoal > 0 ? storedGoal : 3
+        return FeedTodayState(pet: pet, allEvents: allEvents, manualGoalCount: goal).nextPendingReminder
     }
 }
 
@@ -1756,13 +1747,9 @@ private extension GoDashboardView {
             showToast(pet, message: l.homeToastLitter(pet.name, points: got.humanGot), emoji: "🧹")
         case "feed":
             let performFeed = {
-                if HomeFeedRecordMode.isPlanned(for: pet.id) {
-                    if self.completePlannedFeedFromHome(pet: pet) { return }
-                    self.feedDetailPet = pet
-                } else {
-                    let got = CareEventService.recordManualFeed(pet: pet, amountGrams: pet.dailyPortionGrams, context: self.modelContext, executorId: uid)
-                    self.showToast(pet, message: l.homeToastManualFeed(pet.name, points: got.petGot + got.humanGot), emoji: "🍗")
-                }
+                if self.completePlannedFeedFromHome(pet: pet) { return }
+                let got = CareEventService.recordManualFeed(pet: pet, amountGrams: pet.dailyPortionGrams, context: self.modelContext, executorId: uid)
+                self.showToast(pet, message: l.homeToastManualFeed(pet.name, points: got.petGot + got.humanGot), emoji: "🍗")
             }
             if let w = AntiRepeatCareManager.checkRecentCareLog(for: pet, type: .feeding, thresholdMinutes: 120, currentUserId: uid, in: humans) {
                 antiRepeatTitle = l.homeAntiDupFeedTitle

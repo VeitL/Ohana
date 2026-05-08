@@ -23,14 +23,16 @@ struct QuickFeedDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \Event.startDate) private var allEvents: [Event]
     @Query(sort: \Human.createdAt) private var allHumans: [Human]
+    @AppStorage("appLanguage") private var appLanguage = "zh"
 
-    // Feed mode
-    @State private var mode: FeedMode = .manual
+    @State private var selectedTab: FeedTab = .today
     @State private var portionText = ""
     @State private var goalCount = 3
     @State private var newScheduleTime = Date()
     @State private var newScheduleAmount = ""
     @State private var showAddSchedule = false
+    @State private var schedulePendingDelete: Event? = nil
+    @State private var showingDeleteScheduleConfirm = false
 
     // Stock tracking mode
     @State private var selectedStockMode: FoodTrackingMode = .casual
@@ -72,45 +74,50 @@ struct QuickFeedDetailSheet: View {
 
     @AppStorage("defaultFeedGrams") private var defaultFeedGrams: Double = 0
 
-    enum FeedMode: String, CaseIterable {
-        case manual = "按手动餐数"
-        case planned = "按计划提醒"
+    enum FeedTab: String, CaseIterable {
+        case today
+        case plan
+        case stock
+        case history
+
+        var icon: String {
+            switch self {
+            case .today: return "fork.knife.circle.fill"
+            case .plan: return "clock.badge.checkmark.fill"
+            case .stock: return "shippingbox.fill"
+            case .history: return "chart.bar.xaxis"
+            }
+        }
+
+        func label(_ l: L10n) -> String {
+            switch self {
+            case .today: return l.tr(zh: "今日", en: "Today", de: "Heute")
+            case .plan: return l.tr(zh: "计划", en: "Plan", de: "Plan")
+            case .stock: return l.tr(zh: "粮仓", en: "Stock", de: "Vorrat")
+            case .history: return l.tr(zh: "历史", en: "History", de: "Historie")
+            }
+        }
     }
 
+    private var l: L10n { L10n(appLanguage) }
     private var themeColor: Color { Color(hex: pet.themeColorHex) }
+    private var feedTodayState: FeedTodayState {
+        FeedTodayState(pet: pet, allEvents: allEvents, manualGoalCount: goalCount)
+    }
 
     /// 今日仅「手动记录」喂食（与按计划互斥统计）
     private var manualTodayFeedLogs: [PetCareLog] {
-        pet.careLogs
-            .filter {
-                $0.type == CareType.feeding.rawValue
-                    && Calendar.current.isDateInToday($0.date)
-                    && $0.isManualFeedLogEntry
-            }
-            .sorted { $0.date > $1.date }
-    }
-
-    /// 今日仅「按计划」打卡产生的喂食记录
-    private var plannedTodayFeedLogs: [PetCareLog] {
-        pet.careLogs
-            .filter {
-                $0.type == CareType.feeding.rawValue
-                    && Calendar.current.isDateInToday($0.date)
-                    && $0.isPlannedFeedLogEntry
-            }
-            .sorted { $0.date > $1.date }
+        feedTodayState.manualTodayLogs
     }
 
     private var manualTodayFeedGrams: Double {
-        manualTodayFeedLogs.reduce(0) { $0 + $1.amountGrams }
+        manualTodayFeedLogs.reduce(0) { total, log in
+            total + (log.amountGrams > 0 ? log.amountGrams : pet.dailyPortionGrams)
+        }
     }
 
     private var feedScheduleEvents: [Event] {
-        allEvents.filter {
-            ($0.relatedEntityType == EntityKind.pet.rawValue || $0.relatedEntityType == "pet") &&
-            $0.relatedEntityId == pet.id.uuidString &&
-            $0.eventType == EventType.foodChange.rawValue
-        }
+        feedTodayState.feedScheduleEvents
     }
 
     private var savedGoal: Int {
@@ -147,25 +154,8 @@ struct QuickFeedDetailSheet: View {
                         petHeader
                         ExecutorPickerBar(tint: themeColor)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        feedCompletionModeSection
-                        feedModeHint
-                        if mode == .manual {
-                            manualSection
-                        } else {
-                            plannedSection
-                        }
-
-                        stockModePicker
-                        if selectedStockMode == .casual {
-                            casualSection
-                        } else {
-                            stockSection
-                        }
-
-                        calculatorSection
-
-                        todayLogList
-                        historySection
+                        feedTabPicker
+                        selectedTabContent
                         removeQuickActionFooter
                     }
                     .padding(.horizontal, 20)
@@ -208,7 +198,6 @@ struct QuickFeedDetailSheet: View {
             }
         }
         .onAppear {
-            mode = HomeFeedRecordMode.storedRaw(for: pet.id) == HomeFeedRecordMode.planned.rawValue ? .planned : .manual
             goalCount = savedGoal
             if pet.dailyPortionGrams > 0 {
                 portionText = String(format: "%.0f", pet.dailyPortionGrams)
@@ -221,9 +210,6 @@ struct QuickFeedDetailSheet: View {
             if pet.restockWeight > 0 { stockKgInput = String(format: "%.1f", pet.restockWeight) }
             if pet.dailyPortionGrams > 0 { dailyGramsInput = String(format: "%.0f", pet.dailyPortionGrams) }
         }
-        .onChange(of: mode) { _, newVal in
-            HomeFeedRecordMode.set(pet.id, mode: newVal == .planned ? .planned : .manual)
-        }
         .alert(antiRepeatTitle, isPresented: $showingAntiRepeatAlert) {
             Button("确定打卡", role: .destructive) {
                 pendingRepeatAction?()
@@ -234,6 +220,19 @@ struct QuickFeedDetailSheet: View {
             }
         } message: {
             Text(antiRepeatMessage)
+        }
+        .alert(l.tr(zh: "删除喂食计划？", en: "Delete feeding plan?", de: "Fütterungsplan löschen?"), isPresented: $showingDeleteScheduleConfirm) {
+            Button(l.tr(zh: "删除", en: "Delete", de: "Löschen"), role: .destructive) {
+                if let event = schedulePendingDelete {
+                    deleteSchedule(event)
+                }
+                schedulePendingDelete = nil
+            }
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {
+                schedulePendingDelete = nil
+            }
+        } message: {
+            Text(l.tr(zh: "删除后不会影响已经产生的喂食历史。", en: "Existing feeding history will stay unchanged.", de: "Bestehende Fütterungshistorie bleibt erhalten."))
         }
     }
 
@@ -264,136 +263,241 @@ struct QuickFeedDetailSheet: View {
         }
     }
 
-    // MARK: - Feed Mode Picker
-    private var feedCompletionModeSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("首页完成判定方式")
-                .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.secondary)
-            feedModePicker
-        }
-    }
-
-    private var feedModePicker: some View {
-        HStack(spacing: 0) {
-            ForEach(FeedMode.allCases, id: \.rawValue) { m in
+    // MARK: - Tabs
+    private var feedTabPicker: some View {
+        HStack(spacing: 6) {
+            ForEach(FeedTab.allCases, id: \.rawValue) { tab in
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { mode = m }
+                    withAnimation(GoMotion.feedback) {
+                        selectedTab = tab
+                    }
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 } label: {
-                    Text(m.rawValue)
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(mode == m ? Color.arkInk : .primary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(
-                            mode == m ? themeColor : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        )
+                    VStack(spacing: 4) {
+                        Image(systemName: tab.icon)
+                            .font(.system(size: 13, weight: .bold))
+                        Text(tab.label(l))
+                            .font(.system(size: 11, weight: .black, design: .rounded))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                    }
+                    .foregroundStyle(selectedTab == tab ? Color.arkInk : .primary.opacity(0.68))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .goSelectableSurface(
+                        isSelected: selectedTab == tab,
+                        tint: themeColor,
+                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    )
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(4)
-        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
-    private var feedModeHint: some View {
-        Text(mode == .manual
-             ? "手动记录和计划提醒可以同时存在；当前首页喂食完成态只按每日目标餐数判断。"
-             : "手动记录和计划提醒可以同时存在；当前首页喂食完成态只按今日计划提醒判断。")
-            .font(.system(size: 11, weight: .medium, design: .rounded))
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+    @ViewBuilder
+    private var selectedTabContent: some View {
+        switch selectedTab {
+        case .today:
+            todayFeedTab
+        case .plan:
+            plannedSection
+        case .stock:
+            stockTab
+        case .history:
+            historyTab
+        }
     }
 
-    // MARK: - Manual Mode
-    private var manualSection: some View {
+    // MARK: - Today Tab
+    private var todayFeedTab: some View {
         VStack(spacing: 16) {
-            if !feedScheduleEvents.isEmpty {
-                feedModeSideNote(
-                    icon: "bell.badge",
-                    title: "已保留 \(feedScheduleEvents.count) 个喂食计划",
-                    message: "这些计划仍会按时提醒，但不会影响手动模式下的首页完成状态。"
-                )
-            }
-
-            VStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .stroke(themeColor.opacity(0.15), lineWidth: 8)
-                        .frame(width: 100, height: 100)
-                    Circle()
-                        .trim(from: 0, to: min(1, Double(manualTodayFeedLogs.count) / Double(goalCount)))
-                        .stroke(themeColor, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                        .frame(width: 100, height: 100)
-                        .rotationEffect(.degrees(-90))
-                    VStack(spacing: 2) {
-                        Text("\(manualTodayFeedLogs.count)/\(goalCount)")
-                            .font(.system(size: 24, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
-                        Text("手动 · 今日")
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .animation(.spring(response: 0.4), value: manualTodayFeedLogs.count)
-            }
-            .padding(.vertical, 8)
-
-            HStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("默认份量")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.secondary)
-                    HStack(spacing: 6) {
-                        TextField("克数", text: $portionText)
-                            .keyboardType(.decimalPad)
-                            .font(.system(size: 18, weight: .black, design: .rounded))
-                            .frame(width: 80)
-                            .multilineTextAlignment(.center)
-                            .padding(.vertical, 8)
-                            .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
-                        Text("g")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                Divider()
-                    .frame(height: 48)
-                    .padding(.horizontal, 12)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("每日目标")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.secondary)
-                    Stepper(value: $goalCount, in: 1...10) {
-                        Text("\(goalCount) 餐")
-                            .font(.system(size: 18, weight: .black, design: .rounded))
-                    }
-                    .onChange(of: goalCount) { _, newVal in
-                        UserDefaults.standard.set(newVal, forKey: "feedGoal_\(pet.id.uuidString)")
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(16)
-            .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
-
-            Button { commitManualFeed() } label: {
+            todayFocusCard
+            quickAmountSection
+            Button { commitSmartFeed() } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "fork.knife")
+                    Image(systemName: feedTodayState.nextPendingReminder == nil ? "fork.knife" : "checkmark.circle.fill")
                         .font(.system(size: 14, weight: .bold))
-                    Text("手动打卡喂食")
+                    Text(l.tr(zh: "记录喂食", en: "Log feeding", de: "Fütterung eintragen"))
                         .font(.system(size: 16, weight: .black, design: .rounded))
                         .foregroundStyle(Color.arkInk)
                 }
-                .frame(maxWidth: .infinity).padding(.vertical, 14)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
                 .background(themeColor, in: Capsule())
             }
             .buttonStyle(.plain)
+
+            if feedTodayState.hasTodayPlan {
+                todayPlanPreview
+            } else {
+                manualGoalCard
+            }
+
+            todayLogList
         }
+    }
+
+    private var todayFocusCard: some View {
+        let state = feedTodayState
+        let stockStatus = currentFoodRunOutStatus
+        return VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                ZStack {
+                    Circle()
+                        .stroke(themeColor.opacity(0.16), lineWidth: 9)
+                    Circle()
+                        .trim(from: 0, to: state.progress)
+                        .stroke(themeColor, style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    VStack(spacing: 1) {
+                        Text("\(state.completedCount)/\(state.targetCount)")
+                            .font(.system(size: 22, weight: .black, design: .rounded))
+                            .foregroundStyle(.primary)
+                        Text(state.hasTodayPlan ? l.tr(zh: "计划", en: "Plan", de: "Plan") : l.tr(zh: "餐数", en: "Meals", de: "Mahlz."))
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(width: 96, height: 96)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 6) {
+                        Image(systemName: state.hasOverduePlan ? "exclamationmark.triangle.fill" : "fork.knife.circle.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(state.hasOverduePlan ? Color.goRed : themeColor)
+                        Text(todayFeedHeadline)
+                            .font(.system(size: 17, weight: .black, design: .rounded))
+                            .foregroundStyle(.primary)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.82)
+                    }
+                    Text(todayFeedSubtitle)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: 8) {
+                        focusMiniMetric(
+                            title: l.tr(zh: "今日克数", en: "Today", de: "Heute"),
+                            value: state.todayFeedGrams > 0 ? "\(Int(state.todayFeedGrams))g" : "--",
+                            tint: themeColor
+                        )
+                        focusMiniMetric(
+                            title: l.tr(zh: "粮仓", en: "Stock", de: "Vorrat"),
+                            value: stockStatus.value,
+                            tint: stockStatus.tint
+                        )
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .goGlassBackground(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    private func focusMiniMetric(title: String, value: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.system(size: 15, weight: .black, design: .rounded))
+                .foregroundStyle(tint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var quickAmountSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label(l.tr(zh: "本次份量", en: "Amount", de: "Menge"), systemImage: "scalemass.fill")
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                Spacer()
+                HStack(spacing: 4) {
+                    TextField("0", text: $portionText)
+                        .keyboardType(.decimalPad)
+                        .font(.system(size: 16, weight: .black, design: .rounded))
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 70)
+                    Text("g")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+
+            if !quickFeedGramOptions.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(quickFeedGramOptions, id: \.self) { grams in
+                            Button {
+                                portionText = String(format: "%.0f", grams)
+                                UISelectionFeedbackGenerator().selectionChanged()
+                            } label: {
+                                Text("\(Int(grams))g")
+                                    .font(.system(size: 12, weight: .black, design: .rounded))
+                                    .foregroundStyle(isSelectedQuickAmount(grams) ? Color.arkInk : .primary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 7)
+                                    .goSelectableSurface(isSelected: isSelectedQuickAmount(grams), tint: themeColor, in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var todayPlanPreview: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label(l.tr(zh: "今日计划", en: "Today plan", de: "Tagesplan"), systemImage: "clock.badge.checkmark")
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Text("\(feedTodayState.completedCount)/\(feedTodayState.targetCount)")
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(feedTodayState.todayPlanReminders.prefix(4)) { reminder in
+                plannedReminderRow(reminder)
+            }
+        }
+        .padding(14)
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var manualGoalCard: some View {
+        HStack(spacing: 12) {
+            Label(l.tr(zh: "每日目标", en: "Daily goal", de: "Tagesziel"), systemImage: "target")
+                .font(.system(size: 13, weight: .black, design: .rounded))
+                .foregroundStyle(.primary)
+            Spacer()
+            Stepper(value: $goalCount, in: 1...10) {
+                Text("\(goalCount) \(l.tr(zh: "餐", en: "meals", de: "Mahlz."))")
+                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .foregroundStyle(themeColor)
+            }
+            .onChange(of: goalCount) { _, newVal in
+                UserDefaults.standard.set(newVal, forKey: "feedGoal_\(pet.id.uuidString)")
+            }
+        }
+        .padding(14)
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     /// 从计划标题中解析克数（与计划打卡逻辑一致）
@@ -530,16 +634,32 @@ struct QuickFeedDetailSheet: View {
 
     private func scheduleRow(_ event: Event) -> some View {
         let todayReminders = event.reminders.filter { Calendar.current.isDateInToday($0.scheduledAt) }
+        let reminder = todayReminders.sorted { $0.scheduledAt < $1.scheduledAt }.first
         let isDone = todayReminders.contains { $0.isCompleted }
+        let isOverdue = reminder?.isFailed == true || (reminder?.isPending == true && (reminder?.scheduledAt ?? event.startDate) < Date())
+        let statusText = isDone
+            ? l.tr(zh: "已完成", en: "Done", de: "Erledigt")
+            : (isOverdue
+                ? l.tr(zh: "已逾期", en: "Overdue", de: "Überfällig")
+                : (reminder != nil ? l.tr(zh: "待完成", en: "Pending", de: "Offen") : l.tr(zh: "未来", en: "Upcoming", de: "Später")))
+        let statusColor: Color = isDone ? .goTeal : (isOverdue ? .goRed : (reminder != nil ? themeColor : Color.secondary))
         return HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(scheduleDisplayTitle(for: event))
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(isDone ? .secondary : .primary)
                     .strikethrough(isDone)
-                Text(event.startDate, style: .time)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text((reminder?.scheduledAt ?? event.startDate), style: .time)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
+                    Text(statusText)
+                        .font(.system(size: 9, weight: .black, design: .rounded))
+                        .foregroundStyle(statusColor)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(statusColor.opacity(0.12), in: Capsule())
+                }
             }
             Spacer()
             if isDone {
@@ -549,7 +669,7 @@ struct QuickFeedDetailSheet: View {
                 Button {
                     completeScheduledFeed(event: event)
                 } label: {
-                    Text("打卡")
+                    Text(l.tr(zh: "打卡", en: "Done", de: "Fertig"))
                         .font(.system(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 14).padding(.vertical, 6)
@@ -558,12 +678,8 @@ struct QuickFeedDetailSheet: View {
                 .buttonStyle(.plain)
             }
             Button {
-                for r in event.reminders {
-                    NotificationManager.shared.cancel(notificationId: r.notificationId)
-                    modelContext.delete(r)
-                }
-                modelContext.delete(event)
-                modelContext.safeSave()
+                schedulePendingDelete = event
+                showingDeleteScheduleConfirm = true
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 12))
@@ -613,6 +729,88 @@ struct QuickFeedDetailSheet: View {
         }
         .padding(14)
         .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    // MARK: - Stock Tab
+    private var stockTab: some View {
+        VStack(spacing: 16) {
+            foodStockStatusCard
+            stockModePicker
+            if selectedStockMode == .casual {
+                casualSection
+            } else {
+                stockSection
+            }
+            calculatorSection
+        }
+    }
+
+    private var foodStockStatusCard: some View {
+        let status = currentFoodRunOutStatus
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(status.tint.opacity(0.16))
+                        .frame(width: 42, height: 42)
+                    Image(systemName: "shippingbox.fill")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(status.tint)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(pet.foodBrand.isEmpty ? l.tr(zh: "未设置粮食品牌", en: "No food brand", de: "Keine Futtermarke") : pet.foodBrand)
+                        .font(.system(size: 16, weight: .black, design: .rounded))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text(status.message)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+                Spacer()
+                Text(status.value)
+                    .font(.system(size: 20, weight: .black, design: .rounded))
+                    .foregroundStyle(status.tint)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+
+            HStack(spacing: 8) {
+                stockStatusPill(
+                    title: selectedStockMode == .casual ? l.tr(zh: "佛系估算", en: "Casual", de: "Grob") : l.tr(zh: "精准倒数", en: "Precise", de: "Genau"),
+                    icon: selectedStockMode == .casual ? "leaf.fill" : "scalemass.fill",
+                    tint: themeColor
+                )
+                stockStatusPill(
+                    title: pet.foodReminderEnabled ? l.tr(zh: "已开提醒", en: "Reminder on", de: "Erinnerung an") : l.tr(zh: "未开提醒", en: "No reminder", de: "Keine Erinnerung"),
+                    icon: pet.foodReminderEnabled ? "bell.badge.fill" : "bell.slash.fill",
+                    tint: pet.foodReminderEnabled ? .goTeal : .secondary
+                )
+            }
+        }
+        .padding(16)
+        .goGlassBackground(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    private func stockStatusPill(title: String, icon: String, tint: Color) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .bold))
+            Text(title)
+                .font(.system(size: 11, weight: .black, design: .rounded))
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(tint.opacity(0.10), in: Capsule())
+    }
+
+    // MARK: - History Tab
+    private var historyTab: some View {
+        VStack(spacing: 16) {
+            todayLogList
+            historySection
+        }
     }
 
     // MARK: - Stock Mode Picker (casual vs precise)
@@ -1133,14 +1331,13 @@ struct QuickFeedDetailSheet: View {
 
     // MARK: - Today's Log List（按当前模式只展示对应来源，避免混在一起）
     private var todayLogList: some View {
-        let logs = mode == .manual ? manualTodayFeedLogs : plannedTodayFeedLogs
-        let title = mode == .manual ? "今日手动记录" : "今日计划打卡"
+        let logs = feedTodayState.allTodayLogs
         return VStack(alignment: .leading, spacing: 10) {
-            Text(title)
+            Text(l.tr(zh: "今日喂食记录", en: "Today records", de: "Heutige Einträge"))
                 .font(.system(size: 13, weight: .black, design: .rounded))
                 .foregroundStyle(.secondary)
             if logs.isEmpty {
-                Text(mode == .manual ? "暂无手动记录" : "今日尚未完成计划打卡")
+                Text(l.tr(zh: "今天还没有喂食记录", en: "No feeding records today", de: "Heute keine Fütterungseinträge"))
                     .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary.opacity(0.6))
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -1148,11 +1345,12 @@ struct QuickFeedDetailSheet: View {
             } else {
                 ForEach(logs) { log in
                     HStack {
-                        Text(mode == .planned ? "计划" : "手动")
+                        let isPlanned = log.isPlannedFeedLogEntry
+                        Text(isPlanned ? l.tr(zh: "计划", en: "Plan", de: "Plan") : l.tr(zh: "手动", en: "Manual", de: "Manuell"))
                             .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.arkInk)
                             .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background(mode == .planned ? Color.goTeal.opacity(0.85) : themeColor.opacity(0.85), in: Capsule())
+                            .background(isPlanned ? Color.goTeal.opacity(0.85) : themeColor.opacity(0.85), in: Capsule())
                         Text(log.date, style: .time)
                             .font(.system(size: 13, weight: .medium, design: .rounded))
                             .foregroundStyle(.primary.opacity(0.6))
@@ -1186,7 +1384,7 @@ struct QuickFeedDetailSheet: View {
             .sorted { $0.date > $1.date }.prefix(15))
         if !feedLogs.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
-                Text("喂食历史")
+                Text(l.tr(zh: "喂食历史", en: "Feeding history", de: "Fütterungsverlauf"))
                     .font(.system(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(themeColor.opacity(0.85)).tracking(2)
 
@@ -1201,12 +1399,12 @@ struct QuickFeedDetailSheet: View {
                         Image(systemName: "fork.knife")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(themeColor)
-                        Text(log.isPlannedFeedLogEntry ? "计划" : "手动")
+                        Text(log.isPlannedFeedLogEntry ? l.tr(zh: "计划", en: "Plan", de: "Plan") : l.tr(zh: "手动", en: "Manual", de: "Manuell"))
                             .font(.system(size: 9, weight: .bold, design: .rounded))
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 5).padding(.vertical, 2)
                             .background(Color.primary.opacity(0.06), in: Capsule())
-                        Text(log.amountGrams > 0 ? "\(Int(log.amountGrams))g" : "快速打卡")
+                        Text(log.amountGrams > 0 ? "\(Int(log.amountGrams))g" : l.tr(zh: "快速打卡", en: "Quick log", de: "Schnelleintrag"))
                             .font(.system(size: 13, weight: .semibold)).foregroundStyle(.primary)
                         Spacer()
                         Text(log.date, format: .dateTime.month().day().hour().minute())
@@ -1264,14 +1462,183 @@ struct QuickFeedDetailSheet: View {
         .goGlassBackground(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
+    private var todayFeedHeadline: String {
+        let state = feedTodayState
+        if state.hasOverduePlan {
+            return l.tr(zh: "有一餐已逾期", en: "A meal is overdue", de: "Eine Mahlzeit ist überfällig")
+        }
+        if let next = state.nextPendingReminder {
+            return l.tr(
+                zh: "下一餐 \(next.scheduledAt.formatted(date: .omitted, time: .shortened))",
+                en: "Next at \(next.scheduledAt.formatted(date: .omitted, time: .shortened))",
+                de: "Nächste um \(next.scheduledAt.formatted(date: .omitted, time: .shortened))"
+            )
+        }
+        if state.isComplete {
+            return l.tr(zh: "今日喂食已完成", en: "Feeding done today", de: "Fütterung heute erledigt")
+        }
+        let left = max(0, state.targetCount - state.completedCount)
+        return l.tr(zh: "还差 \(left) 餐", en: "\(left) meals left", de: "\(left) Mahlz. offen")
+    }
+
+    private var todayFeedSubtitle: String {
+        let state = feedTodayState
+        let grams = state.todayFeedGrams > 0 ? "\(Int(state.todayFeedGrams))g" : "--"
+        if state.hasTodayPlan {
+            return l.tr(
+                zh: "按今日计划判断完成：\(state.completedCount)/\(state.targetCount)，已记录 \(grams)",
+                en: "Using today plan: \(state.completedCount)/\(state.targetCount), logged \(grams)",
+                de: "Nach Tagesplan: \(state.completedCount)/\(state.targetCount), erfasst \(grams)"
+            )
+        }
+        return l.tr(
+            zh: "无今日计划时按每日目标餐数判断，已记录 \(grams)",
+            en: "No plan today; using daily meal goal, logged \(grams)",
+            de: "Kein Plan heute; Tagesziel zählt, erfasst \(grams)"
+        )
+    }
+
+    private var quickFeedGramOptions: [Double] {
+        var values: [Double] = []
+        func append(_ value: Double) {
+            let rounded = value.rounded()
+            guard rounded > 0, !values.contains(where: { Int($0) == Int(rounded) }) else { return }
+            values.append(rounded)
+        }
+
+        append(pet.dailyPortionGrams)
+        if let event = feedTodayState.nextPendingReminder?.event {
+            append(parseScheduleGrams(from: event))
+        }
+        feedTodayState.todayPlanReminders
+            .compactMap(\.event)
+            .forEach { append(parseScheduleGrams(from: $0)) }
+        pet.careLogs
+            .filter { $0.careType == .feeding && $0.amountGrams > 0 }
+            .sorted { $0.date > $1.date }
+            .prefix(8)
+            .forEach { append($0.amountGrams) }
+        return Array(values.prefix(5))
+    }
+
+    private func isSelectedQuickAmount(_ grams: Double) -> Bool {
+        guard let selected = Double(portionText.replacingOccurrences(of: ",", with: ".")) else { return false }
+        return Int(selected.rounded()) == Int(grams.rounded())
+    }
+
+    private var currentFoodRunOutStatus: (value: String, message: String, tint: Color) {
+        if selectedStockMode == .casual {
+            guard let runOut = pet.casualEstimatedRunOutDate,
+                  let days = pet.casualRemainingDays else {
+                return (
+                    "--",
+                    l.tr(zh: "设置开包日期后显示断粮日", en: "Set open date to estimate run-out", de: "Öffnungsdatum für Prognose setzen"),
+                    Color.secondary
+                )
+            }
+            let tint: Color = days <= 3 ? .goRed : (days <= 7 ? .goYellow : .goTeal)
+            return (
+                days > 0 ? "\(days)天" : l.tr(zh: "断粮", en: "Empty", de: "Leer"),
+                l.tr(
+                    zh: "预计 \(runOut.formatted(.dateTime.month().day())) 断粮",
+                    en: "Runs out around \(runOut.formatted(.dateTime.month().day()))",
+                    de: "Reicht bis ca. \(runOut.formatted(.dateTime.month().day()))"
+                ),
+                tint
+            )
+        }
+
+        guard pet.restockWeight > 0, pet.dailyPortionGrams > 0 else {
+            return (
+                "--",
+                l.tr(zh: "补粮后显示剩余天数", en: "Restock to estimate days left", de: "Nachfüllen für Resttage"),
+                Color.secondary
+            )
+        }
+        let days = pet.remainingFoodDays
+        let tint: Color = days <= 3 ? .goRed : (days <= 7 ? .goYellow : .goTeal)
+        let message: String
+        if let runOut = pet.estimatedRunOutDate {
+            message = l.tr(
+                zh: "预计 \(runOut.formatted(.dateTime.month().day())) 断粮 · 剩 \(Int(pet.remainingFoodGrams))g",
+                en: "Runs out around \(runOut.formatted(.dateTime.month().day())) · \(Int(pet.remainingFoodGrams))g left",
+                de: "Reicht bis ca. \(runOut.formatted(.dateTime.month().day())) · \(Int(pet.remainingFoodGrams))g übrig"
+            )
+        } else {
+            message = l.tr(zh: "粮食快断啦，该补货了", en: "Food is running out", de: "Futter geht aus")
+        }
+        return (days > 0 ? "\(days)天" : l.tr(zh: "断粮", en: "Empty", de: "Leer"), message, tint)
+    }
+
+    private func plannedReminderRow(_ reminder: Reminder) -> some View {
+        let isDone = reminder.isCompleted
+        let isOverdue = reminder.isFailed || (reminder.isPending && reminder.scheduledAt < Date())
+        let tint: Color = isDone ? .goTeal : (isOverdue ? .goRed : themeColor)
+        let status = isDone ? l.tr(zh: "已完成", en: "Done", de: "Erledigt") : (isOverdue ? l.tr(zh: "已逾期", en: "Overdue", de: "Überfällig") : l.tr(zh: "待完成", en: "Pending", de: "Offen"))
+        let grams = reminder.event.map { parseScheduleGrams(from: $0) } ?? 0
+
+        return HStack(spacing: 10) {
+            Image(systemName: isDone ? "checkmark.circle.fill" : "clock.fill")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(tint)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(grams > 0 ? "\(mealName(for: reminder.scheduledAt)) \(Int(grams))g" : mealName(for: reminder.scheduledAt))
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                Text(reminder.scheduledAt, style: .time)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text(status)
+                .font(.system(size: 10, weight: .black, design: .rounded))
+                .foregroundStyle(tint)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(tint.opacity(0.12), in: Capsule())
+            if (reminder.isPending || reminder.isFailed), let event = reminder.event {
+                Button { completeScheduledFeed(event: event) } label: {
+                    Text(l.tr(zh: "打卡", en: "Done", de: "Fertig"))
+                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.arkInk)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(themeColor, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, 5)
+    }
+
     // MARK: - Actions
 
+    private func commitSmartFeed() {
+        if let event = feedTodayState.nextPendingReminder?.event {
+            completeScheduledFeed(event: event)
+        } else {
+            commitManualFeed()
+        }
+    }
+
+    private func deleteSchedule(_ event: Event) {
+        for reminder in event.reminders {
+            NotificationManager.shared.cancel(notificationId: reminder.notificationId)
+            modelContext.delete(reminder)
+        }
+        modelContext.delete(event)
+        modelContext.safeSave()
+        rebuildFoodStockReminder()
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+
     private func commitManualFeed() {
-        let grams = Double(portionText) ?? pet.dailyPortionGrams
+        let grams = Double(portionText.replacingOccurrences(of: ",", with: ".")) ?? pet.dailyPortionGrams
         let currentUserId = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
 
         // 质量判定：精准克数（用户显式输入且非默认）视为 precise；暂未支持备注/拍照
-        let isPrecise = !portionText.isEmpty && Double(portionText) != nil
+        let isPrecise = !portionText.isEmpty && Double(portionText.replacingOccurrences(of: ",", with: ".")) != nil
         let quality = QuestManager.QualityBonus.compose(
             precise: isPrecise,
             hasNote: false,
@@ -1306,7 +1673,7 @@ struct QuickFeedDetailSheet: View {
         // 按计划喂食 = 完整精准模式
         let quality = QuestManager.QualityBonus.precise
         let performFeed = {
-            guard let reminder = event.reminders.first(where: { Calendar.current.isDateInToday($0.scheduledAt) && $0.isPending })
+            guard let reminder = event.reminders.first(where: { Calendar.current.isDateInToday($0.scheduledAt) && ($0.isPending || $0.isFailed) })
                     ?? event.reminders.first(where: { Calendar.current.isDateInToday($0.scheduledAt) }) else { return }
             _ = CareEventService.completePlannedFeed(
                 pet: self.pet,

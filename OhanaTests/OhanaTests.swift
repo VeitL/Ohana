@@ -235,6 +235,73 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func feedTodayStateUsesManualGoalWhenNoPlanExists() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 12)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+        context.insert(PetCareLog(date: now.addingTimeInterval(-3_600), type: .feeding, amountGrams: 30, note: PetCareLog.manualFeedNoteMarker, pet: pet))
+        context.insert(PetCareLog(date: now.addingTimeInterval(-1_800), type: .feeding, amountGrams: 40, note: PetCareLog.manualFeedNoteMarker, pet: pet))
+        try context.save()
+
+        let state = FeedTodayState(pet: pet, allEvents: [], manualGoalCount: 3, now: now, calendar: calendar)
+
+        #expect(!state.hasTodayPlan)
+        #expect(state.completedCount == 2)
+        #expect(state.targetCount == 3)
+        #expect(!state.isComplete)
+        #expect(state.todayFeedGrams == 70)
+    }
+
+    @MainActor
+    @Test func feedTodayStateUsesPlanProgressAndKeepsOverduePlanActionable() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 12)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let pet = Pet(name: "Momo", species: "猫")
+        let breakfast = Event(
+            title: "早餐 35g",
+            startDate: dateForTest(year: 2026, month: 5, day: 8, hour: 8),
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let dinner = Event(
+            title: "晚餐 45g",
+            startDate: dateForTest(year: 2026, month: 5, day: 8, hour: 11),
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let completedBreakfast = Reminder(event: breakfast, scheduledAt: breakfast.startDate)
+        completedBreakfast.statusEnum = .completed
+        let failedDinner = Reminder(event: dinner, scheduledAt: dinner.startDate)
+        failedDinner.statusEnum = .failed
+        context.insert(pet)
+        context.insert(breakfast)
+        context.insert(dinner)
+        context.insert(completedBreakfast)
+        context.insert(failedDinner)
+        context.insert(PetCareLog(date: now, type: .feeding, amountGrams: 20, note: PetCareLog.manualFeedNoteMarker, pet: pet))
+        try context.save()
+
+        let state = FeedTodayState(pet: pet, allEvents: [breakfast, dinner], manualGoalCount: 1, now: now, calendar: calendar)
+
+        #expect(state.hasTodayPlan)
+        #expect(state.completedCount == 1)
+        #expect(state.targetCount == 2)
+        #expect(!state.isComplete)
+        #expect(state.nextPendingReminder?.id == failedDinner.id)
+        #expect(state.hasOverduePlan)
+        #expect(state.manualTodayLogs.count == 1)
+    }
+
+    @MainActor
     @Test func careLedgerBackfillIsIdempotent() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
