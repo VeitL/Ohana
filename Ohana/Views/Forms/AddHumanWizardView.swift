@@ -32,6 +32,8 @@ struct AddHumanWizardView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("appLanguage") private var appLanguage = "zh"
+    @AppStorage(AppMeasurementSystem.storageKey) private var appMeasurementSystem = AppMeasurementSystem.fallbackCode
+    @AppStorage(AppCurrency.storageKey) private var appCurrency = AppCurrency.fallbackCode
     @Query(sort: \Pet.createdAt)   private var existingPets:   [Pet]
     @Query(sort: \Human.createdAt) private var existingHumans: [Human]
 
@@ -104,6 +106,13 @@ struct AddHumanWizardView: View {
     // MARK: - Computed
 
     private var accentColor: Color { Color(hex: themeColorHex) }
+    private var isCreatingFirstHuman: Bool { existingHumans.isEmpty }
+    private var selectedMeasurementSystem: AppMeasurementSystem.Option {
+        AppMeasurementSystem.option(for: appMeasurementSystem)
+    }
+    private var selectedCurrency: AppCurrency.Option {
+        AppCurrency.supported.first { $0.code == AppCurrency.normalize(appCurrency) } ?? AppCurrency.supported[0]
+    }
 
     /// 标准信用卡比例 1.586:1，左右各 7pt 边距（与首页 K.cardH / K.cardMargin 保持一致）
     private var walletDraftCardHeight: CGFloat { (ScreenCompat.width - 7 * 2) / 1.586 }
@@ -877,6 +886,11 @@ struct AddHumanWizardView: View {
 
                 Divider().opacity(0.15)
 
+                if isCreatingFirstHuman {
+                    firstHumanAppPreferencesSection
+                    Divider().opacity(0.15)
+                }
+
                 // Summary tags
                 VStack(alignment: .leading, spacing: 8) {
                     cardSectionLabel(l.humanWizSummaryLabel)
@@ -931,6 +945,98 @@ struct AddHumanWizardView: View {
     }
 
     // MARK: - Component helpers
+
+    private var firstHumanAppPreferencesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            cardSectionLabel(l.tr(
+                zh: "App 偏好",
+                en: "App preferences",
+                de: "App-Einstellungen"
+            ))
+            Text(l.tr(
+                zh: "作为第一个成员，先确认整个 app 使用的货币和计量单位。",
+                en: "As the first member, confirm the currency and units for the whole app.",
+                de: "Als erstes Mitglied legst du Währung und Einheiten für die App fest."
+            ))
+            .font(.system(size: 12, weight: .medium, design: .rounded))
+            .foregroundStyle(.secondary.opacity(0.65))
+
+            VStack(spacing: 10) {
+                appPreferenceMenuRow(
+                    icon: selectedCurrency.systemIconName,
+                    iconColor: Color.goYellow,
+                    title: l.currency,
+                    value: selectedCurrency.displayName
+                ) {
+                    ForEach(AppCurrency.supported) { currency in
+                        Button {
+                            appCurrency = currency.code
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        } label: {
+                            Label(
+                                currency.displayName,
+                                systemImage: currency.code == selectedCurrency.code ? "checkmark" : currency.systemIconName
+                            )
+                        }
+                    }
+                }
+
+                appPreferenceMenuRow(
+                    icon: selectedMeasurementSystem.systemIconName,
+                    iconColor: Color.goTeal,
+                    title: l.measurementUnits,
+                    value: selectedMeasurementSystem.title(appLanguage)
+                ) {
+                    ForEach(AppMeasurementSystem.supported) { unit in
+                        Button {
+                            appMeasurementSystem = unit.code
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        } label: {
+                            Label(
+                                unit.title(appLanguage),
+                                systemImage: unit.code == selectedMeasurementSystem.code ? "checkmark" : unit.systemIconName
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func appPreferenceMenuRow<MenuContent: View>(
+        icon: String,
+        iconColor: Color,
+        title: String,
+        value: String,
+        @ViewBuilder menuContent: () -> MenuContent
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(iconColor)
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary)
+                Text(value)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            Spacer()
+            Menu {
+                menuContent()
+            } label: {
+                Image(systemName: "chevron.down.circle.fill")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(accentColor)
+            }
+        }
+        .padding(14)
+        .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
 
     /// 卡内小节标题（与 `AddPetWizardView` 卡内 `Text(…).foregroundStyle(.secondary)` 同级）
     private func cardSectionLabel(_ text: String) -> some View {

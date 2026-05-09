@@ -550,7 +550,7 @@ final class QuestManager {
         flushToDefaults()
     }
 
-    /// 旧版签名兼容（OverviewView 等已用 allHumans 的调用点）—— 内部映射到新规则
+    /// 旧版签名兼容；内部映射到新规则。
     func awardAction(
         type: ActionType,
         amount: Int,

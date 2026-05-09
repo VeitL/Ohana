@@ -16,7 +16,7 @@ let ohanaProcessStartTime = CFAbsoluteTimeGetCurrent()
 struct OhanaApp: App {
     let container: ModelContainer
     private static let bgTaskID = "com.guanchen.li.Ark.reminderRefill"
-    @AppStorage("appThemePreference") private var appThemePreference: String = "system"
+    @AppStorage("appThemePreference") private var appThemePreference: String = "dark"
     @AppStorage("appLanguage") private var appLanguage: String = "zh"
     @AppStorage(AppCountry.storageKey) private var appCountry: String = AppCountry.detectedCode
     @AppStorage(AppMeasurementSystem.storageKey) private var appMeasurementSystem: String = AppMeasurementSystem.fallbackCode
@@ -49,6 +49,7 @@ struct OhanaApp: App {
                 .tint(Color.goPrimary)
                 .preferredColorScheme(preferredScheme)
                 .environment(\.locale, AppLanguage.swiftUIPreferredLocale)
+                .ignoresSafeArea(.keyboard, edges: .bottom)
                 .onChange(of: appCountry) { _, _ in }
                 .onChange(of: appCurrency) { _, _ in }
                 .onChange(of: appMeasurementSystem) { _, _ in }

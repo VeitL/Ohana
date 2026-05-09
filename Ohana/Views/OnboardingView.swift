@@ -179,18 +179,22 @@ struct OnboardingView: View {
     @AppStorage("ohana_show_first_success_card") private var showFirstSuccessCard: Bool = false
     @AppStorage("ohana_first_quick_checkin_completed") private var firstQuickCheckInCompleted: Bool = false
     @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.fallbackCode
+    @AppStorage(AppCountry.storageKey) private var appCountry: String = AppCountry.detectedCode
+    @AppStorage(AppMeasurementSystem.storageKey) private var appMeasurementSystem: String = AppMeasurementSystem.fallbackCode
+    @AppStorage(AppCurrency.storageKey) private var appCurrency: String = AppCurrency.fallbackCode
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var isReplay: Bool = false
     var onReplayFinished: (() -> Void)?
 
     private enum FlowStep: Int, Equatable {
-        case intro = 0
-        case profile = 1
-        case firstPet = 2
+        case region = 0
+        case intro = 1
+        case profile = 2
+        case firstPet = 3
     }
 
-    @State private var step: FlowStep = .intro
+    @State private var step: FlowStep = .region
     /// 每次进入「添加人类」步骤刷新，避免从欢迎页返回后残留半填状态
     @State private var humanWizardSessionId = UUID()
     @State private var petWizardSessionId = UUID()
@@ -198,6 +202,7 @@ struct OnboardingView: View {
     @State private var iconPulse = false
 
     private var languageCode: String { AppLanguage.normalize(appLanguage) }
+    private var selectedCountry: AppCountry.Option { AppCountry.option(for: appCountry) }
     private var shouldReduceWork: Bool {
         powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
     }
@@ -234,6 +239,9 @@ struct OnboardingView: View {
     @ViewBuilder
     private var content: some View {
         switch step {
+        case .region:
+            regionLanguageFlow
+                .transition(.opacity.combined(with: .move(edge: .leading)))
         case .intro:
             introFlow
                 .transition(.asymmetric(
@@ -256,7 +264,7 @@ struct OnboardingView: View {
 
     private var progressBar: some View {
         HStack(spacing: 8) {
-            ForEach(0 ..< 3, id: \.self) { i in
+            ForEach(0 ..< FlowStep.firstPet.rawValue + 1, id: \.self) { i in
                 Capsule()
                     .fill(i <= step.rawValue ? Color.goLime : Color.arkInk.opacity(0.12))
                     .frame(width: i == step.rawValue ? 28 : nil, height: 4)
@@ -297,6 +305,160 @@ struct OnboardingView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Region and language
+
+    private var regionLanguageFlow: some View {
+        GeometryReader { proxy in
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    HStack {
+                        OhanaIconView(size: 38)
+                        Spacer()
+                        progressBar
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 54)
+
+                    Spacer(minLength: 26)
+
+                    VStack(spacing: 12) {
+                        Text(AppLocalizedText(
+                            zh: "先选择你的地区与语言",
+                            en: "Choose your region and language",
+                            de: "Region und Sprache wählen"
+                        ).resolve(languageCode))
+                        .font(OhanaFont.largeTitle(.black))
+                        .foregroundStyle(Color.arkInk)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.76)
+
+                        Text(AppLocalizedText(
+                            zh: "我们会先应用对应的语言、货币和计量单位，之后都可以在设置里调整。",
+                            en: "Ohana will apply matching language, currency, and units. You can change them later.",
+                            de: "Ohana setzt passende Sprache, Währung und Einheiten. Später änderbar."
+                        ).resolve(languageCode))
+                        .font(OhanaFont.body(.semibold))
+                        .foregroundStyle(Color.arkInk.opacity(0.58))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.horizontal, 30)
+                    .padding(.top, 12)
+
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text(AppLocalizedText(zh: "国家/地区", en: "Country/Region", de: "Land/Region").resolve(languageCode))
+                            .font(OhanaFont.caption(.black))
+                            .foregroundStyle(Color.arkInk.opacity(0.54))
+                            .textCase(.uppercase)
+
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 2), spacing: 10) {
+                            ForEach(AppCountry.supported) { country in
+                                regionChoiceButton(country)
+                            }
+                        }
+
+                        Text(AppLocalizedText(zh: "语言", en: "Language", de: "Sprache").resolve(languageCode))
+                            .font(OhanaFont.caption(.black))
+                            .foregroundStyle(Color.arkInk.opacity(0.54))
+                            .textCase(.uppercase)
+                            .padding(.top, 6)
+
+                        HStack(spacing: 10) {
+                            ForEach(AppLanguage.supported) { language in
+                                languageChoiceButton(language)
+                            }
+                        }
+                    }
+                    .padding(18)
+                    .background(Color(hex: "FFFFFF").opacity(0.72), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .strokeBorder(Color.arkInk.opacity(0.06), lineWidth: 1)
+                    )
+                    .padding(.horizontal, 20)
+                    .padding(.top, 28)
+
+                    Spacer(minLength: 22)
+
+                    Button {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        withAnimation(GoMotion.page) { step = .intro }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text(AppLocalizedText(zh: "继续", en: "Continue", de: "Weiter").resolve(languageCode))
+                                .font(OhanaFont.title3(.black))
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 14, weight: .black))
+                        }
+                        .foregroundStyle(Color.arkInk)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 17)
+                        .background(Color.goLime, in: Capsule())
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 42)
+                }
+                .frame(minHeight: proxy.size.height)
+            }
+        }
+    }
+
+    private func regionChoiceButton(_ country: AppCountry.Option) -> some View {
+        let isSelected = country.code == selectedCountry.code
+        return Button {
+            applyCountryDefaults(country)
+        } label: {
+            HStack(spacing: 8) {
+                Text(country.flag)
+                    .font(.system(size: 20))
+                Text(country.displayName.resolve(languageCode))
+                    .font(OhanaFont.subheadline(isSelected ? .black : .bold))
+                    .foregroundStyle(Color.arkInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                Spacer(minLength: 0)
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 15, weight: .black))
+                        .foregroundStyle(Color.arkInk)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .background(isSelected ? Color.goLime : Color.arkInk.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func languageChoiceButton(_ language: AppLanguage.Option) -> some View {
+        let isSelected = AppLanguage.normalize(appLanguage) == language.code
+        return Button {
+            appLanguage = language.code
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        } label: {
+            Text(language.displayName)
+                .font(OhanaFont.subheadline(isSelected ? .black : .bold))
+                .foregroundStyle(Color.arkInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.74)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(isSelected ? Color.goLime : Color.arkInk.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func applyCountryDefaults(_ country: AppCountry.Option) {
+        AppCountry.applyDefaults(for: country.code)
+        appCountry = country.code
+        appLanguage = AppLanguage.normalize(country.defaultLanguageCode)
+        appMeasurementSystem = AppMeasurementSystem.normalize(country.defaultMeasurementSystemCode)
+        appCurrency = AppCurrency.normalize(country.defaultCurrencyCode)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     // MARK: - Intro flow

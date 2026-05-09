@@ -26,6 +26,7 @@ struct RootView: View {
                 OnboardingView()
             }
         }
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .onAppear {
             queueStartupMaintenance()
         }

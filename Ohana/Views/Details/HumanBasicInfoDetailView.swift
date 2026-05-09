@@ -18,8 +18,8 @@ struct HumanBasicInfoDetailView: View {
     @Query private var allHumans: [Human]
 
     @State private var isEditing = false
-    @State private var showingDeleteConfirm = false
-    @State private var deleteConfirmName = ""
+    @State private var showingDeleteSheet = false
+    @State private var isDeleting = false
     @State private var showingHomeStackFullAlert = false
 
     @State private var eName = ""
@@ -98,21 +98,23 @@ struct HumanBasicInfoDetailView: View {
                 }
             }
         }
-        .alert("确认删除", isPresented: $showingDeleteConfirm) {
-            TextField("输入成员名字确认", text: $deleteConfirmName)
-            Button("取消", role: .cancel) { deleteConfirmName = "" }
-            Button("删除", role: .destructive) {
-                if deleteConfirmName == human.name {
-                    deleteHumanAndReturnHome()
-                }
-            }
-        } message: {
-            Text("请输入 \"\(human.name)\" 确认删除。此操作不可撤销。")
-        }
         .alert("首页卡片堆已满", isPresented: $showingHomeStackFullAlert) {
             Button("知道了", role: .cancel) {}
         } message: {
             Text("首页最多显示 \(HomeCardVisibility.maxVisibleCards) 张卡片。请先从首页移除一张宠物或人类卡片，再添加 \(human.name)。")
+        }
+        .sheet(isPresented: $showingDeleteSheet) {
+            HumanDeleteConfirmationSheet(
+                humanName: human.name,
+                onCancel: { showingDeleteSheet = false },
+                onDelete: {
+                    showingDeleteSheet = false
+                    deleteHumanAndReturnHome()
+                }
+            )
+            .presentationDetents([.height(360), .medium])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(.regularMaterial)
         }
     }
 
@@ -358,7 +360,7 @@ struct HumanBasicInfoDetailView: View {
             Text("危险操作")
                 .font(.system(size: 12, weight: .black, design: .rounded))
                 .foregroundStyle(Color.goRed)
-            Button(role: .destructive) { showingDeleteConfirm = true } label: {
+            Button(role: .destructive) { showingDeleteSheet = true } label: {
                 Label("删除成员", systemImage: "trash")
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.goRed)
@@ -366,6 +368,7 @@ struct HumanBasicInfoDetailView: View {
                     .padding(.vertical, 12)
                     .background(Color.goRed.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
+            .disabled(isDeleting)
             .buttonStyle(.plain)
         }
         .padding(14)
@@ -635,16 +638,110 @@ struct HumanBasicInfoDetailView: View {
     }
 
     private func deleteHumanAndReturnHome() {
-        let deletedHumanId = human.id.uuidString
+        guard !isDeleting else { return }
+        isDeleting = true
+
+        let target = human
+        let deletedHumanId = target.id.uuidString
         let fallbackHumanId = allHumans.first(where: { $0.id.uuidString != deletedHumanId })?.id.uuidString ?? ""
 
         if activeHumanIdStr == deletedHumanId {
             activeHumanIdStr = fallbackHumanId
         }
 
-        modelContext.delete(human)
-        modelContext.safeSave()
-        NotificationCenter.default.post(name: .ohanaReturnHomeAfterHumanDeletion, object: nil)
         dismiss()
+        DispatchQueue.main.async {
+            modelContext.delete(target)
+            modelContext.safeSave()
+            NotificationCenter.default.post(name: .ohanaReturnHomeAfterHumanDeletion, object: nil)
+        }
+    }
+}
+
+private struct HumanDeleteConfirmationSheet: View {
+    let humanName: String
+    let onCancel: () -> Void
+    let onDelete: () -> Void
+
+    @State private var confirmName = ""
+
+    private var canDelete: Bool {
+        confirmName.trimmingCharacters(in: .whitespacesAndNewlines) == humanName
+    }
+
+    var body: some View {
+        ZStack {
+            ArkBackgroundView()
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(spacing: 12) {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 16, weight: .black))
+                        .foregroundStyle(Color.goRed)
+                        .frame(width: 36, height: 36)
+                        .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("删除成员 \(humanName)")
+                            .font(.system(size: 18, weight: .black, design: .rounded))
+                            .foregroundStyle(.primary)
+                        Text("输入名字后才能继续")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button(action: onCancel) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .black))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 34, height: 34)
+                            .background(Color.primary.opacity(0.08), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("这会删除成员资料、体重与运动记录，无法撤销。")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(.primary.opacity(0.68))
+                    Text("请输入：\(humanName)")
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.goRed.opacity(0.8))
+                }
+
+                TextField("成员名字", text: $confirmName)
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 13)
+                    .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(canDelete ? Color.goRed.opacity(0.7) : Color.primary.opacity(0.12), lineWidth: 1))
+
+                HStack(spacing: 10) {
+                    Button(action: onCancel) {
+                        Text("取消")
+                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .foregroundStyle(.primary.opacity(0.72))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 13)
+                            .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: onDelete) {
+                        Text("删除")
+                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .foregroundStyle(canDelete ? Color.white : Color.primary.opacity(0.32))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 13)
+                            .background(canDelete ? Color.goRed : Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canDelete)
+                }
+            }
+            .padding(20)
+        }
     }
 }

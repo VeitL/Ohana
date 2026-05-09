@@ -26,7 +26,6 @@ struct CalendarPetChipFilterBar: View {
     @AppStorage("calendar_filterPetId") private var calendarFilterPetId: String = ""
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage("appUIStyle") private var appUIStyle: String = "go"
 
     private var isMaterial: Bool { false }
     private var chipAccent: Color { Color.goPrimary }
@@ -101,7 +100,6 @@ struct CalendarView: View {
     private var viewMode: CalendarViewMode { CalendarViewMode(rawValue: viewModeRaw) ?? .list }
     @State private var deletingEvent: Event? = nil
     @State private var showDeleteSeriesAlert = false
-    @AppStorage("appUIStyle") private var appUIStyle: String = "go"
     @Environment(\.colorScheme) private var colorScheme
     @State private var coconutCount: Int = QuestManager.shared.coconutCount
     @State private var listVisibleTopDate = Calendar.current.startOfDay(for: Date())
@@ -112,7 +110,7 @@ struct CalendarView: View {
     private var matSurface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
     private var chipAccent: Color { Color.goPrimary }
     private var chipSelFg:  Color { Color.arkInk }
-    // 经典模式下自适应 light/dark 的文字颜色辅助
+    // 独立日历页下自适应 light/dark 的文字颜色辅助
     private var classicSoftText: Color { colorScheme == .dark ? .white.opacity(0.4) : .secondary }
     private var classicPrimaryText: Color { colorScheme == .dark ? .white.opacity(0.85) : .primary }
     private var classicSubtleFill: Color { colorScheme == .dark ? .white.opacity(0.1) : .primary.opacity(0.07) }
@@ -152,7 +150,7 @@ struct CalendarView: View {
         return false
     }
 
-    /// 嵌入 Overview 时顶栏 + 外层宠物条占位（经典 Ark）；略减小使宠物筛选条更靠上
+    /// 首页嵌入时为全局顶栏 + 外层宠物条预留空间。
     private var overviewCalendarEmbedTopInset: CGFloat { 98 }
 
     private var shouldShowInlinePetChips: Bool {
@@ -289,10 +287,10 @@ struct CalendarView: View {
                         // Material 模式：为 sticky header 留空间
                         Spacer().frame(height: 68)
                     } else if !hideToolbar {
-                        // 经典模式：独立页面时显示顶栏（嵌入 OverviewView 时由外层 header 负责）
+                        // 独立页面时显示顶栏；嵌入首页时由外层 header 负责。
                         classicCalendarHeader
                     } else {
-                        // 嵌入 Overview：为全局顶栏 + 外层宠物筛选条留出空间
+                        // 首页嵌入：为全局顶栏 + 外层宠物筛选条留出空间
                         Spacer().frame(height: overviewCalendarEmbedTopInset)
                     }
 

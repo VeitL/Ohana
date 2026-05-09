@@ -124,6 +124,7 @@ struct AddEntityView: View {
                 }
             }
         }
+        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
     
     private var entitySelector: some View {

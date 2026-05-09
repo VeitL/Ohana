@@ -2,11 +2,12 @@
 //  OverviewQuickActions.swift
 //  Ohana
 //
-//  Phase 59: 从 OverviewView.swift 提取的快速动作组件
+//  首页快速动作组件
 //
 
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 // MARK: - 快捷操作候选（与 QACardType.available 物种规则一致，供添加面板共用）
 enum QuickActionPickerCatalog {
@@ -1280,5 +1281,51 @@ struct QuickActionReorderDragPreview: View {
                 .foregroundStyle(.primary)
         }
         .fixedSize()
+    }
+}
+
+/// 编辑模式拖拽层：自定义预览仅图标+标题（无整张卡片矩形）。
+struct QAEditModeDragLayer: View {
+    let item: QuickActionItem
+    let themeHex: String?
+
+    var body: some View {
+        Color.clear
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .draggable(item.id) {
+                QuickActionReorderDragPreview(item: item, themeHex: themeHex)
+            }
+    }
+}
+
+struct QADropDelegate: DropDelegate {
+    let targetItem: QuickActionItem
+    @Binding var items: [QuickActionItem]
+
+    func performDrop(info: DropInfo) -> Bool { true }
+
+    func dropEntered(info: DropInfo) {
+        let types: [UTType] = [.plainText, .utf8PlainText]
+        guard let provider = info.itemProviders(for: types).first else { return }
+        provider.loadObject(ofClass: NSString.self) { obj, _ in
+            guard let ns = obj as? NSString else { return }
+            let fromId = ns as String
+            guard fromId != targetItem.id else { return }
+            DispatchQueue.main.async {
+                guard let fromIdx = items.firstIndex(where: { $0.id == fromId }),
+                      let toIdx = items.firstIndex(where: { $0.id == targetItem.id })
+                else { return }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    items.move(
+                        fromOffsets: IndexSet(integer: fromIdx),
+                        toOffset: toIdx > fromIdx ? toIdx + 1 : toIdx
+                    )
+                }
+            }
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
     }
 }

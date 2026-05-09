@@ -64,6 +64,19 @@ struct IslandQuestEngine {
             }
         }
 
+        if quests.count < 3,
+           let human = preferredHumanForWeight(from: humans, calendar: cal, now: now) {
+            quests.append(IslandQuest(
+                id: "q_human_weight_\(human.id.uuidString)",
+                emoji: "⚖️",
+                title: "记录 \(human.name.isEmpty ? "家人" : human.name) 的体重",
+                subtitle: humanWeightSubtitle(for: human, calendar: cal, now: now),
+                isCompleted: false,
+                targetPetId: nil,
+                targetPlantId: nil
+            ))
+        }
+
         // ── 轻量互动：每天最多一次家庭级陪玩引导；遛狗也视为已互动，避免给每只宠物轮流派发陪玩任务。
         let hasAnyPlayEquivalentToday = activePets.contains { pet in
             pet.careLogs.contains { $0.careType == .play && cal.isDateInToday($0.date) }
@@ -172,6 +185,13 @@ struct IslandQuestEngine {
         return UUID(uuidString: String(id.dropFirst(prefix.count)))
     }
 
+    /// 解析委托 ID 是否为人类体重记录（`q_human_weight_<UUID>`）
+    static func humanWeightId(fromQuestId id: String) -> UUID? {
+        let prefix = "q_human_weight_"
+        guard id.hasPrefix(prefix) else { return nil }
+        return UUID(uuidString: String(id.dropFirst(prefix.count)))
+    }
+
     private enum RoutineKind {
         case feeding
         case watering
@@ -208,6 +228,35 @@ struct IslandQuestEngine {
             break
         }
         return fallback
+    }
+
+    private static func preferredHumanForWeight(
+        from humans: [Human],
+        calendar: Calendar,
+        now: Date
+    ) -> Human? {
+        humans
+            .filter { $0.shouldShowOnHome }
+            .first { human in
+                !human.weightLogs.contains { calendar.isDate($0.date, inSameDayAs: now) }
+            }
+    }
+
+    private static func humanWeightSubtitle(
+        for human: Human,
+        calendar: Calendar,
+        now: Date
+    ) -> String {
+        guard let last = human.weightLogs.max(by: { $0.date < $1.date }) else {
+            return "建立自己的健康趋势，从第一条数据开始"
+        }
+        let days = max(0, calendar.dateComponents(
+            [.day],
+            from: calendar.startOfDay(for: last.date),
+            to: calendar.startOfDay(for: now)
+        ).day ?? 0)
+        if days == 0 { return String(format: "今天最新记录 %.1fkg", last.weight) }
+        return String(format: "上次 %.1fkg · %d 天前", last.weight, days)
     }
 
     private static func carePlanQuests(
@@ -422,6 +471,7 @@ struct IslandQuestEngine {
             if id.hasPrefix("q_water_") { return 1 }
             if id.hasPrefix("q_play_")  { return 2 }
             if id.hasPrefix("q_weight_") { return 2 }
+            if id.hasPrefix("q_human_weight_") { return 2 }
             if id.hasPrefix("q_moment_") { return 1 }
             if id.hasPrefix("q_event_") { return 1 }
             return 1

@@ -41,7 +41,6 @@ struct OasisRewardView: View {
     private let makeupPackKey = "inventory_backdate_1day_count" // 与椰子商店统一 key
     @State private var makeupDates: Set<String> = []       // 补签过的日期集合
     @AppStorage("checkIn_lastClaimedMilestone") private var lastClaimedMilestone: Int = 0
-    @AppStorage("appUIStyle") private var appUIStyle: String = "go"
     @Environment(\.colorScheme) private var colorScheme
 
     private var isMaterial: Bool { false }

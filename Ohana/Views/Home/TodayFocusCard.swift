@@ -21,6 +21,7 @@ struct TodayFocusCard: View {
     let pets: [Pet]
     let plants: [Plant]
     let quests: [IslandQuest]        // passed from parent; isCompleted may be stale
+    let humans: [Human]
     let activePet: Pet?
     var onCompleteQuest: (IslandQuest) -> Void = { _ in }
     var onTapNegativeSignal: (IslandNegativeSignal) -> Void = { _ in }
@@ -31,6 +32,7 @@ struct TodayFocusCard: View {
     @Query(sort: \PetCareLog.date, order: .reverse) private var liveCare: [PetCareLog]
     @Query(sort: \PetWalkLog.startDate, order: .reverse) private var liveWalks: [PetWalkLog]
     @Query(sort: \PetPottyLog.date, order: .reverse) private var livePotty: [PetPottyLog]
+    @Query(sort: \HumanWeightLog.date, order: .reverse) private var liveHumanWeights: [HumanWeightLog]
 
     @State private var bounceEmoji = false
     @State private var pulse: CGFloat = 0
@@ -49,9 +51,11 @@ struct TodayFocusCard: View {
         TodayFocusService.refreshedQuests(
             quests,
             pets: pets,
+            humans: humans,
             careLogs: liveCare,
             walkLogs: liveWalks,
-            pottyLogs: livePotty
+            pottyLogs: livePotty,
+            humanWeightLogs: liveHumanWeights
         )
     }
 
@@ -71,7 +75,7 @@ struct TodayFocusCard: View {
         if !pendingQuests.isEmpty {
             return pendingQuests.map { .quest($0) }
         }
-        if !refreshedQuests.isEmpty || !pets.isEmpty || !plants.isEmpty {
+        if !refreshedQuests.isEmpty || !pets.isEmpty || !plants.isEmpty || !humans.isEmpty {
             return [.celebrate(pets: pets)]
         }
         return [.welcome]

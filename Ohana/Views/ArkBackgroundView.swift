@@ -65,7 +65,7 @@ final class AppPerformanceMonitor: ObservableObject {
 // MARK: - 背景风格枚举
 enum AppBackgroundStyle: String, CaseIterable, Identifiable {
     case goDefault   = "go_default"
-    /// GO UI 首页同款：深蓝竖向渐变（与 `GoDashboardView` 底层一致，可在经典/各子页使用）
+    /// GO Focus 首页同款：深蓝竖向渐变，可在子页复用。
     case goIsland    = "go_island"
     case deepAmbient = "deep_ambient"
     case aurora      = "aurora"
@@ -80,7 +80,7 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .goDefault:   return "Go 经典"
+        case .goDefault:   return "Go 默认"
         case .goIsland:    return "GO 岛屿"
         case .deepAmbient: return "深邃光球"
         case .aurora:      return "极光"
@@ -152,7 +152,7 @@ struct OhanaAppBackground: View {
     }
 }
 
-// MARK: - 1. Go 经典（原设计系统三球 Blob）
+// MARK: - 1. Go 默认（三球 Blob）
 private struct GoDefaultBackground: View {
     @Environment(\.colorScheme) private var colorScheme
     private var isDark: Bool { colorScheme == .dark }
@@ -602,7 +602,7 @@ private struct NeonGridBackground: View {
     }
 }
 
-// MARK: - GO 岛屿向导底（与 `GoDashboardView` 渐变 + 浮动色球一致；`ArkBackgroundView` 默认「Go 经典」与此不同）
+// MARK: - GO 岛屿向导底（与 GO Focus 渐变 + 浮动色球一致）
 /// 添加宠物 / 家庭成员等全屏向导使用，避免误用 `ArkBackgroundView` 的 `go_default` 浅色底。
 struct GoIslandWizardBackdrop: View {
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true

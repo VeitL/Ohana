@@ -16,8 +16,6 @@ struct ContentView: View {
     @State private var selectedPetTab: PetDetailTab = .overview
     @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
-    @AppStorage("appUIStyle") private var appUIStyle: String = "go"
-    @AppStorage("debugEnableClassicHome") private var debugEnableClassicHome: Bool = false
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @State private var showingRequiredHumanProfile = false
     @State private var homeResetToken = UUID()
@@ -31,25 +29,13 @@ struct ContentView: View {
                     .zIndex(100)
             }
             NavigationStack {
-                Group {
-                    if debugEnableClassicHome && appUIStyle == "classic" {
-                        OverviewView(
-                            selectedPet: $selectedPet,
-                            selectedHuman: $selectedHuman,
-                            selectedPlant: $selectedPlant,
-                            selectedPetTab: $selectedPetTab,
-                            heroNS: heroNS
-                        )
-                    } else {
-                        FocusStackHomeTestView(
-                            selectedPet: $selectedPet,
-                            selectedHuman: $selectedHuman,
-                            selectedPlant: $selectedPlant,
-                            selectedPetTab: $selectedPetTab,
-                            heroNS: heroNS
-                        )
-                    }
-                }
+                FocusStackHomeTestView(
+                    selectedPet: $selectedPet,
+                    selectedHuman: $selectedHuman,
+                    selectedPlant: $selectedPlant,
+                    selectedPetTab: $selectedPetTab,
+                    heroNS: heroNS
+                )
                 .navigationDestination(item: $selectedPet) { pet in
                     petDestination(for: pet)
                 }
@@ -72,6 +58,7 @@ struct ContentView: View {
                 }
             }
             .id(homeResetToken)
+            .ignoresSafeArea(.keyboard, edges: .bottom)
 
             if hasOnboarded && !showingRequiredHumanProfile {
                 GlobalWalkBanner()
@@ -79,15 +66,7 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            if !debugEnableClassicHome, appUIStyle != "go" {
-                appUIStyle = "go"
-            }
             reconcileHumanProfileRequirement()
-        }
-        .onChange(of: appUIStyle) { _, newValue in
-            if !debugEnableClassicHome, newValue != "go" {
-                appUIStyle = "go"
-            }
         }
         .onChange(of: hasOnboarded) { _, _ in
             reconcileHumanProfileRequirement()
@@ -110,6 +89,7 @@ struct ContentView: View {
             }
             .interactiveDismissDisabled(true)
         }
+        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
     @ViewBuilder
@@ -184,6 +164,7 @@ private struct RequiredHumanProfileView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
         }
+        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
     private var promptCard: some View {

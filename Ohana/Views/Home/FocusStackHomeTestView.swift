@@ -3,7 +3,7 @@
 //  Ohana
 //
 //  GO Focus UI — default home page.
-//  Formerly a test page; now the primary app home when appUIStyle == "go".
+//  This is the primary app home.
 //
 
 import SwiftUI
@@ -963,6 +963,23 @@ struct FocusStackHomeTestView: View {
         .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
             refreshHeaderStreak()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .ohanaReturnHomeAfterHumanDeletion)) { _ in
+            selectedHuman = nil
+            expandedBasicInfoHuman = nil
+            expandedAllFeaturesHuman = nil
+            expandedQuickHumanWeight = nil
+            expandedQuickHumanWorkout = nil
+            expandedQuickHumanMedicationAdd = nil
+            expandedQuickHumanMedication = nil
+            expandedQuickHumanNote = nil
+            expandedHumanWeightDetail = nil
+            expandedHumanWorkoutDetail = nil
+            expandedHumanNoteDetail = nil
+            withAnimation(walletAnimation) {
+                activeCardId = nil
+                isExpanded = false
+            }
+        }
         .onAppear {
             ensureTodayCheckIn()
             refreshHeaderStreak()
@@ -1011,6 +1028,7 @@ private struct TodayFocusQuestCardHost: View {
                 events: allEvents,
                 humans: humans
             ),
+            humans: humans,
             activePet: activePet,
             onCompleteQuest: onCompleteQuest,
             onTapNegativeSignal: onTapNegativeSignal,
@@ -1091,7 +1109,7 @@ extension FocusStackHomeTestView {
     @ViewBuilder
     private func todayFocusSection(activePets: [Pet]) -> some View {
         // Collapsed first screen answers: who needs care, what is urgent, what can be done now.
-        if !activePets.isEmpty && !isExpanded {
+        if (!activePets.isEmpty || !humans.isEmpty) && !isExpanded {
             TodayFocusCarousel(cardMargin: K.cardMargin, animation: walletAnimation) { cardWidth in
                 TodayFocusQuestCardHost(
                     pets: activePets,
@@ -3389,6 +3407,11 @@ extension FocusStackHomeTestView {
                     focusTodayPetCard(p)
                     expandedQuickWeightPet = p
                 }
+            case let id where IslandQuestEngine.humanWeightId(fromQuestId: id) != nil:
+                if let humanId = IslandQuestEngine.humanWeightId(fromQuestId: id),
+                   let human = humans.first(where: { $0.id == humanId }) {
+                    openTodayFocusHumanWeight(human)
+                }
             case let id where id.hasPrefix("q_moment_"):
                 if let petId = quest.targetPetId, let p = activePets.first(where: { $0.id == petId }) {
                     focusTodayPetCard(p)
@@ -3441,6 +3464,22 @@ extension FocusStackHomeTestView {
     private func openTodayFocusPetShortcut(_ actionType: String, pet: Pet) {
         focusTodayPetCard(pet)
         openExpandedPetShortcut(actionType, pet: pet)
+    }
+
+    private func openTodayFocusHumanWeight(_ human: Human) {
+        guard !PrivacyService.isLocked(.weight, for: human, viewedBy: activeHumanId) else {
+            showingHumanPrivacyAlert = true
+            return
+        }
+        if visibleHomeCards.contains(where: { $0.id == human.id }) {
+            fabExpanded = false
+            isExpandedQAEditMode = false
+            withAnimation(walletAnimation) {
+                activeCardId = human.id
+                isExpanded = true
+            }
+        }
+        expandedQuickHumanWeight = human
     }
 
     private func openTodayFocusWalk(pet: Pet) {
@@ -4188,10 +4227,10 @@ private struct FocusWalletCardView: View {
                 }
 
                 // 5. Right info column: streak · days together · footnote · barcode
-                rightInfoColumn(h: h)
+                rightInfoColumn(h: h, usesFullBleed: usesFullBleed)
 
                 // 6. Top identity bar (peek strip shown when card is behind others)
-                topIdentityBar
+                topIdentityBar(usesFullBleed: usesFullBleed)
                     .opacity(isHeroExpanded ? 0 : 1)
 
                 // 7. Compact cards now keep the same uninterrupted background as the hero card.
@@ -4274,9 +4313,14 @@ private struct FocusWalletCardView: View {
                 startPoint: .topLeading, endPoint: .bottomTrailing
             )
         }
-        // Dark bottom overlay for text readability
+        let useDarkText = !usesFullBleed && WalletPetCardTheme.prefersDarkForeground(for: card.themeColorHex)
         LinearGradient(
-            colors: [.clear, .black.opacity(usesFullBleed ? 0.12 : 0.28)],
+            colors: [
+                .clear,
+                useDarkText
+                    ? Color.white.opacity(isHeroExpanded ? 0.30 : 0.20)
+                    : Color.black.opacity(usesFullBleed ? 0.12 : 0.28)
+            ],
             startPoint: .top, endPoint: .bottom
         )
         .allowsHitTesting(false)
@@ -4370,9 +4414,9 @@ private struct FocusWalletCardView: View {
             Image(uiImage: img)
                 .resizable()
                 .scaledToFit()
-                .frame(width: columnWidth, height: h * 0.96, alignment: .bottom)
+                .frame(width: columnWidth, height: h * 1.02, alignment: .bottom)
                 .frame(width: w, height: h, alignment: .bottomLeading)
-                .offset(x: avatarOffsetX)
+                .offset(x: avatarOffsetX, y: h * 0.025)
                 .allowsHitTesting(false)
                 .shadow(color: .black.opacity(0.28), radius: 18, x: 0, y: 12)
         } else if !card.isHuman, let species = card.petSpecies {
@@ -4414,7 +4458,7 @@ private struct FocusWalletCardView: View {
 
     // MARK: – Right info column
 
-    private func rightInfoColumn(h: CGFloat) -> some View {
+    private func rightInfoColumn(h: CGFloat, usesFullBleed: Bool) -> some View {
         return VStack(alignment: .trailing, spacing: isHeroExpanded ? 5 : 3) {
             if card.streak > 1 {
                 Text("🔥 \(card.streak)天连续")
@@ -4425,9 +4469,9 @@ private struct FocusWalletCardView: View {
             }
             Spacer(minLength: 4)
             if card.isHuman {
-                humanInfoStack
+                humanInfoStack(usesFullBleed: usesFullBleed)
             } else {
-                petInfoStack
+                petInfoStack(usesFullBleed: usesFullBleed)
             }
             if isHeroExpanded {
                 homeVisibilityStatusBadge.padding(.top, 8)
@@ -4437,7 +4481,7 @@ private struct FocusWalletCardView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
     }
 
-    private var humanInfoStack: some View {
+    private func humanInfoStack(usesFullBleed: Bool) -> some View {
         let details = [card.zodiacText, card.mbtiText]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
@@ -4454,21 +4498,21 @@ private struct FocusWalletCardView: View {
             }
             Text(details.first ?? "OHANA MEMBER")
                 .font(.system(size: isHeroExpanded ? 20 : 15, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(cardPrimaryText(usesFullBleed: usesFullBleed))
                 .lineLimit(1)
                 .minimumScaleFactor(0.55)
 
             if details.count > 1 {
                 Text(details.dropFirst().joined(separator: " · "))
                     .font(.system(size: isHeroExpanded ? 11 : 9, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.78))
+                    .foregroundStyle(cardSecondaryText(usesFullBleed: usesFullBleed, opacity: 0.78))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
         }
     }
 
-    private var petInfoStack: some View {
+    private func petInfoStack(usesFullBleed: Bool) -> some View {
         let meta = [card.ageText, card.humanEquivalentAgeText, card.zodiacText]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty && $0 != "未知" }
@@ -4476,7 +4520,7 @@ private struct FocusWalletCardView: View {
         return VStack(alignment: .trailing, spacing: isHeroExpanded ? 5 : 3) {
             Text(petTogetherHeadline)
                 .font(.system(size: isHeroExpanded ? 20 : 15, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(cardPrimaryText(usesFullBleed: usesFullBleed))
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
 
@@ -4484,7 +4528,7 @@ private struct FocusWalletCardView: View {
                !hint.isEmpty {
                 Text(hint)
                     .font(.system(size: isHeroExpanded ? 10.5 : 8.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.82))
+                    .foregroundStyle(cardSecondaryText(usesFullBleed: usesFullBleed, opacity: 0.82))
                     .lineLimit(isHeroExpanded ? 2 : 1)
                     .multilineTextAlignment(.trailing)
                     .minimumScaleFactor(0.62)
@@ -4493,7 +4537,7 @@ private struct FocusWalletCardView: View {
             if !meta.isEmpty {
                 Text(meta.joined(separator: " · "))
                     .font(.system(size: isHeroExpanded ? 10 : 8.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.76))
+                    .foregroundStyle(cardSecondaryText(usesFullBleed: usesFullBleed, opacity: 0.76))
                     .lineLimit(isHeroExpanded ? 2 : 1)
                     .multilineTextAlignment(.trailing)
                     .minimumScaleFactor(0.62)
@@ -4531,11 +4575,11 @@ private struct FocusWalletCardView: View {
 
     // MARK: – Top identity bar (peek strip)
 
-    private var topIdentityBar: some View {
+    private func topIdentityBar(usesFullBleed: Bool) -> some View {
         HStack(spacing: 8) {
             Text(card.name)
                 .font(.system(size: 15, weight: .black, design: .rounded))
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(cardPrimaryText(usesFullBleed: usesFullBleed).opacity(0.9))
                 .lineLimit(1)
                 .minimumScaleFactor(0.65)
             Spacer(minLength: 0)
@@ -4554,7 +4598,7 @@ private struct FocusWalletCardView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(
             LinearGradient(
-                colors: [Color.black.opacity(0.22), Color.black.opacity(0.06), .clear],
+                colors: topIdentityScrimColors(usesFullBleed: usesFullBleed),
                 startPoint: .top, endPoint: .bottom
             )
             .frame(height: K.stackPeekH + 12)
@@ -4576,6 +4620,24 @@ private struct FocusWalletCardView: View {
     }
 
     // MARK: – Helpers
+
+    private func useDarkCardText(usesFullBleed: Bool) -> Bool {
+        !usesFullBleed && WalletPetCardTheme.prefersDarkForeground(for: card.themeColorHex)
+    }
+
+    private func cardPrimaryText(usesFullBleed: Bool) -> Color {
+        useDarkCardText(usesFullBleed: usesFullBleed) ? Color.arkInk : Color.white
+    }
+
+    private func cardSecondaryText(usesFullBleed: Bool, opacity: Double) -> Color {
+        cardPrimaryText(usesFullBleed: usesFullBleed).opacity(opacity)
+    }
+
+    private func topIdentityScrimColors(usesFullBleed: Bool) -> [Color] {
+        useDarkCardText(usesFullBleed: usesFullBleed)
+            ? [Color.white.opacity(0.34), Color.white.opacity(0.10), .clear]
+            : [Color.black.opacity(0.22), Color.black.opacity(0.06), .clear]
+    }
 
     /// Top padding for the kind subtitle so it sits just below the headline name
     private func kindSubtitleTop(w: CGFloat) -> CGFloat {
@@ -5688,27 +5750,5 @@ private extension Text {
             .textCase(.uppercase)
             .lineLimit(1)
             .minimumScaleFactor(0.7)
-    }
-}
-
-// ─────────────────────────────────────────────────
-// MARK: – Wrapper for Settings preview entry
-// ─────────────────────────────────────────────────
-
-struct FocusStackHomeTestViewPreviewWrapper: View {
-    @State private var selectedPet:    Pet?    = nil
-    @State private var selectedHuman:  Human?  = nil
-    @State private var selectedPlant:  Plant?  = nil
-    @State private var selectedPetTab: PetDetailTab = .overview
-    @Namespace private var heroNS
-
-    var body: some View {
-        FocusStackHomeTestView(
-            selectedPet:    $selectedPet,
-            selectedHuman:  $selectedHuman,
-            selectedPlant:  $selectedPlant,
-            selectedPetTab: $selectedPetTab,
-            heroNS:         heroNS
-        )
     }
 }

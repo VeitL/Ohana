@@ -19,9 +19,11 @@ enum TodayFocusService {
     static func refreshedQuests(
         _ quests: [IslandQuest],
         pets: [Pet] = [],
+        humans: [Human] = [],
         careLogs: [PetCareLog],
         walkLogs: [PetWalkLog],
         pottyLogs: [PetPottyLog],
+        humanWeightLogs: [HumanWeightLog] = [],
         calendar: Calendar = .current,
         now: Date = Date()
     ) -> [IslandQuest] {
@@ -30,9 +32,11 @@ enum TodayFocusService {
             let done = isQuestCompletedToday(
                 quest,
                 pets: pets,
+                humans: humans,
                 careLogs: careLogs,
                 walkLogs: walkLogs,
                 pottyLogs: pottyLogs,
+                humanWeightLogs: humanWeightLogs,
                 calendar: calendar,
                 now: now
             )
@@ -56,6 +60,7 @@ enum TodayFocusService {
         careLogs: [PetCareLog],
         walkLogs: [PetWalkLog],
         pottyLogs: [PetPottyLog],
+        humanWeightLogs: [HumanWeightLog] = [],
         memory: MemoryFragment? = nil,
         calendar: Calendar = .current,
         now: Date = Date()
@@ -63,9 +68,11 @@ enum TodayFocusService {
         let refreshed = refreshedQuests(
             quests,
             pets: pets,
+            humans: [],
             careLogs: careLogs,
             walkLogs: walkLogs,
             pottyLogs: pottyLogs,
+            humanWeightLogs: humanWeightLogs,
             calendar: calendar,
             now: now
         )
@@ -97,9 +104,11 @@ enum TodayFocusService {
     private static func isQuestCompletedToday(
         _ quest: IslandQuest,
         pets: [Pet],
+        humans: [Human],
         careLogs: [PetCareLog],
         walkLogs: [PetWalkLog],
         pottyLogs: [PetPottyLog],
+        humanWeightLogs: [HumanWeightLog],
         calendar: Calendar,
         now: Date
     ) -> Bool {
@@ -139,6 +148,15 @@ enum TodayFocusService {
         }
         if quest.id.hasPrefix("q_weight_"), let petId = quest.targetPetId {
             return pets.first(where: { $0.id == petId })?.weightLogs.contains { calendar.isDate($0.date, inSameDayAs: now) } == true
+        }
+        if let humanId = IslandQuestEngine.humanWeightId(fromQuestId: quest.id) {
+            let liveDone = humanWeightLogs.contains {
+                $0.human?.id == humanId && calendar.isDate($0.date, inSameDayAs: now)
+            }
+            let relationshipDone = humans.first(where: { $0.id == humanId })?.weightLogs.contains {
+                calendar.isDate($0.date, inSameDayAs: now)
+            } == true
+            return liveDone || relationshipDone
         }
         if quest.id.hasPrefix("q_moment_"), let petId = quest.targetPetId {
             return pets.first(where: { $0.id == petId })?.photoLogs.contains { calendar.isDate($0.date, inSameDayAs: now) } == true

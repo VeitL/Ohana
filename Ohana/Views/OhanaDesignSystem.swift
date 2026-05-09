@@ -210,7 +210,7 @@ struct NeoWhiteCardModifier: ViewModifier {
     }
 }
 
-/// 与 `GoDashboardView` 首页区块一致；表面色跟随全局浅/深色偏好。
+/// 与 GO Focus 首页区块一致；表面色跟随全局浅/深色偏好。
 struct GoIslandModuleCardModifier: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
     var cornerRadius: CGFloat

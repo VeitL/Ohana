@@ -94,6 +94,29 @@ enum WalletPetCardTheme {
             top,     bottom, darker
         ]
     }
+
+    static func prefersDarkForeground(for hex: String) -> Bool {
+        let normalized = hex.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let sourceHex = PetThemeColor.allCases.first(where: { $0.hexValue.uppercased() == normalized })?.hexValue ?? normalized
+        guard sourceHex.count == 6,
+              let r = Int(sourceHex.prefix(2), radix: 16),
+              let g = Int(sourceHex.dropFirst(2).prefix(2), radix: 16),
+              let b = Int(sourceHex.dropFirst(4).prefix(2), radix: 16) else {
+            return false
+        }
+        func channel(_ value: Int) -> Double {
+            let s = Double(value) / 255.0
+            return s <= 0.03928 ? s / 12.92 : pow((s + 0.055) / 1.055, 2.4)
+        }
+        let luminance = 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+        return luminance > 0.50
+    }
+
+    static func foreground(for hex: String, opacity: Double = 1) -> Color {
+        prefersDarkForeground(for: hex)
+            ? Color.arkInk.opacity(opacity)
+            : Color.white.opacity(opacity)
+    }
 }
 
 enum HomeCardVisibility {
@@ -510,6 +533,9 @@ struct WalletPetCardFront: View {
             let isTransparent = pet.avatarImageData.map { ImageCutoutService.isTransparentPNG($0) } ?? false
             let hasPopout = isTransparent && avatarImage != nil
             let usesFullBleedPhoto = avatarImage != nil && !isTransparent
+            let useDarkText = !usesFullBleedPhoto && WalletPetCardTheme.prefersDarkForeground(for: pet.themeColorHex)
+            let primaryText = useDarkText ? Color.arkInk : Color.white
+            let secondaryText = primaryText.opacity(useDarkText ? 0.72 : 0.70)
 
             ZStack {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -523,7 +549,12 @@ struct WalletPetCardFront: View {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(
                         LinearGradient(
-                            colors: [.clear, .black.opacity(usesFullBleedPhoto ? 0.12 : 0.22)],
+                            colors: [
+                                .clear,
+                                useDarkText
+                                    ? Color.white.opacity(0.20)
+                                    : Color.black.opacity(usesFullBleedPhoto ? 0.12 : 0.22)
+                            ],
                             startPoint: .top,
                             endPoint: .bottom
                         )
@@ -570,21 +601,21 @@ struct WalletPetCardFront: View {
 
                     Text(pet.homeDate == nil ? "—" : "\(pet.daysTogether)")
                         .font(.system(size: 34, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(primaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
 
                     Text("Days Together")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.92))
+                        .foregroundStyle(primaryText.opacity(useDarkText ? 0.82 : 0.92))
 
                     Text(footnote)
                         .font(.system(size: 9, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(secondaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
 
-                    barcode
+                    barcode(foreground: primaryText)
                         .padding(.top, 8)
                 }
                 .padding(.trailing, 16)
@@ -641,8 +672,10 @@ struct WalletPetCardFront: View {
                 // Single image only — a second 88%-scale copy caused a visible ghost.
                 Image(uiImage: img)
                     .resizable()
-                    .scaledToFill()
-                    .frame(width: w, height: h)
+                    .scaledToFit()
+                    .frame(width: w * 0.50, height: h * 1.02, alignment: .bottom)
+                    .frame(width: w * 0.52, height: h, alignment: .bottomLeading)
+                    .offset(x: w * 0.015, y: h * 0.025)
                     // Subtle white halo preserves the "pop-out" depth cue
                     .shadow(color: .white.opacity(0.50), radius: 3, x: 0, y: 0)
                     .shadow(color: .black.opacity(0.30), radius: 18, x: 0, y: 12)
@@ -674,19 +707,19 @@ struct WalletPetCardFront: View {
     }
 
     // MARK: - Barcode
-    private var barcode: some View {
+    private func barcode(foreground: Color = .white) -> some View {
         let pattern: [CGFloat] = [18, 6, 10, 14, 5, 12, 8, 16, 7, 10, 13, 6]
         return VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .bottom, spacing: 2) {
                 ForEach(Array(pattern.enumerated()), id: \.offset) { _, height in
                     RoundedRectangle(cornerRadius: 1.2, style: .continuous)
-                        .fill(.white.opacity(0.95))
+                        .fill(foreground.opacity(0.95))
                         .frame(width: 2, height: height)
                 }
             }
             Text("O H A N A   P E T")
                 .font(.system(size: 9, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.82))
+                .foregroundStyle(foreground.opacity(0.82))
                 .tracking(1.2)
         }
     }
@@ -753,6 +786,9 @@ struct WalletPetCardDraftFront: View {
             }()
             let hasPopout = isTransparent && avatarImage != nil
             let usesFullBleedPhoto = avatarImage != nil && !isTransparent
+            let useDarkText = !usesFullBleedPhoto && WalletPetCardTheme.prefersDarkForeground(for: themeColorHex)
+            let primaryText = useDarkText ? Color.arkInk : Color.white
+            let secondaryText = primaryText.opacity(useDarkText ? 0.72 : 0.70)
 
             ZStack {
                 MeshGradient(
@@ -768,7 +804,12 @@ struct WalletPetCardDraftFront: View {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(
                         LinearGradient(
-                            colors: [.clear, .black.opacity(usesFullBleedPhoto ? 0.12 : 0.22)],
+                            colors: [
+                                .clear,
+                                useDarkText
+                                    ? Color.white.opacity(0.20)
+                                    : Color.black.opacity(usesFullBleedPhoto ? 0.12 : 0.22)
+                            ],
                             startPoint: .top,
                             endPoint: .bottom
                         )
@@ -803,21 +844,21 @@ struct WalletPetCardDraftFront: View {
 
                     Text(daysTogetherLabel)
                         .font(.system(size: 34, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(primaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
 
                     Text("Days Together")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.92))
+                        .foregroundStyle(primaryText.opacity(useDarkText ? 0.82 : 0.92))
 
                     Text(footnote)
                         .font(.system(size: 9, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(secondaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
 
-                    draftBarcode
+                    draftBarcode(foreground: primaryText)
                         .padding(.top, 8)
                 }
                 .padding(.trailing, 16)
@@ -840,9 +881,9 @@ struct WalletPetCardDraftFront: View {
                 Image(uiImage: img)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: w * 0.50, height: h * 0.96, alignment: .bottom)
+                    .frame(width: w * 0.50, height: h * 1.02, alignment: .bottom)
                     .frame(width: w * 0.52, height: h, alignment: .bottomLeading)
-                    .offset(x: w * 0.015)
+                    .offset(x: w * 0.015, y: h * 0.025)
                     .shadow(color: .white.opacity(0.50), radius: 3, x: 0, y: 0)
                     .shadow(color: .black.opacity(0.30), radius: 18, x: 0, y: 12)
             } else {
@@ -872,19 +913,19 @@ struct WalletPetCardDraftFront: View {
         }
     }
 
-    private var draftBarcode: some View {
+    private func draftBarcode(foreground: Color = .white) -> some View {
         let pattern: [CGFloat] = [18, 6, 10, 14, 5, 12, 8, 16, 7, 10, 13, 6]
         return VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .bottom, spacing: 2) {
                 ForEach(Array(pattern.enumerated()), id: \.offset) { _, height in
                     RoundedRectangle(cornerRadius: 1.2, style: .continuous)
-                        .fill(.white.opacity(0.95))
+                        .fill(foreground.opacity(0.95))
                         .frame(width: 2, height: height)
                 }
             }
             Text("O H A N A   P E T")
                 .font(.system(size: 9, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.82))
+                .foregroundStyle(foreground.opacity(0.82))
                 .tracking(1.2)
         }
     }
@@ -1132,8 +1173,10 @@ struct WalletHumanCardFront: View {
             // 全卡尺寸渲染，调用侧裁剪左 48%，与裁剪框 WYSIWYG 一致
             Image(uiImage: img)
                 .resizable()
-                .scaledToFill()
-                .frame(width: w, height: h)
+                .scaledToFit()
+                .frame(width: w * 0.46, height: h * 1.02, alignment: .bottom)
+                .frame(width: w * 0.48, height: h, alignment: .bottomLeading)
+                .offset(x: w * 0.015, y: h * 0.025)
                 .shadow(color: .white.opacity(0.50), radius: 3, x: 0, y: 0)
                 .shadow(color: .black.opacity(0.30), radius: 18, x: 0, y: 12)
         } else if avatarImage == nil {
@@ -1183,6 +1226,8 @@ struct WalletHumanCardDraftFront: View {
             }()
             let hasPopout = isTransparent && avatarImage != nil
             let usesFullBleedPhoto = avatarImage != nil && !isTransparent
+            let useDarkText = !usesFullBleedPhoto && WalletPetCardTheme.prefersDarkForeground(for: themeColorHex)
+            let primaryText = useDarkText ? Color.arkInk : Color.white
 
             ZStack {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -1222,40 +1267,40 @@ struct WalletHumanCardDraftFront: View {
                     Spacer()
                     Text(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? L10n.current.humanWalletNewMember : name)
                         .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(primaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
                     Text(L10n.current.humanWalletResident)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.62))
+                        .foregroundStyle(primaryText.opacity(useDarkText ? 0.72 : 0.62))
                     if (zodiacText?.isEmpty == false) || (mbtiText?.isEmpty == false) {
                         HStack(spacing: 6) {
                             if let zodiacText, !zodiacText.isEmpty {
                                 Text(zodiacText)
                                     .font(.system(size: 11, weight: .black, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.95))
+                                    .foregroundStyle(primaryText.opacity(0.95))
                                     .padding(.horizontal, 10).padding(.vertical, 4)
-                                    .background(Capsule().fill(.white.opacity(0.22)))
+                                    .background(Capsule().fill(primaryText.opacity(useDarkText ? 0.12 : 0.22)))
                             }
                             if let mbtiText, !mbtiText.isEmpty {
                                 Text(mbtiText.uppercased())
                                     .font(.system(size: 11, weight: .black, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.95))
+                                    .foregroundStyle(primaryText.opacity(0.95))
                                     .padding(.horizontal, 10).padding(.vertical, 4)
-                                    .background(Capsule().fill(.white.opacity(0.22)))
+                                    .background(Capsule().fill(primaryText.opacity(useDarkText ? 0.12 : 0.22)))
                             }
                         }
                     }
                     Text(subtitle.isEmpty ? L10n.current.humanWalletSubtitlePlaceholder : subtitle)
                         .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.72))
+                        .foregroundStyle(primaryText.opacity(0.72))
                         .lineLimit(2)
                         .multilineTextAlignment(.trailing)
                         .minimumScaleFactor(0.75)
                     HStack(alignment: .bottom, spacing: 2) {
                         ForEach([14, 8, 12, 6, 10, 16, 5, 11, 9, 13], id: \.self) { bh in
                             RoundedRectangle(cornerRadius: 1.2)
-                                .fill(.white.opacity(0.85))
+                                .fill(primaryText.opacity(0.85))
                                 .frame(width: 2, height: CGFloat(bh))
                         }
                     }
@@ -1279,8 +1324,10 @@ struct WalletHumanCardDraftFront: View {
             if isTransparent {
                 Image(uiImage: img)
                     .resizable()
-                    .scaledToFill()
-                    .frame(width: w, height: h)
+                    .scaledToFit()
+                    .frame(width: w * 0.46, height: h * 1.02, alignment: .bottom)
+                    .frame(width: w * 0.48, height: h, alignment: .bottomLeading)
+                    .offset(x: w * 0.015, y: h * 0.025)
                     .shadow(color: .white.opacity(0.50), radius: 3, x: 0, y: 0)
                     .shadow(color: .black.opacity(0.30), radius: 18, x: 0, y: 12)
             } else {

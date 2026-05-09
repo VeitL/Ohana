@@ -18,7 +18,7 @@ struct SettingsView: View {
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
     @AppStorage(AppMeasurementSystem.storageKey) private var appMeasurementSystem = AppMeasurementSystem.fallbackCode
     @AppStorage(AppCurrency.storageKey) private var appCurrency = AppCurrency.fallbackCode
-    @AppStorage("appThemePreference") private var appThemePreference: String = "system"
+    @AppStorage("appThemePreference") private var appThemePreference: String = "dark"
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
     @AppStorage("userNickname") private var userNickname = ""
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
@@ -38,7 +38,6 @@ struct SettingsView: View {
     @State private var importError: String? = nil
     @State private var showingImportSuccess = false
     @State private var showingImportErrorAlert = false
-    @State private var showingFocusStackTest = false
     @State private var showingOnboardingReplay = false
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
@@ -391,100 +390,6 @@ struct SettingsView: View {
                         // 开发者工具
                         settingsSection(title: "开发者工具") {
                             NavigationLink {
-                                PetThemeUIUXMergedView()
-                            } label: {
-                                HStack(spacing: 12) {
-                                    ZStack {
-                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .fill(Color.goPrimary.opacity(0.12))
-                                            .frame(width: 32, height: 32)
-                                        Image(systemName: "pawprint.fill")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundStyle(Color.goPrimary)
-                                    }
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("宠物主题 UI/UX 规范页")
-                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                            .foregroundStyle(primaryText)
-                                        Text("已合并 Material UI + 主题规范")
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(tertiaryText)
-                                    }
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 11, weight: .semibold))
-                                        .foregroundStyle(tertiaryText.opacity(0.6))
-                                }
-                                .padding(.vertical, 8)
-                            }
-                            .buttonStyle(.plain)
-
-                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-
-                            NavigationLink {
-                                iOS26UITestView()
-                                    .navigationBarBackButtonHidden()
-                            } label: {
-                                HStack(spacing: 12) {
-                                    ZStack {
-                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .fill(Color.goPrimary.opacity(0.12))
-                                            .frame(width: 32, height: 32)
-                                        Image(systemName: "wand.and.sparkles")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundStyle(Color.goPrimary)
-                                    }
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("iOS 26 UI 测试页")
-                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                            .foregroundStyle(primaryText)
-                                        Text("Liquid Glass 原生 .glassEffect() API 展示")
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(tertiaryText)
-                                    }
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 11, weight: .semibold))
-                                        .foregroundStyle(tertiaryText.opacity(0.6))
-                                }
-                                .padding(.vertical, 8)
-                            }
-                            .buttonStyle(.plain)
-
-                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-
-                            NavigationLink {
-                                GoFocusUIView()
-                            } label: {
-                                HStack(spacing: 12) {
-                                    ZStack {
-                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .fill(Color.goPrimary.opacity(0.12))
-                                            .frame(width: 32, height: 32)
-                                        Image(systemName: "paintpalette.fill")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundStyle(Color.goPrimary)
-                                    }
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Go Focus UI")
-                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                            .foregroundStyle(primaryText)
-                                        Text("App UI 规范 · 寒蝉字体 · 控件示例")
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(tertiaryText)
-                                    }
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 11, weight: .semibold))
-                                        .foregroundStyle(tertiaryText.opacity(0.6))
-                                }
-                                .padding(.vertical, 8)
-                            }
-                            .buttonStyle(.plain)
-
-                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-
-                            NavigationLink {
                                 PerformanceDiagnosticsView()
                             } label: {
                                 HStack(spacing: 12) {
@@ -501,37 +406,6 @@ struct SettingsView: View {
                                             .font(.system(size: 15, weight: .semibold, design: .rounded))
                                             .foregroundStyle(primaryText)
                                         Text("启动 · 首页首帧 · 头像 · 点击 · 相机链路")
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(tertiaryText)
-                                    }
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 11, weight: .semibold))
-                                        .foregroundStyle(tertiaryText.opacity(0.6))
-                                }
-                                .padding(.vertical, 8)
-                            }
-                            .buttonStyle(.plain)
-
-                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-
-                            Button {
-                                showingFocusStackTest = true
-                            } label: {
-                                HStack(spacing: 12) {
-                                    ZStack {
-                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .fill(Color.goPrimary.opacity(0.12))
-                                            .frame(width: 32, height: 32)
-                                        Image(systemName: "rectangle.stack.fill")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundStyle(Color.goPrimary)
-                                    }
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("GO Focus 堆叠测试页")
-                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                            .foregroundStyle(primaryText)
-                                        Text("截图风格堆叠 · 单体页 · 快捷打卡")
                                             .font(.system(size: 11, weight: .medium))
                                             .foregroundStyle(tertiaryText)
                                     }
@@ -583,10 +457,6 @@ struct SettingsView: View {
             appMeasurementSystem = AppMeasurementSystem.code
             appCurrency = AppCurrency.code
             appLanguage = AppLanguage.code
-        }
-        .fullScreenCover(isPresented: $showingFocusStackTest) {
-            FocusStackHomeTestViewPreviewWrapper()
-                .preferredColorScheme(preferredScheme)
         }
         .fullScreenCover(isPresented: $showingOnboardingReplay) {
             ZStack(alignment: .topTrailing) {

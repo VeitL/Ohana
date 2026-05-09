@@ -8,7 +8,7 @@
 // 相关数据已在以下位置展示：
 //   - 椰子余额：OasisRewardView header pill
 //   - 打卡连击：OasisRewardView → oasisBentoGrid → 打卡日历卡
-// 若需重启，需在 OverviewView 中手动调用。
+// 若需重启，应在当前 GO Focus 首页中显式接入。
 //
 
 import SwiftUI
