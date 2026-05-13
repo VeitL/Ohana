@@ -11,7 +11,14 @@ import Charts
 struct CoHealthDashboardView: View {
     let human: Human
     @Query(sort: \Pet.name) private var allPets: [Pet]
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @State private var chartRevealProgress: CGFloat = 0.0
+
+    private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
+    private var isPrivacyLocked: Bool {
+        PrivacyService.isLocked(.weight, for: human, viewedBy: activeHumanId) ||
+        PrivacyService.isLocked(.workout, for: human, viewedBy: activeHumanId)
+    }
 
     // 取过去30天数据
     private var past30Days: Date {
@@ -88,6 +95,34 @@ struct CoHealthDashboardView: View {
     }
 
     var body: some View {
+        if isPrivacyLocked {
+            lockedCard
+        } else {
+            dashboardContent
+        }
+    }
+
+    private var lockedCard: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "lock.shield.fill")
+                .font(.system(size: 18, weight: .black))
+                .foregroundStyle(Color.goYellow)
+                .frame(width: 38, height: 38)
+                .background(Color.goYellow.opacity(0.14), in: Circle())
+            VStack(alignment: .leading, spacing: 3) {
+                Text("人宠共健仅本人可见")
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text("切换到本人账户后可查看体重与运动趋势")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+            Spacer()
+        }
+        .padding(20)
+    }
+
+    private var dashboardContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             // 标题
             HStack(spacing: 8) {
@@ -95,7 +130,7 @@ struct CoHealthDashboardView: View {
                     .font(.system(size: 18))
                 Text("人宠共健仪表盘")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
             }
             .padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 6)
@@ -153,12 +188,12 @@ struct CoHealthDashboardView: View {
         VStack(spacing: 3) {
             Text(label)
                 .font(.system(size: 9, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.3))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                 .textCase(.uppercase)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value)
                     .font(.system(size: 22, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .minimumScaleFactor(0.6).lineLimit(1)
                 Text(unit)
                     .font(.system(size: 10, weight: .bold))
@@ -181,13 +216,13 @@ struct CoHealthDashboardView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("体重对比趋势")
                 .font(.system(size: 10, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.3))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                 .textCase(.uppercase)
 
             if !hasData {
                 Text("体重记录 2 条以上后可查看趋势对比")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.primary.opacity(0.25))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .frame(height: 80)
             } else {
@@ -248,7 +283,7 @@ struct CoHealthDashboardView: View {
                             if let v = val.as(Double.self) {
                                 Text(String(format: "%.0f", v))
                                     .font(.system(size: 7, weight: .medium))
-                                    .foregroundStyle(.primary.opacity(0.3))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                             }
                         }
                     }
@@ -279,7 +314,7 @@ struct CoHealthDashboardView: View {
             Circle().fill(color).frame(width: 7, height: 7)
             Text(label)
                 .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(.primary.opacity(0.5))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
         }
     }
 }

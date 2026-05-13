@@ -144,7 +144,7 @@ struct GoDraftTextEditor: View {
         ZStack(alignment: .topLeading) {
             if draftText.isEmpty {
                 Text(placeholder)
-                    .foregroundStyle(.secondary.opacity(0.75))
+                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.75))
                     .padding(.horizontal, 5)
                     .padding(.vertical, 8)
                     .allowsHitTesting(false)
@@ -204,7 +204,7 @@ extension View {
                     GoKeyboard.dismiss()
                 }
                 .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.goLime)
+                .foregroundStyle(Color.goPrimary)
             }
         }
     }

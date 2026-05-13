@@ -302,7 +302,7 @@ struct PetWalletStack: View {
                     WalletHumanCardFront(human: human, cornerRadius: cardCorner)
                         .frame(height: stackCardHeight)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
         // depth=0 的卡片 zIndex 最高，depth>=maxVisible 的卡片在最底层（不遮挡可见卡）
@@ -393,7 +393,7 @@ struct WalletCardTrailingReadabilityOverlay: View {
                     .fill(Color(UIColor.systemBackground).opacity(0.94))
             } else {
                 Rectangle()
-                    .fill(.ultraThinMaterial)
+                    .fill(Color.ohanaCardSurface)
             }
             Rectangle()
                 .fill(darkenGradient)
@@ -833,7 +833,7 @@ struct WalletPetCardDraftFront: View {
 
                 if avatarImage == nil || hasPopout {
                     draftAvatarLayer(avatarImage: avatarImage, isTransparent: hasPopout, w: w, h: h)
-                        .frame(width: w * 0.52, height: h, alignment: .leading)
+                        .frame(width: w, height: h, alignment: .leading)
                         .clipped()
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                         .allowsHitTesting(false)
@@ -881,9 +881,9 @@ struct WalletPetCardDraftFront: View {
                 Image(uiImage: img)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: w * 0.50, height: h * 1.02, alignment: .bottom)
-                    .frame(width: w * 0.52, height: h, alignment: .bottomLeading)
-                    .offset(x: w * 0.015, y: h * 0.025)
+                    .frame(width: w * 0.68, height: h * 1.42, alignment: .bottom)
+                    .frame(width: w, height: h, alignment: .bottomLeading)
+                    .offset(x: w * 0.01, y: h * 0.42)
                     .shadow(color: .white.opacity(0.50), radius: 3, x: 0, y: 0)
                     .shadow(color: .black.opacity(0.30), radius: 18, x: 0, y: 12)
             } else {
@@ -1108,7 +1108,7 @@ struct WalletHumanCardFront: View {
                             .background(Color.goPrimary, in: Capsule())
                     }
                     let mbtiTrim = human.mbti.trimmingCharacters(in: .whitespaces)
-                    let isEn = AppLanguage.isEnglish
+                    let isEn = AppLanguage.code != "zh"
                     let hasAgeOrZodiac = human.walletAgeChip(isEnglish: isEn) != nil || human.birthday != nil
                     let hasMbti = !mbtiTrim.isEmpty
                     if hasAgeOrZodiac || hasMbti {

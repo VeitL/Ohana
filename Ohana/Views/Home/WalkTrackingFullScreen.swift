@@ -49,11 +49,11 @@ struct WalkTrackingFullScreen: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
-            .background(.ultraThinMaterial, in: Capsule())
+            .background(Color.ohanaCardSurface, in: Capsule())
             .overlay(
                 Capsule().strokeBorder(.white.opacity(0.2), lineWidth: 1)
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 }

@@ -156,6 +156,8 @@ final class PetWalkingManager {
     }
     
     func reset() {
+        stopTimer()
+        locationManager.stopAllLocationActivity()
         phase = .idle
         currentPet = nil
         startTime = nil
@@ -168,6 +170,30 @@ final class PetWalkingManager {
         lastCompletedPetId = nil
         lastCompletedWalk = nil
         lastCompletedRouteCoordinates = []
+    }
+
+    func pauseForAppBackground() {
+        if case .running = phase {
+            if let r = resumeTime {
+                pausedElapsed += Date().timeIntervalSince(r)
+                elapsedTime = pausedElapsed
+            }
+            resumeTime = nil
+            phase = .paused
+            stopTimer()
+        }
+        locationManager.stopAllLocationActivity()
+    }
+
+    func handleAppBackgroundTransition() {
+        guard case .running = phase else {
+            locationManager.stopAllLocationActivity()
+            return
+        }
+        if locationManager.canContinueCurrentWalkInBackground {
+            return
+        }
+        pauseForAppBackground()
     }
     
     func addPoop() {

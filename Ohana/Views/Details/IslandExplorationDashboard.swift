@@ -166,7 +166,7 @@ struct IslandExplorationDashboard: View {
     private var dashboardBody: some View {
         if standalone {
             ZStack {
-                ArkBackgroundView().ignoresSafeArea()
+                OhanaAppBackground().ignoresSafeArea()
                 scrollContent
             }
             .ignoresSafeArea(edges: .top)
@@ -204,15 +204,15 @@ struct IslandExplorationDashboard: View {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 36, height: 36)
                     .background(.white.opacity(0.12), in: Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             Spacer()
             Text("全岛探索")
                 .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Color.clear.frame(width: 36, height: 36)
         }
@@ -239,7 +239,7 @@ struct IslandExplorationDashboard: View {
                         .formatted(.number.precision(.fractionLength(totalMeters >= 1000 ? 1 : 0)))
                 )
                 .font(.system(size: 46, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .contentTransition(.numericText())
                 .animation(.spring(response: 0.4), value: totalMeters)
 
@@ -252,7 +252,7 @@ struct IslandExplorationDashboard: View {
 
                 Text(funSubtitle)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.35))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                     .multilineTextAlignment(.trailing)
                     .frame(maxWidth: 140)
                     .lineLimit(2)
@@ -276,16 +276,16 @@ struct IslandExplorationDashboard: View {
                 .chartXAxis {
                     AxisMarks(values: .stride(by: .day, count: uniqueDays > 14 ? 7 : 1)) { _ in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(.primary.opacity(0.06))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.06))
                         AxisValueLabel(format: .dateTime.day())
                             .font(.system(size: 9))
-                            .foregroundStyle(.primary.opacity(0.4))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     }
                 }
                 .chartYAxis {
                     AxisMarks(values: .automatic(desiredCount: 3)) { _ in
-                        AxisGridLine().foregroundStyle(.primary.opacity(0.05))
-                        AxisValueLabel().font(.system(size: 8)).foregroundStyle(.primary.opacity(0.3))
+                        AxisGridLine().foregroundStyle(Color.ohanaPrimaryText.opacity(0.05))
+                        AxisValueLabel().font(.system(size: 8)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     }
                 }
                 .frame(height: 120)
@@ -308,7 +308,7 @@ struct IslandExplorationDashboard: View {
                         Text(p.emoji).font(.system(size: 38))
                         Text(p.name)
                             .font(.system(size: 13, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                         Text(
                             (p.totalMeters / 1000)
@@ -345,7 +345,7 @@ struct IslandExplorationDashboard: View {
                         }
                         Text(h.human.name)
                             .font(.system(size: 13, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                         Text(
                             (h.totalMeters / 1000)
@@ -370,7 +370,7 @@ struct IslandExplorationDashboard: View {
         VStack(spacing: 10) {
             Text(title)
                 .font(.system(size: 10, weight: .black, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.4))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 .tracking(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -390,7 +390,7 @@ struct IslandExplorationDashboard: View {
     private func emptyBentoLabel(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(.primary.opacity(0.2))
+            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
     }
 
     // MARK: - 模块C：探索趋势图（堆叠 BarMark）
@@ -399,14 +399,14 @@ struct IslandExplorationDashboard: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("探索趋势")
                 .font(.system(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.5))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                 .tracking(1)
 
             let data = stackedPoints
             if data.isEmpty {
                 Text("暂无遛宠记录")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.primary.opacity(0.2))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
                     .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
             } else {
                 // 单日数据时固定柱宽，防止撑满全屏
@@ -425,18 +425,18 @@ struct IslandExplorationDashboard: View {
                 .chartXAxis {
                     AxisMarks(values: .stride(by: .day, count: uniqueDays > 14 ? 7 : 1)) { _ in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(.primary.opacity(0.06))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.06))
                         AxisValueLabel(format: .dateTime.day().month(.abbreviated))
-                            .foregroundStyle(.primary.opacity(0.3))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                             .font(.system(size: 9, weight: .medium))
                     }
                 }
                 .chartYAxis {
                     AxisMarks(position: .leading) { _ in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(.primary.opacity(0.06))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.06))
                         AxisValueLabel()
-                            .foregroundStyle(.primary.opacity(0.3))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                             .font(.system(size: 9, weight: .medium))
                     }
                 }
@@ -450,7 +450,7 @@ struct IslandExplorationDashboard: View {
                                 Circle().fill(s.color).frame(width: 7, height: 7)
                                 Text(s.name)
                                     .font(.system(size: 9, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(.primary.opacity(0.5))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                                     .lineLimit(1)
                             }
                         }
@@ -470,13 +470,13 @@ struct IslandExplorationDashboard: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("里程贡献榜")
                 .font(.system(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.5))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                 .tracking(1)
 
             if petSummaries.isEmpty {
                 Text("暂无遛宠记录")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.primary.opacity(0.2))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
                     .frame(maxWidth: .infinity, minHeight: 60, alignment: .center)
             } else {
                 let maxM = petSummaries.first?.totalMeters ?? 1
@@ -495,7 +495,7 @@ struct IslandExplorationDashboard: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(s.name)
                                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(Color.ohanaPrimaryText)
                                     .lineLimit(1)
 
                                 GeometryReader { geo in

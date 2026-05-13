@@ -5,8 +5,8 @@
 //  家庭协作共享组件：所有打卡 / 记录 Sheet 顶部的「执行人」胶囊
 //
 //  - 读取 / 持久化 @AppStorage("currentActiveHumanId")
-//  - 胶囊点击 → Menu 列出所有家庭成员 + "未指定" 快速切换
-//  - 切换后自动触发 selection haptic，并立刻生效于该 Sheet 后续 commit
+//  - 胶囊点击 → 统一账户切换 Sheet
+//  - 切换后立刻生效于该 Sheet 后续 commit
 //
 
 import SwiftUI
@@ -15,6 +15,7 @@ import SwiftData
 struct ExecutorPickerBar: View {
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
+    @State private var showingExecutorSwitcher = false
 
     var tint: Color = .goPrimary
     var compact: Bool = false
@@ -27,36 +28,15 @@ struct ExecutorPickerBar: View {
         if humans.isEmpty {
             EmptyView()
         } else {
-            Menu {
-                ForEach(humans) { h in
-                    Button {
-                        activeHumanId = h.id.uuidString
-                        UISelectionFeedbackGenerator().selectionChanged()
-                    } label: {
-                        if h.id.uuidString == activeHumanId {
-                            Label {
-                                Text(displayName(h))
-                            } icon: {
-                                Image(systemName: "checkmark")
-                            }
-                        } else {
-                            Text("\(h.avatarEmoji)  \(displayName(h))")
-                        }
-                    }
-                }
-                if !activeHumanId.isEmpty {
-                    Divider()
-                    Button(role: .destructive) {
-                        activeHumanId = ""
-                        UISelectionFeedbackGenerator().selectionChanged()
-                    } label: {
-                        Label("不指定执行人", systemImage: "person.fill.questionmark")
-                    }
-                }
+            Button {
+                showingExecutorSwitcher = true
             } label: {
                 barLabel
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
+            .sheet(isPresented: $showingExecutorSwitcher) {
+                HumanExecutorSwitchSheet()
+            }
         }
     }
 
@@ -69,11 +49,11 @@ struct ExecutorPickerBar: View {
             VStack(alignment: .leading, spacing: 0) {
                 Text("执行人")
                     .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
                     .tracking(0.6)
-                Text(currentHuman.map(displayName) ?? "未指定")
+                Text(currentHuman.map(displayName) ?? "选择账户")
                     .font(.system(size: compact ? 11 : 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
             }
 
@@ -81,13 +61,13 @@ struct ExecutorPickerBar: View {
 
             Image(systemName: "chevron.up.chevron.down")
                 .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, compact ? 5 : 7)
         .background(
             Capsule(style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(Color.ohanaCardSurface)
         )
         .overlay(
             Capsule(style: .continuous)
@@ -117,7 +97,7 @@ struct ExecutorPickerBar: View {
             } else {
                 Image(systemName: "person.fill.questionmark")
                     .font(.system(size: compact ? 10 : 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
     }

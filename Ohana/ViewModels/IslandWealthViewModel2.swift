@@ -43,11 +43,14 @@ final class IslandWealthViewModel {
     // 注入实体列表（由 View 从 @Query 传入）
     var pets: [Pet] = []
     var humans: [Human] = []
+    var hiddenHumanIds: Set<String> = []
     // 宠物 id → 主题色（由 View 注入）
     var petColorMap: [String: Color] = [:]
 
-    // 全岛总资产 = QuestManager 全局计数（唯一真相来源）
-    var totalAssets: Int { QuestManager.shared.coconutCount }
+    // 当前查看者可见的全岛总资产；隐私成员的个人椰子余额不计入展示。
+    var totalAssets: Int {
+        pets.reduce(0) { $0 + $1.coconutBalance } + humans.reduce(0) { $0 + $1.coconutBalance }
+    }
 
     // MARK: - 排行榜（直接读个人余额，不从 log 聚合）
     var leaderboard: [WealthLeaderRow] {
@@ -67,7 +70,9 @@ final class IslandWealthViewModel {
     }
 
     // MARK: - 图表数据（按时间桶聚合 log，仅用于趋势图）
-    private var logs: [CoconutLogEntry] { QuestManager.shared.coconutLogs }
+    private var logs: [CoconutLogEntry] {
+        QuestManager.shared.coconutLogs.filter { !hiddenHumanIds.contains($0.actorId ?? "") }
+    }
 
     // 按时间范围过滤（不区分正负）
     private var filteredByTimeRange: [CoconutLogEntry] {

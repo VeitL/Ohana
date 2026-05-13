@@ -48,25 +48,25 @@ struct HomeMoreSection<Memory: View, Stats: View>: View {
             HStack(spacing: 8) {
                 Image(systemName: expanded ? "chevron.up" : "chevron.down")
                     .font(.system(size: 10, weight: .black))
-                    .foregroundStyle(.primary.opacity(0.5))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                     .frame(width: 18, height: 18)
                     .background(Color.primary.opacity(0.08), in: Circle())
                 Text(expanded ? "收起 · 岛屿近况" : "更多 · 岛屿近况")
                     .font(.system(size: 12, weight: .black, design: .rounded))
                     .tracking(1.5)
-                    .foregroundStyle(.primary.opacity(0.55))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                 Spacer()
                 if !expanded {
                     Text(previewHint)
                         .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.35))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                         .lineLimit(1)
                 }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private var previewHint: String {

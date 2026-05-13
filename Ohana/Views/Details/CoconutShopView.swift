@@ -51,6 +51,9 @@ struct CoconutShopView: View {
     @State private var showEquipPopout = false
     @State private var showPetPickerForPopout = false
     @State private var equipPopoutPet: Pet? = nil
+    @State private var showAvatarUpgradeTargetPicker = false
+    @State private var avatarUpgradeErrorMessage = ""
+    @State private var showAvatarUpgradeError = false
 
     init(initialCategory: ShopItem.ShopCategory = .effect) {
         _selectedCategory = State(initialValue: initialCategory)
@@ -88,7 +91,7 @@ struct CoconutShopView: View {
             ShopItem(id: "boost_tree_large",      emoji: "🌳", name: "生命树能量 +110",description: "批量注入 110 点能量，比小包更划算",      cost: 95,  category: .boost, isConsumable: true),
             ShopItem(id: "boost_backdate_single", emoji: "📅", name: "补签券 ×1",      description: "获得 1 张昨日补签券，放入百宝箱",        cost: 45,  category: .boost, isConsumable: true),
             ShopItem(id: "boost_backdate_pack",   emoji: "🗓️", name: "补签券 ×3",      description: "获得 3 张昨日补签券，适合连续补签",      cost: 120, category: .boost, isConsumable: true),
-            ShopItem(id: Avatar2DAccess.shopItemId, emoji: "🖼️", name: "2.5D 头像券", description: "额外解锁 1 个新成员的 2.5D 默认头像", cost: 320, category: .boost, isConsumable: true),
+            ShopItem(id: Avatar2DAccess.shopItemId, emoji: "🖼️", name: "2.5D 头像券", description: "购买后指定 1 位人类或宠物升级 2.5D 头像", cost: 320, category: .boost, isConsumable: true),
         ].map { item in
             var copy = item
             if !item.isConsumable {
@@ -105,7 +108,7 @@ struct CoconutShopView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                     .ignoresSafeArea()
 
                 // 庆典粒子
@@ -142,7 +145,7 @@ struct CoconutShopView: View {
             }
             .navigationTitle("椰子商店")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbarBackground(Color.ohanaCardSurface, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
@@ -170,6 +173,30 @@ struct CoconutShopView: View {
                 }
             }
             Button("取消", role: .cancel) {}
+        }
+        .confirmationDialog("选择 2.5D 头像对象", isPresented: $showAvatarUpgradeTargetPicker, titleVisibility: .visible) {
+            if Avatar2DAccess.extraPassCount <= 0 {
+                Button("暂无可用头像券", role: .cancel) {}
+            } else {
+                ForEach(humans) { human in
+                    Button("人类 · \(human.name)") {
+                        upgradeHumanTo2DAvatar(human)
+                    }
+                }
+                ForEach(pets) { pet in
+                    Button("宠物 · \(pet.name)") {
+                        upgradePetTo2DAvatar(pet)
+                    }
+                }
+                Button("稍后再用", role: .cancel) {}
+            }
+        } message: {
+            Text("每张券可为一个成员生成 2.5D 头像，保存后首页、详情页和所有头像位置会一起更新。")
+        }
+        .alert("无法升级 2.5D 头像", isPresented: $showAvatarUpgradeError) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text(avatarUpgradeErrorMessage)
         }
         .sheet(item: $equipPopoutPet) { pet in
             EquipPopoutCardSheet(pet: pet)
@@ -218,7 +245,7 @@ struct CoconutShopView: View {
 
     private var balanceHeaderBackground: some View {
         RoundedRectangle(cornerRadius: 20, style: .continuous)
-            .fill(.ultraThinMaterial)
+            .fill(Color.ohanaCardSurface)
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .strokeBorder(Color.goPrimary.opacity(colorScheme == .dark ? 0.38 : 0.32), lineWidth: 1)
@@ -252,7 +279,7 @@ struct CoconutShopView: View {
                                 )
                         )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
             Spacer()
         }
@@ -268,6 +295,10 @@ struct CoconutShopView: View {
         return Button {
             if purchased {
                 toggleOwnedItem(item)
+                return
+            }
+            if item.id == Avatar2DAccess.shopItemId, Avatar2DAccess.extraPassCount > 0 {
+                openAvatarUpgradeTargetPicker()
                 return
             }
             if activeStatus != nil { return }
@@ -334,7 +365,7 @@ struct CoconutShopView: View {
             .background(shopCardBackground(purchased: purchased, canAfford: canAfford))
             .opacity((!canAfford && !purchased) ? 0.65 : 1)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func shopCardBackground(purchased: Bool, canAfford: Bool) -> some View {
@@ -410,6 +441,11 @@ struct CoconutShopView: View {
                 } else if pets.count > 1 {
                     showPetPickerForPopout = true
                 }
+            }
+        }
+        if item.id == Avatar2DAccess.shopItemId {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                openAvatarUpgradeTargetPicker()
             }
         }
 
@@ -511,6 +547,67 @@ struct CoconutShopView: View {
         }
     }
 
+    private func openAvatarUpgradeTargetPicker() {
+        guard Avatar2DAccess.extraPassCount > 0 else {
+            avatarUpgradeErrorMessage = "当前没有可用的 2.5D 头像券。"
+            showAvatarUpgradeError = true
+            return
+        }
+        guard !humans.isEmpty || !pets.isEmpty else {
+            avatarUpgradeErrorMessage = "请先创建一个人类或宠物成员，再使用 2.5D 头像券。"
+            showAvatarUpgradeError = true
+            return
+        }
+        showAvatarUpgradeTargetPicker = true
+    }
+
+    private func upgradeHumanTo2DAvatar(_ human: Human) {
+        let rawGender = HumanProfileOptions.normalizedGender(human.genderRaw)
+        let avatarGender: String
+        switch rawGender {
+        case "男", "女", "非二元":
+            avatarGender = rawGender
+        default:
+            avatarGender = "非二元"
+        }
+        guard let data = HumanAvatarAssetCatalog.avatarData(gender: avatarGender, birthday: human.birthday) else {
+            avatarUpgradeErrorMessage = "暂时无法为 \(human.name) 生成 2.5D 头像，请先补充性别或生日资料后再试。"
+            showAvatarUpgradeError = true
+            return
+        }
+        guard Avatar2DAccess.consumeExtraPass() else {
+            avatarUpgradeErrorMessage = "当前没有可用的 2.5D 头像券。"
+            showAvatarUpgradeError = true
+            return
+        }
+        human.avatarImageData = data
+        human.avatarEmoji = HumanGenderIdentity.fallbackAvatarEmoji(for: avatarGender)
+        modelContext.safeSave()
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+
+    private func upgradePetTo2DAvatar(_ pet: Pet) {
+        guard let data = PetAvatarAssetCatalog.avatarData(
+            species: pet.species,
+            breed: pet.breed,
+            gender: pet.gender,
+            coatColor: pet.coatColor,
+            eyeColor: pet.eyeColor
+        ) else {
+            avatarUpgradeErrorMessage = "暂时无法为 \(pet.name) 生成 2.5D 头像，请先补充物种或品种资料后再试。"
+            showAvatarUpgradeError = true
+            return
+        }
+        guard Avatar2DAccess.consumeExtraPass() else {
+            avatarUpgradeErrorMessage = "当前没有可用的 2.5D 头像券。"
+            showAvatarUpgradeError = true
+            return
+        }
+        pet.avatarImageData = data
+        modelContext.safeSave()
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+
     private func activeConsumableStatus(for item: ShopItem) -> String? {
         switch item.id {
         case "boost_double":
@@ -521,6 +618,9 @@ struct CoconutShopView: View {
                 return "保护中"
             }
             return nil
+        case Avatar2DAccess.shopItemId:
+            let count = Avatar2DAccess.extraPassCount
+            return count > 0 ? "库存 \(count) 张" : nil
         default:
             return nil
         }

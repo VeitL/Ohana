@@ -146,14 +146,14 @@ struct IslandQuestCarousel: View {
             Text("✅").font(.system(size: 20))
             Text("今日岛屿委托全部完成！")
                 .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Image(systemName: "checkmark.seal.fill")
                 .font(.system(size: 18))
                 .foregroundStyle(Color.goPrimary)
         }
         .padding(.horizontal, 16).padding(.vertical, 14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .padding(.horizontal, 16)
     }
 
@@ -187,7 +187,7 @@ struct IslandQuestCarousel: View {
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                 )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .disabled(coconutClaimed)
         }
         .padding(.horizontal, 16)
@@ -201,11 +201,11 @@ struct IslandQuestCarousel: View {
                 .font(.headline)
             Text("岛屿很平静，居民们很满足")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 160)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .padding(.horizontal, 16)
     }
 }
@@ -229,7 +229,7 @@ private struct IslandQuestCarouselCard: View {
     }
 
     private var stripColor: Color {
-        if let p = relatedPet { return Color(hex: p.themeColorHex.isEmpty ? "C8FF00" : p.themeColorHex) }
+        if let p = relatedPet { return Color(hex: p.safeThemeColorHex) }
         if let pl = relatedPlant { return Color(hex: pl.themeColorHex.isEmpty ? "4CAF50" : pl.themeColorHex) }
         return Color.goPrimary
     }
@@ -275,21 +275,21 @@ private struct IslandQuestCarouselCard: View {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 22))
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
 
                 Text(quest.title)
                     .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .minimumScaleFactor(0.85)
                     .padding(.top, 6)
 
                 Text(quest.subtitle)
                     .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(2)
                     .padding(.top, 2)
 
@@ -313,12 +313,12 @@ private struct IslandQuestCarouselCard: View {
                     .padding(.horizontal, 14).padding(.vertical, 10)
                     .background(Color.goPrimary, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
             .padding(12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .transition(.opacity.combined(with: .scale(scale: 0.96)))
     }
 

@@ -25,14 +25,14 @@ struct PetHygieneCard: View {
                         Text("✨").font(.system(size: 14))
                         Text("护理打卡")
                             .font(OhanaFont.headline(.black))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.primary.opacity(0.3))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
 
                     // Only show items with records
                     let recordedTypes = HygieneType.allCases.filter { type in
@@ -42,7 +42,7 @@ struct PetHygieneCard: View {
                     if recordedTypes.isEmpty {
                         Text("暂无记录")
                             .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.3))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                             .padding(.vertical, 4)
                     } else {
                         let cols = Array(repeating: GridItem(.flexible()), count: min(recordedTypes.count, 5))
@@ -71,7 +71,7 @@ struct PetHygieneCard: View {
                 HStack(spacing: 8) {
                     Text("✨ \(undoLabel) 已打卡")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Button {
                         if let log = undoLog {
@@ -93,7 +93,7 @@ struct PetHygieneCard: View {
             }
             .animation(.spring(response: 0.3), value: undoLog != nil)
             .sheet(item: $longPressedType) { type in
-                HygieneTodoSheet(pet: pet, type: type, accent: Color(hex: pet.themeColorHex.isEmpty ? "4338FF" : pet.themeColorHex))
+                HygieneTodoSheet(pet: pet, type: type, accent: Color(hex: pet.safeThemeColorHex))
                     .presentationDetents([.height(520)])
                     .presentationDragIndicator(.visible)
             }
@@ -134,7 +134,7 @@ private struct HygieneDetailSheet: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            ArkBackgroundView()
+            OhanaAppBackground()
 
             VStack(spacing: 0) {
                 // ── 顶栏
@@ -142,7 +142,7 @@ private struct HygieneDetailSheet: View {
                     Button { dismiss() } label: {
                         Image(systemName: "chevron.down")
                             .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(.primary.opacity(0.6))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                             .frame(width: 34, height: 34)
                             .goGlassBackground(Circle())
                     }
@@ -150,10 +150,10 @@ private struct HygieneDetailSheet: View {
                     VStack(spacing: 2) {
                         Text("护理打卡")
                             .font(.system(size: 17, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text(pet.name)
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.primary.opacity(0.4))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     }
                     Spacer()
                     // 占位保持居中
@@ -185,7 +185,7 @@ private struct HygieneDetailSheet: View {
                             }
                             Text(type.rawValue)
                                 .font(.system(size: 10, weight: .bold, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.8))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                             if let d = days {
                                 Text(d == 0 ? "今天" : "\(d)天前")
                                     .font(.system(size: 9, weight: .semibold))
@@ -193,7 +193,7 @@ private struct HygieneDetailSheet: View {
                             } else {
                                 Text("未记录")
                                     .font(.system(size: 9, weight: .semibold))
-                                    .foregroundStyle(.primary.opacity(0.3))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -265,7 +265,7 @@ private struct HygieneDetailSheet: View {
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(Color.goYellow.opacity(0.12), in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
 
             // 今日统计行
@@ -274,7 +274,7 @@ private struct HygieneDetailSheet: View {
                 VStack(spacing: 4) {
                     Text("💩").font(.system(size: 22))
                     Text("\(todayPotty)").font(.system(size: 20, weight: .black, design: .rounded)).foregroundStyle(.black)
-                    Text("今日便便").font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
+                    Text("今日便便").font(.system(size: 10, weight: .medium)).foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
@@ -285,7 +285,7 @@ private struct HygieneDetailSheet: View {
                     VStack(spacing: 4) {
                         Text("🪣").font(.system(size: 22))
                         Text("\(todayLitter)").font(.system(size: 20, weight: .black, design: .rounded)).foregroundStyle(.black)
-                        Text("今日铲屎").font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
+                        Text("今日铲屎").font(.system(size: 10, weight: .medium)).foregroundStyle(Color.ohanaSecondaryText)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
@@ -311,7 +311,7 @@ private struct HygieneDetailSheet: View {
                         .padding(.vertical, 10)
                         .background(Color.goYellow, in: RoundedRectangle(cornerRadius: 12))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
 
                 if isLitterPet {
                     Button {
@@ -330,7 +330,7 @@ private struct HygieneDetailSheet: View {
                             .padding(.vertical, 10)
                             .background(Color(hex: "E8E0FF"), in: RoundedRectangle(cornerRadius: 12))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
 
@@ -339,7 +339,7 @@ private struct HygieneDetailSheet: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("便便记录")
                         .font(.system(size: 11, weight: .black, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                     ForEach(recentPotty) { log in
                         HStack {
                             Text("💩").font(.system(size: 13))
@@ -350,7 +350,7 @@ private struct HygieneDetailSheet: View {
                             Button {
                                 modelContext.delete(log); modelContext.safeSave()
                             } label: {
-                                Image(systemName: "trash").font(.system(size: 11)).foregroundStyle(.secondary.opacity(0.4))
+                                Image(systemName: "trash").font(.system(size: 11)).foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
                             }
                         }
                         .padding(.horizontal, 10).padding(.vertical, 6)
@@ -364,7 +364,7 @@ private struct HygieneDetailSheet: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("铲屎记录")
                         .font(.system(size: 11, weight: .black, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                     ForEach(recentLitter) { log in
                         HStack {
                             Text("🪣").font(.system(size: 13))
@@ -375,7 +375,7 @@ private struct HygieneDetailSheet: View {
                             Button {
                                 modelContext.delete(log); modelContext.safeSave()
                             } label: {
-                                Image(systemName: "trash").font(.system(size: 11)).foregroundStyle(.secondary.opacity(0.4))
+                                Image(systemName: "trash").font(.system(size: 11)).foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
                             }
                         }
                         .padding(.horizontal, 10).padding(.vertical, 6)
@@ -427,7 +427,7 @@ private struct HygieneDetailSheet: View {
 
             // 近期记录
             if logs.isEmpty {
-                Text("暂无记录").font(.system(size: 12)).foregroundStyle(.secondary)
+                Text("暂无记录").font(.system(size: 12)).foregroundStyle(Color.ohanaSecondaryText)
                     .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, 4)
             } else {
                 VStack(spacing: 5) {
@@ -442,7 +442,7 @@ private struct HygieneDetailSheet: View {
                             } label: {
                                 Image(systemName: "trash")
                                     .font(.system(size: 11))
-                                    .foregroundStyle(.secondary.opacity(0.4))
+                                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
                             }
                         }
                         .padding(.horizontal, 10).padding(.vertical, 6)
@@ -499,7 +499,7 @@ private struct HygieneCheckButton: View {
                     .lineLimit(1)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .simultaneousGesture(
             LongPressGesture(minimumDuration: 0.5).onEnded { _ in
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -628,7 +628,7 @@ struct HygieneTodoSheet: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 6) {
                             Image(systemName: "repeat").font(.system(size: 13, weight: .semibold)).foregroundStyle(accent)
-                            Text("护理周期").font(.system(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(.primary)
+                            Text("护理周期").font(.system(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
                         }
                         .padding(.horizontal, 4)
                         HStack(spacing: 14) {
@@ -642,16 +642,16 @@ struct HygieneTodoSheet: View {
                                     .frame(width: 38, height: 38)
                                     .background(Color(.systemBackground).opacity(0.82), in: Circle())
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ScaleButtonStyle())
                             .disabled(repeatDays == 0)
 
                             VStack(spacing: 2) {
                                 Text(repeatDays == 0 ? "不重复" : "\(repeatDays) 天")
                                     .font(.system(size: 22, weight: .black, design: .rounded))
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(Color.ohanaPrimaryText)
                                 Text(repeatDescription)
                                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                             }
                             .frame(maxWidth: .infinity)
 
@@ -665,7 +665,7 @@ struct HygieneTodoSheet: View {
                                     .frame(width: 38, height: 38)
                                     .background(Color(.systemBackground).opacity(0.82), in: Circle())
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ScaleButtonStyle())
                         }
                         .padding(.horizontal, 8)
                     }
@@ -695,7 +695,7 @@ struct HygieneTodoSheet: View {
                 .frame(maxWidth: .infinity).padding(.vertical, 14)
                 .background(accent, in: RoundedRectangle(cornerRadius: 14))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 20)
             .padding(.bottom, 20)
         }
@@ -757,6 +757,7 @@ struct HygieneTodoSheet: View {
             event.recurrenceEndDate = cal.date(byAdding: .year, value: 1, to: dayStart)
         }
         if repeatDays > 0 {
+            CarePlanCalendarSync.suppressDefaultPlan(kind: "groom", pet: pet, context: modelContext)
             HygieneType.setCustomCycleDays(repeatDays, for: type, petId: pet.id)
         }
         modelContext.insert(event)

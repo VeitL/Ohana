@@ -31,6 +31,36 @@ enum PrivacyService {
         human.isPrivate(field, viewedBy: viewerId)
     }
 
+    static func unlockedHumans(for field: HumanPrivateField, from humans: [Human], viewedBy viewerId: UUID?) -> [Human] {
+        humans.filter { !isLocked(field, for: $0, viewedBy: viewerId) }
+    }
+
+    static func publicHumans(for field: HumanPrivateField, from humans: [Human]) -> [Human] {
+        humans.filter { !$0.privateFields.contains(field.rawValue) }
+    }
+
+    static func isPubliclyHidden(_ field: HumanPrivateField, for human: Human) -> Bool {
+        human.privateFields.contains(field.rawValue)
+    }
+
+    static func isPubliclyHidden(_ field: HumanPrivateField, humanId: String?, in humans: [Human]) -> Bool {
+        guard let humanId,
+              !humanId.isEmpty,
+              let human = humans.first(where: { $0.id.uuidString == humanId }) else {
+            return false
+        }
+        return isPubliclyHidden(field, for: human)
+    }
+
+    static func isLocked(_ field: HumanPrivateField, humanId: String?, in humans: [Human], viewedBy viewerId: UUID?) -> Bool {
+        guard let humanId,
+              !humanId.isEmpty,
+              let human = humans.first(where: { $0.id.uuidString == humanId }) else {
+            return false
+        }
+        return isLocked(field, for: human, viewedBy: viewerId)
+    }
+
     static func isHumanQuickActionLocked(_ item: QuickActionItem, human: Human?, viewedBy viewerId: UUID?) -> Bool {
         guard item.entityKind == .human,
               let field = field(forHumanAction: item.actionType),
@@ -41,7 +71,7 @@ enum PrivacyService {
     }
 
     static func badgeText(for field: HumanPrivateField, human: Human, viewedBy viewerId: UUID?) -> String {
-        human.privateFields.contains(field.rawValue) ? "仅自己" : "公开"
+        isLocked(field, for: human, viewedBy: viewerId) ? "仅自己" : "公开"
     }
 
     static func lockedMessage(for field: HumanPrivateField) -> String {

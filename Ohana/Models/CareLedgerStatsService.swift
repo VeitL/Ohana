@@ -147,7 +147,7 @@ enum CareLedgerStatsService {
     private static func color(for event: CareLedgerEvent) -> Color {
         switch event.eventKindEnum {
         case .care:
-            return Color(hex: CareType(rawValue: event.actionType)?.accentColorHex ?? "C8FF00")
+            return Color(hex: CareType(rawValue: event.actionType)?.accentColorHex ?? OhanaThemeColorPolicy.petFallbackHex)
         case .potty:
             return .goOrange
         case .walk:

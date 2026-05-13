@@ -65,7 +65,7 @@ struct HumanDetailView: View {
 
     var body: some View {
         ZStack {
-            ArkBackgroundView()
+            OhanaAppBackground()
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 16) {
@@ -140,7 +140,9 @@ struct HumanDetailView: View {
                             remindersSection
                         }
                         notesSection
-                        deleteSection
+                        if isViewingOwnProfile {
+                            deleteSection
+                        }
                     }
                     Spacer(minLength: 40)
                 }
@@ -152,9 +154,11 @@ struct HumanDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 12) {
                     CoconutBalanceCapsule { showingCoconutLog = true }
-                    Button { showingEditSheet = true } label: {
-                        Image(systemName: "pencil.circle")
-                            .foregroundStyle(.white.opacity(0.7))
+                    if isViewingOwnProfile {
+                        Button { showingEditSheet = true } label: {
+                            Image(systemName: "pencil.circle")
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
                     }
                 }
             }
@@ -417,7 +421,7 @@ struct HumanDetailView: View {
             .padding(.horizontal, 16).padding(.vertical, 14)
             .goIslandModuleCard(cornerRadius: 24)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .padding(.horizontal, 16)
     }
 
@@ -469,7 +473,7 @@ struct HumanDetailView: View {
             .padding(.horizontal, 16).padding(.vertical, 14)
             .goIslandModuleCard(cornerRadius: 24)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .padding(.horizontal, 16)
     }
 
@@ -515,7 +519,7 @@ struct HumanDetailView: View {
             .padding(.horizontal, 16).padding(.vertical, 14)
             .goIslandModuleCard(cornerRadius: 24)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .padding(.horizontal, 16)
     }
 
@@ -585,7 +589,7 @@ struct HumanDetailView: View {
             .padding(.horizontal, 16).padding(.vertical, 14)
             .goIslandModuleCard(cornerRadius: 24)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .padding(.horizontal, 16)
     }
 
@@ -615,7 +619,7 @@ struct HumanDetailView: View {
             .padding(.horizontal, 16).padding(.vertical, 14)
             .goIslandModuleCard(cornerRadius: 24)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .padding(.horizontal, 16)
     }
 
@@ -626,7 +630,7 @@ struct HumanDetailView: View {
                 .goIslandModuleCard(cornerRadius: 24)
                 .padding(.horizontal, 16)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     // MARK: - Privacy Placeholder
@@ -826,16 +830,26 @@ struct HumanDetailView: View {
 
     private func deleteHumanAndReturnHome() {
         let deletedHumanId = human.id.uuidString
-        let fallbackHumanId = allHumans.first(where: { $0.id.uuidString != deletedHumanId })?.id.uuidString ?? ""
+        let hasRemainingHuman = allHumans.contains { $0.id.uuidString != deletedHumanId }
+        let deletedCurrentHuman = activeHumanIdStr == deletedHumanId
+        let requiresReplacementHuman = !hasRemainingHuman
+        let requiresAccountSwitch = deletedCurrentHuman && hasRemainingHuman
 
-        if activeHumanIdStr == deletedHumanId {
-            activeHumanIdStr = fallbackHumanId
+        if deletedCurrentHuman || requiresReplacementHuman {
+            activeHumanIdStr = ""
         }
 
         modelContext.delete(human)
         modelContext.safeSave()
 
-        NotificationCenter.default.post(name: .ohanaReturnHomeAfterHumanDeletion, object: nil)
+        NotificationCenter.default.post(
+            name: .ohanaReturnHomeAfterHumanDeletion,
+            object: nil,
+            userInfo: [
+                "requiresReplacementHuman": requiresReplacementHuman,
+                "requiresAccountSwitch": requiresAccountSwitch
+            ]
+        )
         dismiss()
     }
 }
@@ -898,7 +912,7 @@ struct EditHumanSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("备注")
                         .font(OhanaFont.subheadline())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                     TextEditor(text: $notes)
                         .frame(height: 80)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -908,7 +922,7 @@ struct EditHumanSheet: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("🔒  隐私设置")
                         .font(OhanaFont.subheadline())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                     editPrivacyRow("体重记录", binding: $privateWeight)
                     editPrivacyRow("运动记录", binding: $privateWorkout)
                     editPrivacyRow("吃药提醒", binding: $privateMedication)
@@ -953,7 +967,7 @@ struct EditHumanSheet: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(OhanaFont.subheadline())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
             TextField(title, text: text)
                 .textFieldStyle(.roundedBorder)
         }
@@ -994,7 +1008,7 @@ struct EditHumanSheet: View {
         HStack {
             Text(title)
                 .font(OhanaFont.callout())
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Toggle("", isOn: binding).tint(Color.goPrimary).labelsHidden()
         }

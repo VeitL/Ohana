@@ -556,7 +556,7 @@ struct ArkCrewIDCardView: View {
 
             // ── 层3：ultraThinMaterial 进一步柔化
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(.ultraThinMaterial.opacity(0.35))
+                .fill(Color.ohanaCardSurface.opacity(0.35))
 
             // ── 层4：品牌水印
             Text("OHANA")
@@ -958,7 +958,7 @@ struct ArkCrewIDCardView: View {
                         .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 20).padding(.vertical, 12)
 
             Spacer(minLength: 0)
@@ -1029,7 +1029,7 @@ struct ArkCrewIDCardView: View {
                             .font(.system(size: 26, weight: .bold))
                             .foregroundStyle(.white.opacity(0.72))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                     .accessibilityLabel("关闭遛狗总结")
                 }
                 .padding(.horizontal, 22)
@@ -1199,25 +1199,25 @@ struct ArkCrewIDCardView: View {
                             Text("DATA DASHBOARD")
                                 .font(.system(size: 8, weight: .black, design: .rounded))
                                 .tracking(3)
-                                .foregroundStyle(.primary.opacity(0.25))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                             Text(pet.name)
                                 .font(.system(size: 18, weight: .black, design: .rounded))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                         }
                         Spacer()
                         Button(action: onDetail) {
                             HStack(spacing: 4) {
                                 Text(l.petCardDetail)
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.primary.opacity(0.75))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.75))
                                 Image(systemName: "arrow.up.right")
                                     .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(.primary.opacity(0.5))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                             }
                             .padding(.horizontal, 12).padding(.vertical, 6)
                             .goGlassBackground(Capsule())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                     }
                     .padding(.horizontal, 18).padding(.top, 12).padding(.bottom, 8)
 
@@ -1363,12 +1363,12 @@ struct ArkCrewIDCardView: View {
         VStack(spacing: 3) {
             Text(label)
                 .font(.system(size: 8, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.35))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                 .textCase(.uppercase)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value)
                     .font(.system(size: 26, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .minimumScaleFactor(0.55)
                     .lineLimit(1)
                 if !unit.isEmpty {
@@ -1517,16 +1517,16 @@ struct ArkCrewIDCardView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(event.title)
                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.9))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.9))
                         .lineLimit(1)
                     if !event.isAllDay, Calendar.current.isDateInToday(event.startDate) {
                         Text(event.startDate, format: .dateTime.hour().minute())
                             .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.primary.opacity(0.45))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                     } else {
                         Text("今日待办")
                             .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.primary.opacity(0.4))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     }
                 }
                 Spacer()
@@ -1544,7 +1544,7 @@ struct ArkCrewIDCardView: View {
                             .foregroundStyle(Color.goPrimary)
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -1559,7 +1559,7 @@ struct ArkCrewIDCardView: View {
                     .font(.system(size: 14))
                 Text("\(pet.name) 今天没有待完成的事项")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.35))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                 Spacer()
             }
             .padding(.horizontal, 14)
@@ -1651,7 +1651,7 @@ struct ArkCrewIDCardView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("体重走势")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
 
                 let data = weightSparklineData
                 if data.count < 2 {
@@ -1697,7 +1697,7 @@ struct ArkCrewIDCardView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("本周活跃")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
 
                 let data = activitySparklineData
                 let allZero = data.allSatisfy { $0.count == 0 }
@@ -1865,10 +1865,10 @@ struct AddReminderFromCheckInSheet: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("添加待办")
                                 .font(.system(size: 22, weight: .black, design: .rounded))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                             Text("\(pet.name) · \(actionLabel)")
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                         }
                         Spacer()
                     }
@@ -1878,7 +1878,7 @@ struct AddReminderFromCheckInSheet: View {
                     HStack {
                         Label("全天", systemImage: "sun.max.fill")
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Spacer()
                         Toggle("", isOn: $isAllDay)
                             .tint(Color.goPrimary)
@@ -1893,7 +1893,7 @@ struct AddReminderFromCheckInSheet: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("开始时间")
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                             .padding(.horizontal, 24)
                         DatePicker("", selection: $startDate,
                                    displayedComponents: isAllDay ? .date : [.date, .hourAndMinute])
@@ -1908,7 +1908,7 @@ struct AddReminderFromCheckInSheet: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("结束时间")
                                 .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                                 .padding(.horizontal, 24)
                             DatePicker("", selection: $endDate, in: startDate...,
                                        displayedComponents: [.date, .hourAndMinute])
@@ -1923,7 +1923,7 @@ struct AddReminderFromCheckInSheet: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("重复频率")
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                             .padding(.horizontal, 24)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
@@ -2134,7 +2134,7 @@ private struct BackBentoDashboard: View {
                         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .strokeBorder(foodAccent.opacity(0.2), lineWidth: 1))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
 
                 // ── 行2.5：Bug6 健康有效期紧急提醒（< 7 天）
@@ -2375,7 +2375,7 @@ private struct SmartHygieneGrid: View {
                     .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .strokeBorder(Color.goPrimary.opacity(0.25), lineWidth: 1))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
 
                 quietHygieneRow(highlightLabel: reminder.event?.title)
             }
@@ -2418,7 +2418,7 @@ private struct SmartHygieneGrid: View {
                             )
                     )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
     }
@@ -2672,9 +2672,10 @@ struct SpeciesCheckInGrid: View {
         }
         // 体重 sheet
         .sheet(isPresented: $showWeightSheet) {
-            QuickWeightSheet(pet: pet)
-                .presentationDetents([.medium])
+            GenericWeightEntrySheet(target: .pet(pet))
+                .presentationDetents([.height(690), .large])
                 .presentationDragIndicator(.visible)
+                .presentationBackground(.clear)
         }
         // 护理添加待办 sheet
         .sheet(isPresented: $showCareReminderSheet) {
@@ -2706,7 +2707,7 @@ struct SpeciesCheckInGrid: View {
                 .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
                 .foregroundStyle(.white.opacity(0.15)))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     // MARK: - 末尾添加按钮
@@ -2727,7 +2728,7 @@ struct SpeciesCheckInGrid: View {
                 .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
                 .foregroundStyle(.white.opacity(0.12)))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     // MARK: - 单个 QA 卡片
@@ -2744,7 +2745,7 @@ struct SpeciesCheckInGrid: View {
             if !subtitle.isEmpty {
                 Text(subtitle)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
             }
             if count > 0 {
@@ -3131,7 +3132,7 @@ struct QAAddPanel: View {
 
     var body: some View {
         ZStack {
-            ArkBackgroundView().ignoresSafeArea()
+            OhanaAppBackground().ignoresSafeArea()
             VStack(spacing: 0) {
                 // 标题栏
                 HStack {
@@ -3141,14 +3142,14 @@ struct QAAddPanel: View {
                             .foregroundStyle(.white)
                         Text("点击添加到 \(pet.name) 的卡片")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 22))
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
                 .padding(.horizontal, 20).padding(.top, 24).padding(.bottom, 16)
@@ -3160,7 +3161,7 @@ struct QAAddPanel: View {
                             .font(.system(size: 40))
                         Text("已添加全部可用卡片")
                             .font(.system(size: 14, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
                 } else {
@@ -3188,7 +3189,7 @@ struct QAAddPanel: View {
                                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
                                     .strokeBorder(.white.opacity(0.1), lineWidth: 1))
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ScaleButtonStyle())
                         }
                     }
                     .padding(.horizontal, 20)

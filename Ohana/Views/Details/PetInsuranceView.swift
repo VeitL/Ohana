@@ -36,7 +36,7 @@ struct PetInsuranceView: View {
             } else {
                 NavigationStack {
                     ZStack {
-                        ArkBackgroundView()
+                        OhanaAppBackground()
                         standaloneScroll
                     }
                     .navigationTitle("🛡️ \(pet.name)的保险")
@@ -70,14 +70,14 @@ struct PetInsuranceView: View {
             HStack {
                 Text("保险")
                     .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Button { showingAdd = true } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(Color.goPrimary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
             if sorted.isEmpty {
                 embeddedEmpty
@@ -111,7 +111,7 @@ struct PetInsuranceView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("暂无保单，可记录续期与保额")
                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
             Button { showingAdd = true } label: {
                 Text("添加保单")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
@@ -119,7 +119,7 @@ struct PetInsuranceView: View {
                     .padding(.horizontal, 16).padding(.vertical, 8)
                     .background(Color.goPrimary, in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 6)
@@ -130,12 +130,12 @@ struct PetInsuranceView: View {
         VStack(spacing: 16) {
             Text("🛡️").font(.system(size: 56))
             Text("暂无保险记录").font(.system(size: 17, weight: .black, design: .rounded))
-            Text("记录宠物保险保单，轻松追踪续期日期").font(.system(size: 13, weight: .medium, design: .rounded)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Text("记录宠物保险保单，轻松追踪续期日期").font(.system(size: 13, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText).multilineTextAlignment(.center)
             Button { showingAdd = true } label: {
                 Text("添加保单").font(.system(size: 15, weight: .black, design: .rounded)).foregroundStyle(.black)
                     .padding(.horizontal, 28).padding(.vertical, 12)
                     .background(Color.goPrimary, in: Capsule())
-            }.buttonStyle(.plain)
+            }.buttonStyle(ScaleButtonStyle())
         }.padding(.top, 60)
     }
 
@@ -149,7 +149,7 @@ struct PetInsuranceView: View {
                             HStack(spacing: 6) {
                                 Text(ins.productName.isEmpty ? "未命名保单" : ins.productName)
                                     .font(.system(size: 16, weight: .black, design: .rounded))
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(Color.ohanaPrimaryText)
                                 Text(ins.renewalStatusLabel)
                                     .font(.system(size: 10, weight: .bold, design: .rounded))
                                     .foregroundStyle(.black)
@@ -159,7 +159,7 @@ struct PetInsuranceView: View {
                             if !ins.companyName.isEmpty {
                                 Text(ins.companyName)
                                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                             }
                         }
                         Spacer(minLength: 36)
@@ -187,14 +187,14 @@ struct PetInsuranceView: View {
                     if !ins.notes.isEmpty {
                         Text(ins.notes)
                             .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary.opacity(0.7))
+                            .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
                             .lineLimit(1)
                     }
                 }
                 .padding(16)
                 .goTranslucentCard(cornerRadius: 18)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
 
             Menu {
                 Button { insuranceToEdit = ins } label: {
@@ -214,7 +214,7 @@ struct PetInsuranceView: View {
                 Image(systemName: "ellipsis.circle.fill")
                     .font(.system(size: 20))
                     .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
                     .padding(10)
             }
         }
@@ -223,7 +223,7 @@ struct PetInsuranceView: View {
     private func statCell(label: String, value: String) -> some View {
         VStack(spacing: 3) {
             Text(value).font(.system(size: 14, weight: .black, design: .rounded))
-            Text(label).font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+            Text(label).font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
         }.frame(maxWidth: .infinity)
     }
 }
@@ -294,7 +294,7 @@ struct AddPetInsuranceSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                 ScrollView {
                     VStack(spacing: 14) {
                         // 产品名称
@@ -338,7 +338,7 @@ struct AddPetInsuranceSheet: View {
                                 .background(productName.isEmpty ? Color.primary.opacity(0.15) : Color.goPrimary,
                                             in: RoundedRectangle(cornerRadius: 16))
                         }
-                        .buttonStyle(.plain).disabled(productName.isEmpty)
+                        .buttonStyle(ScaleButtonStyle()).disabled(productName.isEmpty)
                         Spacer(minLength: 40)
                     }
                     .padding(.horizontal, 16).padding(.top, 8)
@@ -348,7 +348,7 @@ struct AddPetInsuranceSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }.foregroundStyle(.secondary)
+                    Button("取消") { dismiss() }.foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
             .onAppear { prefill() }
@@ -403,7 +403,7 @@ struct AddPetInsuranceSheet: View {
                     .frame(maxWidth: .infinity)
                 Text(premiumMode == .annual ? "/ 年" : "/ 月")
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             .padding(.vertical, 4)
 
@@ -415,7 +415,7 @@ struct AddPetInsuranceSheet: View {
                     if premiumMode == .monthly {
                         Text("年总保费：\(AppCurrency.format(annualPremiumDouble, fractionDigits: 2))")
                             .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     HStack(spacing: 4) {
                         Text("每期缴纳：\(AppCurrency.format(basePerPeriod + other, fractionDigits: 2))")
@@ -424,7 +424,7 @@ struct AddPetInsuranceSheet: View {
                         if other > 0 {
                             Text("（含其他费用 \(AppCurrency.format(other, fractionDigits: 2))）")
                                 .font(.system(size: 11, weight: .regular, design: .rounded))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                         }
                     }
                 }
@@ -437,20 +437,20 @@ struct AddPetInsuranceSheet: View {
                 HStack(spacing: 6) {
                     Image(systemName: showOtherFee ? "minus.circle" : "plus.circle")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                     Text(showOtherFee ? "收起其他费用" : "添加其他费用（服务费等）")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
 
             if showOtherFee {
                 HStack(spacing: 8) {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text(AppCurrency.symbol)
                             .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                         TextField("0.00", text: $otherFeeInput)
                             .keyboardType(.decimalPad)
                             .font(.system(size: 15, weight: .semibold, design: .rounded))
@@ -480,7 +480,7 @@ struct AddPetInsuranceSheet: View {
                 .padding(.vertical, 7)
                 .background(premiumMode == mode ? Color.goPrimary : .clear, in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     // MARK: - 付款频次 + 付款日区域
@@ -508,7 +508,7 @@ struct AddPetInsuranceSheet: View {
                              ? "每月 \(paymentDay) 日扣款"
                              : "每季度 \(paymentDay) 日扣款")
                             .font(.system(size: 11, weight: .regular, design: .rounded))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
                     HStack(spacing: 12) {
@@ -530,7 +530,7 @@ struct AddPetInsuranceSheet: View {
                                 .foregroundStyle(Color.goPrimary)
                         }
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -552,7 +552,7 @@ struct AddPetInsuranceSheet: View {
                          ? "一次性：仅按该日生成一笔保费记录。"
                          : "按年：每年与此日同月同日生成扣款，直至续期日前。")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -578,7 +578,7 @@ struct AddPetInsuranceSheet: View {
                     in: RoundedRectangle(cornerRadius: 12, style: .continuous)
                 )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     // MARK: - 自动生成选项区域
@@ -594,7 +594,7 @@ struct AddPetInsuranceSheet: View {
                     let perPeriod = paymentFrequency.periodAmount(fromAnnual: annualPremiumDouble) + other
                     Text("每期 \(AppCurrency.format(perPeriod, fractionDigits: 2)) · 按\(paymentFrequency.rawValue)写入花费")
                         .font(.system(size: 12, weight: .regular, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
             .tint(Color.goPrimary)
@@ -609,7 +609,7 @@ struct AddPetInsuranceSheet: View {
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                     Text("为每期付款日创建日历事件")
                         .font(.system(size: 12, weight: .regular, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
             .tint(Color.goPrimary)
@@ -623,7 +623,7 @@ struct AddPetInsuranceSheet: View {
     private func sectionLabel(_ title: String) -> some View {
         Text(title)
             .font(.system(size: 12, weight: .bold, design: .rounded))
-            .foregroundStyle(.primary.opacity(0.45))
+            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
     }
 
     @ViewBuilder

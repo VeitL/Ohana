@@ -23,11 +23,13 @@ struct AddExpenseSheet: View {
     var preselectedPayerId: String? = nil
     var onSaved: (() -> Void)? = nil
     var onRewarded: ((Int) -> Void)? = nil
+    var onDismiss: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("appLanguage") private var appLanguage = "zh"
+    @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @FocusState private var inputFocused: Bool
 
@@ -45,6 +47,10 @@ struct AddExpenseSheet: View {
     @State private var showingFilePicker = false
     @State private var pendingCapturedImage: UIImage? = nil
     @State private var previewReceipt: ExpenseReceiptAttachment? = nil
+    @State private var adaptiveSheetHeight: CGFloat = 660
+    @State private var popupVisible = false
+    @State private var isClosing = false
+    @State private var popupDragOffset: CGFloat = 0
 
     // 报销申请快捷入口
     @State private var savedExpenseId: String? = nil
@@ -52,8 +58,16 @@ struct AddExpenseSheet: View {
 
     private var l: L10n { L10n(appLanguage) }
 
+    private var popupAnimation: Animation {
+        .interactiveSpring(response: 0.30, dampingFraction: 0.88, blendDuration: 0.12)
+    }
+
     private var petThemeColor: Color {
-        Color(hex: pet.themeColorHex.isEmpty ? "C8FF00" : pet.themeColorHex)
+        Color(hex: pet.safeThemeColorHex)
+    }
+
+    private var sheetTint: Color {
+        Color.goPrimary
     }
 
     private var primaryText: Color {
@@ -69,15 +83,11 @@ struct AddExpenseSheet: View {
     }
 
     private var cardSurface: Color {
-        colorScheme == .dark ? .white.opacity(0.06) : .black.opacity(0.055)
-    }
-
-    private var panelStroke: Color {
-        colorScheme == .dark ? .white.opacity(0.10) : .black.opacity(0.08)
+        Color.ohanaCardSurface
     }
 
     private var parsedAmount: Double? {
-        Double(amountInput.replacingOccurrences(of: ",", with: "."))
+        CountryDecimalInput.parse(amountInput, countryCode: appCountry)
     }
 
     private var isAmountValid: Bool {
@@ -122,39 +132,67 @@ struct AddExpenseSheet: View {
     // MARK: - Body
 
     var body: some View {
-        ZStack {
-            ArkBackgroundView()
+        GeometryReader { proxy in
+            let maxPanelHeight = max(430, proxy.size.height * 0.92)
+            let scrollMaxHeight = max(250, maxPanelHeight - 166)
+            let panelHeightEstimate = min(maxPanelHeight, max(adaptiveSheetHeight, 430))
+            let hiddenOffset = panelHeightEstimate + 72
 
-            VStack(spacing: 0) {
-                header
+            ZStack(alignment: .bottom) {
+                popupBackdrop
+                    .opacity(popupVisible ? 1 : 0)
 
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 16) {
-                        amountEntry
-                        quickAmountStrip
-                        categoryStrip
-                        payerSection
-                        receiptSection
-                        if selectedCategory == .insurancePremium {
-                            insurancePolicyNotice
+                VStack(spacing: 0) {
+                    popupDragHandle
+                        .padding(.top, 4)
+                    header
+
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 16) {
+                            amountEntry
+                            quickAmountStrip
+                            categoryStrip
+                            payerSection
+                            receiptSection
+                            if selectedCategory == .insurancePremium {
+                                insurancePolicyNotice
+                            }
+                            moreSection
+
+                            if hasSavedMedicalExpense {
+                                claimHintCard
+                                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                            }
                         }
-                        moreSection
-
-                        if hasSavedMedicalExpense {
-                            claimHintCard
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
-                        }
+                        .padding(.bottom, 18)
                     }
-                    .padding(.bottom, 18)
-                }
-                .scrollDismissesKeyboard(.interactively)
+                    .scrollDismissesKeyboard(.interactively)
+                    .frame(maxHeight: scrollMaxHeight)
 
-                bottomActionBar
+                    bottomActionBar
+                }
+                .background { OhanaPopupGlassSurface(cornerRadius: 52) }
+                .clipShape(RoundedRectangle(cornerRadius: 52, style: .continuous))
+                .shadow(color: Color.black.opacity(0.56), radius: 48, x: 0, y: -18)
+                .shadow(color: Color(hex: "0B102C").opacity(0.46), radius: 28, x: 0, y: 12)
+                .padding(.horizontal, 6)
+                .padding(.bottom, 8)
+                .offset(y: popupVisible ? popupDragOffset : hiddenOffset)
+                .frame(maxHeight: maxPanelHeight, alignment: .bottom)
+                .ohanaAdaptiveSheetContentHeight(
+                    $adaptiveSheetHeight,
+                    minHeight: 430,
+                    maxHeight: maxPanelHeight,
+                    chromePadding: 18
+                )
             }
         }
+        .transition(.opacity)
+        .allowsHitTesting(popupVisible && !isClosing)
+        .animation(popupAnimation, value: popupVisible)
         .presentationBackground(.clear)
-        .presentationDetents([.fraction(0.64), .large])
-        .presentationDragIndicator(.visible)
+        .presentationDetents([.height(adaptiveSheetHeight)])
+        .presentationDragIndicator(.hidden)
         .presentationContentInteraction(.scrolls)
         .sheet(isPresented: $showClaimSheet) {
             if let firstInsurance = activeInsurances.first {
@@ -212,29 +250,20 @@ struct AddExpenseSheet: View {
         } message: {
             Text(l.quickExpenseCameraPermissionMessage)
         }
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Button(l.done) {
-                    inputFocused = false
-                    GoKeyboard.dismiss()
-                }
-                Spacer()
-                if canSave {
-                    Button(l.quickExpenseKeyboardSave) {
-                        GoKeyboard.dismiss()
-                        DispatchQueue.main.async {
-                            saveExpense()
-                        }
-                    }
-                    .fontWeight(.bold)
-                    .disabled(isSaving)
+        .onAppear {
+            configureInitialPayer()
+            popupVisible = false
+            isClosing = false
+            DispatchQueue.main.async {
+                withAnimation(popupAnimation) {
+                    popupVisible = true
                 }
             }
         }
-        .onAppear {
-            configureInitialPayer()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                inputFocused = true
+        .onChange(of: amountInput) { _, newValue in
+            let sanitized = CountryDecimalInput.sanitize(newValue, countryCode: appCountry, maxFractionDigits: 2)
+            if sanitized != newValue {
+                amountInput = sanitized
             }
         }
         .animation(GoMotion.feedback, value: selectedCategory)
@@ -243,6 +272,46 @@ struct AddExpenseSheet: View {
     }
 
     // MARK: - Sections
+
+    private var popupDragHandle: some View {
+        OhanaPopupDragHandle(tint: primaryText.opacity(0.22))
+            .gesture(popupHandleDragGesture)
+    }
+
+    private var popupHandleDragGesture: some Gesture {
+        DragGesture(minimumDistance: 8, coordinateSpace: .global)
+            .onChanged { value in
+                guard value.translation.height > 0 else { return }
+                popupDragOffset = value.translation.height
+            }
+            .onEnded { value in
+                let shouldDismiss = value.translation.height > 56 || value.predictedEndTranslation.height > 108
+                if shouldDismiss {
+                    closeSheet()
+                } else {
+                    withAnimation(GoMotion.feedback) {
+                        popupDragOffset = 0
+                    }
+                }
+            }
+    }
+
+    private var popupBackdrop: some View {
+        ZStack {
+            Color.black.opacity(0.14)
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    Color.black.opacity(0.22)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        .ignoresSafeArea()
+        .contentShape(Rectangle())
+        .onTapGesture { closeSheet() }
+    }
 
     private var header: some View {
         HStack(alignment: .center) {
@@ -258,14 +327,7 @@ struct AddExpenseSheet: View {
                 }
             }
             Spacer()
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .black))
-                    .foregroundStyle(primaryText)
-                    .frame(width: 36, height: 36)
-                    .background(primaryText.opacity(0.08), in: Circle())
-            }
-            .buttonStyle(.plain)
+            OhanaPopupCloseButton(tint: primaryText) { closeSheet() }
         }
         .padding(.horizontal, 20)
         .padding(.top, 18)
@@ -280,28 +342,34 @@ struct AddExpenseSheet: View {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(AppCurrency.symbol)
                     .font(OhanaFont.metric(size: 28, .black))
-                    .foregroundStyle(petThemeColor)
-                GoDraftTextField(
-                    "0",
-                    text: $amountInput,
-                    keyboardType: .decimalPad,
-                    capitalization: .never,
-                    autoFocusDelay: 0.25
-                )
-                    .textFieldStyle(.plain)
+                    .foregroundStyle(sheetTint)
+                Text(amountInput.isEmpty ? CountryDecimalInput.placeholder(fractionDigits: 2, countryCode: appCountry) : amountInput)
                     .font(OhanaFont.metric(size: 52, .black))
-                    .foregroundStyle(primaryText)
+                    .foregroundStyle(amountInput.isEmpty ? tertiaryText : primaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .minimumScaleFactor(0.45)
-                    .disabled(hasSavedMedicalExpense)
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 14)
             .background(cardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(panelStroke, lineWidth: 1)
-            }
             .padding(.horizontal, 20)
+
+            if !hasSavedMedicalExpense {
+                EmbeddedDecimalKeypad(
+                    text: $amountInput,
+                    countryCode: appCountry,
+                    maxFractionDigits: 2,
+                    accent: sheetTint,
+                    isEnabled: !isSaving,
+                    isMini: true,
+                    showsSubmitButton: false,
+                    onSubmit: {
+                        if canSave { saveExpense() }
+                    }
+                )
+                .padding(.horizontal, 20)
+                .padding(.top, -2)
+            }
         }
     }
 
@@ -320,14 +388,14 @@ struct AddExpenseSheet: View {
                                 .foregroundStyle(isQuickAmountSelected(amount) ? Color.arkInk : primaryText)
                                 .padding(.horizontal, 15)
                                 .padding(.vertical, 10)
-                                .goSelectableSurface(
+                                .quickExpenseSolidSelectionSurface(
                                     isSelected: isQuickAmountSelected(amount),
-                                    tint: petThemeColor,
+                                    tint: sheetTint,
                                     in: Capsule()
                                 )
                         }
                         .disabled(hasSavedMedicalExpense)
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                     }
                 }
                 .padding(.horizontal, 20)
@@ -358,7 +426,7 @@ struct AddExpenseSheet: View {
                     .padding(.horizontal, 20)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        payerChip(id: nil, name: l.quickExpenseUnspecified, color: petThemeColor) {
+                        payerChip(id: nil, name: l.quickExpenseUnspecified, color: sheetTint) {
                             Image(systemName: "questionmark")
                                 .font(.system(size: 13, weight: .black))
                                 .foregroundStyle(selectedPayerId == nil ? Color.arkInk : secondaryText)
@@ -395,7 +463,7 @@ struct AddExpenseSheet: View {
                 if !receiptAttachments.isEmpty {
                     Text(l.quickExpenseReceiptCount(receiptAttachments.count))
                         .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(petThemeColor)
+                        .foregroundStyle(sheetTint)
                 }
             }
             .padding(.horizontal, 20)
@@ -408,7 +476,7 @@ struct AddExpenseSheet: View {
                 PhotosPicker(selection: $photoPickerItems, maxSelectionCount: 6, matching: .images) {
                     receiptActionContent(icon: "photo.fill", title: l.quickExpensePhotos)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .disabled(hasSavedMedicalExpense)
                 .onChange(of: photoPickerItems) { _, items in
                     Task { await handleReceiptPhotoItems(items) }
@@ -438,9 +506,9 @@ struct AddExpenseSheet: View {
         HStack(spacing: 10) {
             Image(systemName: "shield.checkered")
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(petThemeColor)
+                .foregroundStyle(sheetTint)
                 .frame(width: 30, height: 30)
-                .background(petThemeColor.opacity(0.14), in: Circle())
+                .background(sheetTint.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(l.quickExpenseInsuranceSingleTitle)
                     .font(OhanaFont.callout(.bold))
@@ -486,7 +554,7 @@ struct AddExpenseSheet: View {
                 .background(cardSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .disabled(hasSavedMedicalExpense)
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 20)
 
             if showMore {
@@ -495,7 +563,7 @@ struct AddExpenseSheet: View {
                         DatePicker("", selection: $date, in: ...Date(), displayedComponents: [.date])
                             .datePickerStyle(.compact)
                             .labelsHidden()
-                            .tint(petThemeColor)
+                            .tint(sheetTint)
                             .disabled(hasSavedMedicalExpense)
                     }
 
@@ -534,11 +602,7 @@ struct AddExpenseSheet: View {
             Spacer()
         }
         .padding(14)
-        .background(Color.goTeal.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.goTeal.opacity(0.26), lineWidth: 1)
-        }
+        .background(cardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .padding(.horizontal, 20)
     }
 
@@ -552,7 +616,7 @@ struct AddExpenseSheet: View {
                 } label: {
                     primaryActionContent(icon: "shield.checkered", title: l.quickExpenseApplyClaim)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             } else {
                 Button {
                     GoKeyboard.dismiss()
@@ -564,18 +628,12 @@ struct AddExpenseSheet: View {
                         .opacity(canSave ? 1 : 0.45)
                 }
                 .disabled(!canSave)
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 12)
-        .padding(.bottom, 12)
-        .background(.ultraThinMaterial)
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(panelStroke)
-                .frame(height: 1)
-        }
+        .padding(.top, 10)
+        .padding(.bottom, 14)
     }
 
     // MARK: - Reusable Views
@@ -585,7 +643,7 @@ struct AddExpenseSheet: View {
             receiptActionContent(icon: icon, title: title)
         }
         .disabled(hasSavedMedicalExpense)
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func receiptActionContent(icon: String, title: String) -> some View {
@@ -601,10 +659,6 @@ struct AddExpenseSheet: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
         .background(cardSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(panelStroke, lineWidth: 1)
-        }
     }
 
     private func receiptAttachmentChip(_ receipt: ExpenseReceiptAttachment) -> some View {
@@ -617,13 +671,13 @@ struct AddExpenseSheet: View {
                         .frame(width: 34, height: 34)
                         .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             } else {
                 Image(systemName: "doc.fill")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(petThemeColor)
+                    .foregroundStyle(sheetTint)
                     .frame(width: 34, height: 34)
-                    .background(petThemeColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .background(sheetTint.opacity(0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             }
 
             Text(receiptLabel(receipt))
@@ -642,16 +696,12 @@ struct AddExpenseSheet: View {
                     .foregroundStyle(tertiaryText)
             }
             .accessibilityLabel(l.quickExpenseRemoveReceipt)
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .disabled(hasSavedMedicalExpense)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(cardSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(panelStroke, lineWidth: 1)
-        }
     }
 
     private func primaryActionContent(icon: String, title: String) -> some View {
@@ -664,7 +714,7 @@ struct AddExpenseSheet: View {
         .foregroundStyle(Color.arkInk)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
-        .background(petThemeColor, in: Capsule())
+        .background(sheetTint, in: Capsule())
     }
 
     private func categoryChip(_ category: ExpenseCategory) -> some View {
@@ -683,10 +733,10 @@ struct AddExpenseSheet: View {
             .foregroundStyle(isSelected ? Color.arkInk : primaryText)
             .padding(.horizontal, 13)
             .padding(.vertical, 10)
-            .goSelectableSurface(isSelected: isSelected, tint: petThemeColor, in: Capsule())
+            .quickExpenseSolidSelectionSurface(isSelected: isSelected, tint: sheetTint, in: Capsule())
         }
         .disabled(hasSavedMedicalExpense)
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func payerChip<Avatar: View>(
@@ -704,7 +754,7 @@ struct AddExpenseSheet: View {
             HStack(spacing: 7) {
                 avatar()
                     .frame(width: 24, height: 24)
-                    .background((isSelected ? color : color.opacity(0.16)), in: Circle())
+                    .background(Color.ohanaCardSurface, in: Circle())
                 Text(name)
                     .font(OhanaFont.subheadline(.black))
                     .lineLimit(1)
@@ -713,10 +763,10 @@ struct AddExpenseSheet: View {
             .padding(.leading, 8)
             .padding(.trailing, 13)
             .padding(.vertical, 8)
-            .goSelectableSurface(isSelected: isSelected, tint: color, in: Capsule())
+            .quickExpenseSolidSelectionSurface(isSelected: isSelected, tint: sheetTint, in: Capsule())
         }
         .disabled(hasSavedMedicalExpense)
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func sectionLabel(icon: String, title: String) -> some View {
@@ -852,10 +902,8 @@ struct AddExpenseSheet: View {
 
     private func displayAmount(_ amount: Double) -> String {
         let rounded = roundedCurrency(amount)
-        if abs(rounded - rounded.rounded()) < 0.01 {
-            return "\(Int(rounded.rounded()))"
-        }
-        return String(format: "%.2f", rounded)
+        let fractionDigits = abs(rounded - rounded.rounded()) < 0.01 ? 0 : 2
+        return CountryDecimalInput.format(rounded, countryCode: appCountry, maxFractionDigits: fractionDigits)
     }
 
     private func amountInputString(_ amount: Double) -> String {
@@ -1021,7 +1069,33 @@ struct AddExpenseSheet: View {
             savedExpenseId = log.id.uuidString
             isSaving = false
         } else {
+            closeSheet()
+        }
+    }
+
+    private func closeSheet() {
+        if let onDismiss {
+            guard !isClosing else { return }
+            isClosing = true
+            withAnimation(popupAnimation) {
+                popupVisible = false
+                popupDragOffset = 0
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) {
+                onDismiss()
+            }
+        } else {
             dismiss()
         }
+    }
+}
+
+private extension View {
+    func quickExpenseSolidSelectionSurface<S: InsettableShape>(
+        isSelected: Bool,
+        tint: Color,
+        in shape: S
+    ) -> some View {
+        background(isSelected ? tint : Color.ohanaCardSurfaceElevated, in: shape)
     }
 }

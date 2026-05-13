@@ -72,6 +72,6 @@ struct HomeFirstSuccessCard: View {
             .padding(.vertical, 8)
             .background(Color.goPrimary, in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 }

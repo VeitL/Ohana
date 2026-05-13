@@ -49,7 +49,7 @@ struct IslandDailyReportSheet: View {
         ZStack {
             // 背景
             Color.black.opacity(0.6).ignoresSafeArea()
-                .background(.ultraThinMaterial)
+                .background(Color.ohanaCardSurface)
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -69,11 +69,11 @@ struct IslandDailyReportSheet: View {
 
                         Text("岛屿日报")
                             .font(.system(size: 28, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
 
                         Text("\(dateText) · \(greetingText)")
                             .font(.system(size: 14, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
 
                     // 分隔
@@ -83,7 +83,7 @@ struct IslandDailyReportSheet: View {
                             .frame(height: 1)
                         Text("今天岛上需要你")
                             .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                             .fixedSize()
                         Rectangle()
                             .fill(Color.primary.opacity(0.1))
@@ -95,7 +95,7 @@ struct IslandDailyReportSheet: View {
                     if quests.isEmpty {
                         Text("🌴 今天岛上很平静，好好休息吧")
                             .font(.system(size: 14, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                             .multilineTextAlignment(.center)
                             .padding(.vertical, 8)
                     } else {
@@ -114,7 +114,7 @@ struct IslandDailyReportSheet: View {
                                 .font(.system(size: 14))
                             Text("完成全部可额外获得 +5 🥥")
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                         }
                         .padding(.horizontal, 16).padding(.vertical, 8)
                         .background(Color.goPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
@@ -143,23 +143,23 @@ struct IslandDailyReportSheet: View {
                             .background(Color.goPrimary, in: Capsule())
                             .shadow(color: Color.goPrimary.opacity(0.4), radius: 12, y: 4)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
 
                         Button {
                             isPresented = false
                         } label: {
                             Text("跳过，直接进入")
                                 .font(.system(size: 13, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                     }
                     .padding(.horizontal, 24)
                 }
                 .padding(.vertical, 32)
                 .background(
                     RoundedRectangle(cornerRadius: 32, style: .continuous)
-                        .fill(.regularMaterial)
+                        .fill(Color.ohanaCardSurface)
                         .shadow(color: .black.opacity(0.2), radius: 30, y: -10)
                 )
                 .padding(.horizontal, 16)
@@ -206,7 +206,7 @@ struct IslandDailyReportSheet: View {
                     .strikethrough(quest.isCompleted)
                 Text(quest.subtitle)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary.opacity(0.7))
+                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
             }
 
             Spacer()

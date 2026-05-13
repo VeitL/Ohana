@@ -50,10 +50,10 @@ struct PetPickerSheet: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(actionTitle)
                             .font(.system(size: 22, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text("选择一只宠物继续")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
                 }
@@ -87,10 +87,10 @@ struct PetPickerSheet: View {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(pet.name)
                                         .font(.system(size: 17, weight: .bold, design: .rounded))
-                                        .foregroundStyle(.primary)
+                                        .foregroundStyle(Color.ohanaPrimaryText)
                                     Text("\(pet.species) · \(pet.breed)")
                                         .font(.system(size: 13, weight: .medium))
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(Color.ohanaSecondaryText)
                                         .lineLimit(1)
                                 }
 
@@ -98,13 +98,13 @@ struct PetPickerSheet: View {
 
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
                             .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                     }
                 }
                 .padding(.horizontal, 24)

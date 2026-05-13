@@ -54,7 +54,7 @@ struct HomeBentoBoxes: View {
                     barMax: 7
                 )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
         }
         .onAppear { refreshCheckInStreak() }
         .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in

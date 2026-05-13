@@ -14,6 +14,9 @@ struct HomeFamilyCollaborationCard: View {
     var onOpenActivity: () -> Void
     var onOpenWeeklyReport: () -> Void
 
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    private var l: L10n { L10n(appLanguage) }
+
     private var shouldShowFamilyCollaboration: Bool {
         humans.count > 1
     }
@@ -30,7 +33,7 @@ struct HomeFamilyCollaborationCard: View {
         var entries: [ActivitySnapshot] = []
         entries += pet.careLogs.map {
             ActivitySnapshot(
-                title: $0.careType.label,
+                title: localizedCareTitle($0.careType),
                 executorId: $0.executorId,
                 date: $0.date,
                 iconName: $0.careType.systemIconName,
@@ -39,7 +42,7 @@ struct HomeFamilyCollaborationCard: View {
         }
         entries += pet.pottyLogs.map {
             ActivitySnapshot(
-                title: $0.pottyType.rawValue,
+                title: localizedPottyTitle($0.pottyType),
                 executorId: $0.executorId,
                 date: $0.date,
                 iconName: $0.pottyType.systemIconName,
@@ -48,7 +51,7 @@ struct HomeFamilyCollaborationCard: View {
         }
         entries += pet.walkLogs.map {
             ActivitySnapshot(
-                title: "遛狗",
+                title: l.tr(zh: "遛狗", en: "Walk", de: "Gassi"),
                 executorId: $0.executorId,
                 date: $0.startDate,
                 iconName: "figure.walk",
@@ -60,8 +63,11 @@ struct HomeFamilyCollaborationCard: View {
 
     private var missingTodayText: String {
         let missing = expectedTodayCare.filter { !$0.done }.map { $0.label }
-        guard !missing.isEmpty else { return "今天基础照护已完成" }
-        return "今天还缺：" + missing.prefix(3).joined(separator: "、")
+        guard !missing.isEmpty else {
+            return l.tr(zh: "今天基础照护已完成", en: "Basic care is done today", de: "Grundpflege ist heute erledigt")
+        }
+        let joined = missing.prefix(3).joined(separator: l.tr(zh: "、", en: ", ", de: ", "))
+        return l.tr(zh: "今天还缺：\(joined)", en: "Still missing today: \(joined)", de: "Heute fehlt noch: \(joined)")
     }
 
     private var expectedTodayCare: [(label: String, done: Bool)] {
@@ -83,44 +89,44 @@ struct HomeFamilyCollaborationCard: View {
 
         if isFish {
             return [
-                ("喂食", careDone(.feeding)),
-                ("换水", careDone(.waterChange)),
-                ("过滤", careDone(.filterClean))
+                (localizedCareTitle(.feeding), careDone(.feeding)),
+                (localizedCareTitle(.waterChange), careDone(.waterChange)),
+                (l.tr(zh: "过滤", en: "Filter", de: "Filter"), careDone(.filterClean))
             ]
         }
         if isBird {
             return [
-                ("喂食", careDone(.feeding)),
-                ("饮水", careDone(.watering)),
-                ("清鸟笼", careDone(.cageCleaning)),
-                ("放飞", careDone(.freeFlight))
+                (localizedCareTitle(.feeding), careDone(.feeding)),
+                (localizedCareTitle(.watering), careDone(.watering)),
+                (localizedCareTitle(.cageCleaning), careDone(.cageCleaning)),
+                (localizedCareTitle(.freeFlight), careDone(.freeFlight))
             ]
         }
         if isReptile {
             return [
-                ("喂食", careDone(.feeding)),
-                ("保湿", careDone(.misting)),
-                ("环境", careDone(.substrateChange))
+                (localizedCareTitle(.feeding), careDone(.feeding)),
+                (localizedCareTitle(.misting), careDone(.misting)),
+                (l.tr(zh: "环境", en: "Habitat", de: "Terrarium"), careDone(.substrateChange))
             ]
         }
         if isDog {
             return [
-                ("喂食", careDone(.feeding)),
-                ("饮水", careDone(.watering)),
-                ("遛狗", pet.walkLogs.contains { cal.isDateInToday($0.startDate) })
+                (localizedCareTitle(.feeding), careDone(.feeding)),
+                (localizedCareTitle(.watering), careDone(.watering)),
+                (l.tr(zh: "遛狗", en: "Walk", de: "Gassi"), pet.walkLogs.contains { cal.isDateInToday($0.startDate) })
             ]
         }
         if isCat || isRabbit {
             return [
-                ("喂食", careDone(.feeding)),
-                ("饮水", careDone(.watering)),
-                ("厕所", pottyDone())
+                (localizedCareTitle(.feeding), careDone(.feeding)),
+                (localizedCareTitle(.watering), careDone(.watering)),
+                (l.tr(zh: "厕所", en: "Toilet", de: "Toilette"), pottyDone())
             ]
         }
         return [
-            ("喂食", careDone(.feeding)),
-            ("饮水", careDone(.watering)),
-            ("互动", careDone(.play))
+            (localizedCareTitle(.feeding), careDone(.feeding)),
+            (localizedCareTitle(.watering), careDone(.watering)),
+            (localizedCareTitle(.play), careDone(.play))
         ]
     }
 
@@ -161,21 +167,21 @@ struct HomeFamilyCollaborationCard: View {
                 Text("FAMILY")
                     .font(.system(size: 10, weight: .black, design: .rounded))
                     .tracking(2.2)
-                    .foregroundStyle(.primary.opacity(0.36))
-                Text("家庭协作")
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.36))
+                Text(l.tr(zh: "家庭协作", en: "Family care", de: "Familienpflege"))
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.9))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.9))
             }
             Spacer()
             Button(action: onOpenWeeklyReport) {
-                Label("周报", systemImage: "chart.bar.doc.horizontal")
+                Label(l.tr(zh: "周报", en: "Weekly", de: "Woche"), systemImage: "chart.bar.doc.horizontal")
                     .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.7))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(Color.primary.opacity(0.07), in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
         }
     }
 
@@ -185,15 +191,19 @@ struct HomeFamilyCollaborationCard: View {
 
             Text(missingTodayText)
                 .font(.system(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.82))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.82))
                 .lineLimit(1)
 
             FamilyActivityStripView(pet: pet, style: .compact, onExpand: onOpenActivity)
 
             if assignedReminders.isEmpty {
-                Text("没有指派待办时，任何家人完成打卡都会更新上次照护状态。")
+                Text(l.tr(
+                    zh: "没有指派待办时，任何家人完成打卡都会更新上次照护状态。",
+                    en: "When nothing is assigned, any family check-in updates the latest care status.",
+                    de: "Ohne Zuweisung aktualisiert jeder Check-in den letzten Pflegestatus."
+                ))
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.55))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
@@ -220,16 +230,19 @@ struct HomeFamilyCollaborationCard: View {
             } else {
                 statusPill(
                     iconName: "person.2.fill",
-                    title: "还没有照护记录",
-                    subtitle: "完成一次打卡后同步",
+                    title: l.tr(zh: "还没有照护记录", en: "No care yet", de: "Noch keine Pflege"),
+                    subtitle: l.tr(zh: "完成一次打卡后同步", en: "Syncs after the first check-in", de: "Nach erstem Check-in synchron"),
                     tint: Color.goBlue
                 )
             }
 
             statusPill(
                 iconName: assignedReminders.isEmpty ? "checklist" : "person.crop.circle.badge.clock",
-                title: assignedReminders.isEmpty ? "无人指派" : "已指派 \(assignedReminders.count) 个",
-                subtitle: assignedReminders.first.map { $0.scheduledAt.formatted(.dateTime.hour().minute()) } ?? "家人可直接接手",
+                title: assignedReminders.isEmpty
+                    ? l.tr(zh: "无人指派", en: "Unassigned", de: "Nicht zugewiesen")
+                    : l.tr(zh: "已指派 \(assignedReminders.count) 个", en: "\(assignedReminders.count) assigned", de: "\(assignedReminders.count) zugewiesen"),
+                subtitle: assignedReminders.first.map { $0.scheduledAt.formatted(.dateTime.hour().minute()) }
+                    ?? l.tr(zh: "家人可直接接手", en: "Anyone can take over", de: "Jede Person kann übernehmen"),
                 tint: assignedReminders.isEmpty ? Color.goTeal : Color.goYellow
             )
         }
@@ -245,12 +258,12 @@ struct HomeFamilyCollaborationCard: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
                     .font(.system(size: 10, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.82))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.82))
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                 Text(subtitle)
                     .font(.system(size: 9, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.45))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
@@ -266,9 +279,9 @@ struct HomeFamilyCollaborationCard: View {
 
     private func actorName(for id: String?) -> String {
         guard let id, let human = humans.first(where: { $0.id.uuidString == id }) else {
-            return "家人"
+            return l.tr(zh: "家人", en: "Family", de: "Familie")
         }
-        return human.name.isEmpty ? "家人" : human.name
+        return human.name.isEmpty ? l.tr(zh: "家人", en: "Family", de: "Familie") : human.name
     }
 
     private func relativeTime(from date: Date) -> String {
@@ -276,11 +289,13 @@ struct HomeFamilyCollaborationCard: View {
         let now = Date()
         if cal.isDate(date, inSameDayAs: now) {
             let minutes = max(1, Int(now.timeIntervalSince(date) / 60))
-            if minutes < 60 { return "\(minutes)分钟前" }
-            return "\(minutes / 60)小时前"
+            if minutes < 60 {
+                return l.tr(zh: "\(minutes)分钟前", en: "\(minutes)m ago", de: "vor \(minutes) Min.")
+            }
+            return l.tr(zh: "\(minutes / 60)小时前", en: "\(minutes / 60)h ago", de: "vor \(minutes / 60) Std.")
         }
         let days = max(1, cal.dateComponents([.day], from: cal.startOfDay(for: date), to: cal.startOfDay(for: now)).day ?? 1)
-        return "\(days)天前"
+        return l.tr(zh: "\(days)天前", en: "\(days)d ago", de: "vor \(days) Tg.")
     }
 
     private func assignedReminderRow(_ reminder: Reminder) -> some View {
@@ -291,13 +306,13 @@ struct HomeFamilyCollaborationCard: View {
         }()
         return HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(event?.title ?? "家庭待办")
+                Text(event?.title ?? l.tr(zh: "家庭待办", en: "Family task", de: "Familienaufgabe"))
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 Text(reminder.scheduledAt, format: .dateTime.hour().minute())
                     .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
 
             Spacer(minLength: 8)
@@ -317,9 +332,33 @@ struct HomeFamilyCollaborationCard: View {
     private func cardBackground(_ accent: Color) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(.thinMaterial)
+                .fill(Color.ohanaCardSurface)
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(accent.opacity(0.25), lineWidth: 1)
+        }
+    }
+
+    private func localizedCareTitle(_ type: CareType) -> String {
+        switch type {
+        case .feeding: return l.tr(zh: "喂食", en: "Feed", de: "Füttern")
+        case .watering: return l.tr(zh: "饮水", en: "Water", de: "Wasser")
+        case .litter: return l.tr(zh: "铲屎", en: "Scoop", de: "Klo reinigen")
+        case .waterChange: return l.tr(zh: "换水", en: "Water change", de: "Wasserwechsel")
+        case .filterClean: return l.tr(zh: "清理滤材", en: "Clean filter", de: "Filter reinigen")
+        case .cageCleaning: return l.tr(zh: "清鸟笼", en: "Clean cage", de: "Käfig reinigen")
+        case .freeFlight: return l.tr(zh: "放飞", en: "Free flight", de: "Freiflug")
+        case .misting: return l.tr(zh: "保湿", en: "Mist", de: "Befeuchten")
+        case .substrateChange: return l.tr(zh: "换垫材", en: "Substrate", de: "Substrat")
+        case .play: return l.tr(zh: "互动", en: "Play", de: "Spielen")
+        }
+    }
+
+    private func localizedPottyTitle(_ type: PottyType) -> String {
+        switch type {
+        case .perfectPoop: return l.tr(zh: "完美便便", en: "Good poop", de: "Guter Kot")
+        case .softPoop: return l.tr(zh: "软便", en: "Soft stool", de: "Weicher Kot")
+        case .liquidPoop: return l.tr(zh: "水便", en: "Diarrhea", de: "Durchfall")
+        case .pee: return l.tr(zh: "尿尿", en: "Pee", de: "Urin")
         }
     }
 }

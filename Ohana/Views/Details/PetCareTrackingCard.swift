@@ -43,14 +43,14 @@ struct PetCareTrackingCard: View {
                             .foregroundStyle(Color.goOrange)
                         Text("日常照料")
                             .font(.system(size: 16, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.primary.opacity(0.3))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 12)
 
                 GoDashedDivider().padding(.horizontal, 16)
@@ -83,7 +83,7 @@ struct PetCareTrackingCard: View {
                 HStack(spacing: 8) {
                     Text("🍚 \(undoLabel) 已记录")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Button {
                         if let log = undoLog {
@@ -136,7 +136,7 @@ struct CareTrackingDetailSheet: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            ArkBackgroundView()
+            OhanaAppBackground()
 
             VStack(spacing: 0) {
                 // ── 顶部关闭 + 标题
@@ -144,7 +144,7 @@ struct CareTrackingDetailSheet: View {
                     Button { dismiss() } label: {
                         Image(systemName: "chevron.down")
                             .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(.primary.opacity(0.6))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                             .frame(width: 34, height: 34)
                             .goGlassBackground(Circle())
                     }
@@ -152,10 +152,10 @@ struct CareTrackingDetailSheet: View {
                     VStack(spacing: 2) {
                         Text("日常照料")
                             .font(.system(size: 17, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text(pet.name)
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.primary.opacity(0.4))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     }
                     Spacer()
                     CoconutBalanceCapsule { showingCoconutLog = true }
@@ -176,10 +176,10 @@ struct CareTrackingDetailSheet: View {
                 .foregroundStyle(Color(hex: type.accentColorHex))
                             Text("\(todayCount(type))")
                                 .font(.system(size: 28, weight: .black, design: .rounded))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                             Text(type.rawValue)
                                 .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.45))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
@@ -266,7 +266,7 @@ struct CareTrackingDetailSheet: View {
 
             // 最近记录（最多5条）
             if logs.isEmpty {
-                Text("暂无记录").font(.system(size: 12)).foregroundStyle(.secondary)
+                Text("暂无记录").font(.system(size: 12)).foregroundStyle(Color.ohanaSecondaryText)
                     .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, 4)
             } else {
                 VStack(spacing: 6) {
@@ -290,7 +290,7 @@ struct CareTrackingDetailSheet: View {
                             } label: {
                                 Image(systemName: "trash")
                                     .font(.system(size: 11))
-                                    .foregroundStyle(.secondary.opacity(0.4))
+                                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
                             }
                         }
                         .padding(.horizontal, 10).padding(.vertical, 7)
@@ -354,7 +354,7 @@ private struct CareTypeRow: View {
                 HStack(spacing: 6) {
                     Text(type.rawValue)
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Text("今日 \(todayCount) 次")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(Color(hex: type.accentColorHex).opacity(0.8))
@@ -390,7 +390,7 @@ private struct CareTypeRow: View {
                         .foregroundStyle(isJustChecked ? .black : Color(hex: type.accentColorHex))
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
         }
     }
 

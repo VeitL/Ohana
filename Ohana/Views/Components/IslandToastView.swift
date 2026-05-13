@@ -15,12 +15,12 @@ struct IslandToastView: View {
         HStack(spacing: 8) {
             Text(message)
                 .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .multilineTextAlignment(.center)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
-        .background(.regularMaterial, in: Capsule())
+        .background(Color.ohanaCardSurface, in: Capsule())
         .shadow(color: .black.opacity(0.15), radius: 16, y: 4)
         .opacity(isShowing ? 1 : 0)
         .offset(y: isShowing ? 0 : 24)

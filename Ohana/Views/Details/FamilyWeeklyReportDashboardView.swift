@@ -154,7 +154,7 @@ struct FamilyWeeklyReportDashboardView: View {
 
     var body: some View {
         ZStack {
-            ArkBackgroundView()
+            OhanaAppBackground()
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
                     headerCard
@@ -181,7 +181,7 @@ struct FamilyWeeklyReportDashboardView: View {
                         .font(.system(size: 22, weight: .black, design: .rounded))
                     Text("\(weekInterval.start.formatted(.dateTime.month().day())) - \(weekInterval.end.formatted(.dateTime.month().day()))")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 ShareLink(item: shareText) {
@@ -210,10 +210,10 @@ struct FamilyWeeklyReportDashboardView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(storyHeadline)
                     .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text(storyBody)
                     .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
                     .lineSpacing(3)
             }
 
@@ -258,7 +258,7 @@ struct FamilyWeeklyReportDashboardView: View {
                         Text(stat.emoji)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(stat.name).font(.system(size: 14, weight: .bold, design: .rounded))
-                            Text("\(stat.count) 次照护 · +\(stat.coconuts)🥥").font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                            Text("\(stat.count) 次照护 · +\(stat.coconuts)🥥").font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
                         }
                         Spacer()
                     }
@@ -292,7 +292,7 @@ struct FamilyWeeklyReportDashboardView: View {
                             .font(.system(size: 14, weight: .black, design: .rounded))
                         Text(memory.note.isEmpty ? memory.date.formatted(.dateTime.weekday().hour().minute()) : memory.note)
                             .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                             .lineLimit(2)
                     }
                     Spacer()
@@ -326,7 +326,7 @@ struct FamilyWeeklyReportDashboardView: View {
                     FMPetAvatar(pet: pet, size: 34)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(pet.name).font(.system(size: 14, weight: .bold, design: .rounded))
-                        Text(count > 0 ? "本周 \(count) 次记录" : "本周暂无记录").font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                        Text(count > 0 ? "本周 \(count) 次记录" : "本周暂无记录").font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
                     Text(count > 0 ? "已照顾" : "待关注")
@@ -359,7 +359,7 @@ struct FamilyWeeklyReportDashboardView: View {
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
                             Text("\(entry.petName) · \(entry.date.formatted(.dateTime.weekday().hour().minute()))")
                                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                         }
                         Spacer()
                     }
@@ -381,7 +381,7 @@ struct FamilyWeeklyReportDashboardView: View {
                             .frame(height: CGFloat(max(8, min(90, week.count * 8))))
                         Text(week.label)
                             .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -395,7 +395,7 @@ struct FamilyWeeklyReportDashboardView: View {
     private func metric(_ label: String, _ value: String, _ color: Color) -> some View {
         VStack(spacing: 4) {
             Text(value).font(.system(size: 24, weight: .black, design: .rounded)).foregroundStyle(color)
-            Text(label).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(.secondary)
+            Text(label).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
@@ -417,12 +417,12 @@ struct FamilyWeeklyReportDashboardView: View {
                 .foregroundStyle(color)
             Text(title)
                 .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
             Text(subtitle)
                 .font(.system(size: 10, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
@@ -437,7 +437,7 @@ struct FamilyWeeklyReportDashboardView: View {
                 .frame(width: 20)
             Text(text)
                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(2)
             Spacer()
         }
@@ -449,7 +449,7 @@ struct FamilyWeeklyReportDashboardView: View {
     private func emptyText(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 12, weight: .medium, design: .rounded))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 8)
     }

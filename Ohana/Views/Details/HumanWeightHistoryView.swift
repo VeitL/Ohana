@@ -13,10 +13,14 @@ struct HumanWeightHistoryView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
 
-    @State private var showAddSheet = false
+    @State private var isInlineWeightComposerVisible = false
+    @State private var newWeightText = ""
+    @State private var newWeightDate = Date()
 
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
+    private var isViewingOwnProfile: Bool { activeHumanId == human.id }
     private var isPrivacyLocked: Bool { human.isPrivate(.weight, viewedBy: activeHumanId) }
 
     private var sortedLogs: [HumanWeightLog] {
@@ -26,9 +30,24 @@ struct HumanWeightHistoryView: View {
         Array(human.weightLogs.sorted { $0.date < $1.date }.suffix(20))
     }
 
+    private var parsedInlineWeight: Double? {
+        CountryDecimalInput.parse(newWeightText, countryCode: appCountry)
+    }
+
+    private var canSaveInlineWeight: Bool {
+        (parsedInlineWeight ?? 0) > 0
+    }
+
+    private var inlineQuickWeights: [Double] {
+        let latest = sortedLogs.first?.weight ?? 60
+        return [latest - 1, latest, latest + 1]
+            .filter { $0 > 0 }
+            .map { (($0 * 10).rounded() / 10) }
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
-            ArkBackgroundView()
+            OhanaAppBackground()
 
             if isPrivacyLocked {
                 privacyLockedView
@@ -40,7 +59,11 @@ struct HumanWeightHistoryView: View {
                 .ignoresSafeArea(edges: .bottom)
 
                 // ── 底部 FAB
-                Button { showAddSheet = true } label: {
+                Button {
+                    withAnimation(GoMotion.feedback) {
+                        isInlineWeightComposerVisible.toggle()
+                    }
+                } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "plus")
                             .font(.system(size: 16, weight: .black))
@@ -59,20 +82,25 @@ struct HumanWeightHistoryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                HumanPrivacyToggleButton(human: human, field: .weight)
+                if isViewingOwnProfile {
+                    HumanPrivacyToggleButton(human: human, field: .weight)
+                }
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { dismiss() } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.secondary)
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .black))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .frame(width: 34, height: 34)
                 }
+                .buttonStyle(ScaleButtonStyle())
             }
         }
-        .sheet(isPresented: $showAddSheet) {
-            GenericWeightEntrySheet(target: .human(human))
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
+        .onChange(of: newWeightText) { _, value in
+            let sanitized = CountryDecimalInput.sanitize(value, countryCode: appCountry, maxFractionDigits: 2)
+            if sanitized != value {
+                newWeightText = sanitized
+            }
         }
     }
 
@@ -83,10 +111,10 @@ struct HumanWeightHistoryView: View {
                 .foregroundStyle(Color.goYellow)
             Text("体重记录仅本人可见")
                 .font(OhanaFont.title3(.black))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Text("当前家庭成员无权查看这些数据。")
                 .font(OhanaFont.callout())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .padding(24)
         .ohanaStandardCard(cornerRadius: 24)
@@ -100,12 +128,12 @@ struct HumanWeightHistoryView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("体重趋势")
                         .font(OhanaFont.title2(.black))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     if let latest = sortedLogs.first {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             Text(String(format: "%.1f", latest.weight))
                                 .font(OhanaFont.metric(size: 44))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                             Text("kg")
                                 .font(OhanaFont.title3(.bold))
                                 .foregroundStyle(Color.goTeal)
@@ -154,13 +182,13 @@ struct HumanWeightHistoryView: View {
                         Text(l.date, format: .dateTime.month(.abbreviated).day())
                     }
                     .font(OhanaFont.caption2())
-                    .foregroundStyle(.primary.opacity(0.3))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     .padding(.horizontal, 24)
                 }
             } else {
                 Text("记录 2 条以上体重后可显示趋势图")
                     .font(OhanaFont.subheadline())
-                    .foregroundStyle(.primary.opacity(0.3))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 40)
             }
@@ -172,7 +200,7 @@ struct HumanWeightHistoryView: View {
     private var recordListLayer: some View {
         ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(Color.ohanaCardSurface)
                 .ignoresSafeArea(edges: .bottom)
 
             VStack(spacing: 0) {
@@ -184,23 +212,30 @@ struct HumanWeightHistoryView: View {
                 HStack {
                     Text("历史记录")
                         .font(OhanaFont.title3(.black))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Text("\(sortedLogs.count) 条")
                         .font(OhanaFont.footnote(.bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .padding(.horizontal, 20).padding(.bottom, 12)
 
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(spacing: 8) {
+                        if isInlineWeightComposerVisible {
+                            inlineWeightComposer
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .top).combined(with: .opacity),
+                                    removal: .opacity
+                                ))
+                        }
                         ForEach(sortedLogs) { log in
                             weightRow(log: log)
                         }
                         if sortedLogs.isEmpty {
-                            Text("还没有体重记录\n点击下方按钮开始记录")
+                            Text("还没有体重记录\n点击下方按钮在这里记录")
                                 .font(OhanaFont.callout())
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                                 .multilineTextAlignment(.center)
                                 .padding(.vertical, 40)
                         }
@@ -211,22 +246,130 @@ struct HumanWeightHistoryView: View {
         }
     }
 
+    private var inlineWeightComposer: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                Image(systemName: "scalemass.fill")
+                    .font(.system(size: 17, weight: .black))
+                    .foregroundStyle(Color.arkInk)
+                    .frame(width: 42, height: 42)
+                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("添加体重")
+                        .font(OhanaFont.title3(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text("记录面板已嵌入当前页面")
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
+                Spacer()
+                Button {
+                    withAnimation(GoMotion.feedback) {
+                        isInlineWeightComposerVisible = false
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .black))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .frame(width: 34, height: 34)
+                }
+                .buttonStyle(ScaleButtonStyle())
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(newWeightText.isEmpty ? CountryDecimalInput.placeholder(fractionDigits: 1, countryCode: appCountry) : newWeightText)
+                        .font(OhanaFont.metric(size: 36))
+                        .foregroundStyle(newWeightText.isEmpty ? Color.ohanaSecondaryText.opacity(0.55) : Color.ohanaPrimaryText)
+                        .contentTransition(.numericText())
+                    Spacer()
+                    Text("kg")
+                        .font(OhanaFont.title3(.black))
+                        .foregroundStyle(Color.goPrimary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+                EmbeddedDecimalKeypad(
+                    text: $newWeightText,
+                    countryCode: appCountry,
+                    maxFractionDigits: 2,
+                    accent: .goPrimary,
+                    isMini: true,
+                    showsSubmitButton: false
+                )
+            }
+
+            HStack(spacing: 8) {
+                ForEach(inlineQuickWeights, id: \.self) { weight in
+                    Button {
+                        withAnimation(GoMotion.feedback) {
+                            newWeightText = CountryDecimalInput.format(weight, countryCode: appCountry, maxFractionDigits: 1)
+                        }
+                    } label: {
+                        Text("\(CountryDecimalInput.format(weight, countryCode: appCountry, maxFractionDigits: 1)) kg")
+                            .font(OhanaFont.caption(.black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 9)
+                            .background(Color.ohanaControlFill, in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
+            }
+
+            HStack(spacing: 10) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 13, weight: .black))
+                    .foregroundStyle(Color.goPrimary)
+                    .frame(width: 24)
+                Text("日期")
+                    .font(OhanaFont.subheadline(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Spacer()
+                DatePicker("", selection: $newWeightDate, in: ...Date(), displayedComponents: .date)
+                    .datePickerStyle(.compact)
+                    .tint(Color.goPrimary)
+                    .labelsHidden()
+            }
+            .padding(12)
+            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+            Button(action: saveInlineWeight) {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                    Text("保存体重")
+                }
+                .font(OhanaFont.body(.black))
+                .foregroundStyle(Color.arkInk)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(canSaveInlineWeight ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+            }
+            .disabled(!canSaveInlineWeight)
+            .buttonStyle(ScaleButtonStyle())
+        }
+        .padding(14)
+        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
     private func weightRow(log: HumanWeightLog) -> some View {
         HStack(spacing: 14) {
             Circle().fill(Color.goPrimary).frame(width: 8, height: 8)
             VStack(alignment: .leading, spacing: 2) {
                 Text(log.date, format: .dateTime.year().month().day())
                     .font(OhanaFont.subheadline(.semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text(log.date, format: .dateTime.weekday(.wide))
                     .font(OhanaFont.caption())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(String(format: "%.1f", log.weight))
                     .font(OhanaFont.metric(size: 20))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text("kg")
                     .font(OhanaFont.footnote(.bold))
                     .foregroundStyle(Color.goPrimary.opacity(0.7))
@@ -237,11 +380,26 @@ struct HumanWeightHistoryView: View {
             } label: {
                 Image(systemName: "trash")
                     .font(OhanaFont.subheadline())
-                    .foregroundStyle(.secondary.opacity(0.5))
+                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.5))
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
         .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func saveInlineWeight() {
+        guard let value = parsedInlineWeight, value > 0 else { return }
+        let executorId = activeHumanIdStr.isEmpty ? nil : activeHumanIdStr
+        let log = HumanWeightLog(date: newWeightDate, weight: value, human: human, executorId: executorId)
+        modelContext.insert(log)
+        human.weightLogs.append(log)
+        modelContext.safeSave()
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        withAnimation(GoMotion.feedback) {
+            newWeightText = ""
+            newWeightDate = Date()
+            isInlineWeightComposerVisible = false
+        }
     }
 }
 

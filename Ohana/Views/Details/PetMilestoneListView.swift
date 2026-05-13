@@ -30,7 +30,7 @@ struct PetMilestoneListView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            ArkBackgroundView().ignoresSafeArea()
+            OhanaAppBackground().ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
@@ -118,10 +118,10 @@ struct PetMilestoneListView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(pet.name)
                     .font(.system(size: 20, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text("\(sortedMilestones.count) 个重要时刻")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.5))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             }
             Spacer()
         }
@@ -155,15 +155,15 @@ struct PetMilestoneListView: View {
                             HStack {
                                 Text(milestone.title)
                                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(Color.ohanaPrimaryText)
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(.primary.opacity(0.25))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                             }
                             Text(milestone.date, format: .dateTime.year().month().day())
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(.primary.opacity(0.4))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                             if !milestone.location.isEmpty {
                                 HStack(spacing: 4) {
                                     Image(systemName: "mappin.circle.fill")
@@ -178,7 +178,7 @@ struct PetMilestoneListView: View {
                             if !milestone.notes.isEmpty {
                                 Text(milestone.notes)
                                     .font(.system(size: 12, weight: .regular))
-                                    .foregroundStyle(.primary.opacity(0.4))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                     .lineLimit(1)
                             }
                             if let photoData = milestone.photoData, let img = UIImage(data: photoData) {
@@ -191,7 +191,7 @@ struct PetMilestoneListView: View {
                         .padding(12)
                         .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                     .padding(.bottom, 8)
                 }
             }
@@ -204,10 +204,10 @@ struct PetMilestoneListView: View {
             Text("🌱").font(.system(size: 56))
             Text("还没有里程碑记录")
                 .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Text("记录 \(pet.name) 的每一个重要时刻")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.primary.opacity(0.4))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 .multilineTextAlignment(.center)
         }
     }
@@ -232,10 +232,10 @@ struct PetMilestoneListView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("记录里程碑")
                             .font(.system(size: 20, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text(pet.name)
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.primary.opacity(0.45))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                     }
                     Spacer()
                 }
@@ -247,7 +247,7 @@ struct PetMilestoneListView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("快捷 Emoji")
                                 .font(.system(size: 11, weight: .bold, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.4))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                 .padding(.horizontal, 4)
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 10) {
@@ -256,7 +256,7 @@ struct PetMilestoneListView: View {
                                             Text(e).font(.system(size: 26))
                                                 .frame(width: 46, height: 46)
                                                 .goSelectableSurface(isSelected: newEmoji == e, tint: Color.goPrimary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                        }.buttonStyle(.plain)
+                                        }.buttonStyle(ScaleButtonStyle())
                                     }
                                 }
                             }
@@ -269,14 +269,14 @@ struct PetMilestoneListView: View {
                                 .multilineTextAlignment(.center)
                                 .frame(width: 56, height: 56)
                                 .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                             GoDraftTextField(
                                 "里程碑标题",
                                 text: $newTitle,
                                 capitalization: .sentences
                             )
                                 .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                                 .tint(Color.goPrimary)
                                 .padding(.horizontal, 14).padding(.vertical, 14)
                                 .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -290,7 +290,7 @@ struct PetMilestoneListView: View {
                                 .foregroundStyle(Color.goPrimary)
                             Text("日期")
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                             Spacer()
                             DatePicker("", selection: $newDate, displayedComponents: .date)
                                 .datePickerStyle(.compact).tint(Color.goPrimary).labelsHidden()
@@ -309,22 +309,22 @@ struct PetMilestoneListView: View {
                                 if newLocation.isEmpty {
                                     Text("地点（点此从地图选择）")
                                         .font(.system(size: 14))
-                                        .foregroundStyle(.primary.opacity(0.4))
+                                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                 } else {
                                     Text(newLocation)
                                         .font(.system(size: 14))
-                                        .foregroundStyle(.primary)
+                                        .foregroundStyle(Color.ohanaPrimaryText)
                                         .lineLimit(1)
                                 }
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(.primary.opacity(0.25))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                             }
                             .padding(.horizontal, 14).padding(.vertical, 12)
                             .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
 
                         // 备注
                         GoDraftTextField(
@@ -333,7 +333,7 @@ struct PetMilestoneListView: View {
                             axis: .vertical
                         )
                             .font(.system(size: 14))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                             .tint(Color.goPrimary)
                             .lineLimit(3...5)
                             .padding(14)
@@ -429,7 +429,7 @@ struct PetMilestoneListView: View {
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(.regularMaterial)
+        .presentationBackground(Color.ohanaCardSurface)
         .goKeyboardDoneToolbar()
         .sheet(isPresented: $showingLocationPicker) {
             MapLocationPickerSheet(selectedLocation: $newLocation)
@@ -450,14 +450,14 @@ struct MapLocationPickerSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView().ignoresSafeArea()
+                OhanaAppBackground().ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     // 搜索框
                     HStack(spacing: 10) {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                         GoDraftTextField(
                             "搜索地点、医院、公园…",
                             text: $searchText,
@@ -465,7 +465,7 @@ struct MapLocationPickerSheet: View {
                             submitLabel: .search,
                             capitalization: .never
                         )
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                             .tint(Color.goYellow)
                         if !searchText.isEmpty {
                             Button {
@@ -475,9 +475,9 @@ struct MapLocationPickerSheet: View {
                                 isSearching = false
                             } label: {
                                 Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ScaleButtonStyle())
                         }
                     }
                     .padding(.horizontal, 14).padding(.vertical, 12)
@@ -491,10 +491,10 @@ struct MapLocationPickerSheet: View {
                         Spacer()
                     } else if results.isEmpty && !searchText.isEmpty {
                         VStack(spacing: 10) {
-                            Image(systemName: "mappin.slash").font(.system(size: 36)).foregroundStyle(.primary.opacity(0.3))
+                            Image(systemName: "mappin.slash").font(.system(size: 36)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                             Text("没有找到匹配地点")
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.primary.opacity(0.4))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }.padding(.top, 60)
                         Spacer()
                     } else if results.isEmpty {
@@ -502,7 +502,7 @@ struct MapLocationPickerSheet: View {
                             Image(systemName: "mappin.and.ellipse").font(.system(size: 36)).foregroundStyle(Color.goYellow.opacity(0.4))
                             Text("输入地名开始搜索")
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.primary.opacity(0.4))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }.padding(.top, 60)
                         Spacer()
                     } else {
@@ -514,17 +514,17 @@ struct MapLocationPickerSheet: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(item.name ?? "未知地点")
                                         .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                        .foregroundStyle(.primary)
+                                        .foregroundStyle(Color.ohanaPrimaryText)
                                     if let addr = item.placemark.title, addr != item.name {
                                         Text(addr)
                                             .font(.system(size: 12, weight: .medium))
-                                            .foregroundStyle(.primary.opacity(0.4))
+                                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                             .lineLimit(1)
                                     }
                                 }
                                 .padding(.vertical, 4)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ScaleButtonStyle())
                             .listRowBackground(Color.clear)
                             .listRowSeparatorTint(.primary.opacity(0.1))
                         }
@@ -613,7 +613,7 @@ private struct MilestoneDetailSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView().ignoresSafeArea()
+                OhanaAppBackground().ignoresSafeArea()
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 16) {
                         // 头部 Emoji + 标题 + 日期
@@ -621,11 +621,11 @@ private struct MilestoneDetailSheet: View {
                             Text(milestone.emoji).font(.system(size: 56))
                             Text(milestone.title)
                                 .font(.system(size: 22, weight: .black, design: .rounded))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                                 .multilineTextAlignment(.center)
                             Text(milestone.date, format: .dateTime.year().month().day())
                                 .font(.system(size: 13, weight: .medium, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.45))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                                 .padding(.horizontal, 14).padding(.vertical, 5)
                                 .goGlassBackground(Capsule())
                         }
@@ -647,7 +647,7 @@ private struct MilestoneDetailSheet: View {
                                             .padding(10)
                                     }
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ScaleButtonStyle())
                             .fullScreenCover(isPresented: $showingPhoto) {
                                 ZStack {
                                     Color.black.ignoresSafeArea()
@@ -673,8 +673,8 @@ private struct MilestoneDetailSheet: View {
                                         Image(systemName: "mappin.circle.fill").font(.system(size: 18)).foregroundStyle(Color.goYellow)
                                     }
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text("地址").font(.system(size: 11, weight: .medium)).foregroundStyle(.primary.opacity(0.4))
-                                        Text(milestone.location).font(.system(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(.primary).lineLimit(2)
+                                        Text("地址").font(.system(size: 11, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
+                                        Text(milestone.location).font(.system(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText).lineLimit(2)
                                     }
                                     Spacer()
                                     Image(systemName: "arrow.up.right.square").font(.system(size: 14)).foregroundStyle(Color.goYellow.opacity(0.7))
@@ -682,7 +682,7 @@ private struct MilestoneDetailSheet: View {
                                 .padding(14)
                                 .goTranslucentCard(cornerRadius: 16)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ScaleButtonStyle())
                         }
 
                         // 备注
@@ -690,10 +690,10 @@ private struct MilestoneDetailSheet: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Label("备注", systemImage: "note.text")
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.primary.opacity(0.4))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                 Text(milestone.notes)
                                     .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(.primary.opacity(0.8))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                             .padding(16)
@@ -710,7 +710,7 @@ private struct MilestoneDetailSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill").symbolRenderingMode(.hierarchical).foregroundStyle(.primary.opacity(0.6))
+                        Image(systemName: "xmark.circle.fill").symbolRenderingMode(.hierarchical).foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {

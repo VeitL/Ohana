@@ -12,6 +12,7 @@ struct PetMedicationView: View {
     let pet: Pet
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Query(sort: \Event.startDate) private var allEvents: [Event]
     @State private var showingAddSheet = false
     @State private var selectedMedication: PetMedication?
     @State private var doseRefreshToken = UUID() // 触发今日进度刷新
@@ -26,7 +27,7 @@ struct PetMedicationView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                 ScrollView {
                     VStack(spacing: 16) {
                         if pet.medications.isEmpty {
@@ -85,10 +86,10 @@ struct PetMedicationView: View {
                 .foregroundStyle(Color(hex: "FF5A00").opacity(0.85))
             Text("暂无用药记录")
                 .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Text("记录宠物当前的药物，按时提醒不漏服")
                 .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
                 .multilineTextAlignment(.center)
             Button {
                 showingAddSheet = true
@@ -99,7 +100,7 @@ struct PetMedicationView: View {
                     .padding(.horizontal, 28).padding(.vertical, 12)
                     .background(Color.goPrimary, in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
         }
         .padding(.top, 60)
     }
@@ -109,15 +110,15 @@ struct PetMedicationView: View {
         HStack {
             Text(title)
                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.5))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             Spacer()
         }
     }
 
     // MARK: - Med Card
     private func medCard(_ med: PetMedication) -> some View {
-        let dosesPerDay = med.frequency.dosesPerDay
-        let dosesTaken = MedicationReminderService.dosesTakenToday(for: med.id)
+        let dosesPerDay = PetMedicationDoseLogging.requiredDoses(on: Date(), for: med)
+        let dosesTaken = PetMedicationDoseLogging.todayDoseCount(events: allEvents, medicationId: med.id)
         let _ = doseRefreshToken // observe refresh token
 
         return Button {
@@ -133,7 +134,7 @@ struct PetMedicationView: View {
                         HStack(spacing: 6) {
                             Text(med.name.isEmpty ? "未命名药物" : med.name)
                                 .font(.system(size: 15, weight: .black, design: .rounded))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                             Text(med.frequency.emoji)
                                 .font(.system(size: 13))
                         }
@@ -141,11 +142,11 @@ struct PetMedicationView: View {
                             if !med.dosage.isEmpty {
                                 Text(med.dosage)
                                     .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                             }
                             Text(med.frequency.rawValue)
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                         }
                     }
 
@@ -185,7 +186,8 @@ struct PetMedicationView: View {
                         // 快速记录按钮
                         if dosesTaken < dosesPerDay {
                             Button {
-                                MedicationReminderService.recordDose(for: med.id)
+                                PetMedicationDoseLogging.recordDose(medication: med, pet: pet, modelContext: modelContext)
+                                MedicationReminderService.shared.scheduleMedicationReminders(for: pet, context: modelContext)
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 doseRefreshToken = UUID()
                             } label: {
@@ -193,7 +195,7 @@ struct PetMedicationView: View {
                                     .font(.system(size: 18))
                                     .foregroundStyle(Color(hex: med.colorHex))
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ScaleButtonStyle())
                         }
                     }
                     .padding(.leading, 24)
@@ -202,7 +204,7 @@ struct PetMedicationView: View {
             .padding(14)
             .goTranslucentCard(cornerRadius: 16)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .onAppear {
             // 首次出现时调度通知
             if med.isActiveToday {

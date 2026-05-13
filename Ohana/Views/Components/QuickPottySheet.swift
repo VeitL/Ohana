@@ -18,19 +18,19 @@ struct QuickPottySheet: View {
 
     var body: some View {
         ZStack {
-            ArkBackgroundView()
+            OhanaAppBackground()
             VStack(spacing: 24) {
                 // 标题
                 HStack {
                     Text("噗噗打卡")
                         .font(OhanaFont.title3(.black))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 20))
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
                 .padding(.horizontal, 20).padding(.top, 20)
@@ -58,7 +58,7 @@ struct QuickPottySheet: View {
                             .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 .strokeBorder(selectedType == type ? Color.goYellow.opacity(0.6) : .white.opacity(0.1), lineWidth: 1))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                     }
                 }
                 .padding(.horizontal, 20)
@@ -68,7 +68,7 @@ struct QuickPottySheet: View {
                     HStack {
                         Text("记录时间")
                             .font(OhanaFont.footnote(.bold))
-                            .foregroundStyle(.primary.opacity(0.4))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         Spacer()
                         DatePicker("", selection: $date, displayedComponents: [.hourAndMinute])
                             .labelsHidden()
@@ -89,7 +89,7 @@ struct QuickPottySheet: View {
                     .frame(maxWidth: .infinity).padding(.vertical, 14)
                     .background(Color.goYellow, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .padding(.horizontal, 20)
 
                 Spacer()

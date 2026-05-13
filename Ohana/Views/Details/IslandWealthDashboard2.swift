@@ -17,23 +17,42 @@ struct IslandWealthDashboardView: View {
     @State private var selectedCoconutActorId: String? = nil
     @Query(sort: \Pet.name) private var pets: [Pet]
     @Query(sort: \Human.name) private var humans: [Human]
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+
+    private var activeHumanId: UUID? {
+        UUID(uuidString: activeHumanIdStr)
+    }
+
+    private var visibleWealthHumans: [Human] {
+        PrivacyService.unlockedHumans(for: .wishlist, from: humans, viewedBy: activeHumanId)
+    }
+
+    private var hiddenWealthHumanIds: Set<String> {
+        Set(humans.compactMap {
+            PrivacyService.isLocked(.wishlist, for: $0, viewedBy: activeHumanId) ? $0.id.uuidString : nil
+        })
+    }
 
     private var petColorMap: [String: Color] {
         Dictionary(uniqueKeysWithValues: pets.map { ($0.id.uuidString, Color(hex: $0.themeColorHex)) })
     }
 
     private var filteredCoconutLogs: [CoconutLogEntry] {
-        guard let id = selectedCoconutActorId else { return questManager.coconutLogs }
-        return questManager.coconutLogs.filter { $0.actorId == id }
+        guard let id = selectedCoconutActorId else { return visibleCoconutLogs }
+        return visibleCoconutLogs.filter { $0.actorId == id }
+    }
+
+    private var visibleCoconutLogs: [CoconutLogEntry] {
+        questManager.coconutLogs.filter { !hiddenWealthHumanIds.contains($0.actorId ?? "") }
     }
 
     private var coconutActors: [(id: String, name: String, emoji: String)] {
         var seen = Set<String>()
         var result: [(String, String, String)] = []
-        for log in questManager.coconutLogs {
+        for log in visibleCoconutLogs {
             guard let id = log.actorId, let name = log.actorName, !seen.contains(id) else { continue }
             seen.insert(id)
-            if let human = humans.first(where: { $0.id.uuidString == id }) {
+            if let human = visibleWealthHumans.first(where: { $0.id.uuidString == id }) {
                 result.append((id, name, human.avatarEmoji))
             } else if let pet = pets.first(where: { $0.id.uuidString == id }) {
                 result.append((id, name, pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji))
@@ -52,7 +71,7 @@ struct IslandWealthDashboardView: View {
 
     var body: some View {
         ZStack {
-            ArkBackgroundView().ignoresSafeArea()
+            OhanaAppBackground().ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
@@ -91,10 +110,17 @@ struct IslandWealthDashboardView: View {
         .onAppear   { syncVM() }
         .onChange(of: pets.count)   { syncVM() }
         .onChange(of: humans.count) { syncVM() }
+        .onChange(of: activeHumanIdStr) { syncVM() }
     }
 
     private func syncVM() {
-        vm.pets = pets; vm.humans = humans; vm.petColorMap = petColorMap
+        if let selectedCoconutActorId, hiddenWealthHumanIds.contains(selectedCoconutActorId) {
+            self.selectedCoconutActorId = nil
+        }
+        vm.pets = pets
+        vm.humans = visibleWealthHumans
+        vm.hiddenHumanIds = hiddenWealthHumanIds
+        vm.petColorMap = petColorMap
     }
 
     // MARK: - Nav Bar
@@ -104,14 +130,14 @@ struct IslandWealthDashboardView: View {
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 36, height: 36)
                     .background(.white.opacity(0.12), in: Circle())
             }
             Spacer()
             Text("Ohana财富")
                 .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Button {
                 withAnimation(.spring(response: 0.3)) { vm.showSystemCoconuts.toggle() }
@@ -122,13 +148,13 @@ struct IslandWealthDashboardView: View {
                     .frame(width: 36, height: 36)
                     .background(.white.opacity(0.12), in: Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             CoconutBalanceCapsule {}
         }
         .padding(.horizontal, 20)
         .padding(.top, safeTop + 8)
         .padding(.bottom, 12)
-        .background(.ultraThinMaterial.opacity(0.01))
+        .background(Color.ohanaCardSurface.opacity(0.01))
     }
 
     // MARK: - Total Assets
@@ -140,7 +166,7 @@ struct IslandWealthDashboardView: View {
                 .foregroundStyle(Color.goPrimary.opacity(0.7))
             Text("\(vm.totalAssets)")
                 .font(.system(size: 52, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .contentTransition(.numericText())
                 .animation(.spring(response: 0.4), value: vm.totalAssets)
             Text("🥥")
@@ -188,7 +214,7 @@ struct IslandWealthDashboardView: View {
                     .foregroundStyle(valueColor.opacity(0.7))
                 Text(label)
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.5))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             }
             Text(value)
                 .font(.system(size: 22, weight: .black, design: .rounded))
@@ -248,16 +274,16 @@ struct IslandWealthDashboardView: View {
             .chartXAxis {
                 AxisMarks(preset: .aligned, values: .stride(by: unit)) { _ in
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
-                        .foregroundStyle(.primary.opacity(0.1))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.1))
                     AxisValueLabel(format: format)
-                        .foregroundStyle(.primary.opacity(0.55))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                         .font(.system(size: 10))
                 }
             }
             .chartYAxis {
                 AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { _ in
-                    AxisGridLine().foregroundStyle(.primary.opacity(0.07))
-                    AxisValueLabel().foregroundStyle(.primary.opacity(0.5))
+                    AxisGridLine().foregroundStyle(Color.ohanaPrimaryText.opacity(0.07))
+                    AxisValueLabel().foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                         .font(.system(size: 10))
                 }
             }
@@ -276,7 +302,7 @@ struct IslandWealthDashboardView: View {
                     Circle().fill(vm.color(for: row.entityId)).frame(width: 7, height: 7)
                     Text(row.name)
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.primary.opacity(0.6))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                         .lineLimit(1)
                 }
             }
@@ -285,7 +311,7 @@ struct IslandWealthDashboardView: View {
                     Circle().fill(Color.goRed.opacity(0.75)).frame(width: 7, height: 7)
                     Text("花费")
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.primary.opacity(0.6))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                 }
             }
             Spacer()
@@ -299,7 +325,7 @@ struct IslandWealthDashboardView: View {
                 .font(.system(size: 52))
             Text("立刻去打卡赚取第一桶金吧！")
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.5))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 32)
@@ -314,10 +340,10 @@ struct IslandWealthDashboardView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "trophy")
                         .font(.system(size: 36))
-                        .foregroundStyle(.primary.opacity(0.25))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                     Text("完成打卡即可解锁财富榜 ✨")
                         .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.5))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 32)
@@ -327,7 +353,7 @@ struct IslandWealthDashboardView: View {
                     HStack {
                         Text("财富榜")
                             .font(.system(size: 13, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.5))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                         Spacer()
                     }
                     .padding(.horizontal, 4)
@@ -380,7 +406,7 @@ struct IslandWealthDashboardView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(row.name)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
@@ -397,7 +423,7 @@ struct IslandWealthDashboardView: View {
 
             Text("\(row.amount)🥥")
                 .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .padding(.horizontal, 9).padding(.vertical, 4)
                 .background(accent.opacity(0.14), in: Capsule())
         }
@@ -414,13 +440,13 @@ struct IslandWealthDashboardView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("椰子记录")
                         .font(.system(size: 13, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.5))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                     Text("最近收支都在这里")
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.32))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.32))
                 }
                 Spacer()
-                Text("\(questManager.coconutLogs.count) 条")
+                Text("\(visibleCoconutLogs.count) 条")
                     .font(.system(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goPrimary)
                     .padding(.horizontal, 9)
@@ -446,10 +472,10 @@ struct IslandWealthDashboardView: View {
                     Text("🥥").font(.system(size: 42))
                     Text(selectedCoconutActorId == nil ? "还没有椰子记录" : "该成员暂无椰子记录")
                         .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.45))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                     Text("完成打卡、照顾家人后椰子会出现在这里")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.28))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.28))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 28)
@@ -482,7 +508,7 @@ struct IslandWealthDashboardView: View {
             .padding(.vertical, 7)
             .background(isSelected ? Color.goPrimary : Color.white.opacity(0.07), in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func coconutLogRow(_ log: CoconutLogEntry) -> some View {
@@ -500,13 +526,13 @@ struct IslandWealthDashboardView: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text(log.title)
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 HStack(spacing: 6) {
                     coconutActorBadge(log: log, isPet: isPet, isHuman: isHuman, isSystem: isSystem)
                     Text(log.timeAgoString)
                         .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.35))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                 }
             }
 
@@ -531,7 +557,7 @@ struct IslandWealthDashboardView: View {
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .foregroundStyle(.primary.opacity(0.48))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.48))
                 .background(.white.opacity(0.07), in: Capsule())
         } else if isPet {
             Text("🐾 \(log.actorName ?? "")")

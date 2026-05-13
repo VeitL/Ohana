@@ -70,7 +70,7 @@ struct AchievementWallView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                     .ignoresSafeArea()
 
                 ScrollView(showsIndicators: false) {
@@ -131,7 +131,7 @@ struct AchievementWallView: View {
                         .background(selectedPetId == item.id ? Color.goPrimary : .white.opacity(0.08), in: Capsule())
                         .overlay(Capsule().strokeBorder(.white.opacity(0.12), lineWidth: 1))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
         }
@@ -232,7 +232,7 @@ struct AchievementWallView: View {
                             .strokeBorder(.white.opacity(0.10), lineWidth: 1)
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             } else {
                 HStack(spacing: 12) {
                     Text("🏆").font(.system(size: 28))
@@ -267,7 +267,7 @@ struct AchievementWallView: View {
                         .padding(.vertical, 7)
                         .background(selectedFilter == filter ? Color.goPrimary : .white.opacity(0.08), in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
             Spacer()
         }
@@ -332,7 +332,7 @@ struct AchievementWallView: View {
                     .strokeBorder(badge.isUnlocked ? badge.color.opacity(0.35) : .white.opacity(0.09), lineWidth: 1)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func achievementDetailSheet(_ badge: Achievement) -> some View {
@@ -340,7 +340,7 @@ struct AchievementWallView: View {
         let claimed = isRewardClaimed(badge)
 
         return ZStack {
-            ArkBackgroundView().ignoresSafeArea()
+            OhanaAppBackground().ignoresSafeArea()
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 14) {
                     Text(badge.emoji)

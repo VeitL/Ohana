@@ -60,13 +60,17 @@ struct PlantDashboardView: View {
             Text("🌱")
                 .font(.system(size: 72))
 
-            Text(appLanguage == "zh" ? "还没有植物" : "No Plants Yet")
+            Text(l.tr(zh: "还没有植物", en: "No plants yet", de: "Noch keine Pflanzen"))
                 .font(.system(size: 24, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
 
-            Text(appLanguage == "zh" ? "添加你的第一棵植物，开始记录浇水和施肥" : "Add your first plant and start tracking watering & fertilizing")
+            Text(l.tr(
+                zh: "添加你的第一棵植物，开始记录浇水和施肥",
+                en: "Add your first plant and start tracking watering and fertilizing",
+                de: "Füge deine erste Pflanze hinzu und tracke Gießen und Düngen"
+            ))
                 .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
 
@@ -76,7 +80,7 @@ struct PlantDashboardView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 16, weight: .bold))
-                    Text(appLanguage == "zh" ? "添加植物" : "Add Plant")
+                    Text(l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen"))
                         .font(.system(size: 16, weight: .bold, design: .rounded))
                 }
                 .foregroundStyle(Color.arkInk)
@@ -84,7 +88,7 @@ struct PlantDashboardView: View {
                 .padding(.vertical, 14)
                 .background(Color.goPrimary, in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
 
             Spacer()
         }
@@ -98,21 +102,21 @@ struct PlantDashboardView: View {
                 Image(systemName: "drop.fill")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.cyan)
-                Text(appLanguage == "zh" ? "需要浇水" : "Needs Watering")
+                Text(l.tr(zh: "需要浇水", en: "Needs watering", de: "Braucht Wasser"))
                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Button {
                     waterAll()
                 } label: {
-                    Text(appLanguage == "zh" ? "全部浇水" : "Water All")
+                    Text(l.tr(zh: "全部浇水", en: "Water all", de: "Alle gießen"))
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 6)
                         .background(Color.goPrimary, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -124,7 +128,7 @@ struct PlantDashboardView: View {
             }
         }
         .padding(16)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private func urgentPlantChip(_ plant: Plant) -> some View {
@@ -134,10 +138,14 @@ struct PlantDashboardView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(plant.name)
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 if let days = plant.daysSinceWatered {
-                    Text(appLanguage == "zh" ? "\(days)天未浇水" : "\(days)d overdue")
+                    Text(l.tr(
+                        zh: "\(days)天未浇水",
+                        en: "\(days)d overdue",
+                        de: "\(days) T. überfällig"
+                    ))
                         .font(.system(size: 10, weight: .medium, design: .rounded))
                         .foregroundStyle(.red.opacity(0.8))
                 }
@@ -151,11 +159,11 @@ struct PlantDashboardView: View {
                     .frame(width: 28, height: 28)
                     .background(.cyan, in: Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: Capsule())
+        .background(Color.ohanaCardSurface, in: Capsule())
     }
 
     // MARK: - Plant Grid
@@ -163,13 +171,13 @@ struct PlantDashboardView: View {
     private var plantGrid: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(appLanguage == "zh" ? "我的植物" : "My Plants")
+                Text(l.tr(zh: "我的植物", en: "My plants", de: "Meine Pflanzen"))
                     .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text("\(plants.count)")
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
 
             LazyVGrid(columns: [
@@ -201,21 +209,21 @@ struct PlantDashboardView: View {
 
                 Text(plant.name)
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
 
                 Text(plant.species)
                     .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
 
                 statusBadge(for: plant)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     @ViewBuilder
@@ -224,7 +232,7 @@ struct PlantDashboardView: View {
             HStack(spacing: 3) {
                 Image(systemName: "drop.fill")
                     .font(.system(size: 8, weight: .bold))
-                Text(appLanguage == "zh" ? "需浇水" : "Water")
+                Text(l.tr(zh: "需浇水", en: "Water", de: "Gießen"))
                     .font(.system(size: 9, weight: .bold, design: .rounded))
             }
             .foregroundStyle(.white)
@@ -235,7 +243,7 @@ struct PlantDashboardView: View {
             HStack(spacing: 3) {
                 Image(systemName: "leaf.fill")
                     .font(.system(size: 8, weight: .bold))
-                Text(appLanguage == "zh" ? "需施肥" : "Fertilize")
+                Text(l.tr(zh: "需施肥", en: "Fertilize", de: "Düngen"))
                     .font(.system(size: 9, weight: .bold, design: .rounded))
             }
             .foregroundStyle(.white)
@@ -243,13 +251,13 @@ struct PlantDashboardView: View {
             .padding(.vertical, 3)
             .background(.orange, in: Capsule())
         } else if let days = plant.daysSinceWatered {
-            Text(appLanguage == "zh" ? "\(days)天前浇水" : "\(days)d ago")
+            Text(l.tr(zh: "\(days)天前浇水", en: "\(days)d ago", de: "vor \(days) T."))
                 .font(.system(size: 10, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
         } else {
-            Text(appLanguage == "zh" ? "新植物" : "New")
+            Text(l.tr(zh: "新植物", en: "New", de: "Neu"))
                 .font(.system(size: 10, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
     }
 
@@ -264,12 +272,12 @@ struct PlantDashboardView: View {
                         .frame(width: 56, height: 56)
                     Image(systemName: "plus")
                         .font(.system(size: 22, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
 
-                Text(appLanguage == "zh" ? "添加" : "Add")
+                Text(l.tr(zh: "添加", en: "Add", de: "Hinzufügen"))
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
 
                 Text(" ")
                     .font(.system(size: 10))
@@ -280,9 +288,9 @@ struct PlantDashboardView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(.ultraThinMaterial.opacity(0.5), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.ohanaCardSurface.opacity(0.5), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     // MARK: - Actions
@@ -294,7 +302,7 @@ struct PlantDashboardView: View {
         log.plant = plant
         modelContext.insert(log)
         let event = Event(
-            title: "💧 给 \(plant.name) 浇水",
+            title: l.tr(zh: "💧 给 \(plant.name) 浇水", en: "💧 Water \(plant.name)", de: "💧 \(plant.name) gießen"),
             startDate: Date(),
             isAllDay: false,
             eventType: EventType.watering.rawValue,
@@ -313,7 +321,7 @@ struct PlantDashboardView: View {
             log.plant = plant
             modelContext.insert(log)
             let event = Event(
-                title: "💧 给 \(plant.name) 浇水",
+                title: l.tr(zh: "💧 给 \(plant.name) 浇水", en: "💧 Water \(plant.name)", de: "💧 \(plant.name) gießen"),
                 startDate: Date(),
                 isAllDay: false,
                 eventType: EventType.watering.rawValue,

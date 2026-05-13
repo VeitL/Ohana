@@ -39,7 +39,7 @@ struct HumanNoteHistorySheet: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
-                ArkBackgroundView().ignoresSafeArea()
+                OhanaAppBackground().ignoresSafeArea()
 
                 if isPrivacyLocked {
                     privacyLockedView
@@ -87,7 +87,7 @@ struct HumanNoteHistorySheet: View {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
             }
@@ -117,7 +117,7 @@ struct HumanNoteHistorySheet: View {
                     .foregroundStyle(Color.goPrimary)
                 Text(entry.text)
                     .font(OhanaFont.body())
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -130,9 +130,9 @@ struct HumanNoteHistorySheet: View {
             } label: {
                 Image(systemName: "trash")
                     .font(OhanaFont.subheadline())
-                    .foregroundStyle(.secondary.opacity(0.45))
+                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.45))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
         }
         .padding(14)
         .background(
@@ -159,10 +159,10 @@ struct HumanNoteHistorySheet: View {
             }
             Text("还没有备注")
                 .font(OhanaFont.title3(.bold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Text("点击下方按钮为 \(human.name) 添加第一条备注")
                 .font(OhanaFont.callout())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
                 .multilineTextAlignment(.center)
         }
         .padding(.top, 80)
@@ -178,10 +178,10 @@ struct HumanNoteHistorySheet: View {
                 .foregroundStyle(Color.goYellow)
             Text("备注仅本人可见")
                 .font(OhanaFont.title3(.black))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Text("当前家庭成员无权查看这些备注。")
                 .font(OhanaFont.callout())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
                 .multilineTextAlignment(.center)
         }
         .padding(24)

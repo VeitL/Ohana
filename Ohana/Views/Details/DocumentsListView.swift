@@ -76,7 +76,7 @@ struct DocumentsListView: View {
         HStack {
             Text(title)
                 .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.45))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
             Spacer()
         }
     }
@@ -95,21 +95,21 @@ struct DocumentsListView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("保险保单")
                         .font(.system(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Text(insuranceSummary)
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .black))
-                    .foregroundStyle(.secondary.opacity(0.7))
+                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
             }
             .padding(14)
             .goGlassBackground(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private var insuranceSummary: String {
@@ -125,10 +125,10 @@ struct DocumentsListView: View {
             Text("📄").font(.system(size: 48))
             Text("还没有证件记录")
                 .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.6))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
             Text("点击右上角 + 添加第一份证件")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.primary.opacity(0.3))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
         }
         .frame(maxWidth: .infinity)
         .padding(40)
@@ -163,10 +163,10 @@ private struct DocumentDetailRow: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(doc.title.isEmpty ? doc.category : doc.title)
                         .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Text(doc.category)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.primary.opacity(0.4))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
 
                 Spacer()
@@ -204,7 +204,7 @@ private struct DocumentDetailRow: View {
             if !doc.notes.isEmpty {
                 Text(doc.notes)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.primary.opacity(0.35))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                     .lineLimit(2)
             }
 
@@ -216,13 +216,13 @@ private struct DocumentDetailRow: View {
                         .frame(maxWidth: .infinity).frame(height: 100)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             } else if !doc.attachmentFilename.isEmpty {
                 HStack(spacing: 8) {
                     Image(systemName: "doc.fill").foregroundStyle(Color.goPrimary)
                     Text(doc.attachmentFilename)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.primary.opacity(0.5))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                         .lineLimit(1)
                 }
                 .padding(10)
@@ -253,7 +253,7 @@ private struct DocumentDetailRow: View {
                             Spacer()
                             Button { showingPreview = false } label: {
                                 Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 28)).foregroundStyle(.primary).shadow(radius: 4)
+                                    .font(.system(size: 28)).foregroundStyle(Color.ohanaPrimaryText).shadow(radius: 4)
                             }.padding(16)
                         }
                         Spacer()

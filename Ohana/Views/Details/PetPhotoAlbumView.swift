@@ -53,7 +53,11 @@ struct PetPhotoAlbumView: View {
     }
 
     private var albumNavigationTitle: String {
-        AppLanguage.isEnglish ? "\(pet.name)'s Album" : "\(pet.name)的相册"
+        L10n(AppLanguage.code).tr(
+            zh: "\(pet.name)的相册",
+            en: "\(pet.name)'s Album",
+            de: "\(pet.name)s Album"
+        )
     }
 
     var body: some View {
@@ -69,7 +73,7 @@ struct PetPhotoAlbumView: View {
                             ToolbarItem(placement: .topBarLeading) {
                                 Button { dismiss() } label: {
                                     Image(systemName: "xmark.circle.fill")
-                                        .symbolRenderingMode(.hierarchical).foregroundStyle(.secondary)
+                                        .symbolRenderingMode(.hierarchical).foregroundStyle(Color.ohanaSecondaryText)
                                 }
                             }
                             ToolbarItem(placement: .topBarTrailing) {
@@ -120,7 +124,7 @@ struct PetPhotoAlbumView: View {
     private var albumCore: some View {
         ZStack {
             if !isHubEmbedded {
-                ArkBackgroundView()
+                OhanaAppBackground()
             }
 
             if sortedPhotos.isEmpty {
@@ -132,7 +136,7 @@ struct PetPhotoAlbumView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(month)
                                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.primary.opacity(0.5))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                                     .padding(.horizontal, 16)
 
                                 LazyVGrid(columns: columns, spacing: 3) {
@@ -143,7 +147,7 @@ struct PetPhotoAlbumView: View {
                                         } label: {
                                             photoThumbnail(photo)
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(ScaleButtonStyle())
                                         .contextMenu {
                                             Button {
                                                 if let img = UIImage(data: photo.imageData) {
@@ -176,9 +180,9 @@ struct PetPhotoAlbumView: View {
         VStack(spacing: 16) {
             Image(systemName: "photo.on.rectangle.angled")
                 .font(OhanaFont.metric(size: 56, .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
             Text("暂无照片").font(OhanaFont.title3(.black))
-            Text("记录\(pet.name)的每一个精彩瞬间").font(OhanaFont.subheadline(.medium)).foregroundStyle(.secondary)
+            Text("记录\(pet.name)的每一个精彩瞬间").font(OhanaFont.subheadline(.medium)).foregroundStyle(Color.ohanaSecondaryText)
             PhotosPicker(selection: pickerBinding, maxSelectionCount: 12, matching: .images) {
                 Text("添加第一张照片")
                     .font(OhanaFont.body(.black)).foregroundStyle(Color.arkInk)
@@ -213,7 +217,7 @@ struct PetPhotoAlbumView: View {
             Rectangle()
                 .fill(Color.primary.opacity(0.1))
                 .frame(width: side, height: side)
-                .overlay(Image(systemName: "photo").foregroundStyle(.secondary))
+                .overlay(Image(systemName: "photo").foregroundStyle(Color.ohanaSecondaryText))
         }
     }
 }

@@ -55,7 +55,7 @@ struct PetWellnessCard: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(Color.ohanaCardSurface)
                 .overlay(
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
                         .stroke(themeColor.opacity(0.2), lineWidth: 1)
@@ -73,10 +73,10 @@ struct PetWellnessCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(pet.name)
                     .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text(todaySummaryText)
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
             if pet.currentStreak > 0 {
@@ -236,7 +236,7 @@ struct FamilyWellnessCard: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(Color.ohanaCardSurface)
         )
         .padding(.horizontal, 16)
     }
@@ -248,10 +248,10 @@ struct FamilyWellnessCard: View {
                 .foregroundStyle(color)
             Text(value)
                 .font(.system(size: 18, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Text(label)
                 .font(.system(size: 9, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(minWidth: 54)
     }

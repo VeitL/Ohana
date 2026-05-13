@@ -14,6 +14,7 @@ struct ExpenseHistoryView: View {
     var onRemove: (() -> Void)? = nil
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
 
     enum TimeRange: String, CaseIterable {
         case week = "本周"
@@ -23,7 +24,7 @@ struct ExpenseHistoryView: View {
     }
 
     @State private var selectedRange: TimeRange = .month
-    @State private var showAddSheet = false
+    @State private var isInlineExpenseComposerVisible = false
     @State private var newAmount = ""
     @State private var newCategory: ExpenseCategory = .food
     @State private var newNote = ""
@@ -49,6 +50,26 @@ struct ExpenseHistoryView: View {
     }
 
     private var sortedLogs: [PetExpenseLog] { filteredLogs }
+
+    private var currentActiveHumanId: String? {
+        let raw = UserDefaults.standard.string(forKey: "currentActiveHumanId") ?? ""
+        return raw.isEmpty ? nil : raw
+    }
+
+    private var parsedNewAmount: Double? {
+        CountryDecimalInput.parse(newAmount, countryCode: appCountry)
+    }
+
+    private var canSaveInlineExpense: Bool {
+        (parsedNewAmount ?? 0) > 0
+    }
+
+    private var selectedPayerName: String {
+        guard let selectedPayerId,
+              let human = allHumans.first(where: { $0.id.uuidString == selectedPayerId })
+        else { return "未指定" }
+        return human.name
+    }
 
     /// 实际总支出（不含报销负值，避免汇总变负数产生误导）
     private var rangeTotal: Double {
@@ -88,7 +109,7 @@ struct ExpenseHistoryView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            ArkBackgroundView()
+            OhanaAppBackground()
 
             VStack(spacing: 0) {
                 chartSection.frame(maxHeight: .infinity)
@@ -100,15 +121,30 @@ struct ExpenseHistoryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button { showAddSheet = true } label: {
+                Button {
+                    withAnimation(GoMotion.feedback) {
+                        isInlineExpenseComposerVisible.toggle()
+                    }
+                    if isInlineExpenseComposerVisible, selectedPayerId == nil {
+                        selectedPayerId = currentActiveHumanId
+                    }
+                } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(Color.goPrimary)
                 }
             }
         }
-        .sheet(isPresented: $showAddSheet) {
-            AddExpenseSheet(pet: pet, preselectedPayerId: UserDefaults.standard.string(forKey: "currentActiveHumanId"))
+        .onAppear {
+            if selectedPayerId == nil {
+                selectedPayerId = currentActiveHumanId
+            }
+        }
+        .onChange(of: newAmount) { _, value in
+            let sanitized = CountryDecimalInput.sanitize(value, countryCode: appCountry, maxFractionDigits: 2)
+            if sanitized != value {
+                newAmount = sanitized
+            }
         }
     }
 
@@ -120,11 +156,11 @@ struct ExpenseHistoryView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(selectedRange.rawValue + "花费")
                         .font(.system(size: 16, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.6))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text(AppCurrency.format(rangeTotal, fractionDigits: 0))
                             .font(.system(size: 44, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                             .contentTransition(.numericText())
                             .animation(.spring(response: 0.4), value: rangeTotal)
                     }
@@ -152,7 +188,7 @@ struct ExpenseHistoryView: View {
                             .background(selectedRange == range ? Color.goYellow : .clear, in: Capsule())
                             .goSelectableSurface(isSelected: selectedRange == range, tint: Color.goYellow, in: Capsule())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
             .padding(.horizontal, 24)
@@ -162,7 +198,7 @@ struct ExpenseHistoryView: View {
             if categoryBreakdown.isEmpty {
                 Text("暂无花费记录")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.primary.opacity(0.3))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 30)
             } else {
@@ -193,11 +229,11 @@ struct ExpenseHistoryView: View {
                                 Text(cat.emoji).font(.system(size: 13))
                                 Text(cat.rawValue)
                                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(.primary.opacity(0.8))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                                 Spacer()
                                 Text("\(pct)%")
                                     .font(.system(size: 10, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.primary.opacity(0.4))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                 Text(AppCurrency.format(amount, fractionDigits: 0))
                                     .font(.system(size: 11, weight: .black, design: .rounded))
                                     .foregroundStyle(Color.goYellow)
@@ -231,7 +267,7 @@ struct ExpenseHistoryView: View {
     private var recordListLayer: some View {
         ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(.regularMaterial)
+                .fill(Color.ohanaCardSurface)
                 .ignoresSafeArea(edges: .bottom)
 
             VStack(spacing: 0) {
@@ -243,24 +279,31 @@ struct ExpenseHistoryView: View {
                 HStack {
                     Text("花费记录")
                         .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Text("\(sortedLogs.count) 条")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 12)
 
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(spacing: 8) {
+                        if isInlineExpenseComposerVisible {
+                            inlineExpenseComposer
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .top).combined(with: .opacity),
+                                    removal: .opacity
+                                ))
+                        }
                         ForEach(sortedLogs) { log in
                             expenseRow(log: log)
                         }
                         if sortedLogs.isEmpty {
-                            Text("还没有花费记录\n点击右上角 + 开始记录")
+                            Text("还没有花费记录\n点击右上角 + 在这里记录")
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.primary.opacity(0.35))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                                 .multilineTextAlignment(.center)
                                 .padding(.vertical, 40)
                         }
@@ -274,7 +317,7 @@ struct ExpenseHistoryView: View {
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 12)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(ScaleButtonStyle())
                             }
                             .padding(.top, 4)
                         }
@@ -284,6 +327,172 @@ struct ExpenseHistoryView: View {
                 }
             }
         }
+    }
+
+    private var inlineExpenseComposer: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                Image(systemName: "creditcard.fill")
+                    .font(.system(size: 17, weight: .black))
+                    .foregroundStyle(Color.arkInk)
+                    .frame(width: 42, height: 42)
+                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("快速记账")
+                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text("金额、日期和备注都在本页完成")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
+                Spacer()
+                Button {
+                    withAnimation(GoMotion.feedback) {
+                        isInlineExpenseComposerVisible = false
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .black))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .frame(width: 34, height: 34)
+                }
+                .buttonStyle(ScaleButtonStyle())
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("金额")
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(AppCurrency.symbol)
+                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.goPrimary)
+                    Text(newAmount.isEmpty ? CountryDecimalInput.placeholder(fractionDigits: 2, countryCode: appCountry) : newAmount)
+                        .font(.system(size: 34, weight: .black, design: .rounded))
+                        .foregroundStyle(newAmount.isEmpty ? Color.ohanaSecondaryText.opacity(0.55) : Color.ohanaPrimaryText)
+                        .contentTransition(.numericText())
+                    Spacer()
+                    Text(AppCurrency.code)
+                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+                EmbeddedDecimalKeypad(
+                    text: $newAmount,
+                    countryCode: appCountry,
+                    maxFractionDigits: 2,
+                    accent: .goPrimary,
+                    isMini: true,
+                    showsSubmitButton: false
+                )
+            }
+
+            inlineExpenseCategoryStrip
+            inlineExpenseMetadataRows
+
+            TextField("备注（可选）", text: $newNote)
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .textInputAutocapitalization(.never)
+                .submitLabel(.done)
+
+            Button(action: saveInlineExpense) {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                    Text("保存记录")
+                }
+                .font(.system(size: 16, weight: .black, design: .rounded))
+                .foregroundStyle(Color.arkInk)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(canSaveInlineExpense ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+            }
+            .disabled(!canSaveInlineExpense)
+            .buttonStyle(ScaleButtonStyle())
+        }
+        .padding(14)
+        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    private var inlineExpenseCategoryStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(ExpenseCategory.allCases, id: \.self) { cat in
+                    Button {
+                        withAnimation(GoMotion.feedback) {
+                            newCategory = cat
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(cat.emoji)
+                            Text(cat.rawValue)
+                                .font(.system(size: 13, weight: .black, design: .rounded))
+                        }
+                        .foregroundStyle(newCategory == cat ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.72))
+                        .padding(.horizontal, 13)
+                        .padding(.vertical, 9)
+                        .background(newCategory == cat ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
+            }
+        }
+    }
+
+    private var inlineExpenseMetadataRows: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 13, weight: .black))
+                    .foregroundStyle(Color.goPrimary)
+                    .frame(width: 24)
+                Text("日期")
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Spacer()
+                DatePicker("", selection: $newDate, in: ...Date(), displayedComponents: .date)
+                    .datePickerStyle(.compact)
+                    .tint(Color.goPrimary)
+                    .labelsHidden()
+            }
+
+            if !allHumans.isEmpty {
+                Menu {
+                    Button("未指定") { selectedPayerId = nil }
+                    ForEach(allHumans) { human in
+                        Button("\(human.avatarEmoji) \(human.name)") {
+                            selectedPayerId = human.id.uuidString
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "person.crop.circle.fill")
+                            .font(.system(size: 13, weight: .black))
+                            .foregroundStyle(Color.goPrimary)
+                            .frame(width: 24)
+                        Text("支付人")
+                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                        Spacer()
+                        Text(selectedPayerName)
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 11, weight: .black))
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(12)
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func expenseRow(log: PetExpenseLog) -> some View {
@@ -322,11 +531,11 @@ struct ExpenseHistoryView: View {
                 HStack(spacing: 8) {
                     Text(log.date, format: .dateTime.year().month().day())
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.primary.opacity(0.4))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     if !log.note.isEmpty {
                         Text(log.note)
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.primary.opacity(0.4))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                             .lineLimit(1)
                     }
                 }
@@ -352,7 +561,7 @@ struct ExpenseHistoryView: View {
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.primary.opacity(0.3))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
@@ -364,165 +573,46 @@ struct ExpenseHistoryView: View {
         return allHumans.first { $0.id.uuidString == executorId }
     }
 
-    // MARK: - Add Expense Sheet
-    private var addExpenseSheet: some View {
-        VStack(spacing: 0) {
-            // 把手
-            Capsule()
-                .fill(.primary.opacity(0.2))
-                .frame(width: 40, height: 4)
-                .padding(.top, 12)
-                .padding(.bottom, 20)
-
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    Text("记录花费")
-                        .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 24)
-
-                    // 金额大输入框
-                    VStack(spacing: 4) {
-                        HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text(AppCurrency.symbol)
-                                .font(.system(size: 36, weight: .black, design: .rounded))
-                                .foregroundStyle(Color.goYellow)
-                            TextField("0", text: $newAmount)
-                                .keyboardType(.decimalPad)
-                                .font(.system(size: 56, weight: .black, design: .rounded))
-                                .foregroundStyle(.primary)
-                        }
-                        .padding(.horizontal, 24).padding(.vertical, 20)
-                        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                        .padding(.horizontal, 24)
-                        Text("金额 (\(AppCurrency.code))")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.primary.opacity(0.4))
-                    }
-
-                    // 分类选择
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("分类")
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .foregroundStyle(.primary)
-                            .padding(.horizontal, 24)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 10) {
-                                ForEach(ExpenseCategory.allCases, id: \.self) { cat in
-                                    Button { newCategory = cat } label: {
-                                        HStack(spacing: 6) {
-                                            Text(cat.emoji)
-                                            Text(cat.rawValue)
-                                                .font(.system(size: 14, weight: .bold, design: .rounded))
-                                                .foregroundStyle(newCategory == cat ? Color.arkInk : .primary.opacity(0.7))
-                                        }
-                                        .padding(.horizontal, 16).padding(.vertical, 10)
-                                        .background(newCategory == cat ? Color.goYellow : .clear, in: Capsule())
-                                        .goSelectableSurface(isSelected: newCategory == cat, tint: Color.goYellow, in: Capsule())
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, 24)
-                        }
-                    }
-
-                    // 备注
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("备注（可选）")
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .foregroundStyle(.primary)
-                        TextField("例如：定期疫苗", text: $newNote)
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(.primary)
-                            .padding(.horizontal, 16).padding(.vertical, 14)
-                            .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    }
-                    .padding(.horizontal, 24)
-
-                    // 日期
-                    HStack {
-                        Text("日期")
-                            .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        DatePicker("", selection: $newDate, in: ...Date(), displayedComponents: .date)
-                            .datePickerStyle(.compact)
-                            .tint(Color.goYellow)
-                            .labelsHidden()
-                    }
-                    .padding(.horizontal, 24)
-
-                    // 支付人选择
-                    if !allHumans.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("支付人")
-                                .font(.system(size: 15, weight: .bold, design: .rounded))
-                                .foregroundStyle(.primary)
-                                .padding(.horizontal, 24)
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    Button { selectedPayerId = nil } label: {
-                                        Text("未指定")
-                                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                                            .foregroundStyle(selectedPayerId == nil ? Color.arkInk : .primary.opacity(0.6))
-                                            .padding(.horizontal, 14).padding(.vertical, 8)
-                                            .background(selectedPayerId == nil ? Color.goYellow : .clear, in: Capsule())
-                                            .goSelectableSurface(isSelected: selectedPayerId == nil, tint: Color.goYellow, in: Capsule())
-                                    }
-                                    .buttonStyle(.plain)
-                                    ForEach(allHumans) { human in
-                                        Button { selectedPayerId = human.id.uuidString } label: {
-                                            HStack(spacing: 5) {
-                                                Text(human.avatarEmoji).font(.system(size: 14))
-                                                Text(human.name)
-                                                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                                                    .foregroundStyle(selectedPayerId == human.id.uuidString ? Color.arkInk : .primary.opacity(0.6))
-                                            }
-                                            .padding(.horizontal, 14).padding(.vertical, 8)
-                                            .background(selectedPayerId == human.id.uuidString ? Color.goYellow : .clear, in: Capsule())
-                                            .goSelectableSurface(isSelected: selectedPayerId == human.id.uuidString, tint: Color.goYellow, in: Capsule())
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                                .padding(.horizontal, 24)
-                            }
-                        }
-                    }
-
-                    // 保存按钮
-                    Button {
-                        if let amount = Double(newAmount.replacingOccurrences(of: ",", with: ".")) {
-                            let log = PetExpenseLog(
-                                date: newDate,
-                                amount: amount,
-                                category: newCategory,
-                                note: newNote,
-                                pet: pet,
-                                executorId: selectedPayerId
-                            )
-                            modelContext.insert(log)
-                            modelContext.safeSave()
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            newAmount = ""; newNote = ""; showAddSheet = false
-                        }
-                    } label: {
-                        Text("保存记录")
-                            .font(.system(size: 17, weight: .bold, design: .rounded))
-                            .foregroundStyle(.black)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 18)
-                            .background(Color.goYellow, in: RoundedRectangle(cornerRadius: 18))
-                    }
-                    .disabled(Double(newAmount.replacingOccurrences(of: ",", with: ".")) == nil)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 40)
-                }
-            }
+    private func saveInlineExpense() {
+        guard let amount = parsedNewAmount, amount > 0 else { return }
+        let note = newNote.trimmingCharacters(in: .whitespacesAndNewlines)
+        let log = PetExpenseLog(
+            date: newDate,
+            amount: amount,
+            category: newCategory,
+            note: note,
+            pet: pet,
+            executorId: selectedPayerId
+        )
+        modelContext.insert(log)
+        modelContext.safeSave()
+        let reward = QuestManager.shared.awardAction(type: .expense, pet: pet, context: modelContext)
+        let rewardDelta = CareLedgerService.rewardDelta(reward)
+        CareLedgerService.record(
+            occurredAt: log.date,
+            actorKind: selectedPayerId == nil ? .unknown : .human,
+            actorId: selectedPayerId,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .expense,
+            actionType: newCategory.rawValue,
+            amountValue: amount,
+            amountUnit: "currency",
+            note: note,
+            source: .detail,
+            legacyModelName: "PetExpenseLog",
+            legacyModelId: log.id.uuidString,
+            coconutDelta: rewardDelta,
+            context: modelContext,
+            save: true
+        )
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        withAnimation(GoMotion.feedback) {
+            newAmount = ""
+            newNote = ""
+            newDate = Date()
+            selectedPayerId = currentActiveHumanId
+            isInlineExpenseComposerVisible = false
         }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-        .presentationBackground(.regularMaterial)
     }
 }

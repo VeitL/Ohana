@@ -106,7 +106,7 @@ struct EditPetSheet: View {
                         HStack {
                             Text("每日喂食量 (g)")
                                 .font(OhanaFont.footnote(.medium))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                             Spacer()
                             TextField("0", value: $dailyPortionGrams, format: .number)
                                 .keyboardType(.decimalPad)
@@ -129,11 +129,11 @@ struct EditPetSheet: View {
                                             Circle().strokeBorder(.white, lineWidth: 2.5).frame(width: 38, height: 38)
                                             Image(systemName: "checkmark")
                                                 .font(.system(size: 11, weight: .black))
-                                                .foregroundStyle(.primary)
+                                                .foregroundStyle(Color.ohanaPrimaryText)
                                         }
                                     }
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(ScaleButtonStyle())
                             }
                         }
                     }
@@ -178,7 +178,7 @@ struct EditPetSheet: View {
         HStack {
             Text(title)
                 .font(OhanaFont.caption2(.bold))
-                .foregroundStyle(.primary.opacity(0.4))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 .tracking(1.2)
                 .textCase(.uppercase)
             Spacer()
@@ -189,7 +189,7 @@ struct EditPetSheet: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(OhanaFont.caption(.medium))
-                .foregroundStyle(.primary.opacity(0.4))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             TextField(title, text: text)
                 .textFieldStyle(.plain)
                 .padding(12)
@@ -233,7 +233,12 @@ struct EditPetSheet: View {
         pet.foodBrand = foodBrand
         pet.dailyPortionGrams = dailyPortionGrams
         pet.notes = notes
-        if !themeColorHex.isEmpty { pet.themeColorHex = themeColorHex }
+        if !themeColorHex.isEmpty {
+            pet.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
+                themeColorHex,
+                fallback: OhanaThemeColorPolicy.petFallbackHex
+            )
+        }
         modelContext.safeSave()
         dismiss()
     }

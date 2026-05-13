@@ -37,7 +37,7 @@ struct FloatingDockNav: View {
                 let isSelected = selectedTab == idx
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    withAnimation(GoMotion.feedback) {
                         selectedTab = idx
                     }
                     switch idx {
@@ -50,9 +50,9 @@ struct FloatingDockNav: View {
                     VStack(spacing: 3) {
                         Image(systemName: item.0)
                             .font(.system(size: isSelected ? 22 : 20, weight: .bold))
-                            .foregroundStyle(isSelected ? Color.goPrimary : (colorScheme == .light ? Color.black.opacity(0.55) : Color.primary.opacity(0.4)))
+                            .foregroundStyle(isSelected ? Color.goPrimary : Color.ohanaSecondaryText)
                             .scaleEffect(isSelected ? 1.1 : 1.0)
-                            .animation(.spring(response: 0.35, dampingFraction: 0.75), value: selectedTab)
+                            .animation(GoMotion.feedback, value: selectedTab)
                         Circle()
                             .fill(isSelected ? Color.goPrimary : Color.clear)
                             .frame(width: 4, height: 4)
@@ -61,12 +61,11 @@ struct FloatingDockNav: View {
                     .padding(.vertical, 12)
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
         .padding(.horizontal, 8)
         .goGlassBackground(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .shadow(color: .black.opacity(0.25), radius: 16, x: 0, y: 6)
         .padding(.horizontal, 32)
     }
 }
@@ -82,26 +81,26 @@ struct CompactTaskRow: View {
             Text(reminder.event?.emoji ?? "📌")
                 .font(.system(size: 18))
                 .frame(width: 32, height: 32)
-                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 8))
             VStack(alignment: .leading, spacing: 1) {
                 Text(reminder.event?.title ?? "提醒")
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(isDone ? .white.opacity(0.3) : .white)
+                    .foregroundStyle(isDone ? Color.ohanaTertiaryText : Color.ohanaPrimaryText)
                     .strikethrough(isDone)
                 HStack(spacing: 4) {
                     if let petName = reminder.event?.relatedEntityId {
                         Text("🐾 \(petName.prefix(8))")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.35))
+                            .foregroundStyle(Color.ohanaTertiaryText)
                     }
                     Text(reminder.scheduledAt, style: .time)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.35))
+                        .foregroundStyle(Color.ohanaTertiaryText)
                 }
             }
             Spacer()
             Button {
-                withAnimation(.spring(response: 0.3)) { isDone.toggle() }
+                withAnimation(GoMotion.feedback) { isDone.toggle() }
                 let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
                 if isDone {
                     ReminderCompletionService.complete(reminder, by: activeHumanId, context: modelContext)
@@ -122,7 +121,7 @@ struct CompactTaskRow: View {
             } label: {
                 ZStack {
                     Circle()
-                        .strokeBorder(isDone ? Color.goTeal : .white.opacity(0.25), lineWidth: 2)
+                        .strokeBorder(isDone ? Color.goTeal : Color.ohanaGlassStroke, lineWidth: 2)
                         .frame(width: 24, height: 24)
                     if isDone {
                         Image(systemName: "checkmark")
@@ -134,8 +133,8 @@ struct CompactTaskRow: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(.white.opacity(isDone ? 0.03 : 0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .animation(.easeInOut(duration: 0.2), value: isDone)
+        .background(Color.ohanaControlFill.opacity(isDone ? 0.55 : 1.0), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .animation(GoMotion.feedback, value: isDone)
     }
 }
 
@@ -166,7 +165,7 @@ struct SwipeableReminderCard: View {
                         Text("Done")
                             .font(.system(size: 13, weight: .bold, design: .rounded))
                     }
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .padding(.leading, 20)
                     Spacer()
                 } else if dragX < -40 {
@@ -177,7 +176,7 @@ struct SwipeableReminderCard: View {
                         Image(systemName: "minus.circle.fill")
                             .font(.system(size: 18, weight: .bold))
                     }
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .padding(.trailing, 20)
                 }
             }
@@ -192,31 +191,31 @@ struct SwipeableReminderCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(reminder.event?.title ?? "提醒")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Text(reminder.scheduledAt, style: .time)
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.arkInk.opacity(0.5))
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(Color.arkInk.opacity(0.3))
+                    .foregroundStyle(Color.ohanaTertiaryText)
             }
             .padding(14)
-            .goCard(color: .white, cornerRadius: 16)
+            .goCard(color: Color.ohanaCardSurface, cornerRadius: 16)
             .offset(x: dragX)
             .rotationEffect(tiltAngle, anchor: UnitPoint(x: 0.5, y: 1.0))
             .gesture(
                 DragGesture(minimumDistance: 10)
                     .onChanged { val in
-                        withAnimation(.interactiveSpring(response: 0.3)) {
+                        withAnimation(GoMotion.feedback) {
                             dragX = val.translation.width
                         }
                     }
                     .onEnded { val in
                         let threshold: CGFloat = 90
                         if val.translation.width > threshold {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            withAnimation(GoMotion.page) {
                                 dragX = 400
                             }
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -224,7 +223,7 @@ struct SwipeableReminderCard: View {
                                 completeReminder()
                             }
                         } else if val.translation.width < -threshold {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            withAnimation(GoMotion.page) {
                                 dragX = -400
                             }
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -232,7 +231,7 @@ struct SwipeableReminderCard: View {
                                 dismissReminder()
                             }
                         } else {
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.78)) {
+                            withAnimation(GoMotion.feedback) {
                                 dragX = 0
                             }
                         }
@@ -241,7 +240,7 @@ struct SwipeableReminderCard: View {
         }
         .opacity(isDismissed ? 0 : 1)
         .frame(maxHeight: isDismissed ? 0 : .infinity)
-        .animation(.spring(response: 0.35), value: isDismissed)
+        .animation(GoMotion.page, value: isDismissed)
     }
 
     private func completeReminder() {
@@ -279,7 +278,7 @@ struct PlantGardenCard: View {
                     Text(plant.avatarEmoji)
                         .font(.system(size: 32))
                         .scaleEffect(isWatering ? 1.2 : 1.0)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isWatering)
+                        .animation(GoMotion.fab, value: isWatering)
                 }
 
                 Text(plant.name)
@@ -316,7 +315,7 @@ struct PlantGardenCard: View {
             .padding(.vertical, 12)
             .goTranslucentCard(cornerRadius: 18)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func waterPlant() {
@@ -354,20 +353,20 @@ struct HomeSectionManageSheet: View {
     var body: some View {
         ZStack {
             Rectangle()
-                .fill(.ultraThinMaterial)
+                .fill(Color.ohanaCardSurface)
                 .ignoresSafeArea()
 
-            Color.goDeepNavy.opacity(0.55).ignoresSafeArea()
+            Color.ohanaCardSurface.opacity(0.55).ignoresSafeArea()
 
             VStack(spacing: 0) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("首页模块管理")
                             .font(.system(size: 20, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text("拖拽排序，切换显示/隐藏")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
                     Button("完成") {
@@ -388,7 +387,7 @@ struct HomeSectionManageSheet: View {
                         HStack(spacing: 14) {
                             Image(systemName: "line.3.horizontal")
                                 .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.35))
+                                .foregroundStyle(Color.ohanaTertiaryText)
                                 .frame(width: 24)
                             Image(systemName: section.icon)
                                 .font(.system(size: 16, weight: .bold))
@@ -397,10 +396,10 @@ struct HomeSectionManageSheet: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(section.title)
                                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Color.ohanaPrimaryText)
                                 Text(section.subtitle)
                                     .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.38))
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                             }
                             Spacer()
                             Toggle("", isOn: $section.isVisible)
@@ -415,7 +414,7 @@ struct HomeSectionManageSheet: View {
                                 .fill(Color.goDarkBlue.opacity(0.6))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                        .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+                                        .strokeBorder(Color.ohanaGlassStroke, lineWidth: 1)
                                 )
                                 .padding(.vertical, 3)
                         )
@@ -502,18 +501,18 @@ struct BentoStatCard: View {
                     .foregroundStyle(accentColor)
                 Text(title)
                     .font(OhanaFont.footnote(.bold))
-                    .foregroundStyle(.primary.opacity(0.55))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                     .lineLimit(1)
             }
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(value)
                     .font(OhanaFont.metric(size: 32))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .contentTransition(.numericText())
                 if !unit.isEmpty {
                     Text(unit)
                         .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(.primary.opacity(0.4))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
             }
             if showMiniBar > 0 || barMax > 0 && showMiniBar >= 0 {
@@ -552,7 +551,7 @@ struct AllPetsFoodOverviewSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 16) {
                         ForEach(pets) { pet in
@@ -563,7 +562,7 @@ struct AllPetsFoodOverviewSheet: View {
                                 Text("🐾").font(.system(size: 48))
                                 Text("还没有宠物")
                                     .font(.system(size: 16, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.6))
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.top, 60)
@@ -581,7 +580,7 @@ struct AllPetsFoodOverviewSheet: View {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 20))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
             }
@@ -616,7 +615,7 @@ struct AllPetsFoodOverviewSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(pet.name)
                         .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Text(days > 0 ? "余粮 \(grams)g · 可用 \(days) 天" : "余粮不足，请补充")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(accent)
@@ -626,7 +625,7 @@ struct AllPetsFoodOverviewSheet: View {
 
                 ZStack {
                     Circle()
-                        .stroke(.white.opacity(0.12), lineWidth: 3)
+                        .stroke(Color.ohanaGlassStroke, lineWidth: 3)
                     Circle()
                         .trim(from: 0, to: progress)
                         .stroke(accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
@@ -639,12 +638,12 @@ struct AllPetsFoodOverviewSheet: View {
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             .padding(14)
-            .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(.white.opacity(0.1), lineWidth: 0.5))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.ohanaGlassStroke, lineWidth: 0.5))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 }

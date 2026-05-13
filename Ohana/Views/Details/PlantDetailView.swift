@@ -19,7 +19,7 @@ struct PlantDetailView: View {
     
     var body: some View {
         ZStack {
-            ArkBackgroundView()
+            OhanaAppBackground()
             
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 20) {
@@ -39,7 +39,7 @@ struct PlantDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showingEditSheet = true } label: {
                     Image(systemName: "pencil.circle")
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                 }
             }
         }
@@ -79,20 +79,20 @@ struct PlantDetailView: View {
             VStack(spacing: 8) {
                 Text(plant.name)
                     .font(.system(size: 32, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 
                 HStack(spacing: 8) {
                     if !plant.species.isEmpty {
                         Text(plant.species)
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                             .padding(.horizontal, 12).padding(.vertical, 5)
                             .background(.white.opacity(0.18), in: Capsule())
                     }
                     if !plant.location.isEmpty {
                         Text("📍 \(plant.location)")
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                             .padding(.horizontal, 12).padding(.vertical, 5)
                             .background(.white.opacity(0.18), in: Capsule())
                     }
@@ -126,7 +126,7 @@ struct PlantDetailView: View {
                     Spacer()
                     Text("周期 \(plant.wateringIntervalDays) 天")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 
                 ProgressView(value: progress)
@@ -145,7 +145,7 @@ struct PlantDetailView: View {
             } else {
                 Text("还没有浇水记录")
                     .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
         .padding(16)
@@ -174,7 +174,7 @@ struct PlantDetailView: View {
                     Spacer()
                     Text("周期 \(plant.fertilizingIntervalDays) 天")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 
                 ProgressView(value: progress)
@@ -193,7 +193,7 @@ struct PlantDetailView: View {
             } else {
                 Text("还没有施肥记录")
                     .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
         .padding(16)
@@ -212,7 +212,7 @@ struct PlantDetailView: View {
                     Text("浇水")
                 }
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .background(Color.blue.opacity(0.6), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -230,7 +230,7 @@ struct PlantDetailView: View {
                     Text("施肥")
                 }
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .background(Color.green.opacity(0.6), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -386,21 +386,21 @@ struct EditPlantSheet: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("浇水周期")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                     Stepper("每 \(wateringInterval) 天", value: $wateringInterval, in: 1...90)
                 }
                 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("施肥周期")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                     Stepper("每 \(fertilizingInterval) 天", value: $fertilizingInterval, in: 1...365)
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("备注")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                     TextEditor(text: $notes)
                         .frame(height: 80)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -428,7 +428,7 @@ struct EditPlantSheet: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
             TextField(title, text: text)
                 .textFieldStyle(.roundedBorder)
         }

@@ -49,11 +49,11 @@ struct IslandNegativeFeedbackBanner: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(signal.title)
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     Text(signal.detail)
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.55))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                         .lineLimit(1)
                 }
 
@@ -62,7 +62,7 @@ struct IslandNegativeFeedbackBanner: View {
                 if signals.count > 1 {
                     Text("\(selectedIndex + 1)/\(signals.count)")
                         .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.3))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                         .padding(.horizontal, 5).padding(.vertical, 2)
                         .background(Color.white.opacity(0.08), in: Capsule())
                 }
@@ -73,17 +73,17 @@ struct IslandNegativeFeedbackBanner: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.primary.opacity(0.4))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         .frame(width: 22, height: 22)
                         .background(Color.white.opacity(0.08), in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(.thinMaterial)
+                    .fill(Color.ohanaCardSurface)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)

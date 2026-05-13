@@ -45,10 +45,10 @@ struct CatCareStationCard: View {
                     Spacer()
                     Image(systemName: "clock.arrow.circlepath")
                         .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
-            .foregroundStyle(.primary)
+            .foregroundStyle(Color.ohanaPrimaryText)
             
             // 操作按钮
             HStack(spacing: 12) {
@@ -95,11 +95,11 @@ struct CatCareStationCard: View {
                     .font(.system(size: 24))
                 Text(action.rawValue)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
-            .background(.ultraThinMaterial.opacity(0.3), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(Color.ohanaCardSurface.opacity(0.3), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .strokeBorder(.primary.opacity(0.12), lineWidth: 1)
@@ -212,7 +212,7 @@ struct CatCareHistorySheet: View {
                         .font(.system(size: 48))
                     Text("暂无护理记录")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .padding(.top, 40)
             } else {
@@ -224,7 +224,7 @@ struct CatCareHistorySheet: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(date, style: .date)
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                         
                         ForEach(events) { event in
                             HStack {
@@ -233,7 +233,7 @@ struct CatCareHistorySheet: View {
                                 Spacer()
                                 Text(event.startDate, style: .time)
                                     .font(.system(size: 12))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                             }
                             .padding(10)
                             .ohanaGlassStyle(cornerRadius: 12)

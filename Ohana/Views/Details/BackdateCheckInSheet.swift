@@ -114,7 +114,7 @@ struct BackdateCheckInSheet: View {
                                     .font(.system(size: 13, weight: .bold, design: .rounded))
                                 Text(date, format: .dateTime.month().day())
                                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.primary.opacity(0.5))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                             }
                             .foregroundStyle(selectedDaysAgo == days ? .black : .white.opacity(0.7))
                             .padding(.horizontal, 16).padding(.vertical, 10)
@@ -123,7 +123,7 @@ struct BackdateCheckInSheet: View {
                                 in: Capsule()
                             )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                     }
                 }
                 .padding(.horizontal, 24)
@@ -143,7 +143,7 @@ struct BackdateCheckInSheet: View {
                         in: RoundedRectangle(cornerRadius: 18, style: .continuous)
                     )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .disabled(selectedPet == nil)
                 .padding(.horizontal, 24)
 
@@ -161,7 +161,7 @@ struct BackdateCheckInSheet: View {
                 .font(.system(size: 72))
             Text("补打卡成功！")
                 .font(.system(size: 28, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             if earnedCoconuts > 0 {
                 HStack(spacing: 6) {
                     Text("🥥 +\(earnedCoconuts)")
@@ -173,7 +173,7 @@ struct BackdateCheckInSheet: View {
             } else {
                 Text("奖励已发放（或今日已超出冷却限制）")
                     .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.4))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
             }
@@ -182,7 +182,7 @@ struct BackdateCheckInSheet: View {
                 .foregroundStyle(.black)
                 .padding(.horizontal, 40).padding(.vertical, 14)
                 .background(Color.goPrimary, in: Capsule())
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .padding(.top, 8)
             Spacer()
         }
@@ -192,7 +192,7 @@ struct BackdateCheckInSheet: View {
     private func sectionTitle(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 13, weight: .bold, design: .rounded))
-            .foregroundStyle(.primary.opacity(0.4))
+            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             .padding(.horizontal, 24)
     }
 
@@ -203,10 +203,10 @@ struct BackdateCheckInSheet: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("补打卡券")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text("可补录 \(backdateDays) 天内任意一次打卡，正常发放椰子奖励")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.5))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             }
         }
         .padding(.horizontal, 20).padding(.vertical, 14)
@@ -231,7 +231,7 @@ struct BackdateCheckInSheet: View {
                 in: Capsule()
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func actionChip(_ action: CheckInActionType) -> some View {
@@ -246,7 +246,7 @@ struct BackdateCheckInSheet: View {
                     in: RoundedRectangle(cornerRadius: 14, style: .continuous)
                 )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     // MARK: - 提交

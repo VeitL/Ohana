@@ -61,7 +61,7 @@ struct IslandSummarySheet: View {
                         Text("需要关心")
                             .font(.system(size: 12, weight: .black, design: .rounded))
                             .tracking(1.5)
-                            .foregroundStyle(.primary.opacity(0.4))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                             .padding(.top, 4)
                         VStack(spacing: 10) {
                             ForEach(signals) { s in
@@ -84,7 +84,7 @@ struct IslandSummarySheet: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 22, weight: .semibold))
-                            .foregroundStyle(.primary.opacity(0.4))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     }
                 }
             }
@@ -98,10 +98,10 @@ struct IslandSummarySheet: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(moodText)
                     .font(.system(size: 17, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text("根据今日喂食/用药/连击/植物护理综合判断")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.5))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                     .lineLimit(2)
             }
             Spacer(minLength: 0)
@@ -109,7 +109,7 @@ struct IslandSummarySheet: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.thinMaterial)
+                .fill(Color.ohanaCardSurface)
         )
     }
 
@@ -126,17 +126,17 @@ struct IslandSummarySheet: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("连续打卡 \(checkInStreak) 天")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text(checkInStreak >= 7 ? "火苗燃烧中，继续保持 🔥" : "每天至少 1 次打卡维持连击")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.5))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             }
             Spacer()
         }
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.thinMaterial)
+                .fill(Color.ohanaCardSurface)
         )
     }
 
@@ -153,20 +153,20 @@ struct IslandSummarySheet: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(s.title)
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text(s.detail)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.55))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
             }
             Spacer()
             Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(.primary.opacity(0.3))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(.thinMaterial)
+                .fill(Color.ohanaCardSurface)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -183,10 +183,10 @@ struct IslandSummarySheet: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("一切安好")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text("当前没有需要关注的信号，继续享受岛屿生活吧")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.5))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             }
             Spacer()
         }

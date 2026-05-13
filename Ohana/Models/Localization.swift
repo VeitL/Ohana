@@ -14,7 +14,10 @@ struct L10n {
         self.lang = AppLanguage.normalize(lang)
     }
 
-    var isEn: Bool { lang == "en" }
+    /// Legacy compatibility flag: many older views only had Chinese/English branches.
+    /// Treat non-Chinese languages as English fallback so German mode never leaks Chinese text
+    /// while each string is migrated to `tr(zh:en:de:)`.
+    var isEn: Bool { lang != "zh" }
     var isDe: Bool { lang == "de" }
 
     func text(_ value: AppLocalizedText) -> String {
@@ -764,6 +767,9 @@ struct L10n {
     var homeQASport: String { isEn ? "Workout" : "运动" }
     var homeQAMeds: String { isEn ? "Meds" : "吃药" }
     var homeQANote: String { isEn ? "Note" : "记录" }
+    var homeQAPlay: String { tr(zh: "陪玩", en: "Play", de: "Spielen") }
+    var homeQACageClean: String { tr(zh: "清鸟笼", en: "Clean cage", de: "Käfig reinigen") }
+    var homeQAFreeFlight: String { tr(zh: "放飞", en: "Free flight", de: "Freiflug") }
 
     // GO dashboard sections & hub
     var goSectionIslandQuests: String { isEn ? "🏝️ Island quests" : "🏝️ 今日委托" }
@@ -1071,6 +1077,9 @@ nonisolated struct AppLocalizedText: Hashable {
         if let value = translations[code], !value.isEmpty {
             return value
         }
+        if code != "zh", let english = translations["en"], !english.isEmpty {
+            return english
+        }
         if let fallback = translations[fallbackCode], !fallback.isEmpty {
             return fallback
         }
@@ -1148,12 +1157,14 @@ nonisolated enum AppMeasurementSystem {
         switch code {
         case "imperial":
             let pounds = grams / 453.59237
+            let preciseDigits = fractionDigits == 0 ? 1 : fractionDigits
             return pounds >= 1
-                ? "\(formattedNumber(pounds, fractionDigits: 1)) lb"
-                : "\(formattedNumber(grams * 0.0352739619, fractionDigits: 1)) oz"
+                ? "\(formattedNumber(pounds, fractionDigits: preciseDigits)) lb"
+                : "\(formattedNumber(grams * 0.0352739619, fractionDigits: preciseDigits)) oz"
         default:
+            let preciseDigits = fractionDigits == 0 ? 1 : fractionDigits
             return grams >= 1_000
-                ? "\(formattedNumber(grams / 1_000, fractionDigits: 1)) kg"
+                ? "\(formattedNumber(grams / 1_000, fractionDigits: preciseDigits)) kg"
                 : "\(formattedNumber(grams, fractionDigits: fractionDigits)) g"
         }
     }

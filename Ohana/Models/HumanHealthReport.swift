@@ -62,7 +62,7 @@ enum ReportConclusion: String, Codable, CaseIterable, Identifiable {
 
     var color: Color {
         switch self {
-        case .normal:    return .goLime
+        case .normal:    return .goTeal
         case .attention: return .goYellow
         case .abnormal:  return .goOrange
         case .critical:  return .goRed

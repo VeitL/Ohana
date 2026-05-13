@@ -32,7 +32,7 @@ struct HumanExpenseDetailView: View {
 
     var body: some View {
         ZStack {
-            ArkBackgroundView()
+            OhanaAppBackground()
 
             if isPrivacyLocked {
                 privacyLockedView
@@ -50,14 +50,14 @@ struct HumanExpenseDetailView: View {
                 VStack(spacing: 6) {
                     Text("累计花费")
                         .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(.primary.opacity(0.5))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text(AppCurrency.symbol)
                             .font(OhanaFont.title3(.bold))
                             .foregroundStyle(Color.goPrimary)
                         Text(String(format: "%.2f", totalAmount))
                             .font(OhanaFont.metric(size: 40))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                     }
                 }
                 .padding(.vertical, 28)
@@ -75,10 +75,10 @@ struct HumanExpenseDetailView: View {
                     VStack(spacing: 12) {
                         Image(systemName: AppCurrency.systemIconName)
                             .font(OhanaFont.metric(size: 48))
-                            .foregroundStyle(.primary.opacity(0.2))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
                         Text("暂无花费记录")
                             .font(OhanaFont.callout(.medium))
-                            .foregroundStyle(.primary.opacity(0.4))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     }
                     .frame(maxHeight: .infinity)
                 } else {
@@ -101,10 +101,10 @@ struct HumanExpenseDetailView: View {
                 .foregroundStyle(Color.goYellow)
             Text(PrivacyService.lockedMessage(for: .expense))
                 .font(OhanaFont.headline(.bold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Text("请切换到本人档案后再查看。")
                 .font(OhanaFont.callout())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .multilineTextAlignment(.center)
         .padding(24)
@@ -124,11 +124,11 @@ struct HumanExpenseDetailView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(log.note.isEmpty ? "花费记录" : log.note)
                     .font(OhanaFont.callout(.bold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 Text(log.date.formatted(date: .abbreviated, time: .shortened))
                     .font(OhanaFont.caption())
-                    .foregroundStyle(.primary.opacity(0.5))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             }
             Spacer()
 

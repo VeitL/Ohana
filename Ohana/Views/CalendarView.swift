@@ -69,13 +69,13 @@ struct CalendarPetChipFilterBar: View {
     private func chipForeground(isSelected: Bool) -> Color {
         if isSelected { return chipSelFg }
         if isMaterial { return Color(hex: "8E8E93") }
-        return colorScheme == .light ? Color.black.opacity(0.55) : Color.white.opacity(0.72)
+        return Color.ohanaSecondaryText
     }
 
     private func chipBackground(isSelected: Bool) -> Color {
         if isSelected { return chipAccent }
         if isMaterial { return matSurface }
-        return colorScheme == .light ? Color.black.opacity(0.08) : Color.white.opacity(0.1)
+        return Color.ohanaControlFill
     }
 }
 
@@ -321,10 +321,19 @@ struct CalendarView: View {
                     listVisibleTopDate = Calendar.current.startOfDay(for: Date())
                 }
             }
-            .onAppear { coconutCount = QuestManager.shared.coconutCount }
+            .onAppear {
+                coconutCount = QuestManager.shared.coconutCount
+                reconcileDefaultPlanOverrides()
+            }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("coconutCountChanged"))) { _ in
                 coconutCount = QuestManager.shared.coconutCount
             }
+        }
+    }
+
+    private func reconcileDefaultPlanOverrides() {
+        for pet in pets {
+            CarePlanCalendarSync.reconcileDefaultPlanOverrides(for: pet, context: modelContext)
         }
     }
 
@@ -334,7 +343,7 @@ struct CalendarView: View {
             // 月历标题
             Text(calendarHeaderDate, format: .dateTime.year().month(.wide))
                 .font(.system(size: 20, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
 
             Spacer()
 
@@ -351,7 +360,7 @@ struct CalendarView: View {
                 Image(systemName: "plus")
                     .font(.system(size: 16, weight: .bold))
                     .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 36, height: 36)
                     .background(Color.goPrimary, in: Circle())
             }
@@ -373,7 +382,7 @@ struct CalendarView: View {
                 Image(systemName: "calendar.badge.plus")
                     .font(.system(size: 17, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 40, height: 40)
                     .background(accent, in: Circle())
                     .shadow(color: accent.opacity(0.35), radius: 8, x: 0, y: 2)
@@ -399,7 +408,7 @@ struct CalendarView: View {
                         .foregroundStyle(accent)
                     Text("\(coconutCount)")
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                         .contentTransition(.numericText())
                         .animation(.spring(response: 0.4), value: coconutCount)
                 }
@@ -413,7 +422,7 @@ struct CalendarView: View {
         .padding(.bottom, 10)
         .background(
             bg.opacity(0.92)
-                .background(.ultraThinMaterial)
+                .background(Color.ohanaCardSurface.opacity(0.88))
                 .ignoresSafeArea(edges: .top)
         )
     }
@@ -519,7 +528,7 @@ struct CalendarView: View {
     private func iconModeBtn(systemName: String, mode: CalendarViewMode) -> some View {
         let unselectedTint: Color = {
             if isMaterial { return Color(hex: "8E8E93") }
-            return colorScheme == .light ? Color.black.opacity(0.5) : Color.white.opacity(0.48)
+            return Color.ohanaSecondaryText
         }()
         return Button {
             withAnimation(.spring(response: 0.28)) { viewModeRaw = mode.rawValue }
@@ -544,7 +553,7 @@ struct CalendarView: View {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 14, weight: .bold))
                         .symbolRenderingMode(.monochrome)
-                        .foregroundStyle(.primary.opacity(0.6))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                         .frame(width: 36, height: 36)
                         .background(isMaterial ? matSurface : classicSubtleFill, in: Circle())
                 }
@@ -553,7 +562,7 @@ struct CalendarView: View {
                 
                 Text(selectedDate, format: .dateTime.year().month(.wide))
                     .font(.system(size: 20, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 
                 Spacer()
                 
@@ -563,7 +572,7 @@ struct CalendarView: View {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 14, weight: .bold))
                         .symbolRenderingMode(.monochrome)
-                        .foregroundStyle(.primary.opacity(0.6))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                         .frame(width: 36, height: 36)
                         .background(isMaterial ? matSurface : classicSubtleFill, in: Circle())
                 }
@@ -575,7 +584,7 @@ struct CalendarView: View {
                 ForEach(["日","一","二","三","四","五","六"], id: \.self) { d in
                     Text(d)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.3))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -630,10 +639,10 @@ struct CalendarView: View {
                             Image(systemName: "tray.fill")
                                 .font(.system(size: 32, weight: .medium))
                                 .symbolRenderingMode(.monochrome)
-                                .foregroundStyle(.primary.opacity(0.35))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                             Text("暂无事件")
                                 .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.4))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }
                         .padding(.top, 20)
                     } else {
@@ -738,7 +747,7 @@ struct CalendarView: View {
 
                     Text("·  \(occurrences.count)")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.25))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
 
                     Spacer()
                 }
@@ -834,7 +843,7 @@ struct CalendarView: View {
     private func weekdayShort(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = AppLanguage.effectiveLocale
-        formatter.dateFormat = AppLanguage.isEnglish ? "EEE" : "EEE"
+        formatter.dateFormat = "EEE"
         return formatter.string(from: date)
     }
 
@@ -867,15 +876,23 @@ struct CalendarView: View {
     }
 
     private func relativeDate(_ date: Date) -> String {
-        if Calendar.current.isDateInToday(date) { return "今天" }
-        if Calendar.current.isDateInYesterday(date) { return "昨天" }
+        let l = L10n(AppLanguage.code)
+        if Calendar.current.isDateInToday(date) {
+            return l.tr(zh: "今天", en: "Today", de: "Heute")
+        }
+        if Calendar.current.isDateInYesterday(date) {
+            return l.tr(zh: "昨天", en: "Yesterday", de: "Gestern")
+        }
         let formatter = DateFormatter()
         formatter.locale = AppLanguage.effectiveLocale
         let sameYear = Calendar.current.isDate(date, equalTo: Date(), toGranularity: .year)
-        if AppLanguage.isEnglish {
-            formatter.dateFormat = sameYear ? "EEEE, MMM d" : "MMM d, yyyy"
-        } else {
+        switch AppLanguage.code {
+        case "zh":
             formatter.dateFormat = sameYear ? "M月d日 EEEE" : "yyyy年M月d日"
+        case "de":
+            formatter.dateFormat = sameYear ? "EEEE, d. MMM" : "d. MMM yyyy"
+        default:
+            formatter.dateFormat = sameYear ? "EEEE, MMM d" : "MMM d, yyyy"
         }
         return formatter.string(from: date)
     }

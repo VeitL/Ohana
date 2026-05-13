@@ -51,13 +51,13 @@ struct AddDocumentSheet: View {
     private var autoTitle: String { "\(pet.name)\(selectedCategory.rawValue)" }
     private var showDocumentNumber: Bool { selectedCategory == .passport || selectedCategory == .registration }
     private var petThemeColor: Color {
-        Color(hex: pet.themeColorHex.isEmpty ? "C8FF00" : pet.themeColorHex)
+        Color(hex: pet.safeThemeColorHex)
     }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 14) {
                         HStack(spacing: 12) {
@@ -115,7 +115,7 @@ struct AddDocumentSheet: View {
                                                 in: Capsule()
                                             )
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(ScaleButtonStyle())
                                     }
                                 }
                             }
@@ -170,7 +170,7 @@ struct AddDocumentSheet: View {
                         HStack(spacing: 8) {
                             Toggle("", isOn: $hasCost).tint(Color.goPrimary).labelsHidden()
                             if hasCost {
-                                Text(AppCurrency.symbol).foregroundStyle(.secondary)
+                                Text(AppCurrency.symbol).foregroundStyle(Color.ohanaSecondaryText)
                                 GoDraftTextField(
                                     "0.00",
                                     text: $costText,
@@ -209,15 +209,15 @@ struct AddDocumentSheet: View {
                                                 }
                                                 Text("未指定")
                                                     .font(.system(size: 10, weight: .medium, design: .rounded))
-                                                    .foregroundStyle(.secondary)
+                                                    .foregroundStyle(Color.ohanaSecondaryText)
                                             }
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(ScaleButtonStyle())
 
                                         ForEach(humans) { human in
                                             let hid = human.id.uuidString
                                             let isSelected = selectedPayerId == hid
-                                            let themeColor = Color(hex: human.themeColorHex.count == 6 ? human.themeColorHex : "C8FF00")
+                                            let themeColor = Color(hex: human.safeThemeColorHex)
                                             Button { selectedPayerId = hid } label: {
                                                 VStack(spacing: 4) {
                                                     ZStack {
@@ -244,7 +244,7 @@ struct AddDocumentSheet: View {
                                                         .lineLimit(1)
                                                 }
                                             }
-                                            .buttonStyle(.plain)
+                                            .buttonStyle(ScaleButtonStyle())
                                         }
                                     }
                                 }
@@ -258,7 +258,7 @@ struct AddDocumentSheet: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "paperclip")
                                     .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                                 Text("附件" + (attachments.isEmpty ? "" : " (\(attachments.count))"))
                                     .font(.system(size: 14, weight: .semibold, design: .rounded))
                             }
@@ -273,7 +273,7 @@ struct AddDocumentSheet: View {
                                                     Image(uiImage: ui).resizable().scaledToFill()
                                                         .frame(width: 40, height: 40)
                                                         .clipShape(RoundedRectangle(cornerRadius: 8))
-                                                }.buttonStyle(.plain)
+                                                }.buttonStyle(ScaleButtonStyle())
                                             } else {
                                                 Image(systemName: "doc.fill")
                                                     .font(.system(size: 18))
@@ -286,7 +286,7 @@ struct AddDocumentSheet: View {
                                             Spacer()
                                             Button { attachments.removeAll { $0.id == att.id } } label: {
                                                 Image(systemName: "xmark.circle.fill")
-                                                    .foregroundStyle(.secondary.opacity(0.6))
+                                                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.6))
                                             }
                                         }
                                         .padding(10)
@@ -359,7 +359,7 @@ struct AddDocumentSheet: View {
                         .padding(.vertical, 16)
                         .background(petThemeColor, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
                 .padding(16)
             }
@@ -367,7 +367,7 @@ struct AddDocumentSheet: View {
             }
             .navigationTitle("添加证件")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbarBackground(Color.ohanaCardSurface, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -422,7 +422,7 @@ struct AddDocumentSheet: View {
                             Button { previewAttachment = nil } label: {
                                 Image(systemName: "xmark.circle.fill")
                                     .font(.system(size: 28))
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(Color.ohanaPrimaryText)
                                     .shadow(radius: 4)
                             }
                             .padding(16)
@@ -472,7 +472,7 @@ struct AddDocumentSheet: View {
                 .background(color.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
             Text(label)
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.55))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
         }
         .frame(maxWidth: .infinity)
     }
@@ -602,13 +602,13 @@ struct EditDocumentSheet: View {
     }
 
     private var petThemeColor: Color {
-        Color(hex: pet.themeColorHex.isEmpty ? "C8FF00" : pet.themeColorHex)
+        Color(hex: pet.safeThemeColorHex)
     }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 14) {
                         HStack(spacing: 12) {
@@ -666,7 +666,7 @@ struct EditDocumentSheet: View {
                                                 in: Capsule()
                                             )
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(ScaleButtonStyle())
                                     }
                                 }
                             }
@@ -713,7 +713,7 @@ struct EditDocumentSheet: View {
                         HStack(spacing: 8) {
                             Toggle("", isOn: $hasCost).tint(Color.goPrimary).labelsHidden()
                             if hasCost {
-                                Text(AppCurrency.symbol).foregroundStyle(.secondary)
+                                Text(AppCurrency.symbol).foregroundStyle(Color.ohanaSecondaryText)
                                 GoDraftTextField(
                                     "0",
                                     text: $costText,
@@ -743,7 +743,7 @@ struct EditDocumentSheet: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "paperclip")
                                     .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                                 Text("附件")
                                     .font(.system(size: 14, weight: .semibold, design: .rounded))
                             }
@@ -756,10 +756,10 @@ struct EditDocumentSheet: View {
                                         .overlay(alignment: .topTrailing) {
                                             Button { attachmentImage = nil } label: {
                                                 Image(systemName: "xmark.circle.fill")
-                                                    .font(.system(size: 20)).foregroundStyle(.primary).padding(6)
+                                                    .font(.system(size: 20)).foregroundStyle(Color.ohanaPrimaryText).padding(6)
                                             }
                                         }
-                                }.buttonStyle(.plain)
+                                }.buttonStyle(ScaleButtonStyle())
                             } else {
                                 HStack(spacing: 10) {
                                     Button { presentCamera() } label: {
@@ -770,9 +770,9 @@ struct EditDocumentSheet: View {
                                                 .background(petThemeColor.opacity(0.18), in: RoundedRectangle(cornerRadius: 12))
                                             Text("拍照")
                                                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                                .foregroundStyle(.secondary)
+                                                .foregroundStyle(Color.ohanaSecondaryText)
                                         }.frame(maxWidth: .infinity)
-                                    }.buttonStyle(.plain)
+                                    }.buttonStyle(ScaleButtonStyle())
                                     PhotosPicker(selection: $photoPickerItem, matching: .images) {
                                         VStack(spacing: 6) {
                                             Image(systemName: "photo.fill").font(.system(size: 20, weight: .semibold))
@@ -781,7 +781,7 @@ struct EditDocumentSheet: View {
                                                 .background(petThemeColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
                                             Text("相册")
                                                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                                .foregroundStyle(.secondary)
+                                                .foregroundStyle(Color.ohanaSecondaryText)
                                         }.frame(maxWidth: .infinity)
                                     }
                                     .onChange(of: photoPickerItem) { _, item in
@@ -816,7 +816,7 @@ struct EditDocumentSheet: View {
                         .padding(.vertical, 16)
                         .background(petThemeColor, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
                 .padding(16)
             }
@@ -824,7 +824,7 @@ struct EditDocumentSheet: View {
             }
             .navigationTitle("编辑证件")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbarBackground(Color.ohanaCardSurface, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -871,7 +871,7 @@ struct EditDocumentSheet: View {
                     Color.black.ignoresSafeArea()
                     Image(uiImage: img).resizable().scaledToFit().ignoresSafeArea()
                     VStack { HStack { Spacer(); Button { showingPreview = false } label: {
-                        Image(systemName: "xmark.circle.fill").font(.system(size: 28)).foregroundStyle(.primary).padding(16)
+                        Image(systemName: "xmark.circle.fill").font(.system(size: 28)).foregroundStyle(Color.ohanaPrimaryText).padding(16)
                     }}; Spacer() }
                 }
             }

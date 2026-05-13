@@ -24,7 +24,7 @@ struct QuickWeightSheet: View {
         return true
     }
 
-    private var themeColor: Color { Color(hex: pet.themeColorHex.isEmpty ? "C8FF00" : pet.themeColorHex) }
+    private var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -49,17 +49,17 @@ struct QuickWeightSheet: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(pet.name)
                                 .font(.system(size: 16, weight: .black, design: .rounded))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                             Text("记录体重")
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.4))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }
                     }
                     Spacer()
                     Button { dismiss() } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -71,7 +71,7 @@ struct QuickWeightSheet: View {
                     TextField("0.0", text: $weightText)
                         .keyboardType(.decimalPad)
                         .font(.system(size: 64, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                         .minimumScaleFactor(0.4)
                         .focused($focused)
                         .multilineTextAlignment(.center)
@@ -93,7 +93,7 @@ struct QuickWeightSheet: View {
                         Text("上次记录：\(last.weight, specifier: "%.1f") kg")
                             .font(.system(size: 12, weight: .medium, design: .rounded))
                     }
-                    .foregroundStyle(.primary.opacity(0.35))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                     .padding(.top, 10)
                 }
 
@@ -103,10 +103,10 @@ struct QuickWeightSheet: View {
                 HStack(spacing: 10) {
                     Image(systemName: "calendar")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary.opacity(0.4))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     Text("记录日期")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.4))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     Spacer()
                     DatePicker("", selection: $recordDate, in: ...Date(), displayedComponents: [.date])
                         .datePickerStyle(.compact)
@@ -134,12 +134,12 @@ struct QuickWeightSheet: View {
                     )
                 }
                 .disabled(!isValid || didSave)
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
                 .padding(.bottom, 32)
         }
-        .background(.ultraThinMaterial)
+        .background(Color.ohanaCardSurface)
         .presentationBackground(.clear)
         .onAppear { focused = true }
     }

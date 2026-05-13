@@ -17,6 +17,9 @@ struct HumanBasicInfoDetailView: View {
     @Query private var allPets: [Pet]
     @Query private var allHumans: [Human]
 
+    private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
+    private var isViewingOwnProfile: Bool { activeHumanId == human.id }
+
     @State private var isEditing = false
     @State private var showingDeleteSheet = false
     @State private var isDeleting = false
@@ -44,14 +47,14 @@ struct HumanBasicInfoDetailView: View {
     @State private var ePrivateExpense = false
     @State private var ePrivateNote = false
 
-    private let themePresets = ["4338FF", "C8FF00", "38BDF8", "EC4899", "F97316", "EF4444", "14B8A6", "A855F7", "FACC15", "64748B"]
+    private let themePresets = ["F97316", "EC4899", "A855F7", "EF4444", "14B8A6", "FACC15", "8B5CF6", "64748B", "B45309", "DB2777"]
     private let bloodTypeOptions = ["未填写", "A", "B", "AB", "O"]
     private let mbtiOptions = ["未填写", "INTJ", "INTP", "ENTJ", "ENTP", "INFJ", "INFP", "ENFJ", "ENFP", "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP"]
     private let genderOptions = HumanProfileOptions.genderOptions
 
     var body: some View {
         ZStack {
-            ArkBackgroundView()
+            OhanaAppBackground()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
@@ -71,24 +74,26 @@ struct HumanBasicInfoDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                if isEditing {
-                    Button {
-                        saveChanges()
-                        withAnimation { isEditing = false }
-                    } label: {
-                        Text("保存")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.goPrimary)
-                    }
-                } else {
-                    Button {
-                        loadEditState()
-                        withAnimation { isEditing = true }
-                    } label: {
-                        Image(systemName: "pencil.circle.fill")
-                            .font(.system(size: 20))
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(Color.goPrimary)
+                if isViewingOwnProfile {
+                    if isEditing {
+                        Button {
+                            saveChanges()
+                            withAnimation { isEditing = false }
+                        } label: {
+                            Text("保存")
+                                .font(.system(size: 15, weight: .black, design: .rounded))
+                                .foregroundStyle(Color.goPrimary)
+                        }
+                    } else {
+                        Button {
+                            loadEditState()
+                            withAnimation { isEditing = true }
+                        } label: {
+                            Image(systemName: "pencil.circle.fill")
+                                .font(.system(size: 20))
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundStyle(Color.goPrimary)
+                        }
                     }
                 }
             }
@@ -114,7 +119,7 @@ struct HumanBasicInfoDetailView: View {
             )
             .presentationDetents([.height(360), .medium])
             .presentationDragIndicator(.visible)
-            .presentationBackground(.regularMaterial)
+            .presentationBackground(Color.ohanaCardSurface)
         }
     }
 
@@ -123,7 +128,7 @@ struct HumanBasicInfoDetailView: View {
             humanAvatarImage(
                 data: isEditing ? eAvatarImageData : human.avatarImageData,
                 fallbackEmoji: isEditing ? eAvatarEmoji : human.avatarEmoji,
-                accent: isEditing ? Color(hex: eThemeColorHex) : Color(hex: human.themeColorHex),
+                accent: isEditing ? Color(hex: eThemeColorHex) : Color(hex: human.safeThemeColorHex),
                 size: 112
             )
 
@@ -134,7 +139,7 @@ struct HumanBasicInfoDetailView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.62)
                 HStack(spacing: 8) {
-                    chip(isEditing ? roleLabel(for: eRole) : human.roleText, color: isEditing ? Color(hex: eThemeColorHex) : Color(hex: human.themeColorHex))
+                    chip(isEditing ? roleLabel(for: eRole) : human.roleText, color: isEditing ? Color(hex: eThemeColorHex) : Color(hex: human.safeThemeColorHex))
                     if let birthday = isEditing && eHasBirthday ? eBirthday : human.birthday {
                         chip(isEditing && eHasBirthday ? humanAgeText(for: birthday) : human.ageText, color: Color.goPrimary)
                         chip(Human.westernZodiacChinese(for: birthday), color: Color.goPurple)
@@ -223,14 +228,14 @@ struct HumanBasicInfoDetailView: View {
                 infoRow(label: "隐私项目", value: privacySummary)
             }
 
-            infoSection(title: "主题色", icon: "paintpalette.fill", iconColor: Color(hex: human.themeColorHex)) {
+            infoSection(title: "主题色", icon: "paintpalette.fill", iconColor: Color(hex: human.safeThemeColorHex)) {
                 HStack(spacing: 10) {
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(hex: human.themeColorHex))
+                        .fill(Color(hex: human.safeThemeColorHex))
                         .frame(width: 32, height: 32)
-                    Text("#\(human.themeColorHex.uppercased())")
+                    Text("#\(human.safeThemeColorHex.uppercased())")
                         .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.primary.opacity(0.8))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                 }
             }
 
@@ -238,12 +243,14 @@ struct HumanBasicInfoDetailView: View {
                 infoSection(title: "备注", icon: "note.text", iconColor: Color.goOrange) {
                     Text(displayNotes)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.primary.opacity(0.7))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
 
-            deleteDangerZone
+            if isViewingOwnProfile {
+                deleteDangerZone
+            }
         }
     }
 
@@ -336,11 +343,11 @@ struct HumanBasicInfoDetailView: View {
                                     Circle().strokeBorder(.white, lineWidth: 2.5)
                                     Image(systemName: "checkmark")
                                         .font(.system(size: 11, weight: .black))
-                                        .foregroundStyle(.primary)
+                                        .foregroundStyle(Color.ohanaPrimaryText)
                                 }
                             }
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                     }
                 }
             }
@@ -369,7 +376,7 @@ struct HumanBasicInfoDetailView: View {
                     .background(Color.goRed.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .disabled(isDeleting)
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
         }
         .padding(14)
         .goTranslucentCard(cornerRadius: 16)
@@ -385,7 +392,7 @@ struct HumanBasicInfoDetailView: View {
                     .background(iconColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 Text(title)
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
             }
             VStack(spacing: 10) { content() }
         }
@@ -401,11 +408,11 @@ struct HumanBasicInfoDetailView: View {
         HStack(alignment: .firstTextBaseline) {
             Text(label)
                 .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
             Spacer(minLength: 16)
             Text(value)
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.85))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.85))
                 .multilineTextAlignment(.trailing)
         }
     }
@@ -413,7 +420,7 @@ struct HumanBasicInfoDetailView: View {
     private func editLabel(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 13, weight: .semibold, design: .rounded))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.ohanaSecondaryText)
     }
 
     private func editField(_ title: String, text: Binding<String>) -> some View {
@@ -455,7 +462,7 @@ struct HumanBasicInfoDetailView: View {
                 Spacer()
                 Text(heightValue > 0 ? "\(Int(heightValue)) cm" : "未填写")
                     .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.82))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.82))
             }
             HStack(spacing: 8) {
                 ForEach(["未填写", "160", "165", "170", "175", "180"], id: \.self) { option in
@@ -469,7 +476,7 @@ struct HumanBasicInfoDetailView: View {
                             .padding(.vertical, 7)
                             .background(heightOptionSelected(option) ? Color.goPrimary : Color.primary.opacity(0.07), in: Capsule())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
             Stepper(
@@ -482,7 +489,7 @@ struct HumanBasicInfoDetailView: View {
             ) {
                 Text("微调 80-230 cm")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
     }
@@ -527,7 +534,7 @@ struct HumanBasicInfoDetailView: View {
                             .padding(.vertical, 7)
                             .background(selected ? accent : Color.primary.opacity(0.07), in: Capsule())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
         }
@@ -591,7 +598,7 @@ struct HumanBasicInfoDetailView: View {
         eMBTI = human.mbti
         eNationality = human.nationality
         eCity = human.city
-        eThemeColorHex = human.themeColorHex.isEmpty ? "4338FF" : human.themeColorHex
+        eThemeColorHex = human.safeThemeColorHex
         eShouldShowOnHome = human.shouldShowOnHome
         eNotes = displayNotes
         ePrivateWeight = human.privateFields.contains(HumanPrivateField.weight.rawValue)
@@ -618,7 +625,10 @@ struct HumanBasicInfoDetailView: View {
         human.mbti = eMBTI.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         human.nationality = eNationality.trimmingCharacters(in: .whitespacesAndNewlines)
         human.city = eCity.trimmingCharacters(in: .whitespacesAndNewlines)
-        human.themeColorHex = eThemeColorHex
+        human.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
+            eThemeColorHex,
+            fallback: OhanaThemeColorPolicy.humanFallbackHex
+        )
         human.shouldShowOnHome = eShouldShowOnHome
 
         var noteParts: [String] = []
@@ -643,17 +653,27 @@ struct HumanBasicInfoDetailView: View {
 
         let target = human
         let deletedHumanId = target.id.uuidString
-        let fallbackHumanId = allHumans.first(where: { $0.id.uuidString != deletedHumanId })?.id.uuidString ?? ""
+        let hasRemainingHuman = allHumans.contains { $0.id.uuidString != deletedHumanId }
+        let deletedCurrentHuman = activeHumanIdStr == deletedHumanId
+        let requiresReplacementHuman = !hasRemainingHuman
+        let requiresAccountSwitch = deletedCurrentHuman && hasRemainingHuman
 
-        if activeHumanIdStr == deletedHumanId {
-            activeHumanIdStr = fallbackHumanId
+        if deletedCurrentHuman || requiresReplacementHuman {
+            activeHumanIdStr = ""
         }
 
         dismiss()
         DispatchQueue.main.async {
             modelContext.delete(target)
             modelContext.safeSave()
-            NotificationCenter.default.post(name: .ohanaReturnHomeAfterHumanDeletion, object: nil)
+            NotificationCenter.default.post(
+                name: .ohanaReturnHomeAfterHumanDeletion,
+                object: nil,
+                userInfo: [
+                    "requiresReplacementHuman": requiresReplacementHuman,
+                    "requiresAccountSwitch": requiresAccountSwitch
+                ]
+            )
         }
     }
 }
@@ -671,7 +691,7 @@ private struct HumanDeleteConfirmationSheet: View {
 
     var body: some View {
         ZStack {
-            ArkBackgroundView()
+            OhanaAppBackground()
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 12) {
                     Image(systemName: "trash.fill")
@@ -682,26 +702,26 @@ private struct HumanDeleteConfirmationSheet: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("删除成员 \(humanName)")
                             .font(.system(size: 18, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text("输入名字后才能继续")
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
                     Button(action: onCancel) {
                         Image(systemName: "xmark")
                             .font(.system(size: 12, weight: .black))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                             .frame(width: 34, height: 34)
                             .background(Color.primary.opacity(0.08), in: Circle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text("这会删除成员资料、体重与运动记录，无法撤销。")
                         .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.68))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.68))
                     Text("请输入：\(humanName)")
                         .font(.system(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goRed.opacity(0.8))
@@ -722,12 +742,12 @@ private struct HumanDeleteConfirmationSheet: View {
                     Button(action: onCancel) {
                         Text("取消")
                             .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.72))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
                             .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
 
                     Button(action: onDelete) {
                         Text("删除")
@@ -737,7 +757,7 @@ private struct HumanDeleteConfirmationSheet: View {
                             .padding(.vertical, 13)
                             .background(canDelete ? Color.goRed : Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                     .disabled(!canDelete)
                 }
             }

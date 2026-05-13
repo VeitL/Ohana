@@ -13,10 +13,12 @@ import UIKit
 @Observable
 final class LocationManager: NSObject, CLLocationManagerDelegate {
     static let shared = LocationManager()
+    static let backgroundWalkTrackingEnabledKey = "ohana_walk_background_route_enabled_v2"
+    private static let legacyBackgroundWalkTrackingEnabledKey = "ohana_walk_background_tracking_enabled"
+    private static let backgroundUpgradePromptedKey = "ohana_walk_background_route_prompted_v2"
     
     private let manager = CLLocationManager()
-    // 任务六：iOS 17+ CLBackgroundActivitySession，WhenInUse 下也可后台追踪
-    private var backgroundSession: AnyObject? = nil  // CLBackgroundActivitySession（类型擦除避免 iOS<17 符号引用）
+    private var backgroundSession: AnyObject?
 
     var currentLocation: CLLocation?
     var collectedLocations: [CLLocation] = []
@@ -29,18 +31,14 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
     private let minimumRoutePointDistance: CLLocationDistance = 8
     private let maximumRoutePointInterval: TimeInterval = 18
     private let maximumPlausibleSpeed: CLLocationSpeed = 12
-    
-    /// 当前设备是否支持后台定位更新（需 UIBackgroundModes 包含 location）
-    private var canUseBackgroundLocation: Bool {
-        // 1. 模拟器不支持后台定位
-        #if targetEnvironment(simulator)
-        return false
-        #else
-        // 2. 检查系统是否允许后台刷新
-        guard UIApplication.shared.backgroundRefreshStatus == .available else { return false }
-        // 3. 需要 Always 或 WhenInUse 权限
-        return authorizationStatus == .authorizedAlways || authorizationStatus == .authorizedWhenInUse
-        #endif
+    private var backgroundWalkTrackingEnabled: Bool {
+        UserDefaults.standard.bool(forKey: Self.backgroundWalkTrackingEnabledKey)
+    }
+
+    var canContinueCurrentWalkInBackground: Bool {
+        isTracking && backgroundWalkTrackingEnabled && (
+            authorizationStatus == .authorizedAlways || authorizationStatus == .authorizedWhenInUse
+        )
     }
 
     private override init() {
@@ -51,23 +49,52 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         manager.activityType = .fitness
         manager.pausesLocationUpdatesAutomatically = false
         authorizationStatus = manager.authorizationStatus
+        UserDefaults.standard.set(false, forKey: Self.legacyBackgroundWalkTrackingEnabledKey)
+        stopAllLocationActivity()
     }
     
     // MARK: - Permission
     func requestPermission() {
         if authorizationStatus == .notDetermined {
             manager.requestWhenInUseAuthorization()
-        } else if authorizationStatus == .authorizedWhenInUse {
-            manager.requestAlwaysAuthorization()
         }
     }
 
     /// 是否已拥有 Always 权限（后台遛狗最优模式）
     var isAlwaysAuthorized: Bool { authorizationStatus == .authorizedAlways }
 
-    /// 主动请求升级到 Always（仅在 WhenInUse 状态下有效）
+    func setBackgroundWalkTrackingEnabled(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: Self.backgroundWalkTrackingEnabledKey)
+        if enabled {
+            requestBackgroundTrackingAuthorizationIfNeeded()
+            if isTracking {
+                beginBackgroundTrackingIfNeeded()
+            }
+        } else {
+            endBackgroundTracking()
+        }
+    }
+
     func upgradeToAlways() {
-        guard authorizationStatus == .authorizedWhenInUse else { return }
+        setBackgroundWalkTrackingEnabled(true)
+    }
+
+    private func requestBackgroundTrackingAuthorizationIfNeeded() {
+        switch authorizationStatus {
+        case .notDetermined:
+            manager.requestWhenInUseAuthorization()
+        case .authorizedWhenInUse:
+            requestAlwaysUpgradeOnce()
+        case .denied, .restricted:
+            UserDefaults.standard.set(false, forKey: Self.backgroundWalkTrackingEnabledKey)
+        default:
+            break
+        }
+    }
+
+    private func requestAlwaysUpgradeOnce() {
+        guard !UserDefaults.standard.bool(forKey: Self.backgroundUpgradePromptedKey) else { return }
+        UserDefaults.standard.set(true, forKey: Self.backgroundUpgradePromptedKey)
         manager.requestAlwaysAuthorization()
     }
     
@@ -84,54 +111,71 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         isTracking = true
         manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
         manager.distanceFilter = 8
-
-        #if !targetEnvironment(simulator)
-        // 任务六：iOS 17+ — 用 CLBackgroundActivitySession 在 WhenInUse 授权下保持后台追踪
-        // 此 Session 在 App 进入后台时保持 "in use" 状态，无需 Always 权限
-        if #available(iOS 17.0, *) {
-            backgroundSession = CLBackgroundActivitySession()
-        } else if canUseBackgroundLocation {
-            manager.allowsBackgroundLocationUpdates = true
-            manager.showsBackgroundLocationIndicator = true
-        }
-        #endif
+        beginBackgroundTrackingIfNeeded()
 
         manager.startUpdatingLocation()
     }
     
     func stopTracking() {
         isTracking = false
+        pendingStart = false
         manager.stopUpdatingLocation()
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
         manager.distanceFilter = kCLDistanceFilterNone
-
-        #if !targetEnvironment(simulator)
-        // 任务六：销毁后台 session
-        if #available(iOS 17.0, *) {
-            (backgroundSession as? CLBackgroundActivitySession)?.invalidate()
-            backgroundSession = nil
-        } else if canUseBackgroundLocation {
-            manager.allowsBackgroundLocationUpdates = false
-            manager.showsBackgroundLocationIndicator = false
-        }
-        #endif
+        endBackgroundTracking()
     }
     
     func pauseTracking() {
         isTracking = false
+        pendingStart = false
         manager.stopUpdatingLocation()
-        // 暂停时保留后台权限，但停止更新
+        endBackgroundTracking()
     }
     
     func resumeTracking() {
         isTracking = true
         manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
         manager.distanceFilter = 8
-        if canUseBackgroundLocation {
+        beginBackgroundTrackingIfNeeded()
+        manager.startUpdatingLocation()
+    }
+
+    private func beginBackgroundTrackingIfNeeded() {
+        guard backgroundWalkTrackingEnabled else {
+            endBackgroundTracking()
+            return
+        }
+
+        #if !targetEnvironment(simulator)
+        if #available(iOS 17.0, *) {
+            if backgroundSession == nil {
+                backgroundSession = CLBackgroundActivitySession()
+            }
+        } else if authorizationStatus == .authorizedAlways {
             manager.allowsBackgroundLocationUpdates = true
             manager.showsBackgroundLocationIndicator = true
         }
-        manager.startUpdatingLocation()
+        #endif
+    }
+
+    func stopAllLocationActivity() {
+        isTracking = false
+        pendingStart = false
+        manager.stopUpdatingLocation()
+        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        manager.distanceFilter = kCLDistanceFilterNone
+        endBackgroundTracking()
+    }
+
+    private func endBackgroundTracking() {
+        #if !targetEnvironment(simulator)
+        if #available(iOS 17.0, *) {
+            (backgroundSession as? CLBackgroundActivitySession)?.invalidate()
+            backgroundSession = nil
+        }
+        manager.allowsBackgroundLocationUpdates = false
+        manager.showsBackgroundLocationIndicator = false
+        #endif
     }
     
     // MARK: - CLLocationManagerDelegate
@@ -194,6 +238,16 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
     
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         authorizationStatus = manager.authorizationStatus
+
+        if backgroundWalkTrackingEnabled &&
+            (authorizationStatus == .denied || authorizationStatus == .restricted) {
+            UserDefaults.standard.set(false, forKey: Self.backgroundWalkTrackingEnabledKey)
+            endBackgroundTracking()
+        }
+
+        if backgroundWalkTrackingEnabled && authorizationStatus == .authorizedWhenInUse {
+            requestAlwaysUpgradeOnce()
+        }
         
         if pendingStart && (authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways) {
             pendingStart = false

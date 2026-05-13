@@ -1,0 +1,1392 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ohana Interactive UI Spec</title>
+  <style>
+    :root {
+      --go-primary: #c8ff00;
+      --go-primary-light: #e0ff80;
+      --go-primary-dark: #9ecc00;
+      --go-teal: #00d4aa;
+      --go-yellow: #fff44f;
+      --go-orange: #ff8c42;
+      --go-red: #ff4757;
+      --go-blue: #3b82f6;
+      --go-purple: #a855f7;
+      --ink: #1a1a2e;
+      --bg-a: #f4f7ff;
+      --bg-b: #eaf0ff;
+      --bg-c: #dde8ff;
+      --surface: rgba(255,255,255,.88);
+      --surface-strong: #ffffff;
+      --surface-soft: rgba(255,255,255,.62);
+      --stroke: rgba(26,26,46,.08);
+      --text: #1a1a2e;
+      --muted: rgba(26,26,46,.62);
+      --faint: rgba(26,26,46,.42);
+      --shadow: 0 18px 48px rgba(12,22,64,.13);
+      --radius-page: 28px;
+      --radius-card: 22px;
+      --radius-inner: 14px;
+      --sidebar: 292px;
+      color-scheme: light;
+    }
+
+    [data-theme="dark"] {
+      --bg-a: #2d4ecc;
+      --bg-b: #1a2e8a;
+      --bg-c: #0c1640;
+      --surface: rgba(255,255,255,.075);
+      --surface-strong: rgba(255,255,255,.11);
+      --surface-soft: rgba(255,255,255,.055);
+      --stroke: rgba(255,255,255,.13);
+      --text: #f8fafc;
+      --muted: rgba(255,255,255,.64);
+      --faint: rgba(255,255,255,.42);
+      --shadow: 0 18px 48px rgba(0,0,0,.26);
+      color-scheme: dark;
+    }
+
+    [data-density="compact"] {
+      --radius-card: 18px;
+      --radius-inner: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: ui-rounded, "SF Pro Rounded", "PingFang SC", "Hiragino Sans GB", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 18% -8%, color-mix(in srgb, var(--go-primary) 26%, transparent), transparent 32rem),
+        radial-gradient(circle at 100% 16%, color-mix(in srgb, var(--go-blue) 22%, transparent), transparent 28rem),
+        linear-gradient(160deg, var(--bg-a), var(--bg-b) 48%, var(--bg-c));
+      letter-spacing: 0;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: linear-gradient(rgba(255,255,255,.028) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px);
+      background-size: 28px 28px;
+      mask-image: linear-gradient(to bottom, black, transparent 78%);
+    }
+
+    a { color: inherit; }
+
+    button, input, select {
+      font: inherit;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: var(--sidebar) minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 22px 18px;
+      border-right: 1px solid var(--stroke);
+      background: color-mix(in srgb, var(--surface) 88%, transparent);
+      backdrop-filter: blur(22px);
+      overflow: auto;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .logo {
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      border-radius: 16px;
+      color: #1a1a2e;
+      background: linear-gradient(135deg, var(--go-primary), var(--go-teal));
+      box-shadow: 0 10px 24px rgba(200,255,0,.24);
+      font-size: 24px;
+      font-weight: 900;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1;
+      letter-spacing: .02em;
+    }
+
+    .brand p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .control-stack {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .search {
+      width: 100%;
+      height: 42px;
+      border: 1px solid var(--stroke);
+      border-radius: 14px;
+      padding: 0 13px;
+      color: var(--text);
+      background: var(--surface-soft);
+      outline: none;
+    }
+
+    .toggle-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .segmented {
+      display: flex;
+      padding: 4px;
+      border: 1px solid var(--stroke);
+      border-radius: 14px;
+      background: var(--surface-soft);
+    }
+
+    .segmented button {
+      flex: 1;
+      border: 0;
+      min-height: 32px;
+      border-radius: 10px;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .segmented button[aria-pressed="true"] {
+      color: #1a1a2e;
+      background: var(--go-primary);
+    }
+
+    .nav-title {
+      margin: 18px 8px 8px;
+      color: var(--faint);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    .nav {
+      display: grid;
+      gap: 5px;
+    }
+
+    .nav a {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 38px;
+      padding: 0 10px 0 12px;
+      border-radius: 13px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .nav a:hover,
+    .nav a.active {
+      color: var(--text);
+      background: var(--surface-soft);
+    }
+
+    .nav code {
+      color: var(--faint);
+      font-size: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    main {
+      min-width: 0;
+      padding: 28px;
+    }
+
+    .hero {
+      min-height: 430px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 390px;
+      gap: 28px;
+      align-items: center;
+      padding: 34px;
+      border: 1px solid var(--stroke);
+      border-radius: var(--radius-page);
+      background: linear-gradient(135deg, color-mix(in srgb, var(--surface) 92%, transparent), color-mix(in srgb, var(--surface-soft) 72%, transparent));
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .hero h2 {
+      max-width: 820px;
+      margin: 0;
+      font-size: clamp(36px, 6vw, 72px);
+      line-height: .96;
+      letter-spacing: 0;
+    }
+
+    .hero p {
+      max-width: 780px;
+      margin: 22px 0 0;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.72;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 26px;
+    }
+
+    .btn {
+      border: 0;
+      min-height: 42px;
+      padding: 0 16px;
+      border-radius: 999px;
+      color: var(--text);
+      background: var(--surface-soft);
+      cursor: pointer;
+      font-weight: 900;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn.primary {
+      color: #1a1a2e;
+      background: var(--go-primary);
+      box-shadow: 0 12px 26px rgba(200,255,0,.22);
+    }
+
+    .btn.icon {
+      width: 42px;
+      padding: 0;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .phone {
+      width: min(100%, 390px);
+      margin-inline: auto;
+      aspect-ratio: 390 / 844;
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 48px;
+      padding: 14px;
+      background: #080b18;
+      box-shadow: 0 28px 70px rgba(0,0,0,.3);
+    }
+
+    .phone-screen {
+      height: 100%;
+      border-radius: 38px;
+      overflow: hidden;
+      background: linear-gradient(180deg, #2d4ecc, #1a2e8a 46%, #0c1640);
+      color: white;
+      position: relative;
+      padding: 22px 18px;
+    }
+
+    .phone-status {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: rgba(255,255,255,.74);
+      font-size: 11px;
+      font-weight: 900;
+      margin-bottom: 24px;
+    }
+
+    .wallet-card {
+      min-height: 238px;
+      border-radius: 30px;
+      padding: 20px;
+      color: #1a1a2e;
+      background: linear-gradient(145deg, #ffc2d6, #c8ff00);
+      box-shadow: 0 24px 46px rgba(0,0,0,.26);
+      transform: rotate(-1deg);
+    }
+
+    .wallet-card:nth-child(2) {
+      position: absolute;
+      top: 126px;
+      left: 30px;
+      right: 30px;
+      z-index: -1;
+      transform: rotate(3deg) translateY(26px) scale(.94);
+      opacity: .68;
+      background: linear-gradient(145deg, #80ffea, #5b6aff);
+    }
+
+    .wallet-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 22px;
+    }
+
+    .avatar {
+      width: 72px;
+      height: 72px;
+      display: grid;
+      place-items: center;
+      border-radius: 24px;
+      background: rgba(255,255,255,.55);
+      font-size: 38px;
+    }
+
+    .wallet-card h3 {
+      margin: 0;
+      font-size: 38px;
+      line-height: .9;
+    }
+
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 22px;
+    }
+
+    .quick-action {
+      display: grid;
+      place-items: center;
+      gap: 5px;
+      min-height: 58px;
+      border-radius: 16px;
+      background: rgba(26,26,46,.09);
+      font-size: 10px;
+      font-weight: 900;
+    }
+
+    .today-preview {
+      margin-top: 94px;
+      padding: 14px;
+      border-radius: 24px;
+      color: var(--ink);
+      background: rgba(255,255,255,.94);
+    }
+
+    .today-preview strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 12px;
+      letter-spacing: .16em;
+    }
+
+    .today-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      color: rgba(26,26,46,.7);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    section {
+      scroll-margin-top: 22px;
+      margin-top: 28px;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 18px;
+      margin: 0 2px 14px;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.12;
+    }
+
+    .section-head p {
+      max-width: 700px;
+      margin: 6px 0 0;
+      color: var(--muted);
+      line-height: 1.62;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 14px;
+    }
+
+    .card {
+      border: 1px solid var(--stroke);
+      border-radius: var(--radius-card);
+      padding: 18px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .card.compact {
+      padding: 14px;
+    }
+
+    .span-3 { grid-column: span 3; }
+    .span-4 { grid-column: span 4; }
+    .span-5 { grid-column: span 5; }
+    .span-6 { grid-column: span 6; }
+    .span-7 { grid-column: span 7; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: 1 / -1; }
+
+    .eyebrow {
+      color: var(--faint);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    .card h3 {
+      margin: 7px 0 8px;
+      font-size: 18px;
+      line-height: 1.18;
+    }
+
+    .card p,
+    .card li {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.62;
+    }
+
+    .card ul {
+      margin: 10px 0 0;
+      padding-left: 18px;
+    }
+
+    .token-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+    }
+
+    .token {
+      min-height: 98px;
+      padding: 13px;
+      border-radius: 16px;
+      border: 1px solid var(--stroke);
+      background: var(--surface-soft);
+    }
+
+    .swatch {
+      height: 34px;
+      border-radius: 11px;
+      margin-bottom: 10px;
+      border: 1px solid rgba(255,255,255,.25);
+    }
+
+    .token b {
+      display: block;
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .token code {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 11px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .type-sample {
+      display: grid;
+      gap: 8px;
+    }
+
+    .type-row {
+      display: grid;
+      grid-template-columns: 140px 1fr 76px;
+      gap: 14px;
+      align-items: baseline;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--stroke);
+    }
+
+    .type-row:last-child { border-bottom: 0; }
+
+    .type-row code {
+      color: var(--faint);
+      font-size: 11px;
+    }
+
+    .metric { font-size: 36px; font-weight: 950; line-height: 1; }
+    .large-title { font-size: 30px; font-weight: 900; }
+    .title { font-size: 24px; font-weight: 900; }
+    .headline { font-size: 17px; font-weight: 850; }
+    .body { font-size: 15px; }
+    .callout { font-size: 13px; }
+    .caption { font-size: 11px; }
+
+    .component-lab {
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr);
+      gap: 16px;
+    }
+
+    .lab-controls {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .control-card {
+      padding: 13px;
+      border: 1px solid var(--stroke);
+      border-radius: 17px;
+      background: var(--surface-soft);
+    }
+
+    .control-card label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .control-card select {
+      width: 100%;
+      height: 38px;
+      border: 1px solid var(--stroke);
+      border-radius: 12px;
+      padding: 0 10px;
+      color: var(--text);
+      background: var(--surface);
+    }
+
+    .lab-preview {
+      min-height: 360px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--stroke);
+      border-radius: 22px;
+      background:
+        linear-gradient(145deg, color-mix(in srgb, var(--go-blue) 16%, transparent), transparent),
+        var(--surface-soft);
+      padding: 20px;
+    }
+
+    .demo-stack {
+      width: min(100%, 470px);
+      display: grid;
+      gap: 13px;
+    }
+
+    .demo-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid var(--stroke);
+      border-radius: var(--radius-inner);
+      background: var(--surface);
+    }
+
+    .demo-icon {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      border-radius: 14px;
+      color: #1a1a2e;
+      background: var(--go-primary);
+      font-weight: 900;
+    }
+
+    .demo-title {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .demo-title b {
+      display: block;
+      font-size: 14px;
+    }
+
+    .demo-title span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 3px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      color: var(--muted);
+      background: var(--surface-soft);
+      font-size: 12px;
+      font-weight: 850;
+      white-space: nowrap;
+    }
+
+    .pill.good { color: #073d32; background: color-mix(in srgb, var(--go-teal) 26%, white); }
+    .pill.warn { color: #443700; background: color-mix(in srgb, var(--go-yellow) 30%, white); }
+    .pill.danger { color: #4a0710; background: color-mix(in srgb, var(--go-red) 24%, white); }
+
+    [data-theme="dark"] .pill.good,
+    [data-theme="dark"] .pill.warn,
+    [data-theme="dark"] .pill.danger {
+      color: #f8fafc;
+      background: rgba(255,255,255,.1);
+    }
+
+    .blueprint {
+      display: grid;
+      gap: 12px;
+    }
+
+    .blueprint-row {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .blueprint-label {
+      display: grid;
+      place-items: center;
+      min-height: 62px;
+      border-radius: 16px;
+      color: #1a1a2e;
+      background: var(--go-primary);
+      font-size: 12px;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .blueprint-content {
+      padding: 13px;
+      border: 1px solid var(--stroke);
+      border-radius: 16px;
+      background: var(--surface-soft);
+    }
+
+    .blueprint-content b {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .blueprint-content span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .checklist {
+      display: grid;
+      gap: 9px;
+    }
+
+    .check-item {
+      display: grid;
+      grid-template-columns: 24px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid var(--stroke);
+      border-radius: 15px;
+      background: var(--surface-soft);
+    }
+
+    .check-item input {
+      width: 20px;
+      height: 20px;
+      accent-color: var(--go-primary);
+    }
+
+    .check-item span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .code-map {
+      display: grid;
+      gap: 10px;
+    }
+
+    .code-line {
+      display: grid;
+      grid-template-columns: minmax(190px, .8fr) minmax(0, 1.2fr);
+      gap: 10px;
+      align-items: center;
+      padding: 11px 12px;
+      border: 1px solid var(--stroke);
+      border-radius: 14px;
+      background: var(--surface-soft);
+    }
+
+    .code-line code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      color: var(--go-primary);
+      overflow-wrap: anywhere;
+    }
+
+    [data-theme="light"] .code-line code { color: #496000; }
+
+    .code-line span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .hidden { display: none !important; }
+
+    .footer {
+      margin: 26px 0 8px;
+      color: var(--faint);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    @media (max-width: 1060px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar {
+        position: relative;
+        height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--stroke);
+      }
+      .nav { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+      .hero { grid-template-columns: 1fr; }
+      .phone { max-width: 340px; }
+      .component-lab { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 760px) {
+      main { padding: 16px; }
+      .hero { padding: 22px; }
+      .grid { grid-template-columns: 1fr; }
+      .span-3, .span-4, .span-5, .span-6, .span-7, .span-8, .span-12 { grid-column: 1; }
+      .section-head { display: block; }
+      .type-row { grid-template-columns: 1fr; gap: 5px; }
+      .blueprint-row { grid-template-columns: 1fr; }
+      .code-line { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body data-theme="dark" data-density="comfortable">
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">O</div>
+        <div>
+          <h1>Ohana UI Spec</h1>
+          <p>交互式规范 · GO Focus · SwiftUI</p>
+        </div>
+      </div>
+
+      <div class="control-stack">
+        <input id="search" class="search" type="search" placeholder="搜索组件、规则、代码映射" />
+        <div class="toggle-row">
+          <div class="segmented" aria-label="主题">
+            <button id="themeDark" type="button" aria-pressed="true">深色</button>
+            <button id="themeLight" type="button" aria-pressed="false">浅色</button>
+          </div>
+          <div class="segmented" aria-label="密度">
+            <button id="densityComfort" type="button" aria-pressed="true">舒适</button>
+            <button id="densityCompact" type="button" aria-pressed="false">紧凑</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-title">Sections</div>
+      <nav class="nav" id="nav">
+        <a href="#overview" class="active">总览 <code>00</code></a>
+        <a href="#principles">设计原则 <code>01</code></a>
+        <a href="#foundations">Foundations <code>02</code></a>
+        <a href="#components">组件规范 <code>03</code></a>
+        <a href="#screens">页面蓝图 <code>04</code></a>
+        <a href="#interaction">交互与动效 <code>05</code></a>
+        <a href="#accessibility">可访问性 <code>06</code></a>
+        <a href="#implementation">实现映射 <code>07</code></a>
+        <a href="#checklist">检查清单 <code>08</code></a>
+      </nav>
+    </aside>
+
+    <main>
+      <section id="overview" class="hero searchable" data-search="overview go focus 首页 钱包卡 today focus swiftui ohana">
+        <div>
+          <div class="eyebrow">Interactive UI Specification</div>
+          <h2>Ohana 是家庭照护工作台，不是营销页。</h2>
+          <p>这份规范把现有 SwiftUI 代码、`ui规范.md`、GO Focus 首页结构和项目文档整理成一个可交互的 HTML 工作台。它用于新增页面、重构界面、给设计或开发对齐组件状态，也用于让后续代理按同一套规则行动。</p>
+          <div class="hero-actions">
+            <a class="btn primary" href="#components">查看组件实验台</a>
+            <a class="btn" href="#checklist">进入 UI 检查清单</a>
+            <button class="btn icon" type="button" id="randomState" title="随机组件状态">↻</button>
+          </div>
+        </div>
+        <div class="phone" aria-label="Ohana GO Focus preview">
+          <div class="phone-screen">
+            <div class="phone-status"><span>9:41</span><span>GO FOCUS</span><span>🥥 66</span></div>
+            <div style="position:relative; z-index:1;">
+              <div class="wallet-card">
+                <div class="wallet-head">
+                  <div>
+                    <div class="eyebrow" style="color:rgba(26,26,46,.48)">PET WALLET</div>
+                    <h3>Luna</h3>
+                  </div>
+                  <div class="avatar">🐱</div>
+                </div>
+                <div class="pill" style="background:rgba(255,255,255,.5); color:#1a1a2e;">12 天连续照护</div>
+                <div class="quick-actions">
+                  <div class="quick-action">🍽<span>FEED</span></div>
+                  <div class="quick-action">💧<span>WATER</span></div>
+                  <div class="quick-action">🧹<span>LITTER</span></div>
+                  <div class="quick-action">✨<span>PLAY</span></div>
+                </div>
+              </div>
+              <div class="wallet-card" aria-hidden="true"></div>
+            </div>
+            <div class="today-preview">
+              <strong>TODAY FOCUS</strong>
+              <div class="today-row"><span>晚餐还差 1 次记录</span><span class="pill warn">+3 🥥</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="principles" class="searchable" data-search="原则 信息密度 圆润 克制 状态 深浅色 性能">
+        <div class="section-head">
+          <div>
+            <h2>1. 设计原则</h2>
+            <p>Ohana 的视觉应该轻快、亲近，但交互本质是高频照护工具。优先可扫描、可重复操作、少解释、多状态。</p>
+          </div>
+        </div>
+        <div class="grid">
+          <article class="card span-4">
+            <div class="eyebrow">Density</div>
+            <h3>信息密度优先</h3>
+            <p>首页只回答“今天谁需要照顾、现在最该做什么、点一下如何完成”。避免常驻长教程、营销式标题和装饰性大模块。</p>
+          </article>
+          <article class="card span-4">
+            <div class="eyebrow">Tone</div>
+            <h3>圆润但克制</h3>
+            <p>胶囊按钮、柔和圆角、轻量半透明表面是 Ohana 的基本语气。卡片可以温柔，但不要卡片套卡片。</p>
+          </article>
+          <article class="card span-4">
+            <div class="eyebrow">State</div>
+            <h3>状态可读</h3>
+            <p>完成、进行中、异常、隐私、逾期都要用文字、图标、颜色共同表达。颜色不能成为唯一信息来源。</p>
+          </article>
+          <article class="card span-6">
+            <div class="eyebrow">Theme</div>
+            <h3>深浅色同步</h3>
+            <p>背景、卡片、描边、文字、图表、控件必须一起响应主题。普通卡片和正文禁止硬编码纯白或纯黑。</p>
+          </article>
+          <article class="card span-6">
+            <div class="eyebrow">Performance</div>
+            <h3>性能稳定</h3>
+            <p>首页、设置、表单和详情页避免高风险重型玻璃效果。大列表使用 `ScrollView + LazyVStack`，动效受低电量和 Reduce Motion 约束。</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="foundations" class="searchable" data-search="颜色 字体 排版 token goPrimary goTeal goYellow goRed goBlue OhanaFont cnFont">
+        <div class="section-head">
+          <div>
+            <h2>2. Foundations</h2>
+            <p>颜色和排版来自 `ColorExtensions.swift`、`OhanaDesignSystem.swift` 与现有 UI 规范。主色当前是荧光绿 `Color.goPrimary = #C8FF00`。</p>
+          </div>
+        </div>
+
+        <div class="grid">
+          <article class="card span-12">
+            <div class="eyebrow">Color Tokens</div>
+            <h3>语义色板</h3>
+            <div class="token-grid">
+              <div class="token"><div class="swatch" style="background:#c8ff00"></div><b>goPrimary</b><code>#C8FF00 · 主操作 / 选中 / 奖励</code></div>
+              <div class="token"><div class="swatch" style="background:#00d4aa"></div><b>goTeal</b><code>#00D4AA · 完成 / 健康 / 成功</code></div>
+              <div class="token"><div class="swatch" style="background:#fff44f"></div><b>goYellow</b><code>#FFF44F · 注意 / 隐私 / 进行中</code></div>
+              <div class="token"><div class="swatch" style="background:#ff4757"></div><b>goRed</b><code>#FF4757 · 错误 / 删除 / 异常</code></div>
+              <div class="token"><div class="swatch" style="background:#3b82f6"></div><b>goBlue</b><code>#3B82F6 · 信息 / 导航 / 辅助强调</code></div>
+              <div class="token"><div class="swatch" style="background:#a855f7"></div><b>goPurple</b><code>#A855F7 · 稀有 / 活动 / 点缀</code></div>
+              <div class="token"><div class="swatch" style="background:linear-gradient(180deg,#2d4ecc,#0c1640)"></div><b>GO 岛屿背景</b><code>dark: #2D4ECC → #0C1640</code></div>
+              <div class="token"><div class="swatch" style="background:linear-gradient(180deg,#f4f7ff,#dde8ff)"></div><b>浅色背景</b><code>light: #F4F7FF → #DDE8FF</code></div>
+            </div>
+          </article>
+
+          <article class="card span-7">
+            <div class="eyebrow">Typography</div>
+            <h3>字体层级</h3>
+            <div class="type-sample">
+              <div class="type-row"><code>Metric 36</code><div class="metric">66</div><span>大数字</span></div>
+              <div class="type-row"><code>Large Title 30</code><div class="large-title">今天要做什么</div><span>页面标题</span></div>
+              <div class="type-row"><code>Title 24</code><div class="title">Luna 的健康概览</div><span>卡片大标题</span></div>
+              <div class="type-row"><code>Headline 17</code><div class="headline">晚餐还差 1 次记录</div><span>列表主标题</span></div>
+              <div class="type-row"><code>Body 15</code><div class="body">记录应尽量短，直接表达当前状态。</div><span>正文</span></div>
+              <div class="type-row"><code>Callout 13</code><div class="callout">上次记录：18:30 · Alex</div><span>辅助说明</span></div>
+              <div class="type-row"><code>Caption 11</code><div class="caption">UPDATED JUST NOW</div><span>标签</span></div>
+            </div>
+          </article>
+
+          <article class="card span-5">
+            <div class="eyebrow">Surfaces</div>
+            <h3>表面与圆角</h3>
+            <ul>
+              <li>页面背景使用 `OhanaAppBackground` 或 GO 岛屿背景。</li>
+              <li>业务表面优先 `goTranslucentCard(cornerRadius: 20)`。</li>
+              <li>轻量控件优先 `goGlassBackground(shape)` 或 `goSelectableSurface`。</li>
+              <li>页面级卡片圆角约 22，内嵌区域 12-14，列表行 14。</li>
+              <li>原生 `.glassEffect()` 只在明确 iOS 26 迁移或内部测试页使用。</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section id="components" class="searchable" data-search="组件 按钮 chip badge toggle sheet toast card 表单 primary secondary destructive ghost quick action">
+        <div class="section-head">
+          <div>
+            <h2>3. 组件规范</h2>
+            <p>下面的实验台可以切换组件类型、语义状态和内容密度，用来快速对齐视觉状态。真实 SwiftUI 实现应复用现有 modifier 与组件，不直接复制 HTML 样式。</p>
+          </div>
+        </div>
+
+        <article class="card span-12">
+          <div class="component-lab">
+            <div class="lab-controls">
+              <div class="control-card">
+                <label for="componentType">组件类型</label>
+                <select id="componentType">
+                  <option value="buttons">按钮组</option>
+                  <option value="row">设置/表单行</option>
+                  <option value="status">状态提示</option>
+                  <option value="sheet">Sheet 顶部结构</option>
+                  <option value="quick">快捷操作网格</option>
+                </select>
+              </div>
+              <div class="control-card">
+                <label for="componentState">状态语义</label>
+                <select id="componentState">
+                  <option value="normal">普通</option>
+                  <option value="success">完成 / 健康</option>
+                  <option value="warning">注意 / 隐私</option>
+                  <option value="danger">异常 / 删除</option>
+                </select>
+              </div>
+              <div class="control-card">
+                <label for="componentEntity">对象</label>
+                <select id="componentEntity">
+                  <option value="pet">宠物</option>
+                  <option value="human">人类</option>
+                  <option value="plant">植物</option>
+                </select>
+              </div>
+            </div>
+            <div class="lab-preview">
+              <div id="componentPreview" class="demo-stack"></div>
+            </div>
+          </div>
+        </article>
+
+        <div class="grid" style="margin-top:14px;">
+          <article class="card span-4">
+            <div class="eyebrow">Buttons</div>
+            <h3>按钮</h3>
+            <ul>
+              <li>每屏最多一个 Primary CTA，使用 `goPrimary` 实色胶囊。</li>
+              <li>Secondary 用轻背景，适合取消、稍后、查看详情。</li>
+              <li>Destructive 必须二次确认，红色文字、浅红背景、红色描边。</li>
+              <li>图标按钮用固定触控区，熟悉动作优先只放 symbol。</li>
+            </ul>
+          </article>
+          <article class="card span-4">
+            <div class="eyebrow">Sheets</div>
+            <h3>Sheet / 表单</h3>
+            <ul>
+              <li>标题明确，右上角纯 icon 关闭。</li>
+              <li>底部主 CTA 固定；复杂长列表才用 `.large` detent。</li>
+              <li>表单分区用轻量半透明块，不在 sheet 内套厚重卡片。</li>
+            </ul>
+          </article>
+          <article class="card span-4">
+            <div class="eyebrow">Feedback</div>
+            <h3>Alert / Toast / Empty</h3>
+            <ul>
+              <li>Banner 用于长期可见提醒。</li>
+              <li>Toast 底部短反馈，2-3 秒自动消失，可带撤回。</li>
+              <li>空状态 = icon + 标题 + 一句说明 + 一个主操作。</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section id="screens" class="searchable" data-search="页面 蓝图 首页 宠物详情 人类详情 快捷操作 设置 dashboard sheet">
+        <div class="section-head">
+          <div>
+            <h2>4. 页面蓝图</h2>
+            <p>页面结构优先表达用户心智路径。首页是核心工作台，详情页承载深数据，sheet 承载快速记录和轻编辑。</p>
+          </div>
+        </div>
+        <div class="grid">
+          <article class="card span-6">
+            <div class="eyebrow">Home / GO Focus</div>
+            <h3>首页</h3>
+            <div class="blueprint">
+              <div class="blueprint-row"><div class="blueprint-label">1<br>卡片堆</div><div class="blueprint-content"><b>家庭成员身份与快捷入口</b><span>只展示前 7 张可见卡。宠物/人类的“在首页显示”开关在展开页管理。</span></div></div>
+              <div class="blueprint-row"><div class="blueprint-label">2<br>Today Focus</div><div class="blueprint-content"><b>今天最该做的一件事</b><span>优先级：异常趋势/医疗风险 > 未完成委托 > 记忆碎片 > 全部完成庆祝 > 岛屿探访。</span></div></div>
+              <div class="blueprint-row"><div class="blueprint-label">3<br>FAB</div><div class="blueprint-content"><b>二级功能入口</b><span>放分类功能，不挤占首屏核心任务。</span></div></div>
+            </div>
+          </article>
+          <article class="card span-6">
+            <div class="eyebrow">Pet Detail</div>
+            <h3>宠物详情页</h3>
+            <div class="blueprint">
+              <div class="blueprint-row"><div class="blueprint-label">身份卡</div><div class="blueprint-content"><b>头像、名字、物种、主题色</b><span>主题色只作为 accent，不做整页主色。</span></div></div>
+              <div class="blueprint-row"><div class="blueprint-label">关键指标</div><div class="blueprint-content"><b>体重、喂食、连续照护、提醒</b><span>先 overview 大卡，再进入深数据。</span></div></div>
+              <div class="blueprint-row"><div class="blueprint-label">深数据</div><div class="blueprint-content"><b>健康、活动、财务、文档、时间线</b><span>每个 dashboard 先概览，再 2-4 个 bento 指标，再明细列表。</span></div></div>
+            </div>
+          </article>
+          <article class="card span-6">
+            <div class="eyebrow">Human Detail</div>
+            <h3>人类详情页</h3>
+            <div class="blueprint">
+              <div class="blueprint-row"><div class="blueprint-label">身份卡</div><div class="blueprint-content"><b>角色、头像、椰子余额</b><span>与宠物卡保持同源语气，但隐私优先。</span></div></div>
+              <div class="blueprint-row"><div class="blueprint-label">隐私指标</div><div class="blueprint-content"><b>体重、药物、健康备注等</b><span>私密字段完全隐藏真实数据，使用锁定占位。</span></div></div>
+              <div class="blueprint-row"><div class="blueprint-label">记录流</div><div class="blueprint-content"><b>运动、备注、财务、提醒</b><span>用同一套 quick detail sheet 结构。</span></div></div>
+            </div>
+          </article>
+          <article class="card span-6">
+            <div class="eyebrow">Settings</div>
+            <h3>设置页</h3>
+            <div class="blueprint">
+              <div class="blueprint-row"><div class="blueprint-label">稳定行高</div><div class="blueprint-content"><b>左 icon + 主副标题 + 右控件</b><span>Toggle 只表达布尔状态，分组必须清楚。</span></div></div>
+              <div class="blueprint-row"><div class="blueprint-label">风险操作</div><div class="blueprint-content"><b>删除、清空、导入覆盖</b><span>必须二次确认，并明确影响范围。</span></div></div>
+              <div class="blueprint-row"><div class="blueprint-label">内部工具</div><div class="blueprint-content"><b>UI 测试页 / 性能面板</b><span>可保留，但不应影响普通用户路径性能。</span></div></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="interaction" class="searchable" data-search="交互 动效 GoMotion spring reduced motion feedback hero fab page quick">
+        <div class="section-head">
+          <div>
+            <h2>5. 交互与动效</h2>
+            <p>动效使用 `GoMotion`，不要在高频页面随手新增一套 spring 参数。动效要服务状态变化，不做无意义循环。</p>
+          </div>
+        </div>
+        <div class="grid">
+          <article class="card span-3"><div class="eyebrow">GoMotion.page</div><h3>页面级</h3><p>详情层展开、页面转场、较大布局变化。`interactiveSpring(response: 0.5, dampingFraction: 0.82)`。</p></article>
+          <article class="card span-3"><div class="eyebrow">GoMotion.hero</div><h3>核心卡片</h3><p>首页卡片堆、头像主体、Today Focus 切换。保持短、稳、有重量。</p></article>
+          <article class="card span-3"><div class="eyebrow">GoMotion.fab</div><h3>强调反馈</h3><p>FAB 菜单、奖励弹出、较强反馈。用于少数高感知动作。</p></article>
+          <article class="card span-3"><div class="eyebrow">GoMotion.feedback</div><h3>轻反馈</h3><p>按钮、chip、segment、toggle 和轻量状态切换。</p></article>
+          <article class="card span-12">
+            <h3>减弱动态与低功耗</h3>
+            <p>首页和背景已考虑 `AppPerformanceMode.powerSavingKey`、低电量、`UIAccessibility.isReduceMotionEnabled`。新增大面积动画、粒子、背景动效前必须提供降级路径。</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="accessibility" class="searchable" data-search="accessibility 可访问性 labels identifiers 触控 对比 隐私 本地化">
+        <div class="section-head">
+          <div>
+            <h2>6. 可访问性与本地化</h2>
+            <p>这部分直接影响后续 UI 自动化、模拟器调试和真实用户可用性。</p>
+          </div>
+        </div>
+        <div class="grid">
+          <article class="card span-4">
+            <div class="eyebrow">Automation</div>
+            <h3>可测试控件</h3>
+            <p>关键按钮、sheet 关闭、主 CTA、列表行、卡片展开入口应补 accessibility label 或 identifier。模拟器自动化优先通过语义定位，不靠坐标。</p>
+          </article>
+          <article class="card span-4">
+            <div class="eyebrow">Contrast</div>
+            <h3>对比与触控</h3>
+            <p>实色按钮文字必须高对比；图标按钮触控区 32-44pt；状态不能只靠颜色表达。</p>
+          </article>
+          <article class="card span-4">
+            <div class="eyebrow">Localization</div>
+            <h3>中文 / English / Deutsch</h3>
+            <p>用户可见中文整句作为 key，英文和德文在各自 `Localizable.strings`。新增 Go Focus 文案应经由 `L10n` / `AppLocalizedText` 提供 fallback。</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="implementation" class="searchable" data-search="实现 映射 swiftui file GoMotion ColorExtensions OhanaDesignSystem ArkBackground">
+        <div class="section-head">
+          <div>
+            <h2>7. 实现映射</h2>
+            <p>新增或重构 UI 时先找这些代码入口。只有当现有模式不足以表达真实复杂度时，才增加新抽象。</p>
+          </div>
+        </div>
+        <article class="card span-12">
+          <div class="code-map">
+            <div class="code-line"><code>Ohana/Utilities/ColorExtensions.swift</code><span>品牌色、GO UI token、深浅色语义色、alert token。</span></div>
+            <div class="code-line"><code>Ohana/Views/OhanaDesignSystem.swift</code><span>`GoMotion`、`OhanaFont`、卡片 modifier、按钮 modifier、底部 tab 和通用视觉基础。</span></div>
+            <div class="code-line"><code>Ohana/Views/ArkBackgroundView.swift</code><span>全局背景、GO 岛屿背景、低功耗和 Reduce Motion 降级。</span></div>
+            <div class="code-line"><code>Ohana/Views/Home/FocusStackHomeTestView.swift</code><span>默认首页：钱包卡片堆、展开态快捷操作、FAB 二级功能。</span></div>
+            <div class="code-line"><code>Ohana/Views/Home/TodayFocusCard.swift</code><span>今日核心任务卡，负责风险、任务、庆祝和欢迎状态。</span></div>
+            <div class="code-line"><code>Ohana/Views/Components/Quick*DetailSheet.swift</code><span>快捷操作长按详情页族群，统一 sheet 结构、隐私、记录和历史展示。</span></div>
+            <div class="code-line"><code>Ohana/Views/Details/*Dashboard*.swift</code><span>深数据页面：overview 大卡、bento 指标、图表、明细列表。</span></div>
+            <div class="code-line"><code>Ohana/Views/SettingsView.swift</code><span>设置行结构、语言、背景、备份、性能与内部工具入口。</span></div>
+          </div>
+        </article>
+      </section>
+
+      <section id="checklist" class="searchable" data-search="检查清单 ui review checklist 深浅色 toggle privacy cta lazyvstack">
+        <div class="section-head">
+          <div>
+            <h2>8. UI 检查清单</h2>
+            <p>勾选状态会保存在浏览器本地，适合每次做 UI 改动前后快速过一遍。</p>
+          </div>
+          <button id="resetChecklist" class="btn" type="button">重置</button>
+        </div>
+        <article class="card span-12">
+          <div id="checklistItems" class="checklist"></div>
+        </article>
+      </section>
+
+      <div class="footer">Ohana Interactive UI Spec · generated for this repository · single-file HTML</div>
+    </main>
+  </div>
+
+  <script>
+    const body = document.body;
+    const themeDark = document.getElementById("themeDark");
+    const themeLight = document.getElementById("themeLight");
+    const densityComfort = document.getElementById("densityComfort");
+    const densityCompact = document.getElementById("densityCompact");
+    const componentType = document.getElementById("componentType");
+    const componentState = document.getElementById("componentState");
+    const componentEntity = document.getElementById("componentEntity");
+    const componentPreview = document.getElementById("componentPreview");
+    const search = document.getElementById("search");
+    const checklistRoot = document.getElementById("checklistItems");
+
+    const stateMeta = {
+      normal: { tint: "var(--go-primary)", pill: "普通", tone: "", icon: "●" },
+      success: { tint: "var(--go-teal)", pill: "已完成", tone: "good", icon: "✓" },
+      warning: { tint: "var(--go-yellow)", pill: "需注意", tone: "warn", icon: "!" },
+      danger: { tint: "var(--go-red)", pill: "异常", tone: "danger", icon: "×" }
+    };
+
+    const entityMeta = {
+      pet: { name: "Luna", noun: "宠物", emoji: "🐱", action: "记录喂食", sub: "晚餐计划 · 还差 1 次" },
+      human: { name: "Alex", noun: "人类", emoji: "🧑", action: "记录体重", sub: "隐私字段 · 仅本人可见" },
+      plant: { name: "Monstera", noun: "植物", emoji: "🌿", action: "记录浇水", sub: "土壤偏干 · 今天建议处理" }
+    };
+
+    function setTheme(theme) {
+      body.dataset.theme = theme;
+      themeDark.setAttribute("aria-pressed", theme === "dark");
+      themeLight.setAttribute("aria-pressed", theme === "light");
+      localStorage.setItem("ohanaSpecTheme", theme);
+    }
+
+    function setDensity(density) {
+      body.dataset.density = density;
+      densityComfort.setAttribute("aria-pressed", density === "comfortable");
+      densityCompact.setAttribute("aria-pressed", density === "compact");
+      localStorage.setItem("ohanaSpecDensity", density);
+    }
+
+    function renderComponent() {
+      const type = componentType.value;
+      const state = stateMeta[componentState.value];
+      const entity = entityMeta[componentEntity.value];
+      const tint = state.tint;
+
+      if (type === "buttons") {
+        componentPreview.innerHTML = `
+          <button class="btn primary" type="button" style="justify-content:center;">${entity.action}</button>
+          <button class="btn" type="button" style="justify-content:center;">稍后处理</button>
+          <button class="btn" type="button" style="justify-content:center; color:${tint};">查看详情</button>
+          <div class="demo-row">
+            <div class="demo-icon" style="background:${tint};">${state.icon}</div>
+            <div class="demo-title"><b>${entity.name} · ${state.pill}</b><span>Primary 每屏最多一个；次级动作保持轻量。</span></div>
+            <span class="pill ${state.tone}">${entity.noun}</span>
+          </div>`;
+        return;
+      }
+
+      if (type === "row") {
+        componentPreview.innerHTML = `
+          <div class="demo-row">
+            <div class="demo-icon" style="background:${tint};">${entity.emoji}</div>
+            <div class="demo-title"><b>${entity.name}</b><span>${entity.sub}</span></div>
+            <span class="pill ${state.tone}">${state.pill}</span>
+          </div>
+          <div class="demo-row">
+            <div class="demo-icon" style="background:var(--surface-soft); color:var(--text);">🔒</div>
+            <div class="demo-title"><b>隐私可见性</b><span>Toggle 只表达布尔状态，锁定字段不显示真实值。</span></div>
+            <button class="btn icon" type="button" style="background:${tint}; color:#1a1a2e;">✓</button>
+          </div>`;
+        return;
+      }
+
+      if (type === "status") {
+        componentPreview.innerHTML = `
+          <div class="demo-row" style="border-color:color-mix(in srgb, ${tint} 42%, transparent); background:color-mix(in srgb, ${tint} 13%, var(--surface));">
+            <div class="demo-icon" style="background:${tint};">${state.icon}</div>
+            <div class="demo-title"><b>${state.pill}状态提示</b><span>状态必须有 icon、文字和颜色，不允许只靠颜色表达。</span></div>
+          </div>
+          <div class="demo-row">
+            <div class="demo-title"><b>Toast 反馈</b><span>${entity.action}成功后 2-3 秒自动消失，可带撤回。</span></div>
+            <span class="pill ${state.tone}">${state.pill}</span>
+          </div>`;
+        return;
+      }
+
+      if (type === "sheet") {
+        componentPreview.innerHTML = `
+          <div class="demo-row">
+            <div class="demo-title"><b>${entity.action}</b><span>右上角纯 icon 关闭；底部固定主 CTA。</span></div>
+            <button class="btn icon" type="button">×</button>
+          </div>
+          <div class="demo-row">
+            <div class="demo-icon" style="background:${tint};">${entity.emoji}</div>
+            <div class="demo-title"><b>Overview</b><span>先概览，再图表/列表，再明细。</span></div>
+          </div>
+          <button class="btn primary" type="button" style="justify-content:center;">保存记录</button>`;
+        return;
+      }
+
+      componentPreview.innerHTML = `
+        <div class="quick-actions" style="grid-template-columns:repeat(4,1fr); margin:0;">
+          <div class="quick-action" style="background:color-mix(in srgb, ${tint} 22%, var(--surface));">🍽<span>FEED</span></div>
+          <div class="quick-action">💧<span>WATER</span></div>
+          <div class="quick-action">🧹<span>LITTER</span></div>
+          <div class="quick-action">✨<span>PLAY</span></div>
+        </div>
+        <div class="demo-row">
+          <div class="demo-title"><b>快捷操作规则</b><span>高频一键动作在展开卡片内；FAB 放二级功能。</span></div>
+          <span class="pill ${state.tone}">${state.pill}</span>
+        </div>`;
+    }
+
+    const checklist = [
+      "是否使用项目现有 `OhanaFont` / `cnFont()` 风格，而不是临时字体？",
+      "是否复用 `GoMotion`，没有新增随意 spring 参数？",
+      "是否避免普通正文和卡片硬编码 `.white` / `.black`？",
+      "深浅色切换时背景、卡片、描边、文字、图表和控件是否一起变化？",
+      "同一屏是否只有一个 Primary CTA？",
+      "关闭按钮是否默认只用 icon，且触控区足够？",
+      "Toggle 是否只表达布尔状态？",
+      "隐私字段是否对非本人完全隐藏真实数据？",
+      "复杂列表是否使用 `LazyVStack` 或等效懒加载结构？",
+      "是否避免卡片套卡片和大段教程文案？",
+      "关键交互是否有 accessibility label 或 identifier？",
+      "UI bug 修复是否附带同路径截图/日志/验证说明？"
+    ];
+
+    function renderChecklist() {
+      const saved = JSON.parse(localStorage.getItem("ohanaSpecChecklist") || "{}");
+      checklistRoot.innerHTML = checklist.map((item, index) => `
+        <label class="check-item">
+          <input type="checkbox" data-check="${index}" ${saved[index] ? "checked" : ""} />
+          <strong>${item}</strong>
+          <span>${saved[index] ? "done" : "todo"}</span>
+        </label>
+      `).join("");
+    }
+
+    function saveChecklist(event) {
+      const input = event.target.closest("input[data-check]");
+      if (!input) return;
+      const saved = JSON.parse(localStorage.getItem("ohanaSpecChecklist") || "{}");
+      saved[input.dataset.check] = input.checked;
+      localStorage.setItem("ohanaSpecChecklist", JSON.stringify(saved));
+      renderChecklist();
+    }
+
+    function filterSections() {
+      const term = search.value.trim().toLowerCase();
+      document.querySelectorAll(".searchable").forEach(section => {
+        if (!term) {
+          section.classList.remove("hidden");
+          return;
+        }
+        const haystack = (section.dataset.search + " " + section.innerText).toLowerCase();
+        section.classList.toggle("hidden", !haystack.includes(term));
+      });
+    }
+
+    function updateActiveNav() {
+      const sections = [...document.querySelectorAll("main section[id]:not(.hidden)")];
+      let active = sections[0]?.id;
+      for (const section of sections) {
+        if (section.getBoundingClientRect().top < 180) active = section.id;
+      }
+      document.querySelectorAll(".nav a").forEach(link => {
+        link.classList.toggle("active", link.getAttribute("href") === `#${active}`);
+      });
+    }
+
+    themeDark.addEventListener("click", () => setTheme("dark"));
+    themeLight.addEventListener("click", () => setTheme("light"));
+    densityComfort.addEventListener("click", () => setDensity("comfortable"));
+    densityCompact.addEventListener("click", () => setDensity("compact"));
+    [componentType, componentState, componentEntity].forEach(el => el.addEventListener("change", renderComponent));
+    search.addEventListener("input", () => { filterSections(); updateActiveNav(); });
+    window.addEventListener("scroll", updateActiveNav, { passive: true });
+    checklistRoot.addEventListener("change", saveChecklist);
+    document.getElementById("resetChecklist").addEventListener("click", () => {
+      localStorage.removeItem("ohanaSpecChecklist");
+      renderChecklist();
+    });
+    document.getElementById("randomState").addEventListener("click", () => {
+      const states = ["normal", "success", "warning", "danger"];
+      const types = ["buttons", "row", "status", "sheet", "quick"];
+      const entities = ["pet", "human", "plant"];
+      componentState.value = states[Math.floor(Math.random() * states.length)];
+      componentType.value = types[Math.floor(Math.random() * types.length)];
+      componentEntity.value = entities[Math.floor(Math.random() * entities.length)];
+      renderComponent();
+      location.hash = "#components";
+    });
+
+    setTheme(localStorage.getItem("ohanaSpecTheme") || "dark");
+    setDensity(localStorage.getItem("ohanaSpecDensity") || "comfortable");
+    renderComponent();
+    renderChecklist();
+    updateActiveNav();
+  </script>
+</body>
+</html>

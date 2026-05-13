@@ -33,14 +33,25 @@ struct HumanPrivacyToggleButton: View {
             modelContext.safeSave()
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         } label: {
-            // 与同页 xmark.circle.fill 关闭按钮对齐：相同 .circle.fill 几何 + hierarchical 渲染
-            // 隐私状态用 goYellow（ui规范.md §3 颜色：goYellow = 进行中/注意/隐私）
-            Image(systemName: isFieldPrivate ? "lock.circle.fill" : "lock.open.circle.fill")
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(isFieldPrivate ? Color.goYellow : Color.secondary)
-                .accessibilityLabel(isFieldPrivate ? "隐私已开启 · 仅本人可见" : "隐私已关闭 · 家庭成员可见")
+            ZStack {
+                Color.clear
+                    .frame(width: 58, height: 30)
+
+                Circle()
+                    .fill(isFieldPrivate ? Color.goYellow : Color.primary.opacity(0.14))
+                    .frame(width: 24, height: 24)
+                    .shadow(color: .black.opacity(0.14), radius: 6, x: 0, y: 2)
+                    .overlay {
+                        Image(systemName: isFieldPrivate ? "lock.fill" : "lock.open.fill")
+                            .font(.system(size: 10, weight: .black))
+                            .foregroundStyle(isFieldPrivate ? Color.arkInk : Color.primary.opacity(0.82))
+                    }
+                    .offset(x: isFieldPrivate ? 14 : -14)
+            }
+            .animation(.spring(response: 0.28, dampingFraction: 0.78), value: isFieldPrivate)
+            .accessibilityLabel(isFieldPrivate ? "隐私已开启，仅本人可见" : "隐私已关闭，家庭成员可见")
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .opacity(isOwner ? 1 : 0.5)
         .disabled(!isOwner)
     }
@@ -73,10 +84,10 @@ struct HumanPrivateDataNotice: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("只有你能看到")
                         .font(OhanaFont.caption(.black))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Text("\(field.title)数据已设为隐私，其他家庭成员不会看到这些内容。")
                         .font(OhanaFont.caption2(.bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 

@@ -56,7 +56,7 @@ struct PetMedicationDetailSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 16) {
                         headerBlock
@@ -81,7 +81,7 @@ struct PetMedicationDetailSheet: View {
                         if !noteBody.isEmpty {
                             Text("备注：\(noteBody)")
                                 .font(.system(size: 13, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                                 .padding(.top, 4)
                         }
 
@@ -95,7 +95,7 @@ struct PetMedicationDetailSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("返回") { dismiss() }
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12) {
@@ -123,7 +123,7 @@ struct PetMedicationDetailSheet: View {
                         } label: {
                             Image(systemName: "ellipsis.circle")
                                 .font(.system(size: 22))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                                 .symbolRenderingMode(.hierarchical)
                         }
                     }
@@ -146,7 +146,7 @@ struct PetMedicationDetailSheet: View {
             }
             Text("\(medication.frequency.rawValue) · 每次 \(medication.dosage.isEmpty ? "—" : medication.dosage)")
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
     }
 
@@ -169,21 +169,21 @@ struct PetMedicationDetailSheet: View {
                 Text("记录今次喂药")
                 Spacer()
                 Text("+1 🥥")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             .font(.system(size: 16, weight: .bold, design: .rounded))
             .foregroundStyle(.black)
             .padding(14)
             .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private var courseProgressCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("疗程进度")
                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
             if let end = medication.endDate {
                 let cal = Calendar.current
                 let start = cal.startOfDay(for: medication.startDate)
@@ -201,13 +201,13 @@ struct PetMedicationDetailSheet: View {
                     .scaleEffect(x: 1, y: 1.6, anchor: .center)
                 Text("\(medication.startDate, format: .dateTime.year().month().day()) → \(end, format: .dateTime.year().month().day())")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             } else {
                 Text("长期用药")
                     .font(.system(size: 20, weight: .black, design: .rounded))
                 Text("未设置结束日期")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
         .padding(16)
@@ -219,7 +219,7 @@ struct PetMedicationDetailSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("今日状态")
                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
             if todayRequired == 0 {
                 Text("无需记录")
                     .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -247,7 +247,7 @@ struct PetMedicationDetailSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("喂药方式")
                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
             HStack(spacing: 6) {
                 Image(systemName: "fork.knife")
                     .font(.system(size: 14))
@@ -279,7 +279,7 @@ struct PetMedicationDetailSheet: View {
                 .tint(themeColor)
             Text("按当前频次，预计还够约 \(max(estDays, 0)) 天")
                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .padding(16)
         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -295,12 +295,12 @@ struct PetMedicationDetailSheet: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(row.title)
                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                     HStack(spacing: 10) {
                         ForEach(row.events) { ev in
                             Label(ev.startDate.formatted(.dateTime.hour().minute()), systemImage: "checkmark.circle.fill")
                                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                         }
                         if row.missedCount > 0 {
                             ForEach(0..<row.missedCount, id: \.self) { _ in

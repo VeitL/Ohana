@@ -79,7 +79,7 @@ final class AchievementManager {
             emoji: "👟",
             title: "步数冠军",
             description: "今天你走的路是宠物的 1.5 倍以上",
-            color: Color.goLime,
+            color: Color.goOrange,
             isUnlocked: petTodayDistanceKm > 0.1 && humanDistanceKm >= petTodayDistanceKm * 1.5
         )
 
@@ -124,7 +124,7 @@ final class AchievementManager {
             let total = pet.walkLogs.reduce(0.0) { $0 + $1.distanceMeters }
             return Achievement(id: "iron_paw", emoji: "🏃", title: "铁脚板",
                                description: "累计遛狗总距离达到 100km",
-                               color: Color.goLime, isUnlocked: total >= 100_000)
+                               color: Color.goTeal, isUnlocked: total >= 100_000)
         }()
 
         // 3. 📅 连续巡岛：连续 7 天都有 walkLog
@@ -222,7 +222,7 @@ final class AchievementManager {
             let has5km = pet.walkLogs.contains { $0.distanceMeters >= 5000 }
             return Achievement(id: "long_runner", emoji: "🐾", title: "长跑健将",
                                description: "单次遛狗距离超过 5km",
-                               color: Color.goLime, isUnlocked: has5km)
+                               color: Color.goOrange, isUnlocked: has5km)
         }()
 
         // 12. 💊 坚持到底：完成至少一个疗程用药（有 endDate 且已过期的药）

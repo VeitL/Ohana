@@ -36,7 +36,7 @@ struct OverlappingAvatarsView: View {
                         .frame(width: 24, height: 24)
                     Text("+\(emojis.count - maxCount)")
                         .font(.system(size: 8, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.7))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                 }
                 .offset(x: CGFloat(-maxCount) * 8)
             }
@@ -65,14 +65,14 @@ struct IslandStatCard<Chart: View>: View {
                     .foregroundStyle(accentColor)
                 Text(title)
                     .font(OhanaFont.footnote(.bold))
-                    .foregroundStyle(.primary.opacity(0.55))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
             }
 
             // 大数字
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(value)
                     .font(OhanaFont.metric(size: 34))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .contentTransition(.numericText())
                 if !unit.isEmpty {
                     Text(unit)
@@ -92,7 +92,7 @@ struct IslandStatCard<Chart: View>: View {
                     if !subtitle.isEmpty {
                         Text(subtitle)
                             .font(OhanaFont.caption2(.medium))
-                            .foregroundStyle(.primary.opacity(0.3))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                             .lineLimit(1)
                     }
                     Spacer()
@@ -105,7 +105,7 @@ struct IslandStatCard<Chart: View>: View {
             } else if !subtitle.isEmpty {
                 Text(subtitle)
                     .font(OhanaFont.caption(.medium))
-                    .foregroundStyle(.primary.opacity(0.35))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                     .lineLimit(2)
             }
         }
@@ -157,7 +157,7 @@ struct MultiPetLineChart: View {
                 if allValues.isEmpty {
                     Text("暂无数据")
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.primary.opacity(0.25))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ForEach(Array(series.enumerated()), id: \.offset) { _, s in
@@ -289,7 +289,7 @@ struct MiniLineChart: View {
                 } else {
                     Text("暂无数据")
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.primary.opacity(0.25))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
@@ -347,7 +347,7 @@ struct MiniBarChart: View {
                         if !labels.isEmpty && i < labels.count {
                             Text(labels[i])
                                 .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(.primary.opacity(0.3))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                                 .frame(width: barW)
                         }
                     }
@@ -388,7 +388,7 @@ struct MultiPetExpenseBar: View {
             if series.isEmpty {
                 Text("暂无花费")
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.primary.opacity(0.25))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 let barCount = series.count
@@ -408,7 +408,7 @@ struct MultiPetExpenseBar: View {
                                 .frame(width: barW, height: barH)
                             Text(name)
                                 .font(.system(size: 7, weight: .bold, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.4))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                 .frame(width: barW)
                                 .lineLimit(1)
                         }
@@ -578,6 +578,19 @@ struct SynergyFlashCard: View {
     @State private var engine = SynergyEngine()
     @State private var currentIndex: Int = 0
     @State private var timer: Timer? = nil
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+
+    private var activeHumanId: UUID? {
+        UUID(uuidString: activeHumanIdStr)
+    }
+
+    private var visibleBriefHumans: [Human] {
+        humans.filter {
+            !PrivacyService.isLocked(.expense, for: $0, viewedBy: activeHumanId) &&
+            !PrivacyService.isLocked(.wishlist, for: $0, viewedBy: activeHumanId) &&
+            !PrivacyService.isLocked(.workout, for: $0, viewedBy: activeHumanId)
+        }
+    }
 
     var body: some View {
         Group {
@@ -593,7 +606,7 @@ struct SynergyFlashCard: View {
                             .foregroundStyle(brief.accentColor)
                         Text("家庭简报")
                             .font(.system(size: 11, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.45))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                             .tracking(2)
                         Spacer()
                         // 分页点
@@ -615,11 +628,11 @@ struct SynergyFlashCard: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(brief.headline)
                                 .font(.system(size: 16, weight: .black, design: .rounded))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                                 .lineLimit(2)
                             Text(brief.subtext)
                                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.45))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                                 .lineLimit(2)
                         }
                         Spacer(minLength: 0)
@@ -644,12 +657,17 @@ struct SynergyFlashCard: View {
             }
         }
         .onAppear {
-            engine.reload(pets: pets, humans: humans)
+            reloadBriefs()
             startTimer()
         }
         .onDisappear { stopTimer() }
-        .onChange(of: pets.count) { _, _ in engine.reload(pets: pets, humans: humans) }
-        .onChange(of: humans.count) { _, _ in engine.reload(pets: pets, humans: humans) }
+        .onChange(of: pets.count) { _, _ in reloadBriefs() }
+        .onChange(of: humans.count) { _, _ in reloadBriefs() }
+        .onChange(of: activeHumanIdStr) { _, _ in reloadBriefs() }
+    }
+
+    private func reloadBriefs() {
+        engine.reload(pets: pets, humans: visibleBriefHumans)
     }
 
     private func startTimer() {
@@ -676,9 +694,19 @@ struct CoconutWealthRankingCard: View {
     let pets: [Pet]
     let humans: [Human]
     var onTap: (() -> Void)? = nil
-    // 全岛总资产：直接使用 QuestManager.coconutCount（全局唯一数据源）
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+
+    private var activeHumanId: UUID? {
+        UUID(uuidString: activeHumanIdStr)
+    }
+
+    private var visibleWealthHumans: [Human] {
+        PrivacyService.unlockedHumans(for: .wishlist, from: humans, viewedBy: activeHumanId)
+    }
+
+    // 当前查看者可见的全岛总资产；隐私成员的个人椰子余额不计入展示。
     private var computedTotal: Int {
-        return QuestManager.shared.coconutCount
+        pets.reduce(0) { $0 + $1.coconutBalance } + visibleWealthHumans.reduce(0) { $0 + $1.coconutBalance }
     }
 
     private struct RankEntry: Identifiable {
@@ -691,7 +719,7 @@ struct CoconutWealthRankingCard: View {
     private var leaderboard: [RankEntry] {
         var all: [RankEntry] = []
         all += pets.map   { RankEntry(emoji: $0.avatarEmoji, name: $0.name,  balance: $0.coconutBalance) }
-        all += humans.map { RankEntry(emoji: $0.avatarEmoji, name: $0.name,  balance: $0.coconutBalance) }
+        all += visibleWealthHumans.map { RankEntry(emoji: $0.avatarEmoji, name: $0.name,  balance: $0.coconutBalance) }
         // Bug11: 即使 balance=0 也展示所有成员，按余额降序，最多显示前3名
         return all.sorted { $0.balance > $1.balance }.prefix(3).map { $0 }
     }
@@ -707,19 +735,19 @@ struct CoconutWealthRankingCard: View {
                         .font(.system(size: 14))
                     Text("Ohana财富")
                         .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.5))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                         .tracking(1)
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.primary.opacity(0.3))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                 }
 
                 // 大数字
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("\(computedTotal)")
                         .font(OhanaFont.metric(size: 36))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                         .contentTransition(.numericText())
                     Text("🥥")
                         .font(.system(size: 18))
@@ -731,7 +759,7 @@ struct CoconutWealthRankingCard: View {
             if leaderboard.isEmpty {
                 Text("完成打卡即可解锁财富榜 ✨")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.3))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
             } else {
                 VStack(spacing: 8) {
                     ForEach(Array(leaderboard.enumerated()), id: \.element.id) { i, entry in
@@ -748,7 +776,7 @@ struct CoconutWealthRankingCard: View {
                             }
                             Text(entry.name)
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                                 .lineLimit(1)
                             Spacer()
                             Text("\(entry.balance) 🥥")

@@ -168,7 +168,7 @@ struct HumanMedicationView: View {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
             }
@@ -187,7 +187,7 @@ struct HumanMedicationView: View {
 
     private var medicationContent: some View {
         ZStack(alignment: .bottom) {
-            ArkBackgroundView().ignoresSafeArea()
+            OhanaAppBackground().ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 20) {
@@ -303,7 +303,7 @@ struct HumanMedicationView: View {
                     .background(Color.goPrimary, in: Capsule())
                     .shadow(color: Color.goPrimary.opacity(0.4), radius: 14, y: 5)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .padding(.bottom, 28)
             }
         }
@@ -328,10 +328,10 @@ struct HumanMedicationView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(human.name)
                     .font(OhanaFont.headline(.bold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "用药管理", en: "Medication", de: "Medikamente"))
                     .font(OhanaFont.caption())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
             // 今日完成进度
@@ -344,7 +344,7 @@ struct HumanMedicationView: View {
                         .foregroundStyle(todayDone == todayTotal ? Color.goTeal : Color.goPrimary)
                     Text(l.tr(zh: "今日服药", en: "Today", de: "Heute"))
                         .font(OhanaFont.caption2(.bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
         }
@@ -354,7 +354,7 @@ struct HumanMedicationView: View {
 
     private var privacyLockedView: some View {
         ZStack {
-            ArkBackgroundView().ignoresSafeArea()
+            OhanaAppBackground().ignoresSafeArea()
             VStack(spacing: 12) {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 34, weight: .bold))
@@ -698,7 +698,7 @@ struct HumanMedicationView: View {
                         .padding(.vertical, 7)
                         .background(isTaken ? controlFill : Color.goTeal, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
 
                 Button {
                     setDoseStatus(isSkipped ? .pending : .skipped, for: item)
@@ -710,7 +710,7 @@ struct HumanMedicationView: View {
                         .padding(.vertical, 7)
                         .background((isSkipped ? Color.goOrange : controlFill).opacity(isSkipped ? 0.16 : 1), in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
         .padding(.vertical, 10)
@@ -831,7 +831,7 @@ struct HumanMedicationView: View {
                         .padding(.vertical, 8)
                         .background(Color.goPrimary, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
 
                 Button {
                     editingMed = med
@@ -842,7 +842,7 @@ struct HumanMedicationView: View {
                         .frame(width: 34, height: 34)
                         .background(controlFill, in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
             .padding(14)
         }
@@ -916,7 +916,7 @@ struct HumanMedicationView: View {
                         .frame(width: 34, height: 34)
                         .background(controlFill, in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
 
                 Button {
                     toggleMedicationActive(med)
@@ -925,7 +925,7 @@ struct HumanMedicationView: View {
                         .font(OhanaFont.title3(.bold))
                         .foregroundStyle(med.isActive ? Color.goOrange : Color.goTeal)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
             .padding(14)
         }
@@ -1116,7 +1116,7 @@ struct AddMedicationSheet: View {
         }
     }
 
-    private let colorOptions = ["FF4757", "FF8C42", "FFF44F", "00D4AA", "4895EF", "9B5DE5", "4338FF"]
+    private let colorOptions = ["FF4757", "FF8C42", "FFF44F", "00D4AA", "14B8A6", "9B5DE5", "64748B"]
     private let humanMedicationEntityType = "human_medication"
 
     private var l: L10n { L10n(appLanguage) }
@@ -1135,7 +1135,7 @@ struct AddMedicationSheet: View {
 
     var body: some View {
         ZStack {
-            ArkBackgroundView().ignoresSafeArea()
+            OhanaAppBackground().ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
@@ -1231,7 +1231,7 @@ struct AddMedicationSheet: View {
                     .frame(width: 36, height: 36)
                     .background(controlFill, in: Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
         }
     }
 
@@ -1273,7 +1273,7 @@ struct AddMedicationSheet: View {
                                         .padding(.vertical, 8)
                                         .goSelectableSurface(isSelected: selected, tint: Color.goPrimary, in: Capsule())
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(ScaleButtonStyle())
                             }
                         }
                     }
@@ -1417,7 +1417,7 @@ struct AddMedicationSheet: View {
                                             .padding(.vertical, 8)
                                             .background(weeklyWeekday == weekday ? Color.goPrimary : controlFill, in: Capsule())
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(ScaleButtonStyle())
                                 }
                             }
                         }
@@ -1486,7 +1486,7 @@ struct AddMedicationSheet: View {
                     .padding(.vertical, 12)
                     .background((isActive ? Color.goOrange : Color.goTeal).opacity(0.12), in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
 
                 Button {
                     showDeleteConfirmation = true
@@ -1499,7 +1499,7 @@ struct AddMedicationSheet: View {
                         .background(Color.goRed.opacity(0.10), in: Capsule())
                         .overlay(Capsule().strokeBorder(Color.goRed.opacity(0.28), lineWidth: 1))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
     }
@@ -1520,7 +1520,7 @@ struct AddMedicationSheet: View {
             .padding(14)
             .background(controlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private var moreCard: some View {
@@ -1543,7 +1543,7 @@ struct AddMedicationSheet: View {
                                     .overlay(Circle().strokeBorder(primaryText, lineWidth: colorHex == hex ? 2.5 : 0))
                                     .scaleEffect(colorHex == hex ? 1.12 : 1.0)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ScaleButtonStyle())
                         }
                         Spacer()
                     }
@@ -1584,13 +1584,13 @@ struct AddMedicationSheet: View {
                     .padding(.vertical, 16)
                     .background(canSave ? Color.goPrimary : Color.goPrimary.opacity(0.35), in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .disabled(!canSave)
             .padding(.horizontal, 16)
             .padding(.top, 12)
             .padding(.bottom, 12)
         }
-        .background(.ultraThinMaterial)
+        .background(Color.ohanaCardSurface)
     }
 
     private func sheetCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
@@ -1635,7 +1635,7 @@ struct AddMedicationSheet: View {
                 .padding(.vertical, 8)
                 .goSelectableSurface(isSelected: selected, tint: Color.goTeal, in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func doseTimeLabel(_ index: Int) -> String {

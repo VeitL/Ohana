@@ -62,7 +62,7 @@ struct AddSymptomSheet: View {
                 } footer: {
                     Text("严重或紧急的情况将触发首页警告并建议就医。")
                         .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
 
                 Section {
@@ -101,7 +101,7 @@ struct AddSymptomSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
         }

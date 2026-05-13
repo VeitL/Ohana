@@ -85,7 +85,7 @@ struct FeatureGroupDashboardView: View {
                         .padding(.vertical, 8)
                         .background(selectedItem.id == item.id ? Color.goLime : Color.white.opacity(0.12), in: Capsule())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
             .padding(.horizontal, 16)

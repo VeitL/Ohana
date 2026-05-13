@@ -10,6 +10,7 @@ import SwiftData
 import UIKit
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selectedPet: Pet?
     @State private var selectedHuman: Human?
     @State private var selectedPlant: Plant?
@@ -18,6 +19,7 @@ struct ContentView: View {
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @State private var showingRequiredHumanProfile = false
+    @State private var showingRequiredAccountSwitch = false
     @State private var homeResetToken = UUID()
     @Namespace private var heroNS
     
@@ -67,6 +69,7 @@ struct ContentView: View {
         }
         .onAppear {
             reconcileHumanProfileRequirement()
+            stopLocationIfNoWalkIsRunning()
         }
         .onChange(of: hasOnboarded) { _, _ in
             reconcileHumanProfileRequirement()
@@ -74,13 +77,22 @@ struct ContentView: View {
         .onChange(of: humans.map { $0.id }) { _, _ in
             reconcileHumanProfileRequirement()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .ohanaReturnHomeAfterHumanDeletion)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .ohanaReturnHomeAfterHumanDeletion)) { notification in
             selectedPet = nil
             selectedHuman = nil
             selectedPlant = nil
             selectedPetTab = .overview
             homeResetToken = UUID()
-            reconcileHumanProfileRequirement()
+            let requiresReplacementHuman = (notification.userInfo?["requiresReplacementHuman"] as? Bool) == true
+            if requiresReplacementHuman {
+                currentActiveHumanId = ""
+                showingRequiredHumanProfile = true
+            } else if (notification.userInfo?["requiresAccountSwitch"] as? Bool) == true {
+                currentActiveHumanId = ""
+                showingRequiredAccountSwitch = true
+            } else {
+                reconcileHumanProfileRequirement()
+            }
         }
         .fullScreenCover(isPresented: $showingRequiredHumanProfile) {
             RequiredHumanProfileView { human in
@@ -88,6 +100,20 @@ struct ContentView: View {
                 showingRequiredHumanProfile = false
             }
             .interactiveDismissDisabled(true)
+        }
+        .sheet(isPresented: $showingRequiredAccountSwitch) {
+            HumanAccountSwitcherSheet {
+                showingRequiredAccountSwitch = false
+            }
+            .interactiveDismissDisabled(true)
+        }
+        .onChange(of: currentActiveHumanId) { _, newValue in
+            if !newValue.isEmpty {
+                showingRequiredAccountSwitch = false
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            handleScenePhaseChange(newPhase)
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
     }
@@ -115,6 +141,11 @@ struct ContentView: View {
             return
         }
 
+        if showingRequiredAccountSwitch {
+            showingRequiredHumanProfile = false
+            return
+        }
+
         if currentActiveHumanId.isEmpty ||
             !humans.contains(where: { $0.id.uuidString == currentActiveHumanId }) {
             currentActiveHumanId = firstHuman.id.uuidString
@@ -129,6 +160,21 @@ struct ContentView: View {
             from: nil,
             for: nil
         )
+    }
+
+    private func stopLocationIfNoWalkIsRunning() {
+        if case .running = PetWalkingManager.shared.phase {
+            return
+        }
+        LocationManager.shared.stopAllLocationActivity()
+    }
+
+    private func handleScenePhaseChange(_ phase: ScenePhase) {
+        if phase == .background {
+            PetWalkingManager.shared.handleAppBackgroundTransition()
+        } else {
+            stopLocationIfNoWalkIsRunning()
+        }
     }
 }
 
@@ -185,16 +231,16 @@ private struct RequiredHumanProfileView: View {
                     Text("先建立你的本人档案")
                         .font(.system(size: 30, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
-                    Text("Ohana 需要至少一个人类成员，用来记录谁完成了喂食、喂水、护理、健康记录和花费。")
+                    Text("当前没有人类成员。Ohana 需要至少一个人类成员，用来记录谁完成了喂食、喂水、护理、健康记录和花费。")
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white.opacity(0.72))
                         .lineSpacing(3)
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
+                    requirementRow(icon: "sparkles", text: "新的第一个人类会再次默认使用 2.5D 头像")
                     requirementRow(icon: "checkmark.seal.fill", text: "快速打卡会自动绑定到你")
                     requirementRow(icon: "creditcard.fill", text: "花费、护理和健康记录会有明确执行者")
-                    requirementRow(icon: "person.2.fill", text: "多人协作时可以准确区分家庭成员")
                 }
 
                 Button {

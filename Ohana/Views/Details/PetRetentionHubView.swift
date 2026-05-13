@@ -136,7 +136,7 @@ struct PetRetentionHubView: View {
 
     var body: some View {
         ZStack {
-            ArkBackgroundView()
+            OhanaAppBackground()
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
                     heroCard
@@ -198,10 +198,10 @@ struct PetRetentionHubView: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text("长期留存总览")
                     .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text("已完善 \(retentionScore)/5 个长期价值模块")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
                 ProgressView(value: Double(retentionScore), total: 5)
                     .tint(Color.goPrimary)
             }
@@ -216,16 +216,16 @@ struct PetRetentionHubView: View {
             HStack {
                 Label("这周的 \(pet.name)", systemImage: "sparkles")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text("\(weekInterval.start.formatted(.dateTime.month().day()))-\(weekInterval.end.formatted(.dateTime.month().day()))")
                     .font(.system(size: 10, weight: .black, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
 
             Text(weeklyArchiveStory)
                 .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
                 .lineSpacing(3)
 
             HStack(spacing: 8) {
@@ -272,12 +272,12 @@ struct PetRetentionHubView: View {
                 .foregroundStyle(color)
             Text(title)
                 .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.68)
             Text(subtitle)
                 .font(.system(size: 10, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
@@ -287,7 +287,7 @@ struct PetRetentionHubView: View {
     private func sectionTitle(_ title: String) -> some View {
         Text(title)
             .font(.system(size: 12, weight: .black, design: .rounded))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.ohanaSecondaryText)
             .padding(.horizontal, 4)
     }
 
@@ -313,7 +313,7 @@ struct PetRetentionHubView: View {
                     HStack {
                         Text(title)
                             .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Spacer()
                         Text(value)
                             .font(.system(size: 14, weight: .black, design: .rounded))
@@ -321,7 +321,7 @@ struct PetRetentionHubView: View {
                     }
                     Text(subtitle)
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(2)
                 }
                 Image(systemName: "chevron.right")
@@ -331,6 +331,6 @@ struct PetRetentionHubView: View {
             .padding(14)
             .goTranslucentCard(cornerRadius: 20)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 }

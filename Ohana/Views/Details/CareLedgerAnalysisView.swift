@@ -40,7 +40,7 @@ struct CareLedgerAnalysisView: View {
 
     var body: some View {
         ZStack {
-            ArkBackgroundView()
+            OhanaAppBackground()
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
                     headerCard
@@ -65,7 +65,7 @@ struct CareLedgerAnalysisView: View {
                         .font(.system(size: 20, weight: .black, design: .rounded))
                     Text("用同一事件层查看谁、给谁、做了什么")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
             }
@@ -153,7 +153,7 @@ struct CareLedgerAnalysisView: View {
                                 .lineLimit(1)
                             Text("\(actorName(for: event.actorId, kind: event.actorKind)) → \(subjectName(for: event.subjectId, kind: event.subjectKind))")
                                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                                 .lineLimit(1)
                         }
                         Spacer()
@@ -182,7 +182,7 @@ struct CareLedgerAnalysisView: View {
                 .padding(.vertical, 7)
                 .background(isSelected ? Color.goPrimary : Color.primary.opacity(0.08), in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func statBar(title: String, count: Int, total: Int, color: Color) -> some View {
@@ -205,7 +205,7 @@ struct CareLedgerAnalysisView: View {
     private func metric(_ label: String, _ value: String, _ color: Color) -> some View {
         VStack(spacing: 4) {
             Text(value).font(.system(size: 22, weight: .black, design: .rounded)).foregroundStyle(color)
-            Text(label).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(.secondary)
+            Text(label).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
@@ -223,7 +223,7 @@ struct CareLedgerAnalysisView: View {
     private func emptyText(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 12, weight: .medium, design: .rounded))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.ohanaSecondaryText)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
     }

@@ -13,24 +13,47 @@ struct CoconutLogView: View {
     @Bindable private var manager = QuestManager.shared
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @Query(sort: \Pet.createdAt)   private var pets:   [Pet]
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
     // N10: member filter
     @State private var selectedActorId: String? = nil
 
+    private var activeHumanId: UUID? {
+        UUID(uuidString: activeHumanIdStr)
+    }
+
+    private var visibleHumans: [Human] {
+        PrivacyService.unlockedHumans(for: .wishlist, from: humans, viewedBy: activeHumanId)
+    }
+
+    private var hiddenHumanIds: Set<String> {
+        Set(humans.compactMap {
+            PrivacyService.isLocked(.wishlist, for: $0, viewedBy: activeHumanId) ? $0.id.uuidString : nil
+        })
+    }
+
+    private var visibleLogs: [CoconutLogEntry] {
+        manager.coconutLogs.filter { !hiddenHumanIds.contains($0.actorId ?? "") }
+    }
+
+    private var visibleCoconutTotal: Int {
+        pets.reduce(0) { $0 + $1.coconutBalance } + visibleHumans.reduce(0) { $0 + $1.coconutBalance }
+    }
+
     private var filteredLogs: [CoconutLogEntry] {
-        guard let id = selectedActorId else { return manager.coconutLogs }
-        return manager.coconutLogs.filter { $0.actorId == id }
+        guard let id = selectedActorId else { return visibleLogs }
+        return visibleLogs.filter { $0.actorId == id }
     }
 
     private var knownActors: [(id: String, name: String, emoji: String)] {
         var seen = Set<String>()
         var result: [(String, String, String)] = []
-        for log in manager.coconutLogs {
+        for log in visibleLogs {
             guard let id = log.actorId, let name = log.actorName, !seen.contains(id) else { continue }
             seen.insert(id)
             let emoji: String
-            if humans.contains(where: { $0.id.uuidString == id }) {
-                emoji = humans.first(where: { $0.id.uuidString == id })?.avatarEmoji ?? "😊"
+            if visibleHumans.contains(where: { $0.id.uuidString == id }) {
+                emoji = visibleHumans.first(where: { $0.id.uuidString == id })?.avatarEmoji ?? "😊"
             } else {
                 emoji = "🐾"
             }
@@ -41,7 +64,7 @@ struct CoconutLogView: View {
 
     var body: some View {
         ZStack {
-            ArkBackgroundView()
+            OhanaAppBackground()
 
             VStack(spacing: 0) {
                 // Header
@@ -49,7 +72,7 @@ struct CoconutLogView: View {
                     Button { dismiss() } label: {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 17, weight: .bold))
-                            .foregroundStyle(.primary.opacity(0.7))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                             .frame(width: 36, height: 36)
                             .background(.white.opacity(0.08), in: Circle())
                     }
@@ -57,10 +80,10 @@ struct CoconutLogView: View {
                     VStack(spacing: 2) {
                         Text("椰子记录")
                             .font(.system(size: 18, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text("每次照顾家人都能获得椰子 🥥")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.primary.opacity(0.4))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     }
                     Spacer()
                     Color.clear.frame(width: 36, height: 36)
@@ -71,14 +94,14 @@ struct CoconutLogView: View {
                 HStack(spacing: 10) {
                     Text("🥥").font(.system(size: 44))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("\(manager.coconutCount)")
+                        Text("\(visibleCoconutTotal)")
                             .font(.system(size: 52, weight: .black, design: .rounded))
                             .foregroundStyle(Color.goPrimary)
                             .contentTransition(.numericText())
-                            .animation(.spring(response: 0.4), value: manager.coconutCount)
+                            .animation(.spring(response: 0.4), value: visibleCoconutTotal)
                         Text("当前椰子余额")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.primary.opacity(0.35))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -107,10 +130,10 @@ struct CoconutLogView: View {
                         Text("🥥").font(.system(size: 48))
                         Text(selectedActorId == nil ? "还没有椰子记录" : "该成员暂无椰子记录")
                             .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.4))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         Text("完成打卡、照顾家人后椰子会出现在这里")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.primary.opacity(0.25))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                             .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -150,7 +173,7 @@ struct CoconutLogView: View {
             .padding(.horizontal, 13).padding(.vertical, 7)
             .background(isSelected ? Color.goPrimary : Color.white.opacity(0.08), in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .animation(.spring(response: 0.3), value: selectedActorId)
     }
 
@@ -159,7 +182,7 @@ struct CoconutLogView: View {
         let isEarning = log.amount > 0
         // 判断 actorId 对应的是宜物还是人类
         let isPet = log.actorId.map { id in pets.contains { $0.id.uuidString == id } } ?? false
-        let isHuman = log.actorId.map { id in humans.contains { $0.id.uuidString == id } } ?? false
+        let isHuman = log.actorId.map { id in visibleHumans.contains { $0.id.uuidString == id } } ?? false
         let isSystem = log.actorId == nil || (!isPet && !isHuman)
 
         HStack(spacing: 14) {
@@ -172,13 +195,13 @@ struct CoconutLogView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(log.title)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 HStack(spacing: 6) {
                     if isSystem {
                         // 全局系统奖励
                         Text("🏕️ 岛屿奖励")
                             .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.45))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(.white.opacity(0.07), in: Capsule())
                     } else if isPet {
@@ -202,7 +225,7 @@ struct CoconutLogView: View {
                     }
                     Text(log.timeAgoString)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.primary.opacity(0.35))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                 }
             }
             Spacer()

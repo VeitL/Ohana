@@ -208,13 +208,13 @@ struct MemoryDropCard: View {
                         .font(.system(size: 11))
                     Text("记忆碎片")
                         .font(.system(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.5))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                         .tracking(1)
                     Spacer()
                     // 闪光扫光效果提示
                     Text("今日回忆")
                         .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(shimmer ? 0.7 : 0.25))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(shimmer ? 0.7 : 0.25))
                         .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: shimmer)
                         .onAppear { shimmer = true }
                 }
@@ -225,7 +225,7 @@ struct MemoryDropCard: View {
                         .font(.system(size: 28))
                     Text(fragment.headline)
                         .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -233,7 +233,7 @@ struct MemoryDropCard: View {
                 // 副标题
                 Text(fragment.subline)
                     .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.55))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -243,7 +243,7 @@ struct MemoryDropCard: View {
                         if let name = fragment.petName {
                             Text(name)
                                 .font(.system(size: 11, weight: .bold, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.4))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }
                         Spacer()
                         HStack(spacing: 3) {

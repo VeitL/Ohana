@@ -112,7 +112,7 @@ struct DogActivityCard: View {
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color(hex: "FF6B6B"), in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
         .padding(16)
@@ -131,7 +131,7 @@ struct DogActivityCard: View {
             // 浅色模式下更透明
             if colorScheme == .light {
                 content()
-                    .background(.ultraThinMaterial.opacity(0.3), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .background(Color.ohanaCardSurface.opacity(0.3), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             } else {
                 content()
                     .goGlassBackground(RoundedRectangle(cornerRadius: 24, style: .continuous))

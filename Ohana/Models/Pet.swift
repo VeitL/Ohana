@@ -22,9 +22,9 @@ enum FoodTrackingMode: String, Codable, CaseIterable {
     }
 }
 
-// MARK: - Pet Theme Color (Go UI palette — used to distinguish pets in charts, calendar, etc.)
+// MARK: - Pet Theme Color (member palette — never reuse global primary lime/blue)
 enum PetThemeColor: String, Codable, CaseIterable {
-    // 16 non-green, distinct, high-contrast colors
+    // 16 non-primary, distinct, high-contrast colors
     case crimson, vermilion, orange, amber, yellow, brown, rust, burgundy
     case magenta, pink, purple, indigo, violet, navy, blue, skyBlue
     
@@ -65,8 +65,8 @@ enum PetThemeColor: String, Codable, CaseIterable {
         case .indigo:    return "575FCF"
         case .violet:    return "686DE0"
         case .navy:      return "273C75"
-        case .blue:      return "4DA1FF"
-        case .skyBlue:   return "48DBFB"
+        case .blue:      return "94A3B8"
+        case .skyBlue:   return "F472B6"
         }
     }
 
@@ -86,8 +86,8 @@ enum PetThemeColor: String, Codable, CaseIterable {
         case .indigo:    return Color(hex: "3C40C6")
         case .violet:    return Color(hex: "4834D4")
         case .navy:      return Color(hex: "192A56")
-        case .blue:      return Color(hex: "007AFF")
-        case .skyBlue:   return Color(hex: "0ABDE3")
+        case .blue:      return Color(hex: "475569")
+        case .skyBlue:   return Color(hex: "BE185D")
         }
     }
 }
@@ -123,6 +123,8 @@ final class Pet {
     var restockDate: Date?
     var restockWeight: Double
     var dailyPortionGrams: Double
+    // ArkSchemaV41：当前主粮类型，用于喂食打卡和计划默认值
+    var mainFoodKindRaw: String = FeedFoodKind.dry.rawValue
     var foodPrice: Double
     var isShared: Bool
     var ckRecordName: String
@@ -198,7 +200,10 @@ final class Pet {
         self.passportExpiryDate = nil
         self.formerName = ""
         self.lineageInfo = ""
-        self.themeColorHex = themeColorHex
+        self.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
+            themeColorHex,
+            fallback: OhanaThemeColorPolicy.petFallbackHex
+        )
         self.homeDate = homeDate
         self.birthCountry = ""
         self.birthCity = ""
@@ -206,6 +211,7 @@ final class Pet {
         self.restockDate = nil
         self.restockWeight = 0
         self.dailyPortionGrams = 0
+        self.mainFoodKindRaw = FeedFoodKind.dry.rawValue
         self.foodPrice = 0
         self.isShared = false
         self.ckRecordName = ""
@@ -246,6 +252,10 @@ final class Pet {
     
     var themeColor: PetThemeColor {
         PetThemeColor.allCases.first { $0.rawValue == themeColorHex.lowercased() } ?? .orange
+    }
+
+    var safeThemeColorHex: String {
+        OhanaThemeColorPolicy.normalizedMemberThemeHex(themeColorHex, fallback: OhanaThemeColorPolicy.petFallbackHex)
     }
     
     var daysTogether: Int {
@@ -311,6 +321,11 @@ final class Pet {
     var foodTrackingMode: FoodTrackingMode {
         get { FoodTrackingMode(rawValue: foodTrackingModeRaw) ?? .casual }
         set { foodTrackingModeRaw = newValue.rawValue }
+    }
+
+    var mainFoodKind: FeedFoodKind {
+        get { FeedFoodKind(rawValue: mainFoodKindRaw) ?? .dry }
+        set { mainFoodKindRaw = newValue.rawValue }
     }
 
     // 佛系模式：预估耗尽日期

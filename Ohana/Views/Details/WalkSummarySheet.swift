@@ -62,7 +62,7 @@ struct WalkSummarySheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                 
                 ScrollView {
                     VStack(spacing: 20) {
@@ -95,7 +95,7 @@ struct WalkSummarySheet: View {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
             }
@@ -124,12 +124,12 @@ struct WalkSummarySheet: View {
                     .tracking(1.2)
                 Text("\(pet.name) 的路线记录")
                     .font(.system(size: 24, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
                 Text("目标、总览和历史轨迹")
                     .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer(minLength: 0)
         }
@@ -151,7 +151,7 @@ struct WalkSummarySheet: View {
                     .foregroundStyle(Color.goPrimary)
                 Text("本次心情")
                     .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
             }
 
             // 星级评分
@@ -164,7 +164,7 @@ struct WalkSummarySheet: View {
                             .font(.system(size: 22))
                             .foregroundStyle(star <= draftMoodRating ? Color.goYellow : Color.primary.opacity(0.25))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
                 Spacer()
                 if draftMoodRating > 0 {
@@ -197,7 +197,7 @@ struct WalkSummarySheet: View {
                     .padding(.vertical, 10)
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .disabled(draftMoodRating == 0 && draftNotes.isEmpty)
         }
         .padding(16)
@@ -224,7 +224,7 @@ struct WalkSummarySheet: View {
                     } else {
                         Image(systemName: "flag")
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(.primary.opacity(0.3))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     }
                 }
                 .frame(width: 56, height: 56)
@@ -232,15 +232,15 @@ struct WalkSummarySheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("本周目标")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.5))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                     if pet.weeklyWalkGoalKm > 0 {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             Text(String(format: "%.1f", thisWeekDistanceKm))
                                 .font(.system(size: 26, weight: .black, design: .rounded))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                             Text(String(format: "/ %.0f km", pet.weeklyWalkGoalKm))
                                 .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.4))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }
                         if weeklyProgress >= 1.0 {
                             Label("本周目标完成！", systemImage: "checkmark.circle.fill")
@@ -249,12 +249,12 @@ struct WalkSummarySheet: View {
                         } else {
                             Text(String(format: "还差 %.1f km", pet.weeklyWalkGoalKm - thisWeekDistanceKm))
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.4))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }
                     } else {
                         Text("尚未设定目标")
                             .font(.system(size: 15, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.3))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     }
                 }
                 Spacer()
@@ -270,7 +270,7 @@ struct WalkSummarySheet: View {
                         .padding(.vertical, 7)
                         .background(Color.goPrimary, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
         .padding(16)
@@ -279,7 +279,7 @@ struct WalkSummarySheet: View {
             goalSetterSheet
                 .presentationDetents([.height(320)])
                 .presentationDragIndicator(.visible)
-                .presentationBackground(.regularMaterial)
+                .presentationBackground(Color.ohanaCardSurface)
         }
     }
 
@@ -292,12 +292,12 @@ struct WalkSummarySheet: View {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(weeklyGoalDisplay(goalDraft))
                     .font(.system(size: 52, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .contentTransition(.numericText())
                     .animation(.spring(duration: 0.2), value: goalDraft)
                 Text("km / 周")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
 
             // 加减步进（0.5 km），替代固定档位
@@ -310,12 +310,12 @@ struct WalkSummarySheet: View {
                         .symbolRenderingMode(.palette)
                         .foregroundStyle(goalDraft <= 0 ? Color.secondary.opacity(0.35) : Color.goPrimary, Color.primary.opacity(0.12))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .disabled(goalDraft <= 0)
 
                 Text("每次 ±\(weeklyGoalStepKm == floor(weeklyGoalStepKm) ? String(format: "%.0f", weeklyGoalStepKm) : String(format: "%.1f", weeklyGoalStepKm)) km")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
 
                 Button {
                     adjustWeeklyGoal(weeklyGoalStepKm)
@@ -325,7 +325,7 @@ struct WalkSummarySheet: View {
                         .symbolRenderingMode(.palette)
                         .foregroundStyle(goalDraft >= weeklyGoalMaxKm ? Color.secondary.opacity(0.35) : Color.goPrimary, Color.primary.opacity(0.12))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .disabled(goalDraft >= weeklyGoalMaxKm)
             }
 
@@ -342,7 +342,7 @@ struct WalkSummarySheet: View {
                     .padding(.vertical, 14)
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 24)
 
             Spacer(minLength: 8)
@@ -371,7 +371,7 @@ struct WalkSummarySheet: View {
             HStack {
                 Text("Overview")
                     .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 Text(thisWeekDistanceKm > 0 ? String(format: "本周 %.1f km", thisWeekDistanceKm) : "本周暂无记录")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
@@ -395,17 +395,17 @@ struct WalkSummarySheet: View {
         VStack(alignment: .leading, spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
                 .frame(width: 26, height: 26)
                 .background(accent.opacity(0.12), in: Circle())
             Text(value)
                 .font(.system(size: 20, weight: .heavy, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Text(label)
                 .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)
         .padding(12)
@@ -418,11 +418,11 @@ struct WalkSummarySheet: View {
             HStack {
                 Text("历史记录")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text("\(sortedWalks.count)")
                     .font(.system(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 4)
                     .background(Color.primary.opacity(0.07), in: Capsule())
@@ -439,7 +439,7 @@ struct WalkSummarySheet: View {
             if sortedWalks.isEmpty {
                 Text("还没有巡岛记录")
                     .font(.system(size: 14))
-                    .foregroundStyle(.primary.opacity(0.4))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 20)
                     .goTranslucentCard(cornerRadius: 18)
@@ -470,11 +470,11 @@ struct WalkSummarySheet: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text(walk.startDate, format: .dateTime.month().day().weekday(.abbreviated))
                         .font(.system(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer(minLength: 8)
                     Text(walk.startDate, format: .dateTime.hour().minute())
                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
 
                 HStack(spacing: 12) {
@@ -492,13 +492,13 @@ struct WalkSummarySheet: View {
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.secondary.opacity(0.55))
+                        .foregroundStyle(Color.ohanaSecondaryText.opacity(0.55))
                 }
 
                 if let notes = walk.behaviorNotes, !notes.isEmpty {
                     Text(notes)
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
                 }
             }
@@ -550,7 +550,7 @@ struct WalkSummarySheet: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
         }
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Color.ohanaSecondaryText)
     }
 
     private func compactBadge(icon: String, text: String) -> some View {

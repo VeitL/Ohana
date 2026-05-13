@@ -40,7 +40,7 @@ struct HumanHealthReportView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            ArkBackgroundView().ignoresSafeArea()
+            OhanaAppBackground().ignoresSafeArea()
 
             if isPrivacyLocked {
                 privacyLockedView
@@ -111,10 +111,10 @@ struct HumanHealthReportView: View {
                 .foregroundStyle(Color.goYellow)
             Text("身体数据仅本人可见")
                 .font(OhanaFont.headline(.bold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Text("请切换到本人档案后再查看。")
                 .font(OhanaFont.callout())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .multilineTextAlignment(.center)
         .padding(24)
@@ -219,7 +219,7 @@ struct HumanHealthReportView: View {
                 .padding(14)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     // MARK: - Empty State
@@ -271,7 +271,7 @@ struct AddHumanHealthReportSheet: View {
 
     var body: some View {
         ZStack {
-            ArkBackgroundView().ignoresSafeArea()
+            OhanaAppBackground().ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 20) {
@@ -310,7 +310,7 @@ struct AddHumanHealthReportSheet: View {
                                             .padding(.horizontal, 12).padding(.vertical, 7)
                                             .background(reportType == type ? Color.goTeal : Color.white.opacity(0.1), in: Capsule())
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(ScaleButtonStyle())
                                     }
                                 }
                             }
@@ -340,7 +340,7 @@ struct AddHumanHealthReportSheet: View {
                                         .padding(.vertical, 10)
                                         .background(conclusion == c ? c.color : Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(ScaleButtonStyle())
                                 }
                             }
                         }
@@ -445,7 +445,7 @@ struct AddHumanHealthReportSheet: View {
                                 .background(Color.goRed.opacity(0.1), in: Capsule())
                                 .overlay(Capsule().strokeBorder(Color.goRed.opacity(0.3), lineWidth: 1))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                         .padding(.horizontal, 16)
                     }
 
@@ -458,7 +458,7 @@ struct AddHumanHealthReportSheet: View {
                             .padding(.vertical, 16)
                             .background(Color.goTeal, in: Capsule())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                     .padding(.horizontal, 16)
                     .padding(.bottom, 40)
                 }

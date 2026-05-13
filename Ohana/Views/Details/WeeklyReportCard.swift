@@ -51,11 +51,11 @@ struct WeeklyReportCard: View {
                     .foregroundStyle(Color.goPrimary)
                 Text("本周小报")
                     .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text("\(weekStart, format: .dateTime.month().day()) - \(weekEnd, format: .dateTime.month().day())")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.4))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 Button {
                     Task { await renderAndShare() }
                 } label: {
@@ -97,7 +97,7 @@ struct WeeklyReportCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("活跃天数")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
                 
                 HStack(spacing: 4) {
                     ForEach(0..<7, id: \.self) { dayOffset in
@@ -111,7 +111,7 @@ struct WeeklyReportCard: View {
                             
                             Text(date, format: .dateTime.weekday(.narrow))
                                 .font(.system(size: 9, weight: .medium))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                         }
                         .frame(maxWidth: .infinity)
                     }
@@ -133,16 +133,16 @@ struct WeeklyReportCard: View {
                 .font(.system(size: 16))
             Text(value)
                 .font(.system(size: 16, weight: .heavy, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Text(label)
                 .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
-        .background(.ultraThinMaterial.opacity(0.3), in: RoundedRectangle(cornerRadius: 12))
+        .background(Color.ohanaCardSurface.opacity(0.3), in: RoundedRectangle(cornerRadius: 12))
     }
     
     private var distanceFormatted: String {
@@ -204,7 +204,7 @@ struct WeeklyReportCard: View {
                 Spacer()
                 Text("\(weekStart, format: .dateTime.month().day()) — \(weekEnd, format: .dateTime.month().day())")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.4))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
@@ -226,10 +226,10 @@ struct WeeklyReportCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(pet.name)
                         .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Text("本周战绩")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.primary.opacity(0.4))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
                 Spacer()
                 // 活跃天数大字
@@ -243,7 +243,7 @@ struct WeeklyReportCard: View {
                         .foregroundStyle(Color.goPrimary)
                     Text("活跃天")
                         .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.4))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
             }
             .padding(.horizontal, 20)
@@ -271,7 +271,7 @@ struct WeeklyReportCard: View {
                             .frame(height: 20)
                         Text(d, format: .dateTime.weekday(.narrow))
                             .font(.system(size: 8, weight: .medium))
-                            .foregroundStyle(.primary.opacity(0.3))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -284,7 +284,7 @@ struct WeeklyReportCard: View {
                 Spacer()
                 Text("Made with Ohana 🏝️")
                     .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.18))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.18))
             }
             .padding(.horizontal, 20)
             .padding(.top, 12)
@@ -308,11 +308,11 @@ struct WeeklyReportCard: View {
             Text(emoji).font(.system(size: 18))
             Text(value)
                 .font(.system(size: 15, weight: .heavy, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1).minimumScaleFactor(0.7)
             Text(label)
                 .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.primary.opacity(0.4))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)

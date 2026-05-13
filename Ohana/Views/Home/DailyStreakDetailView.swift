@@ -37,7 +37,7 @@ struct DailyStreakDetailView: View {
 
     var body: some View {
         ZStack {
-            ArkBackgroundView().ignoresSafeArea()
+            OhanaAppBackground().ignoresSafeArea()
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 16) {
@@ -90,17 +90,17 @@ struct DailyStreakDetailView: View {
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 36, height: 36)
                     .background(.white.opacity(0.12), in: Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
 
             Spacer()
 
             Text("打卡连击")
                 .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
 
             Spacer()
 
@@ -109,7 +109,7 @@ struct DailyStreakDetailView: View {
         .padding(.horizontal, 20)
         .padding(.top, safeTop + 8)
         .padding(.bottom, 12)
-        .background(.ultraThinMaterial.opacity(0.01))
+        .background(Color.ohanaCardSurface.opacity(0.01))
     }
 
     // MARK: - 我的连击卡片
@@ -120,7 +120,7 @@ struct DailyStreakDetailView: View {
             HStack(spacing: 14) {
                 ZStack {
                     Circle()
-                        .fill(Color(hex: activeHuman?.themeColorHex ?? "4338FF").opacity(0.25))
+                        .fill(Color(hex: activeHuman?.safeThemeColorHex ?? OhanaThemeColorPolicy.humanFallbackHex).opacity(0.25))
                         .frame(width: 52, height: 52)
                     if let data = activeHuman?.avatarImageData, let img = UIImage(data: data) {
                         Image(uiImage: img)
@@ -135,10 +135,10 @@ struct DailyStreakDetailView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(activeHuman?.name ?? "我")
                         .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Text("每天打开 App 即打卡")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.4))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
@@ -149,7 +149,7 @@ struct DailyStreakDetailView: View {
                             .contentTransition(.numericText())
                         Text("天")
                             .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.45))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                     }
                     Text(currentStreak >= 30 ? "🔥 传奇！" : currentStreak >= 7 ? "🔥 火热！" : "继续保持")
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
@@ -166,7 +166,7 @@ struct DailyStreakDetailView: View {
                     HStack {
                         Text("距离 \(next) 天里程碑")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.4))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         Spacer()
                         Text("还差 \(next - currentStreak) 天")
                             .font(.system(size: 11, weight: .bold, design: .rounded))
@@ -199,7 +199,7 @@ struct DailyStreakDetailView: View {
                         .foregroundStyle(Color.goPrimary)
                     Text("打卡日历")
                         .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 Spacer()
                 HStack(spacing: 4) {
@@ -225,7 +225,7 @@ struct DailyStreakDetailView: View {
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.primary.opacity(0.5))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                         .frame(width: 36, height: 36)
                         .goGlassBackground(Circle())
                 }
@@ -234,7 +234,7 @@ struct DailyStreakDetailView: View {
 
                 Text(monthYearString(selectedMonth))
                     .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
 
                 Spacer()
 
@@ -263,7 +263,7 @@ struct DailyStreakDetailView: View {
                 ForEach(["日","一","二","三","四","五","六"], id: \.self) { d in
                     Text(d)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.3))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -282,7 +282,7 @@ struct DailyStreakDetailView: View {
                     Text("📦").font(.system(size: 14))
                     Text("补签包")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.7))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                     Text("×\(makeupPackCount)")
                         .font(.system(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(makeupPackCount > 0 ? Color.goPrimary : .primary.opacity(0.3))
@@ -298,7 +298,7 @@ struct DailyStreakDetailView: View {
                             .font(.system(size: 10, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.goYellow.opacity(0.85))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
 
@@ -326,10 +326,10 @@ struct DailyStreakDetailView: View {
                 .foregroundStyle(color)
             Text(value)
                 .font(.system(size: 16, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Text(label)
                 .font(.system(size: 9, weight: .medium, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.35))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
@@ -376,7 +376,7 @@ struct DailyStreakDetailView: View {
                     .padding(.vertical, 10)
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
     }
@@ -480,7 +480,7 @@ struct DailyStreakDetailView: View {
                 }
                 .frame(height: 40)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .disabled(cell.isChecked || cell.isToday || cell.isFuture || makeupPackCount == 0)
         }
     }

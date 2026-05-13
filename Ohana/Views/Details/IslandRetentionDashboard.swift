@@ -80,7 +80,7 @@ struct IslandRetentionDashboard: View {
         if standalone {
             NavigationStack {
                 ZStack {
-                    ArkBackgroundView().ignoresSafeArea()
+                    OhanaAppBackground().ignoresSafeArea()
                     scrollContent
                 }
                 .ignoresSafeArea(edges: .top)
@@ -115,7 +115,7 @@ struct IslandRetentionDashboard: View {
                     .frame(width: 36, height: 36)
                     .goGlassBackground(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             Spacer()
             Text("成长档案")
                 .font(.system(size: 17, weight: .black, design: .rounded))
@@ -247,7 +247,7 @@ struct IslandRetentionDashboard: View {
                     .padding(14)
                     .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
     }
@@ -265,7 +265,7 @@ struct IslandRetentionDashboard: View {
             .padding(.vertical, 8)
             .background(isSelected ? Color.goLime : Color.white.opacity(0.12), in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func selectorChip(title: String, icon: String, isSelected: Bool, action: @escaping () -> Void) -> some View {

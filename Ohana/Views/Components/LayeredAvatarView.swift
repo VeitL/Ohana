@@ -287,7 +287,7 @@ struct ColorPickerPopup: View {
 
                 Text(title)
                     .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
 
                 // Color grid
                 LazyVGrid(columns: columns, spacing: 14) {

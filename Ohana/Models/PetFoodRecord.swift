@@ -13,18 +13,39 @@ final class PetFoodRecord {
     var id: UUID
     var brand: String
     var dailyGrams: Double
+    var totalGrams: Double = 0
+    var foodKindRaw: String = FeedFoodKind.dry.rawValue
+    var purchaseDate: Date?
     var startDate: Date
+    var remainingCorrectionGrams: Double?
+    var remainingCorrectionDate: Date?
     var notes: String
     var executorId: String?  // ArkSchemaV11: 执行该动作的 Human.id.uuidString
     var pet: Pet?
     
-    init(brand: String = "", dailyGrams: Double = 0, startDate: Date = Date(), pet: Pet? = nil, executorId: String? = nil) {
+    init(
+        brand: String = "",
+        dailyGrams: Double = 0,
+        totalGrams: Double = 0,
+        foodKind: FeedFoodKind = .dry,
+        purchaseDate: Date? = nil,
+        startDate: Date = Date(),
+        pet: Pet? = nil,
+        executorId: String? = nil
+    ) {
         self.id = UUID()
         self.brand = brand
         self.dailyGrams = dailyGrams
+        self.totalGrams = totalGrams
+        self.foodKindRaw = foodKind.rawValue
+        self.purchaseDate = purchaseDate
         self.startDate = startDate
+        self.remainingCorrectionGrams = nil
+        self.remainingCorrectionDate = nil
         self.notes = ""
         self.executorId = executorId
         self.pet = pet
     }
+
+    var foodKind: FeedFoodKind { FeedFoodKind(rawValue: foodKindRaw) ?? .dry }
 }

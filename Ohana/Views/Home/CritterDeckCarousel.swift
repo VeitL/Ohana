@@ -123,7 +123,7 @@ struct CritterDeckCarousel: View {
                         .padding(.horizontal, 10).padding(.vertical, 5)
                         .background(.white.opacity(0.1), in: Capsule())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
             .frame(height: 24)
@@ -413,7 +413,7 @@ private struct MiniFlipCard: View {
     private var miniCardFront: some View {
         switch item {
         case .pet(let pet):
-            let themeColor = Color(hex: pet.themeColorHex.isEmpty ? "4338FF" : pet.themeColorHex)
+            let themeColor = Color(hex: pet.safeThemeColorHex)
             let isTransparent = pet.avatarImageData.map { ImageCutoutService.isTransparentPNG($0) } ?? false
             ZStack(alignment: .bottomLeading) {
                 // ── 卡片底层（包含非透明图和文字，整体 clipShape）
@@ -446,7 +446,7 @@ private struct MiniFlipCard: View {
                                 )
                                 // 核心 2：颜色混合叠加层 - mix-blend-color 效果
                                 .overlay(
-                                    Color(hex: "C8FF00")                        // 亮绿色背景色
+                                    Color(hex: "84CC16")
                                         .opacity(0.2)                           // 20% 透明度
                                         .blendMode(.color),                      // mix-blend-color
                                     alignment: .topLeading
@@ -568,7 +568,7 @@ private struct MiniFlipCard: View {
         }()
         let accentColor: Color = {
             switch item {
-            case .pet(let p): return Color(hex: p.themeColorHex.isEmpty ? "4338FF" : p.themeColorHex)
+            case .pet(let p): return Color(hex: p.safeThemeColorHex)
             case .human(let h): return Color(hex: h.themeColor)
             }
         }()
@@ -615,7 +615,7 @@ private struct MiniFlipCard: View {
                         .frame(maxWidth: .infinity).padding(.vertical, 7)
                         .background(accentColor, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
 
                 // 置顶按钮
                 if let promote = onPromote {
@@ -626,7 +626,7 @@ private struct MiniFlipCard: View {
                             .frame(maxWidth: .infinity).padding(.vertical, 5)
                             .background(Color.white.opacity(0.08), in: Capsule())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
             .padding(12)
@@ -839,9 +839,9 @@ struct HumanIDCardView: View {
                                 Image(systemName: "arrow.up.right")
                                     .font(.system(size: 10, weight: .semibold))
                             }
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                             .padding(.horizontal, 12).padding(.vertical, 7)
-                            .background(.ultraThinMaterial)
+                            .background(Color.ohanaCardSurface)
                             .clipShape(Capsule())
                         }
                         .padding(.top, 20).padding(.trailing, 18)
@@ -996,9 +996,9 @@ struct HumanQuickAccessGrid: View {
 
     private let actions: [HumanQAAction] = [
         HumanQAAction(id: "weight",  emoji: "⚖️", label: "记录体重", sublabel: "健康管理", accentHex: "00D4AA"),
-        HumanQAAction(id: "water",   emoji: "💧", label: "喝水打卡", sublabel: "今日饮水", accentHex: "4338FF"),
+        HumanQAAction(id: "water",   emoji: "💧", label: "喝水打卡", sublabel: "今日饮水", accentHex: "14B8A6"),
         HumanQAAction(id: "expense", emoji: "💸", label: "记一笔账", sublabel: "生活花费", accentHex: "FFB800"),
-        HumanQAAction(id: "wish",    emoji: "📝", label: "待办心愿", sublabel: "愿望清单", accentHex: "C8FF00"),
+        HumanQAAction(id: "wish",    emoji: "📝", label: "待办心愿", sublabel: "愿望清单", accentHex: "F59E0B"),
     ]
 
     var body: some View {
@@ -1009,7 +1009,7 @@ struct HumanQuickAccessGrid: View {
         }
         .sheet(isPresented: $showWeightSheet) {
             GenericWeightEntrySheet(target: .human(human))
-                .presentationDetents([.medium])
+                .presentationDetents([.height(690), .large])
                 .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showWishSheet) {
@@ -1049,7 +1049,7 @@ struct HumanQuickAccessGrid: View {
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(isWaterDone ? Color.goPrimary.opacity(0.5) : accent.opacity(0.3), lineWidth: 1))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func handleHumanAction(_ id: String) {

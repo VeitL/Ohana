@@ -88,7 +88,7 @@ struct AddHealthRecordSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
 
                 ScrollView {
                     VStack(spacing: 20) {
@@ -107,7 +107,7 @@ struct AddHealthRecordSheet: View {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(pet.name)
                                     .font(OhanaFont.body(.black))
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(Color.ohanaPrimaryText)
                                 Text(typeLabel)
                                     .font(OhanaFont.caption(.medium))
                                     .foregroundStyle(Color.goTeal)
@@ -132,7 +132,7 @@ struct AddHealthRecordSheet: View {
                                         .frame(width: 22)
                                     TextField("名称（如：狂犬疫苗三联苗）", text: $name)
                                         .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                        .foregroundStyle(.primary)
+                                        .foregroundStyle(Color.ohanaPrimaryText)
                                 }
                             }
                         }
@@ -143,7 +143,7 @@ struct AddHealthRecordSheet: View {
                                 .datePickerStyle(.compact)
                                 .tint(Color.goPrimary)
                                 .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                         }
 
                         // 有效期（疫苗/驱虫才显示）
@@ -154,11 +154,11 @@ struct AddHealthRecordSheet: View {
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text("设置有效期")
                                                 .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                                .foregroundStyle(.primary)
+                                                .foregroundStyle(Color.ohanaPrimaryText)
                                             if !expirationHint.isEmpty {
                                                 Text(expirationHint)
                                                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                                                    .foregroundStyle(.secondary)
+                                                    .foregroundStyle(Color.ohanaSecondaryText)
                                             }
                                         }
                                         Spacer()
@@ -171,7 +171,7 @@ struct AddHealthRecordSheet: View {
                                             .datePickerStyle(.compact)
                                             .tint(Color.goYellow)
                                             .font(.system(size: 14, weight: .medium, design: .rounded))
-                                            .foregroundStyle(.primary.opacity(0.8))
+                                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                                     }
                                 }
                             }
@@ -184,7 +184,7 @@ struct AddHealthRecordSheet: View {
                                     HStack {
                                         Text("下次体检提醒")
                                             .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                            .foregroundStyle(.primary)
+                                            .foregroundStyle(Color.ohanaPrimaryText)
                                         Spacer()
                                         Toggle("", isOn: $hasNextCheckup)
                                             .tint(Color.goTeal)
@@ -195,7 +195,7 @@ struct AddHealthRecordSheet: View {
                                             .datePickerStyle(.compact)
                                             .tint(Color.goTeal)
                                             .font(.system(size: 14, weight: .medium, design: .rounded))
-                                            .foregroundStyle(.primary.opacity(0.8))
+                                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                                     }
                                 }
                             }
@@ -210,7 +210,7 @@ struct AddHealthRecordSheet: View {
                                     .frame(width: 22)
                                 TextField("医生 / 诊所（可选）", text: $vetName)
                                     .font(.system(size: 15, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(Color.ohanaPrimaryText)
                             }
                         }
 
@@ -224,7 +224,7 @@ struct AddHealthRecordSheet: View {
                                 TextField("费用（\(AppCurrency.symbol)，可选）", text: $cost)
                                     .keyboardType(.decimalPad)
                                     .font(.system(size: 15, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(Color.ohanaPrimaryText)
                             }
                         }
 
@@ -233,12 +233,12 @@ struct AddHealthRecordSheet: View {
                             HStack(alignment: .top) {
                                 Image(systemName: "note.text")
                                     .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(.primary.opacity(0.4))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                     .frame(width: 22)
                                     .padding(.top, 2)
                                 TextField("备注 / 笔记（可选）", text: $note, axis: .vertical)
                                     .font(.system(size: 15, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(Color.ohanaPrimaryText)
                                     .lineLimit(3...6)
                             }
                         }
@@ -252,7 +252,7 @@ struct AddHealthRecordSheet: View {
                                 .padding(.vertical, 16)
                                 .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
 
                         Spacer(minLength: 40)
                     }
@@ -261,12 +261,12 @@ struct AddHealthRecordSheet: View {
             }
             .navigationTitle(typeLabel)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbarBackground(Color.ohanaCardSurface, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }
-                        .foregroundStyle(.primary.opacity(0.6))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                 }
             }
             .onAppear {
@@ -306,7 +306,7 @@ struct AddHealthRecordSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("记录类型")
                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
                 .padding(.horizontal, 4)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -320,7 +320,7 @@ struct AddHealthRecordSheet: View {
                                 .padding(.horizontal, 12).padding(.vertical, 8)
                                 .background(selectedType == t ? Color.goPrimary : Color.primary.opacity(0.08), in: Capsule())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                     }
                 }
             }

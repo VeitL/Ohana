@@ -52,7 +52,7 @@ struct AddPlantView: View {
                                         )
                                 )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                     }
                 }
                 .padding(.horizontal, 20)

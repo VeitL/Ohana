@@ -33,14 +33,14 @@ struct WalkInProgressPill: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("\(pet.name) 正在巡岛")
                         .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     TimelineView(.periodic(from: .now, by: 1)) { _ in
                         let elapsed = Int(mgr.elapsedTime)
                         let m = elapsed / 60, s = elapsed % 60
                         Text(String(format: "已巡 %02d:%02d", m, s))
                             .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.55))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                             .monospacedDigit()
                             .contentTransition(.numericText())
                     }
@@ -58,12 +58,12 @@ struct WalkInProgressPill: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .background(
-                Capsule().fill(.thinMaterial)
+                Capsule().fill(Color.ohanaCardSurface)
             )
             .overlay(
                 Capsule().strokeBorder(Color.goPrimary.opacity(0.25), lineWidth: 1)
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 }

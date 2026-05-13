@@ -9,303 +9,14 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
-import ImageIO
 import Foundation
-
-// ─────────────────────────────────────────────────
-// MARK: – Data model
-// ─────────────────────────────────────────────────
-
-private struct FocusCard: Identifiable {
-    let id: UUID
-    let name: String
-    let kind: String
-    let emoji: String
-    let color: Color
-    let streak: Int
-    let coconutBalance: Int
-    var createdAt: Date = .distantPast
-    var daysTogetherText: String?
-    var ageText: String?
-    var zodiacText: String?
-    var mbtiText: String?
-    var humanEquivalentAgeText: String?
-    var genderText: String?
-    var personalityHint: String?
-    var avatarImageData: Data?
-    var humanGender: String? = nil
-    var petSpecies: String?
-    var coatColor:      Color = Color(hex: "E8C49A")
-    var eyeColor:       Color = Color(hex: "6B3A2A")
-    var patternName:    String?
-    var themeColorHex:  String = ""
-    var daysTogether:   Int = 0
-    var breed:          String = ""
-    var isShownOnHome:  Bool = true
-    var isHuman:  Bool = false
-    var isDummy:  Bool = false
-    var isReal:   Bool = false
-    var actions: [Action]
-
-    struct Action: Identifiable {
-        let id = UUID()
-        let label: String
-        let icon: String
-        let colorHex: String
-    }
-}
-
-private struct HomeFabFunctionShortcut: Identifiable {
-    var label: String
-    var icon: String
-    var isAvailable: Bool = true
-    var badge: String? = nil
-    var destination: FMDest? = nil
-
-    var id: String { label }
-}
-
-private enum ExpandedCardFabAction: Hashable {
-    case quick(String)
-    case detail(PetFeature)
-    case allFeatures
-    case humanQuick(String)
-    case humanAllFeatures
-}
-
-private struct ExpandedCardFabShortcut: Identifiable {
-    var label: String
-    var icon: String
-    var action: ExpandedCardFabAction
-    var isAvailable: Bool = true
-    var badge: String? = nil
-
-    var id: String { "\(label)-\(String(describing: action))" }
-}
-
-private struct FunctionMenuPresentation: Identifiable {
-    let id = UUID()
-    let destination: FMDest?
-}
-
-private extension FocusCard {
-
-    static func from(_ pet: Pet) -> FocusCard {
-        let isDog  = pet.species.contains("狗") || pet.species.lowercased().contains("dog")
-        let isCat  = pet.species.contains("猫") || pet.species.lowercased().contains("cat")
-        let isFish = pet.species.contains("鱼") || pet.species.lowercased().contains("fish")
-        let isBird = pet.species.contains("鸟") || pet.species.lowercased().contains("bird")
-        let isRabbit = pet.species.contains("兔") || pet.species.lowercased().contains("rabbit")
-        let isReptile = pet.species.contains("爬") || pet.species.contains("龟") || pet.species.contains("蛇") || pet.species.contains("蜥") || pet.species.contains("守宫") || pet.species.lowercased().contains("reptile")
-
-        var acts: [Action] = [.init(label: "FEED", icon: "fork.knife", colorHex: "FFDD44")]
-        if isFish {
-            acts += [.init(label: "WATER",  icon: "drop.circle",             colorHex: "00D4AA"),
-                     .init(label: "FILTER", icon: "wrench.and.screwdriver",  colorHex: "A78BFA")]
-        } else if isBird {
-            acts += [.init(label: "WATER",  icon: "drop",       colorHex: "00D4AA"),
-                     .init(label: "CAGE",   icon: "basket",     colorHex: "FFD166"),
-                     .init(label: "FLIGHT", icon: "bird",       colorHex: "06D6A0")]
-        } else if isReptile {
-            acts += [.init(label: "MIST",      icon: "cloud.drizzle", colorHex: "118AB2"),
-                     .init(label: "SUBSTRATE", icon: "leaf",          colorHex: "07DB8B"),
-                     .init(label: "PLAY",      icon: "sparkles",      colorHex: "F472B6")]
-        } else if isDog {
-            acts += [.init(label: "WALK",  icon: "figure.walk", colorHex: "C8FF00"),
-                     .init(label: "WATER", icon: "drop",         colorHex: "00D4AA"),
-                     .init(label: "POTTY", icon: "allergens",    colorHex: "A78BFA")]
-        } else if isCat {
-            acts += [.init(label: "WATER",  icon: "drop",     colorHex: "00D4AA"),
-                     .init(label: "LITTER", icon: "trash",     colorHex: "5B6AFF"),
-                     .init(label: "PLAY",   icon: "sparkles",  colorHex: "F472B6")]
-        } else if isRabbit {
-            acts += [.init(label: "WATER",  icon: "drop",      colorHex: "00D4AA"),
-                     .init(label: "LITTER", icon: "trash",     colorHex: "5B6AFF"),
-                     .init(label: "GROOM",  icon: "comb",      colorHex: "FF8C42")]
-        } else {
-            acts += [.init(label: "WATER", icon: "drop",     colorHex: "00D4AA"),
-                     .init(label: "PLAY",  icon: "sparkles",  colorHex: "F472B6")]
-        }
-
-        let hex = pet.themeColorHex.isEmpty ? "FFB3C6" : pet.themeColorHex
-        let language = UserDefaults.standard.string(forKey: "appLanguage") ?? "zh"
-        let hour = Calendar.current.component(.hour, from: Date())
-        return FocusCard(
-            id: pet.id,
-            name: pet.name.isEmpty ? "Unnamed" : pet.name,
-            kind: pet.species.isEmpty ? "PET" : pet.species,
-            emoji: pet.avatarEmoji.isEmpty ? "🐾" : pet.avatarEmoji,
-            color: Color(hex: hex),
-            streak: pet.currentStreak,
-            coconutBalance: pet.coconutBalance,
-            createdAt: pet.createdAt,
-            daysTogetherText: pet.homeDate == nil ? nil : "\(pet.daysTogether) 天",
-            ageText: pet.birthday == nil ? nil : pet.ageText,
-            zodiacText: pet.birthday.map { Human.westernZodiacDisplay(for: $0, isEnglish: false) },
-            humanEquivalentAgeText: pet.birthday.map { pet.humanEquivalentAgeTextForWallet(birthday: $0) },
-            genderText: pet.genderSymbol + (pet.isNeutered ? " 已绝育" : ""),
-            personalityHint: PetTagGreeting.homeSubtitleHint(pet: pet, hour: hour, l: L10n(language)),
-            avatarImageData: pet.avatarImageData,
-            petSpecies: pet.species,
-            coatColor:    WalletPetCardTheme.silhouetteCoatColor(for: pet),
-            eyeColor:     WalletPetCardTheme.silhouetteEyeColor(for: pet),
-            patternName:  WalletPetCardTheme.coatPatternName(for: pet),
-            themeColorHex: hex,
-            daysTogether:  pet.homeDate == nil ? 0 : pet.daysTogether,
-            breed:         pet.breed,
-            isReal: true,
-            actions: Array(acts.prefix(4))
-        )
-    }
-
-    static func from(_ human: Human) -> FocusCard {
-        let hex = human.themeColorHex.isEmpty ? "B9E8D2" : human.themeColorHex
-        let days = max(0, Calendar.current.dateComponents([.day], from: human.createdAt, to: Date()).day ?? 0)
-        return FocusCard(
-            id: human.id,
-            name: human.name.isEmpty ? "Human" : human.name,
-            kind: human.roleText.isEmpty ? "HUMAN" : human.roleText,
-            emoji: human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji,
-            color: Color(hex: hex),
-            streak: 0,
-            coconutBalance: human.coconutBalance,
-            createdAt: human.createdAt,
-            daysTogetherText: "\(days) 天",
-            ageText: human.birthday == nil ? nil : human.ageText,
-            zodiacText: human.birthday.map { Human.westernZodiacDisplay(for: $0, isEnglish: false) },
-            mbtiText: human.mbti.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : human.mbti.uppercased(),
-            genderText: HumanGenderIdentity.title(for: human.genderRaw),
-            avatarImageData: human.avatarImageData,
-            humanGender: human.genderRaw,
-            themeColorHex: hex,
-            daysTogether:  days,
-            isShownOnHome: human.shouldShowOnHome,
-            isHuman: true,
-            isReal: true,
-            actions: [.init(label: "WEIGHT",  icon: "scalemass",  colorHex: "80FFEA"),
-                      .init(label: "WORKOUT", icon: "figure.run",  colorHex: "C8FF00"),
-                      .init(label: "NOTE",    icon: "note.text",   colorHex: "5B6AFF")]
-        )
-    }
-
-    static let dummies: [FocusCard] = [
-        FocusCard(id: UUID(), name: "Mochi", kind: "DOG", emoji: "🐶",
-                  color: Color(hex: "F4A7B9"), streak: 7, coconutBalance: 42,
-                  petSpecies: "狗", coatColor: Color(hex: "D7A76D"), eyeColor: Color(hex: "57341E"),
-                  isDummy: true,
-                  actions: [.init(label: "FEED",  icon: "fork.knife",  colorHex: "FFDD44"),
-                             .init(label: "WALK",  icon: "figure.walk", colorHex: "C8FF00"),
-                             .init(label: "WATER", icon: "drop",        colorHex: "00D4AA"),
-                             .init(label: "POTTY", icon: "allergens",   colorHex: "A78BFA")]),
-
-        FocusCard(id: UUID(), name: "Luna", kind: "CAT", emoji: "🐱",
-                  color: Color(hex: "C9B6E4"), streak: 12, coconutBalance: 66,
-                  petSpecies: "猫", coatColor: Color(hex: "9CA7B2"), eyeColor: Color(hex: "7A4E20"),
-                  isDummy: true,
-                  actions: [.init(label: "FEED",   icon: "fork.knife", colorHex: "FFDD44"),
-                             .init(label: "WATER",  icon: "drop",        colorHex: "00D4AA"),
-                             .init(label: "LITTER", icon: "trash",       colorHex: "5B6AFF"),
-                             .init(label: "PLAY",   icon: "sparkles",    colorHex: "F472B6")]),
-
-        FocusCard(id: UUID(), name: "Alex", kind: "HUMAN", emoji: "🧑‍💻",
-                  color: Color(hex: "B9E8D2"), streak: 3, coconutBalance: 18,
-                  isHuman: true, isDummy: true,
-                  actions: [.init(label: "WEIGHT",  icon: "scalemass",  colorHex: "80FFEA"),
-                             .init(label: "WORKOUT", icon: "figure.run", colorHex: "C8FF00"),
-                             .init(label: "NOTE",    icon: "note.text",  colorHex: "5B6AFF")]),
-
-        FocusCard(id: UUID(), name: "Nemo", kind: "FISH", emoji: "🐟",
-                  color: Color(hex: "C7E7F1"), streak: 4, coconutBalance: 24,
-                  petSpecies: "鱼", isDummy: true,
-                  actions: [.init(label: "FEED",   icon: "fork.knife",             colorHex: "FFDD44"),
-                             .init(label: "WATER",  icon: "drop.circle",            colorHex: "00D4AA"),
-                             .init(label: "FILTER", icon: "wrench.and.screwdriver", colorHex: "A78BFA")]),
-    ]
-}
-
-private extension Pet {
-    func humanEquivalentAgeTextForWallet(birthday: Date) -> String {
-        let equivalent = FocusPetHumanAgeEstimator.equivalentHumanYears(
-            birthday: birthday,
-            species: species,
-            breed: breed
-        )
-        guard equivalent > 0 else { return "" }
-        return "约人类\(equivalent)岁"
-    }
-}
-
-private enum FocusPetHumanAgeEstimator {
-    static func equivalentHumanYears(birthday: Date, species: String, breed: String) -> Int {
-        let ageYears = max(0, Calendar.current.dateComponents([.day], from: birthday, to: Date()).day ?? 0) / 365
-        let preciseAge = max(0, Double(Calendar.current.dateComponents([.day], from: birthday, to: Date()).day ?? 0) / 365.25)
-        let normalizedSpecies = species.lowercased()
-
-        if species.contains("狗") || normalizedSpecies.contains("dog") {
-            return dogHumanYears(age: preciseAge, breed: breed)
-        }
-        if species.contains("猫") || normalizedSpecies.contains("cat") {
-            return catHumanYears(age: preciseAge)
-        }
-        if species.contains("兔") || normalizedSpecies.contains("rabbit") {
-            return Int((preciseAge * 8.0).rounded())
-        }
-        if species.contains("仓鼠") || normalizedSpecies.contains("hamster") {
-            return Int((preciseAge * 26.0).rounded())
-        }
-        if species.contains("鸟") || normalizedSpecies.contains("bird") {
-            return Int((preciseAge * 5.0).rounded())
-        }
-        if species.contains("鱼") || normalizedSpecies.contains("fish") {
-            return Int((preciseAge * 6.0).rounded())
-        }
-        return max(0, ageYears)
-    }
-
-    private static func dogHumanYears(age: Double, breed: String) -> Int {
-        guard age > 0 else { return 0 }
-        if age <= 1 { return Int((age * 15).rounded()) }
-        if age <= 2 { return Int((15 + (age - 1) * 9).rounded()) }
-
-        let increment: Double
-        switch dogSize(for: breed) {
-        case .small: increment = 4
-        case .medium: increment = 5
-        case .large: increment = 6
-        case .giant: increment = 7
-        }
-        return Int((24 + (age - 2) * increment).rounded())
-    }
-
-    private static func catHumanYears(age: Double) -> Int {
-        guard age > 0 else { return 0 }
-        if age <= 1 { return Int((age * 15).rounded()) }
-        if age <= 2 { return Int((15 + (age - 1) * 9).rounded()) }
-        return Int((24 + (age - 2) * 4).rounded())
-    }
-
-    private enum DogSize { case small, medium, large, giant }
-
-    private static func dogSize(for breed: String) -> DogSize {
-        let b = breed.lowercased()
-        if ["马尔济斯", "约克夏", "博美", "比熊", "西施", "查理王", "泰迪", "贵宾", "腊肠", "法斗", "法国斗牛", "corgi", "poodle", "yorkshire", "pomeranian", "bichon", "maltese", "dachshund", "shih"].contains(where: { b.contains($0.lowercased()) }) {
-            return .small
-        }
-        if ["阿拉斯加", "大丹", "圣伯纳", "獒", "纽芬兰", "giant", "great dane", "mastiff", "saint bernard", "newfoundland", "alaskan"].contains(where: { b.contains($0.lowercased()) }) {
-            return .giant
-        }
-        if ["金毛", "拉布拉多", "德国牧羊", "杜宾", "哈士奇", "萨摩耶", "大麦町", "边境牧羊", "golden", "labrador", "german shepherd", "husky", "samoyed", "doberman", "dalmatian", "border collie"].contains(where: { b.contains($0.lowercased()) }) {
-            return .large
-        }
-        return .medium
-    }
-}
+import Combine
 
 // ─────────────────────────────────────────────────
 // MARK: – Layout constants
 // ─────────────────────────────────────────────────
 
-private enum K {
+enum K {
     static let bg    = Color(hex: "F8D8DF")
     static let ink   = Color(hex: "23181A")
     static let muted = Color(hex: "8B6E74")
@@ -341,7 +52,7 @@ private enum K {
     static let focusCardPadding: CGFloat = heroMargin / 3
 }
 
-private enum HeroAnim {
+enum HeroAnim {
     static let stackCardCorner: CGFloat = 24
     static var transitionSpring: Animation {
         GoMotion.page
@@ -360,13 +71,23 @@ private enum HeroAnim {
     static let compactPeek: CGFloat = 14
 }
 
-private struct HeroShellID: Hashable { let cardId: UUID }
-private struct HeroArtID:  Hashable { let cardId: UUID }
+struct HeroShellID: Hashable { let cardId: UUID }
+struct HeroArtID:  Hashable { let cardId: UUID }
 
 private struct FocusHealthRecordTarget: Identifiable {
     let id = UUID()
     let pet: Pet
     let type: HealthLogType
+}
+
+private struct ExpandedQuickPetRecordRoute: Identifiable {
+    let id = UUID()
+    let pet: Pet
+}
+
+private struct ExpandedQuickHumanRecordRoute: Identifiable {
+    let id = UUID()
+    let human: Human
 }
 
 // ─────────────────────────────────────────────────
@@ -388,6 +109,9 @@ struct FocusStackHomeTestView: View {
     @Query(sort: \Human.createdAt, order: .reverse) private var humans: [Human]
     @Query(sort: \Plant.createdAt) private var plants: [Plant]
     @Query(sort: \Event.startDate) private var allEvents: [Event]
+    @Query(filter: #Predicate<PetCareLog> { $0.type == "喂食" },
+           sort: \PetCareLog.date,
+           order: .reverse) private var allFeedCareLogs: [PetCareLog]
     @Query(filter: #Predicate<Reminder> { $0.status == "pending" },
            sort: \Reminder.scheduledAt) private var pendingReminders: [Reminder]
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
@@ -402,10 +126,9 @@ struct FocusStackHomeTestView: View {
     @State private var showingAddEntity    = false
     @State private var addEntityInitialType: EntityType? = nil
     @State private var showingCrewRoster   = false
+    @State private var showingAccountSwitcher = false
     @State private var showingSettings     = false
     @State private var showingCalendar     = false
-    @State private var familyActivityPet: Pet? = nil
-    @State private var weeklyReportPet: Pet? = nil
     @State private var calendarEntityFilterId: String? = nil
     @State private var showingOasisReward  = false
     @State private var cardFabExpanded     = false
@@ -414,13 +137,13 @@ struct FocusStackHomeTestView: View {
     @State private var expandedBasicInfoPet: Pet? = nil
     @State private var expandedBasicInfoHuman: Human? = nil
     @State private var pressedExpandedActionId: String? = nil
-    @State private var expandedQuickWeightPet: Pet? = nil
-    @State private var expandedQuickExpensePet: Pet? = nil
+    @State private var expandedQuickWeightPet: ExpandedQuickPetRecordRoute? = nil
+    @State private var expandedQuickExpensePet: ExpandedQuickPetRecordRoute? = nil
     @State private var expandedQuickWeightDetailPet: Pet? = nil
     @State private var expandedQuickExpenseDetailPet: Pet? = nil
     @State private var expandedQuickFeedDetailPet: Pet? = nil
+    @State private var expandedQuickFeedOpensManualSheet = false
     @State private var expandedQuickWaterDetailPet: Pet? = nil
-    @State private var expandedQuickWaterDetailModeRaw: String? = nil
     @State private var expandedQuickPottyDetailPet: Pet? = nil
     @State private var expandedQuickLitterDetailPet: Pet? = nil
     @State private var expandedQuickPlayDetailPet: Pet? = nil
@@ -432,7 +155,7 @@ struct FocusStackHomeTestView: View {
     @State private var focusHealthRecordTarget: FocusHealthRecordTarget? = nil
     @State private var expandedQuickMomentPet: Pet? = nil
     @State private var expandedMomentHistoryPet: Pet? = nil
-    @State private var expandedQuickHumanWeight: Human? = nil
+    @State private var expandedQuickHumanWeight: ExpandedQuickHumanRecordRoute? = nil
     @State private var expandedQuickHumanWorkout: Human? = nil
     @State private var expandedQuickHumanMedicationAdd: Human? = nil
     @State private var expandedQuickHumanMedication: Human? = nil
@@ -454,7 +177,7 @@ struct FocusStackHomeTestView: View {
     }
     @State private var expandedQAJiggle = false
     @State private var expandedQAEditItems: [QuickActionItem] = []
-    @State private var showingExpandedQAQuickAdd = false
+    @State private var expandedQADraggingItemId: String? = nil
     @State private var showingQuickActionLimitAlert = false
     @State private var showingAntiRepeatAlert = false
     @State private var pendingRepeatAction: (() -> Void)? = nil
@@ -480,6 +203,10 @@ struct FocusStackHomeTestView: View {
     @State private var homeCardReorderEnabled = false
     @State private var homeCardReorderModeActive = false
     @State private var didRecordHomeFirstFrame = false
+    @State private var avatarCacheRevision = 0
+    @State private var quickActionClockTick = Date()
+    @State private var homeCardSnapshot: [FocusCard] = []
+    @State private var homeCardSnapshotInitialized = false
 
     // Debug-only: show Mochi/Luna dummy stack even when real data is empty.
     @AppStorage("debugShowDummyCards") private var showDummyCards: Bool = false
@@ -508,8 +235,10 @@ struct FocusStackHomeTestView: View {
     // then drag reorders the home stack; expanded hero long-press opens basic info.
     @State private var isExpanded: Bool = false
     @State private var activeCardId: UUID?
+    @State private var expandedQuickModulesReady = false
     @State private var rosterPreviewCard: FocusCard?
     @State private var pendingPromotedHomeCardId: UUID?
+    @State private var walletTapFeedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
 
     private let homeCardReorderLiftY: CGFloat = -10
 
@@ -534,7 +263,58 @@ struct FocusStackHomeTestView: View {
     private var l: L10n { L10n(appLanguage) }
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
 
+    private var activeHuman: Human? {
+        humans.first { $0.id.uuidString == activeHumanIdStr }
+    }
+
+    private var activeHumanDisplayName: String {
+        guard let human = activeHuman else { return "未绑定" }
+        let name = human.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return "成员" }
+        return name.count > 6 ? "\(String(name.prefix(6)))…" : name
+    }
+
     private var cards: [FocusCard] {
+        homeCardSnapshotInitialized ? homeCardSnapshot : buildHomeCardSnapshot()
+    }
+
+    private var homeCardSnapshotSourceSignature: String {
+        let petSignature = pets.map { pet in
+            [
+                pet.id.uuidString,
+                pet.name,
+                pet.species,
+                pet.breed,
+                pet.safeThemeColorHex,
+                "\(pet.hasPassedAway)",
+                "\(pet.currentStreak)",
+                "\(pet.coconutBalance)",
+                "\(pet.daysTogether)",
+                pet.avatarImageData.map { FocusWalletAvatarCache.signature(for: $0) } ?? ""
+            ].joined(separator: "|")
+        }.joined(separator: ";")
+        let humanSignature = humans.map { human in
+            [
+                human.id.uuidString,
+                human.name,
+                human.roleText,
+                human.safeThemeColorHex,
+                "\(human.shouldShowOnHome)",
+                "\(human.coconutBalance)",
+                human.avatarImageData.map { FocusWalletAvatarCache.signature(for: $0) } ?? ""
+            ].joined(separator: "|")
+        }.joined(separator: ";")
+        return [
+            petSignature,
+            humanSignature,
+            hiddenHomePetIDsRaw,
+            homeCardOrderRaw,
+            "\(showDummyCards)",
+            appLanguage
+        ].joined(separator: "||")
+    }
+
+    private func buildHomeCardSnapshot() -> [FocusCard] {
         let real = (
             pets
                 .filter { !$0.hasPassedAway && HomeCardVisibility.isPetVisible($0, raw: hiddenHomePetIDsRaw) }
@@ -558,6 +338,51 @@ struct FocusStackHomeTestView: View {
         return homeCardsOrderedByPreference(real + extras)
     }
 
+    private func refreshHomeCardSnapshot() {
+        let snapshot = buildHomeCardSnapshot()
+        homeCardSnapshot = snapshot
+        homeCardSnapshotInitialized = true
+        preheatAvatarCache(for: Array(snapshot.prefix(maxCardsPerPage)))
+    }
+
+    private func avatarPayloads(for cards: [FocusCard]) -> [FocusWalletAvatarCache.Payload] {
+        cards.map { FocusWalletAvatarCache.Payload(id: $0.id, data: $0.avatarImageData) }
+    }
+
+    private func preheatAvatarCache(for cards: [FocusCard]) {
+        let payloads = avatarPayloads(for: cards)
+        guard !payloads.isEmpty else { return }
+        Task(priority: .userInitiated) {
+            let didRefresh = await FocusWalletAvatarCache.preload(payloads: payloads)
+            guard !Task.isCancelled else { return }
+            if didRefresh {
+                avatarCacheRevision &+= 1
+            }
+        }
+    }
+
+    private func runHomePostFirstFrameMaintenance() {
+        Task { @MainActor in
+            await Task.yield()
+            ensureTodayCheckIn()
+            refreshHeaderStreak()
+            syncWalkCardSurfaceVisibility()
+            walletTapFeedbackGenerator.prepare()
+        }
+    }
+
+    private func prepareExpandedQuickModulesAfterHeroFrame() {
+        expandedQuickModulesReady = false
+        let expectedCardId = activeCardId
+        Task { @MainActor in
+            await Task.yield()
+            guard isExpanded, activeCardId == expectedCardId else { return }
+            withAnimation(.easeOut(duration: 0.12)) {
+                expandedQuickModulesReady = true
+            }
+        }
+    }
+
     private var visibleHomeCards: [FocusCard] {
         var visible = Array(cards.prefix(maxCardsPerPage))
         if let rosterPreviewCard,
@@ -572,7 +397,8 @@ struct FocusStackHomeTestView: View {
         visibleHomeCards
             .map { card in
                 let data = card.avatarImageData
-                return "\(card.id.uuidString):\(data?.count ?? 0)"
+                let signature = data.map { FocusWalletAvatarCache.signature(for: $0) } ?? ""
+                return "\(card.id.uuidString):\(signature)"
             }
             .joined(separator: "|")
     }
@@ -602,13 +428,19 @@ struct FocusStackHomeTestView: View {
         }
     }
 
+    private var isInlineRecordOverlayPresented: Bool {
+        expandedQuickWeightPet != nil
+        || expandedQuickExpensePet != nil
+        || expandedQuickHumanWeight != nil
+    }
+
     var body: some View {
         let windowSize = ScreenCompat.bounds.size
         let outerR = displayCornerRadius
 
         return GeometryReader { geo in
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
 
                 stackLayer(geo: geo, outerCornerRadius: outerR)
                     .opacity(expandedId == nil ? 1 : 0)
@@ -620,7 +452,7 @@ struct FocusStackHomeTestView: View {
                 }
 
                 // FAB stays mounted while the wallet card stack changes modes; only its submenu content changes.
-                if expandedId == nil {
+                if expandedId == nil && !isInlineRecordOverlayPresented {
                     if fabExpanded {
                         Color.black.opacity(0.25)
                             .ignoresSafeArea()
@@ -629,9 +461,16 @@ struct FocusStackHomeTestView: View {
                     }
                     homeFabOverlay(activeCard: activeWalletCard)
                         .zIndex(999)
+                        .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottomTrailing)))
                 }
+
+                quickInlineRecordOverlays()
+                    .zIndex(2500)
             }
             .animation(transitionAnimation, value: expandedId)
+            .animation(GoMotion.page, value: expandedQuickWeightPet?.id)
+            .animation(GoMotion.page, value: expandedQuickExpensePet?.id)
+            .animation(GoMotion.page, value: expandedQuickHumanWeight?.id)
             .onChange(of: expandedId) { _, newId in
                 if newId != nil {
                     detailFooterVisible = false
@@ -687,41 +526,17 @@ struct FocusStackHomeTestView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button { showingCrewRoster = false } label: {
-                            Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                            Image(systemName: "xmark.circle.fill").foregroundStyle(Color.ohanaSecondaryText)
                         }
                     }
                 }
             }
         }
+        .sheet(isPresented: $showingAccountSwitcher) {
+            HumanAccountSwitcherSheet()
+        }
         .sheet(isPresented: $showingCalendar, onDismiss: { calendarEntityFilterId = nil }) {
             CalendarView(preselectedPetId: calendarEntityFilterId)
-        }
-        .sheet(item: $familyActivityPet) { pet in
-            NavigationStack {
-                ScrollView {
-                    FamilyActivityStripView(pet: pet, style: .full)
-                        .padding(.vertical, 20)
-                }
-                .navigationTitle("谁在照顾 \(pet.name)")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("完成") { familyActivityPet = nil }
-                            .foregroundStyle(Color.goPrimary)
-                    }
-                }
-            }
-        }
-        .sheet(item: $weeklyReportPet) { _ in
-            NavigationStack {
-                FamilyWeeklyReportDashboardView()
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("完成") { weeklyReportPet = nil }
-                            .foregroundStyle(Color.goPrimary)
-                    }
-                }
-            }
         }
         .sheet(item: $expandedAllFeaturesPet) { pet in
             PetAllFeaturesSheet(pet: pet)
@@ -743,34 +558,6 @@ struct FocusStackHomeTestView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
-        .sheet(item: $expandedQuickWeightPet) { pet in
-            GenericWeightEntrySheet(
-                target: .pet(pet),
-                onRewarded: { delta in
-                    triggerExpandedActionFeedback(
-                        cardId: pet.id,
-                        coconutDelta: delta,
-                        label: delta > 0 ? "体重记录 +\(delta)🥥" : nil
-                    )
-                }
-            )
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(.regularMaterial)
-        }
-        .sheet(item: $expandedQuickExpensePet) { pet in
-            AddExpenseSheet(
-                pet: pet,
-                preselectedPayerId: UserDefaults.standard.string(forKey: "currentActiveHumanId"),
-                onRewarded: { delta in
-                    triggerExpandedActionFeedback(
-                        cardId: pet.id,
-                        coconutDelta: delta,
-                        label: delta > 0 ? "花费记录 +\(delta)🥥" : nil
-                    )
-                }
-            )
-        }
         .sheet(item: $expandedQuickWeightDetailPet) { pet in
             NavigationStack { WeightHistoryView(pet: pet) }
                 .presentationDetents([.large])
@@ -782,24 +569,23 @@ struct FocusStackHomeTestView: View {
                 .presentationDragIndicator(.visible)
         }
         .sheet(item: $expandedQuickFeedDetailPet) { pet in
-            QuickFeedDetailSheet(pet: pet) { expandedQuickFeedDetailPet = nil }
+            QuickFeedDetailSheet(
+                pet: pet,
+                onRemove: { expandedQuickFeedDetailPet = nil },
+                opensManualSheetOnAppear: expandedQuickFeedOpensManualSheet
+            )
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationContentInteraction(.scrolls)
+                .onDisappear { expandedQuickFeedOpensManualSheet = false }
         }
         .sheet(item: $expandedQuickWaterDetailPet) { pet in
-            QuickWaterDetailSheet(
-                pet: pet,
-                initialModeRaw: expandedQuickWaterDetailModeRaw,
-                lockedModeRaw: expandedQuickWaterDetailModeRaw
-            ) {
+            QuickWaterDetailSheet(pet: pet) {
                 expandedQuickWaterDetailPet = nil
-                expandedQuickWaterDetailModeRaw = nil
             }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationContentInteraction(.scrolls)
-                .onDisappear { expandedQuickWaterDetailModeRaw = nil }
         }
         .sheet(item: $expandedQuickPottyDetailPet) { pet in
             QuickPottyDetailSheet(pet: pet) { expandedQuickPottyDetailPet = nil }
@@ -857,17 +643,6 @@ struct FocusStackHomeTestView: View {
             PetMomentsHubView(pet: pet)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
-        }
-        .sheet(item: $expandedQuickHumanWeight) { human in
-            GenericWeightEntrySheet(
-                target: .human(human),
-                onSaved: {
-                    triggerExpandedActionFeedback(cardId: human.id)
-                }
-            )
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(.regularMaterial)
         }
         .sheet(item: $expandedQuickHumanWorkout) { human in
             AddWorkoutSheet(
@@ -955,13 +730,28 @@ struct FocusStackHomeTestView: View {
             if expanded, homeCardPressCandidateId != nil || homeCardReorderDragId != nil || homeCardReorderCards != nil || homeCardReorderModeActive {
                 resetHomeCardReorderState()
             }
+            if expanded {
+                cardFabExpanded = false
+                prepareExpandedQuickModulesAfterHeroFrame()
+            } else {
+                expandedQuickModulesReady = false
+            }
             syncWalkCardSurfaceVisibility()
         }
-        .onChange(of: activeCardId) { _, _ in syncWalkCardSurfaceVisibility() }
+        .onChange(of: activeCardId) { _, _ in
+            if isExpanded {
+                cardFabExpanded = false
+                prepareExpandedQuickModulesAfterHeroFrame()
+            }
+            syncWalkCardSurfaceVisibility()
+        }
         .onChange(of: PetWalkingManager.shared.phase) { _, _ in syncWalkCardSurfaceVisibility() }
         .onChange(of: PetWalkingManager.shared.currentPet?.id) { _, _ in syncWalkCardSurfaceVisibility() }
         .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
             refreshHeaderStreak()
+        }
+        .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { date in
+            quickActionClockTick = date
         }
         .onReceive(NotificationCenter.default.publisher(for: .ohanaReturnHomeAfterHumanDeletion)) { _ in
             selectedHuman = nil
@@ -981,8 +771,7 @@ struct FocusStackHomeTestView: View {
             }
         }
         .onAppear {
-            ensureTodayCheckIn()
-            refreshHeaderStreak()
+            refreshHomeCardSnapshot()
             if !didRecordHomeFirstFrame {
                 didRecordHomeFirstFrame = true
                 DispatchQueue.main.async {
@@ -994,13 +783,21 @@ struct FocusStackHomeTestView: View {
                     homeCardReorderEnabled = true
                 }
             }
-            syncWalkCardSurfaceVisibility()
+            runHomePostFirstFrameMaintenance()
+        }
+        .onChange(of: homeCardSnapshotSourceSignature) { _, _ in
+            refreshHomeCardSnapshot()
         }
         .onDisappear {
             PetWalkingManager.shared.isWalkCardExpandedSurfaceVisible = false
         }
         .task(id: visibleHomeCardsAvatarSignature) {
-            await FocusWalletAvatarCache.preload(cards: visibleHomeCards)
+            guard !Task.isCancelled else { return }
+            let payloads = avatarPayloads(for: visibleHomeCards)
+            let didRefresh = await FocusWalletAvatarCache.preload(payloads: payloads)
+            if didRefresh {
+                avatarCacheRevision &+= 1
+            }
         }
     }
 }
@@ -1010,12 +807,21 @@ private struct TodayFocusQuestCardHost: View {
     let plants: [Plant]
     let reminders: [Reminder]
     let humans: [Human]
+    let events: [Event]
     let activePet: Pet?
     var onCompleteQuest: (IslandQuest) -> Void
     var onTapNegativeSignal: (IslandNegativeSignal) -> Void
     var onTapOasis: () -> Void
 
-    @Query(sort: \Event.startDate) private var allEvents: [Event]
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+
+    private var activeHumanId: UUID? {
+        UUID(uuidString: activeHumanIdStr)
+    }
+
+    private var privacyVisibleHumans: [Human] {
+        PrivacyService.unlockedHumans(for: .weight, from: humans, viewedBy: activeHumanId)
+    }
 
     var body: some View {
         TodayFocusCard(
@@ -1025,10 +831,10 @@ private struct TodayFocusQuestCardHost: View {
                 pets: pets,
                 reminders: reminders,
                 plants: plants,
-                events: allEvents,
-                humans: humans
+                events: events,
+                humans: privacyVisibleHumans
             ),
-            humans: humans,
+            humans: privacyVisibleHumans,
             activePet: activePet,
             onCompleteQuest: onCompleteQuest,
             onTapNegativeSignal: onTapNegativeSignal,
@@ -1042,6 +848,96 @@ private struct TodayFocusQuestCardHost: View {
 // ─────────────────────────────────────────────────
 
 extension FocusStackHomeTestView {
+
+    @ViewBuilder
+    private func quickInlineRecordOverlays() -> some View {
+        if let route = expandedQuickWeightPet {
+            let pet = route.pet
+            GenericWeightEntrySheet(
+                target: .pet(pet),
+                onRewarded: { delta in
+                    triggerExpandedActionFeedback(
+                        cardId: pet.id,
+                        coconutDelta: delta,
+                        label: delta > 0 ? "体重记录 +\(delta)🥥" : nil
+                    )
+                },
+                onDismiss: {
+                    dismissExpandedQuickWeight(routeID: route.id)
+                }
+            )
+            .id(route.id)
+            .zIndex(1)
+        }
+
+        if let route = expandedQuickExpensePet {
+            let pet = route.pet
+            AddExpenseSheet(
+                pet: pet,
+                preselectedPayerId: UserDefaults.standard.string(forKey: "currentActiveHumanId"),
+                onRewarded: { delta in
+                    triggerExpandedActionFeedback(
+                        cardId: pet.id,
+                        coconutDelta: delta,
+                        label: delta > 0 ? "花费记录 +\(delta)🥥" : nil
+                    )
+                },
+                onDismiss: {
+                    dismissExpandedQuickExpense(routeID: route.id)
+                }
+            )
+            .id(route.id)
+            .zIndex(2)
+        }
+
+        if let route = expandedQuickHumanWeight {
+            let human = route.human
+            GenericWeightEntrySheet(
+                target: .human(human),
+                onSaved: {
+                    triggerExpandedActionFeedback(cardId: human.id)
+                },
+                onDismiss: {
+                    dismissExpandedQuickHumanWeight(routeID: route.id)
+                }
+            )
+            .id(route.id)
+            .zIndex(3)
+        }
+    }
+
+    private func openExpandedQuickWeight(for pet: Pet) {
+        fabExpanded = false
+        cardFabExpanded = false
+        expandedQuickWeightPet = ExpandedQuickPetRecordRoute(pet: pet)
+    }
+
+    private func openExpandedQuickExpense(for pet: Pet) {
+        fabExpanded = false
+        cardFabExpanded = false
+        expandedQuickExpensePet = ExpandedQuickPetRecordRoute(pet: pet)
+    }
+
+    private func openExpandedQuickHumanWeight(for human: Human) {
+        fabExpanded = false
+        cardFabExpanded = false
+        expandedQuickHumanWeight = ExpandedQuickHumanRecordRoute(human: human)
+    }
+
+    private func dismissExpandedQuickWeight(routeID: UUID) {
+        guard expandedQuickWeightPet?.id == routeID else { return }
+        expandedQuickWeightPet = nil
+    }
+
+    private func dismissExpandedQuickExpense(routeID: UUID) {
+        guard expandedQuickExpensePet?.id == routeID else { return }
+        expandedQuickExpensePet = nil
+    }
+
+    private func dismissExpandedQuickHumanWeight(routeID: UUID) {
+        guard expandedQuickHumanWeight?.id == routeID else { return }
+        expandedQuickHumanWeight = nil
+    }
 
     private var dailyCheckInKey: String { "oasis_checkedIn_dates" }
 
@@ -1116,23 +1012,13 @@ extension FocusStackHomeTestView {
                     plants: plants,
                     reminders: pendingReminders,
                     humans: humans,
+                    events: allEvents,
                     activePet: todayFocusActivePet,
                     onCompleteQuest: { completeQuestInFocusStack($0) },
                     onTapNegativeSignal: { handleTodayFocusNegativeSignal($0) },
                     onTapOasis: { showingOasisReward = true }
                 )
                 .frame(width: cardWidth)
-
-                if humans.count > 1, let pet = todayFocusActivePet {
-                    HomeFamilyCollaborationCard(
-                        pet: pet,
-                        pendingReminders: pendingReminders,
-                        humans: humans,
-                        onOpenActivity: { familyActivityPet = pet },
-                        onOpenWeeklyReport: { weeklyReportPet = pet }
-                    )
-                    .frame(width: cardWidth)
-                }
 
                 if showFirstSuccessCard,
                    !firstQuickCheckInCompleted,
@@ -1220,9 +1106,8 @@ extension FocusStackHomeTestView {
             }
 
             if let activeCard = cards.first(where: { $0.id == heroId }) {
-                let quickModuleH = expandedQuickModuleHeight(for: activeCard)
                 expandedQuickModules(card: activeCard)
-                    .frame(width: cardW, height: quickModuleH)
+                    .frame(width: cardW, height: expandedQuickModuleHeight(for: activeCard))
                     .offset(x: K.cardMargin, y: quickModulesTopY)
                     .zIndex(Double(n + 80))
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -1303,6 +1188,7 @@ extension FocusStackHomeTestView {
         homeCardOrderRaw = cards
             .map { $0.id.uuidString }
             .joined(separator: ",")
+        refreshHomeCardSnapshot()
     }
 
     private func promoteHomeCardToFront(id: UUID) {
@@ -1313,6 +1199,7 @@ extension FocusStackHomeTestView {
         ids.removeAll { $0 == idString }
         ids.insert(idString, at: 0)
         homeCardOrderRaw = ids.joined(separator: ",")
+        refreshHomeCardSnapshot()
     }
 
     private func homeCardDisplayCards(from source: [FocusCard]) -> [FocusCard] {
@@ -1354,113 +1241,47 @@ extension FocusStackHomeTestView {
             ? expandedQAEditItems
             : Array(expandedQuickActionItems(for: pet).prefix(8))
         let avatar = FocusWalletAvatarCache.entry(for: pet.id, data: pet.avatarImageData).image
-        let themeHex = pet.themeColorHex.isEmpty ? nil : pet.themeColorHex
+        let themeHex = pet.safeThemeColorHex
+        let showPrompt = shouldShowFirstSuccessPrompt(for: pet) && !isExpandedQAEditMode
 
-        return VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                Text(shouldShowFirstSuccessPrompt(for: pet) && !isExpandedQAEditMode ? "第一次成功" : "快捷操作")
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .tracking(2.6)
-                Spacer(minLength: 4)
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    if isExpandedQAEditMode {
-                        exitExpandedQAEditMode(for: pet)
-                    } else {
-                        enterExpandedQAEditMode(for: pet)
-                    }
-                } label: {
-                    Image(systemName: isExpandedQAEditMode ? "checkmark.circle.fill" : "pencil")
-                        .font(OhanaFont.callout(.bold))
-                        .foregroundStyle(isExpandedQAEditMode ? Color.goLime : .white.opacity(0.78))
-                        .frame(width: 28, height: 24)
+        return ExpandedPetQuickActionsSection(
+            title: showPrompt ? "第一次成功" : "快捷操作",
+            pet: pet,
+            items: items,
+            avatar: avatar,
+            themeHex: themeHex,
+            editItems: $expandedQAEditItems,
+            draggingItemId: $expandedQADraggingItemId,
+            pressedActionId: $pressedExpandedActionId,
+            isEditMode: isExpandedQAEditMode,
+            jiggle: expandedQAJiggle,
+            shouldReduceWork: shouldReduceWork,
+            showFirstSuccessPrompt: showPrompt,
+            waterManagementLabel: waterManagementLabel,
+            onToggleEdit: {
+                if isExpandedQAEditMode {
+                    exitExpandedQAEditMode(for: pet)
+                } else {
+                    enterExpandedQAEditMode(for: pet)
                 }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 4)
-
-            if shouldShowFirstSuccessPrompt(for: pet) && !isExpandedQAEditMode {
-                expandedFirstSuccessPrompt(pet: pet)
-            } else {
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4),
-                    spacing: 10
-                ) {
-                    ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
-                        expandedQuickActionGridItem(
-                            idx: idx,
-                            item: item,
-                            pet: pet,
-                            avatar: avatar,
-                            themeHex: themeHex
-                        )
-                    }
-
-                    if isExpandedQAEditMode && QuickActionLimit.count(for: pet, in: expandedQAEditItems) < QuickActionLimit.maxItemsPerEntity {
-                        expandedQuickAddButton(pet: pet)
-                    }
-                }
-            }
-
-            if isExpandedQAEditMode && QuickActionLimit.count(for: pet, in: expandedQAEditItems) >= QuickActionLimit.maxItemsPerEntity {
-                Text("最多 8 个快捷操作")
-                    .font(OhanaFont.caption2(.medium))
-                    .foregroundStyle(.white.opacity(0.45))
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 2)
-                    .transition(.opacity)
-            }
-        }
-        .padding(.horizontal, 2)
-        .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
+            },
+            onFirstSuccessFeed: { completeFirstSuccessFeed(for: pet) },
+            onFirstSuccessPlay: { completeFirstSuccessPlay(for: pet) },
+            onFirstSuccessMoment: { startFirstSuccessMoment(for: pet) },
+            showsAttentionDot: { expandedPetQuickShowsAttentionDot($0, pet: pet) },
+            countText: { expandedPetQuickCountText($0, pet: pet) },
+            isCompleted: { expandedPetQuickCompleted($0, pet: pet) },
+            onTap: { handleExpandedQuickAction($0, pet: pet) },
+            onLongPress: { handleExpandedQuickLongPress($0, pet: pet) },
+            onGroomCheckIn: { applyExpandedGroomCheckIn($0, pet: pet) },
+            onPottySelect: { applyExpandedPottyCheckIn($0, pet: pet) },
+            onHealthSelect: { applyExpandedHealthCheckIn($0, pet: pet) },
+            onLimitReached: { showingQuickActionLimitAlert = true }
+        )
     }
 
     private func shouldShowFirstSuccessPrompt(for pet: Pet) -> Bool {
         showFirstSuccessCard && !firstQuickCheckInCompleted && !pet.hasPassedAway
-    }
-
-    private func expandedFirstSuccessPrompt(pet: Pet) -> some View {
-        HStack(spacing: 8) {
-            firstSuccessPromptButton(title: "喂食", icon: "fork.knife") {
-                completeFirstSuccessFeed(for: pet)
-            }
-            firstSuccessPromptButton(title: "陪玩", icon: "tennisball.fill") {
-                completeFirstSuccessPlay(for: pet)
-            }
-            firstSuccessPromptButton(title: "记录照片", icon: "camera.fill") {
-                startFirstSuccessMoment(for: pet)
-            }
-        }
-        .padding(8)
-        .background(.ultraThinMaterial.opacity(0.52), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.goPrimary.opacity(0.26), lineWidth: 1)
-        )
-    }
-
-    private func firstSuccessPromptButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            action()
-        } label: {
-            VStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.arkInk)
-                    .frame(width: 28, height: 28)
-                    .background(Color.goPrimary, in: Circle())
-                Text(title)
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 62)
-        }
-        .buttonStyle(.plain)
     }
 
     private func expandedHumanQuickActions(human: Human) -> some View {
@@ -1468,320 +1289,44 @@ extension FocusStackHomeTestView {
             ? expandedQAEditItems
             : Array(expandedHumanQuickActionItems(for: human).prefix(8))
         let avatar = FocusWalletAvatarCache.entry(for: human.id, data: human.avatarImageData).image
-        let themeHex = human.themeColorHex.isEmpty ? nil : human.themeColorHex
+        let themeHex = human.safeThemeColorHex
 
-        return VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                Text("快捷操作")
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .tracking(2.6)
-                Spacer(minLength: 4)
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    if isExpandedQAEditMode {
-                        exitExpandedHumanQAEditMode(for: human)
-                    } else {
-                        enterExpandedHumanQAEditMode(for: human)
-                    }
-                } label: {
-                    Image(systemName: isExpandedQAEditMode ? "checkmark.circle.fill" : "pencil")
-                        .font(OhanaFont.callout(.bold))
-                        .foregroundStyle(isExpandedQAEditMode ? Color.goLime : .white.opacity(0.78))
-                        .frame(width: 28, height: 24)
+        return ExpandedHumanQuickActionsSection(
+            human: human,
+            items: items,
+            defaultItems: defaultExpandedHumanQuickActions(for: human),
+            avatar: avatar,
+            themeHex: themeHex,
+            editItems: $expandedQAEditItems,
+            draggingItemId: $expandedQADraggingItemId,
+            pressedActionId: $pressedExpandedActionId,
+            isEditMode: isExpandedQAEditMode,
+            jiggle: expandedQAJiggle,
+            shouldReduceWork: shouldReduceWork,
+            onToggleEdit: {
+                if isExpandedQAEditMode {
+                    exitExpandedHumanQAEditMode(for: human)
+                } else {
+                    enterExpandedHumanQAEditMode(for: human)
                 }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 4)
-
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4),
-                spacing: 10
-            ) {
-                ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
-                    expandedHumanQuickActionGridItem(
-                        idx: idx,
-                        item: item,
-                        human: human,
-                        avatar: avatar,
-                        themeHex: themeHex
-                    )
-                }
-
-                if isExpandedQAEditMode && expandedQAEditItems.count < QuickActionLimit.maxItemsPerEntity {
-                    expandedHumanQuickAddButton(human: human)
-                }
-            }
-
-            if isExpandedQAEditMode && expandedQAEditItems.count >= QuickActionLimit.maxItemsPerEntity {
-                Text("最多 8 个快捷操作")
-                    .font(OhanaFont.caption2(.medium))
-                    .foregroundStyle(.white.opacity(0.45))
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 2)
-                    .transition(.opacity)
-            }
-        }
-        .padding(.horizontal, 2)
-        .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
-    }
-
-    @ViewBuilder
-    private func expandedQuickActionGridItem(idx: Int, item: QuickActionItem, pet: Pet, avatar: UIImage?, themeHex: String?) -> some View {
-        ZStack {
-            GoQuickActionCard(
-                item: item,
-                isPressed: !isExpandedQAEditMode && pressedExpandedActionId == item.id,
-                petAvatar: avatar,
-                petThemeColorHex: themeHex,
-                countText: isExpandedQAEditMode ? nil : expandedQuickCountText(for: item, pet: pet),
-                isCompletedToday: !isExpandedQAEditMode && expandedQuickActionCompleted(item, pet: pet),
-                prefersLightForeground: true,
-                onTap: {
-                    guard !isExpandedQAEditMode else { return }
-                    pressedExpandedActionId = item.id
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                        pressedExpandedActionId = nil
-                        handleExpandedQuickAction(item, pet: pet)
-                    }
-                },
-                onLongPress: isExpandedQAEditMode ? nil : { handleExpandedQuickLongPress(item, pet: pet) },
-                onGroomCheckIn: (!isExpandedQAEditMode && item.actionType == "groom") ? { raw in
-                    applyExpandedGroomCheckIn(raw, pet: pet)
-                } : nil,
-                onPottySelect: (!isExpandedQAEditMode && item.actionType == "potty") ? { raw in
-                    applyExpandedPottyCheckIn(raw, pet: pet)
-                } : nil,
-                onHealthSelect: (!isExpandedQAEditMode && item.actionType == "health") ? { raw in
-                    applyExpandedHealthCheckIn(raw, pet: pet)
-                } : nil
-            )
-            .allowsHitTesting(!isExpandedQAEditMode)
-
-            if isExpandedQAEditMode {
-                QAEditModeDragLayer(item: item, themeHex: themeHex)
-            }
-        }
-        .rotationEffect(.degrees(isExpandedQAEditMode ? (expandedQAJiggle ? -2.5 : 2.5) : 0))
-        .animation(
-            isExpandedQAEditMode
-                ? (shouldReduceWork ? nil : .easeInOut(duration: 0.12 + Double(idx % 4) * 0.015).repeatForever(autoreverses: true))
-                : .easeOut(duration: 0.2),
-            value: expandedQAJiggle
+            },
+            countText: { expandedHumanQuickCountText($0, human: human) },
+            privacyIconName: { ExpandedQuickActionLogic.humanPrivacyIconName(for: $0, human: human) },
+            privacyIconTint: { ExpandedQuickActionLogic.humanPrivacyIconTint(for: $0, human: human) },
+            isPrivacyLocked: { expandedHumanQuickActionIsPrivate($0, human: human) },
+            isCompleted: { expandedHumanQuickCompleted($0, human: human) },
+            onTap: { handleExpandedHumanQuickAction($0, human: human) },
+            onLongPress: { handleExpandedHumanQuickLongPress($0, human: human) },
+            onLimitReached: { showingQuickActionLimitAlert = true }
         )
-        .overlay(alignment: .topLeading) {
-            if isExpandedQAEditMode {
-                Button {
-                    UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                    withAnimation(HeroAnim.buttonSpring) {
-                        expandedQAEditItems.removeAll { $0.id == item.id }
-                    }
-                } label: {
-                    ZStack {
-                        Circle().fill(Color.goRed).frame(width: 20, height: 20)
-                        Image(systemName: "minus")
-                            .font(OhanaFont.caption2(.black))
-                            .foregroundStyle(.white)
-                    }
-                }
-                .buttonStyle(.plain)
-                .offset(x: -4, y: -4)
-            }
-        }
-        .onDrop(of: [.plainText, .utf8PlainText], delegate: QADropDelegate(targetItem: item, items: $expandedQAEditItems))
-    }
-
-    private func expandedQuickAddButton(pet: Pet) -> some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            guard QuickActionLimit.count(for: pet, in: expandedQAEditItems) < QuickActionLimit.maxItemsPerEntity else {
-                showingQuickActionLimitAlert = true
-                return
-            }
-            showingExpandedQAQuickAdd = true
-        } label: {
-            VStack(spacing: 6) {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.12))
-                        .frame(width: 44, height: 44)
-                    Image(systemName: "plus")
-                        .font(OhanaFont.title3(.bold))
-                        .foregroundStyle(Color.goLime)
-                }
-                Text("添加")
-                    .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(.white.opacity(0.86))
-            }
-            .frame(maxWidth: .infinity, minHeight: 80)
-            .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.24), style: StrokeStyle(lineWidth: 1.4, dash: [5]))
-            )
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showingExpandedQAQuickAdd, attachmentAnchor: .point(.top), arrowEdge: .bottom) {
-            QAQuickAddPopoverContent(pet: pet, existingItems: expandedQAEditItems) { newItem in
-                withAnimation(HeroAnim.buttonSpring) {
-                    if QuickActionLimit.count(for: pet, in: expandedQAEditItems) < QuickActionLimit.maxItemsPerEntity {
-                        expandedQAEditItems.append(newItem)
-                    }
-                }
-            }
-            .presentationCompactAdaptation(.popover)
-        }
-        .transition(.scale(scale: 0.8).combined(with: .opacity))
-    }
-
-    @ViewBuilder
-    private func expandedHumanQuickActionGridItem(idx: Int, item: QuickActionItem, human: Human, avatar: UIImage?, themeHex: String?) -> some View {
-        ZStack {
-            GoQuickActionCard(
-                item: item,
-                isPressed: !isExpandedQAEditMode && pressedExpandedActionId == item.id,
-                petAvatar: avatar,
-                petThemeColorHex: themeHex,
-                countText: isExpandedQAEditMode ? nil : expandedHumanQuickCountText(for: item, human: human),
-                privacyBadgeText: isExpandedQAEditMode ? nil : expandedHumanPrivacyBadgeText(for: item, human: human),
-                isPrivacyLocked: !isExpandedQAEditMode && expandedHumanQuickActionIsPrivate(item, human: human),
-                isCompletedToday: !isExpandedQAEditMode && expandedHumanQuickActionCompleted(item, human: human),
-                prefersLightForeground: true,
-                onTap: {
-                    guard !isExpandedQAEditMode else { return }
-                    pressedExpandedActionId = item.id
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                        pressedExpandedActionId = nil
-                        handleExpandedHumanQuickAction(item, human: human)
-                    }
-                },
-                onLongPress: isExpandedQAEditMode ? nil : {
-                    handleExpandedHumanQuickLongPress(item, human: human)
-                }
-            )
-            .allowsHitTesting(!isExpandedQAEditMode)
-
-            if isExpandedQAEditMode {
-                QAEditModeDragLayer(item: item, themeHex: themeHex)
-            }
-        }
-        .rotationEffect(.degrees(isExpandedQAEditMode ? (expandedQAJiggle ? -2.5 : 2.5) : 0))
-        .animation(
-            isExpandedQAEditMode
-                ? (shouldReduceWork ? nil : .easeInOut(duration: 0.12 + Double(idx % 4) * 0.015).repeatForever(autoreverses: true))
-                : .easeOut(duration: 0.2),
-            value: expandedQAJiggle
-        )
-        .overlay(alignment: .topLeading) {
-            if isExpandedQAEditMode {
-                Button {
-                    UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                    withAnimation(HeroAnim.buttonSpring) {
-                        expandedQAEditItems.removeAll { $0.id == item.id }
-                    }
-                } label: {
-                    ZStack {
-                        Circle().fill(Color.goRed).frame(width: 20, height: 20)
-                        Image(systemName: "minus")
-                            .font(OhanaFont.caption2(.black))
-                            .foregroundStyle(.white)
-                    }
-                }
-                .buttonStyle(.plain)
-                .offset(x: -4, y: -4)
-            }
-        }
-        .onDrop(of: [.plainText, .utf8PlainText], delegate: QADropDelegate(targetItem: item, items: $expandedQAEditItems))
-    }
-
-    private func expandedHumanQuickAddButton(human: Human) -> some View {
-        Menu {
-            if expandedQAEditItems.count >= QuickActionLimit.maxItemsPerEntity {
-                Button("已达 8 个上限，可去「全部功能」查看更多") {
-                    showingQuickActionLimitAlert = true
-                }
-            }
-            let existing = Set(expandedQAEditItems.map(\.actionType))
-            ForEach(defaultExpandedHumanQuickActions(for: human).filter { !existing.contains($0.actionType) }) { item in
-                Button {
-                    guard expandedQAEditItems.count < QuickActionLimit.maxItemsPerEntity else {
-                        showingQuickActionLimitAlert = true
-                        return
-                    }
-                    withAnimation(HeroAnim.buttonSpring) {
-                        expandedQAEditItems.append(item)
-                    }
-                } label: {
-                    Label(item.label, systemImage: item.icon)
-                }
-            }
-        } label: {
-            VStack(spacing: 6) {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.12))
-                        .frame(width: 44, height: 44)
-                    Image(systemName: "plus")
-                        .font(OhanaFont.title3(.bold))
-                        .foregroundStyle(Color.goLime)
-                }
-                Text("添加")
-                    .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(.white.opacity(0.86))
-            }
-            .frame(maxWidth: .infinity, minHeight: 80)
-            .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.24), style: StrokeStyle(lineWidth: 1.4, dash: [5]))
-            )
-        }
-        .buttonStyle(.plain)
-        .transition(.scale(scale: 0.8).combined(with: .opacity))
     }
 
     private func legacyExpandedQuickModules(card: FocusCard) -> some View {
-        HStack(spacing: 10) {
-            ForEach(card.actions.prefix(4)) { action in
-                Button {
-                    performExpandedQuickAction(action, for: card)
-                } label: {
-                    VStack(alignment: .leading, spacing: 9) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                                .fill(Color(hex: action.colorHex).opacity(0.22))
-                                .frame(width: 34, height: 34)
-                            Image(systemName: action.icon)
-                                .font(.system(size: 15, weight: .black))
-                                .foregroundStyle(Color(hex: action.colorHex))
-                        }
-
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(expandedQuickActionTitle(action.label))
-                                .font(.system(size: 13, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.72)
-                            Text(card.isReal && !card.isHuman ? "快速打卡" : "查看")
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.48))
-                                .lineLimit(1)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(.ultraThinMaterial.opacity(0.58), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .strokeBorder(.white.opacity(0.14), lineWidth: 0.7)
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(card.name) \(expandedQuickActionTitle(action.label))")
-            }
-        }
-        .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
+        LegacyExpandedQuickModulesView(
+            card: card,
+            titleForAction: { ExpandedQuickActionLogic.quickActionTitle($0) },
+            onAction: { performExpandedQuickAction($0, for: card) }
+        )
     }
 
     private func expandedWalletOffsetY(idx: Int, n: Int, bottomY: CGFloat,
@@ -1844,10 +1389,11 @@ extension FocusStackHomeTestView {
                     )
                 }
 
-                if isExpanded, let activeCard = displayCards.first(where: { $0.id == heroId }) {
-                    let quickModuleH = expandedQuickModuleHeight(for: activeCard)
+                if isExpanded,
+                   expandedQuickModulesReady,
+                   let activeCard = displayCards.first(where: { $0.id == heroId }) {
                     expandedQuickModules(card: activeCard)
-                        .frame(width: geo.size.width, height: quickModuleH)
+                        .frame(width: geo.size.width, height: expandedQuickModuleHeight(for: activeCard))
                         .offset(y: heroTopY + K.expandedCardH + 14)
                         .zIndex(Double(n + 80))
                         .transition(.opacity.combined(with: .move(edge: .top)))
@@ -1943,53 +1489,35 @@ extension FocusStackHomeTestView {
         currentOffsetY: CGFloat,
         collapsedBottomY: CGFloat
     ) -> some Gesture {
-        DragGesture(minimumDistance: 0, coordinateSpace: .local)
+        DragGesture(minimumDistance: 8, coordinateSpace: .local)
             .onChanged { drag in
                 guard homeCardReorderEnabled, !isExpanded else { return }
-                if homeCardReorderDragId == nil && homeCardPressCandidateId == nil {
-                    beginHomeCardPressCandidate(card: card, cards: cards, currentOffsetY: currentOffsetY)
-                }
+                guard homeCardReorderDragId == card.id else { return }
 
-                if homeCardReorderDragId == card.id {
-                    updateHomeCardReorder(
-                        cardId: card.id,
-                        cards: cards,
-                        dragTranslationY: drag.translation.height,
-                        collapsedBottomY: collapsedBottomY
-                    )
-                } else if homeCardPressCandidateId == card.id,
-                          homeCardDragDistance(drag.translation) > 12 {
-                    cancelHomeCardPressCandidate()
-                }
+                updateHomeCardReorder(
+                    cardId: card.id,
+                    cards: cards,
+                    dragTranslationY: drag.translation.height,
+                    collapsedBottomY: collapsedBottomY
+                )
             }
             .onEnded { drag in
-                guard homeCardReorderEnabled else {
-                    handleWalletCardTap(card: card, n: cards.count, isHero: false)
-                    return
-                }
+                guard homeCardReorderEnabled else { return }
                 guard !isExpanded else {
                     if homeCardReorderDragId == card.id || homeCardPressCandidateId == card.id || homeCardReorderCards != nil || homeCardReorderModeActive {
                         resetHomeCardReorderState()
                     }
                     return
                 }
-                if homeCardReorderDragId == card.id {
-                    updateHomeCardReorder(
-                        cardId: card.id,
-                        cards: cards,
-                        dragTranslationY: drag.translation.height,
-                        collapsedBottomY: collapsedBottomY
-                    )
-                    commitHomeCardReorder()
-                    resetHomeCardReorderState()
-                } else if homeCardPressCandidateId == card.id {
-                    cancelHomeCardPressCandidate()
-                    if homeCardDragDistance(drag.translation) <= 12 {
-                        handleWalletCardTap(card: card, n: cards.count, isHero: false)
-                    }
-                } else if homeCardDragDistance(drag.translation) <= 12 {
-                    handleWalletCardTap(card: card, n: cards.count, isHero: false)
-                }
+                guard homeCardReorderDragId == card.id else { return }
+                updateHomeCardReorder(
+                    cardId: card.id,
+                    cards: cards,
+                    dragTranslationY: drag.translation.height,
+                    collapsedBottomY: collapsedBottomY
+                )
+                commitHomeCardReorder()
+                resetHomeCardReorderState()
             }
     }
 
@@ -2137,6 +1665,18 @@ extension FocusStackHomeTestView {
         }
     }
 
+    private func startHomeCardReorderFromLongPress(
+        card: FocusCard,
+        cards: [FocusCard],
+        currentOffsetY: CGFloat
+    ) {
+        guard homeCardReorderEnabled, !isExpanded, cards.count > 1 else { return }
+        guard homeCardReorderDragId == nil, !homeCardReorderModeActive else { return }
+        suppressNextHomeCardTap = true
+        enterHomeCardReorderMode()
+        beginHomeCardReorder(card: card, cards: cards, currentOffsetY: currentOffsetY)
+    }
+
     private func walletCardStackItem(
         card: FocusCard,
         idx: Int,
@@ -2187,6 +1727,20 @@ extension FocusStackHomeTestView {
             }
             .if(!isExpanded && !isInteractiveWalkCard) { view in
                 view.highPriorityGesture(
+                    TapGesture()
+                        .onEnded { handleWalletCardTap(card: card, n: n, isHero: false) }
+                )
+                .simultaneousGesture(
+                    LongPressGesture(minimumDuration: 0.45)
+                        .onEnded { _ in
+                            startHomeCardReorderFromLongPress(
+                                card: card,
+                                cards: cards,
+                                currentOffsetY: offsetY
+                            )
+                        }
+                )
+                .simultaneousGesture(
                     homeCardCollapsedInteractionGesture(
                         card: card,
                         cards: cards,
@@ -2266,7 +1820,7 @@ extension FocusStackHomeTestView {
             return
         }
 
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        triggerWalletTapFeedback()
 
         if n <= 1 {
             if isExpanded {
@@ -2278,6 +1832,7 @@ extension FocusStackHomeTestView {
                 }
             }
             DispatchQueue.main.async {
+                AppPerformanceMonitor.shared.record("卡片展开状态提交", startedAt: tapStartedAt, note: card.name)
                 AppPerformanceMonitor.shared.record("卡片点击延迟", startedAt: tapStartedAt, note: card.name)
             }
             return
@@ -2294,14 +1849,21 @@ extension FocusStackHomeTestView {
             }
         }
         DispatchQueue.main.async {
+            AppPerformanceMonitor.shared.record("卡片展开状态提交", startedAt: tapStartedAt, note: card.name)
             AppPerformanceMonitor.shared.record("卡片点击延迟", startedAt: tapStartedAt, note: card.name)
         }
+    }
+
+    private func triggerWalletTapFeedback() {
+        walletTapFeedbackGenerator.impactOccurred()
+        walletTapFeedbackGenerator.prepare()
     }
 
     private func collapseWalletToHome() {
         if homeCardReorderDragId != nil || homeCardReorderCards != nil || homeCardReorderModeActive {
             resetHomeCardReorderState()
         }
+        expandedQuickModulesReady = false
         withAnimation(walletAnimation) {
             isExpanded = false
             fabExpanded = false
@@ -2358,7 +1920,8 @@ extension FocusStackHomeTestView {
                 namespace: ns,
                 heroNS: heroNS,
                 expandedId: expandedId,
-                isHeroExpanded: isHero
+                isHeroExpanded: isHero,
+                avatarCacheRevision: avatarCacheRevision
             )
             .opacity(showWalkCard ? 0 : 1)
 
@@ -2513,32 +2076,12 @@ extension FocusStackHomeTestView {
         let stored = savedQuickActionItems.filter { $0.petId == pet.id && $0.entityKind != .human }
         let items = (stored.isEmpty ? defaultExpandedQuickActions(for: pet) : stored)
             .filter { $0.actionType != "litterChange" }
-        return ensureIndependentWaterChangeAction(in: items, for: pet)
-    }
-
-    private func ensureIndependentWaterChangeAction(in items: [QuickActionItem], for pet: Pet) -> [QuickActionItem] {
-        let actionTypes = Set(items.map(\.actionType))
-        guard actionTypes.contains("water"),
-              !actionTypes.contains("waterChange"),
-              QuickActionLimit.count(for: pet, in: items) < QuickActionLimit.maxItemsPerEntity
-        else { return items }
-
-        var result = items
-        let waterChange = QuickActionItem(
-            label: l.homeQAWaterChange,
-            icon: "drop.circle.fill",
-            colorHex: "4ECDC4",
-            petId: pet.id,
-            actionType: "waterChange",
-            entityId: pet.id,
-            entityKind: .pet
+        return WaterQuickActionPolicy.normalizedItems(
+            items,
+            for: pet,
+            waterLabel: l.homeQAWater,
+            managementLabel: waterManagementLabel
         )
-        if let waterIndex = result.firstIndex(where: { $0.actionType == "water" }) {
-            result.insert(waterChange, at: min(waterIndex + 1, result.count))
-        } else {
-            result.append(waterChange)
-        }
-        return result
     }
 
     private func expandedHumanQuickActionItems(for human: Human) -> [QuickActionItem] {
@@ -2548,6 +2091,7 @@ extension FocusStackHomeTestView {
 
     private func enterExpandedQAEditMode(for pet: Pet) {
         expandedQAEditItems = expandedQuickActionItems(for: pet)
+        expandedQADraggingItemId = nil
         withAnimation(HeroAnim.buttonSpring) {
             isExpandedQAEditMode = true
         }
@@ -2560,6 +2104,7 @@ extension FocusStackHomeTestView {
 
     private func exitExpandedQAEditMode(for pet: Pet) {
         saveExpandedQAEditItems(expandedQAEditItems, for: pet)
+        expandedQADraggingItemId = nil
         withAnimation(HeroAnim.buttonSpring) {
             isExpandedQAEditMode = false
         }
@@ -2583,6 +2128,7 @@ extension FocusStackHomeTestView {
 
     private func enterExpandedHumanQAEditMode(for human: Human) {
         expandedQAEditItems = expandedHumanQuickActionItems(for: human)
+        expandedQADraggingItemId = nil
         withAnimation(HeroAnim.buttonSpring) {
             isExpandedQAEditMode = true
         }
@@ -2595,6 +2141,7 @@ extension FocusStackHomeTestView {
 
     private func exitExpandedHumanQAEditMode(for human: Human) {
         saveExpandedHumanQAEditItems(expandedQAEditItems, for: human)
+        expandedQADraggingItemId = nil
         withAnimation(HeroAnim.buttonSpring) {
             isExpandedQAEditMode = false
         }
@@ -2616,133 +2163,10 @@ extension FocusStackHomeTestView {
     }
 
     private func defaultExpandedQuickActions(for pet: Pet) -> [QuickActionItem] {
-        let isDog = pet.species.contains("狗") || pet.species.lowercased().contains("dog")
-        let isCat = pet.species.contains("猫") || pet.species.lowercased().contains("cat")
-        let isFish = pet.species.contains("鱼") || pet.species.lowercased().contains("fish")
-        let isBird = pet.species.contains("鸟") || pet.species.lowercased().contains("bird")
-        let isRabbit = pet.species.contains("兔") || pet.species.lowercased().contains("rabbit")
-        let isReptile = pet.species.contains("爬") || pet.species.contains("龟") || pet.species.contains("蛇") || pet.species.contains("蜥") || pet.species.contains("守宫") || pet.species.lowercased().contains("reptile")
-
-        if isFish {
-            return personalizedDefaultQuickActions([
-                QuickActionItem(label: l.homeQAFeed, icon: "fork.knife", colorHex: "FFDD44",
-                                petId: pet.id, actionType: "feed", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQAWaterChange, icon: "drop.circle.fill", colorHex: "4ECDC4",
-                                petId: pet.id, actionType: "waterChange", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQAFilterClean, icon: "wrench.and.screwdriver.fill", colorHex: "A78BFA",
-                                petId: pet.id, actionType: "filterClean", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA",
-                                petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet)
-            ], for: pet)
-        }
-
-        if isDog {
-            return personalizedDefaultQuickActions([
-                QuickActionItem(label: l.homeQAFeed, icon: "fork.knife", colorHex: "FFDD44",
-                                petId: pet.id, actionType: "feed", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA",
-                                petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQAWaterChange, icon: "drop.circle.fill", colorHex: "4ECDC4",
-                                petId: pet.id, actionType: "waterChange", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQAWalk, icon: "figure.walk", colorHex: "C8FF00",
-                                petId: pet.id, actionType: "walk", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQAGroom, icon: "scissors", colorHex: "FF8C42",
-                                petId: pet.id, actionType: "groom", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA",
-                                petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQANote, icon: "camera.circle.fill", colorHex: "FF6B9D",
-                                petId: pet.id, actionType: "moment", entityId: pet.id, entityKind: .pet)
-            ], for: pet)
-        }
-
-        if isCat {
-            return personalizedDefaultQuickActions([
-                QuickActionItem(label: l.homeQAFeed, icon: "fork.knife", colorHex: "FFDD44",
-                                petId: pet.id, actionType: "feed", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA",
-                                petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQAWaterChange, icon: "drop.circle.fill", colorHex: "4ECDC4",
-                                petId: pet.id, actionType: "waterChange", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQALitter, icon: "trash.fill", colorHex: "5B6AFF",
-                                petId: pet.id, actionType: "litter", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: appLanguage == "en" ? "Play" : "陪玩", icon: "tennisball.fill", colorHex: "FF6B6B",
-                                petId: pet.id, actionType: "play", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA",
-                                petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQANote, icon: "camera.circle.fill", colorHex: "FF6B9D",
-                                petId: pet.id, actionType: "moment", entityId: pet.id, entityKind: .pet)
-            ], for: pet)
-        }
-
-        if isBird {
-            return personalizedDefaultQuickActions([
-                QuickActionItem(label: l.homeQAFeed, icon: "fork.knife", colorHex: "FFDD44",
-                                petId: pet.id, actionType: "feed", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA",
-                                petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: "清鸟笼", icon: "basket.fill", colorHex: "FFD166",
-                                petId: pet.id, actionType: "cageCleaning", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: "放飞", icon: "bird.fill", colorHex: "06D6A0",
-                                petId: pet.id, actionType: "freeFlight", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA",
-                                petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQANote, icon: "camera.circle.fill", colorHex: "FF6B9D",
-                                petId: pet.id, actionType: "moment", entityId: pet.id, entityKind: .pet)
-            ], for: pet)
-        }
-
-        if isRabbit {
-            return personalizedDefaultQuickActions([
-                QuickActionItem(label: l.homeQAFeed, icon: "fork.knife", colorHex: "FFDD44",
-                                petId: pet.id, actionType: "feed", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA",
-                                petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQALitter, icon: "trash.fill", colorHex: "5B6AFF",
-                                petId: pet.id, actionType: "litter", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQAGroom, icon: "comb.fill", colorHex: "FF8C42",
-                                petId: pet.id, actionType: "groom", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA",
-                                petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQANote, icon: "camera.circle.fill", colorHex: "FF6B9D",
-                                petId: pet.id, actionType: "moment", entityId: pet.id, entityKind: .pet)
-            ], for: pet)
-        }
-
-        if isReptile {
-            return personalizedDefaultQuickActions([
-                QuickActionItem(label: l.homeQAFeed, icon: "fork.knife", colorHex: "FFDD44",
-                                petId: pet.id, actionType: "feed", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: "喷水", icon: "cloud.drizzle.fill", colorHex: "118AB2",
-                                petId: pet.id, actionType: "misting", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: "换垫材", icon: "leaf.fill", colorHex: "07DB8B",
-                                petId: pet.id, actionType: "substrateChange", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA",
-                                petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet),
-                QuickActionItem(label: l.homeQANote, icon: "camera.circle.fill", colorHex: "FF6B9D",
-                                petId: pet.id, actionType: "moment", entityId: pet.id, entityKind: .pet)
-            ], for: pet)
-        }
-
-        return personalizedDefaultQuickActions([
-            QuickActionItem(label: l.homeQAFeed, icon: "fork.knife", colorHex: "FFDD44",
-                            petId: pet.id, actionType: "feed", entityId: pet.id, entityKind: .pet),
-            QuickActionItem(label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA",
-                            petId: pet.id, actionType: "water", entityId: pet.id, entityKind: .pet),
-            QuickActionItem(label: l.homeQAWaterChange, icon: "drop.circle.fill", colorHex: "4ECDC4",
-                            petId: pet.id, actionType: "waterChange", entityId: pet.id, entityKind: .pet),
-            QuickActionItem(label: l.homeQAGroom, icon: "scissors", colorHex: "FF8C42",
-                            petId: pet.id, actionType: "groom", entityId: pet.id, entityKind: .pet),
-            QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA",
-                            petId: pet.id, actionType: "weight", entityId: pet.id, entityKind: .pet)
-        ], for: pet)
-    }
-
-    private func personalizedDefaultQuickActions(_ items: [QuickActionItem], for pet: Pet) -> [QuickActionItem] {
-        PetPersonalityBehavior.prioritized(
-            items,
-            actionType: { $0.actionType },
-            stableRank: { item in items.firstIndex(of: item) ?? Int.max },
-            pet: pet
+        ExpandedQuickActionDefaults.items(
+            for: pet,
+            localization: l,
+            waterManagementLabel: waterManagementLabel
         )
     }
 
@@ -2750,7 +2174,7 @@ extension FocusStackHomeTestView {
         [
             QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA",
                             actionType: "humanWeight", entityId: human.id, entityKind: .human),
-            QuickActionItem(label: l.homeQASport, icon: "figure.run", colorHex: "C8FF00",
+            QuickActionItem(label: l.homeQASport, icon: "figure.run", colorHex: "F97316",
                             actionType: "humanWorkout", entityId: human.id, entityKind: .human),
             QuickActionItem(label: l.homeQAMeds, icon: "pill.fill", colorHex: "FF6B8A",
                             actionType: "humanMedication", entityId: human.id, entityKind: .human),
@@ -2760,62 +2184,55 @@ extension FocusStackHomeTestView {
     }
 
     private func handleExpandedHumanQuickAction(_ item: QuickActionItem, human: Human) {
-        guard !expandedHumanQuickActionIsPrivate(item, human: human) else {
-            showingHumanPrivacyAlert = true
-            return
-        }
-        switch item.actionType {
-        case "humanWeight":
-            expandedQuickHumanWeight = human
-        case "humanWorkout":
-            expandedQuickHumanWorkout = human
-        case "humanMedication":
-            expandedQuickHumanMedicationAdd = human
-        case "humanNote":
-            expandedQuickHumanNote = human
-        default:
-            selectedHuman = human
-        }
+        handleExpandedHumanRoute(ExpandedQuickActionLogic.humanTapRoute(
+            actionType: item.actionType,
+            isLocked: expandedHumanQuickActionIsPrivate(item, human: human)
+        ), human: human)
     }
 
     private func handleExpandedHumanQuickLongPress(_ item: QuickActionItem, human: Human) {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        guard !expandedHumanQuickActionIsPrivate(item, human: human) else {
-            showingHumanPrivacyAlert = true
-            return
-        }
+        handleExpandedHumanRoute(ExpandedQuickActionLogic.humanLongPressRoute(
+            actionType: item.actionType,
+            isLocked: expandedHumanQuickActionIsPrivate(item, human: human)
+        ), human: human)
+    }
 
-        switch item.actionType {
-        case "humanWeight":
+    private func handleExpandedHumanRoute(_ route: ExpandedHumanQuickRoute, human: Human) {
+        switch route {
+        case .privacyAlert:
+            showingHumanPrivacyAlert = true
+        case .weightQuick:
+            openExpandedQuickHumanWeight(for: human)
+        case .workoutQuick:
+            expandedQuickHumanWorkout = human
+        case .medicationAdd:
+            expandedQuickHumanMedicationAdd = human
+        case .noteQuick:
+            expandedQuickHumanNote = human
+        case .weightDetail:
             expandedHumanWeightDetail = human
-        case "humanWorkout":
+        case .workoutDetail:
             expandedHumanWorkoutDetail = human
-        case "humanMedication":
+        case .medicationDetail:
             expandedQuickHumanMedication = human
-        case "humanNote":
+        case .noteDetail:
             expandedHumanNoteDetail = human
-        default:
+        case .selectHuman:
             selectedHuman = human
+        case .none:
+            break
         }
     }
 
     private func shouldBlockSingleUseAction(_ actionType: String, pet: Pet) -> Bool {
-        guard ["litter", "waterChange", "filterClean", "cageCleaning", "substrateChange"].contains(actionType),
-              expandedQuickActionCompleted(
+        guard let label = ExpandedQuickActionLogic.singleUseLabel(for: actionType),
+              expandedPetQuickCompleted(
                 QuickActionItem(label: "", icon: "", colorHex: "", petId: pet.id, actionType: actionType),
                 pet: pet
               )
         else { return false }
 
-        let label: String
-        switch actionType {
-        case "litter": label = "铲屎"
-        case "waterChange": label = "换水"
-        case "filterClean": label = "清理滤材"
-        case "cageCleaning": label = "清理鸟笼"
-        case "substrateChange": label = "换垫材"
-        default: label = "这个操作"
-        }
         singleUseNoticeTitle = "今天已经完成了"
         singleUseNoticeMessage = "\(pet.name) 今天已经\(label)过了，这类操作一天记录一次就够了。需要修改记录的话，可以进入详情页处理。"
         showingSingleUseNotice = true
@@ -2826,54 +2243,74 @@ extension FocusStackHomeTestView {
     private func handleExpandedQuickAction(_ item: QuickActionItem, pet: Pet) {
         if shouldBlockSingleUseAction(item.actionType, pet: pet) { return }
 
-        switch item.actionType {
-        case "feed": applyExpandedQuickAction("feed", pet: pet)
-        case "walk": applyExpandedQuickAction("walk", pet: pet)
-        case "water": applyExpandedQuickAction("water", pet: pet)
-        case "waterChange": applyExpandedQuickAction("waterChange", pet: pet)
-        case "play": applyExpandedQuickAction("play", pet: pet)
-        case "litter": applyExpandedQuickAction("litter", pet: pet)
-        case "filterClean": applyExpandedQuickAction("filterClean", pet: pet)
-        case "cageCleaning": applyExpandedQuickAction("cageCleaning", pet: pet)
-        case "freeFlight": applyExpandedQuickAction("freeFlight", pet: pet)
-        case "misting": applyExpandedQuickAction("misting", pet: pet)
-        case "substrateChange": applyExpandedQuickAction("substrateChange", pet: pet)
-        case "weight": expandedQuickWeightPet = pet
-        case "expense": expandedQuickExpensePet = pet
-        case "moment": expandedQuickMomentPet = pet
-        case "health": expandedQuickHealthPet = pet
-        default: break
+        handleExpandedPetTapRoute(ExpandedQuickActionLogic.petTapRoute(for: item, pet: pet), pet: pet)
+    }
+
+    private func handleExpandedPetTapRoute(_ route: ExpandedPetQuickTapRoute, pet: Pet) {
+        switch route {
+        case .perform(let actionType):
+            applyExpandedQuickAction(actionType, pet: pet)
+        case .waterManagement:
+            openExpandedWaterManagement(for: pet)
+        case .weight:
+            openExpandedQuickWeight(for: pet)
+        case .expense:
+            openExpandedQuickExpense(for: pet)
+        case .moment:
+            expandedQuickMomentPet = pet
+        case .health:
+            expandedQuickHealthPet = pet
+        case .none:
+            break
         }
     }
 
+    private func openExpandedFeedDetail(for pet: Pet, opensManualSheet: Bool = false) {
+        expandedQuickFeedOpensManualSheet = opensManualSheet
+        expandedQuickFeedDetailPet = pet
+    }
+
     private func handleExpandedQuickLongPress(_ item: QuickActionItem, pet: Pet) {
-        switch item.actionType {
-        case "feed": expandedQuickFeedDetailPet = pet
-        case "water":
-            expandedQuickWaterDetailModeRaw = QuickWaterDetailSheet.WaterMode.drink.rawValue
-            expandedQuickWaterDetailPet = pet
-        case "waterChange":
-            expandedQuickWaterDetailModeRaw = QuickWaterDetailSheet.WaterMode.change.rawValue
-            expandedQuickWaterDetailPet = pet
-        case "walk": expandedQuickWalkPet = pet
-        case "play": expandedQuickPlayDetailPet = pet
-        case "potty": expandedQuickPottyDetailPet = pet
-        case "litter": expandedQuickLitterDetailPet = pet
-        case "groom", "filterClean", "cageCleaning", "freeFlight", "misting", "substrateChange": expandedQuickHygienePet = pet
-        case "health": expandedQuickHealthPet = pet
-        case "weight": expandedQuickWeightDetailPet = pet
-        case "expense": expandedQuickExpenseDetailPet = pet
-        case "moment": expandedMomentHistoryPet = pet
-        default: break
+        switch ExpandedQuickActionLogic.petLongPressRoute(for: item) {
+        case .feedDetail:
+            openExpandedFeedDetail(for: pet)
+        case .waterManagement:
+            openExpandedWaterManagement(for: pet)
+        case .walk:
+            expandedQuickWalkPet = pet
+        case .playDetail:
+            expandedQuickPlayDetailPet = pet
+        case .pottyDetail:
+            expandedQuickPottyDetailPet = pet
+        case .hygiene:
+            expandedQuickHygienePet = pet
+        case .health:
+            expandedQuickHealthPet = pet
+        case .weightDetail:
+            expandedQuickWeightDetailPet = pet
+        case .expenseDetail:
+            expandedQuickExpenseDetailPet = pet
+        case .momentHistory:
+            expandedMomentHistoryPet = pet
+        case .none:
+            break
         }
     }
 
     private func expandedPendingFeedReminderForPlannedMode(pet: Pet) -> Reminder? {
-        expandedFeedTodayState(for: pet).nextPendingReminder
+        ExpandedQuickActionLogic.pendingFeedReminder(for: pet, allEvents: allEvents, allFeedCareLogs: allFeedCareLogs, now: quickActionClockTick)
     }
 
-    private func expandedFeedAppearsComplete(for pet: Pet) -> Bool {
-        expandedFeedTodayState(for: pet).isComplete
+    private func expandedPetQuickShowsAttentionDot(_ item: QuickActionItem, pet: Pet) -> Bool {
+        ExpandedQuickActionLogic.showsAttentionDot(item: item, pet: pet, allEvents: allEvents, allFeedCareLogs: allFeedCareLogs, now: quickActionClockTick)
+    }
+
+    private func expandedPetQuickCompleted(_ item: QuickActionItem, pet: Pet) -> Bool {
+        ExpandedQuickActionLogic.isCompleted(item: item, pet: pet, allEvents: allEvents, allFeedCareLogs: allFeedCareLogs, now: quickActionClockTick)
+    }
+
+    private func expandedPetQuickCountText(_ item: QuickActionItem, pet: Pet) -> String? {
+        ExpandedQuickActionLogic.countText(item: item, pet: pet, allEvents: allEvents, allFeedCareLogs: allFeedCareLogs, now: quickActionClockTick)
     }
 
     @discardableResult
@@ -2897,21 +2334,38 @@ extension FocusStackHomeTestView {
 
     private func performExpandedFeedCheckIn(pet: Pet, executorId: String?) {
         let performFeed = {
-            if self.completeExpandedPlannedFeedFromHome(pet: pet) { return }
-
-            let coconutBefore = QuestManager.shared.coconutCount
-            _ = CareEventService.recordManualFeed(
-                pet: pet,
-                amountGrams: pet.dailyPortionGrams,
-                context: self.modelContext,
-                executorId: executorId
-            )
-            let coconutDelta = max(0, QuestManager.shared.coconutCount - coconutBefore)
-            self.triggerExpandedActionFeedback(cardId: pet.id, coconutDelta: coconutDelta, label: coconutDelta > 0 ? "喂食 +\(coconutDelta)🥥" : nil)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            let dashboard = self.expandedFeedDashboard(for: pet)
+            switch dashboard.operatingMode {
+            case .manual:
+                let amount = pet.dailyPortionGrams
+                guard amount > 0 else {
+                    self.openExpandedFeedDetail(for: pet, opensManualSheet: true)
+                    return
+                }
+                let coconutBefore = QuestManager.shared.coconutCount
+                _ = CareEventService.recordManualFeed(
+                    pet: pet,
+                    amountGrams: amount,
+                    context: self.modelContext,
+                    executorId: executorId,
+                    foodKind: pet.mainFoodKind
+                )
+                let coconutDelta = max(0, QuestManager.shared.coconutCount - coconutBefore)
+                self.triggerExpandedActionFeedback(cardId: pet.id, coconutDelta: coconutDelta, label: coconutDelta > 0 ? "喂食 +\(coconutDelta)🥥" : nil)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            case .manualReminder:
+                if self.completeExpandedPlannedFeedFromHome(pet: pet) { return }
+                self.openExpandedFeedDetail(for: pet)
+            case .autoFeeder:
+                self.openExpandedFeedDetail(for: pet)
+                return
+            }
         }
 
-        if let warning = AntiRepeatCareManager.checkRecentCareLog(
+        let dashboard = expandedFeedDashboard(for: pet)
+        let willWriteFeedLog = (dashboard.operatingMode == .manual && pet.dailyPortionGrams > 0) ||
+            (dashboard.operatingMode == .manualReminder && dashboard.nextManualReminder != nil)
+        if willWriteFeedLog, let warning = AntiRepeatCareManager.checkRecentCareLog(
             for: pet,
             type: .feeding,
             thresholdMinutes: 120,
@@ -2931,10 +2385,60 @@ extension FocusStackHomeTestView {
         }
     }
 
-    private func expandedFeedTodayState(for pet: Pet) -> FeedTodayState {
-        let storedGoal = UserDefaults.standard.integer(forKey: "feedGoal_\(pet.id.uuidString)")
-        let goal = storedGoal > 0 ? storedGoal : 3
-        return FeedTodayState(pet: pet, allEvents: allEvents, manualGoalCount: goal)
+    private func expandedFeedDashboard(for pet: Pet) -> FeedingDashboardState {
+        ExpandedQuickActionLogic.feedDashboard(for: pet, allEvents: allEvents, allFeedCareLogs: allFeedCareLogs, now: quickActionClockTick)
+    }
+
+    private func expandedWaterRuleState(for pet: Pet) -> WaterRuleState {
+        ExpandedQuickActionLogic.waterRuleState(for: pet, allEvents: allEvents)
+    }
+
+    private func expandedDefaultWaterAmountMl(for pet: Pet) -> Double? {
+        ExpandedQuickActionLogic.defaultWaterAmountMl(for: pet)
+    }
+
+    private func completeExpandedPlannedWaterFromHome(pet: Pet) -> Bool {
+        let state = expandedWaterRuleState(for: pet)
+        guard let reminder = state.nextPendingReminder else { return false }
+        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            .flatMap { $0.isEmpty ? nil : $0 }
+        let reward = CareEventService.completePlannedWater(
+            pet: pet,
+            reminder: reminder,
+            amountMl: expandedDefaultWaterAmountMl(for: pet) ?? 0,
+            context: modelContext,
+            executorId: executorId
+        )
+        let delta = (reward?.humanGot ?? 0) + (reward?.petGot ?? 0)
+        triggerExpandedActionFeedback(cardId: pet.id, coconutDelta: delta, label: delta > 0 ? "喂水 +\(delta)🥥" : nil)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        return true
+    }
+
+    private func performExpandedWaterCheckIn(pet: Pet, executorId: String?) {
+        guard !WaterQuickActionPolicy.isAquatic(species: pet.species) else {
+            openExpandedWaterManagement(for: pet)
+            return
+        }
+
+        let state = expandedWaterRuleState(for: pet)
+        if state.operatingMode == .reminder {
+            if completeExpandedPlannedWaterFromHome(pet: pet) { return }
+            openExpandedWaterManagement(for: pet)
+            return
+        }
+
+        let got = CareEventService.recordCare(
+            pet: pet,
+            type: .watering,
+            amountMl: expandedDefaultWaterAmountMl(for: pet) ?? 0,
+            context: modelContext,
+            executorId: executorId,
+            reward: .water
+        )
+        let delta = got.humanGot + got.petGot
+        triggerExpandedActionFeedback(cardId: pet.id, coconutDelta: delta, label: delta > 0 ? "喂水 +\(delta)🥥" : nil)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     private func applyExpandedQuickAction(_ actionType: String, pet: Pet) {
@@ -2945,10 +2449,7 @@ extension FocusStackHomeTestView {
         case "feed":
             performExpandedFeedCheckIn(pet: pet, executorId: executorId)
         case "water":
-            let got = CareEventService.recordCare(pet: pet, type: .watering, amountMl: 250, context: modelContext, executorId: executorId, reward: .water)
-            let delta = got.humanGot + got.petGot
-            triggerExpandedActionFeedback(cardId: pet.id, coconutDelta: delta, label: delta > 0 ? "喂水 +\(delta)🥥" : nil)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            performExpandedWaterCheckIn(pet: pet, executorId: executorId)
         case "walk":
             if case .idle = PetWalkingManager.shared.phase {
                 PetWalkingManager.shared.start(pet: pet)
@@ -2963,12 +2464,8 @@ extension FocusStackHomeTestView {
         case "play":
             performExpandedSpecialCare(.play, pet: pet, executorId: executorId)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-        case "waterChange":
-            performExpandedSpecialCare(.waterChange, pet: pet, executorId: executorId)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-        case "filterClean":
-            performExpandedSpecialCare(.filterClean, pet: pet, executorId: executorId)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        case "waterChange", "filterClean":
+            openExpandedWaterManagement(for: pet)
         case "cageCleaning":
             performExpandedSpecialCare(.cageCleaning, pet: pet, executorId: executorId)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -3043,161 +2540,33 @@ extension FocusStackHomeTestView {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
-    private func expandedQuickActionCompleted(_ item: QuickActionItem, pet: Pet) -> Bool {
-        let cal = Calendar.current
-        switch item.actionType {
-        case "feed":
-            return expandedFeedAppearsComplete(for: pet)
-        case "water":
-            return pet.careLogs.contains { $0.type == CareType.watering.rawValue && cal.isDateInToday($0.date) }
-        case "waterChange":
-            return pet.careLogs.contains { $0.type == CareType.waterChange.rawValue && cal.isDateInToday($0.date) }
-        case "walk":
-            return pet.walkLogs.contains { cal.isDateInToday($0.startDate) }
-        case "potty":
-            return pet.pottyLogs.contains { cal.isDateInToday($0.date) }
-        case "litter":
-            return pet.careLogs.contains { $0.type == CareType.litter.rawValue && cal.isDateInToday($0.date) }
-        case "play":
-            return pet.careLogs.contains { $0.type == CareType.play.rawValue && cal.isDateInToday($0.date) }
-        case "groom":
-            return pet.hygieneLogs.contains { cal.isDateInToday($0.date) }
-        case "filterClean":
-            return pet.careLogs.contains { $0.type == CareType.filterClean.rawValue && cal.isDateInToday($0.date) }
-        case "cageCleaning":
-            return pet.careLogs.contains { $0.type == CareType.cageCleaning.rawValue && cal.isDateInToday($0.date) }
-        case "freeFlight":
-            return pet.careLogs.contains { $0.type == CareType.freeFlight.rawValue && cal.isDateInToday($0.date) }
-        case "misting":
-            return pet.careLogs.contains { $0.type == CareType.misting.rawValue && cal.isDateInToday($0.date) }
-        case "substrateChange":
-            return pet.careLogs.contains { $0.type == CareType.substrateChange.rawValue && cal.isDateInToday($0.date) }
-        case "weight":
-            return pet.weightLogs.contains { cal.isDateInToday($0.date) }
-        default:
-            return false
-        }
+    private var waterManagementLabel: String {
+        l.tr(zh: "水管理", en: "Water", de: "Wasser")
     }
 
-    private func expandedQuickCountText(for item: QuickActionItem, pet: Pet) -> String? {
-        let cal = Calendar.current
-        switch item.actionType {
-        case "feed":
-            let count = pet.careLogs.filter {
-                $0.type == CareType.feeding.rawValue && cal.isDateInToday($0.date) && $0.isManualFeedLogEntry
-            }.count
-            return count > 0 ? "手动 \(count)餐" : nil
-        case "water":
-            let count = pet.careLogs.filter { $0.type == CareType.watering.rawValue && cal.isDateInToday($0.date) }.count
-            return count > 0 ? "今日 \(count)次" : nil
-        case "waterChange":
-            if let last = pet.careLogs.filter({ $0.type == CareType.waterChange.rawValue }).max(by: { $0.date < $1.date }) {
-                let days = cal.dateComponents([.day], from: last.date, to: Date()).day ?? 0
-                return days == 0 ? "今天已换" : "\(days)天前"
-            }
-            return nil
-        case "walk":
-            let walks = pet.walkLogs.filter { cal.isDateInToday($0.startDate) }
-            guard !walks.isEmpty else { return "今日未遛" }
-            let dist = walks.reduce(0.0) { $0 + $1.distanceMeters }
-            let distText = dist >= 1000 ? String(format: "%.1fkm", dist / 1000) : String(format: "%.0fm", dist)
-            return "今日 \(walks.count)次 · \(distText)"
-        case "potty":
-            let count = pet.pottyLogs.filter { cal.isDateInToday($0.date) }.count
-            return count > 0 ? "今日 \(count)次" : nil
-        case "litter":
-            let count = pet.careLogs.filter { $0.type == CareType.litter.rawValue && cal.isDateInToday($0.date) }.count
-            return count > 0 ? "今日 \(count)次" : nil
-        case "play":
-            let count = pet.careLogs.filter { $0.type == CareType.play.rawValue && cal.isDateInToday($0.date) }.count
-            return count > 0 ? "今日逗玩 \(count)次" : "今日未逗玩"
-        case "weight":
-            if let last = pet.weightLogs.max(by: { $0.date < $1.date }) {
-                return String(format: "%.1fkg", last.weight)
-            }
-            return nil
-        case "expense":
-            let total = pet.expenseLogs
-                .filter { cal.isDate($0.date, equalTo: Date(), toGranularity: .month) }
-                .reduce(0.0) { $0 + $1.amount }
-            return total > 0 ? "本月 \(AppCurrency.format(total, fractionDigits: 0))" : nil
-        case "filterClean":
-            if let last = pet.careLogs.filter({ $0.type == CareType.filterClean.rawValue }).max(by: { $0.date < $1.date }) {
-                let days = cal.dateComponents([.day], from: last.date, to: Date()).day ?? 0
-                return days == 0 ? "今天已清" : "\(days)天前"
-            }
-            return nil
-        case "cageCleaning":
-            return latestCareAgeText(.cageCleaning, pet: pet, calendar: cal, todayDone: "今天已清")
-        case "freeFlight":
-            let count = pet.careLogs.filter { $0.type == CareType.freeFlight.rawValue && cal.isDateInToday($0.date) }.count
-            return count > 0 ? "今日 \(count)次" : nil
-        case "misting":
-            let count = pet.careLogs.filter { $0.type == CareType.misting.rawValue && cal.isDateInToday($0.date) }.count
-            return count > 0 ? "今日 \(count)次" : nil
-        case "substrateChange":
-            return latestCareAgeText(.substrateChange, pet: pet, calendar: cal, todayDone: "今天已换")
-        default:
-            return nil
-        }
+    private func openExpandedWaterManagement(for pet: Pet) {
+        expandedQuickWaterDetailPet = pet
     }
 
-    private func latestCareAgeText(_ type: CareType, pet: Pet, calendar cal: Calendar, todayDone: String) -> String? {
-        guard let last = pet.careLogs.filter({ $0.type == type.rawValue }).max(by: { $0.date < $1.date }) else {
-            return nil
-        }
-        let days = cal.dateComponents([.day], from: last.date, to: Date()).day ?? 0
-        return days == 0 ? todayDone : "\(days)天前"
+    private func expandedHumanQuickCompleted(_ item: QuickActionItem, human: Human) -> Bool {
+        let humanId = human.id.uuidString
+        return ExpandedQuickActionLogic.humanCompleted(
+            item: item,
+            human: human,
+            isLocked: expandedHumanQuickActionIsPrivate(item, human: human),
+            todayMedicationLogs: fetchTodayMedicationLogs(for: humanId)
+        )
     }
 
-    private func expandedHumanQuickActionCompleted(_ item: QuickActionItem, human: Human) -> Bool {
-        guard !expandedHumanQuickActionIsPrivate(item, human: human) else { return false }
-        let cal = Calendar.current
-        switch item.actionType {
-        case "humanWeight":
-            return human.weightLogs.contains { cal.isDateInToday($0.date) }
-        case "humanWorkout":
-            return human.workoutLogs.contains { cal.isDateInToday($0.date) }
-        case "humanMedication":
-            let humanId = human.id.uuidString
-            return fetchTodayMedicationLogs(for: humanId).contains {
-                $0.humanId == humanId &&
-                cal.isDateInToday($0.scheduledTime) &&
-                $0.status == .taken
-            }
-        default:
-            return false
-        }
-    }
-
-    private func expandedHumanQuickCountText(for item: QuickActionItem, human: Human) -> String? {
-        guard !expandedHumanQuickActionIsPrivate(item, human: human) else { return nil }
-        let cal = Calendar.current
-        switch item.actionType {
-        case "humanWeight":
-            if let last = human.weightLogs.max(by: { $0.date < $1.date }) {
-                return String(format: "%.1fkg", last.weight)
-            }
-            return nil
-        case "humanWorkout":
-            let cutoff = cal.date(byAdding: .day, value: -30, to: Date()) ?? Date()
-            let count = human.workoutLogs.filter { $0.date >= cutoff }.count
-            return count > 0 ? "近30天 \(count)次" : nil
-        case "humanMedication":
-            let humanId = human.id.uuidString
-            let activeMedCount = fetchActiveMedications(for: humanId).filter {
-                $0.humanId == humanId && $0.isActive && $0.isActiveToday
-            }.count
-            guard activeMedCount > 0 else { return nil }
-            let takenToday = fetchTodayMedicationLogs(for: humanId).filter {
-                $0.humanId == humanId &&
-                cal.isDateInToday($0.scheduledTime) &&
-                $0.status == .taken
-            }.count
-            return "今日已服 \(takenToday)/\(activeMedCount)"
-        default:
-            return nil
-        }
+    private func expandedHumanQuickCountText(_ item: QuickActionItem, human: Human) -> String? {
+        let humanId = human.id.uuidString
+        return ExpandedQuickActionLogic.humanCountText(
+            item: item,
+            human: human,
+            isLocked: expandedHumanQuickActionIsPrivate(item, human: human),
+            activeMedications: fetchActiveMedications(for: humanId),
+            todayMedicationLogs: fetchTodayMedicationLogs(for: humanId)
+        )
     }
 
     private func fetchActiveMedications(for humanId: String) -> [HumanMedication] {
@@ -3226,58 +2595,22 @@ extension FocusStackHomeTestView {
         return (try? modelContext.fetch(descriptor)) ?? []
     }
 
-    private func expandedHumanPrivacyField(for actionType: String) -> HumanPrivateField? {
-        PrivacyService.field(forHumanAction: actionType)
-    }
-
     private func expandedHumanQuickActionIsPrivate(_ item: QuickActionItem, human: Human) -> Bool {
         PrivacyService.isHumanQuickActionLocked(item, human: human, viewedBy: activeHumanId)
-    }
-
-    private func expandedHumanPrivacyBadgeText(for item: QuickActionItem, human: Human) -> String? {
-        guard let field = expandedHumanPrivacyField(for: item.actionType) else { return nil }
-        return PrivacyService.badgeText(for: field, human: human, viewedBy: activeHumanId)
-    }
-
-    private func expandedQuickActionTitle(_ raw: String) -> String {
-        switch raw.uppercased() {
-        case "FEED": return "喂食"
-        case "WALK": return "出行"
-        case "WATER": return "喂水"
-        case "POTTY": return "便便"
-        case "LITTER": return "铲屎"
-        case "PLAY": return "逗玩"
-        case "FILTER": return "滤材"
-        case "CAGE": return "清笼"
-        case "FLIGHT": return "放飞"
-        case "MIST": return "喷水"
-        case "SUBSTRATE": return "换垫"
-        case "TEMP": return "温湿"
-        case "WEIGHT": return "体重"
-        case "WORKOUT": return "运动"
-        case "NOTE": return "记录"
-        default: return raw.capitalized
-        }
     }
 
     private func performExpandedQuickAction(_ action: FocusCard.Action, for card: FocusCard) {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
-        if card.isHuman {
+        let pet = pets.first(where: { $0.id == card.id && !$0.hasPassedAway })
+        switch ExpandedQuickActionLogic.legacyRoute(action: action, card: card, pet: pet) {
+        case .selectHuman:
             selectedHuman = humans.first(where: { $0.id == card.id })
+        case .none:
             return
-        }
-
-        guard card.isReal,
-              let pet = pets.first(where: { $0.id == card.id && !$0.hasPassedAway }) else {
-            return
-        }
-
-        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-            .flatMap { $0.isEmpty ? nil : $0 }
-
-        switch action.label.uppercased() {
-        case "FEED":
+        case .recordFeed:
+            guard let pet else { return }
+            let executorId = currentExecutorId()
             let log = PetCareLog(
                 date: Date(),
                 type: .feeding,
@@ -3289,68 +2622,52 @@ extension FocusStackHomeTestView {
             modelContext.insert(log)
             QuestManager.shared.recordFirstMeal()
             QuestManager.shared.awardAction(type: .feed, pet: pet, context: modelContext)
-
-        case "WATER":
-            let isFish = pet.species.contains("鱼") || pet.species.lowercased().contains("fish")
-            let careType: CareType = isFish ? .waterChange : .watering
+        case .recordWater:
+            guard let pet else { return }
+            let executorId = currentExecutorId()
             let log = PetCareLog(
                 date: Date(),
-                type: careType,
-                amountMl: isFish ? 0 : 250,
+                type: .watering,
+                amountMl: 250,
                 pet: pet,
                 executorId: executorId
             )
             modelContext.insert(log)
-            if isFish {
-                let reward = QuestManager.OhanaActionType.general(
-                    humanReward: 15,
-                    petReward: 20,
-                    emoji: careType.emoji,
-                    title: "\(pet.name) 换水奖励"
-                )
-                QuestManager.shared.awardAction(type: reward, pet: pet, context: modelContext)
-            } else {
-                QuestManager.shared.awardAction(type: .water, pet: pet, context: modelContext)
-            }
-
-        case "WALK":
+            QuestManager.shared.awardAction(type: .water, pet: pet, context: modelContext)
+        case .startWalk:
+            guard let pet else { return }
             if case .idle = PetWalkingManager.shared.phase {
                 PetWalkingManager.shared.start(pet: pet)
             }
             triggerWalkCardTransform(for: pet)
-
-        case "POTTY":
+        case .recordPotty:
+            guard let pet else { return }
+            let executorId = currentExecutorId()
             let log = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet, executorId: executorId)
             modelContext.insert(log)
             QuestManager.shared.awardAction(type: .potty(isLitter: false), pet: pet, context: modelContext)
-
-        case "LITTER":
+        case .recordLitter:
+            guard let pet else { return }
+            let executorId = currentExecutorId()
             let log = PetCareLog(date: Date(), type: .litter, pet: pet, executorId: executorId)
             modelContext.insert(log)
             QuestManager.shared.awardAction(type: .potty(isLitter: true), pet: pet, context: modelContext)
-
-        case "PLAY":
-            performExpandedSpecialCare(.play, pet: pet, executorId: executorId)
-
-        case "FILTER":
-            performExpandedSpecialCare(.filterClean, pet: pet, executorId: executorId)
-
-        case "CAGE":
-            performExpandedSpecialCare(.cageCleaning, pet: pet, executorId: executorId)
-
-        case "FLIGHT":
-            performExpandedSpecialCare(.freeFlight, pet: pet, executorId: executorId)
-
-        case "MIST":
-            performExpandedSpecialCare(.misting, pet: pet, executorId: executorId)
-
-        case "SUBSTRATE":
-            performExpandedSpecialCare(.substrateChange, pet: pet, executorId: executorId)
-
-        default:
+        case .specialCare(let type):
+            guard let pet else { return }
+            performExpandedSpecialCare(type, pet: pet, executorId: currentExecutorId())
+        case .waterManagement:
+            guard let pet else { return }
+            openExpandedWaterManagement(for: pet)
+        case .selectPetOverview:
+            guard let pet else { return }
             selectedPetTab = .overview
             selectedPet = pet
         }
+    }
+
+    private func currentExecutorId() -> String? {
+        UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            .flatMap { $0.isEmpty ? nil : $0 }
     }
 
     private func performExpandedSpecialCare(_ type: CareType, pet: Pet, executorId: String?) {
@@ -3405,7 +2722,7 @@ extension FocusStackHomeTestView {
             case let id where id.hasPrefix("q_weight_"):
                 if let petId = quest.targetPetId, let p = activePets.first(where: { $0.id == petId }) {
                     focusTodayPetCard(p)
-                    expandedQuickWeightPet = p
+                    openExpandedQuickWeight(for: p)
                 }
             case let id where IslandQuestEngine.humanWeightId(fromQuestId: id) != nil:
                 if let humanId = IslandQuestEngine.humanWeightId(fromQuestId: id),
@@ -3479,7 +2796,7 @@ extension FocusStackHomeTestView {
                 isExpanded = true
             }
         }
-        expandedQuickHumanWeight = human
+        openExpandedQuickHumanWeight(for: human)
     }
 
     private func openTodayFocusWalk(pet: Pet) {
@@ -3514,8 +2831,12 @@ extension FocusStackHomeTestView {
                 focusHealthRecordTarget = FocusHealthRecordTarget(pet: pet, type: .vaccine)
             case .dewormingDue:
                 focusHealthRecordTarget = FocusHealthRecordTarget(pet: pet, type: .dewormingExternal)
-            case .weightGainAlert, .weightLossAlert, .drinkingWeightAlert:
-                expandedQuickWeightPet = pet
+            case .weightGainAlert, .weightLossAlert:
+                focusTodayPetCard(pet)
+                expandedQuickWeightDetailPet = pet
+            case .drinkingWeightAlert:
+                focusTodayPetCard(pet)
+                expandedQuickHealthPet = pet
             default:
                 expandedQuickHealthPet = pet
             }
@@ -3628,7 +2949,7 @@ extension FocusStackHomeTestView {
                         .animation(HeroAnim.buttonSpring, value: fabExpanded)
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .accessibilityLabel(fabExpanded ? "收起菜单" : "展开菜单")
             .accessibilityHint("点击展开常用功能")
         }
@@ -3687,7 +3008,7 @@ extension FocusStackHomeTestView {
             .foregroundStyle(.white)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
-            .background(.ultraThinMaterial.opacity(item.isAvailable ? 0.9 : 0.45), in: Capsule())
+            .background(Color.ohanaCardSurface.opacity(item.isAvailable ? 0.9 : 0.45), in: Capsule())
             .shadow(color: .black.opacity(item.isAvailable ? 0.15 : 0.06), radius: 4, y: 2)
 
             ZStack {
@@ -3812,7 +3133,7 @@ extension FocusStackHomeTestView {
                         .animation(HeroAnim.buttonSpring, value: cardFabExpanded)
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .accessibilityLabel(cardFabExpanded ? "收起成员快捷菜单" : "展开成员快捷菜单")
             .accessibilityHint("点击展开常用功能")
         }
@@ -3843,22 +3164,16 @@ extension FocusStackHomeTestView {
     private func openExpandedPetShortcut(_ actionType: String, pet: Pet) {
         switch actionType {
         case "feed":
-            expandedQuickFeedDetailPet = pet
-        case "water":
-            expandedQuickWaterDetailModeRaw = QuickWaterDetailSheet.WaterMode.drink.rawValue
-            expandedQuickWaterDetailPet = pet
-        case "waterChange":
-            expandedQuickWaterDetailModeRaw = QuickWaterDetailSheet.WaterMode.change.rawValue
-            expandedQuickWaterDetailPet = pet
+            openExpandedFeedDetail(for: pet)
+        case "water", "waterChange", "filterClean":
+            openExpandedWaterManagement(for: pet)
         case "walk":
             expandedQuickWalkPet = pet
-        case "potty":
+        case "potty", "litter":
             expandedQuickPottyDetailPet = pet
-        case "litter":
-            expandedQuickLitterDetailPet = pet
         case "play":
             expandedQuickPlayDetailPet = pet
-        case "groom", "filterClean":
+        case "groom":
             expandedQuickHygienePet = pet
         case "moment":
             expandedQuickMomentPet = pet
@@ -3872,7 +3187,7 @@ extension FocusStackHomeTestView {
         case .health:
             expandedQuickHealthPet = pet
         case .food:
-            expandedQuickFeedDetailPet = pet
+            openExpandedFeedDetail(for: pet)
         case .hygiene:
             expandedQuickHygienePet = pet
         case .walks:
@@ -3943,7 +3258,7 @@ extension FocusStackHomeTestView {
                             .animation(GoMotion.feedback, value: headerStreak)
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel("连续打卡 \(headerStreak) 天")
 
                 CoconutBalanceCapsule(onTap: { showingOasisReward = true })
@@ -3953,15 +3268,21 @@ extension FocusStackHomeTestView {
 
             // ── Right: calendar + ... menu ──
             HStack(spacing: 8) {
-                Button { showingCrewRoster = true } label: {
-                    topLimePill {
-                        Image(systemName: "person.2.fill")
-                            .font(.system(size: 12, weight: .black))
-                            .frame(width: 18)
-                    }
+                topLimePill {
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 12, weight: .black))
+                        .frame(width: 18)
                 }
-                .buttonStyle(.plain)
+                .contentShape(Capsule())
+                .onTapGesture {
+                    showingCrewRoster = true
+                }
+                .onLongPressGesture(minimumDuration: 0.45) {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    showingAccountSwitcher = true
+                }
                 .accessibilityLabel("Ohana 成员")
+                .accessibilityHint("点击打开成员图鉴，长按切换人类账户")
 
                 Button { openTopCalendar() } label: {
                     topLimePill {
@@ -3970,18 +3291,14 @@ extension FocusStackHomeTestView {
                             .frame(width: 18)
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel("日历")
 
                 Button { showingSettings = true } label: {
-                    topLimePill {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 12, weight: .black))
-                            .frame(width: 18)
-                    }
+                    currentHumanSettingsPill
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("设置")
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel("设置，当前用户 \(activeHumanDisplayName)")
             }
         }
         .padding(.horizontal, K.hPad)
@@ -3999,6 +3316,52 @@ extension FocusStackHomeTestView {
         .frame(height: 26)
         .fixedSize(horizontal: true, vertical: false)
         .background(Color.goPrimary, in: Capsule())
+    }
+
+    private var currentHumanSettingsPill: some View {
+        HStack(spacing: 5) {
+            currentHumanMiniAvatar
+            Text(activeHumanDisplayName)
+                .font(OhanaFont.caption2(.black))
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 9, weight: .black))
+        }
+        .foregroundStyle(.black)
+        .padding(.leading, 4)
+        .padding(.trailing, 7)
+        .padding(.vertical, 3)
+        .frame(height: 26)
+        .frame(maxWidth: 104)
+        .background(Color.goPrimary, in: Capsule())
+    }
+
+    @ViewBuilder
+    private var currentHumanMiniAvatar: some View {
+        if let human = activeHuman {
+            let _ = avatarCacheRevision
+            let avatarEntry = FocusWalletAvatarCache.entry(for: human.id, data: human.avatarImageData)
+            ZStack {
+                Circle()
+                    .fill(Color.black.opacity(0.12))
+                    .frame(width: 20, height: 20)
+                if let image = avatarEntry.image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 18, height: 18)
+                        .clipShape(Circle())
+                } else {
+                    Text(human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji)
+                        .font(.system(size: 11))
+                }
+            }
+        } else {
+            Image(systemName: "person.crop.circle.badge.exclamationmark")
+                .font(.system(size: 14, weight: .black))
+                .frame(width: 20, height: 20)
+        }
     }
 
     // MARK: Context menu (long-press on card)
@@ -4022,10 +3385,9 @@ extension FocusStackHomeTestView {
 
             Button {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                let log = PetCareLog(date: Date(), type: .waterChange, pet: pet, executorId: uid)
-                modelContext.insert(log); modelContext.safeSave()
+                openExpandedWaterManagement(for: pet)
             } label: {
-                Label("换水", systemImage: "drop.fill")
+                Label("水管理", systemImage: "water.waves")
             }
 
             Button {
@@ -4051,631 +3413,6 @@ extension FocusStackHomeTestView {
 // ─────────────────────────────────────────────────
 // MARK: – Wallet card view  (WalletPetCardFront style)
 // ─────────────────────────────────────────────────
-
-@MainActor
-private enum FocusWalletAvatarCache {
-    struct Entry {
-        let image: UIImage?
-        let isTransparent: Bool
-        let signature: String
-    }
-
-    private static var entries: [UUID: Entry] = [:]
-
-    static func entry(for cardId: UUID, data: Data?) -> Entry {
-        guard let data else {
-            entries.removeValue(forKey: cardId)
-            return Entry(image: nil, isTransparent: false, signature: "")
-        }
-
-        let signature = avatarSignature(data)
-        if let cached = entries[cardId], cached.signature == signature {
-            return cached
-        }
-
-        let decodeStartedAt = CFAbsoluteTimeGetCurrent()
-        let entry = decodedEntry(from: data, signature: signature)
-        entries[cardId] = entry
-        DispatchQueue.main.async {
-            AppPerformanceMonitor.shared.record("首页头像解码", startedAt: decodeStartedAt, note: "同步 1 张")
-        }
-        return entry
-    }
-
-    static func preload(cards: [FocusCard]) async {
-        let payloads: [(UUID, Data, String)] = cards.compactMap { card in
-            guard let data = card.avatarImageData else {
-                entries.removeValue(forKey: card.id)
-                return nil
-            }
-            let signature = avatarSignature(data)
-            if let cached = entries[card.id], cached.signature == signature { return nil }
-            return (card.id, data, signature)
-        }
-        guard !payloads.isEmpty else { return }
-
-        let decodeStartedAt = CFAbsoluteTimeGetCurrent()
-        let decoded = await Task.detached(priority: .utility) {
-            payloads.map { id, data, signature in
-                let entry = decodedEntry(from: data, signature: signature)
-                return (
-                    id,
-                    entry.image,
-                    entry.isTransparent,
-                    entry.signature
-                )
-            }
-        }.value
-
-        for (id, image, isTransparent, signature) in decoded {
-            entries[id] = Entry(image: image, isTransparent: isTransparent, signature: signature)
-        }
-        AppPerformanceMonitor.shared.record("首页头像解码", startedAt: decodeStartedAt, note: "\(decoded.count) 张")
-    }
-
-    nonisolated private static func avatarSignature(_ data: Data) -> String {
-        let head = data.prefix(12).map { String(format: "%02x", $0) }.joined()
-        let tail = data.suffix(12).map { String(format: "%02x", $0) }.joined()
-        return "\(data.count)-\(head)-\(tail)"
-    }
-
-    nonisolated private static func decodedEntry(from data: Data, signature: String) -> Entry {
-        let image = decodedImage(from: data)
-        let isTransparent = image.map { ImageCutoutService.imageHasTransparentPixels($0) } ?? false
-        return Entry(image: image, isTransparent: isTransparent, signature: signature)
-    }
-
-    nonisolated private static func decodedImage(from data: Data, maxPixel: CGFloat = 1_200) -> UIImage? {
-        let options: [CFString: Any] = [kCGImageSourceShouldCache: false]
-        guard let source = CGImageSourceCreateWithData(data as CFData, options as CFDictionary) else {
-            return UIImage(data: data)
-        }
-        let thumbnailOptions: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceShouldCacheImmediately: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: Int(maxPixel)
-        ]
-        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions as CFDictionary) else {
-            return UIImage(data: data)
-        }
-        return UIImage(cgImage: cgImage)
-    }
-}
-
-private struct FocusWalletCardView: View {
-    let card: FocusCard
-    let namespace: Namespace.ID
-    let heroNS: Namespace.ID
-    let expandedId: UUID?
-    let isHeroExpanded: Bool
-
-    @State private var delayedPopoutExpanded = false
-
-    private let accent = Color(hex: "FF5A3D")
-    @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
-    @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
-    @AppStorage("shop_equipped_title") private var equippedTitle: String = ""
-    @AppStorage("shop_equip_fx_lime_glow") private var equipFxLimeGlow: Bool = false
-    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private var shouldReduceWork: Bool {
-        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
-    }
-    private var walletAnimation: Animation {
-        shouldReduceWork ? .easeOut(duration: 0.16) : HeroAnim.walletSpring
-    }
-
-    var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            let avatarEntry = FocusWalletAvatarCache.entry(for: card.id, data: card.avatarImageData)
-            let avatarImage = avatarEntry.image
-            let hasPopout = avatarEntry.isTransparent && avatarImage != nil
-            let usesFullBleed = avatarImage != nil && !avatarEntry.isTransparent
-            let avatarExpanded = hasPopout && !card.isHuman ? delayedPopoutExpanded : isHeroExpanded
-
-            ZStack(alignment: .topLeading) {
-                // 1. Background: mesh gradient (real pet/human) or flat gradient (dummy)
-                cardBackground(usesFullBleed: usesFullBleed)
-
-                // Geometry capture for bloom expand animation
-                Color.clear
-                    .matchedGeometryEffect(
-                        id: HeroShellID(cardId: card.id),
-                        in: namespace,
-                        isSource: !(expandedId == card.id)
-                    )
-                    .allowsHitTesting(false)
-
-                // 2. Full-card photo + right-side readability scrim
-                if usesFullBleed, let img = avatarImage {
-                    cardPhotoLayer(img, w: w, h: h)
-                    .allowsHitTesting(false)
-                }
-
-                // 3. Expanded cards keep the oversized background identity; compact
-                // stack cards stay clean so the peek strip remains legible.
-                if isHeroExpanded {
-                    backgroundHeadlineLayer(w: w)
-                }
-
-                // 4. Left avatar (silhouette or transparent photo popout)
-                if !usesFullBleed {
-                    leftAvatarContent(
-                        avatarImage: avatarImage,
-                        hasPopout: hasPopout,
-                        avatarExpanded: avatarExpanded,
-                        w: w,
-                        h: h
-                    )
-                        .matchedGeometryEffect(
-                            id: HeroArtID(cardId: card.id),
-                            in: namespace,
-                            isSource: !(expandedId == card.id)
-                        )
-                        .frame(
-                            width: w * avatarContentWidthRatio(hasPopout: hasPopout, avatarExpanded: avatarExpanded),
-                            height: h,
-                            alignment: .leading
-                        )
-                        .clipped()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                        .allowsHitTesting(false)
-                }
-
-                // 5. Right info column: streak · days together · footnote · barcode
-                rightInfoColumn(h: h, usesFullBleed: usesFullBleed)
-
-                // 6. Top identity bar (peek strip shown when card is behind others)
-                topIdentityBar(usesFullBleed: usesFullBleed)
-                    .opacity(isHeroExpanded ? 0 : 1)
-
-                // 7. Compact cards now keep the same uninterrupted background as the hero card.
-            }
-            .animation(walletAnimation, value: isHeroExpanded)
-        }
-        .onAppear {
-            delayedPopoutExpanded = isHeroExpanded
-        }
-        .onChange(of: isHeroExpanded) { _, newValue in
-            if newValue {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.07) {
-                    withAnimation(HeroAnim.walletSpring) {
-                        delayedPopoutExpanded = true
-                    }
-                }
-            } else {
-                withAnimation(HeroAnim.buttonSpring) {
-                    delayedPopoutExpanded = false
-                }
-            }
-        }
-        .frame(height: isHeroExpanded ? K.expandedCardH : K.cardH)
-        .clipShape(RoundedRectangle(cornerRadius: HeroAnim.stackCardCorner, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: HeroAnim.stackCardCorner, style: .continuous)
-                .strokeBorder(equipFxLimeGlow ? Color.goPrimary.opacity(0.72) : .white.opacity(0.15), lineWidth: equipFxLimeGlow ? 1.4 : 0.5)
-        )
-        .shadow(color: equipFxLimeGlow ? Color.goPrimary.opacity(0.34) : .clear, radius: equipFxLimeGlow ? 18 : 0, y: 0)
-        .modifier(RealPetTransitionModifier(card: card, heroNS: heroNS))
-    }
-
-    // MARK: – Background
-
-    private func avatarContentWidthRatio(hasPopout: Bool, avatarExpanded: Bool) -> CGFloat {
-        let shouldUseExpandedWidth = hasPopout ? avatarExpanded : isHeroExpanded
-        if shouldUseExpandedWidth && !card.isHuman && card.petSpecies != nil {
-            return 0.98
-        }
-        return 0.52
-    }
-
-    private func backgroundHeadlineLayer(w: CGFloat) -> some View {
-        VStack(spacing: 4) {
-            Text(card.name.uppercased())
-                .font(.system(
-                    size: WalletPetCardTheme.headlinePointSize(cardWidth: w, headlineCount: card.name.count),
-                    weight: .black, design: .rounded
-                ))
-                .foregroundStyle(accent.opacity(0.85))
-                .lineLimit(1)
-                .minimumScaleFactor(0.22)
-                .frame(maxWidth: .infinity, alignment: .center)
-        }
-        .padding(.horizontal, 8)
-        .padding(.top, 8)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .allowsHitTesting(false)
-    }
-
-    @ViewBuilder
-    private func cardBackground(usesFullBleed: Bool) -> some View {
-        if !card.themeColorHex.isEmpty {
-            MeshGradient(
-                width: 3, height: 3,
-                points: [
-                    SIMD2(0.0, 0.0), SIMD2(0.5, 0.0), SIMD2(1.0, 0.0),
-                    SIMD2(0.0, 0.5), SIMD2(0.52, 0.38), SIMD2(1.0, 0.5),
-                    SIMD2(0.0, 1.0), SIMD2(0.5, 1.0),  SIMD2(1.0, 1.0)
-                ],
-                colors: WalletPetCardTheme.meshColors(for: card.themeColorHex)
-            )
-        } else {
-            LinearGradient(
-                colors: [
-                    card.color.mix(with: .white, by: 0.22),
-                    card.color,
-                    card.color.mix(with: .black, by: 0.12)
-                ],
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            )
-        }
-        let useDarkText = !usesFullBleed && WalletPetCardTheme.prefersDarkForeground(for: card.themeColorHex)
-        LinearGradient(
-            colors: [
-                .clear,
-                useDarkText
-                    ? Color.white.opacity(isHeroExpanded ? 0.30 : 0.20)
-                    : Color.black.opacity(usesFullBleed ? 0.12 : 0.28)
-            ],
-            startPoint: .top, endPoint: .bottom
-        )
-        .allowsHitTesting(false)
-    }
-
-    @ViewBuilder
-    private func cardPhotoLayer(_ img: UIImage, w: CGFloat, h: CGFloat) -> some View {
-        if isHeroExpanded {
-            ZStack {
-                Image(uiImage: img)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: w, height: h)
-                    .clipped()
-                    .saturation(1.02)
-                    .contrast(1.03)
-                WalletCardTrailingReadabilityOverlay(width: w, height: h)
-                bottomRightTextShadow(width: w, height: h, isExpanded: true)
-            }
-        } else {
-            let photoW = compactPhotoRenderedWidth(img, h: h, cardW: w)
-            ZStack(alignment: .leading) {
-                Image(uiImage: img)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: photoW, height: h)
-                    .clipped()
-                    .frame(width: w, height: h, alignment: .leading)
-                    .saturation(1.04)
-                    .contrast(1.02)
-                    .mask(compactPhotoSoftMask(width: w, height: h))
-                bottomRightTextShadow(width: w, height: h, isExpanded: false)
-            }
-        }
-    }
-
-    private func compactPhotoRenderedWidth(_ img: UIImage, h: CGFloat, cardW: CGFloat) -> CGFloat {
-        guard img.size.height > 0 else { return cardW }
-        return max(cardW, h * img.size.width / img.size.height)
-    }
-
-    private func compactPhotoSoftMask(width: CGFloat, height: CGFloat) -> some View {
-        LinearGradient(
-            stops: [
-                .init(color: .white, location: 0),
-                .init(color: .white, location: 0.46),
-                .init(color: .white.opacity(0.72), location: 0.60),
-                .init(color: .white.opacity(0.18), location: 0.76),
-                .init(color: .clear, location: 0.92)
-            ],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
-        .frame(width: width, height: height)
-    }
-
-    private func bottomRightTextShadow(width: CGFloat, height: CGFloat, isExpanded: Bool) -> some View {
-        ZStack {
-            LinearGradient(
-                stops: [
-                    .init(color: .clear, location: 0.0),
-                    .init(color: .black.opacity(isExpanded ? 0.18 : 0.10), location: 0.38),
-                    .init(color: .black.opacity(isExpanded ? 0.44 : 0.32), location: 0.76),
-                    .init(color: .black.opacity(isExpanded ? 0.62 : 0.46), location: 1.0)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            RadialGradient(
-                colors: [
-                    .black.opacity(isExpanded ? 0.56 : 0.42),
-                    .black.opacity(isExpanded ? 0.28 : 0.20),
-                    .clear
-                ],
-                center: .bottomTrailing,
-                startRadius: 8,
-                endRadius: min(width, height) * (isExpanded ? 0.78 : 0.66)
-            )
-        }
-        .frame(width: width, height: height)
-        .allowsHitTesting(false)
-    }
-
-    // MARK: – Left avatar
-
-    @ViewBuilder
-    private func leftAvatarContent(avatarImage: UIImage?, hasPopout: Bool, avatarExpanded: Bool, w: CGFloat, h: CGFloat) -> some View {
-        if let img = avatarImage, hasPopout {
-            let columnWidth = w * (avatarExpanded && !card.isHuman ? 0.72 : 0.50)
-            let avatarOffsetX = avatarExpanded && !card.isHuman ? w * 0.06 : w * 0.015
-            Image(uiImage: img)
-                .resizable()
-                .scaledToFit()
-                .frame(width: columnWidth, height: h * 1.02, alignment: .bottom)
-                .frame(width: w, height: h, alignment: .bottomLeading)
-                .offset(x: avatarOffsetX, y: h * 0.025)
-                .allowsHitTesting(false)
-                .shadow(color: .black.opacity(0.28), radius: 18, x: 0, y: 12)
-        } else if !card.isHuman, let species = card.petSpecies {
-            // Pet silhouette
-            let silSpecies = FocusWalletCardView.normalizeSpecies(species)
-            ZStack {
-                Ellipse()
-                    .fill(Color.black.opacity(0.16))
-                    .frame(width: w * (isHeroExpanded ? 0.32 : 0.28), height: isHeroExpanded ? 26 : 24)
-                    .blur(radius: 10)
-                    .offset(y: h * (isHeroExpanded ? 0.18 : 0.14))
-                PetSilhouetteView(
-                    species: silSpecies,
-                    coatColor: card.coatColor,
-                    eyeColor: card.eyeColor,
-                    patternName: card.patternName,
-                    isAnimationEnabled: false
-                )
-                .scaleEffect(isHeroExpanded ? 1.0 : 0.92)
-                .frame(
-                    width: w * (isHeroExpanded ? 0.78 : 0.38),
-                    height: h * (isHeroExpanded ? 0.90 : 0.68)
-                )
-                .offset(x: isHeroExpanded ? -w * 0.03 : 0, y: isHeroExpanded ? h * 0.04 : 0)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if card.isHuman {
-            HumanSilhouetteView(gender: card.humanGender ?? "", accent: .white.opacity(0.78))
-                .scaleEffect(0.9)
-                .frame(width: w * 0.34, height: h * 0.68)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        } else {
-            // Unknown: emoji fallback
-            Text(card.emoji.isEmpty ? "👤" : card.emoji)
-                .font(.system(size: min(w * 0.22, 60)))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-
-    // MARK: – Right info column
-
-    private func rightInfoColumn(h: CGFloat, usesFullBleed: Bool) -> some View {
-        return VStack(alignment: .trailing, spacing: isHeroExpanded ? 5 : 3) {
-            if card.streak > 1 {
-                Text("🔥 \(card.streak)天连续")
-                    .font(.system(size: 10, weight: .black, design: .rounded))
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 9).padding(.vertical, 4)
-                    .background(Color.goPrimary, in: Capsule())
-            }
-            Spacer(minLength: 4)
-            if card.isHuman {
-                humanInfoStack(usesFullBleed: usesFullBleed)
-            } else {
-                petInfoStack(usesFullBleed: usesFullBleed)
-            }
-            if isHeroExpanded {
-                homeVisibilityStatusBadge.padding(.top, 8)
-            }
-        }
-        .padding(.trailing, 16).padding(.top, 18).padding(.bottom, 16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-    }
-
-    private func humanInfoStack(usesFullBleed: Bool) -> some View {
-        let details = [card.zodiacText, card.mbtiText]
-            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-
-        return VStack(alignment: .trailing, spacing: isHeroExpanded ? 5 : 3) {
-            if let title = equippedTitleBadge {
-                Text(title)
-                    .font(.system(size: isHeroExpanded ? 11 : 9, weight: .black, design: .rounded))
-                    .foregroundStyle(.black)
-                    .lineLimit(1)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.goPrimary, in: Capsule())
-            }
-            Text(details.first ?? "OHANA MEMBER")
-                .font(.system(size: isHeroExpanded ? 20 : 15, weight: .black, design: .rounded))
-                .foregroundStyle(cardPrimaryText(usesFullBleed: usesFullBleed))
-                .lineLimit(1)
-                .minimumScaleFactor(0.55)
-
-            if details.count > 1 {
-                Text(details.dropFirst().joined(separator: " · "))
-                    .font(.system(size: isHeroExpanded ? 11 : 9, weight: .bold, design: .rounded))
-                    .foregroundStyle(cardSecondaryText(usesFullBleed: usesFullBleed, opacity: 0.78))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-        }
-    }
-
-    private func petInfoStack(usesFullBleed: Bool) -> some View {
-        let meta = [card.ageText, card.humanEquivalentAgeText, card.zodiacText]
-            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty && $0 != "未知" }
-
-        return VStack(alignment: .trailing, spacing: isHeroExpanded ? 5 : 3) {
-            Text(petTogetherHeadline)
-                .font(.system(size: isHeroExpanded ? 20 : 15, weight: .black, design: .rounded))
-                .foregroundStyle(cardPrimaryText(usesFullBleed: usesFullBleed))
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-
-            if let hint = card.personalityHint?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !hint.isEmpty {
-                Text(hint)
-                    .font(.system(size: isHeroExpanded ? 10.5 : 8.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(cardSecondaryText(usesFullBleed: usesFullBleed, opacity: 0.82))
-                    .lineLimit(isHeroExpanded ? 2 : 1)
-                    .multilineTextAlignment(.trailing)
-                    .minimumScaleFactor(0.62)
-            }
-
-            if !meta.isEmpty {
-                Text(meta.joined(separator: " · "))
-                    .font(.system(size: isHeroExpanded ? 10 : 8.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(cardSecondaryText(usesFullBleed: usesFullBleed, opacity: 0.76))
-                    .lineLimit(isHeroExpanded ? 2 : 1)
-                    .multilineTextAlignment(.trailing)
-                    .minimumScaleFactor(0.62)
-            }
-        }
-    }
-
-    private var petTogetherHeadline: String {
-        guard card.daysTogetherText != nil else { return "New Family" }
-        if card.daysTogether < 0 { return "\(abs(card.daysTogether)) Days Until Home" }
-        return "\(card.daysTogether) Days Together"
-    }
-
-    private var homeVisibilityStatusBadge: some View {
-        let isShown = card.isHuman
-            ? card.isShownOnHome
-            : HomeCardVisibility.isPetIDVisible(card.id, raw: hiddenHomePetIDsRaw)
-        return HStack(spacing: 6) {
-            Image(systemName: isShown ? "house.fill" : "house.slash.fill")
-                .font(.system(size: 10, weight: .black))
-            Text(isShown ? "首页显示中" : "未显示在首页")
-                .font(.system(size: 10, weight: .black, design: .rounded))
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-        }
-        .foregroundStyle(isShown ? Color.arkInk : Color.white.opacity(0.74))
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(isShown ? Color.goLime : Color.black.opacity(0.26), in: Capsule())
-        .overlay(
-            Capsule()
-                .strokeBorder(isShown ? Color.clear : Color.white.opacity(0.16), lineWidth: 0.6)
-        )
-    }
-
-    // MARK: – Top identity bar (peek strip)
-
-    private func topIdentityBar(usesFullBleed: Bool) -> some View {
-        HStack(spacing: 8) {
-            Text(card.name)
-                .font(.system(size: 15, weight: .black, design: .rounded))
-                .foregroundStyle(cardPrimaryText(usesFullBleed: usesFullBleed).opacity(0.9))
-                .lineLimit(1)
-                .minimumScaleFactor(0.65)
-            Spacer(minLength: 0)
-            if let title = equippedTitleBadge {
-                Text(title)
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(.black)
-                    .lineLimit(1)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(Color.goPrimary, in: Capsule())
-            }
-        }
-        .padding(.horizontal, 18)
-        .frame(height: K.stackPeekH, alignment: .center)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(
-            LinearGradient(
-                colors: topIdentityScrimColors(usesFullBleed: usesFullBleed),
-                startPoint: .top, endPoint: .bottom
-            )
-            .frame(height: K.stackPeekH + 12)
-            .frame(maxHeight: .infinity, alignment: .top)
-            .allowsHitTesting(false)
-        )
-    }
-
-    private var equippedTitleBadge: String? {
-        guard card.isHuman,
-              card.id.uuidString == activeHumanId,
-              !equippedTitle.isEmpty else { return nil }
-        switch equippedTitle {
-        case "title_guardian": return "🛡️ 守护者"
-        case "title_pioneer": return "🚀 先行者"
-        case "title_chef": return "👨‍🍳 首席厨师"
-        default: return nil
-        }
-    }
-
-    // MARK: – Helpers
-
-    private func useDarkCardText(usesFullBleed: Bool) -> Bool {
-        !usesFullBleed && WalletPetCardTheme.prefersDarkForeground(for: card.themeColorHex)
-    }
-
-    private func cardPrimaryText(usesFullBleed: Bool) -> Color {
-        useDarkCardText(usesFullBleed: usesFullBleed) ? Color.arkInk : Color.white
-    }
-
-    private func cardSecondaryText(usesFullBleed: Bool, opacity: Double) -> Color {
-        cardPrimaryText(usesFullBleed: usesFullBleed).opacity(opacity)
-    }
-
-    private func topIdentityScrimColors(usesFullBleed: Bool) -> [Color] {
-        useDarkCardText(usesFullBleed: usesFullBleed)
-            ? [Color.white.opacity(0.34), Color.white.opacity(0.10), .clear]
-            : [Color.black.opacity(0.22), Color.black.opacity(0.06), .clear]
-    }
-
-    /// Top padding for the kind subtitle so it sits just below the headline name
-    private func kindSubtitleTop(w: CGFloat) -> CGFloat {
-        let headlineSize = WalletPetCardTheme.headlinePointSize(cardWidth: w, headlineCount: card.name.count)
-        return 8 + headlineSize + 4
-    }
-
-    private static func normalizeSpecies(_ s: String) -> String {
-        let l = s.lowercased()
-        if s.contains("猫") || l.contains("cat")       { return "猫" }
-        if s.contains("狗") || l.contains("dog")       { return "狗" }
-        if s.contains("兔") || l.contains("rabbit")    { return "兔子" }
-        if s.contains("仓鼠") || l.contains("hamster") { return "仓鼠" }
-        if s.contains("鸟") || l.contains("bird")      { return "鸟" }
-        return s
-    }
-}
-
-// ─────────────────────────────────────────────────
-// MARK: – matchedTransitionSource helper (real pets only)
-// ─────────────────────────────────────────────────
-
-private struct RealPetTransitionModifier: ViewModifier {
-    let card: FocusCard
-    let heroNS: Namespace.ID
-
-    func body(content: Content) -> some View {
-        if card.isReal && !card.isDummy {
-            content
-                .matchedTransitionSource(id: card.id as UUID, in: heroNS) { cfg in
-                    cfg.clipShape(RoundedRectangle(cornerRadius: HeroAnim.stackCardCorner,
-                                                   style: .continuous))
-                }
-        } else {
-            content
-        }
-    }
-}
 
 private struct WalkLaunchBurst: View {
     @State private var animate = false
@@ -4800,7 +3537,7 @@ private struct ExpandedHumanFeaturesSheet: View {
                         } label: {
                             humanFeatureHero
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
 
                         if isAllPrivateForViewer {
                             fullPrivacyCard
@@ -4835,7 +3572,7 @@ private struct ExpandedHumanFeaturesSheet: View {
                                 label: {
                                     bentoCard(
                                         icon: "figure.run",
-                                        color: Color(hex: "38BDF8"),
+                                        color: Color.goOrange,
                                         title: "活动",
                                         value: "\(visibleWorkoutCount)",
                                         subtitle: "运动与共同健康",
@@ -4902,7 +3639,9 @@ private struct ExpandedHumanFeaturesSheet: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             remindersCard
                             notesCard
-                            deleteCard
+                            if isViewingOwnProfile {
+                                deleteCard
+                            }
                         }
                     }
                     .padding(.horizontal, 16)
@@ -4921,16 +3660,18 @@ private struct ExpandedHumanFeaturesSheet: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 10) {
-                        Button {
-                            showingEditSheet = true
-                        } label: {
-                            Image(systemName: "pencil")
-                                .font(.system(size: 14, weight: .black))
-                                .foregroundStyle(.black)
-                                .frame(width: 30, height: 30)
-                                .background(Color.goLime, in: Circle())
+                        if isViewingOwnProfile {
+                            Button {
+                                showingEditSheet = true
+                            } label: {
+                                Image(systemName: "pencil")
+                                    .font(.system(size: 14, weight: .black))
+                                    .foregroundStyle(.black)
+                                    .frame(width: 30, height: 30)
+                                    .background(Color.goLime, in: Circle())
+                            }
+                            .buttonStyle(ScaleButtonStyle())
                         }
-                        .buttonStyle(.plain)
                         Button("完成") { dismiss() }
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(Color.goLime)
@@ -4965,7 +3706,7 @@ private struct ExpandedHumanFeaturesSheet: View {
             } label: {
                 label()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
         }
     }
 
@@ -5007,7 +3748,7 @@ private struct ExpandedHumanFeaturesSheet: View {
                         .frame(width: 32, height: 32)
                         .background(Color.goLime, in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
@@ -5135,7 +3876,7 @@ private struct ExpandedHumanFeaturesSheet: View {
                         .strokeBorder(.white.opacity(0.09), lineWidth: 1)
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
         }
     }
 
@@ -5154,7 +3895,7 @@ private struct ExpandedHumanFeaturesSheet: View {
                         .strokeBorder(Color.goRed.opacity(0.24), lineWidth: 1)
                 }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private var fullPrivacyCard: some View {
@@ -5274,15 +4015,25 @@ private struct ExpandedHumanFeaturesSheet: View {
 
     private func deleteHumanAndDismiss() {
         let deletedHumanId = human.id.uuidString
-        let fallbackHumanId = allHumans.first(where: { $0.id.uuidString != deletedHumanId })?.id.uuidString ?? ""
+        let hasRemainingHuman = allHumans.contains { $0.id.uuidString != deletedHumanId }
+        let deletedCurrentHuman = activeHumanIdStr == deletedHumanId
+        let requiresReplacementHuman = !hasRemainingHuman
+        let requiresAccountSwitch = deletedCurrentHuman && hasRemainingHuman
 
-        if activeHumanIdStr == deletedHumanId {
-            activeHumanIdStr = fallbackHumanId
+        if deletedCurrentHuman || requiresReplacementHuman {
+            activeHumanIdStr = ""
         }
 
         modelContext.delete(human)
         modelContext.safeSave()
-        NotificationCenter.default.post(name: .ohanaReturnHomeAfterHumanDeletion, object: nil)
+        NotificationCenter.default.post(
+            name: .ohanaReturnHomeAfterHumanDeletion,
+            object: nil,
+            userInfo: [
+                "requiresReplacementHuman": requiresReplacementHuman,
+                "requiresAccountSwitch": requiresAccountSwitch
+            ]
+        )
         dismiss()
     }
 
@@ -5302,14 +4053,14 @@ private struct ExpandedHumanFeaturesSheet: View {
                     SIMD2(0.0, 1.0), SIMD2(0.5, 1.0), SIMD2(1.0, 1.0)
                 ],
                 colors: [
-                    Color(hex: human.themeColorHex).mix(with: .white, by: 0.2),
-                    Color(hex: "38BDF8").opacity(0.88),
-                    Color(hex: "C8FF00").opacity(0.62),
-                    Color(hex: human.themeColorHex),
+                    Color(hex: human.safeThemeColorHex).mix(with: .white, by: 0.2),
+                    Color.goTeal.opacity(0.70),
+                    Color.goOrange.opacity(0.48),
+                    Color(hex: human.safeThemeColorHex),
                     Color(hex: "1A2E8A"),
                     Color(hex: "EC4899").opacity(0.7),
                     Color(hex: "0C1640"),
-                    Color(hex: human.themeColorHex).mix(with: .black, by: 0.28),
+                    Color(hex: human.safeThemeColorHex).mix(with: .black, by: 0.28),
                     Color(hex: "050816")
                 ]
             )
@@ -5336,9 +4087,9 @@ private struct ExpandedHumanFeaturesSheet: View {
                 }
 
                 HStack(spacing: 9) {
-                    heroChip(title: "椰子", value: "\(human.coconutBalance)")
-                    heroChip(title: "运动", value: "\(human.workoutLogs.count)")
-                    heroChip(title: "体重", value: "\(human.weightLogs.count)")
+                    heroChip(title: "椰子", value: privateAwareHeroValue(.wishlist, "\(human.coconutBalance)"))
+                    heroChip(title: "运动", value: privateAwareHeroValue(.workout, "\(human.workoutLogs.count)"))
+                    heroChip(title: "体重", value: privateAwareHeroValue(.weight, "\(human.weightLogs.count)"))
                 }
             }
             .padding(18)
@@ -5361,7 +4112,7 @@ private struct ExpandedHumanFeaturesSheet: View {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .strokeBorder(.white.opacity(0.16), lineWidth: 1)
         }
-        .shadow(color: Color(hex: human.themeColorHex).opacity(0.28), radius: 22, y: 12)
+        .shadow(color: Color(hex: human.safeThemeColorHex).opacity(0.28), radius: 22, y: 12)
     }
 
     private var humanSubtitle: String {
@@ -5375,6 +4126,10 @@ private struct ExpandedHumanFeaturesSheet: View {
         guard !human.isPrivate(.weight, viewedBy: activeHumanId) else { return "—" }
         guard let latest = human.weightLogs.sorted(by: { $0.date > $1.date }).first else { return "--" }
         return String(format: "%.1f", latest.weight)
+    }
+
+    private func privateAwareHeroValue(_ field: HumanPrivateField, _ value: String) -> String {
+        human.isPrivate(field, viewedBy: activeHumanId) ? "—" : value
     }
 
     private func bentoCard(icon: String, color: Color, title: String, value: String, subtitle: String, height: CGFloat) -> some View {
@@ -5503,10 +4258,10 @@ private struct ExpandedHumanFeaturesSheet: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text(subtitle)
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
         .padding(.vertical, 5)
@@ -5597,7 +4352,7 @@ extension FocusStackHomeTestView {
                             .foregroundStyle(.white.opacity(0.92))
                             .shadow(color: .black.opacity(0.35), radius: 6, y: 2)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                     Spacer()
                 }
                 .padding(.leading, padding + 4)
@@ -5606,11 +4361,14 @@ extension FocusStackHomeTestView {
             }
             .allowsHitTesting(true)
 
-            expandedCardFab(card: card)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                .padding(.trailing, 20)
-                .padding(.bottom, floatingFabBottomPadding)
-                .allowsHitTesting(true)
+            if !isInlineRecordOverlayPresented {
+                expandedCardFab(card: card)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    .padding(.trailing, 20)
+                    .padding(.bottom, floatingFabBottomPadding)
+                    .allowsHitTesting(true)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottomTrailing)))
+            }
         }
         .frame(width: fullW, height: fullH)
         .offset(y: max(0, dragOffset))
@@ -5631,7 +4389,8 @@ extension FocusStackHomeTestView {
     }
 
     private func heroCardView(card: FocusCard, width: CGFloat, height: CGFloat) -> some View {
-        let avatarImage = FocusWalletAvatarCache.entry(for: card.id, data: card.avatarImageData).image
+        let avatarEntry = FocusWalletAvatarCache.entry(for: card.id, data: card.avatarImageData)
+        let avatarImage = avatarEntry.image
 
         return ZStack {
             LinearGradient(
@@ -5644,8 +4403,12 @@ extension FocusStackHomeTestView {
 
             Group {
                 if let img = avatarImage {
-                    Image(uiImage: img).resizable().scaledToFill()
-                        .frame(width: width, height: height).clipped()
+                    if avatarEntry.isTransparent {
+                        expandedTransparentAvatarLayer(img, card: card, width: width, height: height)
+                    } else {
+                        Image(uiImage: img).resizable().scaledToFill()
+                            .frame(width: width, height: height).clipped()
+                    }
                 } else if card.isHuman {
                     FocusHumanPortrait(emoji: card.emoji, color: card.color)
                 } else if let sp = card.petSpecies {
@@ -5670,6 +4433,22 @@ extension FocusStackHomeTestView {
             )
             .allowsHitTesting(false)
         }
+    }
+
+    private func expandedTransparentAvatarLayer(_ image: UIImage, card: FocusCard, width: CGFloat, height: CGFloat) -> some View {
+        let avatarWidth = width * (card.isHuman ? 0.72 : 0.78)
+        let avatarHeight = height * (card.isHuman ? 0.98 : 0.92)
+        let offsetX = width * (card.isHuman ? 0.05 : 0.04)
+        let offsetY = card.isHuman ? 0 : -height * 0.02
+
+        return Image(uiImage: image)
+            .resizable()
+            .scaledToFit()
+            .frame(width: avatarWidth, height: avatarHeight, alignment: .bottom)
+            .frame(width: width, height: height, alignment: .bottomLeading)
+            .offset(x: offsetX, y: offsetY)
+            .shadow(color: .white.opacity(0.38), radius: 4)
+            .shadow(color: .black.opacity(0.28), radius: 20, x: 0, y: 12)
     }
 
     private func goStyleActions(card: FocusCard) -> some View {
@@ -5700,7 +4479,7 @@ extension FocusStackHomeTestView {
             .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.14)))
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(K.ink.opacity(0.14), lineWidth: 1))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func normalizeSpecies(_ s: String) -> String {

@@ -57,7 +57,7 @@ struct QuickMomentSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView().ignoresSafeArea()
+                OhanaAppBackground().ignoresSafeArea()
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 16) {
                         momentHeader
@@ -97,14 +97,14 @@ struct QuickMomentSheet: View {
                             } label: {
                                 Image(systemName: "ellipsis.circle")
                                     .font(.system(size: 22))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                                     .symbolRenderingMode(.hierarchical)
                             }
                         }
                         Button { dismiss() } label: {
                             Image(systemName: "xmark")
                                 .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                         }
                     }
                 }
@@ -176,7 +176,7 @@ struct QuickMomentSheet: View {
                         .font(.system(size: 18, weight: .bold, design: .rounded))
                     Text("为 \(pet.name)")
                         .font(.system(size: 13, weight: .regular, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
             } else {
                 VStack(alignment: .leading, spacing: 2) {
@@ -184,7 +184,7 @@ struct QuickMomentSheet: View {
                         .font(.system(size: 18, weight: .bold, design: .rounded))
                     Text("照片与文字将保存到相册")
                         .font(.system(size: 13, weight: .regular, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
             Spacer(minLength: 0)
@@ -219,7 +219,7 @@ struct QuickMomentSheet: View {
                 if !resolvedPlaceDisplay.isEmpty {
                     Text(resolvedPlaceDisplay)
                         .font(.system(size: 15, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     Spacer(minLength: 0)
                     Button {
@@ -228,7 +228,7 @@ struct QuickMomentSheet: View {
                         showLocationInput = false
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                             .symbolRenderingMode(.hierarchical)
                     }
                 } else {
@@ -237,10 +237,10 @@ struct QuickMomentSheet: View {
                     } label: {
                         Text("添加位置（可选）")
                             .font(.system(size: 15, design: .rounded))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                     Button {
                         locationModel.requestFix()
                     } label: {
@@ -251,19 +251,19 @@ struct QuickMomentSheet: View {
                             .padding(.vertical, 4)
                             .background(Capsule().fill(momentAccent.opacity(0.12)))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 12))
 
             if showLocationInput {
                 TextField("输入地点", text: $manualPlace)
                     .font(.system(size: 15, design: .rounded))
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 12))
             }
         }
     }
@@ -295,13 +295,13 @@ struct QuickMomentSheet: View {
                         PhotosPicker(selection: $selectedItems, maxSelectionCount: max(1, maxDraftPhotos - selectedPhotos.count), matching: .images) {
                             photoActionLabel(icon: "photo.on.rectangle.angled", title: selectedPhotos.isEmpty ? "从相册选择" : "继续添加", color: momentAccent)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                         .disabled(selectedPhotos.count >= maxDraftPhotos)
 
                         Button { presentMomentCamera() } label: {
                             photoActionLabel(icon: "camera.fill", title: "拍照", color: Color.goTeal)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                         .disabled(selectedPhotos.count >= maxDraftPhotos)
                     }
 
@@ -354,7 +354,7 @@ struct QuickMomentSheet: View {
                 .foregroundStyle(color)
             Text(title)
                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
@@ -376,9 +376,9 @@ struct QuickMomentSheet: View {
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 5)
                                 .background(Capsule().fill(Color.primary.opacity(0.07)))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                     }
                 }
             }
@@ -398,7 +398,7 @@ struct QuickMomentSheet: View {
                     .padding(.horizontal, 12)
                     .scrollContentBackground(.hidden)
             }
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 12))
 
             Text("\(noteText.count)/140")
                 .font(.system(size: 12))
@@ -442,7 +442,7 @@ struct QuickMomentSheet: View {
             )
             .animation(.spring(response: 0.3), value: canSave)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .disabled(!canSave || isSaving)
     }
 
@@ -452,7 +452,7 @@ struct QuickMomentSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             Label("近期时刻", systemImage: "photo.stack.fill")
                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
                 .padding(.horizontal, 4)
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
@@ -487,7 +487,7 @@ struct QuickMomentSheet: View {
                             .overlay {
                                 Text(photo.note)
                                     .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(.primary.opacity(0.7))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                                     .multilineTextAlignment(.center)
                                     .lineLimit(4)
                                     .padding(8)
@@ -509,7 +509,7 @@ struct QuickMomentSheet: View {
                 .font(.system(size: 18, weight: .black, design: .rounded))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.regularMaterial)
+        .background(Color.ohanaCardSurface)
         .transition(.opacity)
     }
 
@@ -639,6 +639,7 @@ private final class MomentLocationModel: NSObject, ObservableObject, CLLocationM
         statusText = ""
         latitude = 0
         longitude = 0
+        manager.stopUpdatingLocation()
     }
 
     func requestFix() {
@@ -647,6 +648,7 @@ private final class MomentLocationModel: NSObject, ObservableObject, CLLocationM
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        manager.stopUpdatingLocation()
         guard let l = locations.last else { return }
         latitude = l.coordinate.latitude
         longitude = l.coordinate.longitude
@@ -665,6 +667,7 @@ private final class MomentLocationModel: NSObject, ObservableObject, CLLocationM
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        manager.stopUpdatingLocation()
         DispatchQueue.main.async {
             self.statusText = "定位不可用"
         }

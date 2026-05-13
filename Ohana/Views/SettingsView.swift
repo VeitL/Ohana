@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+import PhotosUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
@@ -19,11 +20,9 @@ struct SettingsView: View {
     @AppStorage(AppMeasurementSystem.storageKey) private var appMeasurementSystem = AppMeasurementSystem.fallbackCode
     @AppStorage(AppCurrency.storageKey) private var appCurrency = AppCurrency.fallbackCode
     @AppStorage("appThemePreference") private var appThemePreference: String = "dark"
+    @AppStorage("appBackgroundStyle") private var appBackgroundStyle: String = AppBackgroundStyle.goIsland.rawValue
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
-    @AppStorage("userNickname") private var userNickname = ""
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
-    @State private var showingNicknameEdit = false
-    @State private var editingNickname = ""
     @State private var showingClearDataAlert = false
     @State private var showingDeletePetSheet = false
     @State private var petToDelete: Pet? = nil
@@ -39,6 +38,9 @@ struct SettingsView: View {
     @State private var showingImportSuccess = false
     @State private var showingImportErrorAlert = false
     @State private var showingOnboardingReplay = false
+    @State private var showingAccountSwitcher = false
+    @State private var showingBackgroundPicker = false
+    @State private var quickSwitchHuman: Human? = nil
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
     
@@ -50,22 +52,20 @@ struct SettingsView: View {
         }
     }
     
-    // 自适应文字颜色
     private var primaryText: Color {
-        colorScheme == .dark ? .white : .black
+        Color.ohanaPrimaryText
     }
     
     private var secondaryText: Color {
-        colorScheme == .dark ? .white.opacity(0.7) : .black.opacity(0.6)
+        Color.ohanaSecondaryText
     }
     
     private var tertiaryText: Color {
-        colorScheme == .dark ? .white.opacity(0.45) : .black.opacity(0.4)
+        Color.ohanaTertiaryText
     }
 
-    /// 列表分隔虚线（浅/深对比）
     private var dividerLine: Color {
-        colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.08)
+        Color.ohanaDivider
     }
     
     private var accentColor: Color { Color.goPrimary }
@@ -86,39 +86,23 @@ struct SettingsView: View {
                 OhanaAppBackground()
                 
                 ScrollView {
-                    VStack(spacing: 18) {
-                        // Profile Card
-                        profileCard
+                    VStack(spacing: 14) {
+                        settingsHeader
 
                         // 设备身份绑定
                         if !humans.isEmpty {
                             deviceIdentitySection
                         }
                         
-                        // 昵称
-                        settingsSection(title: l.personalInfo) {
-                            settingsRow(icon: "person.fill", title: l.nickname, subtitle: userNickname.isEmpty ? l.notSet : userNickname) {
-                                editingNickname = userNickname
-                                showingNicknameEdit = true
-                            }
-                        }
-                        .alert(l.editNickname, isPresented: $showingNicknameEdit) {
-                            TextField(l.enterNickname, text: $editingNickname)
-                            Button(l.save) { userNickname = editingNickname }
-                            Button(l.cancel, role: .cancel) {}
-                        }
-                        
                         // 国家 / 语言 / 单位 / 货币
                         settingsSection(title: l.preferences) {
                             HStack(spacing: 12) {
-                                Image(systemName: "mappin.and.ellipse")
-                                    .foregroundStyle(Color.goPrimary)
-                                    .frame(width: 28)
+                                settingsIcon("mappin.and.ellipse", color: Color.goPrimary)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(l.countryRegion)
-                                        .font(.system(size: 15, weight: .medium))
+                                        .font(OhanaFont.body(.semibold))
                                     Text(l.countryDefaultsHint)
-                                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                                        .font(OhanaFont.caption2(.semibold))
                                         .foregroundStyle(tertiaryText)
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
@@ -139,15 +123,14 @@ struct SettingsView: View {
                                 }
                             }
                             .foregroundStyle(primaryText)
+                            .frame(minHeight: 44)
 
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
 
                             HStack {
-                                Image(systemName: "globe")
-                                    .foregroundStyle(Color.goPrimary)
-                                    .frame(width: 28)
+                                settingsIcon("globe", color: Color.goPrimary)
                                 Text(l.language)
-                                    .font(.system(size: 15, weight: .medium))
+                                    .font(OhanaFont.body(.semibold))
                                 Spacer()
                                 Picker("", selection: $appLanguage) {
                                     ForEach(AppLanguage.supported) { language in
@@ -157,18 +140,17 @@ struct SettingsView: View {
                                 .pickerStyle(.menu)
                             }
                             .foregroundStyle(primaryText)
+                            .frame(minHeight: 44)
 
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
 
                             HStack(spacing: 12) {
-                                Image(systemName: selectedMeasurementSystem.systemIconName)
-                                    .foregroundStyle(Color.goTeal)
-                                    .frame(width: 28)
+                                settingsIcon(selectedMeasurementSystem.systemIconName, color: Color.goTeal)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(l.measurementUnits)
-                                        .font(.system(size: 15, weight: .medium))
+                                        .font(OhanaFont.body(.semibold))
                                     Text(l.measurementUnitsHint)
-                                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                                        .font(OhanaFont.caption2(.semibold))
                                         .foregroundStyle(tertiaryText)
                                 }
                                 Spacer()
@@ -189,19 +171,17 @@ struct SettingsView: View {
                                 }
                             }
                             .foregroundStyle(primaryText)
-                            .padding(.top, 8)
+                            .frame(minHeight: 44)
 
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
 
                             HStack {
-                                Image(systemName: selectedCurrency.systemIconName)
-                                    .foregroundStyle(Color.goYellow)
-                                    .frame(width: 28)
+                                settingsIcon(selectedCurrency.systemIconName, color: Color.goYellow)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(l.currency)
-                                        .font(.system(size: 15, weight: .medium))
+                                        .font(OhanaFont.body(.semibold))
                                     Text(l.currencyDisplayOnlyHint)
-                                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                                        .font(OhanaFont.caption2(.semibold))
                                         .foregroundStyle(tertiaryText)
                                 }
                                 Spacer()
@@ -218,25 +198,17 @@ struct SettingsView: View {
                                         }
                                     }
                                 } label: {
-                                    HStack(spacing: 5) {
-                                        Text(selectedCurrency.displayName)
-                                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                                        Image(systemName: "chevron.down")
-                                            .font(.system(size: 9, weight: .black))
-                                    }
-                                    .foregroundStyle(primaryText)
+                                    menuValueLabel(selectedCurrency.displayName)
                                 }
                             }
                             .foregroundStyle(primaryText)
-                            .padding(.top, 8)
+                            .frame(minHeight: 44)
                             
                             // 外观主题
                             HStack {
-                                Image(systemName: "circle.lefthalf.filled")
-                                    .foregroundStyle(accentColor)
-                                    .frame(width: 28)
+                                settingsIcon("circle.lefthalf.filled", color: accentColor)
                                 Text(l.appearance)
-                                    .font(.system(size: 15, weight: .medium))
+                                    .font(OhanaFont.body(.semibold))
                                 Spacer()
                                 Picker("", selection: $appThemePreference) {
                                     Text(l.themeSystem).tag("system")
@@ -246,7 +218,19 @@ struct SettingsView: View {
                                 .pickerStyle(.menu)
                             }
                             .foregroundStyle(primaryText)
-                            .padding(.top, 8)
+                            .frame(minHeight: 44)
+                            .animation(GoMotion.feedback, value: appThemePreference)
+
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+
+                            settingsRow(
+                                icon: "photo.on.rectangle.angled",
+                                title: l.tr(zh: "背景", en: "Background", de: "Hintergrund"),
+                                subtitle: currentBackgroundStyle.localizedName(appLanguage),
+                                iconColor: Color.goBlue
+                            ) {
+                                showingBackgroundPicker = true
+                            }
 
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
                             performanceToggleRow
@@ -316,7 +300,7 @@ struct SettingsView: View {
                                         HStack(spacing: 10) {
                                             ZStack {
                                                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                                    .fill(Color.goPrimary.opacity(0.1))
+                                                    .fill(Color.ohanaControlFill)
                                                     .frame(width: 32, height: 32)
                                                 Text(pet.avatarEmoji)
                                                     .font(.system(size: 16))
@@ -333,10 +317,11 @@ struct SettingsView: View {
                                                 Text("重置")
                                                     .font(.system(size: 11, weight: .bold, design: .rounded))
                                                     .foregroundStyle(Color.goYellow.opacity(0.8))
-                                                    .padding(.horizontal, 8).padding(.vertical, 3)
+                                                    .frame(minHeight: 32)
+                                                    .padding(.horizontal, 10)
                                                     .background(Color.goYellow.opacity(0.1), in: Capsule())
                                             }
-                                            .buttonStyle(.plain)
+                                            .buttonStyle(ScaleButtonStyle())
                                             // 删除宠物
                                             Button {
                                                 petToDelete = pet
@@ -346,12 +331,13 @@ struct SettingsView: View {
                                                 Text("删除")
                                                     .font(.system(size: 11, weight: .bold, design: .rounded))
                                                     .foregroundStyle(Color.goRed.opacity(0.8))
-                                                    .padding(.horizontal, 8).padding(.vertical, 3)
+                                                    .frame(minHeight: 32)
+                                                    .padding(.horizontal, 10)
                                                     .background(Color.goRed.opacity(0.1), in: Capsule())
                                             }
-                                            .buttonStyle(.plain)
+                                            .buttonStyle(ScaleButtonStyle())
                                         }
-                                        .padding(.vertical, 2)
+                                        .frame(minHeight: 44)
                                     }
                                 }
                             }
@@ -359,7 +345,7 @@ struct SettingsView: View {
                                 TextField("输入宠物名字确认", text: $deleteConfirmName)
                                 Button("取消", role: .cancel) { deleteConfirmName = "" }
                                 Button("删除", role: .destructive) {
-                                    if let p = petToDelete, deleteConfirmName == p.name {
+                                    if let p = petToDelete, ConfirmationNameMatcher.matches(deleteConfirmName, expectedName: p.name) {
                                         let petIdStr = p.id.uuidString
                                         if let allEvents = try? modelContext.fetch(FetchDescriptor<Event>()) {
                                             for event in allEvents where event.relatedEntityId == petIdStr {
@@ -390,22 +376,15 @@ struct SettingsView: View {
                         // 开发者工具
                         settingsSection(title: "开发者工具") {
                             NavigationLink {
-                                PerformanceDiagnosticsView()
+                                UIGuidelinesView()
                             } label: {
                                 HStack(spacing: 12) {
-                                    ZStack {
-                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .fill(Color.goPrimary.opacity(0.12))
-                                            .frame(width: 32, height: 32)
-                                        Image(systemName: "speedometer")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundStyle(Color.goPrimary)
-                                    }
+                                    settingsIcon("rectangle.3.group.bubble.left.fill", color: Color.goTeal)
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text("性能诊断面板")
+                                        Text("UI/UX 规范查看")
                                             .font(.system(size: 15, weight: .semibold, design: .rounded))
                                             .foregroundStyle(primaryText)
-                                        Text("启动 · 首页首帧 · 头像 · 点击 · 相机链路")
+                                        Text("组件、页面、流程与验收")
                                             .font(.system(size: 11, weight: .medium))
                                             .foregroundStyle(tertiaryText)
                                     }
@@ -414,9 +393,57 @@ struct SettingsView: View {
                                         .font(.system(size: 11, weight: .semibold))
                                         .foregroundStyle(tertiaryText.opacity(0.6))
                                 }
-                                .padding(.vertical, 8)
+                                .frame(minHeight: 44)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ScaleButtonStyle())
+
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+
+                            NavigationLink {
+                                PerformanceDiagnosticsView()
+                            } label: {
+                                HStack(spacing: 12) {
+                                    settingsIcon("speedometer", color: Color.goPrimary)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("性能诊断面板")
+                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                            .foregroundStyle(primaryText)
+                                        Text("性能记录")
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(tertiaryText)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(tertiaryText.opacity(0.6))
+                                }
+                                .frame(minHeight: 44)
+                            }
+                            .buttonStyle(ScaleButtonStyle())
+
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+
+                            NavigationLink {
+                                HumanPrivacyTestView()
+                            } label: {
+                                HStack(spacing: 12) {
+                                    settingsIcon("lock.shield.fill", color: Color.goYellow)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("隐私测试面板")
+                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                            .foregroundStyle(primaryText)
+                                        Text("可见性检查")
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(tertiaryText)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(tertiaryText.opacity(0.6))
+                                }
+                                .frame(minHeight: 44)
+                            }
+                            .buttonStyle(ScaleButtonStyle())
                         }
 
                         // 数据
@@ -424,10 +451,9 @@ struct SettingsView: View {
                             VStack(spacing: 0) {
                                 settingsRow(icon: "square.and.arrow.up", title: "导出数据", subtitle: "即将推出") {}
                                 OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-                                settingsRow(icon: "exclamationmark.triangle", title: "清除所有数据", subtitle: "") {
+                                settingsRow(icon: "exclamationmark.triangle", title: "清除所有数据", subtitle: "", iconColor: Color.goRed) {
                                     showingClearDataAlert = true
                                 }
-                                .foregroundStyle(.red)
                             }
                         }
                         .alert("清除所有数据", isPresented: $showingClearDataAlert) {
@@ -442,7 +468,7 @@ struct SettingsView: View {
                         Spacer(minLength: 40)
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, 8)
+                    .padding(.top, 10)
                 }
             }
             .navigationTitle("")
@@ -463,19 +489,38 @@ struct SettingsView: View {
                 OnboardingView(isReplay: true) {
                     showingOnboardingReplay = false
                 }
-                .preferredColorScheme(preferredScheme)
+                .preferredColorScheme(.dark)
 
                 Button {
                     showingOnboardingReplay = false
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 30, weight: .semibold))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.white.opacity(0.78))
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .frame(width: 38, height: 34)
+                        .background(Color.ohanaControlFill, in: Capsule())
                         .padding(20)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
+        }
+        .sheet(isPresented: $showingAccountSwitcher) {
+            HumanAccountSwitcherSheet()
+                .presentationBackground(.clear)
+        }
+        .sheet(isPresented: $showingBackgroundPicker) {
+            AppBackgroundPickerSheet()
+                .presentationDetents([.large])
+                .presentationBackground(.clear)
+        }
+        .sheet(item: $quickSwitchHuman) { human in
+            HumanQuickSwitchPasscodeSheet(human: human) {
+                currentActiveHumanId = human.id.uuidString
+                quickSwitchHuman = nil
+            }
+            .presentationDetents([.height(420)])
+            .presentationBackground(.clear)
+            .presentationDragIndicator(.visible)
         }
     }
     
@@ -483,9 +528,31 @@ struct SettingsView: View {
     private var deviceIdentitySection: some View {
         settingsSection(title: "设备身份") {
             VStack(alignment: .leading, spacing: 12) {
-                Text("这台手机的主人是谁？")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(secondaryText)
+                Button {
+                    withAnimation(GoMotion.page) {
+                        showingAccountSwitcher = true
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        settingsIcon("person.2.badge.key.fill", color: Color.goPrimary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("切换人类账户")
+                                .font(.system(size: 15, weight: .black, design: .rounded))
+                                .foregroundStyle(primaryText)
+                            Text("账户与密码")
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .foregroundStyle(tertiaryText)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .black))
+                            .foregroundStyle(tertiaryText)
+                    }
+                    .padding(12)
+                    .frame(minHeight: 44)
+                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .buttonStyle(ScaleButtonStyle())
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
                         /* Removing "Unbind" option to enforce mandatory identity */
@@ -493,13 +560,12 @@ struct SettingsView: View {
                         ForEach(humans) { human in
                             let isSelected = currentActiveHumanId == human.id.uuidString
                             Button {
-                                currentActiveHumanId = human.id.uuidString
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                quickSwitch(to: human)
                             } label: {
                                 VStack(spacing: 4) {
                                     ZStack {
                                         Circle()
-                                            .fill(isSelected ? Color.goPrimary.opacity(0.2) : Color.white.opacity(0.08))
+                                            .fill(isSelected ? Color.goPrimary.opacity(0.20) : Color.ohanaControlFill)
                                             .frame(width: 44, height: 44)
                                             .overlay(Circle().strokeBorder(isSelected ? Color.goPrimary : Color.clear, lineWidth: 2))
                                         if let data = human.avatarImageData, let img = UIImage(data: data) {
@@ -509,14 +575,23 @@ struct SettingsView: View {
                                         } else {
                                             Text(human.avatarEmoji).font(.system(size: 20))
                                         }
+                                        if HumanPasscodeService.hasPasscode(human) {
+                                            Image(systemName: "lock.fill")
+                                                .font(.system(size: 8, weight: .black))
+                                                .foregroundStyle(Color.arkInk)
+                                                .frame(width: 16, height: 16)
+                                                .background(Color.goYellow, in: Circle())
+                                                .offset(x: 15, y: 15)
+                                        }
                                     }
                                     Text(human.name.isEmpty ? "成员" : human.name)
                                         .font(.system(size: 10, weight: .bold, design: .rounded))
-                                        .foregroundStyle(isSelected ? Color.goPrimary : .white.opacity(0.4))
+                                        .foregroundStyle(isSelected ? Color.goPrimary : tertiaryText)
                                         .lineLimit(1)
                                 }
+                                .frame(minWidth: 56, minHeight: 72)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ScaleButtonStyle())
                         }
                     }
                 }
@@ -535,6 +610,21 @@ struct SettingsView: View {
         }
     }
 
+    private var currentBackgroundStyle: AppBackgroundStyle {
+        AppBackgroundStyle(rawValue: appBackgroundStyle) ?? .goIsland
+    }
+
+    private func quickSwitch(to human: Human) {
+        UISelectionFeedbackGenerator().selectionChanged()
+        guard currentActiveHumanId != human.id.uuidString else { return }
+        if HumanPasscodeService.hasPasscode(human) {
+            quickSwitchHuman = human
+        } else {
+            currentActiveHumanId = human.id.uuidString
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
+    }
+
     // MARK: - Backup Section（TASK 1）
     @ViewBuilder
     private var backupSection: some View {
@@ -542,19 +632,12 @@ struct SettingsView: View {
             VStack(spacing: 0) {
                 // ── 导出行
                 HStack(spacing: 10) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.goTeal.opacity(0.15))
-                            .frame(width: 32, height: 32)
-                        Image(systemName: "arrow.down.doc.fill")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.goTeal)
-                    }
+                    settingsIcon("arrow.down.doc.fill", color: Color.goTeal)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("导出备份")
                             .font(.system(size: 15, weight: .semibold, design: .rounded))
                             .foregroundStyle(primaryText)
-                        Text("全量 JSON · 含所有宠物、日志、状态")
+                        Text("全量 JSON")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(tertiaryText)
                     }
@@ -567,7 +650,7 @@ struct SettingsView: View {
                                   message: Text("由 Ohana App 导出的全量备份文件")) {
                             backupPill("分享", icon: "square.and.arrow.up", color: Color.goTeal)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                     } else {
                         Button {
                             isExporting = true
@@ -586,28 +669,21 @@ struct SettingsView: View {
                         } label: {
                             backupPill("生成备份", icon: "archivebox", color: Color.goTeal)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                     }
                 }
-                .padding(.vertical, 6)
+                .frame(minHeight: 44)
 
                 OhanaDashedDivider(color: dividerLine).padding(.leading, 44).padding(.vertical, 2)
 
                 // ── 导入行
                 HStack(spacing: 10) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.goOrange.opacity(0.15))
-                            .frame(width: 32, height: 32)
-                        Image(systemName: "square.and.arrow.down.fill")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.goOrange)
-                    }
+                    settingsIcon("square.and.arrow.down.fill", color: Color.goOrange)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("从备份恢复")
                             .font(.system(size: 15, weight: .semibold, design: .rounded))
                             .foregroundStyle(primaryText)
-                        Text("选择 .json 备份文件导入")
+                        Text("选择 .json")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(tertiaryText)
                     }
@@ -620,10 +696,10 @@ struct SettingsView: View {
                         } label: {
                             backupPill("选择文件", icon: "folder", color: Color.goOrange)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                     }
                 }
-                .padding(.vertical, 6)
+                .frame(minHeight: 44)
 
                 OhanaDashedDivider(color: dividerLine).padding(.leading, 44).padding(.vertical, 2)
 
@@ -632,7 +708,7 @@ struct SettingsView: View {
                     Image(systemName: "info.circle")
                         .font(.system(size: 12))
                         .foregroundStyle(Color.goYellow.opacity(0.6))
-                    Text("备份含全部宠物、家庭成员、日志、健康档案及应用状态。恢复时以 UUID 去重，不会清除现有数据。")
+                    Text("恢复会自动去重。")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(tertiaryText.opacity(0.7))
                         .fixedSize(horizontal: false, vertical: true)
@@ -683,9 +759,10 @@ struct SettingsView: View {
             Text(label).font(.system(size: 12, weight: .bold, design: .rounded))
         }
         .foregroundStyle(color)
-        .padding(.horizontal, 12).padding(.vertical, 6)
+        .frame(minHeight: 34)
+        .padding(.horizontal, 12)
         .background(color.opacity(0.12), in: Capsule())
-        .overlay(Capsule().strokeBorder(color.opacity(0.3), lineWidth: 1))
+        .overlay(Capsule().strokeBorder(Color.clear, lineWidth: 1))
     }
 
     private func menuValueLabel(_ text: String) -> some View {
@@ -698,6 +775,9 @@ struct SettingsView: View {
                 .font(.system(size: 9, weight: .black))
         }
         .foregroundStyle(primaryText)
+        .frame(minHeight: 34)
+        .padding(.horizontal, 10)
+        .background(Color.ohanaControlFill, in: Capsule())
     }
 
     private func applyCountryDefaults(_ country: AppCountry.Option) {
@@ -709,44 +789,30 @@ struct SettingsView: View {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
-    // MARK: - Profile Card
-    private var profileCard: some View {
-        glassCard {
-            HStack(spacing: 16) {
-                ZStack {
-                    Circle()
-                        .fill(Color.goPrimary.opacity(0.14))
-                        .frame(width: 64, height: 64)
-                        .overlay(Circle().strokeBorder(Color.goPrimary.opacity(0.35), lineWidth: 1.5))
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(Color.goPrimary)
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(userNickname.isEmpty ? "Ohana 岛民" : userNickname)
-                        .font(OhanaFont.title3(.black))
-                        .foregroundStyle(primaryText)
-                    Text("本地模式")
-                        .font(OhanaFont.caption(.medium))
-                        .foregroundStyle(tertiaryText)
-                }
-                Spacer()
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .black))
-                        .foregroundStyle(secondaryText)
-                        .frame(width: 34, height: 34)
-                        .background(Color.primary.opacity(0.07), in: Circle())
-                }
-                .buttonStyle(ScaleButtonStyle())
+    // MARK: - Header
+    private var settingsHeader: some View {
+        HStack(spacing: 12) {
+            Text("设置")
+                .font(OhanaFont.largeTitle(.black))
+                .foregroundStyle(primaryText)
+            Spacer()
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .black))
+                    .foregroundStyle(primaryText)
+                    .frame(width: 38, height: 34)
+                    .background(Color.ohanaControlFill, in: Capsule())
             }
-            .padding(20)
+            .buttonStyle(ScaleButtonStyle())
         }
+        .padding(.horizontal, 2)
+        .padding(.top, 2)
+        .padding(.bottom, 4)
     }
     
     // MARK: - Settings Section
     private func settingsSection<Content: View>(title: String, @ViewBuilder content: @escaping () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
                     .fill(Color.goPrimary)
@@ -762,22 +828,19 @@ struct SettingsView: View {
                 VStack(spacing: 0) {
                     content()
                 }
-                .padding(16)
+                .padding(14)
             }
         }
     }
 
-    private func settingsRow(icon: String, title: String, subtitle: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+    private func settingsRow(icon: String, title: String, subtitle: String, iconColor: Color = Color.goPrimary, action: @escaping () -> Void) -> some View {
+        Button {
+            withAnimation(GoMotion.feedback) {
+                action()
+            }
+        } label: {
             HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.goPrimary.opacity(colorScheme == .dark ? 0.16 : 0.10))
-                        .frame(width: 32, height: 32)
-                    Image(systemName: icon)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(accentColor)
-                }
+                settingsIcon(icon, color: iconColor)
                 Text(title)
                     .font(OhanaFont.body(.semibold))
                     .foregroundStyle(primaryText)
@@ -791,47 +854,34 @@ struct SettingsView: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(tertiaryText.opacity(0.6))
             }
-            .padding(.vertical, 4)
+            .frame(minHeight: 44)
         }
         .buttonStyle(ScaleButtonStyle())
     }
 
     private var performanceToggleRow: some View {
         HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.goLime.opacity(colorScheme == .dark ? 0.16 : 0.10))
-                    .frame(width: 32, height: 32)
-                Image(systemName: "battery.75percent")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.goLime)
-            }
+            settingsIcon("battery.75percent", color: Color.goPrimary)
             VStack(alignment: .leading, spacing: 2) {
                 Text("省电模式")
                     .font(OhanaFont.body(.semibold))
                     .foregroundStyle(primaryText)
-                Text("减少背景动效和首页持续渲染")
+                Text("减少动效")
                     .font(OhanaFont.footnote())
                     .foregroundStyle(tertiaryText)
             }
             Spacer()
             Toggle("", isOn: $powerSavingMode)
-                .tint(Color.goLime)
+                .tint(Color.goPrimary)
                 .labelsHidden()
         }
-        .padding(.vertical, 4)
+        .frame(minHeight: 44)
+        .animation(GoMotion.feedback, value: powerSavingMode)
     }
 
     private func notificationToggleRow(icon: String, iconColor: Color, title: String, key: String) -> some View {
         HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(iconColor.opacity(colorScheme == .dark ? 0.16 : 0.10))
-                    .frame(width: 32, height: 32)
-                Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(iconColor)
-            }
+            settingsIcon(icon, color: iconColor)
             Text(title)
                 .font(OhanaFont.body(.semibold))
                 .foregroundStyle(primaryText)
@@ -843,7 +893,7 @@ struct SettingsView: View {
             .tint(accentColor)
             .labelsHidden()
         }
-        .padding(.vertical, 4)
+        .frame(minHeight: 44)
     }
 
     private func removeQuickAccessItems(for petId: UUID) {
@@ -882,35 +932,427 @@ struct SettingsView: View {
     // MARK: - Glass Card Helper
     @ViewBuilder
     private func glassCard<C: View>(@ViewBuilder content: () -> C) -> some View {
-        if reduceTransparency {
-            content()
-                .background(Color(.systemBackground).opacity(0.95))
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        } else {
-            content()
-                .background(
-                    (colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.76)),
-                    in: RoundedRectangle(cornerRadius: 22, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.black.opacity(0.06), lineWidth: 1)
+        content()
+            .background(
+                reduceTransparency ? Color.ohanaCardSurfaceElevated : Color.ohanaCardSurface,
+                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+            }
+    }
+
+    private func settingsIcon(_ icon: String, color: Color) -> some View {
+        Image(systemName: icon)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(color)
+            .frame(width: 32, height: 32)
+            .background(color.opacity(colorScheme == .dark ? 0.16 : 0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+private struct AppBackgroundPickerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @AppStorage("appBackgroundStyle") private var styleRaw: String = AppBackgroundStyle.goIsland.rawValue
+    @AppStorage("appCustomBackgroundVersion") private var customBackgroundVersion = 0
+
+    @State private var photoItem: PhotosPickerItem? = nil
+    @State private var isSavingPhoto = false
+    @State private var errorMessage: String? = nil
+
+    private var l: L10n { L10n(appLanguage) }
+    private var selectedStyle: AppBackgroundStyle {
+        AppBackgroundStyle(rawValue: styleRaw) ?? .goIsland
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                OhanaAppBackground()
+
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        header
+                        officialBackgrounds
+                        customBackgroundSection
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 18)
+                    .padding(.bottom, 30)
                 }
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.18 : 0.05), radius: 12, x: 0, y: 6)
+            }
+            .toolbar(.hidden, for: .navigationBar)
         }
+        .onChange(of: photoItem) { _, item in
+            handlePhotoItem(item)
+        }
+        .alert(l.tr(zh: "背景保存失败", en: "Could not save background", de: "Hintergrund konnte nicht gespeichert werden"), isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button(l.tr(zh: "好", en: "OK", de: "OK"), role: .cancel) { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(l.tr(zh: "背景", en: "Background", de: "Hintergrund"))
+                    .font(OhanaFont.title2(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text(l.tr(
+                    zh: "选择一组背景，同时决定浅色和深色模式。",
+                    en: "Choose one background pair for both light and dark mode.",
+                    de: "Wähle ein Hintergrundpaar für Hell- und Dunkelmodus."
+                ))
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(Color.ohanaSecondaryText)
+            }
+            Spacer()
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .frame(width: 38, height: 34)
+                    .background(Color.ohanaControlFill, in: Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+        }
+    }
+
+    private var officialBackgrounds: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle(l.tr(zh: "官方背景对", en: "Official background pairs", de: "Offizielle Hintergrundpaare"))
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                ForEach(AppBackgroundStyle.officialPairOptions) { style in
+                    backgroundOptionCard(style)
+                }
+            }
+        }
+    }
+
+    private var customBackgroundSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle(l.tr(zh: "自定义", en: "Custom", de: "Eigenes Bild"))
+            backgroundOptionCard(.customPhoto)
+
+            HStack(spacing: 10) {
+                PhotosPicker(selection: $photoItem, matching: .images) {
+                    HStack(spacing: 6) {
+                        if isSavingPhoto {
+                            ProgressView()
+                                .tint(Color.goPrimary)
+                                .scaleEffect(0.72)
+                        } else {
+                            Image(systemName: CustomAppBackgroundStore.exists ? "photo.on.rectangle.angled" : "plus")
+                        }
+                        Text(CustomAppBackgroundStore.exists
+                             ? l.tr(zh: "更换图片", en: "Change photo", de: "Bild ändern")
+                             : l.tr(zh: "上传图片", en: "Upload photo", de: "Bild hochladen"))
+                    }
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                    .background(Color.goPrimary, in: Capsule())
+                }
+                .disabled(isSavingPhoto)
+                .buttonStyle(ScaleButtonStyle())
+
+                if CustomAppBackgroundStore.exists {
+                    Button {
+                        withAnimation(GoMotion.page) {
+                            CustomAppBackgroundStore.deleteImage()
+                            customBackgroundVersion += 1
+                            if selectedStyle == .customPhoto {
+                                styleRaw = AppBackgroundStyle.goIsland.rawValue
+                            }
+                        }
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 15, weight: .black))
+                            .foregroundStyle(Color.goRed)
+                            .frame(width: 48, height: 46)
+                            .background(Color.goRed.opacity(0.12), in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
+            }
+        }
+    }
+
+    private func sectionTitle(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(OhanaFont.caption2(.black))
+            .foregroundStyle(Color.ohanaTertiaryText)
+            .tracking(1.1)
+    }
+
+    private func backgroundOptionCard(_ style: AppBackgroundStyle) -> some View {
+        let selected = selectedStyle == style
+        return Button {
+            guard style != .customPhoto || CustomAppBackgroundStore.exists else {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                return
+            }
+            withAnimation(GoMotion.page) {
+                styleRaw = style.rawValue
+            }
+            UISelectionFeedbackGenerator().selectionChanged()
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                backgroundPairPreview(style)
+                    .frame(height: 86)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay(alignment: .topTrailing) {
+                        if selected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 18, weight: .black))
+                                .foregroundStyle(Color.goPrimary)
+                                .padding(8)
+                        }
+                    }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(style.localizedName(appLanguage))
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .lineLimit(1)
+                    Text(style.localizedSubtitle(appLanguage))
+                        .font(OhanaFont.caption2(.semibold))
+                        .foregroundStyle(Color.ohanaTertiaryText)
+                        .lineLimit(2)
+                }
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(selected ? Color.goPrimary.opacity(0.75) : Color.ohanaGlassStroke.opacity(0.36), lineWidth: selected ? 2 : 1)
+            }
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .animation(GoMotion.feedback, value: selected)
+    }
+
+    @ViewBuilder
+    private func backgroundPairPreview(_ style: AppBackgroundStyle) -> some View {
+        if style == .customPhoto, let image = CustomAppBackgroundStore.image {
+            HStack(spacing: 0) {
+                customPhotoPairHalf(image: image, isDarkPreview: false)
+                customPhotoPairHalf(image: image, isDarkPreview: true)
+            }
+        } else {
+            HStack(spacing: 0) {
+                officialPairHalf(style, scheme: .light, label: l.tr(zh: "浅", en: "Light", de: "Hell"))
+                officialPairHalf(style, scheme: .dark, label: l.tr(zh: "深", en: "Dark", de: "Dunkel"))
+            }
+        }
+    }
+
+    private func officialPairHalf(_ style: AppBackgroundStyle, scheme: ColorScheme, label: String) -> some View {
+        LinearGradient(
+            colors: style.gradientColors(for: scheme),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .overlay(alignment: .bottomLeading) {
+            Text(label)
+                .font(OhanaFont.caption2(.black))
+                .foregroundStyle(scheme == .dark ? Color.white.opacity(0.82) : Color(hex: "26364D").opacity(0.72))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background((scheme == .dark ? Color.black : Color.white).opacity(0.18), in: Capsule())
+                .padding(7)
+        }
+    }
+
+    private func customPhotoPairHalf(image: UIImage, isDarkPreview: Bool) -> some View {
+        Image(uiImage: image)
+            .resizable()
+            .scaledToFill()
+            .overlay {
+                LinearGradient(
+                    colors: isDarkPreview
+                        ? [Color.black.opacity(0.58), Color(hex: "0F172A").opacity(0.48)]
+                        : [Color(hex: "DDE8F6").opacity(0.54), Color(hex: "AEBFD4").opacity(0.42)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+            .overlay(alignment: .bottomLeading) {
+                Text(isDarkPreview ? l.tr(zh: "深", en: "Dark", de: "Dunkel") : l.tr(zh: "浅", en: "Light", de: "Hell"))
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(isDarkPreview ? Color.white.opacity(0.82) : Color(hex: "26364D").opacity(0.72))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background((isDarkPreview ? Color.black : Color.white).opacity(0.18), in: Capsule())
+                    .padding(7)
+            }
+    }
+
+    private func handlePhotoItem(_ item: PhotosPickerItem?) {
+        guard let item else { return }
+        isSavingPhoto = true
+        Task {
+            do {
+                guard let data = try await item.loadTransferable(type: Data.self) else {
+                    throw CocoaError(.fileReadUnknown)
+                }
+                try CustomAppBackgroundStore.saveImageData(data)
+                await MainActor.run {
+                    withAnimation(GoMotion.page) {
+                        customBackgroundVersion += 1
+                        styleRaw = AppBackgroundStyle.customPhoto.rawValue
+                    }
+                    photoItem = nil
+                    isSavingPhoto = false
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                }
+            } catch {
+                await MainActor.run {
+                    photoItem = nil
+                    isSavingPhoto = false
+                    errorMessage = error.localizedDescription
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                }
+            }
+        }
+    }
+}
+
+private struct HumanQuickSwitchPasscodeSheet: View {
+    let human: Human
+    let onVerified: () -> Void
+
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var pin = ""
+    @State private var message = "输入 4 位密码后切换到此账户"
+    @State private var isError = false
+
+    var body: some View {
+        ZStack {
+            OhanaAppBackground()
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    header
+                    HumanPasscodePad(pin: $pin, accent: Color(hex: human.themeColor)) {
+                        verify()
+                    }
+                    .padding(.top, 8)
+                    statusText
+                }
+                .padding(22)
+                .padding(.bottom, 28)
+            }
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            avatar
+            VStack(alignment: .leading, spacing: 3) {
+                Text("切换到 \(displayName(human))")
+                    .font(OhanaFont.title3(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.76)
+                Text("此账户已开启 4 位密码")
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+            Spacer()
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .frame(width: 38, height: 34)
+                    .background(Color.ohanaControlFill, in: Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+        }
+    }
+
+    private var statusText: some View {
+        Text(message)
+            .font(OhanaFont.caption(.bold))
+            .foregroundStyle(isError ? Color.goRed : Color.ohanaSecondaryText)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+            .animation(GoMotion.feedback, value: isError)
+    }
+
+    private var avatar: some View {
+        ZStack {
+            Circle()
+                .fill(Color(hex: human.themeColor).opacity(0.18))
+                .frame(width: 48, height: 48)
+            if let data = human.avatarImageData, let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 48, height: 48)
+                    .clipShape(Circle())
+            } else {
+                Text(human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji)
+                    .font(.system(size: 22))
+            }
+        }
+    }
+
+    private func verify() {
+        let now = Date()
+        switch HumanPasscodeService.verify(pin, for: human, now: now) {
+        case .success, .noPasscode:
+            modelContext.safeSave()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            onVerified()
+            dismiss()
+        case .incorrect(let remaining):
+            modelContext.safeSave()
+            pin = ""
+            isError = true
+            message = "密码不正确，还可尝试 \(remaining) 次"
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+        case .locked(let until):
+            modelContext.safeSave()
+            pin = ""
+            isError = true
+            message = "尝试过多，请 \(max(1, Int(ceil(until.timeIntervalSince(now))))) 秒后再试"
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+        case .invalidFormat:
+            pin = ""
+            isError = true
+            message = "请输入 4 位数字"
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+        }
+    }
+
+    private func displayName(_ human: Human) -> String {
+        let name = human.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "成员" : name
     }
 }
 
 private struct PerformanceDiagnosticsView: View {
     @ObservedObject private var monitor = AppPerformanceMonitor.shared
-    @Environment(\.colorScheme) private var colorScheme
 
     private var primaryText: Color {
-        colorScheme == .dark ? .white : Color(hex: "0D1026")
+        Color.ohanaPrimaryText
     }
 
     private var secondaryText: Color {
-        colorScheme == .dark ? .white.opacity(0.68) : Color(hex: "3B4266").opacity(0.72)
+        Color.ohanaSecondaryText
     }
 
     var body: some View {
@@ -953,17 +1395,17 @@ private struct PerformanceDiagnosticsView: View {
                             ForEach(monitor.samples) { sample in
                                 performanceSampleRow(sample)
                                 if sample.id != monitor.samples.last?.id {
-                                    OhanaDashedDivider(color: .white.opacity(0.12))
+                                    OhanaDashedDivider(color: Color.ohanaDivider)
                                 }
                             }
                         }
                     }
                     .padding(14)
-                    .background(Color.black.opacity(colorScheme == .dark ? 0.22 : 0.08),
+                    .background(Color.ohanaCardSurface,
                                 in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+                            .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
                     )
 
                     Button {
@@ -971,12 +1413,12 @@ private struct PerformanceDiagnosticsView: View {
                     } label: {
                         Label("清空样本", systemImage: "trash")
                             .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.arkInk)
+                            .foregroundStyle(Color.ohanaPrimaryActionText)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .frame(minHeight: 44)
+                            .background(Color.goPrimary, in: Capsule())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                     .disabled(monitor.samples.isEmpty)
                     .opacity(monitor.samples.isEmpty ? 0.45 : 1)
                 }
@@ -1014,7 +1456,7 @@ private struct PerformanceDiagnosticsView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity)
-        .background(.white.opacity(colorScheme == .dark ? 0.08 : 0.18),
+        .background(Color.ohanaCardSurface,
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 

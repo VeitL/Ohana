@@ -287,17 +287,36 @@ struct HomeHighlightDeck: View {
 private struct DeckHumanStatusCard: View {
     let human: Human
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+
+    private var activeHumanId: UUID? {
+        UUID(uuidString: activeHumanIdStr)
+    }
+
+    private var isWorkoutLocked: Bool {
+        PrivacyService.isLocked(.workout, for: human, viewedBy: activeHumanId)
+    }
+
+    private var isWeightLocked: Bool {
+        PrivacyService.isLocked(.weight, for: human, viewedBy: activeHumanId)
+    }
+
+    private var isCoconutLocked: Bool {
+        PrivacyService.isLocked(.wishlist, for: human, viewedBy: activeHumanId)
+    }
 
     private var recentWorkoutCount: Int {
+        guard !isWorkoutLocked else { return 0 }
         let cutoff = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
         return human.workoutLogs.filter { $0.date >= cutoff }.count
     }
 
     private var latestWeight: Double? {
-        human.weightLogs.max(by: { $0.date < $1.date })?.weight
+        guard !isWeightLocked else { return nil }
+        return human.weightLogs.max(by: { $0.date < $1.date })?.weight
     }
 
-    private var themeColor: Color { Color(hex: human.themeColorHex.isEmpty ? "233BFF" : human.themeColorHex) }
+    private var themeColor: Color { Color(hex: human.safeThemeColorHex) }
 
     var body: some View {
         GeometryReader { geo in
@@ -353,8 +372,12 @@ private struct DeckHumanStatusCard: View {
 
                         // 数据行
                         HStack(spacing: 14) {
-                            statPill(icon: "🥥", value: "\(human.coconutBalance)")
-                            statPill(icon: "💪", value: "\(recentWorkoutCount)次")
+                            if !isCoconutLocked {
+                                statPill(icon: "🥥", value: "\(human.coconutBalance)")
+                            }
+                            if !isWorkoutLocked {
+                                statPill(icon: "💪", value: "\(recentWorkoutCount)次")
+                            }
                             if let w = latestWeight {
                                 statPill(icon: "⚖️", value: String(format: "%.1fkg", w))
                             }
@@ -408,7 +431,7 @@ private struct DeckPetStatusCard: View {
         PetHealthAlertEngine.shared.scanAlerts(pets: [pet])
             .filter { $0.severity >= .warning }.first
     }
-    private var themeColor: Color { Color(hex: pet.themeColorHex) }
+    private var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
     private var streakColor: Color {
         pet.currentStreak >= 30 ? .orange : (pet.currentStreak >= 7 ? Color.goPrimary : .secondary)
     }
@@ -423,11 +446,11 @@ private struct DeckPetStatusCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(pet.name)
                         .font(OhanaFont.title3())
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     Text(totalToday == 0 ? "今天还没有打卡记录" : "今日已完成 \(totalToday) 项打卡")
                         .font(OhanaFont.caption())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
                 }
                 Spacer(minLength: 4)
@@ -556,21 +579,21 @@ private struct DeckCheckInStreakCard: View {
                         .foregroundStyle(accentColor)
                     Text("打卡连击")
                         .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                     Spacer()
                     Text("🎯 下一里程碑 \(nextMilestone) 天")
                         .font(OhanaFont.caption2())
-                        .foregroundStyle(.secondary.opacity(0.7))
+                        .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
                 }
 
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
                     Text("\(streak)")
                         .font(OhanaFont.metric(size: 32))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                         .contentTransition(.numericText())
                     Text("天")
                         .font(OhanaFont.footnote(.bold))
-                        .foregroundStyle(.primary.opacity(0.4))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     Spacer()
                     Text(trendText)
                         .font(OhanaFont.caption(.semibold))
@@ -596,7 +619,7 @@ private struct DeckCheckInStreakCard: View {
 
                     Text(daysToNext == 0 ? "🎉 里程碑达成！" : "距 \(nextMilestone) 天里程碑还差 \(daysToNext) 天")
                         .font(OhanaFont.caption2())
-                        .foregroundStyle(.secondary.opacity(0.65))
+                        .foregroundStyle(Color.ohanaSecondaryText.opacity(0.65))
                 }
             }
             .padding(14)
@@ -607,7 +630,7 @@ private struct DeckCheckInStreakCard: View {
                     .strokeBorder(accentColor.opacity(0.2), lineWidth: 1)
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 }
 
@@ -629,7 +652,7 @@ private struct DeckQuestCard: View {
         return plants.first { $0.id == pid }
     }
     private var stripColor: Color {
-        if let p = relatedPet { return Color(hex: p.themeColorHex.isEmpty ? "C8FF00" : p.themeColorHex) }
+        if let p = relatedPet { return Color(hex: p.safeThemeColorHex) }
         if let pl = relatedPlant { return Color(hex: pl.themeColorHex.isEmpty ? "4CAF50" : pl.themeColorHex) }
         return Color.goPrimary
     }
@@ -665,16 +688,16 @@ private struct DeckQuestCard: View {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 20))
                         .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
             .padding(.bottom, 8)
 
             // Title
             Text(quest.title)
                 .font(OhanaFont.body(.bold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(2)
                 .minimumScaleFactor(0.88)
                 .fixedSize(horizontal: false, vertical: true)
@@ -689,7 +712,7 @@ private struct DeckQuestCard: View {
                     Text("+\(reward) 🥥")
                         .font(OhanaFont.caption(.bold))
                 }
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
 
                 Spacer()
 
@@ -703,7 +726,7 @@ private struct DeckQuestCard: View {
                         .padding(.horizontal, 14).padding(.vertical, 6)
                         .background(Color.goPrimary, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
         .padding(14)
@@ -755,10 +778,10 @@ private struct DeckQuestDoneCard: View {
             VStack(spacing: 4) {
                 Text("今日委托全部完成！")
                     .font(OhanaFont.body(.bold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text("岛屿很平静，居民们很满足 🌴")
                     .font(OhanaFont.caption())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -785,10 +808,10 @@ private struct DeckCoconutCallCard: View {
                     VStack(spacing: 4) {
                         Text("今日盲盒已领取！")
                             .font(OhanaFont.body(.bold))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text("感谢认真照料你的宠物 🌴")
                             .font(OhanaFont.caption())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -823,7 +846,7 @@ private struct DeckCoconutCallCard: View {
                 )
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .disabled(claimed)
     }
 }
@@ -839,10 +862,10 @@ private struct DeckQuestEmptyCard: View {
             VStack(spacing: 4) {
                 Text("暂无委托")
                     .font(OhanaFont.body(.bold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text("今日委托已跳过或暂无任务")
                     .font(OhanaFont.caption())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -854,7 +877,7 @@ private struct DeckQuestEmptyCard: View {
                     .padding(.horizontal, 14).padding(.vertical, 6)
                     .background(Color.goPrimary.opacity(0.1), in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .goTranslucentCard(cornerRadius: 20)
@@ -891,11 +914,11 @@ private struct DeckLevelCard: View {
                         .font(.system(size: 13))
                     Text("岛屿成长")
                         .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                     Spacer()
                     Text("\(Int(mgr.progressToNextLevel * 100))%")
                         .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
 
                 Text(levelLabel)
@@ -921,7 +944,7 @@ private struct DeckLevelCard: View {
 
                 Text(nextHint)
                     .font(OhanaFont.caption2())
-                    .foregroundStyle(.secondary.opacity(0.7))
+                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
                     .lineLimit(1)
             }
             .padding(14)
@@ -932,7 +955,7 @@ private struct DeckLevelCard: View {
                     .strokeBorder(accentColor.opacity(0.2), lineWidth: 1)
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .onAppear {
             withAnimation(.easeOut(duration: 0.8).delay(0.15)) {
                 animatedProgress = mgr.progressToNextLevel
@@ -989,7 +1012,7 @@ private struct QuestConfirmationSheet: View {
                     VStack(spacing: 6) {
                         Text(quest.title)
                             .font(OhanaFont.title3(.bold))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                             .multilineTextAlignment(.center)
 
                         HStack(spacing: 4) {
@@ -998,7 +1021,7 @@ private struct QuestConfirmationSheet: View {
                             Text("+\(reward) 🥥 椰子奖励")
                                 .font(OhanaFont.footnote(.semibold))
                         }
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                         .padding(.horizontal, 14).padding(.vertical, 6)
                         .background(Color.goPrimary.opacity(0.08), in: Capsule())
                     }
@@ -1008,7 +1031,7 @@ private struct QuestConfirmationSheet: View {
                 // Info text
                 Text("确认已完成此委托？")
                     .font(OhanaFont.subheadline(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
 
                 // Buttons
                 VStack(spacing: 10) {
@@ -1023,19 +1046,19 @@ private struct QuestConfirmationSheet: View {
                             .padding(.vertical, 16)
                             .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
 
                     Button {
                         onCancel()
                     } label: {
                         Text("再想想")
                             .font(OhanaFont.body(.semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                             .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
             .padding(.horizontal, 24)

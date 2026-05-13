@@ -12,12 +12,12 @@ import UIKit
 
 // MARK: - GO Motion Tokens
 enum GoMotion {
-    static let page: Animation = .interactiveSpring(response: 0.5, dampingFraction: 0.82, blendDuration: 0.55)
-    static let hero: Animation = .spring(response: 0.36, dampingFraction: 0.84)
-    static let fab: Animation = .spring(response: 0.35, dampingFraction: 0.72)
-    static let feedback: Animation = .spring(response: 0.28, dampingFraction: 0.82)
-    static let quick: Animation = .easeOut(duration: 0.22)
-    static let reduced: Animation = .easeOut(duration: 0.16)
+    static let page: Animation = .interactiveSpring(response: 0.46, dampingFraction: 0.84, blendDuration: 0.35)
+    static let hero: Animation = .spring(response: 0.38, dampingFraction: 0.82)
+    static let fab: Animation = .spring(response: 0.34, dampingFraction: 0.68)
+    static let feedback: Animation = .spring(response: 0.26, dampingFraction: 0.74)
+    static let quick: Animation = .easeInOut(duration: 0.18)
+    static let reduced: Animation = .easeInOut(duration: 0.14)
 }
 
 // MARK: - Global Coconut Balance Capsule
@@ -37,7 +37,7 @@ struct CoconutBalanceCapsule: View {
             Text("🥥").font(OhanaFont.metric(size: 9, .medium))
             Text("\(questManager.coconutCount)")
                 .font(OhanaFont.caption2(.black))
-                .foregroundStyle(.black)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .contentTransition(.numericText())
                 .animation(GoMotion.feedback, value: questManager.coconutCount)
         }
@@ -67,7 +67,7 @@ struct CoconutBalanceCapsule: View {
         Button(action: onTap) {
             capsuleCore
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .onAppear {
             previousCount = questManager.coconutCount
         }
@@ -160,39 +160,19 @@ struct OhanaGlassModifier: ViewModifier {
         content
             .background {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(.ultraThinMaterial)
-            }
-            .background {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                .white.opacity(0.20),
-                                .white.opacity(0.04),
-                                .white.opacity(0.10)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(Color.ohanaCardSurface.opacity(max(0.72, fillOpacity)))
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(.white.opacity(0.55), lineWidth: 1)
+                    .strokeBorder(Color.ohanaGlassStroke, lineWidth: 1)
             }
-            .shadow(color: .black.opacity(0.05), radius: 12, x: 0, y: 4)
     }
 }
 
 // MARK: - Card Modifiers
 struct NeoWhiteCardModifier: ViewModifier {
-    @Environment(\.colorScheme) private var colorScheme
     var cornerRadius: CGFloat
-
-    private var shadowColor: Color {
-        colorScheme == .dark ? Color.black.opacity(0.28) : Color.black.opacity(0.08)
-    }
     
     func body(content: Content) -> some View {
         content
@@ -206,31 +186,20 @@ struct NeoWhiteCardModifier: ViewModifier {
                     .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .shadow(color: shadowColor, radius: 16, x: 0, y: 4)
     }
 }
 
 /// 与 GO Focus 首页区块一致；表面色跟随全局浅/深色偏好。
 struct GoIslandModuleCardModifier: ViewModifier {
-    @Environment(\.colorScheme) private var colorScheme
     var cornerRadius: CGFloat
-
-    private var surface: Color {
-        colorScheme == .dark ? Color.white.opacity(0.08) : Color.white
-    }
-
-    private var shadowColor: Color {
-        colorScheme == .dark ? Color.black.opacity(0.24) : Color(hex: "0C1640").opacity(0.14)
-    }
 
     func body(content: Content) -> some View {
         content
-            .background(surface, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.04), lineWidth: 1)
+                    .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             )
-            .shadow(color: shadowColor, radius: 8, y: 3)
     }
 }
 
@@ -245,30 +214,23 @@ struct NeoDarkCardModifier: ViewModifier {
         content
             .background {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(Color.arkCardDark)
+                    .fill(Color.ohanaCardSurface)
             }
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
     }
 }
 
 // MARK: - Button Modifiers
 struct CapsuleButtonModifier: ViewModifier {
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var shadowColor: Color {
-        colorScheme == .dark ? Color.black.opacity(0.24) : Color.black.opacity(0.08)
-    }
-
     func body(content: Content) -> some View {
         content
             .font(OhanaFont.headline(.semibold))
             .foregroundStyle(Color.ohanaPrimaryText)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
+            .frame(minHeight: 44)
+            .padding(.vertical, 10)
             .background(Color.ohanaCardSurface, in: Capsule())
             .overlay(Capsule().strokeBorder(Color.ohanaCardStroke, lineWidth: 1))
-            .shadow(color: shadowColor, radius: 8, x: 0, y: 2)
     }
 }
 
@@ -276,11 +238,11 @@ struct NeonCapsuleButtonModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .font(OhanaFont.headline(.bold))
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(Color(hex: "E0FF00"), in: Capsule())
-            .shadow(color: Color(hex: "E0FF00").opacity(0.3), radius: 12, x: 0, y: 4)
+            .frame(minHeight: 44)
+            .padding(.vertical, 10)
+            .background(Color.goPrimary, in: Capsule())
     }
 }
 
@@ -288,10 +250,10 @@ struct CapsuleButtonDarkModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .font(OhanaFont.headline(.semibold))
-            .foregroundStyle(Color.white)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(Color.arkInk, in: Capsule())
+            .background(Color.goPrimary, in: Capsule())
     }
 }
 
@@ -324,7 +286,7 @@ struct GoCardModifier: ViewModifier {
             .background(color, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.05), lineWidth: 1)
+                    .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
     }
 }
@@ -347,27 +309,21 @@ struct GoBlueCardModifier: ViewModifier {
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(.white.opacity(0.15), lineWidth: 1)
+                    .strokeBorder(Color.ohanaGlassStroke, lineWidth: 1)
             }
     }
 }
 
 struct GoTranslucentCardModifier: ViewModifier {
-    @Environment(\.colorScheme) private var colorScheme
     var cornerRadius: CGFloat = 20
-
-    private var surface: Color {
-        colorScheme == .dark ? Color.white.opacity(0.075) : Color.white.opacity(0.86)
-    }
     
     func body(content: Content) -> some View {
         content
-            .background(surface, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.11 : 0.06), lineWidth: 1)
+                    .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
-            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.16 : 0.06), radius: 8, y: 3)
     }
 }
 
@@ -377,9 +333,9 @@ struct GoGlassBackground<S: InsettableShape>: ViewModifier {
     
     func body(content: Content) -> some View {
         content
-            .background(colorScheme == .dark ? Color.white.opacity(0.075) : Color.white.opacity(0.86), in: shape)
+            .background(Color.ohanaControlFill.opacity(colorScheme == .dark ? 0.92 : 0.86), in: shape)
             .overlay {
-                shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.11 : 0.06), lineWidth: 1)
+                shape.strokeBorder(Color.ohanaGlassStroke, lineWidth: 1)
             }
     }
 }
@@ -394,14 +350,14 @@ struct GoSelectableSurface<S: InsettableShape>: ViewModifier {
         if isSelected {
             return tint.opacity(colorScheme == .dark ? 0.22 : 0.18)
         }
-        return colorScheme == .dark ? Color.white.opacity(0.075) : Color.white.opacity(0.86)
+        return Color.ohanaControlFill
     }
 
     private var border: Color {
         if isSelected {
             return tint.opacity(colorScheme == .dark ? 0.40 : 0.30)
         }
-        return Color.primary.opacity(colorScheme == .dark ? 0.11 : 0.06)
+        return Color.clear
     }
 
     func body(content: Content) -> some View {
@@ -468,7 +424,7 @@ extension View {
     }
     
     // MARK: - Go UI Style Extensions
-    func goCard(color: Color = .white, cornerRadius: CGFloat = 24) -> some View {
+    func goCard(color: Color = Color.ohanaCardSurface, cornerRadius: CGFloat = 24) -> some View {
         modifier(GoCardModifier(cornerRadius: cornerRadius, color: color))
     }
     
@@ -483,7 +439,7 @@ extension View {
 
 // MARK: - Go Dashed Divider
 struct GoDashedDivider: View {
-    var color: Color = .white.opacity(0.2)
+    var color: Color = Color.ohanaDivider
     
     var body: some View {
         GeometryReader { geo in
@@ -519,7 +475,7 @@ struct GoBottomTabBar: View {
                                 .font(OhanaFont.callout(.bold))
                         }
                     }
-                    .foregroundStyle(selectedIndex == index ? Color.goPrimary : .gray)
+                    .foregroundStyle(selectedIndex == index ? Color.goPrimary : Color.ohanaSecondaryText)
                     .padding(.horizontal, selectedIndex == index ? 20 : 16)
                     .padding(.vertical, 12)
                     .background {
@@ -530,6 +486,7 @@ struct GoBottomTabBar: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
         .padding(6)
@@ -546,7 +503,7 @@ struct OhanaSheetWrapper<Content: View>: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                 ScrollView {
                     content()
                         .padding(.horizontal, 16)
@@ -557,20 +514,23 @@ struct OhanaSheetWrapper<Content: View>: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { onDismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.secondary)
+                        Image(systemName: "xmark")
+                            .font(OhanaFont.callout(.black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .frame(width: 38, height: 34)
+                            .background(Color.ohanaControlFill, in: Capsule())
                     }
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
         }
+        .presentationBackground(Color.ohanaCardSurface)
     }
 }
 
 // MARK: - Dashed Divider
 struct OhanaDashedDivider: View {
-    var color: Color = .white.opacity(0.25)
+    var color: Color = Color.ohanaDivider
     
     var body: some View {
         GeometryReader { geo in
@@ -733,11 +693,16 @@ struct AlertBanner: View {
 // MARK: - Noise Texture View
 struct NoiseTextureView: View {
     var body: some View {
-        Canvas { context, size in
-            for _ in 0..<3000 {
-                let x = CGFloat.random(in: 0..<size.width)
-                let y = CGFloat.random(in: 0..<size.height)
-                let opacity = Double.random(in: 0.02...0.08)
+        Canvas(opaque: false, colorMode: .linear, rendersAsynchronously: true) { context, size in
+            let area = max(1, size.width * size.height)
+            let baselineArea: CGFloat = 390 * 844
+            let density = min(1.25, max(0.45, area / baselineArea))
+            let pointCount = Int(640 * density)
+
+            for index in 0..<pointCount {
+                let x = CGFloat(Self.unitNoise(index, salt: 17)) * size.width
+                let y = CGFloat(Self.unitNoise(index, salt: 71)) * size.height
+                let opacity = 0.018 + Self.unitNoise(index, salt: 131) * 0.045
                 context.fill(
                     Path(CGRect(x: x, y: y, width: 1, height: 1)),
                     with: .color(.white.opacity(opacity))
@@ -745,6 +710,16 @@ struct NoiseTextureView: View {
             }
         }
         .allowsHitTesting(false)
+    }
+
+    private static func unitNoise(_ index: Int, salt: UInt64) -> Double {
+        var value = UInt64(index + 1) &* 0x9E37_79B9_7F4A_7C15 &+ salt
+        value ^= value >> 30
+        value &*= 0xBF58_476D_1CE4_E5B9
+        value ^= value >> 27
+        value &*= 0x94D0_49BB_1331_11EB
+        value ^= value >> 31
+        return Double(value & 0xFFFF) / Double(UInt16.max)
     }
 }
 
@@ -780,13 +755,17 @@ struct CoconutRewardModifier: ViewModifier {
                         if let lbl = label {
                             Text(lbl)
                                 .font(OhanaFont.callout(.semibold))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                                 .transition(.opacity)
                         }
                     }
                 }
                 .padding(32)
-                .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .background(Color.ohanaCardSurfaceElevated.opacity(0.92), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .strokeBorder(Color.ohanaGlassStroke, lineWidth: 1)
+                }
                 .transition(.opacity)
                 .allowsHitTesting(false)
             }
@@ -796,7 +775,7 @@ struct CoconutRewardModifier: ViewModifier {
             withAnimation(GoMotion.fab) { phase = .bouncing }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
-                withAnimation(.easeIn(duration: 0.4)) { phase = .flying }
+                withAnimation(GoMotion.fab) { phase = .flying }
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.9) {
                 phase = .hidden
@@ -844,42 +823,94 @@ extension View {
 // MARK: - Ohana Unified UI Components (Phase 60)
 
 public struct OhanaStandardCardModifier: ViewModifier {
-    var isDarkMode: Bool
     var cornerRadius: CGFloat
     
     public func body(content: Content) -> some View {
         content
             .background(
-                isDarkMode ? Color.white.opacity(0.075) : Color.white.opacity(0.88),
+                Color.ohanaCardSurface,
                 in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(isDarkMode ? 0.11 : 0.06), lineWidth: 1)
+                    .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
-            .shadow(color: Color.black.opacity(isDarkMode ? 0.16 : 0.06), radius: 8, y: 3)
     }
 }
 
 public extension View {
     func ohanaStandardCard(isDarkMode: Bool, cornerRadius: CGFloat = 20) -> some View {
-        modifier(OhanaStandardCardModifier(isDarkMode: isDarkMode, cornerRadius: cornerRadius))
+        modifier(OhanaStandardCardModifier(cornerRadius: cornerRadius))
     }
 }
 
 // 自动读取 colorScheme 的版本
 public struct AutoOhanaStandardCardModifier: ViewModifier {
-    @Environment(\.colorScheme) private var colorScheme
     var cornerRadius: CGFloat
     
     public func body(content: Content) -> some View {
-        content.modifier(OhanaStandardCardModifier(isDarkMode: colorScheme == .dark, cornerRadius: cornerRadius))
+        content.modifier(OhanaStandardCardModifier(cornerRadius: cornerRadius))
     }
 }
 
 public extension View {
     func ohanaStandardCard(cornerRadius: CGFloat = 20) -> some View {
         modifier(AutoOhanaStandardCardModifier(cornerRadius: cornerRadius))
+    }
+}
+
+public struct OhanaPopupGlassSurface: View {
+    var cornerRadius: CGFloat = 34
+
+    public init(cornerRadius: CGFloat = 34) {
+        self.cornerRadius = cornerRadius
+    }
+
+    public var body: some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        shape
+            .fill(.clear)
+            .glassEffect(.regular.interactive(false), in: shape)
+    }
+}
+
+struct OhanaPopupDragHandle: View {
+    var tint: Color
+
+    init(tint: Color = Color.ohanaPrimaryText.opacity(0.22)) {
+        self.tint = tint
+    }
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Capsule()
+                .fill(tint)
+                .frame(width: 48, height: 5)
+                .padding(.top, 4)
+        }
+        .frame(width: 112, height: 28, alignment: .top)
+        .contentShape(Rectangle())
+    }
+}
+
+struct OhanaPopupCloseButton: View {
+    var tint: Color
+    var action: () -> Void
+
+    init(tint: Color = Color.ohanaPrimaryText, action: @escaping () -> Void) {
+        self.tint = tint
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 13, weight: .black))
+                .foregroundStyle(tint)
+                .frame(width: 44, height: 40)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(ScaleButtonStyle())
     }
 }
 
@@ -906,6 +937,7 @@ public struct OhanaIconButton: View {
                     in: RoundedRectangle(cornerRadius: 14)
                 )
         }
+        .buttonStyle(ScaleButtonStyle())
     }
 }
 
@@ -954,17 +986,17 @@ public struct OhanaChip: View {
         let chipContent = HStack(spacing: 6) {
             Circle().fill(color).frame(width: 6, height: 6)
             Text(label).font(OhanaFont.callout(.bold))
-                .foregroundStyle(selected ? (isDarkMode ? .white : Color.arkInk) : (isDarkMode ? .white.opacity(0.5) : Color.arkInk.opacity(0.5)))
+                .foregroundStyle(selected ? Color.ohanaPrimaryText : Color.ohanaSecondaryText)
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .background(
-            isDarkMode ? (selected ? Color.white.opacity(0.12) : Color.white.opacity(0.05))
-                      : (selected ? color.opacity(0.12) : Color.black.opacity(0.04)),
+            selected ? color.opacity(0.14) : Color.ohanaControlFill,
             in: RoundedRectangle(cornerRadius: 10)
         )
         
         if let action = action {
             Button(action: action) { chipContent }
+                .buttonStyle(ScaleButtonStyle())
         } else {
             chipContent
         }
@@ -991,12 +1023,53 @@ public struct OhanaQACard: View {
         VStack(alignment: .leading, spacing: 12) {
             Image(systemName: icon).font(OhanaFont.title(.bold)).foregroundStyle(color)
             VStack(alignment: .leading, spacing: 2) {
-                Text(value).font(OhanaFont.title2(.black)).foregroundStyle(isDarkMode ? Color(light: .white, dark: Color.primary) : Color.arkInk)
-                Text(title).font(OhanaFont.caption2(.bold)).foregroundStyle(isDarkMode ? Color(light: .white.opacity(0.55), dark: Color.secondary) : Color.arkInk.opacity(0.5))
+                Text(value).font(OhanaFont.title2(.black)).foregroundStyle(Color.ohanaPrimaryText)
+                Text(title).font(OhanaFont.caption2(.bold)).foregroundStyle(Color.ohanaSecondaryText)
             }
         }
         .frame(width: 130, alignment: .leading)
         .padding(16)
         .ohanaStandardCard(isDarkMode: isDarkMode)
+    }
+}
+
+// MARK: - Adaptive Sheet Height
+
+private struct OhanaAdaptiveSheetHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+public extension View {
+    func ohanaAdaptiveSheetContentHeight(
+        _ height: Binding<CGFloat>,
+        minHeight: CGFloat,
+        maxHeight: CGFloat,
+        chromePadding: CGFloat = 70
+    ) -> some View {
+        background {
+            GeometryReader { proxy in
+                Color.clear
+                    .preference(
+                        key: OhanaAdaptiveSheetHeightPreferenceKey.self,
+                        value: proxy.size.height
+                    )
+            }
+        }
+        .onPreferenceChange(OhanaAdaptiveSheetHeightPreferenceKey.self) { rawHeight in
+            let clampedHeight = min(max(rawHeight + chromePadding, minHeight), maxHeight)
+            guard clampedHeight.isFinite, clampedHeight > 0 else { return }
+            DispatchQueue.main.async {
+                guard abs(height.wrappedValue - clampedHeight) > 6 else { return }
+                var transaction = Transaction()
+                transaction.animation = nil
+                withTransaction(transaction) {
+                    height.wrappedValue = clampedHeight
+                }
+            }
+        }
     }
 }

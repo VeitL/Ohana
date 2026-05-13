@@ -70,6 +70,7 @@ struct IslandWeightDashboard: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Query(sort: \Pet.name)       private var pets:   [Pet]
     @Query(sort: \Human.name)     private var humans: [Human]
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
     @State private var vm = IslandUnifiedStatsViewModel()
     @State private var weightTimeRange: WeightTimeFilter = .all
@@ -91,13 +92,13 @@ struct IslandWeightDashboard: View {
     private func color(forSeriesID seriesID: String, isHuman: Bool) -> Color {
         if seriesID.hasPrefix("human:"),
            let u = UUID(uuidString: String(seriesID.dropFirst(6))),
-           let human = visibleHumans.first(where: { $0.id == u }) {
-            return Color(hex: human.themeColorHex)
+           let human = visibleWeightHumans.first(where: { $0.id == u }) {
+            return Color(hex: human.safeThemeColorHex)
         }
         if seriesID.hasPrefix("pet:"),
            let u = UUID(uuidString: String(seriesID.dropFirst(4))),
            let pet = pets.first(where: { $0.id == u }) {
-            return Color(hex: pet.themeColorHex)
+            return Color(hex: pet.safeThemeColorHex)
         }
         return isHuman ? humanColor : petColorFallback
     }
@@ -136,6 +137,24 @@ struct IslandWeightDashboard: View {
         humans.filter { $0.shouldShowOnHome }
     }
 
+    private var activeHumanId: UUID? {
+        UUID(uuidString: activeHumanIdStr)
+    }
+
+    private var visibleWeightHumans: [Human] {
+        PrivacyService.unlockedHumans(for: .weight, from: visibleHumans, viewedBy: activeHumanId)
+    }
+
+    private var privateVisibleWeightHumans: [Human] {
+        visibleWeightHumans.filter { PrivacyService.isPubliclyHidden(.weight, for: $0) }
+    }
+
+    private var visibleWeightHumanSignature: String {
+        visibleWeightHumans
+            .map { "\($0.id.uuidString):\($0.privateFieldsRaw):\($0.weightLogs.count)" }
+            .joined(separator: "|")
+    }
+
     // 自适应文字颜色
     private var primaryText: Color {
         colorScheme == .dark ? .white : .black
@@ -156,7 +175,7 @@ struct IslandWeightDashboard: View {
             return latest
         }
         let petWeight  = pets.compactMap   { $0.weightLogs.sorted { $0.date > $1.date }.first?.weight }.reduce(0, +)
-        let humanWeight = visibleHumans.compactMap { $0.weightLogs.sorted { $0.date > $1.date }.first?.weight }.reduce(0, +)
+        let humanWeight = visibleWeightHumans.compactMap { $0.weightLogs.sorted { $0.date > $1.date }.first?.weight }.reduce(0, +)
         return petWeight + humanWeight
     }
 
@@ -172,9 +191,20 @@ struct IslandWeightDashboard: View {
 
     var body: some View {
         dashboardBody
-            .onAppear { vm.load(modelContext: modelContext, pets: pets, humans: visibleHumans) }
-            .onChange(of: pets.count)   { _, _ in vm.load(modelContext: modelContext, pets: pets, humans: visibleHumans) }
-            .onChange(of: humans.count) { _, _ in vm.load(modelContext: modelContext, pets: pets, humans: visibleHumans) }
+            .onAppear { reloadDashboard() }
+            .onChange(of: pets.count) { _, _ in reloadDashboard() }
+            .onChange(of: humans.count) { _, _ in reloadDashboard() }
+            .onChange(of: activeHumanIdStr) { _, _ in reloadDashboard() }
+            .onChange(of: visibleWeightHumanSignature) { _, _ in reloadDashboard() }
+    }
+
+    private func reloadDashboard() {
+        if let selectedSeriesID,
+           selectedSeriesID.hasPrefix("human:"),
+           !visibleWeightHumans.contains(where: { selectedSeriesID == "human:\($0.id.uuidString)" }) {
+            self.selectedSeriesID = nil
+        }
+        vm.load(modelContext: modelContext, pets: pets, humans: visibleWeightHumans)
     }
 
     @ViewBuilder
@@ -182,7 +212,7 @@ struct IslandWeightDashboard: View {
         if standalone {
             NavigationStack {
                 ZStack {
-                    ArkBackgroundView().ignoresSafeArea()
+                    OhanaAppBackground().ignoresSafeArea()
                     scrollContent
                 }
                 .ignoresSafeArea(edges: .top)
@@ -198,6 +228,7 @@ struct IslandWeightDashboard: View {
             VStack(spacing: 20) {
                 if standalone { navBar }
                 memberSelector
+                privateWeightNotice
                 weightHeroCard
                 funBentoRow
                 individualSparklineCard
@@ -218,7 +249,7 @@ struct IslandWeightDashboard: View {
                     .frame(width: 36, height: 36)
                     .goGlassBackground(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             Spacer()
             Text("全岛体重")
                 .font(.system(size: 17, weight: .black, design: .rounded))
@@ -249,20 +280,20 @@ struct IslandWeightDashboard: View {
                         title: pet.name,
                         subtitle: latestWeightText(for: seriesID),
                         avatar: { FMPetAvatar(pet: pet, size: 26) },
-                        tint: Color(hex: pet.themeColorHex),
+                        tint: Color(hex: pet.safeThemeColorHex),
                         isSelected: selectedSeriesID == seriesID
                     ) {
                         selectedSeriesID = seriesID
                     }
                 }
 
-                ForEach(visibleHumans) { human in
+                ForEach(visibleWeightHumans) { human in
                     let seriesID = "human:\(human.id.uuidString)"
                     weightEntityChip(
                         title: human.name,
-                        subtitle: latestWeightText(for: seriesID),
+                        subtitle: humanWeightChipSubtitle(for: human, seriesID: seriesID),
                         avatar: { humanAvatarView(human, size: 26) },
-                        tint: Color(hex: human.themeColorHex),
+                        tint: Color(hex: human.safeThemeColorHex),
                         isSelected: selectedSeriesID == seriesID
                     ) {
                         selectedSeriesID = seriesID
@@ -271,6 +302,48 @@ struct IslandWeightDashboard: View {
             }
             .padding(.vertical, 2)
         }
+    }
+
+    @ViewBuilder
+    private var privateWeightNotice: some View {
+        if !privateVisibleWeightHumans.isEmpty {
+            HStack(spacing: 10) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 13, weight: .black))
+                    .foregroundStyle(Color.goYellow)
+                    .frame(width: 26, height: 26)
+                    .background(Color.goYellow.opacity(0.16), in: Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("包含仅自己可见的体重数据")
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(primaryText)
+                    Text(privateWeightNoticeText)
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(secondaryText)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                Color.goYellow.opacity(colorScheme == .dark ? 0.12 : 0.18),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(Color.goYellow.opacity(0.24), lineWidth: 1)
+            )
+        }
+    }
+
+    private var privateWeightNoticeText: String {
+        let names = privateVisibleWeightHumans.map(\.name).joined(separator: "、")
+        return "\(names) 的体重只会在本人账户下显示，其他成员看不到。"
+    }
+
+    private func humanWeightChipSubtitle(for human: Human, seriesID: String) -> String {
+        PrivacyService.isPubliclyHidden(.weight, for: human) ? "仅自己可见" : latestWeightText(for: seriesID)
     }
 
     private func weightEntityChip(
@@ -294,7 +367,7 @@ struct IslandWeightDashboard: View {
             .padding(.vertical, 8)
             .background(isSelected ? tint : Color.white.opacity(0.11), in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func weightEntityChip<Avatar: View>(
@@ -315,7 +388,7 @@ struct IslandWeightDashboard: View {
             .padding(.vertical, 8)
             .background(isSelected ? tint : Color.white.opacity(0.11), in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func weightEntityChipText(title: String, subtitle: String, isSelected: Bool) -> some View {
@@ -700,11 +773,11 @@ struct IslandWeightDashboard: View {
                 emoji: pet.avatarEmoji, name: pet.name,
                 current: sorted.last!.weight, isHuman: false,
                 history: pts,
-                accentColor: Color(hex: pet.themeColorHex),
+                accentColor: Color(hex: pet.safeThemeColorHex),
                 petRef: pet, humanRef: nil
             ))
         }
-        for human in visibleHumans {
+        for human in visibleWeightHumans {
             let seriesID = "human:\(human.id.uuidString)"
             if includeSelection, let selectedSeriesID, selectedSeriesID != seriesID { continue }
             let sorted = human.weightLogs.sorted { $0.date < $1.date }
@@ -714,7 +787,7 @@ struct IslandWeightDashboard: View {
                 emoji: human.avatarEmoji, name: human.name,
                 current: sorted.last!.weight, isHuman: true,
                 history: pts,
-                accentColor: Color(hex: human.themeColorHex),
+                accentColor: Color(hex: human.safeThemeColorHex),
                 petRef: nil, humanRef: human
             ))
         }
@@ -770,12 +843,12 @@ struct IslandWeightDashboard: View {
                 NavigationLink(destination: WeightHistoryView(pet: pet)) {
                     rowContent
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             } else if let human = entry.humanRef {
                 NavigationLink(destination: HumanWeightHistoryView(human: human)) {
                     rowContent
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             } else {
                 rowContent
             }
@@ -799,7 +872,7 @@ struct IslandWeightDashboard: View {
         }
         if selectedSeriesID.hasPrefix("human:"),
            let id = UUID(uuidString: String(selectedSeriesID.dropFirst(6))),
-           let human = visibleHumans.first(where: { $0.id == id }) {
+           let human = visibleWeightHumans.first(where: { $0.id == id }) {
             return human.name
         }
         return "成员"
@@ -824,7 +897,7 @@ struct IslandWeightDashboard: View {
     }
 
     private func humanAvatarView(_ human: Human, size: CGFloat) -> some View {
-        let color = Color(hex: human.themeColorHex.isEmpty ? "4ECDC4" : human.themeColorHex)
+        let color = Color(hex: human.safeThemeColorHex)
         return ZStack {
             Circle().fill(color.opacity(0.24)).frame(width: size, height: size)
             if let data = human.avatarImageData, let img = UIImage(data: data) {
@@ -853,7 +926,7 @@ struct IslandWeightDashboard: View {
             // 浅色模式下更透明
             if colorScheme == .light {
                 content()
-                    .background(.ultraThinMaterial.opacity(0.3), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                    .background(Color.ohanaCardSurface.opacity(0.3), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             } else {
                 content()
                     .goGlassBackground(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))

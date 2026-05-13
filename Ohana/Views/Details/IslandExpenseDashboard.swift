@@ -51,8 +51,17 @@ struct IslandExpenseDashboard: View {
     @Environment(\.dismiss)           private var dismiss
     @Query(sort: \Pet.name)           private var pets: [Pet]
     @Query(sort: \Human.createdAt)    private var humans: [Human]
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @State private var timeRange: ExpenseTimeRange = .month
     @State private var chartAnimationProgress: Double = 0.0
+
+    private var activeHumanId: UUID? {
+        UUID(uuidString: activeHumanIdStr)
+    }
+
+    private var visibleExpenseHumans: [Human] {
+        PrivacyService.unlockedHumans(for: .expense, from: humans, viewedBy: activeHumanId)
+    }
 
     // 时间过滤后的所有花费
     private var filteredLogs: [PetExpenseLog] {
@@ -72,15 +81,21 @@ struct IslandExpenseDashboard: View {
         }
     }
 
+    private var visibleExpenseLogs: [PetExpenseLog] {
+        filteredLogs.filter {
+            !PrivacyService.isLocked(.expense, humanId: $0.executorId, in: humans, viewedBy: activeHumanId)
+        }
+    }
+
     /// 实际总支出（正值，不含报销负值）
-    private var totalAmount: Double { filteredLogs.filter { $0.amount > 0 }.reduce(0) { $0 + $1.amount } }
+    private var totalAmount: Double { visibleExpenseLogs.filter { $0.amount > 0 }.reduce(0) { $0 + $1.amount } }
     /// 报销合计（绝对值）
-    private var totalReimbursed: Double { filteredLogs.filter { $0.amount < 0 }.reduce(0) { $0 + abs($1.amount) } }
+    private var totalReimbursed: Double { visibleExpenseLogs.filter { $0.amount < 0 }.reduce(0) { $0 + abs($1.amount) } }
 
     // 每宠物汇总
     private var petSummaries: [PetExpenseSummary] {
         pets.compactMap { pet -> PetExpenseSummary? in
-            let logs = filteredLogs.filter { $0.pet?.id == pet.id && $0.amount > 0 }
+            let logs = visibleExpenseLogs.filter { $0.pet?.id == pet.id && $0.amount > 0 }
             let total = logs.reduce(0) { $0 + $1.amount }
             guard total > 0 else { return nil }
             return PetExpenseSummary(id: pet.id, name: pet.name,
@@ -93,7 +108,7 @@ struct IslandExpenseDashboard: View {
     private var categorySummaries: [CategorySummary] {
         let total = max(1, totalAmount)
         var dict: [String: Double] = [:]
-        for log in filteredLogs where log.amount > 0 {
+        for log in visibleExpenseLogs where log.amount > 0 {
             dict[log.category, default: 0] += log.amount
         }
         return dict.compactMap { key, val -> CategorySummary? in
@@ -111,12 +126,12 @@ struct IslandExpenseDashboard: View {
     private var humanSummaries: [PayerSummary] {
         let total = max(1, totalAmount)
         var dict: [String: Double] = [:]
-        for log in filteredLogs {
+        for log in visibleExpenseLogs {
             let raw = log.executorId
             let key: String
             if raw == nil || (raw?.isEmpty ?? true) {
                 key = "__unknown__"
-            } else if let r = raw, !r.isEmpty, humans.contains(where: { $0.id.uuidString == r }) {
+            } else if let r = raw, !r.isEmpty, visibleExpenseHumans.contains(where: { $0.id.uuidString == r }) {
                 key = r
             } else {
                 // 已删除成员或无效 id：并入未指定，避免支付人统计漏额
@@ -129,7 +144,7 @@ struct IslandExpenseDashboard: View {
                 return PayerSummary(name: "未指定", emoji: "❓", total: val,
                                    color: .white.opacity(0.4), pct: val / total)
             }
-            guard let human = humans.first(where: { $0.id.uuidString == key }) else { return nil }
+            guard let human = visibleExpenseHumans.first(where: { $0.id.uuidString == key }) else { return nil }
             return PayerSummary(name: human.name, emoji: human.avatarEmoji, total: val,
                                color: humanThemeColor(human), pct: val / total)
         }.sorted { $0.total > $1.total }
@@ -162,7 +177,7 @@ struct IslandExpenseDashboard: View {
     private var dashboardBody: some View {
         if standalone {
             ZStack {
-                ArkBackgroundView().ignoresSafeArea()
+                OhanaAppBackground().ignoresSafeArea()
                 scrollContent
             }
             .ignoresSafeArea(edges: .top)
@@ -179,7 +194,7 @@ struct IslandExpenseDashboard: View {
                 funBentoRow
                 petBarChartCard
                 payerBreakdownCard
-                ExpenseSplitterCard(filteredLogs: filteredLogs, humans: humans)
+                ExpenseSplitterCard(filteredLogs: visibleExpenseLogs, humans: visibleExpenseHumans)
                 Color.clear.frame(height: 40)
             }
             .padding(.horizontal, 16)
@@ -192,15 +207,15 @@ struct IslandExpenseDashboard: View {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 36, height: 36)
                     .background(.white.opacity(0.12), in: Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             Spacer()
             Text("全岛花费")
                 .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Color.clear.frame(width: 36, height: 36)
         }
@@ -244,14 +259,14 @@ struct IslandExpenseDashboard: View {
                         if categorySummaries.isEmpty {
                             Text("暂无数据")
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.3))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                         } else {
                             Text(AppCurrency.format(totalAmount, fractionDigits: 0))
                                 .font(.system(size: 16, weight: .black, design: .rounded))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                             Text(timeRange.rawValue == "全部" ? "累计" : "本\(timeRange.rawValue)")
                                 .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                         }
                     }
                 }
@@ -265,11 +280,11 @@ struct IslandExpenseDashboard: View {
                                     .frame(width: 7, height: 7)
                                 Text(item.category.rawValue)
                                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(.primary.opacity(0.75))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.75))
                                 Spacer()
                                 Text("\(Int(item.pct * 100))%")
                                     .font(.system(size: 10, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.primary.opacity(0.45))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                             }
                         }
                         // 报销行
@@ -293,10 +308,10 @@ struct IslandExpenseDashboard: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("记录第一笔花费")
                             .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.4))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         Text("在宠物详情页添加花费记录后，这里会显示消费分布")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.25))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -309,7 +324,7 @@ struct IslandExpenseDashboard: View {
     /// E7: 独立色系，和宠物主题色区分
     private func expensePieColor(_ cat: ExpenseCategory) -> Color {
         switch cat {
-        case .food:             return Color(hex: "3B82F6")  // 蓝
+        case .food:             return Color.foodDry
         case .treats:           return Color(hex: "10B981")  // 緑
         case .medical:          return Color(hex: "F59E0B")  // 橙黄
         case .grooming:         return Color(hex: "8B5CF6")  // 紫
@@ -333,20 +348,20 @@ struct IslandExpenseDashboard: View {
                 Text("💰")
                 Text("吞金兽")
                     .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.6))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
             }
             Spacer(minLength: 0)
             if let top = topPet {
                 Text(top.emoji).font(.system(size: 34))
                 Text(top.name)
                     .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 Text(AppCurrency.format(top.total, fractionDigits: 0))
                     .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.85))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.85))
             } else {
-                Text("暂无数据").font(.system(size: 12)).foregroundStyle(.primary.opacity(0.3))
+                Text("暂无数据").font(.system(size: 12)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
             }
         }
         .padding(14)
@@ -361,19 +376,19 @@ struct IslandExpenseDashboard: View {
                 Text("🏷️")
                 Text("消费大头")
                     .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.6))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
             }
             Spacer(minLength: 0)
             if let top = topCategory {
                 Text(top.category.emoji).font(.system(size: 34))
                 Text(top.category.rawValue)
                     .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text("\(Int(top.pct * 100))%")
                     .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.85))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.85))
             } else {
-                Text("暂无数据").font(.system(size: 12)).foregroundStyle(.primary.opacity(0.3))
+                Text("暂无数据").font(.system(size: 12)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
             }
         }
         .padding(14)
@@ -389,7 +404,7 @@ struct IslandExpenseDashboard: View {
                 Text("🐾").font(.system(size: 14))
                 Text("成员花费对比")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
             }
 
             if petSummaries.isEmpty {
@@ -411,7 +426,7 @@ struct IslandExpenseDashboard: View {
                     Text(summary.emoji).font(.system(size: 16))
                     Text(summary.name)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 50, alignment: .leading)
                         .lineLimit(1)
                     GeometryReader { geo in
@@ -444,7 +459,7 @@ struct IslandExpenseDashboard: View {
                 Text("💳").font(.system(size: 14))
                 Text("谁在买单")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
             }
 
             if humanSummaries.isEmpty {
@@ -457,7 +472,7 @@ struct IslandExpenseDashboard: View {
                             Text(summary.emoji).font(.system(size: 16))
                             Text(summary.name)
                                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                                 .frame(width: 50, alignment: .leading)
                                 .lineLimit(1)
                             GeometryReader { geo in
@@ -495,7 +510,7 @@ struct IslandExpenseDashboard: View {
                 Text("🍩").font(.system(size: 14))
                 Text("消费类目分布")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
             }
 
             if categorySummaries.isEmpty {
@@ -528,10 +543,10 @@ struct IslandExpenseDashboard: View {
             VStack(spacing: 2) {
                 Text(AppCurrency.format(totalAmount, fractionDigits: 0))
                     .font(.title3.bold())
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text("总计")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
     }
@@ -545,11 +560,11 @@ struct IslandExpenseDashboard: View {
                         .frame(width: 8, height: 8)
                     Text(item.category.rawValue)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.75))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.75))
                     Spacer()
                     Text("\(Int(item.pct * 100))%")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.5))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                 }
             }
         }
@@ -572,7 +587,7 @@ struct IslandExpenseDashboard: View {
     private func emptyState(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 13, weight: .medium, design: .rounded))
-            .foregroundStyle(.primary.opacity(0.3))
+            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 28)

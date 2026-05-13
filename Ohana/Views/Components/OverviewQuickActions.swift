@@ -20,7 +20,7 @@ enum QuickActionPickerCatalog {
 
     private static var all: [Option] {
         [
-        Option(id: "walk", label: "遛狗", icon: "figure.walk", colorHex: "C8FF00"),
+        Option(id: "walk", label: "遛狗", icon: "figure.walk", colorHex: "14B8A6"),
         Option(id: "feed", label: "喂食", icon: "fork.knife", colorHex: "FFDD44"),
         Option(id: "water", label: "喂水", icon: "drop.fill", colorHex: "00D4AA"),
         Option(id: "potty", label: "便便", icon: "allergens", colorHex: "FF8C42"),
@@ -31,8 +31,6 @@ enum QuickActionPickerCatalog {
         Option(id: "weight", label: "体重", icon: "scalemass.fill", colorHex: "80FFEA"),
         Option(id: "play", label: "陪玩", icon: "tennisball.fill", colorHex: "FF6B6B"),
         Option(id: "moment", label: "记录", icon: "camera.circle.fill", colorHex: "FF6B9D"),
-        Option(id: "waterChange", label: "换水", icon: "drop.circle.fill", colorHex: "4ECDC4"),
-        Option(id: "filterClean", label: "清滤材", icon: "wrench.and.screwdriver.fill", colorHex: "A78BFA"),
         Option(id: "cageCleaning", label: "清鸟笼", icon: "basket.fill", colorHex: "FFD166"),
         Option(id: "freeFlight", label: "放飞", icon: "bird.fill", colorHex: "06D6A0"),
         Option(id: "misting", label: "喷水", icon: "cloud.drizzle.fill", colorHex: "118AB2"),
@@ -45,7 +43,6 @@ enum QuickActionPickerCatalog {
         var allowed = Set(QACardType.available(for: species).map(\.rawValue))
         if allowed.contains("care") { allowed.insert("groom") }
         allowed.insert("water")
-        allowed.insert("waterChange")
         allowed.insert("moment")
         if species.contains("猫") || species.lowercased().contains("cat") {
             allowed.insert("litter")
@@ -103,6 +100,52 @@ enum QuickActionLimit {
     }
 }
 
+enum WaterQuickActionPolicy {
+    static let foldedActionTypes: Set<String> = ["waterChange", "filterClean"]
+
+    static func isAquatic(species: String) -> Bool {
+        let lower = species.lowercased()
+        return species.contains("鱼") ||
+            species.contains("水族") ||
+            lower.contains("fish") ||
+            lower.contains("aquarium")
+    }
+
+    static func normalizedItems(
+        _ items: [QuickActionItem],
+        for pet: Pet,
+        waterLabel: String,
+        managementLabel: String
+    ) -> [QuickActionItem] {
+        var result = items.filter { !foldedActionTypes.contains($0.actionType) }
+        let hadFoldedWaterAction = items.contains { foldedActionTypes.contains($0.actionType) }
+        let hasWater = result.contains { $0.actionType == "water" }
+        guard !hasWater, hadFoldedWaterAction else { return result }
+
+        let firstFoldedIndex = items.firstIndex { foldedActionTypes.contains($0.actionType) } ?? result.count
+        let insertIndex = min(firstFoldedIndex, result.count)
+        let item = QuickActionItem(
+            label: isAquatic(species: pet.species) ? managementLabel : waterLabel,
+            icon: isAquatic(species: pet.species) ? "water.waves" : "drop.fill",
+            colorHex: "00D4AA",
+            petId: pet.id,
+            actionType: "water",
+            entityId: pet.id,
+            entityKind: .pet
+        )
+        result.insert(item, at: insertIndex)
+        return result
+    }
+
+    static func titleOverride(for item: QuickActionItem, pet: Pet, managementLabel: String) -> String? {
+        item.actionType == "water" && isAquatic(species: pet.species) ? managementLabel : nil
+    }
+
+    static func iconOverride(for item: QuickActionItem, pet: Pet) -> String? {
+        item.actionType == "water" && isAquatic(species: pet.species) ? "water.waves" : nil
+    }
+}
+
 // MARK: - Go Quick Action Card (毛玻璃正方形)
 struct GoQuickActionCard: View {
     let item: QuickActionItem
@@ -114,8 +157,11 @@ struct GoQuickActionCard: View {
     /// 覆盖主标题（如首页喂水快捷项在「换水」模式下显示「换水」）
     var titleLabelOverride: String? = nil
     var pendingReminder: Reminder? = nil
+    var showsAttentionDot: Bool = false
     var countText: String? = nil
     var privacyBadgeText: String? = nil
+    var privacyIconName: String? = nil
+    var privacyIconTint: Color = Color.goYellow
     var isPrivacyLocked: Bool = false
     var isCompletedToday: Bool = false
     var prefersLightForeground: Bool = false
@@ -159,19 +205,19 @@ struct GoQuickActionCard: View {
     private let premiumShape = RoundedRectangle(cornerRadius: 20, style: .continuous)
 
     private var cardBgColor: Color {
-        if isCompletedToday { return Color.goLime.opacity(0.18) }
+        if isCompletedToday { return Color.goPrimary.opacity(0.18) }
         let base = petThemeColorHex.map { Color(hex: $0) } ?? Color(hex: item.colorHex)
-        return pendingReminder != nil ? base.opacity(0.22) : base.opacity(0.14)
+        return pendingReminder != nil ? base.opacity(0.16) : Color.ohanaCardSurface
     }
     private var cardBorderColor: Color {
-        if isCompletedToday { return Color.goLime.opacity(0.68) }
+        if isCompletedToday { return Color.goPrimary.opacity(0.68) }
         let base = petThemeColorHex.map { Color(hex: $0) } ?? Color(hex: item.colorHex)
-        return pendingReminder != nil ? base.opacity(0.7) : base.opacity(0.3)
+        return pendingReminder != nil ? base.opacity(0.54) : Color.ohanaGlassStroke.opacity(0.42)
     }
 
     /// 今日已打卡时图标/水浪用色：优先宠物主题色，否则快捷项自带色
     private var checkInAccentColor: Color {
-        if isCompletedToday { return Color.goLime }
+        if isCompletedToday { return Color.goPrimary }
         if let hex = petThemeColorHex { return Color(hex: hex) }
         return Color(hex: item.colorHex)
     }
@@ -181,7 +227,7 @@ struct GoQuickActionCard: View {
 
     /// 深色背景上优先保证可读性；浅色模式保留原来的完成态主题色反馈。
     private var quickActionIconForeground: Color {
-        if isCompletedToday { return Color.goLime }
+        if isCompletedToday { return Color.goPrimary }
         if usesLightForeground { return .white.opacity(isFeedAction && !isCompletedToday ? 0.72 : 0.92) }
         if isFeedAction { return Color.secondary }
         return Color.primary.opacity(0.75)
@@ -191,7 +237,7 @@ struct GoQuickActionCard: View {
     private var isDarkMode: Bool { colorScheme == .dark }
     private var usesLightForeground: Bool { prefersLightForeground || isDarkMode }
     private var titleForeground: Color {
-        if isCompletedToday { return Color.goLime }
+        if isCompletedToday { return Color.goPrimary }
         return usesLightForeground ? Color.white.opacity(0.9) : Color.primary.opacity(0.75)
     }
     private var subtitleForeground: Color {
@@ -207,6 +253,12 @@ struct GoQuickActionCard: View {
     private let doubleTapInterval: TimeInterval = 0.28
 
     private var resolvedIcon: String { displayIcon ?? item.icon }
+    private var iconTileColor: Color {
+        if isCompletedToday {
+            return Color.goPrimary.opacity(0.18)
+        }
+        return checkInAccentColor.opacity(usesLightForeground ? 0.18 : 0.12)
+    }
 
     /// 无菜单项时不挂 contextMenu，避免与长按打开详情 sheet 冲突（系统菜单盖住 sheet）
     private var hasContextMenuContent: Bool {
@@ -303,12 +355,21 @@ struct GoQuickActionCard: View {
                         .scaleEffect(isPressed ? 0.90 : 1.0)
                 }
 
-                if pendingReminder != nil {
+                if pendingReminder != nil || showsAttentionDot {
                     Circle()
                         .fill(Color.goRed)
                         .frame(width: 7, height: 7)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                         .offset(x: 2, y: -2)
+                }
+
+                if let privacyIconName {
+                    Image(systemName: privacyIconName)
+                        .font(.system(size: 10, weight: .black))
+                        .foregroundStyle(privacyIconTint)
+                        .shadow(color: Color.black.opacity(0.35), radius: 2, x: 0, y: 1)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                        .offset(x: 3, y: -4)
                 }
             }
             .frame(width: 44, height: 44)
@@ -356,7 +417,11 @@ struct GoQuickActionCard: View {
             }
         }
         .scaleEffect(isPressed ? 0.88 : 1.0)
-        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isPressed)
+        .frame(maxWidth: .infinity, minHeight: 82)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+        .animation(GoMotion.feedback, value: isPressed)
+        .animation(GoMotion.feedback, value: isCompletedToday)
     }
 
     private func handleTapCandidate() {
@@ -439,10 +504,10 @@ private struct GroomPopoverContent: View {
                             .frame(width: 48, height: 48)
                         Text(opt.label)
                             .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
         .padding(.horizontal, 16)
@@ -466,7 +531,7 @@ private struct PottyPopoverContent: View {
         PottyOption(id: PottyType.perfectPoop.rawValue, icon: "seal.fill",                    label: "完美", colorHex: "8B6914"),
         PottyOption(id: PottyType.softPoop.rawValue,    icon: "circle.dashed",                label: "软便", colorHex: "F59E0B"),
         PottyOption(id: PottyType.liquidPoop.rawValue,  icon: "exclamationmark.triangle.fill", label: "水便", colorHex: "EF4444"),
-        PottyOption(id: PottyType.pee.rawValue,         icon: "drop.fill",                    label: "尿尿", colorHex: "3B82F6"),
+        PottyOption(id: PottyType.pee.rawValue,         icon: "drop.fill",                    label: "尿尿", colorHex: "06B6D4"),
     ]
 
     var body: some View {
@@ -484,10 +549,10 @@ private struct PottyPopoverContent: View {
                             .frame(width: 48, height: 48)
                         Text(opt.label)
                             .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
         .padding(.horizontal, 16)
@@ -535,10 +600,10 @@ private struct HealthPopoverContent: View {
                             .frame(width: 48, height: 48)
                         Text(opt.label)
                             .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
         .padding(.horizontal, 16)
@@ -573,11 +638,11 @@ struct QAManageSheet: View {
                             if let pid = item.petId, let pet = pets.first(where: { $0.id == pid }) {
                                 Text(pet.name)
                                     .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                             } else {
                                 Text("通用")
                                     .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                             }
                         }
                     }
@@ -656,11 +721,7 @@ struct AddQuickActionSheet: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            // 拖拽把手
-            Capsule()
-                .fill(.secondary.opacity(0.35))
-                .frame(width: 36, height: 4)
-                .padding(.top, 10)
+            OhanaPopupDragHandle(tint: Color.ohanaPrimaryText.opacity(0.22))
                 .zIndex(1)
 
             VStack(spacing: 0) {
@@ -673,7 +734,7 @@ struct AddQuickActionSheet: View {
                 Spacer(minLength: 32)
             }
         }
-        .presentationBackground(.ultraThinMaterial)
+        .presentationBackground(Color.ohanaCardSurface)
         .presentationDetents([.height(380), .medium])
         .presentationDragIndicator(.hidden)
         .onAppear {
@@ -698,17 +759,10 @@ struct AddQuickActionSheet: View {
                         .font(.system(size: 22, weight: .black, design: .rounded))
                     Text("为哪只宠物添加快速入口")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 30, height: 30)
-                        .background(.secondary.opacity(0.15), in: Circle())
-                }
-                .buttonStyle(.plain)
+                OhanaPopupCloseButton(tint: Color.ohanaPrimaryText) { dismiss() }
             }
             .padding(.horizontal, 24)
             .padding(.top, 12)
@@ -737,10 +791,10 @@ struct AddQuickActionSheet: View {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(pet.name)
                                     .font(.system(size: 16, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(Color.ohanaPrimaryText)
                                 Text("\(pet.species) · \(pet.breed)")
                                     .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                                     .lineLimit(1)
                             }
                             Spacer()
@@ -751,7 +805,7 @@ struct AddQuickActionSheet: View {
                         .padding(.horizontal, 16).padding(.vertical, 12)
                         .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
             .padding(.horizontal, 20)
@@ -767,11 +821,11 @@ struct AddQuickActionSheet: View {
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                         .frame(width: 32, height: 32)
                         .background(.secondary.opacity(0.12), in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
 
                 if let pet = selectedPet {
                     ZStack {
@@ -789,18 +843,11 @@ struct AddQuickActionSheet: View {
                             .font(.system(size: 18, weight: .black, design: .rounded))
                         Text("选择快捷功能")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
                 Spacer()
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 30, height: 30)
-                        .background(.secondary.opacity(0.15), in: Circle())
-                }
-                .buttonStyle(.plain)
+                OhanaPopupCloseButton(tint: Color.ohanaPrimaryText) { dismiss() }
             }
             .padding(.horizontal, 20)
             .padding(.top, 12)
@@ -817,17 +864,17 @@ struct AddQuickActionSheet: View {
                             VStack(spacing: 8) {
                                 Text("最多 8 个快捷操作")
                                     .font(.system(size: 15, weight: .black, design: .rounded))
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(Color.ohanaPrimaryText)
                                 Text("更多功能可以去「全部功能」里查看。")
                                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 40)
                         } else if available.isEmpty {
                             Text("所有快捷入口已添加")
                                 .font(.system(size: 14, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 40)
                         }
@@ -854,7 +901,7 @@ struct AddQuickActionSheet: View {
                                         .frame(width: 44, height: 44)
                                     Text(action.label)
                                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                                        .foregroundStyle(.primary)
+                                        .foregroundStyle(Color.ohanaPrimaryText)
                                         .lineLimit(1)
                                 }
                                 .frame(maxWidth: .infinity)
@@ -866,7 +913,7 @@ struct AddQuickActionSheet: View {
                                 .scaleEffect(isPressed ? 0.90 : 1.0)
                                 .animation(.spring(response: 0.22, dampingFraction: 0.6), value: isPressed)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ScaleButtonStyle())
                             .disabled(selectedPetItemCount >= QuickActionLimit.maxItemsPerEntity)
                             .simultaneousGesture(
                                 DragGesture(minimumDistance: 0)
@@ -902,7 +949,7 @@ struct QuickFeedSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                 VStack(spacing: 24) {
                     petHeader
                     HStack {
@@ -925,7 +972,7 @@ struct QuickFeedSheet: View {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
             }
@@ -950,10 +997,10 @@ struct QuickFeedSheet: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(pet.name)
                     .font(OhanaFont.body(.black))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text(isWater ? "喂水打卡" : (isCasual ? "佛系喂食 🐾" : "精准喂食 📊"))
                     .font(OhanaFont.caption(.medium))
-                    .foregroundStyle(.primary.opacity(0.45))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
             }
             Spacer()
             Text(isWater ? "💧" : "🍗").font(.system(size: 30))
@@ -967,11 +1014,11 @@ struct QuickFeedSheet: View {
                 VStack(spacing: 12) {
                     Text(casualCopyText)
                         .font(OhanaFont.title3(.black))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                         .multilineTextAlignment(.center)
                     Text("打卡后获得 +1🥥 椰子奖励")
                         .font(OhanaFont.footnote(.medium))
-                        .foregroundStyle(.primary.opacity(0.4))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
                 .padding(24)
             }
@@ -987,7 +1034,7 @@ struct QuickFeedSheet: View {
                 .frame(maxWidth: .infinity).padding(.vertical, 16)
                 .background(Color.goPrimary, in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 20)
 
             removeButton
@@ -1000,25 +1047,25 @@ struct QuickFeedSheet: View {
                 VStack(spacing: 12) {
                     Text("输入\(isWater ? "饮水量" : "喂食量")")
                         .font(OhanaFont.footnote(.semibold))
-                        .foregroundStyle(.primary.opacity(0.6))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                     HStack(spacing: 8) {
                         TextField("默认 \(Int(defaultAmount))", text: $amountText)
                             .keyboardType(.decimalPad)
                             .font(OhanaFont.metric(size: 32))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                             .multilineTextAlignment(.center)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
                             .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
                         Text(unit)
                             .font(OhanaFont.title3(.bold))
-                            .foregroundStyle(.primary.opacity(0.5))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                             .frame(width: 36)
                     }
                     Toggle(isOn: $setAsDefault) {
                         Text("设为默认\(isWater ? "饮水量" : "每日份量")")
                             .font(OhanaFont.footnote(.medium))
-                            .foregroundStyle(.primary.opacity(0.7))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                     }
                     .tint(Color.goPrimary)
                 }
@@ -1036,7 +1083,7 @@ struct QuickFeedSheet: View {
                     .frame(maxWidth: .infinity).padding(.vertical, 14)
                     .background(Color.goPrimary, in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 20)
 
             removeButton
@@ -1051,7 +1098,7 @@ struct QuickFeedSheet: View {
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.goRed)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private var casualCopyText: String {
@@ -1074,7 +1121,13 @@ struct QuickFeedSheet: View {
             CareEventService.recordCare(pet: pet, type: .watering, amountMl: waterAmount, context: modelContext, executorId: executorId, reward: .water)
         } else {
             if !isCasual && setAsDefault && amount > 0 { pet.dailyPortionGrams = amount }
-            CareEventService.recordManualFeed(pet: pet, amountGrams: amount, context: modelContext, executorId: executorId)
+            CareEventService.recordManualFeed(
+                pet: pet,
+                amountGrams: amount,
+                context: modelContext,
+                executorId: executorId,
+                foodKind: pet.mainFoodKind
+            )
         }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         dismiss()
@@ -1190,10 +1243,10 @@ struct QAQuickAddPopoverContent: View {
                     Text("8/8").font(.system(size: 24, weight: .black, design: .rounded))
                     Text("快捷操作已满")
                         .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Text("更多功能请去「全部功能」查看")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
@@ -1202,7 +1255,7 @@ struct QAQuickAddPopoverContent: View {
                     Text("✅").font(.system(size: 26))
                     Text("已全部添加")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
@@ -1243,7 +1296,7 @@ struct QAQuickAddPopoverContent: View {
                                         .foregroundStyle(qaColorScheme == .dark ? .white.opacity(0.9) : .primary)
                                 }
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ScaleButtonStyle())
                         }
                     }
                     .padding(.horizontal, 16)
@@ -1278,7 +1331,7 @@ struct QuickActionReorderDragPreview: View {
                 .frame(width: 44, height: 44)
             Text(item.label)
                 .font(OhanaFont.caption2(.semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
         }
         .fixedSize()
     }
@@ -1288,11 +1341,15 @@ struct QuickActionReorderDragPreview: View {
 struct QAEditModeDragLayer: View {
     let item: QuickActionItem
     let themeHex: String?
+    @Binding var draggingItemId: String?
 
     var body: some View {
         Color.clear
             .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .draggable(item.id) {
+            .onDrag {
+                draggingItemId = item.id
+                return NSItemProvider(object: item.id as NSString)
+            } preview: {
                 QuickActionReorderDragPreview(item: item, themeHex: themeHex)
             }
     }
@@ -1301,31 +1358,45 @@ struct QAEditModeDragLayer: View {
 struct QADropDelegate: DropDelegate {
     let targetItem: QuickActionItem
     @Binding var items: [QuickActionItem]
+    @Binding var draggingItemId: String?
 
-    func performDrop(info: DropInfo) -> Bool { true }
+    func performDrop(info: DropInfo) -> Bool {
+        draggingItemId = nil
+        return true
+    }
 
     func dropEntered(info: DropInfo) {
+        if let draggingItemId {
+            moveItem(fromId: draggingItemId)
+            return
+        }
+
         let types: [UTType] = [.plainText, .utf8PlainText]
         guard let provider = info.itemProviders(for: types).first else { return }
         provider.loadObject(ofClass: NSString.self) { obj, _ in
             guard let ns = obj as? NSString else { return }
             let fromId = ns as String
-            guard fromId != targetItem.id else { return }
             DispatchQueue.main.async {
-                guard let fromIdx = items.firstIndex(where: { $0.id == fromId }),
-                      let toIdx = items.firstIndex(where: { $0.id == targetItem.id })
-                else { return }
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    items.move(
-                        fromOffsets: IndexSet(integer: fromIdx),
-                        toOffset: toIdx > fromIdx ? toIdx + 1 : toIdx
-                    )
-                }
+                moveItem(fromId: fromId)
             }
         }
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
         DropProposal(operation: .move)
+    }
+
+    private func moveItem(fromId: String) {
+        guard fromId != targetItem.id,
+              let fromIdx = items.firstIndex(where: { $0.id == fromId }),
+              let toIdx = items.firstIndex(where: { $0.id == targetItem.id })
+        else { return }
+
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
+            items.move(
+                fromOffsets: IndexSet(integer: fromIdx),
+                toOffset: toIdx > fromIdx ? toIdx + 1 : toIdx
+            )
+        }
     }
 }

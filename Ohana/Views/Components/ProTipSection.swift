@@ -121,12 +121,12 @@ private struct StepRow: View {
             
             HStack(spacing: 0) {
                 Text(text)
-                    .foregroundStyle(.primary.opacity(0.8))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                 Text(highlightText)
                     .bold()
                     .foregroundStyle(highlightColor)
                 Text(suffix)
-                    .foregroundStyle(.primary.opacity(0.8))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
             }
             .font(.system(size: 14, weight: .medium))
             

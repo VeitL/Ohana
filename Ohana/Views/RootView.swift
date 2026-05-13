@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct RootView: View {
     @AppStorage("ohana_has_onboarded") private var hasOnboarded = false
@@ -48,7 +49,7 @@ struct RootView: View {
 
         switch action {
         case "COMPLETE":
-            ReminderCompletionService.complete(reminder, by: currentActiveHumanId, context: modelContext)
+            completeReminder(reminder)
         case "SKIP":
             ReminderCompletionService.skip(reminder, by: currentActiveHumanId, context: modelContext)
         case "SNOOZE":
@@ -58,14 +59,46 @@ struct RootView: View {
         }
     }
 
+    private func completeReminder(_ reminder: Reminder) {
+        if let event = reminder.event,
+           event.feedRuleKindRaw == FeedRuleKind.manualReminder.rawValue,
+           let pet = pet(for: event) {
+            _ = CareEventService.completePlannedFeed(
+                pet: pet,
+                reminder: reminder,
+                context: modelContext,
+                executorId: currentActiveHumanId.isEmpty ? nil : currentActiveHumanId
+            )
+            return
+        }
+        ReminderCompletionService.complete(reminder, by: currentActiveHumanId, context: modelContext)
+    }
+
+    private func pet(for event: Event) -> Pet? {
+        guard let id = UUID(uuidString: event.relatedEntityId) else { return nil }
+        let descriptor = FetchDescriptor<Pet>(
+            predicate: #Predicate<Pet> { pet in
+                pet.id == id
+            }
+        )
+        return (try? modelContext.fetch(descriptor))?.first
+    }
+
     private func queueStartupMaintenance() {
         guard !didQueueStartupMaintenance else { return }
         didQueueStartupMaintenance = true
 
         Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            await Task.yield()
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
             guard !Task.isCancelled else { return }
+            InputLatencyWarmupService.warmUpOnce()
+
+            try? await Task.sleep(nanoseconds: 9_000_000_000)
+            guard !Task.isCancelled else { return }
+            MemberThemeColorMaintenanceService.normalizeReservedColors(context: modelContext)
             FamilyWeeklyReportService.shared.scheduleWeeklyReminder()
+            materializeAutoFeederLogsIfNeeded()
 
             try? await Task.sleep(nanoseconds: 17_000_000_000)
             guard !Task.isCancelled else { return }
@@ -103,6 +136,21 @@ struct RootView: View {
         }
     }
 
+    private func materializeAutoFeederLogsIfNeeded() {
+        let events = (try? modelContext.fetch(FetchDescriptor<Event>())) ?? []
+        guard events.contains(where: { $0.relatedEntityType == FeedRuleMetadata.autoFeederEntityType }) else { return }
+        let pets = (try? modelContext.fetch(FetchDescriptor<Pet>())) ?? []
+        var inserted = 0
+        for pet in pets {
+            inserted += FeedAutoLogMaterializer.materializeDueLogs(pet: pet, allEvents: events, context: modelContext)
+        }
+        #if DEBUG
+        if inserted > 0 {
+            print("✅ Auto feeder materialized \(inserted) due feed log(s)")
+        }
+        #endif
+    }
+
     private func compactAvatarAssetsIfNeeded() async {
         guard !avatarAssetCompactionCompleted else { return }
         await AvatarAssetMaintenanceService.compactStoredAvatars(context: modelContext)
@@ -125,6 +173,48 @@ struct RootView: View {
             }
         }
         return nil
+    }
+}
+
+@MainActor
+private enum InputLatencyWarmupService {
+    private static var didWarmUp = false
+
+    static func warmUpOnce() {
+        guard !didWarmUp else { return }
+        didWarmUp = true
+
+        UIImpactFeedbackGenerator(style: .light).prepare()
+        UIImpactFeedbackGenerator(style: .medium).prepare()
+        UISelectionFeedbackGenerator().prepare()
+
+        guard UIApplication.shared.applicationState == .active,
+              let scene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.activationState == .foregroundActive }),
+              let window = scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first
+        else { return }
+
+        let startedAt = CFAbsoluteTimeGetCurrent()
+        let textField = UITextField(frame: CGRect(x: -240, y: -240, width: 1, height: 1))
+        textField.alpha = 0.01
+        textField.tintColor = .clear
+        textField.textColor = .clear
+        textField.backgroundColor = .clear
+        textField.keyboardType = .decimalPad
+        textField.autocorrectionType = .no
+        textField.spellCheckingType = .no
+        textField.accessibilityElementsHidden = true
+        textField.inputAssistantItem.leadingBarButtonGroups = []
+        textField.inputAssistantItem.trailingBarButtonGroups = []
+        window.addSubview(textField)
+
+        textField.becomeFirstResponder()
+        DispatchQueue.main.async {
+            textField.resignFirstResponder()
+            textField.removeFromSuperview()
+            AppPerformanceMonitor.shared.record("键盘冷启动预热", startedAt: startedAt)
+        }
     }
 }
 

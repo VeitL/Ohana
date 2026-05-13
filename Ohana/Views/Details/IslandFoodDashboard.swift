@@ -125,7 +125,7 @@ struct IslandFoodDashboard: View {
         if standalone {
             NavigationStack {
                 ZStack {
-                    ArkBackgroundView().ignoresSafeArea()
+                    OhanaAppBackground().ignoresSafeArea()
                     scrollContent
                 }
                 .ignoresSafeArea(edges: .top)
@@ -157,16 +157,16 @@ struct IslandFoodDashboard: View {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 36, height: 36)
                     .goGlassBackground(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
 
             Spacer()
             Text("饮食总览")
                 .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Color.clear.frame(width: 36, height: 36)
         }
@@ -198,12 +198,12 @@ struct IslandFoodDashboard: View {
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .lineLimit(1)
             }
-            .foregroundStyle(isSelected ? .black : .white)
+            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
             .padding(.horizontal, 13)
             .padding(.vertical, 8)
-            .background(isSelected ? Color.goLime : Color.white.opacity(0.12), in: Capsule())
+            .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func selectorChip<Avatar: View>(
@@ -219,20 +219,20 @@ struct IslandFoodDashboard: View {
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .lineLimit(1)
             }
-            .foregroundStyle(isSelected ? .black : .white)
+            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
             .padding(.leading, 7)
             .padding(.trailing, 12)
             .padding(.vertical, 6)
-            .background(isSelected ? Color.goLime : Color.white.opacity(0.12), in: Capsule())
+            .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private var overviewCards: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-            metricCard(title: "今日喂食", value: "\(todayFeedLogs.count)", unit: "次", icon: "fork.knife", accent: Color(hex: "FF8C00"))
-            metricCard(title: "今日总量", value: compactFoodWeight(todayGrams), unit: "", icon: "scalemass.fill", accent: Color.goLime)
-            metricCard(title: "7 天总量", value: compactFoodWeight(weekGrams), unit: "", icon: "chart.bar.fill", accent: Color(hex: "80FFEA"))
+            metricCard(title: "今日喂食", value: "\(todayFeedLogs.count)", unit: "次", icon: "fork.knife", accent: Color.foodDry)
+            metricCard(title: "今日总量", value: compactFoodWeight(todayGrams), unit: "", icon: "scalemass.fill", accent: Color.goPrimary)
+            metricCard(title: "7 天总量", value: compactFoodWeight(weekGrams), unit: "", icon: "chart.bar.fill", accent: Color.goTeal)
             metricCard(title: "余粮风险", value: foodRiskValue, unit: foodRiskUnit, icon: "shippingbox.fill", accent: foodRiskAccent)
         }
     }
@@ -242,9 +242,9 @@ struct IslandFoodDashboard: View {
             ZStack(alignment: .bottom) {
                 Image(systemName: "takeoutbag.and.cup.and.straw.fill")
                     .font(.system(size: 82, weight: .black))
-                    .foregroundStyle(Color(hex: "FF8C00").opacity(0.22))
+                    .foregroundStyle(Color.foodDry.opacity(0.22))
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color(hex: "FF8C00").gradient)
+                    .fill(Color.foodDry.gradient)
                     .frame(width: 82, height: max(10, 68 * CGFloat(min(1, weekGrams / max(1, Double(selectedPets.count) * 700))) * chartRevealProgress))
                     .mask {
                         Image(systemName: "takeoutbag.and.cup.and.straw.fill")
@@ -256,21 +256,18 @@ struct IslandFoodDashboard: View {
             VStack(alignment: .leading, spacing: 7) {
                 Text("喂食节奏")
                     .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.56))
+                    .foregroundStyle(Color.ohanaSecondaryText)
                 Text(todayFeedLogs.isEmpty ? "今天还没开饭" : "今天 \(todayFeedLogs.count) 次")
                     .font(.system(size: 24, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text("7 天 \(weekFeedLogs.count) 次 · \(compactFoodWeight(weekGrams))")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.52))
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
         }
         .padding(18)
-        .background(
-            LinearGradient(colors: [Color(hex: "FF8C00").opacity(0.25), Color.white.opacity(0.07)], startPoint: .topLeading, endPoint: .bottomTrailing),
-            in: RoundedRectangle(cornerRadius: 26, style: .continuous)
-        )
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
     }
 
     private var trendSection: some View {
@@ -278,14 +275,14 @@ struct IslandFoodDashboard: View {
             HStack(spacing: 6) {
                 Image(systemName: "chart.bar.xaxis")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(Color.goLime)
+                    .foregroundStyle(Color.goPrimary)
                 Text("近 7 天喂食")
                     .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.72))
+                    .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 Text("克数")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.38))
+                    .foregroundStyle(Color.ohanaTertiaryText)
             }
 
             if dailyPoints.allSatisfy({ $0.count == 0 }) {
@@ -297,34 +294,28 @@ struct IslandFoodDashboard: View {
                         x: .value("日期", point.date, unit: .day),
                         y: .value("克数", point.grams * Double(chartRevealProgress))
                     )
-                    .foregroundStyle(Color(hex: "FF8C00").gradient)
+                    .foregroundStyle(Color.foodDry.gradient)
                     .cornerRadius(6)
                 }
                 .chartXAxis {
                     AxisMarks(values: dailyPoints.map(\.date)) { _ in
                         AxisValueLabel(format: .dateTime.weekday(.narrow))
                             .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.42))
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
                 .chartYAxis {
                     AxisMarks(values: .automatic(desiredCount: 3)) { _ in
-                        AxisGridLine().foregroundStyle(.white.opacity(0.08))
+                        AxisGridLine().foregroundStyle(Color.ohanaDivider)
                         AxisValueLabel()
                             .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.42))
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
                 .chartPlotStyle { plot in
                     plot.padding(.top, 10)
                 }
                 .frame(height: 168)
-                .padding(12)
-                .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.7)
-                }
             }
         }
     }
@@ -333,7 +324,7 @@ struct IslandFoodDashboard: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("成员饮食状态")
                 .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.white.opacity(0.72))
+                .foregroundStyle(Color.ohanaSecondaryText)
                 .padding(.horizontal, 2)
 
             if petSummaries.isEmpty {
@@ -364,11 +355,11 @@ struct IslandFoodDashboard: View {
                     HStack(spacing: 6) {
                         Text(pet.name)
                             .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                         Text(pet.species.isEmpty ? "成员" : pet.species)
                             .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.42))
+                            .foregroundStyle(Color.ohanaTertiaryText)
                             .lineLimit(1)
                     }
                     Text(foodStatusText(for: pet))
@@ -377,7 +368,7 @@ struct IslandFoodDashboard: View {
                         .lineLimit(1)
                     Text("今日 \(summary.todayCount) 次 · \(compactFoodWeight(summary.todayGrams)) / 7天 \(summary.weekCount) 次")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.42))
+                        .foregroundStyle(Color.ohanaTertiaryText)
                         .lineLimit(1)
                 }
 
@@ -385,25 +376,21 @@ struct IslandFoodDashboard: View {
 
                 ZStack {
                     Circle()
-                        .stroke(Color.white.opacity(0.12), lineWidth: 4)
+                        .stroke(Color.ohanaDivider, lineWidth: 4)
                     Circle()
                         .trim(from: 0, to: foodProgress(for: pet))
                         .stroke(accent, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                     Image(systemName: "chevron.right")
                         .font(.system(size: 10, weight: .black))
-                        .foregroundStyle(.white.opacity(0.52))
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .frame(width: 38, height: 38)
             }
             .padding(14)
-            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.7)
-            }
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func metricCard(title: String, value: String, unit: String, icon: String, accent: Color) -> some View {
@@ -417,39 +404,35 @@ struct IslandFoodDashboard: View {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
                     .font(.system(size: 26, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                 Text(unit)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.42))
+                    .foregroundStyle(Color.ohanaTertiaryText)
             }
             Text(title)
                 .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.52))
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.7)
-        }
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func emptyState(_ text: String) -> some View {
         VStack(spacing: 8) {
             Image(systemName: "fork.knife.circle")
                 .font(.system(size: 26, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.34))
+                .foregroundStyle(Color.ohanaTertiaryText)
             Text(text)
                 .font(.system(size: 13, weight: .bold, design: .rounded))
                 .multilineTextAlignment(.center)
-                .foregroundStyle(.white.opacity(0.42))
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)
         .padding(18)
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func amountGrams(for log: PetCareLog) -> Double {
@@ -471,10 +454,10 @@ struct IslandFoodDashboard: View {
     }
 
     private var foodRiskAccent: Color {
-        guard let pet = lowestFoodDaysPet, let days = foodRemainingDays(for: pet) else { return Color.white.opacity(0.55) }
+        guard let pet = lowestFoodDaysPet, let days = foodRemainingDays(for: pet) else { return Color.ohanaSecondaryText }
         if days <= 3 { return Color.goRed }
         if days <= 7 { return Color.goOrange }
-        return Color.goTeal
+        return Color.goPrimary
     }
 
     private func foodRemainingDays(for pet: Pet) -> Int? {
@@ -499,10 +482,10 @@ struct IslandFoodDashboard: View {
     }
 
     private func foodAccent(for pet: Pet) -> Color {
-        guard let days = foodRemainingDays(for: pet) else { return Color.white.opacity(0.55) }
+        guard let days = foodRemainingDays(for: pet) else { return Color.ohanaSecondaryText }
         if days <= 3 { return Color.goRed }
         if days <= 7 { return Color.goOrange }
-        return Color.goTeal
+        return Color.goPrimary
     }
 
     private func foodStatusText(for pet: Pet) -> String {
@@ -522,7 +505,7 @@ struct IslandFoodDashboard: View {
 
     private func playChartReveal() {
         chartRevealProgress = 0
-        withAnimation(.spring(response: 0.58, dampingFraction: 0.82)) {
+        withAnimation(GoMotion.page) {
             chartRevealProgress = 1
         }
     }

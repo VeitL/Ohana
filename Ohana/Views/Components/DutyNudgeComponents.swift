@@ -29,7 +29,7 @@ struct AssigneeChip: View {
                 }
                 Text(h.name)
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.7))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                     .lineLimit(1)
             }
             .padding(.horizontal, 8).padding(.vertical, 4)
@@ -70,7 +70,7 @@ struct NudgeButton: View {
                 )
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .alert("已提醒 \(targetHuman.name)！", isPresented: $showAlert) {
             Button("好的", role: .cancel) {}
         } message: {
@@ -88,7 +88,7 @@ struct AssigneePickerRow: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("指派给")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
@@ -105,7 +105,7 @@ struct AssigneePickerRow: View {
                                 in: Capsule()
                             )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
 
                     ForEach(allHumans) { human in
                         Button {
@@ -123,7 +123,7 @@ struct AssigneePickerRow: View {
                                 in: Capsule()
                             )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                     }
                 }
             }

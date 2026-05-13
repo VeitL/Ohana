@@ -149,12 +149,12 @@ struct IslandMoodHeaderStrip: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(primaryMessage.title)
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     if let detail = primaryMessage.detail {
                         Text(detail)
                             .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.55))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                             .lineLimit(1)
                     }
                 }
@@ -173,21 +173,21 @@ struct IslandMoodHeaderStrip: View {
                     }
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.primary.opacity(0.35))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                 }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(.thinMaterial)
+                    .fill(Color.ohanaCardSurface)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .strokeBorder(accentColor.opacity(0.22), lineWidth: 1)
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .padding(.horizontal, 16)
         .onAppear {
             guard !shouldReduceWork else {

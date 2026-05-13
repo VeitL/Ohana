@@ -95,7 +95,7 @@ struct SwipeableEventRow: View {
                             .symbolRenderingMode(.monochrome)
                         Text("完成").font(.system(size: 12, weight: .bold, design: .rounded))
                     }
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .opacity(min(1, leftProgress * 1.5))
                     .scaleEffect(0.8 + leftProgress * 0.2)
                     .padding(.trailing, 20)
@@ -114,7 +114,7 @@ struct SwipeableEventRow: View {
                             .symbolRenderingMode(.monochrome)
                         Text("删除").font(.system(size: 12, weight: .bold, design: .rounded))
                     }
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .opacity(min(1, rightProgress * 1.5))
                     .scaleEffect(0.8 + rightProgress * 0.2)
                     .padding(.leading, 20)
@@ -268,7 +268,7 @@ struct SwipeableEventRow: View {
                         Image(systemName: event.silhouetteListSymbol)
                             .font(.system(size: 18, weight: .bold))
                             .symbolRenderingMode(.monochrome)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                             .opacity(leftProgress > 0 ? Double(1 - leftProgress / 0.4) : 1)
                     }
                 }
@@ -574,7 +574,7 @@ private struct EventDetailSheet: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(event.title)
                                 .font(.system(size: 18, weight: .black, design: .rounded))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                                 .lineLimit(2)
                             Text(event.eventType)
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
@@ -629,11 +629,11 @@ private struct EventDetailSheet: View {
                                 Label(event.isOccurrenceMarkedComplete(on: occurrenceDate) ? "标记未完成" : "标记完成",
                                       systemImage: event.isOccurrenceMarkedComplete(on: occurrenceDate) ? "xmark.circle" : "checkmark.circle.fill")
                                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(Color.ohanaPrimaryText)
                                     .frame(maxWidth: .infinity).padding(.vertical, 14)
                                     .background(Color.goTeal, in: RoundedRectangle(cornerRadius: 14))
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ScaleButtonStyle())
                         }
 
                         Button {
@@ -641,11 +641,11 @@ private struct EventDetailSheet: View {
                         } label: {
                             Label("删除", systemImage: "trash.fill")
                                 .font(.system(size: 15, weight: .bold, design: .rounded))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                                 .frame(maxWidth: .infinity).padding(.vertical, 14)
                                 .background(Color.goRed, in: RoundedRectangle(cornerRadius: 14))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                         .confirmationDialog("确认删除", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
                             Button("删除此事项", role: .destructive) {
                                 modelContext.delete(event)
@@ -681,11 +681,11 @@ private struct EventDetailSheet: View {
                 .frame(width: 22)
             Text(label)
                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.5))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             Spacer()
             Text(value)
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
         }
         .padding(.horizontal, 24)
     }

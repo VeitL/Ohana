@@ -104,7 +104,7 @@ struct IslandPottyDashboard: View {
         if standalone {
             NavigationStack {
                 ZStack {
-                    ArkBackgroundView().ignoresSafeArea()
+                    OhanaAppBackground().ignoresSafeArea()
                     scrollContent
                 }
                 .ignoresSafeArea(edges: .top)
@@ -140,7 +140,7 @@ struct IslandPottyDashboard: View {
                     .frame(width: 36, height: 36)
                     .goGlassBackground(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             Spacer()
             Text("便便电台")
                 .font(.system(size: 17, weight: .black, design: .rounded))
@@ -292,7 +292,7 @@ struct IslandPottyDashboard: View {
                     .padding(14)
                     .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
     }
@@ -310,7 +310,7 @@ struct IslandPottyDashboard: View {
             .padding(.vertical, 8)
             .background(isSelected ? Color.goLime : Color.white.opacity(0.12), in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func selectorChip(title: String, icon: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
@@ -326,7 +326,7 @@ struct IslandPottyDashboard: View {
         case .perfectPoop: return pottyBrown
         case .softPoop:    return Color.goOrange
         case .liquidPoop:  return Color.goRed
-        case .pee:         return Color(hex: "3B82F6")
+        case .pee:         return Color(hex: "06B6D4")
         }
     }
 

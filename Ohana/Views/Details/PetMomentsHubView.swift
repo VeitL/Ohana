@@ -42,7 +42,7 @@ struct PetMomentsHubView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView().ignoresSafeArea()
+                OhanaAppBackground().ignoresSafeArea()
                 VStack(spacing: 0) {
                     memoryOverview
                         .padding(.horizontal, 16)
@@ -77,7 +77,7 @@ struct PetMomentsHubView: View {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -144,10 +144,10 @@ struct PetMomentsHubView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("记忆胶卷")
                     .font(.system(size: 22, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text(momentPhotos.isEmpty ? "还没有记录，先留下今天的一句话或照片。" : "这个月新增 \(thisMonthMomentCount) 条 · \(notedMomentCount) 条有备注")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(2)
 
                 HStack(spacing: 8) {
@@ -158,7 +158,7 @@ struct PetMomentsHubView: View {
             Spacer(minLength: 0)
         }
         .padding(14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .strokeBorder(.white.opacity(0.12), lineWidth: 1)
@@ -182,7 +182,7 @@ struct PetMomentsHubView: View {
                 HStack {
                     Text("共 \(timelineItems.count) 条记录")
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                     Spacer()
                 }
                 .padding(.horizontal, 20)
@@ -221,7 +221,7 @@ struct PetMomentsHubView: View {
                     .padding(.vertical, 11)
                     .background(Color.goPrimary, in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 44)
@@ -277,11 +277,11 @@ struct PetMomentsHubView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.title)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 if !item.subtitle.isEmpty {
                     Text(item.subtitle)
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(2)
                 }
                 Text(item.date, format: .dateTime.year().month().day().hour().minute())

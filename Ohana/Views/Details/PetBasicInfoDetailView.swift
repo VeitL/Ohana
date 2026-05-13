@@ -52,12 +52,12 @@ struct PetBasicInfoDetailView: View {
     private let themePresets: [(String, String)] = [
         ("FF6B6B","coral"), ("4ECDC4","ocean"), ("B8A9C9","lavender"),
         ("95E1D3","mint"), ("F38181","sunset"), ("AA96DA","berry"),
-        ("8EC5FC","sky"), ("A8E6CF","sage"), ("FFD3B6","peach"), ("95ADBE","slate"),
+        ("F472B6","rose"), ("A8E6CF","sage"), ("FFD3B6","peach"), ("95ADBE","slate"),
     ]
 
     var body: some View {
         ZStack {
-            ArkBackgroundView()
+            OhanaAppBackground()
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
                     avatarSection
@@ -165,19 +165,19 @@ struct PetBasicInfoDetailView: View {
                 }
             }
             // 主题色预览
-            infoSection(title: "主题色", icon: "paintpalette.fill", iconColor: Color(hex: pet.themeColorHex)) {
+            infoSection(title: "主题色", icon: "paintpalette.fill", iconColor: Color(hex: pet.safeThemeColorHex)) {
                 HStack(spacing: 10) {
-                    RoundedRectangle(cornerRadius: 8).fill(Color(hex: pet.themeColorHex)).frame(width: 32, height: 32)
-                    Text("#\(pet.themeColorHex.uppercased())")
+                    RoundedRectangle(cornerRadius: 8).fill(Color(hex: pet.safeThemeColorHex)).frame(width: 32, height: 32)
+                    Text("#\(pet.safeThemeColorHex.uppercased())")
                         .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.primary.opacity(0.8))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                 }
             }
             if !pet.notes.isEmpty {
                 infoSection(title: "备注", icon: "note.text", iconColor: Color.goOrange) {
                     Text(pet.notes)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.primary.opacity(0.7))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
@@ -204,18 +204,18 @@ struct PetBasicInfoDetailView: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text("\(breed) · 护理贴士")
                             .font(.system(size: 13, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text("基于品种特点的个性化建议")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
                     Image(systemName: breedTipsExpanded ? "chevron.up" : "chevron.down")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
 
             if breedTipsExpanded {
                 VStack(alignment: .leading, spacing: 7) {
@@ -227,7 +227,7 @@ struct PetBasicInfoDetailView: View {
                                 .padding(.top, 5)
                             Text(tip)
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.75))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.75))
                         }
                     }
                 }
@@ -345,10 +345,10 @@ struct PetBasicInfoDetailView: View {
                                 Circle().fill(Color(hex: hex)).frame(width: 38, height: 38)
                                 if eThemeColorHex.uppercased() == hex.uppercased() {
                                     Circle().strokeBorder(.white, lineWidth: 2.5)
-                                    Image(systemName: "checkmark").font(.system(size: 11, weight: .black)).foregroundStyle(.primary)
+                                    Image(systemName: "checkmark").font(.system(size: 11, weight: .black)).foregroundStyle(Color.ohanaPrimaryText)
                                 }
                             }
-                        }.buttonStyle(.plain)
+                        }.buttonStyle(ScaleButtonStyle())
                     }
                     ColorPicker("", selection: Binding(
                         get: { Color(hex: eThemeColorHex) },
@@ -362,7 +362,7 @@ struct PetBasicInfoDetailView: View {
             editSection(title: "备注", icon: "note.text", iconColor: Color.goOrange) {
                 TextField("备注（可选）", text: $eNotes, axis: .vertical)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .tint(Color.goOrange)
                     .lineLimit(3...6)
             }
@@ -377,18 +377,18 @@ struct PetBasicInfoDetailView: View {
                     profileAvatarImage(
                         data: isEditing ? eAvatarImageData : pet.avatarImageData,
                         fallbackEmoji: pet.avatarEmoji,
-                        accent: isEditing ? Color(hex: eThemeColorHex) : Color(hex: pet.themeColorHex),
+                        accent: isEditing ? Color(hex: eThemeColorHex) : Color(hex: pet.safeThemeColorHex),
                         size: 84
                     )
                     VStack(spacing: 4) {
                         Text(isEditing ? (eName.isEmpty ? pet.name : eName) : pet.name)
                             .font(.system(size: 22, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.65)
                         Text("\(isEditing ? eSpecies : pet.species) · \(isEditing ? (eBreed.isEmpty ? "未填写品种" : eBreed) : (pet.breed.isEmpty ? "未填写品种" : pet.breed))")
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.primary.opacity(0.5))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                     }
@@ -443,7 +443,7 @@ struct PetBasicInfoDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: icon).font(.system(size: 13, weight: .bold)).foregroundStyle(iconColor)
-                Text(title).font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(.primary)
+                Text(title).font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
             }
             content()
         }
@@ -454,7 +454,7 @@ struct PetBasicInfoDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: icon).font(.system(size: 13, weight: .bold)).foregroundStyle(iconColor)
-                Text(title).font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(.primary)
+                Text(title).font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
             }
             content()
         }
@@ -463,14 +463,14 @@ struct PetBasicInfoDetailView: View {
 
     private func infoRow(label: String, value: String) -> some View {
         HStack {
-            Text(label).font(.system(size: 13, weight: .medium)).foregroundStyle(.primary.opacity(0.45)).frame(width: 80, alignment: .leading)
-            Text(value).font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(.primary.opacity(0.9))
+            Text(label).font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.45)).frame(width: 80, alignment: .leading)
+            Text(value).font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.9))
             Spacer()
         }
     }
 
     private func editLabel(_ label: String) -> some View {
-        Text(label).font(.system(size: 13, weight: .medium)).foregroundStyle(.primary.opacity(0.55))
+        Text(label).font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
     }
 
     private func editField(_ label: String, text: Binding<String>) -> some View {
@@ -478,7 +478,7 @@ struct PetBasicInfoDetailView: View {
             editLabel(label).frame(width: 70, alignment: .leading)
             TextField(label, text: text)
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goPrimary)
                 .multilineTextAlignment(.trailing)
         }
@@ -497,7 +497,9 @@ struct PetBasicInfoDetailView: View {
     }
 
     private var coatOptions: [(name: String, hex: String)] {
-        let options = selectedBreedInfo?.coatColors ?? PetBreedDatabase.genericCoatColors
+        let options = PetAvatarAssetCatalog.coatColors(species: eSpecies, breed: eBreed)
+            ?? selectedBreedInfo?.coatColors
+            ?? PetBreedDatabase.genericCoatColors
         return uniqueColorOptions(options.map { ($0.name, $0.hex) }, current: eCoatColor)
     }
 
@@ -574,7 +576,7 @@ struct PetBasicInfoDetailView: View {
                         .padding(.vertical, 7)
                         .background(selection.wrappedValue == item.name ? Color.goPrimary : Color.primary.opacity(0.07), in: Capsule())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
         }
@@ -589,7 +591,7 @@ struct PetBasicInfoDetailView: View {
                     .foregroundStyle(Color.goRed)
                 Text("就诊卡片")
                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 ShareLink(item: vetVisitSummaryText) {
                     HStack(spacing: 5) {
@@ -621,11 +623,11 @@ struct PetBasicInfoDetailView: View {
         HStack(alignment: .top, spacing: 10) {
             Text(label)
                 .font(.system(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.46))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.46))
                 .frame(width: 58, alignment: .leading)
             Text(value)
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.82))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.82))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .lineLimit(2)
         }
@@ -701,7 +703,7 @@ struct PetBasicInfoDetailView: View {
                     Text("🌈").font(.system(size: 14))
                     Text("岁月史书 · 彩虹桥彼端")
                         .font(.system(size: 11, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.5))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                         .tracking(1)
                     Spacer()
                 }
@@ -710,11 +712,11 @@ struct PetBasicInfoDetailView: View {
                         if let d = pet.passedAwayDate {
                             Text("离世日期：\(d.formatted(.dateTime.year().month().day()))")
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.7))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                         }
                         Text("相伴 \(pet.daysTogetherAtPassing) 天 · \(pet.ageAtPassingText)")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.45))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                     }
                     Spacer()
                     Button { showingUndoPassingAlert = true } label: {
@@ -725,7 +727,7 @@ struct PetBasicInfoDetailView: View {
                             .background(Color.goYellow.opacity(0.1), in: Capsule())
                             .overlay(Capsule().strokeBorder(Color.goYellow.opacity(0.3), lineWidth: 1))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
                 .padding(14)
                 .background(Color.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -766,7 +768,7 @@ struct PetBasicInfoDetailView: View {
                     .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .strokeBorder(Color.purple.opacity(0.25), lineWidth: 1))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
             .alert("确认标记离世", isPresented: $showingRainbowBridgeAlert) {
                 Button("确认", role: .destructive) {
@@ -834,7 +836,7 @@ struct PetBasicInfoDetailView: View {
         ePassportExpiry = pet.passportExpiryDate ?? Calendar.current.date(byAdding: .year, value: 1, to: Date())!
         eFormerName = pet.formerName; eBirthCountry = pet.birthCountry; eBirthCity = pet.birthCity
         eLineageInfo = pet.lineageInfo; eNotes = pet.notes
-        eThemeColorHex = pet.themeColorHex
+        eThemeColorHex = pet.safeThemeColorHex
         eAvatarImageData = pet.avatarImageData
     }
 
@@ -852,7 +854,10 @@ struct PetBasicInfoDetailView: View {
         pet.passportExpiryDate = eHasPassportExpiry ? ePassportExpiry : nil
         pet.formerName = eFormerName; pet.birthCountry = eBirthCountry; pet.birthCity = eBirthCity
         pet.lineageInfo = eLineageInfo; pet.notes = eNotes
-        pet.themeColorHex = eThemeColorHex
+        pet.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
+            eThemeColorHex,
+            fallback: OhanaThemeColorPolicy.petFallbackHex
+        )
         pet.avatarImageData = eAvatarImageData
         CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: modelContext)
         modelContext.safeSave()
@@ -911,7 +916,7 @@ struct EditableProfileAvatarPicker: View {
                 PhotosPicker(selection: $photosPickerItem, matching: .images) {
                     avatarActionLabel(icon: "photo.on.rectangle.angled", title: "相册")
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
 
                 avatarActionButton(icon: "camera.fill", title: "拍照") {
                     presentCamera()
@@ -924,9 +929,9 @@ struct EditableProfileAvatarPicker: View {
                 } label: {
                     Text("移除头像")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.45))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
         .disabled(isPasting)
@@ -986,7 +991,7 @@ struct EditableProfileAvatarPicker: View {
         Button(action: action) {
             avatarActionLabel(icon: icon, title: title)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func avatarActionLabel(icon: String, title: String) -> some View {
@@ -1096,7 +1101,7 @@ private struct PetBasicInfoDangerZone: View {
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .strokeBorder(Color.goOrange.opacity(0.3), lineWidth: 1))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
 
             Button {
                 showingDeleteSheet = true
@@ -1114,7 +1119,7 @@ private struct PetBasicInfoDangerZone: View {
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .strokeBorder(Color.goRed.opacity(0.3), lineWidth: 1))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
         }
         .padding(.top, 8)
         .alert("仅清空所有记录", isPresented: $showingClearConfirm) {
@@ -1134,7 +1139,7 @@ private struct PetBasicInfoDangerZone: View {
             )
             .presentationDetents([.height(380), .medium])
             .presentationDragIndicator(.visible)
-            .presentationBackground(.regularMaterial)
+            .presentationBackground(Color.ohanaCardSurface)
         }
     }
 }
@@ -1145,14 +1150,15 @@ private struct PetDeleteConfirmationSheet: View {
     let onDelete: () -> Void
 
     @State private var confirmName = ""
+    @FocusState private var confirmNameFocused: Bool
 
     private var canDelete: Bool {
-        confirmName.trimmingCharacters(in: .whitespacesAndNewlines) == petName
+        ConfirmationNameMatcher.matches(confirmName, expectedName: petName)
     }
 
     var body: some View {
         ZStack {
-            ArkBackgroundView()
+            OhanaAppBackground()
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 12) {
                     Image(systemName: "trash.fill")
@@ -1163,26 +1169,26 @@ private struct PetDeleteConfirmationSheet: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("彻底删除 \(petName)")
                             .font(.system(size: 18, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text("输入名字后才能继续")
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
                     Button(action: onCancel) {
                         Image(systemName: "xmark")
                             .font(.system(size: 12, weight: .black))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                             .frame(width: 34, height: 34)
                             .background(Color.primary.opacity(0.08), in: Circle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text("这会删除宠物和所有关联记录，无法撤销。")
                         .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.68))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.68))
                     Text("请输入：\(petName)")
                         .font(.system(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goRed.opacity(0.8))
@@ -1193,6 +1199,8 @@ private struct PetDeleteConfirmationSheet: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.done)
+                    .focused($confirmNameFocused)
+                    .onSubmit { attemptDelete() }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 13)
                     .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -1203,14 +1211,14 @@ private struct PetDeleteConfirmationSheet: View {
                     Button(action: onCancel) {
                         Text("取消")
                             .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.72))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
                             .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
 
-                    Button(action: onDelete) {
+                    Button(action: attemptDelete) {
                         Text("删除")
                             .font(.system(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(canDelete ? Color.white : Color.primary.opacity(0.32))
@@ -1218,11 +1226,22 @@ private struct PetDeleteConfirmationSheet: View {
                             .padding(.vertical, 13)
                             .background(canDelete ? Color.goRed : Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                     .disabled(!canDelete)
                 }
             }
             .padding(20)
         }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                confirmNameFocused = true
+            }
+        }
+    }
+
+    private func attemptDelete() {
+        guard canDelete else { return }
+        confirmNameFocused = false
+        onDelete()
     }
 }

@@ -16,10 +16,10 @@ struct WalkTrackingCard: View {
 
     private var mgr: PetWalkingManager { PetWalkingManager.shared }
     private var locationMgr: LocationManager { LocationManager.shared }
+    @AppStorage(LocationManager.backgroundWalkTrackingEnabledKey) private var backgroundWalkTrackingEnabled = false
 
     @State private var showFloatingPoop = false
     @State private var showWalkDetail: PetWalkLog? = nil
-    @State private var showAlwaysBanner = false
     @State private var showSummaryBack = false
     @State private var summaryRotation: Double = 0
     @State private var showingGoalSetter = false
@@ -64,7 +64,7 @@ struct WalkTrackingCard: View {
             walkGoalSetterSheet
                 .presentationDetents([.height(320)])
                 .presentationDragIndicator(.visible)
-                .presentationBackground(.regularMaterial)
+                .presentationBackground(Color.ohanaCardSurface)
         }
         .onChange(of: mgr.showSummary) { _, newVal in
             if newVal && mgr.currentPet?.id == pet.id {
@@ -78,13 +78,9 @@ struct WalkTrackingCard: View {
             }
         }
         .onAppear {
-            withAnimation { showAlwaysBanner = locationMgr.authorizationStatus == .authorizedWhenInUse }
             if case .finished = mgr.phase, mgr.currentPet?.id == pet.id {
                 presentSummaryBack(animated: false)
             }
-        }
-        .onChange(of: locationMgr.authorizationStatus) { _, status in
-            withAnimation { showAlwaysBanner = (status == .authorizedWhenInUse) }
         }
     }
 
@@ -96,12 +92,12 @@ struct WalkTrackingCard: View {
 
             // ── 控制层：半透明玻璃条
             VStack(spacing: 0) {
-                if showAlwaysBanner {
-                    alwaysBanner
+                if isActivePet {
+                    backgroundRoutePill
                 }
                 controlPanel
             }
-            .background(.ultraThinMaterial)
+            .background(Color.ohanaCardSurface)
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
     }
@@ -140,7 +136,7 @@ struct WalkTrackingCard: View {
                         .resizable()
                         .scaledToFill()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             } else {
                 // 无快照：渐变占位
                 LinearGradient(
@@ -165,34 +161,38 @@ struct WalkTrackingCard: View {
         AppMeasurementSystem.formatDistanceMeters(locationMgr.totalDistance)
     }
 
-    // MARK: - Always Permission Banner
-
-    private var alwaysBanner: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "location.fill")
-                .font(OhanaFont.caption2())
-                .foregroundStyle(Color.goYellow)
-            Text("开启「始终允许」定位，后台追踪更完整")
-                .font(OhanaFont.caption())
-                .foregroundStyle(.primary.opacity(0.8))
-            Spacer()
-            Button { locationMgr.upgradeToAlways() } label: {
-                Text("升级")
+    private var backgroundRoutePill: some View {
+        Button {
+            let next = !backgroundWalkTrackingEnabled
+            backgroundWalkTrackingEnabled = next
+            locationMgr.setBackgroundWalkTrackingEnabled(next)
+            UIImpactFeedbackGenerator(style: next ? .medium : .light).impactOccurred()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: backgroundWalkTrackingEnabled ? "lock.iphone" : "iphone")
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(backgroundWalkTrackingEnabled ? Color.goPrimary : .primary.opacity(0.62))
+                Text("锁屏继续路线")
                     .font(OhanaFont.caption(.bold))
-                    .foregroundStyle(Color.goYellow)
-                    .padding(.horizontal, 10).padding(.vertical, 4)
-                    .background(Color.goYellow.opacity(0.15), in: Capsule())
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.82))
+                Spacer(minLength: 8)
+                Text(backgroundWalkTrackingEnabled ? "开" : "关")
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(backgroundWalkTrackingEnabled ? Color.arkInk : .primary.opacity(0.58))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        backgroundWalkTrackingEnabled ? Color.goPrimary : Color.primary.opacity(0.08),
+                        in: Capsule()
+                    )
             }
-            .buttonStyle(.plain)
-            Button { withAnimation { showAlwaysBanner = false } } label: {
-                Image(systemName: "xmark")
-                    .font(OhanaFont.caption2())
-                    .foregroundStyle(.primary.opacity(0.4))
-            }
-            .buttonStyle(.plain)
+            .padding(.horizontal, 14)
+            .padding(.top, 9)
+            .padding(.bottom, 2)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        .transition(.move(edge: .top).combined(with: .opacity))
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(backgroundWalkTrackingEnabled ? "关闭锁屏继续记录路线" : "开启锁屏继续记录路线")
     }
 
     // MARK: - Control Panel
@@ -205,7 +205,7 @@ struct WalkTrackingCard: View {
                     Text(pet.avatarEmoji).font(.system(size: 18))
                     Text(pet.name)
                         .font(OhanaFont.footnote(.bold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     statusDot
                 }
                 timerText
@@ -245,7 +245,7 @@ struct WalkTrackingCard: View {
                  ? String(format: "%d:%02d:%02d", h, m, s)
                  : String(format: "%02d:%02d", m, s))
                 .font(OhanaFont.metric(size: 22))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .contentTransition(.numericText())
         }
     }
@@ -284,7 +284,7 @@ struct WalkTrackingCard: View {
                             .font(.system(size: 28, weight: .bold))
                             .foregroundStyle(.white.opacity(0.82))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                     .accessibilityLabel("关闭遛狗摘要")
                 }
 
@@ -436,7 +436,7 @@ struct WalkTrackingCard: View {
                         .padding(.vertical, 7)
                         .background(Color.goPrimary, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -453,12 +453,12 @@ struct WalkTrackingCard: View {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(weeklyGoalDisplay(goalDraft))
                     .font(.system(size: 52, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .contentTransition(.numericText())
                     .animation(.spring(duration: 0.2), value: goalDraft)
                 Text("km / 周")
                     .font(OhanaFont.title3(.bold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
 
             HStack(spacing: 28) {
@@ -468,12 +468,12 @@ struct WalkTrackingCard: View {
                         .symbolRenderingMode(.palette)
                         .foregroundStyle(goalDraft <= 0 ? Color.secondary.opacity(0.35) : Color.goPrimary, Color.primary.opacity(0.12))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .disabled(goalDraft <= 0)
 
                 Text("每次 ±0.5 km")
                     .font(OhanaFont.caption(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
 
                 Button { adjustWeeklyGoal(0.5) } label: {
                     Image(systemName: "plus.circle.fill")
@@ -481,7 +481,7 @@ struct WalkTrackingCard: View {
                         .symbolRenderingMode(.palette)
                         .foregroundStyle(goalDraft >= 100 ? Color.secondary.opacity(0.35) : Color.goPrimary, Color.primary.opacity(0.12))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .disabled(goalDraft >= 100)
             }
 
@@ -498,7 +498,7 @@ struct WalkTrackingCard: View {
                     .padding(.vertical, 14)
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 24)
 
             Spacer(minLength: 8)
@@ -660,7 +660,7 @@ struct WalkTrackingCard: View {
                         .padding(.horizontal, 16).padding(.vertical, 8)
                         .background(Color.goPrimary, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
 
             case .running:
                 circleButton(icon: "pause.fill", color: Color.goYellow) { mgr.pause() }
@@ -687,7 +687,7 @@ struct WalkTrackingCard: View {
                         .padding(.horizontal, 16).padding(.vertical, 8)
                         .background(Color.goPrimary, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
     }
@@ -703,7 +703,7 @@ struct WalkTrackingCard: View {
                 .frame(width: 34, height: 34)
                 .background(color, in: Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private var poopButton: some View {
@@ -717,7 +717,7 @@ struct WalkTrackingCard: View {
                 Text("💩")
                     .font(.system(size: 15))
                     .frame(width: 34, height: 34)
-                    .background(.ultraThinMaterial, in: Circle())
+                    .background(Color.ohanaCardSurface, in: Circle())
             }
             if mgr.poopCount > 0 {
                 Text("\(mgr.poopCount)")

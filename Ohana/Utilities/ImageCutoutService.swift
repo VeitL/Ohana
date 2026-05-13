@@ -174,6 +174,102 @@ final class ImageCutoutService {
             return false
         }
     }
+
+    nonisolated static func trimmedTransparentSubjectImage(from image: UIImage, alphaThreshold: UInt8 = 12) -> UIImage? {
+        guard let cgImage = image.cgImage else { return image }
+
+        let width = cgImage.width
+        let height = cgImage.height
+        guard width > 0, height > 0 else { return image }
+
+        let bytesPerPixel = 4
+        let bytesPerRow = width * bytesPerPixel
+        var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
+
+        let bounds = pixels.withUnsafeMutableBytes { rawBuffer -> CGRect? in
+            guard let baseAddress = rawBuffer.baseAddress,
+                  let context = CGContext(
+                    data: baseAddress,
+                    width: width,
+                    height: height,
+                    bitsPerComponent: 8,
+                    bytesPerRow: bytesPerRow,
+                    space: CGColorSpaceCreateDeviceRGB(),
+                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                  ) else {
+                return nil
+            }
+
+            context.clear(CGRect(x: 0, y: 0, width: width, height: height))
+            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+            let buffer = rawBuffer.bindMemory(to: UInt8.self)
+            var minX = width
+            var minY = height
+            var maxX = -1
+            var maxY = -1
+
+            for y in 0..<height {
+                let rowStart = y * bytesPerRow
+                for x in 0..<width {
+                    let alpha = buffer[rowStart + x * bytesPerPixel + 3]
+                    guard alpha > alphaThreshold else { continue }
+                    minX = min(minX, x)
+                    minY = min(minY, y)
+                    maxX = max(maxX, x)
+                    maxY = max(maxY, y)
+                }
+            }
+
+            guard maxX >= minX, maxY >= minY else { return nil }
+
+            let sidePadding = max(2, Int(CGFloat(max(width, height)) * 0.015))
+            let cropX = max(0, minX - sidePadding)
+            let cropY = max(0, minY - sidePadding)
+            let cropMaxX = min(width - 1, maxX + sidePadding)
+
+            return CGRect(
+                x: cropX,
+                y: cropY,
+                width: cropMaxX - cropX + 1,
+                height: maxY - cropY + 1
+            )
+        }
+
+        guard let bounds else { return image }
+        let cropX = Int(bounds.origin.x)
+        let cropY = Int(bounds.origin.y)
+        let cropW = Int(bounds.width)
+        let cropH = Int(bounds.height)
+        guard cropW > 0, cropH > 0 else { return image }
+
+        var croppedPixels = [UInt8](repeating: 0, count: cropW * cropH * bytesPerPixel)
+        for row in 0..<cropH {
+            let srcStart = (cropY + row) * bytesPerRow + cropX * bytesPerPixel
+            let dstStart = row * cropW * bytesPerPixel
+            croppedPixels[dstStart..<(dstStart + cropW * bytesPerPixel)] =
+                pixels[srcStart..<(srcStart + cropW * bytesPerPixel)]
+        }
+
+        return croppedPixels.withUnsafeMutableBytes { rawBuffer -> UIImage? in
+            guard let baseAddress = rawBuffer.baseAddress,
+                  let context = CGContext(
+                    data: baseAddress,
+                    width: cropW,
+                    height: cropH,
+                    bitsPerComponent: 8,
+                    bytesPerRow: cropW * bytesPerPixel,
+                    space: CGColorSpaceCreateDeviceRGB(),
+                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                  ),
+                  let croppedCGImage = context.makeImage()
+            else {
+                return image
+            }
+
+            return UIImage(cgImage: croppedCGImage, scale: image.scale, orientation: .up)
+        }
+    }
 }
 
 // MARK: - UIImage 方向修正扩展

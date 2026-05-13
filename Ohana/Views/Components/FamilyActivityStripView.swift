@@ -32,6 +32,8 @@ struct FamilyActivityStripView: View {
 
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    private var l: L10n { L10n(appLanguage) }
 
     // MARK: - Entry model
 
@@ -148,25 +150,25 @@ struct FamilyActivityStripView: View {
                 // 描述文本
                 Text(compactDescription(uniqueCount: uniqueHumans.count, actionCount: entries.count))
                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.8))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                     .lineLimit(1)
 
                 Spacer(minLength: 4)
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.primary.opacity(0.35))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
-                Capsule().fill(.thinMaterial)
+                Capsule().fill(Color.ohanaCardSurface)
             )
             .overlay(
                 Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .padding(.horizontal, 20)
     }
 
@@ -184,11 +186,11 @@ struct FamilyActivityStripView: View {
 
     private func compactDescription(uniqueCount: Int, actionCount: Int) -> String {
         if uniqueCount == 0 {
-            return "今天 \(actionCount) 次记录"
+            return l.tr(zh: "今天 \(actionCount) 次记录", en: "\(actionCount) records today", de: "\(actionCount) Einträge heute")
         } else if uniqueCount == 1 {
-            return "今天已照顾 \(pet.name) \(actionCount) 次"
+            return l.tr(zh: "今天已照顾 \(pet.name) \(actionCount) 次", en: "\(pet.name) cared for \(actionCount)x today", de: "\(pet.name) heute \(actionCount)x versorgt")
         } else {
-            return "全家今日一起照顾 \(pet.name) \(actionCount) 次"
+            return l.tr(zh: "全家今日一起照顾 \(pet.name) \(actionCount) 次", en: "Family cared for \(pet.name) \(actionCount)x today", de: "Familie hat \(pet.name) heute \(actionCount)x versorgt")
         }
     }
 
@@ -215,12 +217,12 @@ struct FamilyActivityStripView: View {
         HStack(spacing: 6) {
             Image(systemName: "person.2.fill")
                 .font(.system(size: 10, weight: .bold))
-            Text("今日 · 谁在照顾 \(pet.name)")
+            Text(l.tr(zh: "今日 · 谁在照顾 \(pet.name)", en: "Today · Who cared for \(pet.name)", de: "Heute · Wer versorgt \(pet.name)"))
                 .font(.system(size: 11, weight: .black, design: .rounded))
                 .tracking(0.4)
             Spacer(minLength: 0)
         }
-        .foregroundStyle(.primary.opacity(colorScheme == .dark ? 0.55 : 0.45))
+        .foregroundStyle(Color.ohanaPrimaryText.opacity(colorScheme == .dark ? 0.55 : 0.45))
         .padding(.horizontal, 20)
     }
 
@@ -228,7 +230,7 @@ struct FamilyActivityStripView: View {
     private func chip(for entry: ActivityEntry) -> some View {
         let h = human(for: entry.executorId)
         let name = h.map { $0.name.trimmingCharacters(in: .whitespaces) } ?? ""
-        let display = name.isEmpty ? (h == nil ? "未指定" : "家人") : name
+        let display = name.isEmpty ? (h == nil ? l.tr(zh: "未指定", en: "Unassigned", de: "Nicht zugewiesen") : l.tr(zh: "家人", en: "Family", de: "Familie")) : name
 
         VStack(spacing: 4) {
             ZStack(alignment: .bottomTrailing) {
@@ -238,7 +240,7 @@ struct FamilyActivityStripView: View {
             }
             Text(display)
                 .font(.system(size: 9, weight: .semibold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.65))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.65))
                 .lineLimit(1)
                 .frame(maxWidth: 44)
         }
@@ -265,7 +267,7 @@ struct FamilyActivityStripView: View {
             } else {
                 Image(systemName: "person.fill.questionmark")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
         .overlay(

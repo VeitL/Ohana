@@ -35,7 +35,7 @@ struct EmptyStateWelcomeCard: View {
                     .padding(.vertical, 13)
                     .background(Color.goLime, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel("添加宠物")
                 .accessibilityHint("打开添加成员界面")
 
@@ -50,7 +50,7 @@ struct EmptyStateWelcomeCard: View {
                     .padding(.vertical, 13)
                     .background(Color.white.opacity(0.6), in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel("添加家人")
                 .accessibilityHint("打开添加成员界面")
             }

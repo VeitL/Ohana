@@ -75,7 +75,7 @@ struct AddHumanWizardView: View {
     @State private var privateExpense  = false
 
     // ── Theme + Role
-    @State private var themeColorHex = "C8FF00"
+    @State private var themeColorHex = OhanaThemeColorPolicy.humanFallbackHex
     @State private var role          = "owner"
 
     // ── Wizard navigation
@@ -89,7 +89,7 @@ struct AddHumanWizardView: View {
     @State private var decodedAvatar:           UIImage? = nil
     @State private var decodedAvatarTransparent = false
 
-    private let totalCards = HumanWizardStep.allCases.count
+    private var totalCards: Int { isCreatingFirstHuman ? HumanWizardStep.allCases.count : 5 }
 
     private let bloodTypes     = ["A", "B", "AB", "O"]
     private let mbtiOptions: [String] = [
@@ -98,9 +98,9 @@ struct AddHumanWizardView: View {
     ]
     private let genderOptions = HumanProfileOptions.genderOptions
     private let themeColorOptions: [(hex: String, label: String)] = [
-        ("C8FF00","青柠"), ("FF7600","橙色"), ("5B6AFF","靛蓝"),
-        ("FF6B9D","粉色"), ("00E5C8","青色"), ("A855F7","紫色"),
-        ("FF4757","红色"), ("FDCB6E","金色")
+        ("FF7600","橙色"), ("EC4899","粉色"), ("A855F7","紫色"),
+        ("FF4757","红色"), ("F59E0B","金色"), ("14B8A6","青色"),
+        ("8B5CF6","靛蓝"), ("64748B","灰色")
     ]
 
     // MARK: - Computed
@@ -183,17 +183,14 @@ struct AddHumanWizardView: View {
     }
 
     private var canUseAutomatic2DAvatar: Bool {
-        Avatar2DAccess.hasAccess(kind: .human, existingCount: existingHumans.count)
+        Avatar2DAccess.usesFreeSlot(kind: .human, existingCount: existingHumans.count)
     }
 
     private var avatar2DStatusText: String {
         if Avatar2DAccess.usesFreeSlot(kind: .human, existingCount: existingHumans.count) {
-            return l.tr(zh: "首个人类成员默认使用 2.5D 头像。", en: "The first human member gets a 2.5D avatar by default.", de: "Das erste menschliche Mitglied erhält standardmäßig einen 2.5D-Avatar.")
+            return l.tr(zh: "推荐使用当前 2.5D 头像，可获得最佳卡片和首页体验。", en: "We recommend the current 2.5D avatar for the best card and Home experience.", de: "Wir empfehlen den aktuellen 2.5D-Avatar für die beste Karten- und Home-Erfahrung.")
         }
-        if Avatar2DAccess.extraPassCount > 0 {
-            return l.tr(zh: "将使用 1 张已购买的 2.5D 头像券。", en: "This will use 1 purchased 2.5D avatar pass.", de: "Dies nutzt 1 gekauften 2.5D-Avatar-Pass.")
-        }
-        return l.tr(zh: "更多 2.5D 头像需要在椰子商店购买解锁。", en: "More 2.5D avatars require an unlock from the Coconut Shop.", de: "Weitere 2.5D-Avatare müssen im Kokosnuss-Shop freigeschaltet werden.")
+        return l.tr(zh: "2.5D 头像需要后期在椰子商店购买，并指定给这个成员解锁。", en: "2.5D avatars can be unlocked later from the Coconut Shop for this member.", de: "2.5D-Avatare kannst du später im Kokosnuss-Shop für dieses Mitglied freischalten.")
     }
 
     // MARK: - Body
@@ -331,7 +328,6 @@ struct AddHumanWizardView: View {
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: themeColorHex)
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: nationalityCountry)
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: residenceCountry)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: residenceCity)
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: hasBirthday)
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: birthday)
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: mbti)
@@ -341,12 +337,20 @@ struct AddHumanWizardView: View {
 
     private var pagedCards: some View {
         TabView(selection: $wizardPageIndex) {
-            pagedCard { card1Identity }.tag(0)
-            pagedCard { card2Profile }.tag(1)
-            pagedCard { card3Avatar }.tag(2)
-            pagedCard { card4Family }.tag(3)
-            pagedCard { card5Body }.tag(4)
-            pagedCard { card6Confirm }.tag(5)
+            if isCreatingFirstHuman {
+                pagedCard { card1Identity }.tag(0)
+                pagedCard { card2Profile }.tag(1)
+                pagedCard { card3Avatar }.tag(2)
+                pagedCard { card4Family }.tag(3)
+                pagedCard { card5Body }.tag(4)
+                pagedCard { card6Confirm }.tag(5)
+            } else {
+                pagedCard { card1IdentityAndProfile }.tag(0)
+                pagedCard { card3Avatar }.tag(1)
+                pagedCard { card4Family }.tag(2)
+                pagedCard { card5Body }.tag(3)
+                pagedCard { card6Confirm }.tag(4)
+            }
         }
         .id(wizardTabViewRemountID)
         .tabViewStyle(.page(indexDisplayMode: .never))
@@ -366,6 +370,7 @@ struct AddHumanWizardView: View {
 
     private func wizardPageDotButton(index i: Int) -> some View {
         Button {
+            GoKeyboard.dismiss()
             withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
                 wizardPageIndex = i
             }
@@ -374,7 +379,7 @@ struct AddHumanWizardView: View {
                 .fill(i == wizardPageIndex ? Color.goPrimary : Color.primary.opacity(0.2))
                 .frame(width: i == wizardPageIndex ? 20 : 6, height: 6)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .animation(.spring(response: 0.3), value: wizardPageIndex)
     }
 
@@ -401,37 +406,61 @@ struct AddHumanWizardView: View {
             VStack(spacing: 18) {
                 meshCardLabel(l.humanWizMesh1).padding(.top, 14).padding(.horizontal, 20)
 
-                // Name field
-                VStack(alignment: .leading, spacing: 6) {
-                    cardSectionLabel(l.humanWizNameLabel)
-                    TextField(l.humanWizNamePlaceholder, text: $name)
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .multilineTextAlignment(.center)
-                        .textFieldStyle(.plain)
-                        .foregroundStyle(.primary)
-                        .padding(.vertical, 14).padding(.horizontal, 16)
-                        .background(Color.primary.opacity(0.08),
-                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .strokeBorder(
-                                    name.isEmpty         ? Color.red.opacity(0.4) :
-                                    isNameDuplicate      ? Color.orange.opacity(0.7)
-                                                         : Color.goPrimary.opacity(colorScheme == .dark ? 0.55 : 0.4),
-                                    lineWidth: 1.5
-                                )
-                        )
-                    if isNameDuplicate {
-                        Text(l.humanWizDupNameInline)
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(Color(hex: "FF6B00"))
-                            .padding(.leading, 4)
-                    }
-                }
+                humanNameSection
 
                 Spacer(minLength: 20)
             }
             .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 16)
+        }
+    }
+
+    private var card1IdentityAndProfile: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 18) {
+                meshCardLabel(l.humanWizMesh1).padding(.top, 14).padding(.horizontal, 20)
+                humanNameSection
+                Divider().opacity(0.15)
+                VStack(spacing: 22) {
+                    humanProfileFields
+                }
+                Spacer(minLength: 20)
+            }
+            .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 16)
+        }
+    }
+
+    private var humanNameSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            cardSectionLabel(l.humanWizNameLabel)
+            GoDraftTextField(
+                l.humanWizNamePlaceholder,
+                text: $name,
+                commitDelayNanoseconds: 160_000_000,
+                submitLabel: .done,
+                capitalization: .words
+            )
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .padding(.vertical, 14).padding(.horizontal, 16)
+                .background(Color.primary.opacity(0.08),
+                            in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(
+                            name.isEmpty         ? Color.red.opacity(0.4) :
+                            isNameDuplicate      ? Color.orange.opacity(0.7)
+                                                 : Color.goPrimary.opacity(colorScheme == .dark ? 0.55 : 0.4),
+                            lineWidth: 1.5
+                        )
+                )
+                .transaction { $0.animation = nil }
+            if isNameDuplicate {
+                Text(l.humanWizDupNameInline)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(hex: "FF6B00"))
+                    .padding(.leading, 4)
+            }
         }
     }
 
@@ -441,151 +470,152 @@ struct AddHumanWizardView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 22) {
                 meshCardLabel(l.humanWizMesh2).padding(.top, 14).padding(.horizontal, 20)
-
-                // Gender / identity
-                VStack(alignment: .leading, spacing: 10) {
-                    cardSectionLabel(l.humanWizGenderLabel)
-                    LazyVGrid(
-                        columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2),
-                        spacing: 8
-                    ) {
-                        ForEach(genderOptions, id: \.key) { opt in
-                            Button {
-                                gender = opt.key
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            } label: {
-                                VStack(spacing: 8) {
-                                    HumanSilhouetteView(gender: opt.key, accent: gender == opt.key ? .arkInk : accentColor)
-                                        .frame(width: 42, height: 48)
-                                    Text(l.humanGenderDisplay(opt.key))
-                                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                                        .foregroundStyle(gender == opt.key ? Color.arkInk : .primary)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(
-                                    gender == opt.key ? Color.goPrimary : Color.primary.opacity(0.07),
-                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .strokeBorder(gender == opt.key ? Color.goPrimary : .clear, lineWidth: 1.5)
-                                )
-                                .scaleEffect(gender == opt.key ? 0.97 : 1.0)
-                                .animation(.spring(response: 0.25), value: gender)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-
-                Divider().opacity(0.15)
-
-                // Birthday（滚轮在 Sheet 内，需点「完成」确认）
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        cardSectionLabel(l.humanWizBirthdayLabel)
-                        Spacer()
-                        Toggle("", isOn: $hasBirthday)
-                            .tint(Color.goPrimary)
-                            .labelsHidden()
-                    }
-                    if hasBirthday {
-                        Button {
-                            birthdayPickerDraft = birthday
-                            showBirthdayPickerSheet = true
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        } label: {
-                            HStack(alignment: .center, spacing: 12) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(birthday.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted)))
-                                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                                        .foregroundStyle(.primary)
-                                    Text(Human.westernZodiacDisplay(for: birthday, isEnglish: l.isEn))
-                                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                                        .foregroundStyle(Color.goPrimary)
-                                }
-                                Spacer()
-                                Image(systemName: "calendar")
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(Color.primary.opacity(0.45))
-                            }
-                            .padding(.horizontal, 14).padding(.vertical, 12)
-                            .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                        Text(l.humanWizBirthdayHint)
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary.opacity(0.55))
-                    }
-                }
-                .animation(.spring(response: 0.35), value: hasBirthday)
-
-                Divider().opacity(0.15)
-
-                // Blood type
-                VStack(alignment: .leading, spacing: 10) {
-                    cardSectionLabel(l.humanWizBloodLabel)
-                    HStack(spacing: 10) {
-                        ForEach(bloodTypes, id: \.self) { bt in
-                            Button {
-                                bloodType = bloodType == bt ? "" : bt
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            } label: {
-                                Text(bt)
-                                    .font(.system(size: 18, weight: .black, design: .rounded))
-                                    .foregroundStyle(bloodType == bt ? Color.arkInk : .primary)
-                                    .frame(maxWidth: .infinity).padding(.vertical, 14)
-                                    .background(
-                                        bloodType == bt ? Color.goPrimary : Color.primary.opacity(0.08),
-                                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    )
-                                    .scaleEffect(bloodType == bt ? 0.96 : 1.0)
-                                    .animation(.spring(response: 0.25), value: bloodType)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-
-                Divider().opacity(0.15)
-
-                // MBTI（可选）
-                VStack(alignment: .leading, spacing: 10) {
-                    cardSectionLabel(l.humanWizMbtiLabel)
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            Button {
-                                mbti = ""
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            } label: {
-                                Text(l.humanWizSkipChip)
-                                    .font(.system(size: 13, weight: mbti.isEmpty ? .bold : .medium, design: .rounded))
-                                    .foregroundStyle(mbti.isEmpty ? Color.arkInk : .primary.opacity(0.75))
-                                    .padding(.horizontal, 14).padding(.vertical, 8)
-                                    .background(mbti.isEmpty ? Color.goPrimary : Color.primary.opacity(0.08), in: Capsule())
-                            }
-                            .buttonStyle(.plain)
-                            ForEach(mbtiOptions, id: \.self) { code in
-                                Button {
-                                    mbti = (mbti == code) ? "" : code
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                } label: {
-                                    Text(code)
-                                        .font(.system(size: 12, weight: mbti == code ? .bold : .semibold, design: .rounded))
-                                        .foregroundStyle(mbti == code ? Color.arkInk : .primary.opacity(0.75))
-                                        .padding(.horizontal, 11).padding(.vertical, 8)
-                                        .background(mbti == code ? Color.goPrimary : Color.primary.opacity(0.08), in: Capsule())
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-                }
+                humanProfileFields
 
                 Spacer(minLength: 20)
             }
             .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 16)
+        }
+    }
+
+    @ViewBuilder
+    private var humanProfileFields: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            cardSectionLabel(l.humanWizGenderLabel)
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2),
+                spacing: 8
+            ) {
+                ForEach(genderOptions, id: \.key) { opt in
+                    Button {
+                        gender = opt.key
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        VStack(spacing: 8) {
+                            HumanSilhouetteView(gender: opt.key, accent: gender == opt.key ? .arkInk : accentColor)
+                                .frame(width: 42, height: 48)
+                            Text(l.humanGenderDisplay(opt.key))
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundStyle(gender == opt.key ? Color.arkInk : .primary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(
+                            gender == opt.key ? Color.goPrimary : Color.primary.opacity(0.07),
+                            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .strokeBorder(gender == opt.key ? Color.goPrimary : .clear, lineWidth: 1.5)
+                        )
+                        .scaleEffect(gender == opt.key ? 0.97 : 1.0)
+                        .animation(.spring(response: 0.25), value: gender)
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
+            }
+        }
+
+        Divider().opacity(0.15)
+
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                cardSectionLabel(l.humanWizBirthdayLabel)
+                Spacer()
+                Toggle("", isOn: $hasBirthday)
+                    .tint(Color.goPrimary)
+                    .labelsHidden()
+            }
+            if hasBirthday {
+                Button {
+                    GoKeyboard.dismiss()
+                    birthdayPickerDraft = birthday
+                    showBirthdayPickerSheet = true
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                } label: {
+                    HStack(alignment: .center, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(birthday.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted)))
+                                .font(.system(size: 17, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color.ohanaPrimaryText)
+                            Text(Human.westernZodiacDisplay(for: birthday, isEnglish: l.isEn))
+                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color.goPrimary)
+                        }
+                        Spacer()
+                        Image(systemName: "calendar")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.primary.opacity(0.45))
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 12)
+                    .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(ScaleButtonStyle())
+                Text(l.humanWizBirthdayHint)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.55))
+            }
+        }
+        .animation(.spring(response: 0.35), value: hasBirthday)
+
+        Divider().opacity(0.15)
+
+        VStack(alignment: .leading, spacing: 10) {
+            cardSectionLabel(l.humanWizBloodLabel)
+            HStack(spacing: 10) {
+                ForEach(bloodTypes, id: \.self) { bt in
+                    Button {
+                        bloodType = bloodType == bt ? "" : bt
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        Text(bt)
+                            .font(.system(size: 18, weight: .black, design: .rounded))
+                            .foregroundStyle(bloodType == bt ? Color.arkInk : .primary)
+                            .frame(maxWidth: .infinity).padding(.vertical, 14)
+                            .background(
+                                bloodType == bt ? Color.goPrimary : Color.primary.opacity(0.08),
+                                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            )
+                            .scaleEffect(bloodType == bt ? 0.96 : 1.0)
+                            .animation(.spring(response: 0.25), value: bloodType)
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
+            }
+        }
+
+        Divider().opacity(0.15)
+
+        VStack(alignment: .leading, spacing: 10) {
+            cardSectionLabel(l.humanWizMbtiLabel)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    Button {
+                        mbti = ""
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        Text(l.humanWizSkipChip)
+                            .font(.system(size: 13, weight: mbti.isEmpty ? .bold : .medium, design: .rounded))
+                            .foregroundStyle(mbti.isEmpty ? Color.arkInk : .primary.opacity(0.75))
+                            .padding(.horizontal, 14).padding(.vertical, 8)
+                            .background(mbti.isEmpty ? Color.goPrimary : Color.primary.opacity(0.08), in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    ForEach(mbtiOptions, id: \.self) { code in
+                        Button {
+                            mbti = (mbti == code) ? "" : code
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        } label: {
+                            Text(code)
+                                .font(.system(size: 12, weight: mbti == code ? .bold : .semibold, design: .rounded))
+                                .foregroundStyle(mbti == code ? Color.arkInk : .primary.opacity(0.75))
+                                .padding(.horizontal, 11).padding(.vertical, 8)
+                                .background(mbti == code ? Color.goPrimary : Color.primary.opacity(0.08), in: Capsule())
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                    }
+                }
+            }
         }
     }
 
@@ -609,6 +639,22 @@ struct AddHumanWizardView: View {
                     Text(avatar2DStatusText)
                         .font(.system(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(canUseAutomatic2DAvatar ? Color.goPrimary.opacity(0.85) : .secondary.opacity(0.65))
+                    if canUseAutomatic2DAvatar && !usesAutomaticAvatarAsset {
+                        Button {
+                            restoreAutomaticAvatarAsset()
+                        } label: {
+                            Label(
+                                l.tr(zh: "恢复 2.5D 头像", en: "Restore 2.5D avatar", de: "2.5D-Avatar wiederherstellen"),
+                                systemImage: "sparkles"
+                            )
+                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.arkInk)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 11)
+                            .background(Color.goPrimary, in: Capsule())
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                    }
                 }
 
                 Spacer(minLength: 20)
@@ -638,7 +684,7 @@ struct AddHumanWizardView: View {
                     cardSectionLabel(l.humanWizNationalityLabel)
                     Text(l.humanWizNationalityHint)
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary.opacity(0.65))
+                        .foregroundStyle(Color.ohanaSecondaryText.opacity(0.65))
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             Button {
@@ -654,7 +700,7 @@ struct AddHumanWizardView: View {
                                         in: Capsule()
                                     )
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ScaleButtonStyle())
                             ForEach(PetBreedDatabase.countries, id: \.self) { country in
                                 Button {
                                     nationalityCountry = nationalityCountry == country ? "" : country
@@ -669,7 +715,7 @@ struct AddHumanWizardView: View {
                                             in: Capsule()
                                         )
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(ScaleButtonStyle())
                             }
                         }
                     }
@@ -682,7 +728,7 @@ struct AddHumanWizardView: View {
                     cardSectionLabel(l.humanWizResidenceLabel)
                     Text(l.humanWizResidenceHint)
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary.opacity(0.65))
+                        .foregroundStyle(Color.ohanaSecondaryText.opacity(0.65))
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             Button {
@@ -700,7 +746,7 @@ struct AddHumanWizardView: View {
                                         in: Capsule()
                                     )
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ScaleButtonStyle())
                             ForEach(PetBreedDatabase.countries, id: \.self) { country in
                                 Button {
                                     if residenceCountry == country {
@@ -723,7 +769,7 @@ struct AddHumanWizardView: View {
                                             in: Capsule()
                                         )
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(ScaleButtonStyle())
                             }
                         }
                     }
@@ -754,15 +800,22 @@ struct AddHumanWizardView: View {
                                             in: RoundedRectangle(cornerRadius: 10, style: .continuous)
                                         )
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(ScaleButtonStyle())
                             }
                         }
                         if isCustomResidenceCity {
-                            TextField(l.humanWizResidenceCityPlaceholder, text: $residenceCity)
+                            GoDraftTextField(
+                                l.humanWizResidenceCityPlaceholder,
+                                text: $residenceCity,
+                                commitDelayNanoseconds: 180_000_000,
+                                submitLabel: .done,
+                                capitalization: .words
+                            )
                                 .font(.system(size: 15, weight: .medium, design: .rounded))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                                 .padding(12)
                                 .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .transaction { $0.animation = nil }
                         }
                     }
                 }
@@ -773,12 +826,19 @@ struct AddHumanWizardView: View {
                     HStack(alignment: .top, spacing: 10) {
                         Image(systemName: "note.text")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                             .padding(.top, 2)
-                        TextField(l.humanWizNotesPlaceholder, text: $notes, axis: .vertical)
+                        GoDraftTextField(
+                            l.humanWizNotesPlaceholder,
+                            text: $notes,
+                            axis: .vertical,
+                            commitDelayNanoseconds: 220_000_000,
+                            submitLabel: .done
+                        )
                             .font(.system(size: 15, weight: .medium, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(3...5)
+                            .transaction { $0.animation = nil }
                     }
                     .padding(14)
                     .background(Color.primary.opacity(0.07),
@@ -813,7 +873,7 @@ struct AddHumanWizardView: View {
                     }
                     Text(l.humanWizWeightFootnote)
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary.opacity(0.5))
+                        .foregroundStyle(Color.ohanaSecondaryText.opacity(0.5))
                 }
 
                 Divider().opacity(0.15)
@@ -823,7 +883,7 @@ struct AddHumanWizardView: View {
                     cardSectionLabel(l.humanWizPrivacyLabel)
                     Text(l.humanWizPrivacyHint)
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary.opacity(0.6))
+                        .foregroundStyle(Color.ohanaSecondaryText.opacity(0.6))
                     VStack(spacing: 8) {
                         privacyRow(l.humanWizPrivacyWeight, emoji: "⚖️", binding: $privateWeight)
                         privacyRow(l.humanWizPrivacyWorkout, emoji: "🏋️", binding: $privateWorkout)
@@ -874,10 +934,10 @@ struct AddHumanWizardView: View {
                                             .animation(.spring(response: 0.25), value: themeColorHex)
                                         Text(l.humanThemeSwatchLabel(opt.label))
                                             .font(.system(size: 10, weight: .bold, design: .rounded))
-                                            .foregroundStyle(.primary.opacity(themeColorHex == opt.hex ? 1 : 0.4))
+                                            .foregroundStyle(Color.ohanaPrimaryText.opacity(themeColorHex == opt.hex ? 1 : 0.4))
                                     }
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(ScaleButtonStyle())
                             }
                         }
                         .padding(.horizontal, 2)
@@ -920,6 +980,7 @@ struct AddHumanWizardView: View {
                         if isNameDuplicate { showDuplicateNameAlert = true }
                         return
                     }
+                    GoKeyboard.dismiss()
                     UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                     saveHuman()
                 } label: {
@@ -959,7 +1020,7 @@ struct AddHumanWizardView: View {
                 de: "Als erstes Mitglied legst du Währung und Einheiten für die App fest."
             ))
             .font(.system(size: 12, weight: .medium, design: .rounded))
-            .foregroundStyle(.secondary.opacity(0.65))
+            .foregroundStyle(Color.ohanaSecondaryText.opacity(0.65))
 
             VStack(spacing: 10) {
                 appPreferenceMenuRow(
@@ -1018,10 +1079,10 @@ struct AddHumanWizardView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text(value)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
@@ -1038,11 +1099,11 @@ struct AddHumanWizardView: View {
         .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    /// 卡内小节标题（与 `AddPetWizardView` 卡内 `Text(…).foregroundStyle(.secondary)` 同级）
+    /// 卡内小节标题（与 `AddPetWizardView` 卡内 `Text(…).foregroundStyle(Color.ohanaSecondaryText)` 同级）
     private func cardSectionLabel(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 11, weight: .bold, design: .rounded))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.ohanaSecondaryText)
     }
 
     /// 生日滚轮 Sheet：选日期后点「完成」写回 `birthday`
@@ -1095,7 +1156,7 @@ struct AddHumanWizardView: View {
                 .foregroundStyle(accent)
             Text(label)
                 .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.65))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.65))
         }
         .frame(maxWidth: .infinity).padding(.vertical, 12)
         .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -1117,15 +1178,23 @@ struct AddHumanWizardView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
                     .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundStyle(.secondary)
-                TextField(placeholder, text: text)
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                GoDraftTextField(
+                    placeholder,
+                    text: text,
+                    commitDelayNanoseconds: 140_000_000,
+                    keyboardType: .decimalPad,
+                    submitLabel: .done,
+                    capitalization: .never
+                )
                     .keyboardType(.decimalPad)
                     .font(.system(size: 17, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .transaction { $0.animation = nil }
             }
             Text(unit)
                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .padding(14)
         .frame(maxWidth: .infinity)
@@ -1137,7 +1206,7 @@ struct AddHumanWizardView: View {
             Text(emoji).font(.system(size: 20)).frame(width: 28)
             Text(title)
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Toggle("", isOn: binding)
                 .tint(Color.goPrimary)
@@ -1164,10 +1233,10 @@ struct AddHumanWizardView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Text(desc)
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 if isSelected {
@@ -1186,7 +1255,7 @@ struct AddHumanWizardView: View {
                     .strokeBorder(isSelected ? accentColor.opacity(0.4) : .clear, lineWidth: 1.5)
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .animation(.spring(response: 0.25), value: role)
     }
 
@@ -1261,6 +1330,13 @@ struct AddHumanWizardView: View {
         )
     }
 
+    private func restoreAutomaticAvatarAsset() {
+        guard canUseAutomatic2DAvatar else { return }
+        usesAutomaticAvatarAsset = true
+        refreshAutomaticAvatarAssetData()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
     private func scheduleAvatarDecode() {
         guard let data = avatarImageData, !data.isEmpty else {
             decodedAvatar = nil; decodedAvatarTransparent = false; return
@@ -1308,7 +1384,10 @@ struct AddHumanWizardView: View {
         let shouldUseAutomaticAvatar = usesAutomaticAvatarAsset && canUseAutomatic2DAvatar
         let finalAvatarData = shouldUseAutomaticAvatar ? automaticHumanAvatarData() : avatarImageData
         human.avatarImageData = finalAvatarData
-        human.themeColorHex   = themeColorHex
+        human.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
+            themeColorHex,
+            fallback: OhanaThemeColorPolicy.humanFallbackHex
+        )
         human.shouldShowOnHome = true
         human.mbti = mbti.trimmingCharacters(in: .whitespaces).uppercased()
         if let h = Double(heightText), h > 0 { human.heightCm = h }
@@ -1352,12 +1431,12 @@ struct AddHumanWizardView: View {
 private struct FlowTagRow: View {
     let tags: [String]
     var emptyHint: String
-    var accent: Color = Color(hex: "C8FF00")
+    var accent: Color = Color(hex: OhanaThemeColorPolicy.humanFallbackHex)
     var body: some View {
         if tags.isEmpty {
             Text(emptyHint)
                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary.opacity(0.5))
+                .foregroundStyle(Color.ohanaSecondaryText.opacity(0.5))
         } else {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {

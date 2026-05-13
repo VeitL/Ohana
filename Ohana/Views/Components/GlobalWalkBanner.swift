@@ -112,7 +112,7 @@ struct GlobalWalkBanner: View {
                 }
                 Image(systemName: "figure.walk")
                     .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
             }
         }
         .frame(width: 64, height: 64)
@@ -162,14 +162,14 @@ struct GlobalWalkBanner: View {
                         }
                         Text(pet.name)
                             .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                     }
                 }
                 Spacer()
                 Button { withAnimation { isMinimized = true } } label: {
                     Image(systemName: "minus.circle.fill")
                         .font(.system(size: 22))
-                        .foregroundStyle(.primary.opacity(0.4))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
             }
             .padding(.horizontal, 20).padding(.top, 18)
@@ -182,7 +182,7 @@ struct GlobalWalkBanner: View {
                     TimelineView(.periodic(from: .now, by: 1)) { _ in
                         Text(formatElapsed(mgr.elapsedTime))
                             .font(.system(size: 26, weight: .black, design: .monospaced))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                     }
                 }
                 Rectangle().fill(.white.opacity(0.1)).frame(width: 1, height: 40)
@@ -190,7 +190,7 @@ struct GlobalWalkBanner: View {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text(String(format: "%.2f", LocationManager.shared.totalDistance / 1000))
                             .font(.system(size: 26, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text("km").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.goTeal)
                     }
                 }
@@ -199,7 +199,7 @@ struct GlobalWalkBanner: View {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text("\(mgr.poopCount)")
                             .font(.system(size: 26, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text("💩").font(.system(size: 14))
                     }
                 }
@@ -243,12 +243,12 @@ struct GlobalWalkBanner: View {
                 } label: {
                     Label("结束", systemImage: "stop.fill")
                         .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(maxWidth: .infinity).padding(.vertical, 13)
                         .background(Color.goRed, in: RoundedRectangle(cornerRadius: 14))
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 20).padding(.vertical, 14)
         }
         .background(walkPanelFill, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
@@ -323,7 +323,7 @@ struct GlobalWalkBanner: View {
                             .foregroundStyle(Color.goPrimary)
                         Text(pet.name)
                             .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                     }
                 }
                 Spacer()
@@ -337,11 +337,11 @@ struct GlobalWalkBanner: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 28))
-                        .foregroundStyle(.primary.opacity(0.7))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                 }
                 .frame(width: 52, height: 52)
                 .contentShape(Rectangle())
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
             .padding(.horizontal, 18).padding(.top, 12)
 
@@ -363,14 +363,14 @@ struct GlobalWalkBanner: View {
                                     Text("在地图中查看")
                                         .font(.system(size: 11, weight: .bold, design: .rounded))
                                 }
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                                 .padding(.horizontal, 10).padding(.vertical, 5)
                                 .background(.black.opacity(0.45), in: Capsule())
                                 .padding(8),
                                 alignment: .bottomTrailing
                             )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 } else if !coords.isEmpty, let region = routeRegion(for: coords) {
                     Map(initialPosition: .region(region)) {
                         if coords.count >= 2 {
@@ -417,8 +417,8 @@ struct GlobalWalkBanner: View {
                         .frame(maxWidth: .infinity).frame(height: 108)
                         .overlay(
                             HStack(spacing: 6) {
-                                Image(systemName: "map").font(.system(size: 20)).foregroundStyle(.primary.opacity(0.2))
-                                Text("地图生成中…").font(.system(size: 12)).foregroundStyle(.primary.opacity(0.3))
+                                Image(systemName: "map").font(.system(size: 20)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
+                                Text("地图生成中…").font(.system(size: 12)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                             }
                         )
                 }
@@ -447,7 +447,7 @@ struct GlobalWalkBanner: View {
             value()
             Text(label)
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.4))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
         }
         .frame(maxWidth: .infinity)
     }
@@ -457,12 +457,12 @@ struct GlobalWalkBanner: View {
         VStack(spacing: 3) {
             Text(value)
                 .font(.system(size: 18, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Text(label)
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.4))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
         }
         .frame(maxWidth: .infinity)
     }

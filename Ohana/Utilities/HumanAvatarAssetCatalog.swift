@@ -114,12 +114,20 @@ enum Avatar2DAccess {
         UserDefaults.standard.set(extraPassCount + count, forKey: extraPassInventoryKey)
     }
 
+    @discardableResult
+    static func consumeExtraPass() -> Bool {
+        let passes = extraPassCount
+        guard passes > 0 else { return false }
+        UserDefaults.standard.set(passes - 1, forKey: extraPassInventoryKey)
+        return true
+    }
+
     static var extraPassCount: Int {
         UserDefaults.standard.integer(forKey: extraPassInventoryKey)
     }
 
     private static func freeSlotAvailable(kind: Kind, existingCount: Int) -> Bool {
-        existingCount == 0 && !UserDefaults.standard.bool(forKey: freeUsedKey(kind))
+        existingCount == 0
     }
 
     private static func markFreeSlotUsed(kind: Kind) {

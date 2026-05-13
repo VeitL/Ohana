@@ -1,0 +1,337 @@
+//
+//  FocusHomeModels.swift
+//  Ohana
+//
+//  Lightweight model helpers for the GO Focus home wallet.
+//
+
+import Foundation
+import SwiftUI
+
+struct FocusCard: Identifiable {
+    let id: UUID
+    let name: String
+    let kind: String
+    let emoji: String
+    let color: Color
+    let streak: Int
+    let coconutBalance: Int
+    var createdAt: Date = .distantPast
+    var daysTogetherText: String?
+    var ageText: String?
+    var zodiacText: String?
+    var mbtiText: String?
+    var humanEquivalentAgeText: String?
+    var genderText: String?
+    var personalityHint: String?
+    var avatarImageData: Data?
+    var humanGender: String? = nil
+    var petSpecies: String?
+    var coatColor: Color = Color(hex: "E8C49A")
+    var eyeColor: Color = Color(hex: "6B3A2A")
+    var patternName: String?
+    var themeColorHex: String = ""
+    var daysTogether: Int = 0
+    var breed: String = ""
+    var isShownOnHome: Bool = true
+    var isHuman: Bool = false
+    var isDummy: Bool = false
+    var isReal: Bool = false
+    var actions: [Action]
+
+    struct Action: Identifiable {
+        let id = UUID()
+        let label: String
+        let icon: String
+        let colorHex: String
+    }
+}
+
+struct HomeFabFunctionShortcut: Identifiable {
+    var label: String
+    var icon: String
+    var isAvailable: Bool = true
+    var badge: String? = nil
+    var destination: FMDest? = nil
+
+    var id: String { label }
+}
+
+enum ExpandedCardFabAction: Hashable {
+    case quick(String)
+    case detail(PetFeature)
+    case allFeatures
+    case humanQuick(String)
+    case humanAllFeatures
+}
+
+struct ExpandedCardFabShortcut: Identifiable {
+    var label: String
+    var icon: String
+    var action: ExpandedCardFabAction
+    var isAvailable: Bool = true
+    var badge: String? = nil
+
+    var id: String { "\(label)-\(String(describing: action))" }
+}
+
+struct FunctionMenuPresentation: Identifiable {
+    let id = UUID()
+    let destination: FMDest?
+}
+
+extension FocusCard {
+    static func from(_ pet: Pet) -> FocusCard {
+        let isDog = pet.species.contains("狗") || pet.species.lowercased().contains("dog")
+        let isCat = pet.species.contains("猫") || pet.species.lowercased().contains("cat")
+        let isFish = pet.species.contains("鱼") || pet.species.lowercased().contains("fish")
+        let isBird = pet.species.contains("鸟") || pet.species.lowercased().contains("bird")
+        let isRabbit = pet.species.contains("兔") || pet.species.lowercased().contains("rabbit")
+        let isReptile = pet.species.contains("爬") || pet.species.contains("龟") || pet.species.contains("蛇") || pet.species.contains("蜥") || pet.species.contains("守宫") || pet.species.lowercased().contains("reptile")
+
+        var acts: [Action] = [.init(label: "FEED", icon: "fork.knife", colorHex: "FFDD44")]
+        if isFish {
+            acts += [.init(label: "WATER", icon: "drop.circle", colorHex: "00D4AA"),
+                     .init(label: "FILTER", icon: "wrench.and.screwdriver", colorHex: "A78BFA")]
+        } else if isBird {
+            acts += [.init(label: "WATER", icon: "drop", colorHex: "00D4AA"),
+                     .init(label: "CAGE", icon: "basket", colorHex: "FFD166"),
+                     .init(label: "FLIGHT", icon: "bird", colorHex: "06D6A0")]
+        } else if isReptile {
+            acts += [.init(label: "MIST", icon: "cloud.drizzle", colorHex: "118AB2"),
+                     .init(label: "SUBSTRATE", icon: "leaf", colorHex: "07DB8B"),
+                     .init(label: "PLAY", icon: "sparkles", colorHex: "F472B6")]
+        } else if isDog {
+            acts += [.init(label: "WALK", icon: "figure.walk", colorHex: "14B8A6"),
+                     .init(label: "WATER", icon: "drop", colorHex: "00D4AA"),
+                     .init(label: "POTTY", icon: "allergens", colorHex: "A78BFA")]
+        } else if isCat {
+            acts += [.init(label: "WATER", icon: "drop", colorHex: "00D4AA"),
+                     .init(label: "LITTER", icon: "trash", colorHex: "5B6AFF"),
+                     .init(label: "PLAY", icon: "sparkles", colorHex: "F472B6")]
+        } else if isRabbit {
+            acts += [.init(label: "WATER", icon: "drop", colorHex: "00D4AA"),
+                     .init(label: "LITTER", icon: "trash", colorHex: "5B6AFF"),
+                     .init(label: "GROOM", icon: "comb", colorHex: "FF8C42")]
+        } else {
+            acts += [.init(label: "WATER", icon: "drop", colorHex: "00D4AA"),
+                     .init(label: "PLAY", icon: "sparkles", colorHex: "F472B6")]
+        }
+
+        let hex = pet.safeThemeColorHex
+        let language = UserDefaults.standard.string(forKey: "appLanguage") ?? "zh"
+        let l = L10n(language)
+        let usesEnglishFallback = AppLanguage.normalize(language) != "zh"
+        let hour = Calendar.current.component(.hour, from: Date())
+        return FocusCard(
+            id: pet.id,
+            name: pet.name.isEmpty ? l.tr(zh: "未命名", en: "Unnamed", de: "Unbenannt") : pet.name,
+            kind: pet.species.isEmpty ? "PET" : pet.species,
+            emoji: pet.avatarEmoji.isEmpty ? "🐾" : pet.avatarEmoji,
+            color: Color(hex: hex),
+            streak: pet.currentStreak,
+            coconutBalance: pet.coconutBalance,
+            createdAt: pet.createdAt,
+            daysTogetherText: pet.homeDate == nil ? nil : l.tr(
+                zh: "\(pet.daysTogether) 天",
+                en: "\(pet.daysTogether) days",
+                de: "\(pet.daysTogether) Tage"
+            ),
+            ageText: pet.birthday.map { pet.localizedAgeTextForWallet(birthday: $0, l: l) },
+            zodiacText: pet.birthday.map { Human.westernZodiacDisplay(for: $0, isEnglish: usesEnglishFallback) },
+            humanEquivalentAgeText: pet.birthday.map { pet.humanEquivalentAgeTextForWallet(birthday: $0, l: l) },
+            genderText: pet.genderSymbol + (pet.isNeutered ? l.tr(zh: " 已绝育", en: " neutered", de: " kastriert") : ""),
+            personalityHint: PetTagGreeting.homeSubtitleHint(pet: pet, hour: hour, l: L10n(language)),
+            avatarImageData: pet.avatarImageData,
+            petSpecies: pet.species,
+            coatColor: WalletPetCardTheme.silhouetteCoatColor(for: pet),
+            eyeColor: WalletPetCardTheme.silhouetteEyeColor(for: pet),
+            patternName: WalletPetCardTheme.coatPatternName(for: pet),
+            themeColorHex: hex,
+            daysTogether: pet.homeDate == nil ? 0 : pet.daysTogether,
+            breed: pet.breed,
+            isReal: true,
+            actions: Array(acts.prefix(4))
+        )
+    }
+
+    static func from(_ human: Human) -> FocusCard {
+        let hex = human.safeThemeColorHex
+        let days = max(0, Calendar.current.dateComponents([.day], from: human.createdAt, to: Date()).day ?? 0)
+        let language = AppLanguage.code
+        let l = L10n(language)
+        let usesEnglishFallback = language != "zh"
+        return FocusCard(
+            id: human.id,
+            name: human.name.isEmpty ? l.tr(zh: "成员", en: "Human", de: "Mitglied") : human.name,
+            kind: human.roleText.isEmpty ? "HUMAN" : human.roleText,
+            emoji: human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji,
+            color: Color(hex: hex),
+            streak: 0,
+            coconutBalance: human.coconutBalance,
+            createdAt: human.createdAt,
+            daysTogetherText: l.tr(
+                zh: "\(days) 天",
+                en: "\(days) days",
+                de: "\(days) Tage"
+            ),
+            ageText: human.birthday.map { human.localizedAgeTextForWallet(birthday: $0, l: l) },
+            zodiacText: human.birthday.map { Human.westernZodiacDisplay(for: $0, isEnglish: usesEnglishFallback) },
+            mbtiText: human.mbti.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : human.mbti.uppercased(),
+            genderText: HumanGenderIdentity.title(for: human.genderRaw),
+            avatarImageData: human.avatarImageData,
+            humanGender: human.genderRaw,
+            themeColorHex: hex,
+            daysTogether: days,
+            isShownOnHome: human.shouldShowOnHome,
+            isHuman: true,
+            isReal: true,
+            actions: [.init(label: "WEIGHT", icon: "scalemass", colorHex: "80FFEA"),
+                      .init(label: "WORKOUT", icon: "figure.run", colorHex: "F97316"),
+                      .init(label: "NOTE", icon: "note.text", colorHex: "5B6AFF")]
+        )
+    }
+
+    static let dummies: [FocusCard] = [
+        FocusCard(id: UUID(), name: "Mochi", kind: "DOG", emoji: "🐶",
+                  color: Color(hex: "F4A7B9"), streak: 7, coconutBalance: 42,
+                  petSpecies: "狗", coatColor: Color(hex: "D7A76D"), eyeColor: Color(hex: "57341E"),
+                  isDummy: true,
+                  actions: [.init(label: "FEED", icon: "fork.knife", colorHex: "FFDD44"),
+                             .init(label: "WALK", icon: "figure.walk", colorHex: "14B8A6"),
+                             .init(label: "WATER", icon: "drop", colorHex: "00D4AA"),
+                             .init(label: "POTTY", icon: "allergens", colorHex: "A78BFA")]),
+
+        FocusCard(id: UUID(), name: "Luna", kind: "CAT", emoji: "🐱",
+                  color: Color(hex: "C9B6E4"), streak: 12, coconutBalance: 66,
+                  petSpecies: "猫", coatColor: Color(hex: "9CA7B2"), eyeColor: Color(hex: "7A4E20"),
+                  isDummy: true,
+                  actions: [.init(label: "FEED", icon: "fork.knife", colorHex: "FFDD44"),
+                             .init(label: "WATER", icon: "drop", colorHex: "00D4AA"),
+                             .init(label: "LITTER", icon: "trash", colorHex: "5B6AFF"),
+                             .init(label: "PLAY", icon: "sparkles", colorHex: "F472B6")]),
+
+        FocusCard(id: UUID(), name: "Alex", kind: "HUMAN", emoji: "🧑‍💻",
+                  color: Color(hex: "B9E8D2"), streak: 3, coconutBalance: 18,
+                  isHuman: true, isDummy: true,
+                  actions: [.init(label: "WEIGHT", icon: "scalemass", colorHex: "80FFEA"),
+                             .init(label: "WORKOUT", icon: "figure.run", colorHex: "F97316"),
+                             .init(label: "NOTE", icon: "note.text", colorHex: "5B6AFF")]),
+
+        FocusCard(id: UUID(), name: "Nemo", kind: "FISH", emoji: "🐟",
+                  color: Color(hex: "C7E7F1"), streak: 4, coconutBalance: 24,
+                  petSpecies: "鱼", isDummy: true,
+                  actions: [.init(label: "FEED", icon: "fork.knife", colorHex: "FFDD44"),
+                             .init(label: "WATER", icon: "drop.circle", colorHex: "00D4AA"),
+                             .init(label: "FILTER", icon: "wrench.and.screwdriver", colorHex: "A78BFA")]),
+    ]
+}
+
+extension Pet {
+    func localizedAgeTextForWallet(birthday: Date, l: L10n) -> String {
+        let components = Calendar.current.dateComponents([.year, .month], from: birthday, to: Date())
+        let years = max(0, components.year ?? 0)
+        let months = max(0, components.month ?? 0)
+        if years > 0 {
+            if months > 0 {
+                return l.tr(
+                    zh: "\(years)岁\(months)月",
+                    en: "\(years)y \(months)m",
+                    de: "\(years) J. \(months) Mon."
+                )
+            }
+            return l.tr(zh: "\(years)岁", en: "\(years)y", de: "\(years) J.")
+        }
+        return l.tr(zh: "\(months)个月", en: "\(months)m", de: "\(months) Mon.")
+    }
+
+    func humanEquivalentAgeTextForWallet(birthday: Date, l: L10n) -> String {
+        let equivalent = FocusPetHumanAgeEstimator.equivalentHumanYears(
+            birthday: birthday,
+            species: species,
+            breed: breed
+        )
+        guard equivalent > 0 else { return "" }
+        return l.tr(
+            zh: "约人类\(equivalent)岁",
+            en: "about \(equivalent) human years",
+            de: "ca. \(equivalent) Menschenjahre"
+        )
+    }
+}
+
+extension Human {
+    func localizedAgeTextForWallet(birthday: Date, l: L10n) -> String {
+        let years = max(0, Calendar.current.dateComponents([.year], from: birthday, to: Date()).year ?? 0)
+        if years >= 1 {
+            return l.tr(zh: "\(years)岁", en: "\(years)y", de: "\(years) J.")
+        }
+        return l.tr(zh: "不满1岁", en: "Under 1", de: "Unter 1")
+    }
+}
+
+enum FocusPetHumanAgeEstimator {
+    static func equivalentHumanYears(birthday: Date, species: String, breed: String) -> Int {
+        let ageYears = max(0, Calendar.current.dateComponents([.day], from: birthday, to: Date()).day ?? 0) / 365
+        let preciseAge = max(0, Double(Calendar.current.dateComponents([.day], from: birthday, to: Date()).day ?? 0) / 365.25)
+        let normalizedSpecies = species.lowercased()
+
+        if species.contains("狗") || normalizedSpecies.contains("dog") {
+            return dogHumanYears(age: preciseAge, breed: breed)
+        }
+        if species.contains("猫") || normalizedSpecies.contains("cat") {
+            return catHumanYears(age: preciseAge)
+        }
+        if species.contains("兔") || normalizedSpecies.contains("rabbit") {
+            return Int((preciseAge * 8.0).rounded())
+        }
+        if species.contains("仓鼠") || normalizedSpecies.contains("hamster") {
+            return Int((preciseAge * 26.0).rounded())
+        }
+        if species.contains("鸟") || normalizedSpecies.contains("bird") {
+            return Int((preciseAge * 5.0).rounded())
+        }
+        if species.contains("鱼") || normalizedSpecies.contains("fish") {
+            return Int((preciseAge * 6.0).rounded())
+        }
+        return max(0, ageYears)
+    }
+
+    private static func dogHumanYears(age: Double, breed: String) -> Int {
+        guard age > 0 else { return 0 }
+        if age <= 1 { return Int((age * 15).rounded()) }
+        if age <= 2 { return Int((15 + (age - 1) * 9).rounded()) }
+
+        let increment: Double
+        switch dogSize(for: breed) {
+        case .small: increment = 4
+        case .medium: increment = 5
+        case .large: increment = 6
+        case .giant: increment = 7
+        }
+        return Int((24 + (age - 2) * increment).rounded())
+    }
+
+    private static func catHumanYears(age: Double) -> Int {
+        guard age > 0 else { return 0 }
+        if age <= 1 { return Int((age * 15).rounded()) }
+        if age <= 2 { return Int((15 + (age - 1) * 9).rounded()) }
+        return Int((24 + (age - 2) * 4).rounded())
+    }
+
+    private enum DogSize { case small, medium, large, giant }
+
+    private static func dogSize(for breed: String) -> DogSize {
+        let b = breed.lowercased()
+        if ["马尔济斯", "约克夏", "博美", "比熊", "西施", "查理王", "泰迪", "贵宾", "腊肠", "法斗", "法国斗牛", "corgi", "poodle", "yorkshire", "pomeranian", "bichon", "maltese", "dachshund", "shih"].contains(where: { b.contains($0.lowercased()) }) {
+            return .small
+        }
+        if ["阿拉斯加", "大丹", "圣伯纳", "獒", "纽芬兰", "giant", "great dane", "mastiff", "saint bernard", "newfoundland", "alaskan"].contains(where: { b.contains($0.lowercased()) }) {
+            return .giant
+        }
+        if ["金毛", "拉布拉多", "德国牧羊", "杜宾", "哈士奇", "萨摩耶", "大麦町", "边境牧羊", "golden", "labrador", "german shepherd", "husky", "samoyed", "doberman", "dalmatian", "border collie"].contains(where: { b.contains($0.lowercased()) }) {
+            return .large
+        }
+        return .medium
+    }
+}

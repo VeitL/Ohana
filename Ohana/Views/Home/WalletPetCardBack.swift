@@ -185,7 +185,7 @@ struct WalletPetCardBack: View {
             .padding(.vertical, 6)
             .background(.white.opacity(0.13), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     // MARK: - Top bar
@@ -219,7 +219,7 @@ struct WalletPetCardBack: View {
                     .frame(width: 28, height: 28)
                     .background(.white.opacity(0.13), in: Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
         }
     }
 }

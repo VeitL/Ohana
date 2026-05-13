@@ -28,7 +28,8 @@ struct TodayFocusCard: View {
     var onTapMemory: () -> Void = {}
     var onTapOasis: () -> Void = {}
 
-    // Live @Query arrays — force re-render on any new check-in
+    // Live @Query arrays — scoped to today so the home card does not hydrate
+    // the full care history on every launch.
     @Query(sort: \PetCareLog.date, order: .reverse) private var liveCare: [PetCareLog]
     @Query(sort: \PetWalkLog.startDate, order: .reverse) private var liveWalks: [PetWalkLog]
     @Query(sort: \PetPottyLog.date, order: .reverse) private var livePotty: [PetPottyLog]
@@ -38,10 +39,55 @@ struct TodayFocusCard: View {
     @State private var pulse: CGFloat = 0
     @State private var selectedFocusIndex = 0
     @State private var skippedFocusKeys: Set<String> = TodayFocusCard.loadSkippedFocusKeys()
+    @State private var closedNegativeKeys: Set<String> = TodayFocusCard.loadClosedNegativeKeys()
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+
+    init(
+        pets: [Pet],
+        plants: [Plant],
+        quests: [IslandQuest],
+        humans: [Human],
+        activePet: Pet?,
+        onCompleteQuest: @escaping (IslandQuest) -> Void = { _ in },
+        onTapNegativeSignal: @escaping (IslandNegativeSignal) -> Void = { _ in },
+        onTapMemory: @escaping () -> Void = {},
+        onTapOasis: @escaping () -> Void = {}
+    ) {
+        self.pets = pets
+        self.plants = plants
+        self.quests = quests
+        self.humans = humans
+        self.activePet = activePet
+        self.onCompleteQuest = onCompleteQuest
+        self.onTapNegativeSignal = onTapNegativeSignal
+        self.onTapMemory = onTapMemory
+        self.onTapOasis = onTapOasis
+
+        let todayStart = Calendar.current.startOfDay(for: Date())
+        _liveCare = Query(
+            filter: #Predicate<PetCareLog> { $0.date >= todayStart },
+            sort: \.date,
+            order: .reverse
+        )
+        _liveWalks = Query(
+            filter: #Predicate<PetWalkLog> { $0.startDate >= todayStart },
+            sort: \.startDate,
+            order: .reverse
+        )
+        _livePotty = Query(
+            filter: #Predicate<PetPottyLog> { $0.date >= todayStart },
+            sort: \.date,
+            order: .reverse
+        )
+        _liveHumanWeights = Query(
+            filter: #Predicate<HumanWeightLog> { $0.date >= todayStart },
+            sort: \.date,
+            order: .reverse
+        )
+    }
 
     private var shouldReduceWork: Bool {
         powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
@@ -65,7 +111,7 @@ struct TodayFocusCard: View {
 
     private var negativeSignals: [IslandNegativeSignal] {
         IslandNegativeFeedback.signals(pets: pets, plants: plants)
-            .filter { !skippedFocusKeys.contains(negativeSkipKey($0)) }
+            .filter { !closedNegativeKeys.contains(negativeSkipKey($0)) }
     }
 
     private var focusCards: [TodayFocusService.Content] {
@@ -108,15 +154,15 @@ struct TodayFocusCard: View {
                         Text("TODAY FOCUS")
                             .font(.system(size: 10, weight: .black, design: .rounded))
                             .tracking(2.2)
-                            .foregroundStyle(.primary.opacity(0.36))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.36))
                         Text("今天要做什么")
                             .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.9))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.9))
                     }
                     Spacer()
                     Text(focusStatusText)
                         .font(.system(size: 11, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.7))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
                         .background(Color.primary.opacity(0.07), in: Capsule())
@@ -197,11 +243,11 @@ struct TodayFocusCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(q.title)
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                 Text(q.subtitle)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.55))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                     .lineLimit(2)
             }
 
@@ -222,7 +268,7 @@ struct TodayFocusCard: View {
                     .padding(.horizontal, 14).padding(.vertical, 10)
                     .background(accent, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
 
                 skipButton(for: .quest(q), accent: accent)
             }
@@ -249,11 +295,11 @@ struct TodayFocusCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(s.title)
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 Text(s.detail)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.6))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                     .lineLimit(2)
             }
 
@@ -264,20 +310,33 @@ struct TodayFocusCard: View {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     onTapNegativeSignal(s)
                 } label: {
-                    Text(s.severity == .critical ? "立即处理" : "去快捷打卡")
+                    Text(negativeActionTitle(for: s))
                         .font(.system(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 9)
                         .background(accent, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
 
                 skipButton(for: .negative(s), accent: accent)
             }
         }
         .padding(14)
         .background(cardBackground(accent))
+    }
+
+    private func negativeActionTitle(for signal: IslandNegativeSignal) -> String {
+        switch signal.healthAlertType {
+        case .weightGainAlert, .weightLossAlert:
+            return "查看趋势"
+        case .drinkingWeightAlert:
+            return "查看健康"
+        case .none:
+            return signal.severity == .critical ? "立即处理" : "去查看"
+        default:
+            return signal.severity == .critical ? "立即处理" : "去处理"
+        }
     }
 
     // MARK: - Memory fragment card
@@ -290,11 +349,11 @@ struct TodayFocusCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(m.headline)
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                 Text(m.subline)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.55))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                     .lineLimit(2)
             }
 
@@ -307,7 +366,7 @@ struct TodayFocusCard: View {
                     .frame(width: 36, height: 36)
                     .background(accent.opacity(0.15), in: Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
         }
         .padding(14)
         .background(cardBackground(accent))
@@ -337,11 +396,11 @@ struct TodayFocusCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(skippedFocusKeys.isEmpty ? "今日任务已清空" : "今天已暂时跳过")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 Text(skippedFocusKeys.isEmpty ? "没有需要处理的任务，安心享受今天" : "跳过的卡明天会自动回来")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.55))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                     .lineLimit(2)
             }
 
@@ -360,7 +419,7 @@ struct TodayFocusCard: View {
                     .padding(.horizontal, 14).padding(.vertical, 10)
                     .background(accent, in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
         }
         .padding(14)
         .background(cardBackground(accent))
@@ -375,10 +434,10 @@ struct TodayFocusCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("岛屿欢迎你")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text("添加第一位家人，开启 Ohana 之旅")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.55))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
             }
             Spacer()
         }
@@ -427,7 +486,11 @@ struct TodayFocusCard: View {
     }
 
     private var contentIdentity: String {
-        focusCards.map(contentKey).joined(separator: "|") + "|skipped:\(skippedFocusKeys.sorted().joined(separator: ","))"
+        [
+            focusCards.map(contentKey).joined(separator: "|"),
+            "skipped:\(skippedFocusKeys.sorted().joined(separator: ","))",
+            "closed:\(closedNegativeKeys.sorted().joined(separator: ","))"
+        ].joined(separator: "|")
     }
 
     private func contentKey(_ content: TodayFocusService.Content) -> String {
@@ -452,28 +515,37 @@ struct TodayFocusCard: View {
     }
 
     private func skipButton(for content: TodayFocusService.Content, accent: Color) -> some View {
-        Button {
+        let isNegative: Bool = {
+            if case .negative = content { return true }
+            return false
+        }()
+        return Button {
             skipFocusCard(content)
         } label: {
-            Text("跳过")
+            Text(isNegative ? "关闭" : "跳过")
                 .font(.system(size: 10, weight: .black, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.58))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.58))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
                 .background(Color.primary.opacity(0.06), in: Capsule())
                 .overlay(Capsule().strokeBorder(accent.opacity(0.18), lineWidth: 0.8))
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("跳过这张 Today Focus 卡")
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(isNegative ? "关闭这条 Today Focus 警告" : "跳过这张 Today Focus 卡")
     }
 
     private func skipFocusCard(_ content: TodayFocusService.Content) {
         let key = contentKey(content)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         withAnimation(GoMotion.hero) {
-            _ = skippedFocusKeys.insert(key)
+            switch content {
+            case .negative:
+                _ = closedNegativeKeys.insert(key)
+            default:
+                _ = skippedFocusKeys.insert(key)
+            }
         }
-        persistSkippedFocusKeys()
+        persistHiddenFocusKeys()
         let nextCount = focusCards.count
         if selectedFocusIndex >= nextCount {
             selectedFocusIndex = max(0, nextCount - 1)
@@ -489,12 +561,17 @@ struct TodayFocusCard: View {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
-    private func persistSkippedFocusKeys() {
+    private func persistHiddenFocusKeys() {
         UserDefaults.standard.set(Array(skippedFocusKeys), forKey: Self.skippedStorageKey())
+        UserDefaults.standard.set(Array(closedNegativeKeys), forKey: Self.closedNegativeStorageKey())
     }
 
     private static func loadSkippedFocusKeys() -> Set<String> {
         Set(UserDefaults.standard.stringArray(forKey: skippedStorageKey()) ?? [])
+    }
+
+    private static func loadClosedNegativeKeys() -> Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: closedNegativeStorageKey()) ?? [])
     }
 
     private static func skippedStorageKey() -> String {
@@ -502,10 +579,14 @@ struct TodayFocusCard: View {
         return "todayFocus.skipped.\(day)"
     }
 
+    private static func closedNegativeStorageKey() -> String {
+        "todayFocus.closedNegativeSignals"
+    }
+
     private func cardBackground(_ accent: Color) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(.thinMaterial)
+                .fill(Color.ohanaCardSurface)
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(accent.opacity(0.25), lineWidth: 1)
         }

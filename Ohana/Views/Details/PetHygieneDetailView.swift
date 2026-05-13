@@ -21,17 +21,18 @@ struct PetHygieneDetailView: View {
     let pet: Pet
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @State private var showingPottyOverview = false
     @State private var groomingPlanTarget: HygieneType? = nil
 
     /// 用于匹配 `HygieneTodoSheet` 写入的 Event 标题前缀：`\(pet.name) — \(type.rawValue)`
     @Query(sort: \Reminder.scheduledAt, order: .forward) private var allReminders: [Reminder]
 
-    /// 与钱包卡、Wellness 一致：直接使用 `themeColorHex`，不用 `PetThemeColor` 枚举（避免 hex 与枚举名不一致时错成默认橙）
     private var themeColor: Color {
-        let h = pet.themeColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
-        return Color(hex: h.isEmpty ? "4338FF" : h)
+        Color(hex: pet.safeThemeColorHex)
     }
+    private var isDark: Bool { colorScheme == .dark }
+    private var chromeAccent: Color { isDark ? Color.goPrimary : Color.goBlue }
 
     private func daysSince(_ type: HygieneType) -> Int? {
         guard let last = pet.hygieneLogs.filter({ $0.type == type.rawValue })
@@ -99,7 +100,7 @@ struct PetHygieneDetailView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("近 28 天")
                 .font(.system(size: 10, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
             HStack(spacing: 2) {
                 ForEach(pts) { pt in
                     let h = min(maxH, 4 + CGFloat(min(pt.count, 4)) * 4)
@@ -156,9 +157,10 @@ struct PetHygieneDetailView: View {
 
     var body: some View {
         ZStack {
-            ArkBackgroundView().ignoresSafeArea()
+            OhanaAppBackground().ignoresSafeArea()
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
+                    hygieneHeader
                     // ── 本月概览（无卡片背景）
                     monthlySummaryCard
                     // ── 5 项护理卡片（打卡 + 计划；顶部状态条已移除，与首页快捷护理重复）
@@ -171,22 +173,11 @@ struct PetHygieneDetailView: View {
                 .padding(.top, 12)
             }
         }
-        .navigationTitle("\(pet.name) · 护理")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .tint(themeColor)
         .toolbarBackground(.hidden, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showingPottyOverview = true } label: {
-                    Image(systemName: "chart.bar.doc.horizontal")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(themeColor)
-                }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("关闭") { dismiss() }
-            }
-        }
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showingPottyOverview) {
             PottyOverviewView(pet: pet)
                 .presentationDetents([.large])
@@ -207,6 +198,56 @@ struct PetHygieneDetailView: View {
         }
     }
 
+    private var hygieneHeader: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(chromeAccent.opacity(isDark ? 0.18 : 0.12))
+                    .frame(width: 46, height: 46)
+                if let data = pet.avatarImageData, let image = UIImage(data: data) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 46, height: 46)
+                        .clipShape(Circle())
+                } else {
+                    Text(pet.avatarEmoji)
+                        .font(.system(size: 24))
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(pet.name)
+                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text("护理")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+
+            Spacer()
+
+            Button { showingPottyOverview = true } label: {
+                Image(systemName: "chart.bar.doc.horizontal")
+                    .font(.system(size: 14, weight: .black))
+                    .foregroundStyle(chromeAccent)
+                    .frame(width: 40, height: 40)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(ScaleButtonStyle())
+
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .frame(width: 40, height: 40)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(ScaleButtonStyle())
+        }
+        .padding(.top, 4)
+    }
+
     // MARK: - 本月概览
     private var monthlySummaryCard: some View {
         let totalTypes = max(HygieneType.allCases.count, 1)
@@ -225,10 +266,10 @@ struct PetHygieneDetailView: View {
                     VStack(spacing: 1) {
                         Text("\(completedTodayCount)/\(totalTypes)")
                             .font(.system(size: 17, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text("今日")
                             .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
                 .frame(width: 66, height: 66)
@@ -236,7 +277,7 @@ struct PetHygieneDetailView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(headline)
                         .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Text(overdueTypes.isEmpty ? "继续保持，下一次护理会自动提醒。" : overdueTypes.map(\.rawValue).joined(separator: "、"))
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(overdueTypes.isEmpty ? .secondary : Color.goRed.opacity(0.9))
@@ -251,19 +292,7 @@ struct PetHygieneDetailView: View {
                 overviewMetric(icon: "clock", value: "\(overdueTypes.count)", label: "待护理", tint: overdueTypes.isEmpty ? themeColor : Color.goRed)
             }
         }
-        .padding(16)
-        .background(
-            LinearGradient(
-                colors: [Color.white.opacity(0.12), themeColor.opacity(0.08)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
-        )
+        .padding(.vertical, 6)
     }
 
     private func overviewMetric(icon: String, value: String, label: String, tint: Color) -> some View {
@@ -275,10 +304,10 @@ struct PetHygieneDetailView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
                     .font(.system(size: 17, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text(label)
                     .font(.system(size: 9, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
@@ -286,7 +315,7 @@ struct PetHygieneDetailView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 9)
         .frame(maxWidth: .infinity)
-        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     // MARK: - 是否今天已完成
@@ -314,7 +343,7 @@ struct PetHygieneDetailView: View {
                     .foregroundStyle(themeColor)
                 Text(type.rawValue)
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer(minLength: 4)
                 if let d = days {
                     Text(d == 0 ? "✓ 今天" : "\(d)天前")
@@ -344,7 +373,7 @@ struct PetHygieneDetailView: View {
                     .background(themeColor.opacity(0.12), in: Capsule())
                     .overlay(Capsule().strokeBorder(themeColor.opacity(0.35), lineWidth: 0.5))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 Button {
                     guard !doneToday else {
                         singleUseNoticeMessage = "\(pet.name) 今天已经记录过\(type.rawValue)了，这类护理一天记录一次就够了。"
@@ -374,7 +403,7 @@ struct PetHygieneDetailView: View {
                             .background(themeColor, in: Capsule())
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
 
             // 已添加的护理计划（HygieneTodoSheet → Event + Reminder）
@@ -386,7 +415,7 @@ struct PetHygieneDetailView: View {
                         Text("已设计划")
                             .font(.system(size: 10, weight: .heavy, design: .rounded))
                     }
-                    .foregroundStyle(.primary.opacity(0.7))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
 
                     ForEach(plans, id: \.id) { rem in
                         HStack(alignment: .top, spacing: 8) {
@@ -397,11 +426,11 @@ struct PetHygieneDetailView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(rem.scheduledAt, format: .dateTime.month().day())
                                     .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(Color.ohanaPrimaryText)
                                 if let ev = rem.event, ev.recurrenceDays > 0 {
                                     Text("重复 · \(recurrenceLabel(ev.recurrenceDays))")
                                         .font(.system(size: 10, weight: .medium, design: .rounded))
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(Color.ohanaSecondaryText)
                                 }
                             }
                             Spacer(minLength: 0)
@@ -431,7 +460,7 @@ struct PetHygieneDetailView: View {
                     .foregroundStyle(themeColor.opacity(0.6))
                 Text("每\(effectiveDays)天\(isCustom ? " · 已自定义" : "")")
                     .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary.opacity(0.7))
+                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
                 Spacer()
             }
 
@@ -442,11 +471,11 @@ struct PetHygieneDetailView: View {
                         HStack {
                             Text(log.date, format: .dateTime.month().day().hour().minute())
                                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary.opacity(0.7))
+                                .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
                             Spacer()
                             Button { modelContext.delete(log); modelContext.safeSave() } label: {
                                 Image(systemName: "trash").font(.system(size: 10))
-                                    .foregroundStyle(.secondary.opacity(0.4))
+                                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
                             }
                         }
                         .padding(.vertical, 4)
@@ -456,10 +485,10 @@ struct PetHygieneDetailView: View {
             }
         }
         .padding(14)
-        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.primary.opacity(doneToday ? 0.15 : 0.07), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         )
     }
 }

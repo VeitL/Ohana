@@ -61,9 +61,9 @@ enum TreeLevel: Int, CaseIterable, Comparable {
         switch self {
         case .lv1, .lv2:         return Color.goYellow
         case .lv3, .lv4:         return Color(hex: "A3E635")
-        case .lv5, .lv6:         return Color.goLime
+        case .lv5, .lv6:         return Color(hex: "84CC16")
         case .lv7, .lv8:         return Color.goTeal
-        case .lv9:               return Color.goPrimary
+        case .lv9:               return Color.goOrange
         case .lv10:              return Color(hex: "00FFD1")
         }
     }

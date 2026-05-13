@@ -7,7 +7,7 @@ struct ScaleButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(reduceMotion ? 1.0 : (configuration.isPressed ? 0.96 : 1.0))
             .opacity(configuration.isPressed ? 0.88 : 1.0)
-            .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.78), value: configuration.isPressed)
+            .animation(reduceMotion ? GoMotion.reduced : GoMotion.feedback, value: configuration.isPressed)
     }
 }
 
@@ -29,7 +29,7 @@ private struct OhanaSmoothAppearModifier: ViewModifier {
 
                 let delay = min(Double(index) * 0.035, 0.24)
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                    withAnimation(.spring(response: 0.38, dampingFraction: 0.84)) {
+                    withAnimation(GoMotion.page) {
                         isVisible = true
                     }
                 }

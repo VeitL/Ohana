@@ -42,7 +42,7 @@ enum BatchActionType: String, CaseIterable, Codable {
         case .feed:   return "FF8C00"
         case .water:  return "00D4AA"
         case .potty:  return "FFF44F"
-        case .litter: return "C8FF00"
+        case .litter: return "F59E0B"
         case .play:   return "FF6B6B"
         }
     }
@@ -206,7 +206,7 @@ struct BatchActionEditSheet: View {
                     .foregroundStyle(.black)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color.goLime, in: RoundedRectangle(cornerRadius: 14))
+                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14))
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 20)

@@ -21,17 +21,23 @@ struct CrewRosterOverlay: View {
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @Query(sort: \Plant.createdAt) private var plants: [Plant]
+    @Query(filter: #Predicate<Reminder> { $0.status == "pending" },
+           sort: \Reminder.scheduledAt) private var pendingReminders: [Reminder]
 
     @State private var searchText = ""
     @State private var isSearchActive = false
     @State private var showingAddEntity = false
     @State private var showingCoconutLog = false
+    @State private var familyActivityPet: Pet? = nil
+    @State private var showingFamilyWeeklyReport = false
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @Environment(\.colorScheme) private var colorScheme
 
     private var isMaterial: Bool { false }
     private var matBg:      Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
     private var matSurface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
     private var matAccent:  Color { Color(hex: "FF5A00") }
+    private var l: L10n { L10n(appLanguage) }
 
     private var filteredPets: [Pet] {
         searchText.isEmpty ? Array(pets) : pets.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
@@ -43,6 +49,8 @@ struct CrewRosterOverlay: View {
         searchText.isEmpty ? Array(plants) : plants.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
     }
     private var isEmpty: Bool { filteredPets.isEmpty && filteredHumans.isEmpty && filteredPlants.isEmpty }
+    private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
+    private var showsFamilyCollaboration: Bool { humans.count > 1 && !activePets.isEmpty && searchText.isEmpty }
 
     var body: some View {
         NavigationStack {
@@ -53,43 +61,7 @@ struct CrewRosterOverlay: View {
                     .allowsHitTesting(false)
 
                 VStack(spacing: 0) {
-                    // R6: 全局 header 占位
-                    Spacer().frame(height: 70)
-
-                    if !hideToolbar {
-                        // 顶部搜索栏 + 添加按钮（独立使用时显示）
-                        HStack(spacing: 10) {
-                            dexSearchBar
-                            Button { showingAddEntity = true } label: {
-                                Image(systemName: "plus.circle.fill")
-                                    .symbolRenderingMode(.hierarchical)
-                                    .foregroundStyle(Color.goPrimary)
-                                    .font(.system(size: 24))
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 4)
-                        .padding(.bottom, 10)
-                    } else if isSearchActive {
-                        // 嵌入 tab 时，仅当搜索激活时显示搜索栏
-                        HStack(spacing: 10) {
-                            dexSearchBar
-                            Button {
-                                withAnimation(.spring(response: 0.25)) {
-                                    isSearchActive = false
-                                    searchText = ""
-                                }
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundStyle(.primary.opacity(0.4))
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 4)
-                        .padding(.bottom, 10)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                    }
+                    rosterTopChrome
 
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(spacing: 20) {
@@ -108,6 +80,43 @@ struct CrewRosterOverlay: View {
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingAddEntity) { AddEntityView() }
             .sheet(isPresented: $showingCoconutLog) { CoconutLogView() }
+            .sheet(item: $familyActivityPet) { pet in
+                NavigationStack {
+                    ScrollView {
+                        FamilyActivityStripView(pet: pet, style: .full)
+                            .padding(.vertical, 20)
+                    }
+                    .navigationTitle(
+                        l.tr(
+                            zh: "谁在照顾 \(pet.name)",
+                            en: "Who's caring for \(pet.name)",
+                            de: "Wer kümmert sich um \(pet.name)?"
+                        )
+                    )
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
+                                familyActivityPet = nil
+                            }
+                            .foregroundStyle(Color.goPrimary)
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showingFamilyWeeklyReport) {
+                NavigationStack {
+                    FamilyWeeklyReportDashboardView()
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
+                                    showingFamilyWeeklyReport = false
+                                }
+                                .foregroundStyle(Color.goPrimary)
+                            }
+                        }
+                }
+            }
             .onChange(of: searchTrigger) { _, _ in
                 withAnimation(.spring(response: 0.25)) { isSearchActive.toggle() }
                 if !isSearchActive { searchText = "" }
@@ -116,42 +125,177 @@ struct CrewRosterOverlay: View {
         }
     }
 
+    // MARK: - Top Chrome
+
+    private var rosterTopChrome: some View {
+        VStack(spacing: 12) {
+            rosterHeader
+            if !hideToolbar || isSearchActive {
+                searchArea
+            }
+            rosterMetrics
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 16)
+        .padding(.bottom, 12)
+        .background {
+            LinearGradient(
+                colors: [
+                    Color.ohanaCardSurface.opacity(colorScheme == .dark ? 0.36 : 0.54),
+                    Color.clear
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea(edges: .top)
+        }
+    }
+
+    private var rosterHeader: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "person.2.crop.square.stack.fill")
+                .font(.system(size: 18, weight: .black))
+                .foregroundStyle(Color.goPrimary)
+                .frame(width: 42, height: 42)
+                .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(l.tr(zh: "Ohana 成员", en: "Ohana Members", de: "Ohana Mitglieder"))
+                    .font(OhanaFont.title3(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text(l.tr(zh: "成员、协作和首页显示", en: "People, care, and home cards", de: "Mitglieder, Pflege und Startkarten"))
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
+
+            Spacer()
+
+            Button { showingAddEntity = true } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 15, weight: .black))
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
+                    .frame(width: 40, height: 40)
+                    .background(Color.goPrimary, in: Circle())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(l.tr(zh: "添加成员", en: "Add member", de: "Mitglied hinzufügen"))
+
+            if !hideToolbar {
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .frame(width: 40, height: 40)
+                        .background(Color.ohanaControlFill, in: Circle())
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+            }
+        }
+    }
+
+    private var searchArea: some View {
+        HStack(spacing: 10) {
+            dexSearchBar
+            if hideToolbar && isSearchActive {
+                Button {
+                    withAnimation(GoMotion.feedback) {
+                        isSearchActive = false
+                        searchText = ""
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .frame(width: 38, height: 38)
+                        .background(Color.ohanaControlFill, in: Circle())
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .transition(.scale.combined(with: .opacity))
+            }
+        }
+    }
+
+    private var rosterMetrics: some View {
+        HStack(spacing: 8) {
+            rosterMetricChip(
+                icon: "pawprint.fill",
+                value: "\(pets.count)",
+                label: l.tr(zh: "宠物", en: "Pets", de: "Tiere"),
+                color: Color.goOrange
+            )
+            rosterMetricChip(
+                icon: "person.2.fill",
+                value: "\(humans.count)",
+                label: l.tr(zh: "人类", en: "Humans", de: "Menschen"),
+                color: Color.goPurple
+            )
+            rosterMetricChip(
+                icon: "leaf.fill",
+                value: "\(plants.count)",
+                label: l.tr(zh: "植物", en: "Plants", de: "Pflanzen"),
+                color: Color.goTeal
+            )
+        }
+    }
+
+    private func rosterMetricChip(icon: String, value: String, label: String, color: Color) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .black))
+                .foregroundStyle(color)
+            Text(value)
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .monospacedDigit()
+            Text(label)
+                .font(OhanaFont.caption2(.bold))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(Color.ohanaControlFill, in: Capsule())
+    }
+
     // MARK: - 搜索栏
     private var dexSearchBar: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(isMaterial ? Color(hex: "8E8E93") : .primary.opacity(0.4))
-            TextField("搜索成员...", text: $searchText)
-                .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundStyle(.primary)
-                .tint(isMaterial ? matAccent : Color.goPrimary)
+                .foregroundStyle(Color.ohanaTertiaryText)
+            TextField(l.tr(zh: "搜索成员", en: "Search members", de: "Mitglieder suchen"), text: $searchText)
+                .font(OhanaFont.callout(.bold))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .tint(Color.goPrimary)
             if !searchText.isEmpty {
                 Button { searchText = "" } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.primary.opacity(0.35))
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .black))
+                        .foregroundStyle(Color.ohanaTertiaryText)
+                        .frame(width: 28, height: 28)
                 }
+                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 11)
-        .background(
-            isMaterial ? matSurface : .white.opacity(0.08),
-            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(isMaterial ? Color.clear : .white.opacity(0.1), lineWidth: 1)
-        )
-        .shadow(color: isMaterial ? .black.opacity(0.04) : .clear, radius: 8, x: 0, y: 2)
+        .frame(height: 42)
+        .background(Color.ohanaControlFill, in: Capsule())
     }
 
     // MARK: - Bento Dex 主体
     private var bentoDex: some View {
         VStack(spacing: 16) {
+            if showsFamilyCollaboration {
+                familyCollaborationSection
+            }
+
             // ── 宠物区（正方形卡片 2列 Bento）
             if !filteredPets.isEmpty {
-                dexSectionLabel("PETS", count: filteredPets.count, emoji: "🐾")
+                dexSectionLabel(l.tr(zh: "宠物", en: "Pets", de: "Tiere"), count: filteredPets.count, symbol: "pawprint.fill")
                 BentoPetGrid(pets: filteredPets, onSelect: { pet in
                     onSelectPet(pet)
                 })
@@ -160,7 +304,7 @@ struct CrewRosterOverlay: View {
 
             // ── 人类区（正方形卡片 2列 Bento）
             if !filteredHumans.isEmpty {
-                dexSectionLabel("HUMANS", count: filteredHumans.count, emoji: "👥")
+                dexSectionLabel(l.tr(zh: "人类", en: "Humans", de: "Menschen"), count: filteredHumans.count, symbol: "person.2.fill")
                 BentoHumanGrid(humans: filteredHumans, onSelect: { human in
                     onSelectHuman(human)
                 })
@@ -169,7 +313,7 @@ struct CrewRosterOverlay: View {
 
             // ── 植物区（竖向卡片横排）
             if !filteredPlants.isEmpty {
-                dexSectionLabel("PLANTS", count: filteredPlants.count, emoji: "🌿")
+                dexSectionLabel(l.tr(zh: "植物", en: "Plants", de: "Pflanzen"), count: filteredPlants.count, symbol: "leaf.fill")
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         ForEach(Array(filteredPlants.enumerated()), id: \.element.id) { index, plant in
@@ -187,98 +331,96 @@ struct CrewRosterOverlay: View {
         }
     }
 
-    // MARK: - Section 标签
-    private func dexSectionLabel(_ title: String, count: Int, emoji: String) -> some View {
-        HStack(spacing: 8) {
-            if isMaterial {
-                HStack(spacing: 5) {
-                    Text(emoji).font(.system(size: 12))
-                    Text(title)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.6))
-                    Text("· \(count)")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(matAccent)
+    private var familyCollaborationSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            dexSectionLabel(l.tr(zh: "今日协作", en: "Today Care", de: "Pflege heute"), count: humans.count, symbol: "hands.sparkles.fill")
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(activePets) { pet in
+                        HomeFamilyCollaborationCard(
+                            pet: pet,
+                            pendingReminders: pendingReminders,
+                            humans: humans,
+                            onOpenActivity: { familyActivityPet = pet },
+                            onOpenWeeklyReport: { showingFamilyWeeklyReport = true }
+                        )
+                        .frame(width: 330)
+                    }
                 }
-                .padding(.horizontal, 12).padding(.vertical, 5)
-                .background(matSurface, in: Capsule())
-                .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
-                Spacer()
-            } else {
-                Text(emoji).font(.system(size: 12))
-                Text(title)
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.4))
-                    .tracking(2)
-                Text("· \(count)")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.goPrimary.opacity(0.7))
-                Spacer()
+                .padding(.horizontal, 16)
             }
+        }
+    }
+
+    // MARK: - Section 标签
+    private func dexSectionLabel(_ title: String, count: Int, symbol: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .black))
+                .foregroundStyle(Color.goPrimary)
+            Text(title)
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+            Text("\(count)")
+                .font(OhanaFont.caption2(.black))
+                .foregroundStyle(Color.ohanaPrimaryActionText)
+                .monospacedDigit()
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(Color.goPrimary, in: Capsule())
+            Spacer()
         }
         .padding(.horizontal, 20)
     }
 
     // MARK: - 添加按钮
     private var addNewLifeButton: some View {
-        let accent = isMaterial ? matAccent : Color.goPrimary
+        let accent = Color.goPrimary
         return Button { showingAddEntity = true } label: {
             HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(accent.opacity(isMaterial ? 0.1 : 0.12))
-                        .frame(width: 44, height: 44)
-                    Image(systemName: "plus")
-                        .font(.system(size: 20, weight: .black))
-                        .foregroundStyle(accent)
-                }
+                Image(systemName: "plus")
+                    .font(.system(size: 17, weight: .black))
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
+                    .frame(width: 42, height: 42)
+                    .background(accent, in: Circle())
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(isMaterial ? "Add Member" : "迎接新生命")
-                        .font(.system(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(accent)
-                    Text("宠物 · 家人 · 植物")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.4))
+                    Text(l.tr(zh: "添加新成员", en: "Add a member", de: "Mitglied hinzufügen"))
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(l.tr(zh: "宠物 · 人类 · 植物", en: "Pets · Humans · Plants", de: "Tiere · Menschen · Pflanzen"))
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
-                Image(systemName: "arrow.right")
+                Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(accent.opacity(0.6))
+                    .foregroundStyle(Color.ohanaTertiaryText)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .background(
-                isMaterial
-                ? AnyShapeStyle(matSurface)
-                : AnyShapeStyle(Color.clear)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(
-                        style: isMaterial
-                            ? StrokeStyle(lineWidth: 1.5)
-                            : StrokeStyle(lineWidth: 1.5, dash: [6, 4])
-                    )
-                    .foregroundStyle(accent.opacity(0.35))
-            )
-            .shadow(color: isMaterial ? .black.opacity(0.04) : .clear, radius: 8, x: 0, y: 2)
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     // MARK: - 空状态
     private var emptyState: some View {
-        VStack(spacing: 16) {
-            Text("🔍").font(.system(size: 48))
-            Text("没有找到岛民")
-                .font(.system(size: 17, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.5))
-            Text("试试其他关键词")
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.3))
+        VStack(spacing: 14) {
+            Image(systemName: searchText.isEmpty ? "person.2.slash" : "magnifyingglass")
+                .font(.system(size: 34, weight: .black))
+                .foregroundStyle(Color.goPrimary)
+                .frame(width: 72, height: 72)
+                .background(Color.goPrimary.opacity(0.14), in: Circle())
+            Text(searchText.isEmpty ? l.tr(zh: "还没有成员", en: "No members yet", de: "Noch keine Mitglieder") : l.tr(zh: "没有找到成员", en: "No member found", de: "Kein Mitglied gefunden"))
+                .font(OhanaFont.title3(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+            Text(searchText.isEmpty ? l.tr(zh: "添加宠物、人类或植物开始照顾。", en: "Add a pet, human, or plant to begin.", de: "Füge Tier, Mensch oder Pflanze hinzu.") : l.tr(zh: "试试其他关键词", en: "Try another keyword", de: "Versuche ein anderes Stichwort"))
+                .font(OhanaFont.caption(.bold))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .multilineTextAlignment(.center)
         }
         .padding(.top, 80)
+        .padding(.horizontal, 32)
     }
 }
 
@@ -322,7 +464,7 @@ private struct PetSquareCard: View {
     @State private var showHomeStackFullAlert = false
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
 
-    private var themeColor: Color { Color(hex: pet.themeColorHex.isEmpty ? "4338FF" : pet.themeColorHex) }
+    private var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
     private var isShownOnHome: Bool { HomeCardVisibility.isPetVisible(pet, raw: hiddenHomePetIDsRaw) }
 
     private var posterHeadline: String {
@@ -464,25 +606,24 @@ private struct PetSquareCard: View {
         HStack(spacing: 6) {
             Image(systemName: isShownOnHome ? "house.fill" : "house.slash.fill")
                 .font(.system(size: 11, weight: .black))
-                .foregroundStyle(isShownOnHome ? Color.goLime : Color.white.opacity(0.45))
+                .foregroundStyle(isShownOnHome ? Color.goPrimary : Color.ohanaTertiaryText)
                 .frame(width: 16)
-            Text(isShownOnHome ? "首页显示" : "不在首页")
+            Text(isShownOnHome ? "首页显示" : "已隐藏")
                 .font(.system(size: 10, weight: .black, design: .rounded))
-                .foregroundStyle(.white.opacity(isShownOnHome ? 0.86 : 0.52))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(isShownOnHome ? 0.86 : 0.52))
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
             Toggle("", isOn: homeVisibilityBinding)
                 .labelsHidden()
                 .toggleStyle(.switch)
-                .tint(Color.goLime)
+                .tint(Color.goPrimary)
                 .scaleEffect(0.62)
                 .frame(width: 34, height: 22)
         }
         .padding(.leading, 9)
         .padding(.trailing, 7)
         .padding(.vertical, 4)
-        .background(Color.white.opacity(0.07), in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
+        .background(Color.ohanaControlFill, in: Capsule())
         .fixedSize(horizontal: true, vertical: false)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityLabel("首页显示")
@@ -670,7 +811,7 @@ private struct PetSquareCard: View {
                         colors: [Color.black.opacity(0.25), Color.black.opacity(0.52)],
                         startPoint: .topLeading, endPoint: .bottomTrailing))
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(.ultraThinMaterial.opacity(0.30))
+                    .fill(Color.ohanaCardSurface.opacity(0.30))
                 Image(uiImage: img).resizable().scaledToFill()
                     .frame(width: w * 0.60, height: h).clipped()
                     .mask(LinearGradient(
@@ -980,25 +1121,24 @@ private struct HumanSquareCard: View {
         HStack(spacing: 6) {
             Image(systemName: human.shouldShowOnHome ? "house.fill" : "house.slash.fill")
                 .font(.system(size: 11, weight: .black))
-                .foregroundStyle(human.shouldShowOnHome ? Color.goLime : Color.white.opacity(0.45))
+                .foregroundStyle(human.shouldShowOnHome ? Color.goPrimary : Color.ohanaTertiaryText)
                 .frame(width: 16)
-            Text(human.shouldShowOnHome ? "首页显示" : "不在首页")
+            Text(human.shouldShowOnHome ? "首页显示" : "已隐藏")
                 .font(.system(size: 10, weight: .black, design: .rounded))
-                .foregroundStyle(.white.opacity(human.shouldShowOnHome ? 0.86 : 0.52))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(human.shouldShowOnHome ? 0.86 : 0.52))
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
             Toggle("", isOn: homeVisibilityBinding)
                 .labelsHidden()
                 .toggleStyle(.switch)
-                .tint(Color.goLime)
+                .tint(Color.goPrimary)
                 .scaleEffect(0.62)
                 .frame(width: 34, height: 22)
         }
         .padding(.leading, 9)
         .padding(.trailing, 7)
         .padding(.vertical, 4)
-        .background(Color.white.opacity(0.07), in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
+        .background(Color.ohanaControlFill, in: Capsule())
         .fixedSize(horizontal: true, vertical: false)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityLabel("首页显示")
@@ -1124,7 +1264,7 @@ private struct HumanSquareCard: View {
                         colors: [Color.black.opacity(0.25), Color.black.opacity(0.52)],
                         startPoint: .topLeading, endPoint: .bottomTrailing))
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(.ultraThinMaterial.opacity(0.30))
+                    .fill(Color.ohanaCardSurface.opacity(0.30))
                 Image(uiImage: img).resizable().scaledToFill()
                     .frame(width: w * 0.60, height: h).clipped()
                     .mask(LinearGradient(
@@ -1218,7 +1358,7 @@ private struct PlantTallCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(plant.name)
                     .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 if plant.needsWatering {
                     Label("需要浇水", systemImage: "drop.fill")
@@ -1227,7 +1367,7 @@ private struct PlantTallCard: View {
                 } else {
                     Text(plant.species.isEmpty ? "植物" : plant.species)
                         .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.45))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                         .lineLimit(1)
                 }
             }

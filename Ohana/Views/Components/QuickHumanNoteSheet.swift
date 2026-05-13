@@ -15,20 +15,20 @@ struct QuickHumanNoteSheet: View {
 
     var body: some View {
         ZStack {
-            ArkBackgroundView().ignoresSafeArea()
+            OhanaAppBackground().ignoresSafeArea()
             VStack(spacing: 20) {
                 // 标题栏
                 HStack {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(OhanaFont.title2())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                     Spacer()
                     Text("快速备注")
                         .font(OhanaFont.headline(.bold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Button("保存") { save() }
                         .font(OhanaFont.callout(.bold))
@@ -49,11 +49,11 @@ struct QuickHumanNoteSheet: View {
                                 .foregroundStyle(Color.goPrimary)
                             Text(human.name)
                                 .font(OhanaFont.subheadline(.bold))
-                                .foregroundStyle(.primary.opacity(0.8))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                         }
                         TextEditor(text: $noteText)
                             .font(OhanaFont.body())
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                             .scrollContentBackground(.hidden)
                             .frame(minHeight: 120)
                     }
@@ -66,7 +66,7 @@ struct QuickHumanNoteSheet: View {
                     HStack {
                         Label("日期", systemImage: "calendar")
                             .font(OhanaFont.callout(.semibold))
-                            .foregroundStyle(.primary.opacity(0.7))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                         Spacer()
                         DatePicker("", selection: $date, displayedComponents: .date)
                             .labelsHidden()

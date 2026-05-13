@@ -106,7 +106,7 @@ struct IslandHygieneDashboard: View {
         if standalone {
             NavigationStack {
                 ZStack {
-                    ArkBackgroundView().ignoresSafeArea()
+                    OhanaAppBackground().ignoresSafeArea()
                     scrollContent
                 }
                 .ignoresSafeArea(edges: .top)
@@ -142,7 +142,7 @@ struct IslandHygieneDashboard: View {
                     .frame(width: 36, height: 36)
                     .goGlassBackground(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
 
             Spacer()
             Text("清洁护理")
@@ -261,7 +261,7 @@ struct IslandHygieneDashboard: View {
                 } label: {
                     hygieneRow(summary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
     }
@@ -346,7 +346,7 @@ struct IslandHygieneDashboard: View {
             .padding(.vertical, 8)
             .background(isSelected ? Color.goLime : Color.white.opacity(0.12), in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func selectorChip(title: String, icon: String, isSelected: Bool, action: @escaping () -> Void) -> some View {

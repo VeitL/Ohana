@@ -97,7 +97,7 @@ struct PetAllFeaturesSheet: View {
                             if isDog {
                                 featureTile(
                                     icon: "figure.walk",
-                                    color: Color(hex: "38BDF8"),
+                                    color: Color(hex: "14B8A6"),
                                     title: "遛狗",
                                     value: weekWalkText,
                                     subtitle: walkSub,
@@ -269,10 +269,10 @@ struct PetAllFeaturesSheet: View {
                         SIMD2(0.0, 1.0), SIMD2(0.5, 1.0), SIMD2(1.0, 1.0)
                     ],
                     colors: [
-                        Color(hex: pet.themeColorHex).mix(with: .white, by: 0.22),
-                        Color(hex: "C8FF00").opacity(0.9),
-                        Color(hex: "38BDF8").opacity(0.65),
-                        Color(hex: pet.themeColorHex).opacity(0.85),
+                        Color(hex: pet.safeThemeColorHex).mix(with: .white, by: 0.22),
+                        Color.goTeal.opacity(0.62),
+                        Color.goOrange.opacity(0.48),
+                        Color(hex: pet.safeThemeColorHex).opacity(0.85),
                         Color(hex: "1A2E8A"),
                         Color(hex: "F97316").opacity(0.72),
                         Color(hex: "0C1640"),
@@ -324,7 +324,7 @@ struct PetAllFeaturesSheet: View {
             .shadow(color: Color(hex: pet.themeColorHex).opacity(0.28), radius: 22, y: 12)
             .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private var archiveBento: some View {
@@ -468,7 +468,7 @@ struct PetAllFeaturesSheet: View {
             }
             .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func compactFeatureTile(
@@ -506,7 +506,7 @@ struct PetAllFeaturesSheet: View {
             }
             .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func heroChip(title: String, value: String) -> some View {
@@ -576,7 +576,7 @@ struct PetAllFeaturesSheet: View {
             }
             .padding(.vertical, 4)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .listRowSeparatorTint(.white.opacity(0.08))
     }
 

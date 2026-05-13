@@ -14,8 +14,12 @@ struct WeightHistoryView: View {
     var onRemove: (() -> Void)? = nil
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
 
-    @State private var showAddSheet = false
+    @State private var isInlineWeightComposerVisible = false
+    @State private var newWeightText = ""
+    @State private var newWeightUnit = "kg"
+    @State private var newWeightDate = Date()
 
     private var sortedLogs: [PetWeightLog] {
         pet.weightLogs.sorted(by: { $0.date > $1.date })
@@ -35,10 +39,26 @@ struct WeightHistoryView: View {
         return precise.reduce(0.0) { $0 + $1.dailyGrams } / Double(precise.count)
     }
 
+    private var parsedInlineWeight: Double? {
+        CountryDecimalInput.parse(newWeightText, countryCode: appCountry)
+    }
+
+    private var canSaveInlineWeight: Bool {
+        (parsedInlineWeight ?? 0) > 0
+    }
+
+    private var inlineQuickWeights: [Double] {
+        let latestKg = sortedLogs.first?.weightInKg
+        let base = latestKg ?? (pet.species.lowercased().contains("cat") || pet.species.contains("猫") ? 4.0 : 10.0)
+        return [base - 0.2, base, base + 0.2]
+            .filter { $0 > 0 }
+            .map { (($0 * 10).rounded() / 10) }
+    }
+
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
-                ArkBackgroundView()
+                OhanaAppBackground()
 
                 VStack(spacing: 0) {
                     chartSection
@@ -60,18 +80,22 @@ struct WeightHistoryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button { showAddSheet = true } label: {
+                Button {
+                    withAnimation(GoMotion.feedback) {
+                        isInlineWeightComposerVisible.toggle()
+                    }
+                } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(OhanaFont.title2(.bold))
                         .foregroundStyle(Color.goPrimary)
                 }
             }
         }
-        .sheet(isPresented: $showAddSheet) {
-            GenericWeightEntrySheet(target: .pet(pet))
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(.regularMaterial)
+        .onChange(of: newWeightText) { _, value in
+            let sanitized = CountryDecimalInput.sanitize(value, countryCode: appCountry, maxFractionDigits: 2)
+            if sanitized != value {
+                newWeightText = sanitized
+            }
         }
     }
 
@@ -83,15 +107,15 @@ struct WeightHistoryView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("体重趋势")
                         .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     if let latest = sortedLogs.first {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             Text(displayWeightValue(latest))
                                 .font(.system(size: 44, weight: .black, design: .rounded))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                             Text(displayWeightUnit(latest))
                                 .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(.primary.opacity(0.7))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                         }
                     }
                 }
@@ -121,7 +145,7 @@ struct WeightHistoryView: View {
                     Text(displayWeightDelta(delta))
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                 }
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .padding(.horizontal, 10).padding(.vertical, 4)
                 .goGlassBackground(Capsule())
                 .padding(.horizontal, 24)
@@ -143,13 +167,13 @@ struct WeightHistoryView: View {
                         Text(l.date, format: .dateTime.month(.abbreviated).day())
                     }
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.primary.opacity(0.3))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     .padding(.horizontal, 24)
                 }
             } else {
                 Text("记录 2 条以上体重后可显示趋势图")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.primary.opacity(0.3))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 40)
             }
@@ -170,11 +194,11 @@ struct WeightHistoryView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("饮食 · 体重关联")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.6))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                 HStack(spacing: 4) {
                     Text(String(format: "近期日均摄入 %.0fg", avg))
                         .font(.system(size: 13, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     if let latest = sortedLogs.first, let prev = sortedLogs.dropFirst().first {
                         let delta = latest.weightInKg - prev.weightInKg
                         Image(systemName: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
@@ -209,7 +233,7 @@ struct WeightHistoryView: View {
     private var recordListLayer: some View {
         ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(.regularMaterial)
+                .fill(Color.ohanaCardSurface)
                 .ignoresSafeArea(edges: .bottom)
 
             VStack(spacing: 0) {
@@ -222,24 +246,31 @@ struct WeightHistoryView: View {
                 HStack {
                     Text("历史记录")
                         .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Text("\(sortedLogs.count) 条")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 12)
 
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(spacing: 8) {
+                        if isInlineWeightComposerVisible {
+                            inlineWeightComposer
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .top).combined(with: .opacity),
+                                    removal: .opacity
+                                ))
+                        }
                         ForEach(sortedLogs) { log in
                             weightRow(log: log)
                         }
                         if sortedLogs.isEmpty {
-                            Text("还没有体重记录\n点击右上角 + 开始记录")
+                            Text("还没有体重记录\n点击右上角 + 在这里记录")
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                                 .multilineTextAlignment(.center)
                                 .padding(.vertical, 40)
                         }
@@ -253,7 +284,7 @@ struct WeightHistoryView: View {
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 12)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(ScaleButtonStyle())
                             }
                             .padding(.top, 4)
                         }
@@ -263,6 +294,118 @@ struct WeightHistoryView: View {
                 }
             }
         }
+    }
+
+    private var inlineWeightComposer: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                Image(systemName: "scalemass.fill")
+                    .font(.system(size: 17, weight: .black))
+                    .foregroundStyle(Color.arkInk)
+                    .frame(width: 42, height: 42)
+                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("记录体重")
+                        .font(OhanaFont.title3(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text("不用系统键盘，直接快速输入")
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
+                Spacer()
+                Button {
+                    withAnimation(GoMotion.feedback) {
+                        isInlineWeightComposerVisible = false
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .black))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .frame(width: 34, height: 34)
+                }
+                .buttonStyle(ScaleButtonStyle())
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(newWeightText.isEmpty ? CountryDecimalInput.placeholder(fractionDigits: 1, countryCode: appCountry) : newWeightText)
+                        .font(.system(size: 36, weight: .black, design: .rounded))
+                        .foregroundStyle(newWeightText.isEmpty ? Color.ohanaSecondaryText.opacity(0.55) : Color.ohanaPrimaryText)
+                        .contentTransition(.numericText())
+                    Spacer()
+                    Picker("", selection: $newWeightUnit) {
+                        Text("kg").tag("kg")
+                        Text("g").tag("g")
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 118)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+                EmbeddedDecimalKeypad(
+                    text: $newWeightText,
+                    countryCode: appCountry,
+                    maxFractionDigits: 2,
+                    accent: .goPrimary,
+                    isMini: true,
+                    showsSubmitButton: false
+                )
+            }
+
+            HStack(spacing: 8) {
+                ForEach(inlineQuickWeights, id: \.self) { weight in
+                    Button {
+                        withAnimation(GoMotion.feedback) {
+                            newWeightText = CountryDecimalInput.format(weight, countryCode: appCountry, maxFractionDigits: 1)
+                            newWeightUnit = "kg"
+                        }
+                    } label: {
+                        Text("\(CountryDecimalInput.format(weight, countryCode: appCountry, maxFractionDigits: 1)) kg")
+                            .font(OhanaFont.caption(.black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 9)
+                            .background(Color.ohanaControlFill, in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
+            }
+
+            HStack(spacing: 10) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 13, weight: .black))
+                    .foregroundStyle(Color.goPrimary)
+                    .frame(width: 24)
+                Text("日期")
+                    .font(OhanaFont.subheadline(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Spacer()
+                DatePicker("", selection: $newWeightDate, in: ...Date(), displayedComponents: .date)
+                    .datePickerStyle(.compact)
+                    .tint(Color.goPrimary)
+                    .labelsHidden()
+            }
+            .padding(12)
+            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+            Button(action: saveInlineWeight) {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                    Text("保存体重")
+                }
+                .font(OhanaFont.body(.black))
+                .foregroundStyle(Color.arkInk)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(canSaveInlineWeight ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+            }
+            .disabled(!canSaveInlineWeight)
+            .buttonStyle(ScaleButtonStyle())
+        }
+        .padding(14)
+        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     private func bcsColor(_ score: Int) -> Color {
@@ -299,10 +442,10 @@ struct WeightHistoryView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(log.date, format: .dateTime.year().month().day())
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.8))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                 Text(log.date, format: .dateTime.weekday(.wide))
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
 
             Spacer()
@@ -311,10 +454,10 @@ struct WeightHistoryView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
                     Text(displayWeightValue(log))
                         .font(.system(size: 20, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Text(displayWeightUnit(log))
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.primary.opacity(0.7))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                 }
                 if log.bcsScore > 0 {
                     Text("BCS \(log.bcsScore)")
@@ -331,13 +474,39 @@ struct WeightHistoryView: View {
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary.opacity(0.5))
+                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.5))
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
     }
 
+    private func saveInlineWeight() {
+        guard let value = parsedInlineWeight, value > 0 else { return }
+        let log = PetWeightLog(
+            date: newWeightDate,
+            weight: value,
+            weightUnit: newWeightUnit,
+            bcsScore: autoBCS(for: value, unit: newWeightUnit),
+            pet: pet,
+            executorId: UserDefaults.standard.string(forKey: "currentActiveHumanId")
+        )
+        modelContext.insert(log)
+        QuestManager.shared.awardAction(type: .weight, pet: pet, context: modelContext)
+        modelContext.safeSave()
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        withAnimation(GoMotion.feedback) {
+            newWeightText = ""
+            newWeightUnit = "kg"
+            newWeightDate = Date()
+            isInlineWeightComposerVisible = false
+        }
+    }
+
+    private func autoBCS(for value: Double, unit: String) -> Int {
+        let kg = unit == "g" ? value / 1000.0 : value
+        return PetBodyConditionEstimator.suggestedBCS(for: pet, weightKg: kg)
+    }
 }
 
 // MARK: - Weight Detail Line Chart (大图)
@@ -386,7 +555,7 @@ struct WeightDetailLineChart: View {
                         path.addLine(to: CGPoint(x: xPos(logs.count-1, w: w), y: h))
                         path.closeSubpath()
                     }
-                    .fill(.regularMaterial.opacity(0.3))
+                    .fill(Color.ohanaCardSurface.opacity(0.3))
 
                     // 折线
                     Path { path in

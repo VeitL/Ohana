@@ -47,7 +47,7 @@ struct WalkDetailView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
 
                 ScrollView {
                     VStack(spacing: 20) {
@@ -83,7 +83,7 @@ struct WalkDetailView: View {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
             }
@@ -117,10 +117,10 @@ struct WalkDetailView: View {
                     .tracking(1.2)
                 Text(walk.startDate, format: .dateTime.month().day().weekday(.wide))
                     .font(.system(size: 24, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text(walk.startDate, format: .dateTime.hour().minute())
                     .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer(minLength: 0)
         }
@@ -182,7 +182,7 @@ struct WalkDetailView: View {
                     .background(Color.goPrimary.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
                     .padding(.top, 10)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
             .padding(12)
             .goTranslucentCard(cornerRadius: 24)
@@ -197,15 +197,15 @@ struct WalkDetailView: View {
         } else {
             ZStack {
                 RoundedRectangle(cornerRadius: 20)
-                    .fill(.regularMaterial)
+                    .fill(Color.ohanaCardSurface)
                     .frame(height: 160)
                 VStack(spacing: 8) {
                     Image(systemName: "map")
                         .font(.system(size: 32))
-                        .foregroundStyle(.primary.opacity(0.25))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                     Text("没有路径数据")
                         .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.3))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                 }
             }
             .goTranslucentCard(cornerRadius: 24)
@@ -217,7 +217,7 @@ struct WalkDetailView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Overview")
                 .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 2), spacing: 10) {
                 statCell(icon: "arrow.left.and.right", value: walk.distanceText, label: "距离")
@@ -240,16 +240,16 @@ struct WalkDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
                 .frame(width: 26, height: 26)
                 .background(Color.primary.opacity(0.07), in: Circle())
             Text(value)
                 .font(.system(size: 18, weight: .heavy, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1).minimumScaleFactor(0.7)
             Text(label)
                 .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)
         .padding(12)

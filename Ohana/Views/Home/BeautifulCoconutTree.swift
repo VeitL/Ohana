@@ -640,7 +640,7 @@ struct DivineHaloView: View {
             Circle()
                 .strokeBorder(
                     AngularGradient(
-                        colors: [Color(hex: "00FFD1"), Color(hex: "C8FF00"), Color(hex: "00FFD1")],
+                        colors: [Color(hex: "00FFD1"), Color(hex: "84CC16"), Color(hex: "00FFD1")],
                         center: .center
                     ),
                     style: StrokeStyle(lineWidth: 1.5 + CGFloat(tier) * 0.25, dash: [6, 10])
@@ -688,7 +688,7 @@ struct RunesView: View {
                 let angle = Double(i) * (360.0 / Double(runes.count))
                 Text(runes[i])
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(Color(hex: "C8FF00"))
+                    .foregroundStyle(Color(hex: "84CC16"))
                     .shadow(color: Color(hex: "00FFD1"), radius: 4)
                     .offset(y: -130)
                     .rotationEffect(.degrees(angle))
@@ -766,7 +766,7 @@ struct StardustView: View {
 
                     Text("Lv.\(level) · 点击椰子采摘")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.6))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
 
                     HStack(spacing: 16) {
                         Button("升级") {
@@ -784,12 +784,12 @@ struct StardustView: View {
                         }
                         .padding(.horizontal, 20).padding(.vertical, 10)
                         .background(.white.opacity(0.15), in: Capsule())
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
 
                         Button("重置椰子") { harvested = [] }
                         .padding(.horizontal, 20).padding(.vertical, 10)
                         .background(.white.opacity(0.15), in: Capsule())
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     }
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                 }

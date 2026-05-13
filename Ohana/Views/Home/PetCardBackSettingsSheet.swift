@@ -64,7 +64,7 @@ struct PetCardBackSettingsSheet: View {
                 TextField("输入宠物名确认", text: $deleteNameInput)
                 Button("取消", role: .cancel) { deleteNameInput = "" }
                 Button("删除", role: .destructive) {
-                    guard deleteNameInput == pet.name else { return }
+                    guard ConfirmationNameMatcher.matches(deleteNameInput, expectedName: pet.name) else { return }
                     modelContext.delete(pet)
                     modelContext.safeSave()
                     dismiss()

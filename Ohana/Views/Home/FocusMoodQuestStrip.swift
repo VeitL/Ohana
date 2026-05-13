@@ -121,7 +121,7 @@ struct FocusMoodQuestStrip: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .accessibilityLabel(moodText)
             .accessibilityHint(badgeCount > 0 ? "有\(badgeCount)条提醒，点击展开详情" : "点击展开详情")
 
@@ -183,7 +183,7 @@ struct FocusMoodQuestStrip: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
         .background(cardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -257,7 +257,7 @@ struct FocusMoodQuestStrip: View {
                 .frame(width: 52)
                 .animation(.spring(response: 0.25), value: isCompleting)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .scaleEffect(isCompleting ? 0.92 : 1)
             .animation(.spring(response: 0.2), value: isCompleting)
             .accessibilityLabel("完成任务：\(q.title)")

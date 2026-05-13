@@ -68,7 +68,7 @@ struct PetBackup: Codable {
     var formerName: String; var lineageInfo: String; var themeColorHex: String
     var homeDate: String?; var birthCountry: String; var birthCity: String
     var foodBrand: String; var restockDate: String?; var restockWeight: Double
-    var dailyPortionGrams: Double; var foodPrice: Double; var isShared: Bool
+    var dailyPortionGrams: Double; var mainFoodKindRaw: String?; var foodPrice: Double; var isShared: Bool
     var createdAt: String; var notes: String; var coatColor: String; var eyeColor: String
     var currentStreak: Int; var lastCheckInDate: String?
     var foodTrackingModeRaw: String; var casualOpenDate: String?; var casualDurationDays: Int
@@ -124,6 +124,7 @@ struct PlantBackup: Codable {
 struct PetCareLogBackup: Codable {
     var id: String; var date: String; var type: String
     var amountGrams: Double; var amountMl: Double; var note: String
+    var foodKindRaw: String?; var treatKindRaw: String?
     var executorId: String?; var petId: String?
 }
 
@@ -162,7 +163,8 @@ struct PetHygieneLogBackup: Codable {
 
 struct PetFoodRecordBackup: Codable {
     var id: String; var date: String; var brand: String
-    var dailyGrams: Double; var petId: String?
+    var dailyGrams: Double; var totalGrams: Double?; var foodKindRaw: String?; var petId: String?
+    var purchaseDate: String?; var remainingCorrectionGrams: Double?; var remainingCorrectionDate: String?
     var notes: String?; var executorId: String?
 }
 
@@ -555,6 +557,7 @@ final class DataBackupManager {
             homeDate: d(p.homeDate), birthCountry: p.birthCountry, birthCity: p.birthCity,
             foodBrand: p.foodBrand, restockDate: d(p.restockDate),
             restockWeight: p.restockWeight, dailyPortionGrams: p.dailyPortionGrams,
+            mainFoodKindRaw: p.mainFoodKindRaw,
             foodPrice: p.foodPrice, isShared: p.isShared,
             createdAt: d(p.createdAt), notes: p.notes, coatColor: p.coatColor,
             eyeColor: p.eyeColor, currentStreak: p.currentStreak,
@@ -641,6 +644,7 @@ final class DataBackupManager {
     private func encodeCareLog(_ l: PetCareLog) -> PetCareLogBackup {
         PetCareLogBackup(id: l.id.uuidString, date: d(l.date), type: l.type,
             amountGrams: l.amountGrams, amountMl: l.amountMl, note: l.note,
+            foodKindRaw: l.foodKindRaw, treatKindRaw: l.treatKindRaw,
             executorId: l.executorId, petId: l.pet?.id.uuidString)
     }
 
@@ -684,7 +688,11 @@ final class DataBackupManager {
 
     private func encodeFoodRecord(_ r: PetFoodRecord) -> PetFoodRecordBackup {
         PetFoodRecordBackup(id: r.id.uuidString, date: d(r.startDate), brand: r.brand,
-            dailyGrams: r.dailyGrams, petId: r.pet?.id.uuidString,
+            dailyGrams: r.dailyGrams, totalGrams: r.totalGrams, foodKindRaw: r.foodKindRaw,
+            petId: r.pet?.id.uuidString,
+            purchaseDate: d(r.purchaseDate),
+            remainingCorrectionGrams: r.remainingCorrectionGrams,
+            remainingCorrectionDate: d(r.remainingCorrectionDate),
             notes: r.notes, executorId: r.executorId)
     }
 
@@ -909,11 +917,15 @@ final class DataBackupManager {
         p.allergies = dto.allergies; p.passportNumber = dto.passportNumber
         p.passportExpiryDate = parseDate(dto.passportExpiryDate)
         p.formerName = dto.formerName; p.lineageInfo = dto.lineageInfo
-        p.themeColorHex = dto.themeColorHex
+        p.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
+            dto.themeColorHex,
+            fallback: OhanaThemeColorPolicy.petFallbackHex
+        )
         p.homeDate = parseDate(dto.homeDate)
         p.birthCountry = dto.birthCountry; p.birthCity = dto.birthCity
         p.foodBrand = dto.foodBrand; p.restockDate = parseDate(dto.restockDate)
         p.restockWeight = dto.restockWeight; p.dailyPortionGrams = dto.dailyPortionGrams
+        p.mainFoodKindRaw = dto.mainFoodKindRaw ?? FeedFoodKind.dry.rawValue
         p.foodPrice = dto.foodPrice; p.isShared = dto.isShared
         p.createdAt = parseDate(dto.createdAt) ?? Date()
         p.notes = dto.notes; p.coatColor = dto.coatColor; p.eyeColor = dto.eyeColor
@@ -942,7 +954,10 @@ final class DataBackupManager {
         h.shouldShowOnHome = dto.shouldShowOnHome
         h.mbti = dto.mbti ?? ""
         h.privateFieldsRaw = dto.privateFieldsRaw ?? ""
-        h.themeColorHex = dto.themeColorHex ?? "4338FF"
+        h.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
+            dto.themeColorHex ?? "",
+            fallback: OhanaThemeColorPolicy.humanFallbackHex
+        )
         h.heightCm = dto.heightCm ?? 0
         h.avatarImageData = dto.avatarImageBase64.flatMap { Data(base64Encoded: $0) }
         return h
@@ -994,6 +1009,8 @@ final class DataBackupManager {
         let l = PetCareLog(date: parseDate(dto.date) ?? Date(),
                            type: CareType(rawValue: dto.type) ?? .feeding,
                            amountGrams: dto.amountGrams, amountMl: dto.amountMl, note: dto.note,
+                           foodKind: FeedFoodKind(rawValue: dto.foodKindRaw ?? "") ?? .dry,
+                           treatKind: dto.treatKindRaw.flatMap(FeedTreatKind.init(rawValue:)),
                            pet: dto.petId.flatMap { pets[$0] },
                            executorId: dto.executorId)
         if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
@@ -1060,10 +1077,15 @@ final class DataBackupManager {
 
     private func decodeFoodRecord(_ dto: PetFoodRecordBackup, pets: [String: Pet]) -> PetFoodRecord {
         let l = PetFoodRecord(brand: dto.brand, dailyGrams: dto.dailyGrams,
+                              totalGrams: dto.totalGrams ?? 0,
+                              foodKind: FeedFoodKind(rawValue: dto.foodKindRaw ?? "") ?? .dry,
+                              purchaseDate: parseDate(dto.purchaseDate ?? ""),
                               startDate: parseDate(dto.date) ?? Date(),
                               pet: dto.petId.flatMap { pets[$0] },
                               executorId: dto.executorId)
         if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
+        l.remainingCorrectionGrams = dto.remainingCorrectionGrams
+        l.remainingCorrectionDate = parseDate(dto.remainingCorrectionDate ?? "")
         l.notes = dto.notes ?? ""
         return l
     }

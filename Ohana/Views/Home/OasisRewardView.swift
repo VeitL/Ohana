@@ -88,7 +88,7 @@ struct OasisRewardView: View {
                 .background(Color.goPrimary.opacity(0.18), in: Circle())
                 .overlay(Circle().strokeBorder(Color.goPrimary.opacity(0.35), lineWidth: 1))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     var body: some View {
@@ -122,7 +122,7 @@ struct OasisRewardView: View {
                                     .symbolRenderingMode(.hierarchical)
                                     .foregroundStyle(.white.opacity(0.9))
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ScaleButtonStyle())
 
                             Spacer()
 
@@ -294,7 +294,7 @@ struct OasisRewardView: View {
                 .padding(.horizontal, 14).padding(.vertical, 7)
                 .background(Color.goPrimary, in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .accessibilityLabel("椰子资产 \(QuestManager.shared.coconutCount)")
             .accessibilityHint("打开岛屿财富")
         }
@@ -438,7 +438,7 @@ struct OasisRewardView: View {
                         .scaleEffect(harvestBubbleBounce ? 1.06 : 1.0)
                         .animation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true), value: harvestBubbleBounce)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                     .padding(.bottom, 10)
                     .transition(.scale.combined(with: .opacity))
                     .onAppear { harvestBubbleBounce = true }
@@ -618,7 +618,7 @@ struct OasisRewardView: View {
                 lineWidth: 1
             ))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .opacity(canInject ? 1 : 0.45)
     }
 
@@ -692,7 +692,7 @@ struct OasisRewardView: View {
                     .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     // MARK: - 模块六：打卡日历（完整月视图）
@@ -709,7 +709,7 @@ struct OasisRewardView: View {
                         .foregroundStyle(Color.goPrimary)
                     Text("打卡日历")
                         .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 Spacer()
                 HStack(spacing: 4) {
@@ -736,12 +736,12 @@ struct OasisRewardView: View {
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.primary.opacity(0.5))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                 }
                 Spacer()
                 Text(monthYearString(calendarDisplayMonth))
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Button {
                     let next = Calendar.current.date(byAdding: .month, value: 1, to: calendarDisplayMonth) ?? calendarDisplayMonth
@@ -765,7 +765,7 @@ struct OasisRewardView: View {
                 ForEach(["日","一","二","三","四","五","六"], id: \.self) { d in
                     Text(d)
                         .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.3))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -786,7 +786,7 @@ struct OasisRewardView: View {
                     Text("📦").font(.system(size: 14))
                     Text("补签包")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.7))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                     Text("×\(makeupPackCount)")
                         .font(.system(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(makeupPackCount > 0 ? Color.goPrimary : .white.opacity(0.3))
@@ -842,10 +842,10 @@ struct OasisRewardView: View {
                 .foregroundStyle(color)
             Text(value)
                 .font(.system(size: 16, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Text(label)
                 .font(.system(size: 9, weight: .medium, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.35))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
         }
         .frame(maxWidth: .infinity)
     }
@@ -890,7 +890,7 @@ struct OasisRewardView: View {
                         .padding(.horizontal, 14).padding(.vertical, 10)
                         .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
         }
@@ -977,7 +977,7 @@ struct OasisRewardView: View {
                     }
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .disabled(cell.isChecked || cell.isToday || cell.isFuture || makeupPackCount == 0)
         }
     }
@@ -1200,7 +1200,7 @@ struct OasisRewardView: View {
                     .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     // MARK: - Animations
@@ -1261,19 +1261,19 @@ private struct CoconutRulesSheet: View {
     }
 
     private let earnCards: [RuleCard] = [
-        RuleCard(emoji: "🦮", title: "遛狗", desc: "带毛孩子出门溜达", glowColor: Color(hex: "C8FF00"), reward: "每100m得1🥥"),
+        RuleCard(emoji: "🦮", title: "遛狗", desc: "带毛孩子出门溜达", glowColor: Color(hex: "14B8A6"), reward: "每100m得1🥥"),
         RuleCard(emoji: "🍗", title: "喂食·喂水", desc: "按时投喂，爱意满满", glowColor: Color(hex: "FF8C42"), reward: "每次2~3🥥"),
         RuleCard(emoji: "🧹", title: "铲屎官在线", desc: "勤劳铲屎，功德无量", glowColor: Color(hex: "A8E6CF"), reward: "每次5~8🥥"),
         RuleCard(emoji: "🪮", title: "护理·梳毛", desc: "精心打理，美美的", glowColor: Color(hex: "DDA0DD"), reward: "5~10🥥，洗澡15🥥"),
         RuleCard(emoji: "💉", title: "健康打卡", desc: "关注健康，守护生命", glowColor: Color(hex: "FF6B6B"), reward: "每次20🥥"),
         RuleCard(emoji: "💰", title: "记一笔账", desc: "精打细算，爱的花销", glowColor: Color(hex: "FFD93D"), reward: "每次10🥥"),
         RuleCard(emoji: "🎾", title: "逗玩互动", desc: "玩耍时光最快乐", glowColor: Color(hex: "6BCB77"), reward: "每次10~12🥥"),
-        RuleCard(emoji: "🌳", title: "每日掉落", desc: "生命之树被动收益", glowColor: Color(hex: "C8FF00"), reward: "定时领取"),
+        RuleCard(emoji: "🌳", title: "每日掉落", desc: "生命之树被动收益", glowColor: Color(hex: "84CC16"), reward: "定时领取"),
         RuleCard(emoji: "🎲", title: "暴击加成", desc: "幸运降临！", glowColor: Color(hex: "FFCC00"), reward: "10%双倍·1%五倍🔥"),
     ]
 
     private let spendCards: [RuleCard] = [
-        RuleCard(emoji: "✨", title: "注入生命之树", desc: "让生命之树更旺盛", glowColor: Color(hex: "C8FF00"), reward: "每次10🥥"),
+        RuleCard(emoji: "✨", title: "注入生命之树", desc: "让生命之树更旺盛", glowColor: Color(hex: "F59E0B"), reward: "每次10🥥"),
         RuleCard(emoji: "🛍️", title: "椰子商店", desc: "兑换特效/称号/加成", glowColor: Color(hex: "667eea"), reward: "各种道具"),
         RuleCard(emoji: "🎰", title: "欧气扭蛋机", desc: "测测你的运气！", glowColor: Color(hex: "FF6B9D"), reward: "每次30🥥"),
         RuleCard(emoji: "🎯", title: "悬赏任务", desc: "发布·接单·奖励", glowColor: Color(hex: "FF8C42"), reward: "转给完成者"),
@@ -1326,7 +1326,7 @@ private struct CoconutRulesSheet: View {
                                     .font(.system(size: 28))
                                 Text("打卡次数越多，椰子越多，生命之树越旺！")
                                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.primary.opacity(0.35))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                                     .multilineTextAlignment(.center)
                             }
                             Spacer()
@@ -1360,11 +1360,11 @@ private struct CoconutRulesSheet: View {
                 Text(emoji).font(.system(size: 18))
                 Text(title)
                     .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
             }
             Text(subtitle)
                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.4))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
         }
     }
 
@@ -1375,12 +1375,12 @@ private struct CoconutRulesSheet: View {
                 .font(.system(size: 28))
             Text(card.title)
                 .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Text(card.desc)
                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.45))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                 .lineLimit(2)
             Spacer(minLength: 0)
             Text(card.reward)
@@ -1420,10 +1420,10 @@ private struct CoconutRulesSheet: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text(desc)
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.4))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             }
             Spacer()
         }

@@ -1,6 +1,39 @@
 # Ohana UI 规范
 
-本文档以 `Ohana/Views/Details/GoFocusUIView.swift` 为 UI 基础规范页。新增页面、重构页面或修复 UI 时，优先遵循本文档；如页面与规范冲突，应先调整页面，除非有明确产品原因。
+`ui规范.selection.json` 是 Ohana UI 的唯一机器可读规范源头。本文档是同一选择的人类可读说明，用来解释规则、约束和使用场景；如本文档与 `ui规范.selection.json` 不一致，以 `ui规范.selection.json` 为准，并更新本文档。
+
+`设置 > 开发者工具 > UI/UX 规范查看` 中的 V4 交互式设计控制台只是编辑、预览和导出工具。控制台里的 AppStorage 状态不自动成为正式规范；只有导出的 V4 JSON 同步到 `ui规范.selection.json` 后，才算新的设计源头。
+
+## 0. V4 设计控制台使用规则
+
+- 入口：`设置 > 开发者工具 > UI/UX 规范查看`。
+- 控制台只使用 fixture 假数据，不读取真实 SwiftData，不修改全 app 主题。
+- 设计选择按 `背景 → 卡片 → 按钮 → 输入 → 控件 → 文字 → 导航 → 弹窗 → 图表 → 反馈 → 动效` 的积木顺序调整。
+- 预览画布采用“全元素总览”：同一画布内覆盖导航、卡片、按钮、输入、开关、chip、列表、角标、进度、图表、toast/banner、状态矩阵和 FAB。
+- 预览画布应模拟一个固定高度的 iPhone 视口，内部内容可独立上下滑动；不要把长预览裁切成不可滚动的海报。
+- 弹窗不再作为单独页面切换，而是从全元素画布内打开覆盖层，用来观察 sheet 透明度、关闭按钮、底部 CTA、删除确认等效果。
+- Chip 指“小型选择标签”，例如时间范围、筛选项、快捷克数、干粮/湿粮切换；它不是独立页面控件，应在控件区和真实业务卡片中同时预览。
+- 卡片和输入框必须提供 `纯色无边框 / Flat Block` 选项：纯色块、无描边、无阴影，适合极简表单和密集工具页。
+- 所有可见状态切换都必须有顺滑过渡：按钮按压、chip/segment 选中、toggle 滑动、卡片展开、sheet 出入场、toast/banner、列表更新、图表数据变化、日历切换都不能硬切。
+- 每次确定设计方向后，复制 V4 JSON/Markdown，并同步到 `ui规范.selection.json` 与本文档。
+- 新建页面或大改页面时，从 `docs/ui-v4-new-page-template.md` 开始；完成前运行 `scripts/audit-ui-v4.sh --changed` 或指定文件扫描。
+- 后续 UI 修改必须先检查 V4 控制台中的设计检查面板：文字对比、44pt 触控区域、玻璃可读性、动效强度、状态可见性、深浅色安全。
+
+## 0.1 当前正式设计选择
+
+以 `ui规范.selection.json` 为准，当前已确认的 V4 token：
+
+- **导出版本**：Ohana UI 规范选择 V4，Generated `2026-05-13T00:00:00Z`。
+- **颜色与背景**：深色预览使用 `deep` 背景；主色为 adaptive primary，深色解析为 `goLime`，浅色解析为清爽蓝 `goBlue`。全局背景必须以“浅色/深色成对”的官方背景包选择，一次选择同时决定两种模式；浅色背景必须比浅色卡片更深一档，让白色/浅色卡片保持层次。当前官方背景对为 `goIsland`、`cleanBlueGray`、`paperCream`、`forestGlade`、`deepAmbient`；自定义照片使用同一张图片叠加深/浅色可读性遮罩。
+- **食物语义色**：喂食页只保留三种喂食模式色和干/湿粮食物色。干粮全局使用 `foodDry` 琥珀色，湿粮全局使用 `foodWet` rose；余粮、库存、零食在喂食模块内统一使用 `goPrimary`，低余粮/异常只在局部状态上使用 `goYellow/goRed`。
+- **卡片与输入**：卡片使用 `flat`，输入框使用 `flat`，即纯色块、无描边、无阴影；整体密度使用 `compact`。
+- **控件**：按钮 `pill`，chip `pill`，segment `capsule`，toggle `pill`，进度条 `bar`，列表行 `filled`，角标 `solid`。
+- **实色控件**：高频按钮、chip、快捷金额/克数、内嵌数字键盘优先使用实色填充，减少低透明度和磨砂表面。选中态使用实色 `goPrimary` / 业务 tint + `Color.arkInk` 文本；未选态使用实色 elevated surface，不使用低透明度 tint。
+- **导航与设置行**：设置项左 icon 使用 `tintedTile`；非弹窗页面返回使用 `floatingCircle`；非弹窗页面关闭使用 `iconOnly`；弹窗关闭继续使用独立 `sheetChrome=iconOnly`。
+- **弹窗**：sheet 使用独立 token，当前为 `compact` 布局、`nativeRegular` 背景、`flat` 卡片、`flat` 输入框、`pill` 按钮、`iconOnly` 关闭。短记录/确认弹窗使用 `inlineOverlay`，底部贴近安全区、左右 `6pt`、连续圆角 `52pt`、自适应内容高度、`liftedAlert` 阴影、`scrimGradient` 背后遮罩、`bottomSpringScaleFade` 出入场；长表单底部 CTA 固定可见；下滑关闭只允许从顶部 drag handle 触发。弹窗 token 不跟随普通卡片/输入/按钮选择变化。
+- **图表与日历**：图表使用 `area` 趋势 + `quiet` 坐标；日历使用 `agendaHybrid`、`minimalNumber` 日期格、`dots` 事件标记、`timeRail` 日程列表。
+- **反馈与动效**：toast 使用 `icon`，banner 使用 `inline`，触感 `soft`，主运动 `spring`，FAB `rotate`，转场 `scale`，奖励 `bouncy`。
+- **已接受的风险约束**：`compact` 密度仍必须保留 44pt 实际触控区；`clear` 玻璃必须有足够遮罩和描边，避免文字浮在复杂背景上。
 
 ## 1. 设计原则
 
@@ -8,7 +41,9 @@
 - **圆润但克制**：使用圆体、胶囊按钮和柔和卡片，但不要卡片套卡片，不要堆过多装饰。
 - **状态可读**：任何状态都必须靠文字、icon、颜色共同表达，不能只靠颜色。
 - **状态优先于说明**：高频页面只展示当前状态和下一步动作，避免常驻“点击/长按/拖动/如何使用”式教程文案。
+- **卡片只给可操作表面**：卡片 UI 只用于可点击、可进入、可展开或可操作的区域；纯信息总览、静态指标和标题说明使用无框布局、行内数字或轻量分隔，不为了分组而套卡片背景。
 - **深浅色同步**：页面切换浅色/深色时，背景、卡片、描边、文字、图表和控件都必须同步变化。
+- **顺滑过渡，不硬切**：所有用户能看到的 UI 状态变化都要用项目动效 token 过渡。即使是轻量变化，也应有短促的 fade/scale/slide/spring，让界面像“滑过去、浮出来、收回去”，而不是突然换帧。
 - **性能稳定**：规范页和设置入口不要使用高风险重型 glass API。大页面使用 `ScrollView + LazyVStack`。
 
 ## 2. Foundations
@@ -27,12 +62,14 @@
 
 ### 颜色
 
-- `goPrimary`：主操作、品牌强调、选中状态。
+- `goPrimary`：全局主操作、品牌强调、系统级选中状态；深色模式解析为 `goLime`，浅色模式解析为清爽蓝 `goBlue`。
+- `goLime` / `goBlue`：保留主色，只能作为 `goPrimary` 的深/浅色解析或系统级强调；宠物/人类主题色、业务模式色、图表系列色、计划等专有色不能直接复用这两个颜色。喂食模块中的余粮/库存/零食按业务决策使用 `goPrimary`。
 - `goTeal`：完成、健康、成功。
 - `goYellow`：进行中、注意、隐私。
 - `goRed`：错误、危险、删除、异常。
-- `goBlue`：信息、导航、辅助强调。
-- 宠物主题色：只用于宠物身份、图表系列、头像底色；避免使用绿色，防止和品牌主色混淆。
+- `goBlue`：浅色模式主色，不再作为普通信息色或业务专有色使用。
+- 成员主题色：只用于宠物/人类身份、图表系列、头像底色；从成员主题色库选择，必须避开 `goLime`、`goBlue` 及它们的明暗变体。旧数据若命中保留色，启动时自动归一到成员 fallback 色。
+- 粮食语义色：手动模式用 `goOrange`，计划模式用 `goPurple`，自动模式用 `goTeal`；干粮用 amber，湿粮用 rose；余粮/库存/零食统一使用 `goPrimary`，但低余粮、异常、删除等局部状态仍使用 `goYellow/goRed`。
 
 ### 动效
 
@@ -43,6 +80,16 @@
 - `GoMotion.fab`：FAB 菜单、奖励弹出、较强反馈。
 - `GoMotion.feedback`：按钮、色块、segment、轻量状态切换。
 - `GoMotion.quick` / `GoMotion.reduced`：短淡出、低功耗/减弱动态模式。
+
+全局过渡规则：
+
+- **控件切换**：chip、segment、tab、filter、picker 行切换应使用 spring 或 matched transition；选中态要滑动/扩散/淡入，不能直接跳到新位置。
+- **Toggle**：轨道高度只比内部圆钮略高；圆钮必须滑动到另一侧，icon/文字可同步 crossfade 或 bounce。
+- **卡片与列表**：展开/收起、插入/删除、排序变化应使用 `GoMotion.page` 或 `GoMotion.feedback`，配合 opacity/scale/offset，避免列表瞬间重排。
+- **Sheet / 弹窗**：出入场使用 slide/scale/fade 组合；背景遮罩和玻璃透明度也要同步动画。
+- **图表 / 日历**：数据范围、日期、选中点变化要 animate value；空状态和有数据状态之间使用 crossfade。
+- **深浅色切换**：颜色 token 变化也应使用短过渡，避免整屏闪一下。
+- **减弱动态模式**：可以降低位移和弹性，但仍使用短 fade/ease 过渡，不做硬切。
 
 不要在高频页面随手写新的 `.spring(response:)` 参数；除非该动画是独立特效，并且不会影响首页、表单输入或头像裁剪性能。
 
@@ -58,6 +105,10 @@
 ### 背景和卡片
 
 - 页面背景必须随深浅色变化。
+- 浅色页面背景不能接近纯白；默认使用稍深的清爽蓝灰渐变，确保 `ohanaCardSurface`、白色卡片和输入块能从背景中分离。
+- 官方背景和自定义照片背景都必须经过深浅色可读性遮罩。自定义照片只保存一张原图，渲染时按当前模式叠加蓝灰/深蓝遮罩与轻模糊。
+- 背景选择是全局页面底，不等同于卡片、弹窗或玻璃 token；省电模式只能降低动画，不能覆盖用户选择的背景。
+- 纯信息显示区域不使用卡片背景；只有可点击、可导航、可展开、可编辑的区域才使用卡片样式。
 - 大面积内容使用 `sectionCard`。
 - 卡片内子区域使用 `cardSurface`。
 - 普通业务页面使用 `goTranslucentCard`、`goGlassBackground` 或 `goSelectableSurface`；不要直接调用原生 `.glassEffect()`。
@@ -74,20 +125,34 @@
 - Destructive：红色文字、浅红背景、红色描边，必须配二次确认。
 - Ghost：无背景或轻背景，只用于卡片内轻量动作。
 - Quick Action Circle：40x40 圆形 icon 按钮，按功能使用 tint。
+- 高频选择按钮：选中态必须是实色主色/业务色，未选态必须是实色 surface；避免 `tint.opacity(0.10-0.20)` 作为可点击按钮主体。
+- 内嵌数字键盘：数字、删除、小数点键统一使用实色 elevated surface；不要用半透明磨砂键帽。
 
 ### 关闭按钮
 
-- 默认 sheet/弹窗右上角使用纯 icon 关闭按钮。
-- 普通关闭：`xmark` + 36x36 圆形浅背景。
-- 系统 sheet 可用 `xmark.circle.fill` hierarchical。
+- 弹窗关闭由 `sheetChrome` 控制，当前为 `iconOnly`。
+- 非弹窗页面关闭由 `pageCloseButton` 控制，当前为 `iconOnly`。
+- 普通关闭：`xmark` + 32-36 视觉框 + 44pt 实际触控区域，不额外加圆形浅背景。
+- 只有图片预览、强视觉 hero 或背景对比不足时，才使用浅色圆形底。
+- 系统确认类 sheet 可用 `xmark.circle.fill` hierarchical，但业务详情页优先纯 icon。
 - 只有退出长表单或有数据丢失风险时，才用带文字的关闭胶囊。
 
 ### 返回按钮
 
-- 优先使用 `NavigationStack` 系统返回。
-- 自定义 toolbar 使用 36x36 `chevron.left` 圆形按钮。
+- 返回按钮由 `pageBackButton` 控制，当前为 `floatingCircle`。
+- 系统 push 页面优先使用 `NavigationStack` 系统返回。
+- 自定义 toolbar 使用 34-36 视觉框的 `chevron.left` 圆形按钮，并保留 44pt 实际触控区。
 - 彩色 hero 上使用实色返回圆按钮。
 - 多级详情可使用“返回”文字胶囊，但背景和文字必须有足够对比。
+
+### 设置行左侧 Icon
+
+- 设置项左侧 icon 由 `settingIcon` 控制，当前为 `tintedTile`。
+- 默认结构：SF Symbol + 32pt 圆角方块，背景为功能 tint 的低透明度填充，icon 使用功能 tint。
+- `plainGlyph` 只用于极简列表，不适合复杂设置页。
+- `circleDisc` 可用于设备身份、权限、账户等更接近系统设置的模块。
+- `flatBlock` 可用于 compact 工具页，与 `flat` 卡片/输入保持一致。
+- 设置行 icon 必须和标题、右侧 chevron/toggle 对齐，行高稳定，不能因为 icon 样式切换造成布局跳动。
 
 ### Toggle
 
@@ -121,6 +186,7 @@
 - 使用卡片堆、快捷操作、聚合入口和状态条。
 - 避免大面积装饰图、营销式标题、卡片套卡片。
 - GO Focus 是默认主路径；经典首页只能作为内部兼容/回归入口，不在普通设置中暴露切换。
+- Today Focus 中普通任务用“跳过”，当天隐藏、次日恢复；异常/风险警告用“关闭”，用户确认后不应每天重复出现。
 
 ### 宠物详情页
 
@@ -159,12 +225,37 @@
 - 标题明确，右上角关闭。
 - 表单区域分组清晰，底部主 CTA 固定。
 - 关闭按钮默认只用 icon，不加文字。
+- 弹出卡片默认使用 `nativeRegular` 背景：优先 `.glassEffect(.regular)` / 原生高斯玻璃效果，避免厚重灰色材质和突兀纯白/纯黑大卡。
+- 当前 `nativeRegular` 弹窗背景只能有一层原生 `.glassEffect(.regular)`，不能在玻璃面本身额外叠加 material、渐变或厚描边；系统 `.sheet` 的这层玻璃应放在 `.presentationBackground`，不要放在 sheet 内容层的 `.background` 里，否则会被 NavigationStack / presentation 容器采样成更厚的磨砂感。需要对比时可临时使用 `.glassEffect(.clear)`。弹窗内操作、输入、选项切换时不得触发整张弹窗闪动；自适应高度更新应静默完成，避免 detent 动画造成闪烁。
+- 记录、确认、补粮、轻量管理这类短弹窗优先使用当前页面内自绘 overlay sheet，直接盖在同一个 `ZStack` 上，让玻璃采样真实页面背景；系统 `.sheet` 只保留给 overview、历史、长列表和复杂编辑页。
+- 弹窗内部卡片和输入框默认使用 `flat` 纯色无边框块；只有弹窗背景负责玻璃质感，内部不要再叠厚玻璃卡。
+- Sheet 高度使用能完整显示内容的最小 detent；短记录/确认弹窗必须测量内容高度后使用自适应 `.height(...)`，避免 `.medium` 留出大块空白；表单较长时底部主 CTA 必须固定可见，内容区独立滚动；只有历史、长列表、复杂编辑才使用 `.large`。
+- 表单内分区用轻量半透明块承载，避免在 sheet 里继续套厚重卡片。
+
+#### 短弹窗标准 / Inline Popup Standard
+
+当用户说“改为弹窗 UI”或需要记录、确认、补粮、轻量管理这类短弹窗时，默认按以下标准实现：
+
+- **实现方式**：使用当前页面内自绘 `inlineOverlay`，直接盖在同一个 `ZStack` 上；不要用系统 `.sheet`，除非内容是 overview、历史、长列表或复杂编辑。
+- **位置**：底部对齐，距离屏幕底部安全区约 `8pt`；键盘弹出时只抬起弹窗本身，不抬起背景页面。
+- **宽度与边距**：左右屏幕边距 `6pt`，视觉上接近屏幕边缘，但仍保留一点呼吸感。
+- **圆角**：使用 `RoundedRectangle(cornerRadius: 52, style: .continuous)`；目标是接近 iPhone 屏幕圆角的同心圆感觉。
+- **高度**：内容自适应，只比最底部 CTA 多留少量 padding；不要留 `.medium` 那种大块空白。短弹窗建议最小约 `260pt`，最大不超过当前页面高度的 `94%`；键盘出现时最大不超过约 `68%`。表单内容超过可用高度时，底部 CTA 固定在弹窗底部，滚动区域不遮住 CTA。
+- **背景**：弹窗玻璃面只保留一层 `nativeRegular` / `.glassEffect(.regular)`；补粮等对比场景可使用 `clear`。不要在玻璃面上再叠厚 material、纯色大底、第二层玻璃或重描边。
+- **阴影**：允许在弹窗外层增加 `liftedAlert` 背后托举阴影，参考当前粮食记录弹窗：一层较强的上方 lift shadow + 一层柔和 grounding shadow。阴影要随弹出淡入，不要出现硬切的黑块。
+- **背后遮罩**：使用 `scrimGradient`，包含轻微全屏 scrim 和底部渐变，用来托出玻璃层级；遮罩随弹窗一起平滑淡入淡出。
+- **弹出动画**：使用 `bottomSpringScaleFade`：从底部向上滑入，同时轻微 scale 和 fade；退出反向。动画使用 `GoMotion.page`，拖拽偏移使用 `GoMotion.feedback`，不能硬切。
+- **关闭方式**：右上角 `iconOnly` 关闭按钮；点击外部关闭或先收键盘；弹窗顶部必须有小型 drag handle。实现时统一使用 `OhanaPopupCloseButton` 和 `OhanaPopupDragHandle`，视觉参数为：纯 `xmark`、无圆形底、约 `44pt` 触控区；handle 宽约 `48pt`、高 `5pt`、距离弹窗顶部约 `4pt`。下滑关闭手势只能绑定在顶部 drag handle 上，内容区域的上下滑动只滚动内容，绝不能关闭弹窗，也不能把背后的详情页一起关闭。
+- **内部结构**：弹窗内表单块、输入框、分区使用 `flat` 纯色无边框块；不要卡片套卡片。像“当前主粮”这种二选一模块只显示两个胶囊按钮，不要额外加外层卡片背景。
+- **选择动画**：干粮/湿粮、segment、chip 等选中态必须用 matched geometry 或 spring 滑块/淡入过渡；不能直接换背景色硬切。
+- **底部 CTA**：一个主操作，使用 `pill` 胶囊按钮；短内容可跟随内容底部，长表单必须固定在弹窗底部。弹窗底边只比 CTA 低一小段 padding。
 
 ## 5. 深浅色规则
 
 页面切换浅色/深色时，至少这些元素必须变化：
 
 - 页面背景
+- 自定义/官方背景遮罩
 - 卡片背景
 - 卡片描边
 - 主/副/三级文字
@@ -192,17 +283,25 @@
 - 关闭按钮是否只用 icon？
 - 返回按钮是否优先使用系统返回？
 - Toggle 是否只表达布尔状态？
+- 状态切换、选中态、弹窗、列表更新、图表变化是否都有顺滑过渡，避免硬切？
 - 私密数据是否对非本人完全隐藏？
 - 复杂列表是否使用 `LazyVStack`？
 - 是否避免卡片套卡片？
 
 ## 7. 代码映射
 
-- 规范展示页：`Ohana/Views/Details/GoFocusUIView.swift`
+- 规范展示页：`Ohana/Views/Details/UIGuidelinesView.swift`
+- 规范选择源：`ui规范.selection.json`
+- 新页面模板：`docs/ui-v4-new-page-template.md`
+- 自动检查脚本：`scripts/audit-ui-v4.sh`
+- 规范类型：`DesignSpecSelectionV4`
+- 规范选项：`DesignSpecOptionCatalogV4`
+- 场景预览：`DesignSpecPreviewCanvasV4`
+- 导出器：`DesignSpecExporterV4`
 - 背景和卡片基础：`goFocusBackdrop`、`sectionCard`
 - 通用业务表面：`goTranslucentCard`、`goGlassBackground`、`goSelectableSurface`
 - 文字颜色：`primaryText`、`secondaryText`、`tertiaryText`
 - 表面色：`cardSurface`、`sectionCardFill`、`sectionCardStroke`
-- 组件展示：`buttonShowcase`、`annotation`、`statusBadge`、`chip`、`toggleRow`
+- V4 控制台组件：背景、卡片、按钮、输入、控件、文字、导航、弹窗、图表、反馈、动效
 
-修改 UI 时，先在 `GoFocusUIView` 中补齐或调整规范，再应用到业务页面。
+修改 UI 时，先在 V4 控制台中确认规范与状态矩阵，再应用到业务页面。

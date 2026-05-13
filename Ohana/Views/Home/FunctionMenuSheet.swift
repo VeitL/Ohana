@@ -48,8 +48,8 @@ enum FeatureGroup: String, Hashable, CaseIterable {
         switch self {
         case .dailyCare:     return Color(hex: "F59E0B")
         case .healthBody:    return Color(hex: "EF4444")
-        case .archiveMemory: return Color(hex: "C8FF00")
-        case .householdHub:  return Color(hex: "38BDF8")
+        case .archiveMemory: return Color(hex: "F59E0B")
+        case .householdHub:  return Color.goTeal
         case .oasisRewards:  return Color(hex: "EAB308")
         case .plants:        return Color(hex: "22C55E")
         }
@@ -479,7 +479,7 @@ struct FunctionMenuSheet: View {
             }
             .padding(.vertical, 4)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .listRowSeparatorTint(.white.opacity(0.08))
     }
 
@@ -511,7 +511,7 @@ struct FMPetAvatar: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(Color(hex: pet.themeColorHex.isEmpty ? "233BFF" : pet.themeColorHex).opacity(0.3))
+                .fill(Color(hex: pet.safeThemeColorHex).opacity(0.3))
                 .frame(width: size, height: size)
             if let data = pet.avatarImageData, let uiImg = UIImage(data: data) {
                 Image(uiImage: uiImg)
@@ -522,7 +522,7 @@ struct FMPetAvatar: View {
             } else {
                 Text(String(pet.name.prefix(1)))
                     .font(.system(size: size * 0.4, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(hex: pet.themeColorHex.isEmpty ? "233BFF" : pet.themeColorHex))
+                    .foregroundStyle(Color(hex: pet.safeThemeColorHex))
             }
         }
     }

@@ -57,7 +57,7 @@ struct InventoryView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -99,13 +99,13 @@ struct InventoryView: View {
                             VStack(spacing: 12) {
                                 Image(systemName: "shippingbox")
                                     .font(.system(size: 40))
-                                    .foregroundStyle(.primary.opacity(0.2))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
                                 Text("百宝箱空空如也")
                                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.primary.opacity(0.4))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                 Text("前往椰子商店兑换更多有趣的道具吧！")
                                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.primary.opacity(0.3))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                             }
                             .padding(.top, 60)
                         }
@@ -143,7 +143,7 @@ struct InventoryView: View {
                     .foregroundStyle(Color.goPrimary)
                 Text(title)
                     .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
             }
             .padding(.horizontal, 4)
             
@@ -165,10 +165,10 @@ struct InventoryView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.name)
                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text(item.description)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.4))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             }
             Spacer()
             
@@ -186,7 +186,7 @@ struct InventoryView: View {
                     .padding(.horizontal, 14).padding(.vertical, 6)
                     .background(isEquipped ? Color.goPrimary : Color.goPrimary.opacity(0.15), in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
         }
         .padding(16)
         .overlay(alignment: .bottom) {
@@ -226,10 +226,10 @@ struct InventoryView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.name)
                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text(item.description)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.4))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             }
             Spacer()
             
@@ -248,7 +248,7 @@ struct InventoryView: View {
                         .padding(.vertical, 6)
                         .background(Color.goPrimary, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             } else {
                 Toggle("", isOn: isActive)
                     .tint(Color.goPrimary)
@@ -268,7 +268,7 @@ struct InventoryView: View {
                 .font(.system(size: 28))
             Text(name)
                 .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             if let suf = suffix {
                 Text(suf)
@@ -277,7 +277,7 @@ struct InventoryView: View {
             } else {
                 Text("x\(count)")
                     .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
             }
         }
         .padding(16)

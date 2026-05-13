@@ -176,6 +176,11 @@ final class Human {
     var heightCm: Double
     // ArkSchemaV35：MBTI（可选，空字符串表示未设置）
     var mbti: String = ""
+    // ArkSchemaV40：本地人类账户 4 位 PIN（只存 salted hash，不存明文）
+    var pinHash: String = ""
+    var pinSalt: String = ""
+    var pinFailedAttempts: Int = 0
+    var pinLockedUntil: Date? = nil
     // Relationships
     @Relationship(deleteRule: .cascade) var weightLogs: [HumanWeightLog]
     @Relationship(deleteRule: .cascade) var workoutLogs: [HumanWorkoutLog]
@@ -203,12 +208,20 @@ final class Human {
         self.city = city
         self.coconutBalance = 0
         self.shouldShowOnHome = true
-        self.themeColorHex = "4338FF"
+        self.themeColorHex = OhanaThemeColorPolicy.humanFallbackHex
         self.privateFieldsRaw = ""
         self.heightCm = 0
         self.mbti = ""
+        self.pinHash = ""
+        self.pinSalt = ""
+        self.pinFailedAttempts = 0
+        self.pinLockedUntil = nil
         self.weightLogs = []
         self.workoutLogs = []
+    }
+
+    var safeThemeColorHex: String {
+        OhanaThemeColorPolicy.normalizedMemberThemeHex(themeColorHex, fallback: OhanaThemeColorPolicy.humanFallbackHex)
     }
     
     var ageText: String {

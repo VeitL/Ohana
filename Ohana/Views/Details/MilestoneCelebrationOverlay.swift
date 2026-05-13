@@ -122,18 +122,18 @@ struct MilestoneCelebrationOverlay: View {
                                 .foregroundStyle(milestone.accentColor)
                             Text("天")
                                 .font(.system(size: 28, weight: .bold, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.7))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                         }
 
                         // 标题
                         Text(milestone.title)
                             .font(.system(size: 26, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
 
                         // 副标题
                         Text(milestone.subtitle)
                             .font(.system(size: 15, weight: .medium, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.6))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
 
@@ -148,7 +148,7 @@ struct MilestoneCelebrationOverlay: View {
                     .padding(.horizontal, 32)
                     .background(
                         RoundedRectangle(cornerRadius: 32, style: .continuous)
-                            .fill(.ultraThinMaterial)
+                            .fill(Color.ohanaCardSurface)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 32, style: .continuous)
                                     .strokeBorder(milestone.accentColor.opacity(0.4), lineWidth: 1.5)
@@ -168,7 +168,7 @@ struct MilestoneCelebrationOverlay: View {
                         .background(milestone.accentColor, in: Capsule())
                         .shadow(color: milestone.accentColor.opacity(0.6), radius: 16, x: 0, y: 6)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .padding(.bottom, 52)
             }
             .scaleEffect(cardScale)

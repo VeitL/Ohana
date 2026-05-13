@@ -38,7 +38,7 @@ struct AddEventView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("事件标题")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                     TextField("输入标题", text: $title)
                         .textFieldStyle(.roundedBorder)
                 }
@@ -47,7 +47,7 @@ struct AddEventView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("事件类型")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                     
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
@@ -101,7 +101,7 @@ struct AddEventView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("开始")
                                 .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                             HStack(alignment: .center, spacing: 12) {
                                 DatePicker("", selection: $startDate, displayedComponents: .date)
                                     .labelsHidden()
@@ -123,7 +123,7 @@ struct AddEventView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("结束")
                                     .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                                 HStack(alignment: .center, spacing: 12) {
                                     DatePicker("", selection: $endDate, displayedComponents: .date)
                                         .labelsHidden()
@@ -144,7 +144,7 @@ struct AddEventView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("关联对象")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                     
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {

@@ -142,7 +142,7 @@ struct GachaView: View {
         NavigationStack {
             GeometryReader { geo in
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                     .ignoresSafeArea()
 
                 // 背景光晕
@@ -191,7 +191,7 @@ struct GachaView: View {
             }
             .navigationTitle("欧气扭蛋机")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbarBackground(Color.ohanaCardSurface, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
@@ -221,7 +221,7 @@ struct GachaView: View {
             .padding(.horizontal, 14).padding(.vertical, 8)
             .background(
                 Capsule()
-                    .fill(.ultraThinMaterial)
+                    .fill(Color.ohanaCardSurface)
                     .overlay(Capsule().strokeBorder(Color.goPrimary.opacity(0.28), lineWidth: 1))
             )
 
@@ -308,7 +308,7 @@ struct GachaView: View {
                 )
                 .shadow(color: canRoll ? Color.goPrimary.opacity(0.5) : .clear, radius: 20, x: 0, y: 6)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .opacity(canRoll ? 1 : 0.5)
             .disabled(!canRoll)
 
@@ -364,7 +364,7 @@ struct GachaView: View {
                     .padding(.horizontal, 20).padding(.vertical, 10)
                     .background(Color.goPrimary, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .padding(.top, 4)
             }
         }
@@ -372,7 +372,7 @@ struct GachaView: View {
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(Color.ohanaCardSurface)
                 .overlay(
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
                         .strokeBorder(prize.rarity.glowColor, lineWidth: 1.5)

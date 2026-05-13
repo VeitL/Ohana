@@ -66,6 +66,68 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func humanPasscodeValidatesHashesAndLocksAfterFailures() async throws {
+        let human = Human(name: "Private")
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+        #expect(!HumanPasscodeService.isValidPin("123"))
+        #expect(!HumanPasscodeService.isValidPin("12a4"))
+        #expect(HumanPasscodeService.isValidPin("1234"))
+
+        try HumanPasscodeService.setPasscode("1234", for: human)
+        #expect(HumanPasscodeService.hasPasscode(human))
+        #expect(human.pinHash != "1234")
+        #expect(!human.pinSalt.isEmpty)
+
+        if case .incorrect(let remaining) = HumanPasscodeService.verify("0000", for: human, now: now) {
+            #expect(remaining == 4)
+        } else {
+            Issue.record("Expected first incorrect passcode")
+        }
+
+        _ = HumanPasscodeService.verify("0000", for: human, now: now)
+        _ = HumanPasscodeService.verify("0000", for: human, now: now)
+        _ = HumanPasscodeService.verify("0000", for: human, now: now)
+        if case .locked(let until) = HumanPasscodeService.verify("0000", for: human, now: now) {
+            #expect(until.timeIntervalSince(now) == HumanPasscodeService.lockoutDuration)
+        } else {
+            Issue.record("Expected lockout after five failures")
+        }
+
+        if case .locked = HumanPasscodeService.verify("1234", for: human, now: now.addingTimeInterval(1)) {
+            #expect(true)
+        } else {
+            Issue.record("Expected correct passcode to remain locked during cooldown")
+        }
+
+        #expect(HumanPasscodeService.verify("1234", for: human, now: now.addingTimeInterval(31)) == .success)
+        #expect(human.pinFailedAttempts == 0)
+        #expect(human.pinLockedUntil == nil)
+    }
+
+    @MainActor
+    @Test func humanPasscodeIsNotIncludedInBackupAndRestore() async throws {
+        let source = try makeInMemoryContainer()
+        let sourceContext = source.mainContext
+        let human = Human(name: "Backup Owner")
+        try HumanPasscodeService.setPasscode("2468", for: human)
+        sourceContext.insert(human)
+        try sourceContext.save()
+
+        let url = try await DataBackupManager.shared.exportJSON(context: sourceContext)
+        let exported = try String(contentsOf: url, encoding: .utf8)
+        #expect(!exported.contains("pinHash"))
+        #expect(!exported.contains("pinSalt"))
+        #expect(!exported.contains(human.pinHash))
+
+        let target = try makeInMemoryContainer()
+        try await DataBackupManager.shared.importJSON(from: url, context: target.mainContext)
+        let restored = try target.mainContext.fetch(FetchDescriptor<Human>()).first
+        #expect(restored?.name == "Backup Owner")
+        #expect(restored.map { !HumanPasscodeService.hasPasscode($0) } ?? false)
+    }
+
+    @MainActor
     @Test func reminderCompletionServiceCompletesAndSkips() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -145,7 +207,8 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let event = Event(title: "重复提醒", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: UUID().uuidString)
-        let scheduledAt = Date().addingTimeInterval(3_600)
+        let rawScheduledAt = Date().addingTimeInterval(3_600)
+        let scheduledAt = Date(timeIntervalSince1970: floor(rawScheduledAt.timeIntervalSince1970 / 60) * 60)
         let first = Reminder(event: event, scheduledAt: scheduledAt)
         let duplicate = Reminder(event: event, scheduledAt: scheduledAt.addingTimeInterval(10))
         context.insert(event)
@@ -254,6 +317,29 @@ struct OhanaTests {
         #expect(state.targetCount == 3)
         #expect(!state.isComplete)
         #expect(state.todayFeedGrams == 70)
+    }
+
+    @MainActor
+    @Test func petMainFoodKindDrivesManualFeedKind() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+
+        #expect(pet.mainFoodKind == .dry)
+        pet.mainFoodKind = .wet
+        _ = CareEventService.recordManualFeed(
+            pet: pet,
+            amountGrams: 85,
+            context: context,
+            executorId: "human-1",
+            foodKind: pet.mainFoodKind
+        )
+
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        #expect(logs.count == 1)
+        #expect(logs.first?.foodKind == .wet)
+        #expect(logs.first?.amountGrams == 85)
     }
 
     @MainActor
@@ -406,6 +492,42 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func backupRestoresFoodStockDatesAndCorrection() async throws {
+        let source = try makeInMemoryContainer()
+        let sourceContext = source.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let purchaseDate = dateForTest(year: 2026, month: 5, day: 1)
+        let openDate = dateForTest(year: 2026, month: 5, day: 5)
+        let correctionDate = dateForTest(year: 2026, month: 5, day: 7, hour: 10)
+        let record = PetFoodRecord(
+            brand: "Backup Food",
+            dailyGrams: 50,
+            totalGrams: 1200,
+            foodKind: .dry,
+            purchaseDate: purchaseDate,
+            startDate: openDate,
+            pet: pet,
+            executorId: "human-1"
+        )
+        record.remainingCorrectionGrams = 700
+        record.remainingCorrectionDate = correctionDate
+        sourceContext.insert(pet)
+        sourceContext.insert(record)
+        try sourceContext.save()
+
+        let url = try await DataBackupManager.shared.exportJSON(context: sourceContext)
+        let target = try makeInMemoryContainer()
+        let targetContext = target.mainContext
+        try await DataBackupManager.shared.importJSON(from: url, context: targetContext)
+
+        let restored = try #require(try targetContext.fetch(FetchDescriptor<PetFoodRecord>()).first)
+        #expect(restored.purchaseDate == purchaseDate)
+        #expect(restored.startDate == openDate)
+        #expect(restored.remainingCorrectionGrams == 700)
+        #expect(restored.remainingCorrectionDate == correctionDate)
+    }
+
+    @MainActor
     @Test func backupRestoresRetentionAndMedicationModels() async throws {
         let source = try makeInMemoryContainer()
         let sourceContext = source.mainContext
@@ -535,6 +657,376 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func waterQuickActionsFoldLegacyWaterButtons() async throws {
+        let fish = Pet(name: "Bubbles", species: "金鱼")
+        let legacyItems = [
+            QuickActionItem(label: "喂食", icon: "fork.knife", colorHex: "FFDD44", petId: fish.id, actionType: "feed"),
+            QuickActionItem(label: "换水", icon: "drop.circle.fill", colorHex: "4ECDC4", petId: fish.id, actionType: "waterChange"),
+            QuickActionItem(label: "清滤芯", icon: "sparkles", colorHex: "A78BFA", petId: fish.id, actionType: "filterClean")
+        ]
+
+        let normalized = WaterQuickActionPolicy.normalizedItems(
+            legacyItems,
+            for: fish,
+            waterLabel: "喂水",
+            managementLabel: "水管理"
+        )
+
+        #expect(normalized.contains { $0.actionType == "water" })
+        #expect(!normalized.contains { $0.actionType == "waterChange" })
+        #expect(!normalized.contains { $0.actionType == "filterClean" })
+
+        let waterItem = try #require(normalized.first { $0.actionType == "water" })
+        #expect(WaterQuickActionPolicy.titleOverride(for: waterItem, pet: fish, managementLabel: "水管理") == "水管理")
+        #expect(WaterQuickActionPolicy.iconOverride(for: waterItem, pet: fish) == "water.waves")
+    }
+
+    @MainActor
+    @Test func quickActionPickerDoesNotOfferIndependentWaterMaintenance() async throws {
+        let cat = Pet(name: "Momo", species: "猫")
+
+        let options = QuickActionPickerCatalog.available(for: cat, existingActionTypes: [])
+
+        #expect(options.contains { $0.id == "water" })
+        #expect(!options.contains { $0.id == "waterChange" })
+        #expect(!options.contains { $0.id == "filterClean" })
+    }
+
+    @MainActor
+    @Test func defaultCarePlansDoNotCreateDailyPlayPlan() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let startDate = dateForTest(year: 2026, month: 5, day: 10)
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+
+        let legacyDefaultPlay = Event(
+            title: "Momo 陪玩",
+            startDate: startDate,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        legacyDefaultPlay.recurrenceDays = 1
+        context.insert(legacyDefaultPlay)
+        try context.save()
+
+        let petKey = pet.id.uuidString
+        defer { clearCareCalendarDefaults(petKey: petKey, kinds: ["play"]) }
+
+        CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context, startDate: startDate)
+
+        let events = try context.fetch(FetchDescriptor<Event>()).filter { $0.relatedEntityId == petKey }
+        #expect(!events.contains { $0.title == "Momo 陪玩" })
+        #expect(!events.contains { $0.title == "Momo 互动" })
+        #expect(!events.contains { $0.title == "Momo 放飞互动" })
+    }
+
+    @MainActor
+    @Test func explicitPlayPlanCanBeAddedFromPlaySettings() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let startDate = dateForTest(year: 2026, month: 5, day: 10)
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+        try context.save()
+
+        let petKey = pet.id.uuidString
+        defer {
+            clearCareCalendarDefaults(petKey: petKey, kinds: ["play"])
+            UserDefaults.standard.removeObject(forKey: "careCalendarEventId_play_\(petKey)")
+        }
+
+        CarePlanCalendarSync.syncPlayPlan(
+            pet: pet,
+            context: context,
+            intervalDays: 3,
+            enabled: true,
+            anchor: startDate
+        )
+
+        let events = try context.fetch(FetchDescriptor<Event>()).filter { $0.relatedEntityId == petKey }
+        let plan = try #require(events.first { $0.title == "Momo 陪玩计划" })
+        #expect(plan.recurrenceDays == 3)
+        #expect(plan.reminders.count == 1)
+    }
+
+    @MainActor
+    @Test func waterPlanWriterCreatesDailyPlanAndSuppressesDefaultDrinkPlan() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = dateForTest(year: 2026, month: 5, day: 10, hour: 6)
+        let pet = Pet(name: "Momo", species: "猫")
+        let defaultDrink = Event(
+            title: "Momo 补充饮水",
+            startDate: now,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        context.insert(pet)
+        context.insert(defaultDrink)
+        try context.save()
+
+        let petKey = pet.id.uuidString
+        defer { clearCareCalendarDefaults(petKey: petKey, kinds: ["drink"]) }
+
+        let reminders = WaterPlanWriter.replacePlan(
+            pet: pet,
+            times: WaterPlanWriter.suggestedTimes(count: 3, now: now, calendar: calendar),
+            allEvents: [defaultDrink],
+            context: context,
+            now: now,
+            calendar: calendar
+        )
+
+        let events = try context.fetch(FetchDescriptor<Event>()).filter { $0.relatedEntityId == petKey }
+        #expect(events.filter { $0.relatedEntityType == WaterPlanWriter.entityType }.count == 3)
+        #expect(!events.contains { $0.title == "Momo 补充饮水" })
+        #expect(reminders.count >= 3)
+        #expect(events.filter { $0.relatedEntityType == WaterPlanWriter.entityType }.allSatisfy { $0.recurrenceDays == 1 && $0.eventType == EventType.daily.rawValue })
+    }
+
+    @MainActor
+    @Test func waterPlanWriterDeletesPlanForManualMode() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = dateForTest(year: 2026, month: 5, day: 10, hour: 6)
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+        try context.save()
+
+        _ = WaterPlanWriter.replacePlan(
+            pet: pet,
+            times: WaterPlanWriter.suggestedTimes(count: 2, now: now),
+            allEvents: [],
+            context: context,
+            now: now
+        )
+        var events = try context.fetch(FetchDescriptor<Event>())
+        #expect(events.contains { $0.relatedEntityType == WaterPlanWriter.entityType })
+
+        WaterPlanWriter.deletePlan(pet: pet, allEvents: events, context: context)
+        events = try context.fetch(FetchDescriptor<Event>())
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
+        #expect(!events.contains { $0.relatedEntityType == WaterPlanWriter.entityType })
+        #expect(reminders.isEmpty)
+    }
+
+    @MainActor
+    @Test func completePlannedWaterWritesWaterLogAndCompletesReminder() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let event = Event(
+            title: "Momo 喂水",
+            startDate: Date().addingTimeInterval(-60),
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: WaterPlanWriter.entityType,
+            relatedEntityId: pet.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: event.startDate)
+        context.insert(pet)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        _ = CareEventService.completePlannedWater(
+            pet: pet,
+            reminder: reminder,
+            amountMl: 180,
+            context: context,
+            executorId: "human-1"
+        )
+
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let log = try #require(logs.first)
+        #expect(log.careType == .watering)
+        #expect(log.amountMl == 180)
+        #expect(log.note.hasPrefix(PetCareLog.plannedWaterNotePrefix))
+        #expect(log.executorId == "human-1")
+        #expect(reminder.statusEnum == .completed)
+        #expect(reminder.completedBy == "human-1")
+    }
+
+    @MainActor
+    @Test func filterPlanSyncDeduplicatesCleanAndReplaceEvents() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Bubbles", species: "金鱼")
+        context.insert(pet)
+        context.insert(PetCareLog(date: Date().addingTimeInterval(-5 * 86_400), type: .filterClean, pet: pet))
+        try context.save()
+
+        let petKey = pet.id.uuidString
+        defer {
+            UserDefaults.standard.removeObject(forKey: "careCalendarEventId_filterClean_\(petKey)")
+            UserDefaults.standard.removeObject(forKey: "careCalendarEventId_filterReplace_\(petKey)")
+        }
+
+        CarePlanCalendarSync.syncFilterPlan(
+            pet: pet,
+            context: context,
+            cleanIntervalDays: 14,
+            replaceIntervalDays: 90,
+            enabled: true
+        )
+        CarePlanCalendarSync.syncFilterPlan(
+            pet: pet,
+            context: context,
+            cleanIntervalDays: 7,
+            replaceIntervalDays: 60,
+            enabled: true
+        )
+
+        let events = try context.fetch(FetchDescriptor<Event>())
+            .filter { $0.relatedEntityId == petKey && $0.title.contains("滤芯") }
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
+
+        #expect(events.count == 2)
+        #expect(reminders.count == 2)
+        #expect(events.contains { $0.title.contains("清洗滤芯") && $0.recurrenceDays == 7 })
+        #expect(events.contains { $0.title.contains("更换滤芯") && $0.recurrenceDays == 60 })
+
+        CarePlanCalendarSync.syncFilterPlan(
+            pet: pet,
+            context: context,
+            cleanIntervalDays: 7,
+            replaceIntervalDays: 60,
+            enabled: false
+        )
+
+        let remaining = try context.fetch(FetchDescriptor<Event>())
+            .filter { $0.relatedEntityId == petKey && $0.title.contains("滤芯") }
+        #expect(remaining.isEmpty)
+    }
+
+    @MainActor
+    @Test func customScoopPlanSuppressesDefaultDailyLitterPlan() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let startDate = dateForTest(year: 2026, month: 5, day: 10)
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+        try context.save()
+
+        let petKey = pet.id.uuidString
+        defer {
+            clearCareCalendarDefaults(petKey: petKey, kinds: ["litter"])
+            UserDefaults.standard.removeObject(forKey: "careCalendarEventId_scoop_\(petKey)")
+        }
+
+        CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context, startDate: startDate)
+        var events = try context.fetch(FetchDescriptor<Event>()).filter { $0.relatedEntityId == petKey }
+        #expect(events.contains { $0.title == "Momo 铲屎" && $0.recurrenceDays == 1 })
+
+        CarePlanCalendarSync.syncScoopPlan(
+            pet: pet,
+            context: context,
+            intervalDays: 4,
+            enabled: true,
+            anchor: startDate
+        )
+        CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context, startDate: startDate)
+
+        events = try context.fetch(FetchDescriptor<Event>()).filter { $0.relatedEntityId == petKey }
+        #expect(!events.contains { $0.title == "Momo 铲屎" })
+        let scoop = try #require(events.first { $0.title == "Momo 铲屎计划" })
+        #expect(scoop.recurrenceDays == 4)
+    }
+
+    @MainActor
+    @Test func customWaterAndFilterPlansSuppressDefaultAquaticPlans() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let startDate = dateForTest(year: 2026, month: 5, day: 10)
+        let pet = Pet(name: "Bubbles", species: "金鱼")
+        context.insert(pet)
+        try context.save()
+
+        let petKey = pet.id.uuidString
+        defer {
+            clearCareCalendarDefaults(petKey: petKey, kinds: ["waterChange", "filter"])
+            for kind in ["waterChange", "filterClean", "filterReplace"] {
+                UserDefaults.standard.removeObject(forKey: "careCalendarEventId_\(kind)_\(petKey)")
+            }
+        }
+
+        CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context, startDate: startDate)
+        var events = try context.fetch(FetchDescriptor<Event>()).filter { $0.relatedEntityId == petKey }
+        #expect(events.contains { $0.title == "Bubbles 换水" })
+        #expect(events.contains { $0.title == "Bubbles 过滤检查" })
+
+        CarePlanCalendarSync.syncWaterChangePlan(
+            pet: pet,
+            context: context,
+            intervalDays: 10,
+            enabled: true,
+            cycleAnchor: startDate
+        )
+        CarePlanCalendarSync.syncFilterPlan(
+            pet: pet,
+            context: context,
+            cleanIntervalDays: 21,
+            replaceIntervalDays: 90,
+            enabled: true
+        )
+        CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context, startDate: startDate)
+
+        events = try context.fetch(FetchDescriptor<Event>()).filter { $0.relatedEntityId == petKey }
+        #expect(events.filter { $0.title == "Bubbles 换水" }.count == 1)
+        #expect(events.first { $0.title == "Bubbles 换水" }?.recurrenceDays == 10)
+        #expect(!events.contains { $0.title == "Bubbles 过滤检查" })
+        #expect(events.contains { $0.title == "Bubbles 清洗滤芯" && $0.recurrenceDays == 21 })
+        #expect(events.contains { $0.title == "Bubbles 更换滤芯" && $0.recurrenceDays == 90 })
+    }
+
+    @MainActor
+    @Test func customFeedPlanSuppressesDefaultDailyFeedPlan() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = dateForTest(year: 2026, month: 5, day: 10, hour: 6)
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+        try context.save()
+
+        let petKey = pet.id.uuidString
+        defer {
+            clearCareCalendarDefaults(petKey: petKey, kinds: ["feed"])
+        }
+
+        CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context, startDate: now)
+        var events = try context.fetch(FetchDescriptor<Event>()).filter { $0.relatedEntityId == petKey }
+        #expect(events.contains { $0.title == "Momo 喂食" && $0.feedRuleKindRaw.isEmpty })
+
+        let draft = FeedPlanDraft(
+            kind: .manualReminder,
+            dailyCount: 2,
+            gramsPerMeal: 50,
+            times: FeedPlanDraft.suggestedTimes(for: 2, on: now, calendar: calendar),
+            now: now,
+            calendar: calendar
+        )
+        _ = FeedingPlanWriter.replacePlan(
+            pet: pet,
+            draft: draft,
+            allEvents: events,
+            context: context,
+            now: now,
+            calendar: calendar
+        )
+        CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context, startDate: now)
+
+        events = try context.fetch(FetchDescriptor<Event>()).filter { $0.relatedEntityId == petKey }
+        #expect(!events.contains { $0.title == "Momo 喂食" && $0.feedRuleKindRaw.isEmpty })
+        #expect(events.filter { $0.feedRuleKindRaw == FeedRuleKind.manualReminder.rawValue }.count == 2)
+    }
+
+    @MainActor
     @Test func petFoodStockUsesActualFeedAmountsAfterRestock() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -623,13 +1115,16 @@ struct OhanaTests {
         let now = dateForTest(year: 2026, month: 5, day: 8, hour: 21)
         let pet = Pet(name: "Momo", species: "猫")
         let auto = Event(
-            title: "自动喂食器 40g",
+            title: "自动喂食器 湿粮",
             startDate: dateForTest(year: 2026, month: 5, day: 7, hour: 8),
             eventType: EventType.foodChange.rawValue,
             relatedEntityType: FeedRuleMetadata.autoFeederEntityType,
             relatedEntityId: pet.id.uuidString
         )
         auto.recurrenceDays = 1
+        auto.feedRuleKindRaw = FeedRuleKind.autoFeeder.rawValue
+        auto.foodKindRaw = FeedFoodKind.wet.rawValue
+        auto.feedAmountGrams = 35
         context.insert(pet)
         context.insert(auto)
         try context.save()
@@ -641,7 +1136,148 @@ struct OhanaTests {
         #expect(first == 2)
         #expect(second == 0)
         #expect(logs.count == 2)
-        #expect(logs.allSatisfy { $0.isAutoFeedLogEntry && $0.amountGrams == 40 })
+        #expect(logs.allSatisfy { $0.isAutoFeedLogEntry && $0.amountGrams == 35 && $0.foodKind == .wet })
+    }
+
+    @MainActor
+    @Test func autoFeederLogsDeductMatchingFoodKindStock() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 21)
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+
+        FeedingPlanWriter.saveFoodPurchase(
+            pet: pet,
+            brand: "Wet Test",
+            totalGrams: 600,
+            purchaseDate: dateForTest(year: 2026, month: 5, day: 7, hour: 0),
+            dailyGrams: nil,
+            foodKind: .wet,
+            reminderEnabled: false,
+            reminderAdvanceDays: 7,
+            executorId: nil,
+            allEvents: [],
+            context: context,
+            now: now,
+            calendar: calendar
+        )
+
+        let auto = Event(
+            title: "自动喂食器 湿粮",
+            startDate: dateForTest(year: 2026, month: 5, day: 7, hour: 8),
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: FeedRuleMetadata.autoFeederEntityType,
+            relatedEntityId: pet.id.uuidString
+        )
+        auto.recurrenceDays = 1
+        auto.feedRuleKindRaw = FeedRuleKind.autoFeeder.rawValue
+        auto.foodKindRaw = FeedFoodKind.wet.rawValue
+        auto.feedAmountGrams = 35
+        context.insert(auto)
+        try context.save()
+
+        _ = FeedAutoLogMaterializer.materializeDueLogs(pet: pet, allEvents: [auto], context: context, now: now, calendar: calendar)
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let records = try context.fetch(FetchDescriptor<PetFoodRecord>())
+        let wet = FeedStockCalculator.snapshot(for: pet, foodKind: .wet, careLogs: logs, foodRecords: records, now: now, calendar: calendar)
+
+        #expect(wet.totalGrams == 600)
+        #expect(wet.consumedGrams == 70)
+        #expect(wet.remainingGrams == 530)
+    }
+
+    @MainActor
+    @Test func feedingPlanWriterKeepsManualAndAutoModesMutuallyExclusive() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 6)
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+
+        let autoDraft = FeedPlanDraft(
+            kind: .autoFeeder,
+            meals: [
+                FeedPlanMealDraft(time: dateForTest(year: 2026, month: 5, day: 8, hour: 8), foodKind: .dry, grams: 45)
+            ],
+            now: now,
+            calendar: calendar
+        )
+        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: autoDraft, allEvents: [], context: context, now: now, calendar: calendar)
+        var events = try context.fetch(FetchDescriptor<Event>())
+        #expect(events.filter { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }.count == 1)
+
+        let manualDraft = FeedPlanDraft(
+            kind: .manualReminder,
+            meals: [
+                FeedPlanMealDraft(time: dateForTest(year: 2026, month: 5, day: 8, hour: 9), foodKind: .wet, grams: 80),
+                FeedPlanMealDraft(time: dateForTest(year: 2026, month: 5, day: 8, hour: 19), foodKind: .dry, grams: 35)
+            ],
+            now: now,
+            calendar: calendar
+        )
+        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: manualDraft, allEvents: events, context: context, now: now, calendar: calendar)
+        events = try context.fetch(FetchDescriptor<Event>())
+        #expect(events.filter { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }.isEmpty)
+        #expect(events.filter { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }.count == 2)
+
+        let autoAgainDraft = FeedPlanDraft(
+            kind: .autoFeeder,
+            meals: [
+                FeedPlanMealDraft(time: dateForTest(year: 2026, month: 5, day: 8, hour: 7), foodKind: .dry, grams: 50)
+            ],
+            now: now,
+            calendar: calendar
+        )
+        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: autoAgainDraft, allEvents: events, context: context, now: now, calendar: calendar)
+        events = try context.fetch(FetchDescriptor<Event>())
+        #expect(events.filter { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }.isEmpty)
+        #expect(events.filter { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }.count == 1)
+    }
+
+    @MainActor
+    @Test func feedingPlanWriterClearsPlansForManualMode() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 6)
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+
+        let manualDraft = FeedPlanDraft(
+            kind: .manualReminder,
+            meals: [
+                FeedPlanMealDraft(time: dateForTest(year: 2026, month: 5, day: 8, hour: 8), foodKind: .dry, grams: 40)
+            ],
+            now: now,
+            calendar: calendar
+        )
+        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: manualDraft, allEvents: [], context: context, now: now, calendar: calendar)
+        var events = try context.fetch(FetchDescriptor<Event>())
+        #expect(FeedRuleState(pet: pet, allEvents: events, now: now, calendar: calendar).operatingMode == .manualReminder)
+
+        let autoDraft = FeedPlanDraft(
+            kind: .autoFeeder,
+            meals: [
+                FeedPlanMealDraft(time: dateForTest(year: 2026, month: 5, day: 8, hour: 12), foodKind: .wet, grams: 70)
+            ],
+            now: now,
+            calendar: calendar
+        )
+        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: autoDraft, allEvents: events, context: context, now: now, calendar: calendar)
+        events = try context.fetch(FetchDescriptor<Event>())
+        #expect(FeedRuleState(pet: pet, allEvents: events, now: now, calendar: calendar).operatingMode == .autoFeeder)
+
+        FeedingPlanWriter.clearFeedModePlans(pet: pet, allEvents: events, context: context)
+        events = try context.fetch(FetchDescriptor<Event>())
+        #expect(FeedRuleState(pet: pet, allEvents: events, now: now, calendar: calendar).operatingMode == .manual)
+        #expect(events.filter { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }.isEmpty)
+        #expect(events.filter { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }.isEmpty)
     }
 
     @MainActor
@@ -658,6 +1294,553 @@ struct OhanaTests {
 
         #expect(state.manualReminderEvents.count == 1)
         #expect(state.autoFeederEvents.isEmpty)
+    }
+
+    @MainActor
+    @Test func feedingPlanWriterCreatesDailyManualPlanWithUpcomingReminders() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 6)
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+
+        let draft = FeedPlanDraft(
+            kind: .manualReminder,
+            dailyCount: 3,
+            gramsPerMeal: 50,
+            times: FeedPlanDraft.suggestedTimes(for: 3, on: now, calendar: calendar),
+            now: now,
+            calendar: calendar
+        )
+
+        let result = FeedingPlanWriter.replacePlan(
+            pet: pet,
+            draft: draft,
+            allEvents: [],
+            context: context,
+            now: now,
+            calendar: calendar
+        )
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
+
+        #expect(result.events.count == 3)
+        #expect(events.count == 3)
+        #expect(events.allSatisfy { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) })
+        #expect(events.allSatisfy { $0.recurrenceDays == 1 })
+        #expect(events.allSatisfy { FeedRuleMetadata.amountGrams(from: $0) == 50 })
+        #expect(reminders.filter { calendar.isDate($0.scheduledAt, inSameDayAs: now) }.count == 3)
+        #expect(result.reminders.count >= 3)
+    }
+
+    @MainActor
+    @Test func feedingTodayStateFlagsMissedPlanMeals() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 10)
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+
+        let missedEvent = Event(
+            title: "早餐 干粮 50g",
+            startDate: dateForTest(year: 2026, month: 5, day: 8, hour: 8),
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        missedEvent.feedRuleKindRaw = FeedRuleKind.manualReminder.rawValue
+        missedEvent.feedAmountGrams = 50
+        let futureEvent = Event(
+            title: "午餐 干粮 50g",
+            startDate: dateForTest(year: 2026, month: 5, day: 8, hour: 12),
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        futureEvent.feedRuleKindRaw = FeedRuleKind.manualReminder.rawValue
+        futureEvent.feedAmountGrams = 50
+        context.insert(missedEvent)
+        context.insert(futureEvent)
+        context.insert(Reminder(event: missedEvent, scheduledAt: missedEvent.startDate))
+        context.insert(Reminder(event: futureEvent, scheduledAt: futureEvent.startDate))
+        try context.save()
+
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let state = FeedTodayState(pet: pet, allEvents: events, manualGoalCount: 1, now: now, calendar: calendar)
+        let dashboard = FeedingDashboardState(pet: pet, allEvents: events, now: now, calendar: calendar)
+
+        #expect(state.hasOverduePlan)
+        #expect(state.missedTodayPlanReminders.count == 1)
+        #expect(dashboard.hasMissedManualPlan)
+        #expect(dashboard.todayManualPlanMissedCount == 1)
+        #expect(dashboard.todayManualPlanCompletionText == "0/2")
+    }
+
+    @MainActor
+    @Test func plannedFeedCompletionIsPerReminderOccurrence() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 13)
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+
+        let event = Event(
+            title: "早餐 干粮 50g",
+            startDate: dateForTest(year: 2026, month: 5, day: 8, hour: 8),
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        event.feedRuleKindRaw = FeedRuleKind.manualReminder.rawValue
+        event.feedAmountGrams = 50
+        let completedReminder = Reminder(event: event, scheduledAt: event.startDate)
+        completedReminder.statusEnum = .completed
+        completedReminder.completedAt = dateForTest(year: 2026, month: 5, day: 8, hour: 8, minute: 5)
+        let pendingReminder = Reminder(event: event, scheduledAt: dateForTest(year: 2026, month: 5, day: 8, hour: 12))
+        let log = PetCareLog(
+            date: now,
+            type: .feeding,
+            amountGrams: 50,
+            note: "\(PetCareLog.plannedFeedNotePrefix)\(event.id.uuidString)",
+            foodKind: .dry,
+            pet: pet
+        )
+        context.insert(event)
+        context.insert(completedReminder)
+        context.insert(pendingReminder)
+        context.insert(log)
+        try context.save()
+
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let dashboard = FeedingDashboardState(pet: pet, allEvents: events, careLogs: logs, now: now, calendar: calendar)
+
+        #expect(dashboard.todayManualPlanCompletedCount == 1)
+        #expect(dashboard.todayManualPlanMissedCount == 1)
+        #expect(dashboard.todayManualPlanCompletionText == "1/2")
+        #expect(dashboard.nextManualReminder?.id == pendingReminder.id)
+    }
+
+    @MainActor
+    @Test func feedingPlanWriterCreatesPerMealKindsAndAmounts() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 6)
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+
+        let draft = FeedPlanDraft(
+            kind: .manualReminder,
+            meals: [
+                FeedPlanMealDraft(time: dateForTest(year: 2026, month: 5, day: 8, hour: 8), foodKind: .dry, grams: 45),
+                FeedPlanMealDraft(time: dateForTest(year: 2026, month: 5, day: 8, hour: 13), foodKind: .wet, grams: 80),
+                FeedPlanMealDraft(time: dateForTest(year: 2026, month: 5, day: 8, hour: 19), foodKind: .dry, grams: 35)
+            ],
+            now: now,
+            calendar: calendar
+        )
+
+        let result = FeedingPlanWriter.replacePlan(
+            pet: pet,
+            draft: draft,
+            allEvents: [],
+            context: context,
+            now: now,
+            calendar: calendar
+        )
+        let events = try context.fetch(FetchDescriptor<Event>()).sorted { $0.startDate < $1.startDate }
+
+        #expect(result.events.count == 3)
+        #expect(events.map(\.foodKindRaw) == [FeedFoodKind.dry.rawValue, FeedFoodKind.wet.rawValue, FeedFoodKind.dry.rawValue])
+        #expect(events.map(\.feedAmountGrams) == [45, 80, 35])
+        #expect(events.allSatisfy { $0.feedRuleKindRaw == FeedRuleKind.manualReminder.rawValue })
+        #expect(events.allSatisfy { FeedRuleMetadata.amountGrams(from: $0) == $0.feedAmountGrams })
+    }
+
+    @MainActor
+    @Test func feedingPlanWriterPurchaseTracksMainFoodButNotTreats() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 8)
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+
+        FeedingPlanWriter.saveFoodPurchase(
+            pet: pet,
+            brand: "Test Food",
+            totalGrams: 1000,
+            purchaseDate: now,
+            dailyGrams: 50,
+            reminderEnabled: false,
+            reminderAdvanceDays: 7,
+            executorId: "human-1",
+            allEvents: [],
+            context: context,
+            now: now
+        )
+        CareEventService.recordManualFeed(pet: pet, amountGrams: 120, context: context, executorId: "human-1", date: now.addingTimeInterval(60))
+        CareEventService.recordTreatFeed(pet: pet, amountGrams: 20, context: context, executorId: "human-1", date: now.addingTimeInterval(120))
+
+        let snapshot = FeedStockCalculator.snapshot(for: pet, now: now.addingTimeInterval(180))
+        let records = try context.fetch(FetchDescriptor<PetFoodRecord>())
+
+        #expect(records.count == 1)
+        #expect(pet.foodTrackingMode == .precise)
+        #expect(pet.restockWeight == 1)
+        #expect(records.first?.totalGrams == 1000)
+        #expect(records.first?.foodKind == .dry)
+        #expect(snapshot.consumedGrams == 120)
+        #expect(snapshot.remainingGrams == 880)
+    }
+
+    @MainActor
+    @Test func feedStockSeparatesDryWetAndTreatsDoNotDeductStock() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 8)
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+
+        FeedingPlanWriter.saveFoodPurchase(
+            pet: pet,
+            brand: "Dry Test",
+            totalGrams: 1000,
+            purchaseDate: now,
+            dailyGrams: nil,
+            foodKind: .dry,
+            reminderEnabled: false,
+            reminderAdvanceDays: 7,
+            executorId: nil,
+            allEvents: [],
+            context: context,
+            now: now
+        )
+        FeedingPlanWriter.saveFoodPurchase(
+            pet: pet,
+            brand: "Wet Test",
+            totalGrams: 600,
+            purchaseDate: now,
+            dailyGrams: nil,
+            foodKind: .wet,
+            reminderEnabled: false,
+            reminderAdvanceDays: 7,
+            executorId: nil,
+            allEvents: [],
+            context: context,
+            now: now
+        )
+        CareEventService.recordManualFeed(pet: pet, amountGrams: 120, context: context, date: now.addingTimeInterval(60), foodKind: .dry)
+        CareEventService.recordManualFeed(pet: pet, amountGrams: 80, context: context, date: now.addingTimeInterval(120), foodKind: .wet)
+        CareEventService.recordTreatFeed(pet: pet, amountGrams: 25, context: context, date: now.addingTimeInterval(180), treatKind: .lickable)
+
+        let dry = FeedStockCalculator.snapshot(for: pet, foodKind: .dry, now: now.addingTimeInterval(240))
+        let wet = FeedStockCalculator.snapshot(for: pet, foodKind: .wet, now: now.addingTimeInterval(240))
+
+        #expect(dry.totalGrams == 1000)
+        #expect(dry.consumedGrams == 120)
+        #expect(dry.remainingGrams == 880)
+        #expect(wet.totalGrams == 600)
+        #expect(wet.consumedGrams == 80)
+        #expect(wet.remainingGrams == 520)
+    }
+
+    @MainActor
+    @Test func foodStockDeductsOnlyFromOpenDate() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 12)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+
+        FeedingPlanWriter.saveFoodPurchase(
+            pet: pet,
+            brand: "Dry Test",
+            totalGrams: 1000,
+            purchaseDate: dateForTest(year: 2026, month: 5, day: 1),
+            openDate: dateForTest(year: 2026, month: 5, day: 5),
+            dailyGrams: nil,
+            foodKind: .dry,
+            reminderEnabled: false,
+            reminderAdvanceDays: 7,
+            executorId: nil,
+            allEvents: [],
+            context: context,
+            now: now,
+            calendar: calendar
+        )
+        CareEventService.recordManualFeed(pet: pet, amountGrams: 300, context: context, date: dateForTest(year: 2026, month: 5, day: 4, hour: 12), foodKind: .dry)
+        CareEventService.recordManualFeed(pet: pet, amountGrams: 120, context: context, date: dateForTest(year: 2026, month: 5, day: 5, hour: 8), foodKind: .dry)
+
+        let snapshot = FeedStockCalculator.snapshot(for: pet, foodKind: .dry, now: now)
+        let record = try #require(try context.fetch(FetchDescriptor<PetFoodRecord>()).first)
+
+        #expect(record.purchaseDate == dateForTest(year: 2026, month: 5, day: 1))
+        #expect(record.startDate == dateForTest(year: 2026, month: 5, day: 5))
+        #expect(snapshot.consumedGrams == 120)
+        #expect(snapshot.remainingGrams == 880)
+    }
+
+    @MainActor
+    @Test func futureOpenStockDoesNotReplaceCurrentStock() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 12)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+
+        FeedingPlanWriter.saveFoodPurchase(
+            pet: pet,
+            brand: "Current",
+            totalGrams: 1000,
+            purchaseDate: dateForTest(year: 2026, month: 5, day: 1),
+            openDate: dateForTest(year: 2026, month: 5, day: 1),
+            dailyGrams: nil,
+            foodKind: .dry,
+            reminderEnabled: false,
+            reminderAdvanceDays: 7,
+            executorId: nil,
+            allEvents: [],
+            context: context,
+            now: now,
+            calendar: calendar
+        )
+        FeedingPlanWriter.saveFoodPurchase(
+            pet: pet,
+            brand: "Future",
+            totalGrams: 2000,
+            purchaseDate: dateForTest(year: 2026, month: 5, day: 2),
+            openDate: dateForTest(year: 2026, month: 5, day: 10),
+            dailyGrams: nil,
+            foodKind: .dry,
+            reminderEnabled: false,
+            reminderAdvanceDays: 7,
+            executorId: nil,
+            allEvents: [],
+            context: context,
+            now: now,
+            calendar: calendar
+        )
+
+        let current = FeedStockCalculator.snapshot(for: pet, foodKind: .dry, now: now)
+        let future = FeedStockCalculator.snapshot(for: pet, foodKind: .dry, now: dateForTest(year: 2026, month: 5, day: 10, hour: 12))
+
+        #expect(current.totalGrams == 1000)
+        #expect(current.remainingGrams == 1000)
+        #expect(future.totalGrams == 2000)
+
+        let futureOnlyPet = Pet(name: "Luna", species: "猫")
+        context.insert(futureOnlyPet)
+        FeedingPlanWriter.saveFoodPurchase(
+            pet: futureOnlyPet,
+            brand: "Future Only",
+            totalGrams: 1500,
+            purchaseDate: dateForTest(year: 2026, month: 5, day: 2),
+            openDate: dateForTest(year: 2026, month: 5, day: 10),
+            dailyGrams: nil,
+            foodKind: .dry,
+            reminderEnabled: false,
+            reminderAdvanceDays: 7,
+            executorId: nil,
+            allEvents: [],
+            context: context,
+            now: now,
+            calendar: calendar
+        )
+        let inactiveFutureOnly = FeedStockCalculator.snapshot(for: futureOnlyPet, foodKind: .dry, now: now)
+        #expect(inactiveFutureOnly.totalGrams == 0)
+    }
+
+    @MainActor
+    @Test func foodStockManualCorrectionBecomesNewRemainingBaseline() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 12)
+        let correctionTime = dateForTest(year: 2026, month: 5, day: 3, hour: 12)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+
+        FeedingPlanWriter.saveFoodPurchase(
+            pet: pet,
+            brand: "Dry Test",
+            totalGrams: 1000,
+            purchaseDate: dateForTest(year: 2026, month: 5, day: 1),
+            openDate: dateForTest(year: 2026, month: 5, day: 1),
+            dailyGrams: nil,
+            foodKind: .dry,
+            reminderEnabled: false,
+            reminderAdvanceDays: 7,
+            executorId: nil,
+            allEvents: [],
+            context: context,
+            now: now,
+            calendar: calendar
+        )
+        let record = try #require(try context.fetch(FetchDescriptor<PetFoodRecord>()).first)
+        CareEventService.recordManualFeed(pet: pet, amountGrams: 100, context: context, date: dateForTest(year: 2026, month: 5, day: 2, hour: 8), foodKind: .dry)
+        CareEventService.recordManualFeed(pet: pet, amountGrams: 200, context: context, date: dateForTest(year: 2026, month: 5, day: 3, hour: 8), foodKind: .dry)
+        FeedingPlanWriter.correctFoodStock(record: record, remainingGrams: 700, allEvents: [], context: context, now: correctionTime)
+        CareEventService.recordManualFeed(pet: pet, amountGrams: 50, context: context, date: dateForTest(year: 2026, month: 5, day: 3, hour: 18), foodKind: .dry)
+
+        let snapshot = FeedStockCalculator.snapshot(for: pet, foodKind: .dry, now: now)
+
+        #expect(record.remainingCorrectionGrams == 700)
+        #expect(record.remainingCorrectionDate == correctionTime)
+        #expect(snapshot.consumedGrams == 50)
+        #expect(snapshot.remainingGrams == 650)
+    }
+
+    @MainActor
+    @Test func deletingActiveFoodStockFallsBackToPreviousOpenedRecord() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 12)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+
+        FeedingPlanWriter.saveFoodPurchase(
+            pet: pet,
+            brand: "Old",
+            totalGrams: 1000,
+            purchaseDate: dateForTest(year: 2026, month: 5, day: 1),
+            openDate: dateForTest(year: 2026, month: 5, day: 1),
+            dailyGrams: nil,
+            foodKind: .dry,
+            reminderEnabled: false,
+            reminderAdvanceDays: 7,
+            executorId: nil,
+            allEvents: [],
+            context: context,
+            now: now,
+            calendar: calendar
+        )
+        FeedingPlanWriter.saveFoodPurchase(
+            pet: pet,
+            brand: "Current",
+            totalGrams: 800,
+            purchaseDate: dateForTest(year: 2026, month: 5, day: 2),
+            openDate: dateForTest(year: 2026, month: 5, day: 2),
+            dailyGrams: nil,
+            foodKind: .dry,
+            reminderEnabled: false,
+            reminderAdvanceDays: 7,
+            executorId: nil,
+            allEvents: [],
+            context: context,
+            now: now,
+            calendar: calendar
+        )
+        let active = try #require(FeedStockCalculator.activeStockRecord(for: pet, foodKind: .dry, now: now))
+        #expect(active.brand == "Current")
+
+        context.delete(active)
+        try context.save()
+        let fallback = FeedStockCalculator.snapshot(for: pet, foodKind: .dry, now: now)
+
+        #expect(fallback.totalGrams == 1000)
+    }
+
+    @MainActor
+    @Test func feedStockSnapshotUsesObservedQueryLogsForCurrentPetOnly() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 8)
+        let momo = Pet(name: "Momo", species: "猫")
+        let luna = Pet(name: "Luna", species: "猫")
+        context.insert(momo)
+        context.insert(luna)
+
+        FeedingPlanWriter.saveFoodPurchase(
+            pet: momo,
+            brand: "Momo Dry",
+            totalGrams: 1000,
+            purchaseDate: now,
+            dailyGrams: nil,
+            foodKind: .dry,
+            reminderEnabled: false,
+            reminderAdvanceDays: 7,
+            executorId: nil,
+            allEvents: [],
+            context: context,
+            now: now
+        )
+        FeedingPlanWriter.saveFoodPurchase(
+            pet: luna,
+            brand: "Luna Dry",
+            totalGrams: 1000,
+            purchaseDate: now,
+            dailyGrams: nil,
+            foodKind: .dry,
+            reminderEnabled: false,
+            reminderAdvanceDays: 7,
+            executorId: nil,
+            allEvents: [],
+            context: context,
+            now: now
+        )
+        CareEventService.recordManualFeed(pet: momo, amountGrams: 100, context: context, date: now.addingTimeInterval(60), foodKind: .dry)
+        CareEventService.recordManualFeed(pet: luna, amountGrams: 300, context: context, date: now.addingTimeInterval(60), foodKind: .dry)
+
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let records = try context.fetch(FetchDescriptor<PetFoodRecord>())
+        let snapshot = FeedStockCalculator.snapshot(
+            for: momo,
+            foodKind: .dry,
+            careLogs: logs,
+            foodRecords: records,
+            now: now.addingTimeInterval(120)
+        )
+
+        #expect(snapshot.totalGrams == 1000)
+        #expect(snapshot.consumedGrams == 100)
+        #expect(snapshot.remainingGrams == 900)
+    }
+
+    @MainActor
+    @Test func treatKindAndOptionalGramsArePreserved() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = dateForTest(year: 2026, month: 5, day: 8, hour: 12)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+
+        let noGramTreat = CareEventService.recordTreatFeed(pet: pet, amountGrams: 0, context: context, date: now, treatKind: .dentalNeck)
+        let gramTreat = CareEventService.recordTreatFeed(pet: pet, amountGrams: 14, context: context, date: now.addingTimeInterval(60), treatKind: .freezeDried)
+
+        let state = FeedTodayState(pet: pet, allEvents: [], manualGoalCount: 1, now: now, calendar: calendar)
+
+        #expect(noGramTreat.treatKind == .dentalNeck)
+        #expect(gramTreat.treatKind == .freezeDried)
+        #expect(state.treatTodayLogs.count == 2)
+        #expect(state.todayTreatGrams == 14)
+    }
+
+    @Test func petFoodBrandCatalogReturnsCountryAndTypeSpecificBrands() async throws {
+        let chinaDry = PetFoodBrandCatalog.brands(countryCode: "CN", foodKind: .dry)
+        let chinaWet = PetFoodBrandCatalog.brands(countryCode: "CN", foodKind: .wet)
+        let usDry = PetFoodBrandCatalog.brands(countryCode: "US", foodKind: .dry)
+
+        #expect(chinaDry.contains("皇家"))
+        #expect(chinaWet.contains("巅峰"))
+        #expect(usDry.contains("Purina Pro Plan"))
+        #expect(chinaDry != chinaWet)
     }
 
     @MainActor
@@ -961,9 +2144,16 @@ struct OhanaTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV37.models)
+        let schema = Schema(ArkSchemaV41.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func clearCareCalendarDefaults(petKey: String, kinds: [String]) {
+        for kind in kinds {
+            UserDefaults.standard.removeObject(forKey: "careCalendarEventId_default_\(kind)_\(petKey)")
+            UserDefaults.standard.removeObject(forKey: "careCalendarDefaultSuppressed_\(kind)_\(petKey)")
+        }
     }
 
     private func archiveReadyPet() -> Pet {

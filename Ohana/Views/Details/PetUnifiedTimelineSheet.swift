@@ -19,7 +19,7 @@ struct PetUnifiedTimelineSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView().ignoresSafeArea()
+                OhanaAppBackground().ignoresSafeArea()
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
                         petHeader
@@ -66,7 +66,7 @@ struct PetUnifiedTimelineSheet: View {
                     .font(.system(size: 16, weight: .bold, design: .rounded))
                 Text("共 \(items.count) 条记录")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
         }
@@ -90,7 +90,7 @@ struct PetUnifiedTimelineSheet: View {
                 .foregroundStyle(color)
             Text("\(count)")
                 .font(.system(size: 11, weight: .black, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.6))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
@@ -101,10 +101,10 @@ struct PetUnifiedTimelineSheet: View {
         VStack(spacing: 12) {
             Image(systemName: "clock.arrow.circlepath")
                 .font(.system(size: 36, weight: .light))
-                .foregroundStyle(.secondary.opacity(0.4))
+                .foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
             Text("还没有任何记录")
                 .font(.system(size: 14, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 48)
@@ -132,16 +132,16 @@ struct PetUnifiedTimelineSheet: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(item.title)
                             .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         if !item.subtitle.isEmpty {
                             Text(item.subtitle)
                                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.4))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                 .lineLimit(1)
                         }
                         Text(item.date, format: .dateTime.year().month().day().hour().minute())
                             .font(.system(size: 10, weight: .medium, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.25))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                     }
                     .padding(.top, 6)
                     .padding(.bottom, idx < items.count - 1 ? 16 : 0)

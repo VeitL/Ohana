@@ -69,7 +69,7 @@ struct AddPetMedicationSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 16) {
                         labeledField("药品名称 *") {
@@ -118,7 +118,7 @@ struct AddPetMedicationSheet: View {
                                                 .padding(.horizontal, 12).padding(.vertical, 8)
                                                 .background(frequency == freq ? Color.goPrimary : Color.primary.opacity(0.08), in: Capsule())
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(ScaleButtonStyle())
                                     }
                                 }
                             }
@@ -133,7 +133,7 @@ struct AddPetMedicationSheet: View {
                                         .tint(themeColor)
                                     Text("疗程天数")
                                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(Color.ohanaSecondaryText)
                                     ScrollView(.horizontal, showsIndicators: false) {
                                         HStack(spacing: 8) {
                                             ForEach([7, 14, 30], id: \.self) { d in
@@ -147,7 +147,7 @@ struct AddPetMedicationSheet: View {
                                                         .padding(.horizontal, 14).padding(.vertical, 8)
                                                         .background(coursePresetDays == d && customCourseDays.isEmpty ? Color.goPrimary : Color.primary.opacity(0.08), in: Capsule())
                                                 }
-                                                .buttonStyle(.plain)
+                                                .buttonStyle(ScaleButtonStyle())
                                             }
                                             GoDraftTextField(
                                                 "自定义",
@@ -167,7 +167,7 @@ struct AddPetMedicationSheet: View {
                                 } else {
                                     Text("长期用药：不设置结束日期")
                                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(Color.ohanaSecondaryText)
                                 }
                             }
                         }
@@ -185,7 +185,7 @@ struct AddPetMedicationSheet: View {
                                                 .padding(.horizontal, 12).padding(.vertical, 8)
                                                 .background(administrationTag == opt ? themeColor.opacity(0.35) : Color.primary.opacity(0.08), in: Capsule())
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(ScaleButtonStyle())
                                     }
                                 }
                             }
@@ -205,7 +205,7 @@ struct AddPetMedicationSheet: View {
                                         .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
                                     Text(doseUnit)
                                         .font(.system(size: 13, weight: .medium, design: .rounded))
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(Color.ohanaSecondaryText)
                                 }
                                 Text("填写后可在详情页查看余量与预估天数")
                                     .font(.system(size: 11, weight: .medium, design: .rounded))
@@ -226,7 +226,7 @@ struct AddPetMedicationSheet: View {
                                                 Circle().strokeBorder(Color.white.opacity(0.9), lineWidth: colorHex == hex ? 2 : 0)
                                             }
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(ScaleButtonStyle())
                                 }
                             }
                         }
@@ -251,7 +251,7 @@ struct AddPetMedicationSheet: View {
                                 .padding(.vertical, 16)
                                 .background(canSave ? Color.goPrimary : Color.primary.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                         .disabled(!canSave)
 
                         Spacer(minLength: 40)
@@ -266,7 +266,7 @@ struct AddPetMedicationSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("返回") { dismiss() }
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") { saveAfterKeyboardDismiss() }
@@ -318,7 +318,7 @@ struct AddPetMedicationSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
             content()
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -336,7 +336,7 @@ struct AddPetMedicationSheet: View {
                 .padding(.horizontal, 12).padding(.vertical, 8)
                 .background(doseUnit == u ? Color.goPrimary : Color.primary.opacity(0.08), in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func parseDosage(_ raw: String) {

@@ -21,7 +21,7 @@ struct QuickWaterChangeDetailSheet: View {
     @State private var waterReminderOn = false
     @State private var filterReminderOn = false
 
-    private var themeColor: Color { Color(hex: pet.themeColorHex) }
+    private var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
 
     private var lastWaterChange: PetCareLog? {
         pet.careLogs.filter { $0.type == CareType.waterChange.rawValue }.sorted { $0.date > $1.date }.first
@@ -47,7 +47,7 @@ struct QuickWaterChangeDetailSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
                         petHeader
@@ -69,7 +69,7 @@ struct QuickWaterChangeDetailSheet: View {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
             }
@@ -91,10 +91,10 @@ struct QuickWaterChangeDetailSheet: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(pet.name)
                     .font(.system(size: 17, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text("水质管理")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.45))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
             }
             Spacer()
             Text("🪣").font(.system(size: 28))
@@ -108,7 +108,7 @@ struct QuickWaterChangeDetailSheet: View {
                 Text("💧").font(.system(size: 14))
                 Text("换水")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
             }
 
             HStack {
@@ -125,13 +125,13 @@ struct QuickWaterChangeDetailSheet: View {
                         .padding(.horizontal, 16).padding(.vertical, 8)
                         .background(themeColor, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
 
             HStack {
                 Text("换水间隔")
                     .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 Stepper(value: $waterIntervalDays, in: 1...30) {
                     Text("\(waterIntervalDays) 天")
@@ -145,7 +145,7 @@ struct QuickWaterChangeDetailSheet: View {
             Toggle(isOn: $waterReminderOn) {
                 Text("到期提醒")
                     .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             .tint(themeColor)
             .onChange(of: waterReminderOn) { _, on in
@@ -163,7 +163,7 @@ struct QuickWaterChangeDetailSheet: View {
                 Text("🔧").font(.system(size: 14))
                 Text("滤芯管理")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
             }
 
             HStack {
@@ -180,13 +180,13 @@ struct QuickWaterChangeDetailSheet: View {
                         .padding(.horizontal, 16).padding(.vertical, 8)
                         .background(themeColor, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
 
             HStack {
                 Text("清洗间隔")
                     .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 Stepper(value: $filterCleanIntervalDays, in: 1...60) {
                     Text("\(filterCleanIntervalDays) 天")
@@ -200,7 +200,7 @@ struct QuickWaterChangeDetailSheet: View {
             HStack {
                 Text("更换间隔")
                     .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 Stepper(value: $filterReplaceIntervalDays, in: 7...365) {
                     Text("\(filterReplaceIntervalDays) 天")
@@ -214,7 +214,7 @@ struct QuickWaterChangeDetailSheet: View {
             Toggle(isOn: $filterReminderOn) {
                 Text("到期提醒")
                     .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             .tint(themeColor)
             .onChange(of: filterReminderOn) { _, on in
@@ -230,11 +230,11 @@ struct QuickWaterChangeDetailSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("最近记录")
                 .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
             if recentLogs.isEmpty {
                 Text("暂无记录")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary.opacity(0.6))
+                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.6))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 12)
             } else {
@@ -243,18 +243,18 @@ struct QuickWaterChangeDetailSheet: View {
                         Text(log.careType.emoji).font(.system(size: 14))
                         Text(log.careType.label)
                             .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Spacer()
                         Text(log.date, format: .dateTime.month().day().hour().minute())
                             .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                         Button {
                             modelContext.delete(log)
                             modelContext.safeSave()
                         } label: {
-                            Image(systemName: "trash").font(.system(size: 10)).foregroundStyle(.secondary.opacity(0.3))
+                            Image(systemName: "trash").font(.system(size: 10)).foregroundStyle(Color.ohanaSecondaryText.opacity(0.3))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                     }
                     .padding(.vertical, 3)
                 }
@@ -268,7 +268,7 @@ struct QuickWaterChangeDetailSheet: View {
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.goRed)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     // MARK: - Helpers

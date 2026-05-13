@@ -32,7 +32,7 @@ enum WorkoutType: String, Codable, CaseIterable {
 
     var colorHex: String {
         switch self {
-        case .running:  return "C8FF00"
+        case .running:  return "F97316"
         case .walking:  return "80FFEA"
         case .cycling:  return "FF8C42"
         case .swimming: return "5B6AFF"

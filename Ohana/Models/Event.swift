@@ -103,6 +103,9 @@ final class Event {
     var completedOccurrences: [String]
     var createdAt: Date
     var assigneeId: String?        // 模块4：指派给谁 (Human.id.uuidString)
+    var feedRuleKindRaw: String = ""
+    var foodKindRaw: String = FeedFoodKind.dry.rawValue
+    var feedAmountGrams: Double = 0
 
     @Relationship(deleteRule: .cascade) var reminders: [Reminder]
     
@@ -129,11 +132,22 @@ final class Event {
         self.completedOccurrences = []
         self.createdAt = Date()
         self.assigneeId = nil
+        self.feedRuleKindRaw = ""
+        self.foodKindRaw = FeedFoodKind.dry.rawValue
+        self.feedAmountGrams = 0
         self.reminders = []
     }
     
     var eventTypeEnum: EventType? {
         EventType(rawValue: eventType)
+    }
+
+    var feedRuleKind: FeedRuleKind? {
+        FeedRuleKind(rawValue: feedRuleKindRaw)
+    }
+
+    var foodKind: FeedFoodKind {
+        FeedFoodKind(rawValue: foodKindRaw) ?? .dry
     }
     
     var emoji: String {

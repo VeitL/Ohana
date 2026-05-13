@@ -13,6 +13,10 @@ enum CarePlanCalendarSync {
         "careCalendarEventId_\(kind)_\(petKey)"
     }
 
+    private static func defaultSuppressionKey(kind: String, petKey: String) -> String {
+        "careCalendarDefaultSuppressed_\(kind)_\(petKey)"
+    }
+
     private static func existingEvent(uuid: UUID, context: ModelContext) -> Event? {
         var d = FetchDescriptor<Event>(predicate: #Predicate<Event> { $0.id == uuid })
         d.fetchLimit = 1
@@ -30,6 +34,119 @@ enum CarePlanCalendarSync {
         context.delete(ev)
         UserDefaults.standard.removeObject(forKey: key)
         context.safeSave()
+    }
+
+    static func suppressDefaultPlan(kind: String, pet: Pet, context: ModelContext) {
+        let petKey = pet.id.uuidString
+        UserDefaults.standard.set(true, forKey: defaultSuppressionKey(kind: kind, petKey: petKey))
+        removeCalendarPlan(kind: "default_\(kind)", petKey: petKey, context: context)
+        removeKnownDefaultPlanEvents(kind: kind, pet: pet, context: context)
+    }
+
+    static func reconcileDefaultPlanOverrides(for pet: Pet, context: ModelContext) {
+        let petKey = pet.id.uuidString
+        for kind in ["feed", "drink", "litter", "waterChange", "filter", "groom", "play"] where shouldSkipDefaultPlan(kind: kind, petKey: petKey, context: context) {
+            removeCalendarPlan(kind: "default_\(kind)", petKey: petKey, context: context)
+            removeKnownDefaultPlanEvents(kind: kind, pet: pet, context: context)
+        }
+    }
+
+    private static func shouldSkipDefaultPlan(kind: String, petKey: String, context: ModelContext) -> Bool {
+        if UserDefaults.standard.bool(forKey: defaultSuppressionKey(kind: kind, petKey: petKey)) {
+            return true
+        }
+
+        switch kind {
+        case "feed":
+            return hasCustomFeedPlan(petKey: petKey, context: context)
+        case "drink":
+            return hasCustomWaterPlan(petKey: petKey, context: context)
+        case "litter":
+            return storedCalendarPlanExists(kind: "scoop", petKey: petKey, context: context)
+        case "waterChange":
+            return storedCalendarPlanExists(kind: "waterChange", petKey: petKey, context: context)
+        case "filter":
+            return storedCalendarPlanExists(kind: "filterClean", petKey: petKey, context: context) ||
+                   storedCalendarPlanExists(kind: "filterReplace", petKey: petKey, context: context)
+        case "play":
+            return storedCalendarPlanExists(kind: "play", petKey: petKey, context: context)
+        default:
+            return false
+        }
+    }
+
+    private static func storedCalendarPlanExists(kind: String, petKey: String, context: ModelContext) -> Bool {
+        let key = eventStorageKey(kind: kind, petKey: petKey)
+        guard let idStr = UserDefaults.standard.string(forKey: key),
+              let uuid = UUID(uuidString: idStr) else { return false }
+        if existingEvent(uuid: uuid, context: context) != nil {
+            return true
+        }
+        UserDefaults.standard.removeObject(forKey: key)
+        return false
+    }
+
+    private static func hasCustomFeedPlan(petKey: String, context: ModelContext) -> Bool {
+        var descriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> {
+                $0.relatedEntityId == petKey && $0.feedRuleKindRaw != ""
+            }
+        )
+        descriptor.fetchLimit = 1
+        return ((try? context.fetch(descriptor).isEmpty) == false)
+    }
+
+    private static func hasCustomWaterPlan(petKey: String, context: ModelContext) -> Bool {
+        let entityType = WaterPlanWriter.entityType
+        var descriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> {
+                $0.relatedEntityId == petKey && $0.relatedEntityType == entityType
+            }
+        )
+        descriptor.fetchLimit = 1
+        return ((try? context.fetch(descriptor).isEmpty) == false)
+    }
+
+    private static func removeKnownDefaultPlanEvents(kind: String, pet: Pet, context: ModelContext) {
+        let petKey = pet.id.uuidString
+        let titles = defaultPlanTitleCandidates(kind: kind, pet: pet)
+        guard !titles.isEmpty else { return }
+
+        let descriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> {
+                $0.relatedEntityId == petKey
+            }
+        )
+        guard let events = try? context.fetch(descriptor) else { return }
+        var didDelete = false
+        for event in events where titles.contains(event.title) {
+            context.delete(event)
+            didDelete = true
+        }
+        if didDelete {
+            context.safeSave()
+        }
+    }
+
+    private static func defaultPlanTitleCandidates(kind: String, pet: Pet) -> Set<String> {
+        switch kind {
+        case "feed":
+            return ["\(pet.name) 喂食"]
+        case "drink":
+            return ["\(pet.name) 补充饮水", "\(pet.name) 喂水"]
+        case "litter":
+            return ["\(pet.name) 铲屎", "\(pet.name) 清理厕所"]
+        case "waterChange":
+            return ["\(pet.name) 换水"]
+        case "filter":
+            return ["\(pet.name) 过滤检查"]
+        case "groom":
+            return ["\(pet.name) 毛发护理", "\(pet.name) 毛球/毛发护理"]
+        case "play":
+            return ["\(pet.name) 陪玩", "\(pet.name) 互动", "\(pet.name) 放飞互动"]
+        default:
+            return []
+        }
     }
 
     private static func upsert(
@@ -70,6 +187,74 @@ enum CarePlanCalendarSync {
         context.safeSave()
     }
 
+    private static func upsertWithSingleReminder(
+        pet: Pet,
+        kind: String,
+        title: String,
+        startDate: Date,
+        recurrenceDays: Int,
+        eventType: EventType = .daily,
+        context: ModelContext
+    ) {
+        let petKey = pet.id.uuidString
+        let key = eventStorageKey(kind: kind, petKey: petKey)
+        let reminderDate = morningReminderDate(on: startDate)
+
+        if let idStr = UserDefaults.standard.string(forKey: key),
+           let uuid = UUID(uuidString: idStr),
+           let ev = existingEvent(uuid: uuid, context: context) {
+            ev.title = title
+            ev.startDate = startDate
+            ev.recurrenceDays = max(1, recurrenceDays)
+            ev.relatedEntityType = EntityKind.pet.rawValue
+            ev.relatedEntityId = petKey
+            ev.eventType = eventType.rawValue
+            ev.isAllDay = true
+
+            if let reminder = ev.reminders.first {
+                reminder.scheduledAt = reminderDate
+                reminder.statusEnum = .pending
+                reminder.completedAt = nil
+                reminder.completedBy = ""
+                for extra in ev.reminders.dropFirst() {
+                    context.delete(extra)
+                }
+            } else {
+                context.insert(Reminder(event: ev, scheduledAt: reminderDate))
+            }
+            context.safeSave()
+            return
+        }
+
+        let ev = Event(
+            title: title,
+            startDate: startDate,
+            isAllDay: true,
+            eventType: eventType.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: petKey
+        )
+        ev.recurrenceDays = max(1, recurrenceDays)
+        context.insert(ev)
+        context.insert(Reminder(event: ev, scheduledAt: reminderDate))
+        UserDefaults.standard.set(ev.id.uuidString, forKey: key)
+        context.safeSave()
+    }
+
+    private static func morningReminderDate(on date: Date) -> Date {
+        Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: date) ?? date
+    }
+
+    private static func nextCycleDate(from base: Date, intervalDays: Int) -> Date {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        var next = cal.date(byAdding: .day, value: max(1, intervalDays), to: cal.startOfDay(for: base)) ?? base
+        while next < today {
+            next = cal.date(byAdding: .day, value: max(1, intervalDays), to: next) ?? next
+        }
+        return next
+    }
+
     private struct DefaultPlanItem {
         let kind: String
         let title: String
@@ -84,9 +269,16 @@ enum CarePlanCalendarSync {
         let activeKinds = Set(items.map { "default_\($0.kind)" })
         for kind in knownDefaultPlanKinds where !activeKinds.contains(kind) {
             removeCalendarPlan(kind: kind, petKey: petKey, context: context)
+            if let defaultKind = kind.split(separator: "_").last.map(String.init) {
+                removeKnownDefaultPlanEvents(kind: defaultKind, pet: pet, context: context)
+            }
         }
 
         for item in items {
+            if shouldSkipDefaultPlan(kind: item.kind, petKey: petKey, context: context) {
+                removeCalendarPlan(kind: "default_\(item.kind)", petKey: petKey, context: context)
+                continue
+            }
             let firstDueDate = item.recurrenceDays > 1
                 ? Calendar.current.date(byAdding: .day, value: item.recurrenceDays, to: startDate) ?? startDate
                 : startDate
@@ -149,7 +341,6 @@ enum CarePlanCalendarSync {
                 .init(kind: "feed", title: "喂食", recurrenceDays: 1, eventType: .daily),
                 .init(kind: "drink", title: "补充饮水", recurrenceDays: 1, eventType: .daily),
                 .init(kind: "litter", title: "铲屎", recurrenceDays: 1, eventType: .litterBox),
-                .init(kind: "play", title: "陪玩", recurrenceDays: 1, eventType: .daily),
                 .init(kind: "weight", title: "体重记录", recurrenceDays: 30, eventType: .health),
                 .init(kind: "groom", title: "毛球/毛发护理", recurrenceDays: groomingInterval(for: pet, fallback: 14), eventType: .grooming)
             ] + breedRiskPlanItems(for: pet)
@@ -165,7 +356,6 @@ enum CarePlanCalendarSync {
                 .init(kind: "feed", title: "喂食", recurrenceDays: 1, eventType: .daily),
                 .init(kind: "drink", title: "补充饮水", recurrenceDays: 1, eventType: .daily),
                 .init(kind: "cage", title: "清理鸟笼", recurrenceDays: 7, eventType: .daily),
-                .init(kind: "play", title: "放飞互动", recurrenceDays: 1, eventType: .daily),
                 .init(kind: "weight", title: "体重记录", recurrenceDays: 14, eventType: .health)
             ] + breedRiskPlanItems(for: pet)
         case "rabbit":
@@ -188,7 +378,6 @@ enum CarePlanCalendarSync {
             return [
                 .init(kind: "feed", title: "喂食", recurrenceDays: 1, eventType: .daily),
                 .init(kind: "drink", title: "补充饮水", recurrenceDays: 1, eventType: .daily),
-                .init(kind: "play", title: "互动", recurrenceDays: 1, eventType: .daily),
                 .init(kind: "weight", title: "体重记录", recurrenceDays: 30, eventType: .health)
             ]
         }
@@ -285,6 +474,9 @@ enum CarePlanCalendarSync {
     /// 与铲屎计划一致：「起算日」与最近一次换水记录取较晚者为基准，再按间隔推算下次。
     static func syncWaterChangePlan(pet: Pet, context: ModelContext, intervalDays: Int, enabled: Bool, cycleAnchor: Date) {
         let petKey = pet.id.uuidString
+        if intervalDays > 0 {
+            suppressDefaultPlan(kind: "waterChange", pet: pet, context: context)
+        }
         guard enabled, intervalDays > 0 else {
             removeCalendarPlan(kind: "waterChange", petKey: petKey, context: context)
             return
@@ -299,7 +491,49 @@ enum CarePlanCalendarSync {
         while next < today {
             next = cal.date(byAdding: .day, value: intervalDays, to: next) ?? next
         }
-        upsert(pet: pet, kind: "waterChange", title: "\(pet.name) 换水", startDate: next, recurrenceDays: intervalDays, context: context)
+        upsertWithSingleReminder(pet: pet, kind: "waterChange", title: "\(pet.name) 换水", startDate: next, recurrenceDays: intervalDays, context: context)
+    }
+
+    static func syncFilterPlan(
+        pet: Pet,
+        context: ModelContext,
+        cleanIntervalDays: Int,
+        replaceIntervalDays: Int,
+        enabled: Bool
+    ) {
+        let petKey = pet.id.uuidString
+        if cleanIntervalDays > 0 || replaceIntervalDays > 0 {
+            suppressDefaultPlan(kind: "filter", pet: pet, context: context)
+        }
+        guard enabled, cleanIntervalDays > 0, replaceIntervalDays > 0 else {
+            removeCalendarPlan(kind: "filterClean", petKey: petKey, context: context)
+            removeCalendarPlan(kind: "filterReplace", petKey: petKey, context: context)
+            return
+        }
+
+        let base = pet.careLogs
+            .filter { $0.type == CareType.filterClean.rawValue }
+            .map(\.date)
+            .max() ?? Date()
+        let nextClean = nextCycleDate(from: base, intervalDays: cleanIntervalDays)
+        let nextReplace = nextCycleDate(from: base, intervalDays: replaceIntervalDays)
+
+        upsertWithSingleReminder(
+            pet: pet,
+            kind: "filterClean",
+            title: "\(pet.name) 清洗滤芯",
+            startDate: nextClean,
+            recurrenceDays: cleanIntervalDays,
+            context: context
+        )
+        upsertWithSingleReminder(
+            pet: pet,
+            kind: "filterReplace",
+            title: "\(pet.name) 更换滤芯",
+            startDate: nextReplace,
+            recurrenceDays: replaceIntervalDays,
+            context: context
+        )
     }
 
     static func syncLitterFullChangePlan(pet: Pet, context: ModelContext, intervalDays: Int, enabled: Bool, cycleAnchor: Date) {
@@ -327,11 +561,14 @@ enum CarePlanCalendarSync {
             }
             next = d
         }
-        upsert(pet: pet, kind: "litterFull", title: "\(pet.name) 换猫砂", startDate: next, recurrenceDays: intervalDays, context: context)
+        upsertWithSingleReminder(pet: pet, kind: "litterFull", title: "\(pet.name) 换猫砂", startDate: next, recurrenceDays: intervalDays, context: context)
     }
 
     static func syncScoopPlan(pet: Pet, context: ModelContext, intervalDays: Int, enabled: Bool, anchor: Date) {
         let petKey = pet.id.uuidString
+        if intervalDays > 0 {
+            suppressDefaultPlan(kind: "litter", pet: pet, context: context)
+        }
         guard enabled, intervalDays > 0 else {
             removeCalendarPlan(kind: "scoop", petKey: petKey, context: context)
             return
@@ -346,6 +583,28 @@ enum CarePlanCalendarSync {
         while next < today {
             next = cal.date(byAdding: .day, value: intervalDays, to: next) ?? next
         }
-        upsert(pet: pet, kind: "scoop", title: "\(pet.name) 铲屎计划", startDate: next, recurrenceDays: intervalDays, context: context)
+        upsertWithSingleReminder(pet: pet, kind: "scoop", title: "\(pet.name) 铲屎计划", startDate: next, recurrenceDays: intervalDays, context: context)
+    }
+
+    static func syncPlayPlan(pet: Pet, context: ModelContext, intervalDays: Int, enabled: Bool, anchor: Date) {
+        let petKey = pet.id.uuidString
+        if intervalDays > 0 {
+            suppressDefaultPlan(kind: "play", pet: pet, context: context)
+        }
+        guard enabled, intervalDays > 0 else {
+            removeCalendarPlan(kind: "play", petKey: petKey, context: context)
+            return
+        }
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        let anchorDay = cal.startOfDay(for: anchor)
+        let last = pet.careLogs.filter { $0.type == CareType.play.rawValue }.map(\.date).max()
+        var base = anchorDay
+        if let last { base = max(base, cal.startOfDay(for: last)) }
+        var next = cal.date(byAdding: .day, value: intervalDays, to: base) ?? base
+        while next < today {
+            next = cal.date(byAdding: .day, value: intervalDays, to: next) ?? next
+        }
+        upsertWithSingleReminder(pet: pet, kind: "play", title: "\(pet.name) 陪玩计划", startDate: next, recurrenceDays: intervalDays, context: context)
     }
 }

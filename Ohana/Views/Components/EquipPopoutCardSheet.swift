@@ -23,7 +23,7 @@ struct EquipPopoutCardSheet: View {
 
     var body: some View {
         ZStack {
-            ArkBackgroundView()
+            OhanaAppBackground()
 
             VStack(spacing: 0) {
                 // 把手
@@ -38,17 +38,17 @@ struct EquipPopoutCardSheet: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("激活 3D 破框卡片")
                             .font(.system(size: 20, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text(pet.name)
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.45))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                     }
                     Spacer()
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 22))
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -69,7 +69,7 @@ struct EquipPopoutCardSheet: View {
                                     .foregroundStyle(Color.goPrimary)
                                 Text("当前已激活破框风格")
                                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.primary.opacity(0.7))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                             }
                             .padding(.horizontal, 14).padding(.vertical, 10)
                             .background(Color.goPrimary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
@@ -86,7 +86,7 @@ struct EquipPopoutCardSheet: View {
                             } label: {
                                 Text("恢复默认风格")
                                     .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(.primary.opacity(0.35))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                             }
                             .padding(.top, 4)
                         }
@@ -105,7 +105,7 @@ struct EquipPopoutCardSheet: View {
                             .foregroundStyle(Color.goOrange)
                         Text("剪贴板没有图片，请先在相册长按宠物并拷贝")
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                     }
                     .padding(.horizontal, 16).padding(.vertical, 12)
                     .background(Color.goDarkBlue, in: RoundedRectangle(cornerRadius: 14))
@@ -164,7 +164,7 @@ struct EquipPopoutCardSheet: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("✨ 3D 破框悬浮效果")
                     .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 VStack(alignment: .leading, spacing: 4) {
                     guideStep("1", "打开系统相册，找到宠物照片")
                     guideStep("2", "长按宠物主体，点击「拷贝」（iOS 自动抠图）")
@@ -239,7 +239,7 @@ struct EquipPopoutCardSheet: View {
                 }
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .disabled(isPasting)
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -258,7 +258,7 @@ struct EquipPopoutCardSheet: View {
                 .background(Color.goPrimary, in: Circle())
             Text(text)
                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.65))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.65))
             Spacer()
         }
     }

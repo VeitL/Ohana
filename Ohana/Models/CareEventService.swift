@@ -17,13 +17,15 @@ enum CareEventService {
         context: ModelContext,
         executorId: String? = nil,
         quality: QuestManager.QualityBonus = .none,
-        date: Date = Date()
+        date: Date = Date(),
+        foodKind: FeedFoodKind = .dry
     ) -> (humanGot: Int, petGot: Int) {
         let log = PetCareLog(
             date: date,
             type: .feeding,
             amountGrams: amountGrams,
             note: PetCareLog.manualFeedNoteMarker,
+            foodKind: foodKind,
             pet: pet,
             executorId: executorId
         )
@@ -49,13 +51,15 @@ enum CareEventService {
         amountGrams: Double,
         context: ModelContext,
         executorId: String? = nil,
-        date: Date = Date()
+        date: Date = Date(),
+        treatKind: FeedTreatKind = .other
     ) -> PetCareLog {
         let log = PetCareLog(
             date: date,
             type: .feeding,
             amountGrams: amountGrams,
             note: FeedLogMetadata.treatFeedNoteMarker,
+            treatKind: treatKind,
             pet: pet,
             executorId: executorId
         )
@@ -87,6 +91,7 @@ enum CareEventService {
             type: .feeding,
             amountGrams: feedAmount(from: event, fallback: pet.dailyPortionGrams),
             note: "\(PetCareLog.plannedFeedNotePrefix)\(event.id.uuidString)",
+            foodKind: event.foodKind,
             pet: pet,
             executorId: executorId
         )
@@ -109,6 +114,55 @@ enum CareEventService {
 
         QuestManager.shared.recordFirstMeal()
         let reward = CoconutEconomyService.awardCareAction(type: .feed, pet: pet, context: context, quality: quality)
+        CareLedgerService.recordPetCare(
+            log: log,
+            pet: pet,
+            source: .reminder,
+            sourceEventId: event.id.uuidString,
+            sourceReminderId: reminder.id.uuidString,
+            coconutDelta: CareLedgerService.rewardDelta(reward),
+            context: context
+        )
+        return reward
+    }
+
+    @discardableResult
+    @MainActor
+    static func completePlannedWater(
+        pet: Pet,
+        reminder: Reminder,
+        amountMl: Double,
+        context: ModelContext,
+        executorId: String? = nil
+    ) -> (humanGot: Int, petGot: Int)? {
+        guard let event = reminder.event else { return nil }
+
+        let log = PetCareLog(
+            date: Date(),
+            type: .watering,
+            amountMl: max(0, amountMl),
+            note: "\(PetCareLog.plannedWaterNotePrefix)\(event.id.uuidString)",
+            pet: pet,
+            executorId: executorId
+        )
+        context.insert(log)
+
+        reminder.statusEnum = .completed
+        reminder.completedAt = Date()
+        if let executorId {
+            reminder.completedBy = executorId
+        }
+        NotificationManager.shared.cancel(notificationId: reminder.notificationId)
+        context.safeSave()
+        CareLedgerService.recordReminderState(
+            reminder: reminder,
+            actionType: "completePlannedCare",
+            actorId: executorId,
+            source: .reminder,
+            context: context
+        )
+
+        let reward = CoconutEconomyService.awardCareAction(type: .water, pet: pet, context: context)
         CareLedgerService.recordPetCare(
             log: log,
             pet: pet,
@@ -179,6 +233,9 @@ enum CareEventService {
     }
 
     static func feedAmount(from event: Event, fallback: Double) -> Double {
+        if event.feedAmountGrams > 0 {
+            return event.feedAmountGrams
+        }
         let digits = event.title.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
         return Double(digits) ?? fallback
     }
@@ -257,6 +314,7 @@ enum CalendarTaskCompletionSyncService {
             amountGrams: amountGrams,
             amountMl: amountMl,
             note: noteMarker(for: event, occurrenceDate: occurrenceDate, careType: careType),
+            foodKind: event.foodKind,
             pet: pet,
             executorId: executorId
         )

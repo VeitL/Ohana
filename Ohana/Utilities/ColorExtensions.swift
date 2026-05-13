@@ -67,10 +67,6 @@ extension Color {
     
     // MARK: - Go UI Color Palette
     static let goLime = Color(hex: "C8FF00")
-    /// GO UI 主强调色：始终为荧光绿（GO UI 永远是深色背景，无需光/暗自适应）
-    static let goPrimary = goLime
-    static let goPrimaryLight = Color(hex: "E0FF80")  // 浅色高亮变体
-    static let goPrimaryDark = Color(hex: "9ECC00")   // 深色按压变体
     static let goBackground = Color(hex: "4338FF")
     static let goLimeLight = Color(hex: "E8FFB0")
     static let goMint = Color(hex: "B8FFD0")
@@ -88,16 +84,25 @@ extension Color {
     static let goPurple = Color(hex: "A855F7")
     static let goDarkBlue = Color(hex: "1A0E4B")
     static let goDeepNavy = Color(hex: "0D0638")
+    static let foodDry = Color(light: Color(hex: "D97706"), dark: Color(hex: "FFB84D"))
+    static let foodWet = Color(light: Color(hex: "DB2777"), dark: Color(hex: "F472B6"))
+    static let foodStock = Color(light: Color(hex: "16A34A"), dark: Color(hex: "86EFAC"))
+    /// V4 主强调色：深色模式使用 lime，浅色模式使用清爽蓝，避免浅底 lime 对比不足。
+    static let goPrimary = Color(light: goBlue, dark: goLime)
+    static let goPrimaryLight = Color(light: Color(hex: "60A5FA"), dark: Color(hex: "E0FF80"))
+    static let goPrimaryDark = Color(light: Color(hex: "2563EB"), dark: Color(hex: "9ECC00"))
 
     // MARK: - Theme Semantic Colors
-    static let ohanaCardSurface = Color(light: Color.white, dark: Color.white.opacity(0.08))
-    static let ohanaCardSurfaceElevated = Color(light: Color.white, dark: Color(hex: "171B2A"))
+    static let ohanaCardSurface = Color(light: Color(hex: "EEF1F6"), dark: Color(hex: "1A2030"))
+    static let ohanaCardSurfaceElevated = Color(light: Color(hex: "F7F8FB"), dark: Color(hex: "171B2A"))
     static let ohanaPrimaryText = Color(light: Color.arkInk, dark: Color(hex: "F8FAFC"))
-    static let ohanaSecondaryText = Color(light: Color.arkInk.opacity(0.62), dark: Color.white.opacity(0.62))
-    static let ohanaTertiaryText = Color(light: Color.arkInk.opacity(0.42), dark: Color.white.opacity(0.42))
-    static let ohanaDivider = Color(light: Color.black.opacity(0.08), dark: Color.white.opacity(0.12))
-    static let ohanaControlFill = Color(light: Color.black.opacity(0.05), dark: Color.white.opacity(0.09))
-    static let ohanaCardStroke = Color(light: Color.black.opacity(0.06), dark: Color.white.opacity(0.14))
+    static let ohanaSecondaryText = Color(light: Color.arkInk.opacity(0.62), dark: Color.white.opacity(0.62)) // ui-v4: allow semantic color token source
+    static let ohanaTertiaryText = Color(light: Color.arkInk.opacity(0.42), dark: Color.white.opacity(0.42)) // ui-v4: allow semantic color token source
+    static let ohanaDivider = Color(light: Color.black.opacity(0.08), dark: Color.white.opacity(0.12)) // ui-v4: allow semantic color token source
+    static let ohanaControlFill = Color(light: Color(hex: "E9EDF4"), dark: Color.white.opacity(0.09)) // ui-v4: allow semantic color token source
+    static let ohanaCardStroke = Color(light: Color.clear, dark: Color.clear)
+    static let ohanaGlassStroke = Color(light: Color.black.opacity(0.08), dark: Color.white.opacity(0.14)) // ui-v4: allow semantic color token source
+    static let ohanaPrimaryActionText = Color(light: Color.white, dark: Color.arkInk) // ui-v4: allow semantic color token source
 
     // MARK: - Alert Semantic Colors (from Figma Tokens, Light/Dark adaptive)
     // Alert/Success
@@ -158,9 +163,9 @@ extension Color {
 
     // MARK: - Figma Token: Button Colors
     static let tokenButtonPrimaryBg     = Color(red: 0.259, green: 0.220, blue: 1.000)
-    static let tokenButtonPrimaryText   = Color.white
+    static let tokenButtonPrimaryText   = Color.white // ui-v4: allow imported Figma token source
     static let tokenButtonSecondaryBg   = Color(red: 0.784, green: 1.000, blue: 0.000)
-    static let tokenButtonSecondaryText = Color.black
+    static let tokenButtonSecondaryText = Color.black // ui-v4: allow imported Figma token source
     static let tokenButtonDisabledBg = Color(light:
         Color(red: 0.961, green: 0.961, blue: 0.961),
         dark: Color(red: 0.165, green: 0.165, blue: 0.165))
@@ -169,13 +174,13 @@ extension Color {
         dark: Color(red: 0.322, green: 0.322, blue: 0.322))
 
     // MARK: - Figma Token: Form Colors
-    static let tokenFormInputBg = Color(light: Color.white,
+    static let tokenFormInputBg = Color(light: Color.white, // ui-v4: allow imported Figma token source
         dark: Color(red: 0.039, green: 0.039, blue: 0.039))
     static let tokenFormInputBorder = Color(light:
         Color(red: 0.898, green: 0.898, blue: 0.898),
         dark: Color(red: 0.165, green: 0.165, blue: 0.165))
 
-    // MARK: - Pet Theme Colors (16 non-green, distinct, high-contrast colors)
+    // MARK: - Pet Theme Colors (16 non-primary, distinct, high-contrast colors)
     static let petThemeCrimson   = Color(light: Color(hex: "C23616"), dark: Color(hex: "FF5252"))
     static let petThemeVermilion = Color(light: Color(hex: "E15F41"), dark: Color(hex: "FF793F"))
     static let petThemeOrange    = Color(light: Color(hex: "E67E22"), dark: Color(hex: "FF9F43"))
@@ -190,8 +195,8 @@ extension Color {
     static let petThemeIndigo    = Color(light: Color(hex: "3C40C6"), dark: Color(hex: "575FCF"))
     static let petThemeViolet    = Color(light: Color(hex: "4834D4"), dark: Color(hex: "686DE0"))
     static let petThemeNavy      = Color(light: Color(hex: "192A56"), dark: Color(hex: "273C75"))
-    static let petThemeBlue      = Color(light: Color(hex: "007AFF"), dark: Color(hex: "4DA1FF"))
-    static let petThemeSkyBlue   = Color(light: Color(hex: "0ABDE3"), dark: Color(hex: "48DBFB"))
+    static let petThemeBlue      = Color(light: Color(hex: "475569"), dark: Color(hex: "94A3B8"))
+    static let petThemeSkyBlue   = Color(light: Color(hex: "BE185D"), dark: Color(hex: "F472B6"))
 
     // MARK: - Hex extraction
     func toHex() -> String? {
@@ -200,5 +205,36 @@ extension Color {
         guard ui.getRed(&r, green: &g, blue: &b, alpha: &a) else { return nil }
         return String(format: "%02X%02X%02X",
                       Int(r * 255), Int(g * 255), Int(b * 255))
+    }
+}
+
+enum OhanaThemeColorPolicy {
+    static let darkPrimaryHex = "C8FF00"
+    static let lightPrimaryHex = "3B82F6"
+    static let petFallbackHex = "FF5252"
+    static let humanFallbackHex = "F97316"
+
+    private static let reservedMemberThemeHexes: Set<String> = [
+        darkPrimaryHex, "E8FFB0", "E0FF80", "9ECC00",
+        lightPrimaryHex, "60A5FA", "2563EB", "007AFF", "4DA1FF",
+        "38BDF8", "233BFF", "4338FF"
+    ]
+
+    static func normalizedMemberThemeHex(_ hex: String, fallback: String) -> String {
+        let cleaned = cleanedHex(hex)
+        guard cleaned.count == 6, !reservedMemberThemeHexes.contains(cleaned) else {
+            return fallback
+        }
+        return cleaned
+    }
+
+    static func isReservedMemberThemeHex(_ hex: String) -> Bool {
+        reservedMemberThemeHexes.contains(cleanedHex(hex))
+    }
+
+    private static func cleanedHex(_ hex: String) -> String {
+        hex
+            .trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+            .uppercased()
     }
 }

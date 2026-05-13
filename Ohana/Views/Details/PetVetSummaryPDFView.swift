@@ -355,12 +355,12 @@ struct PetVetPDFShareSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                 VStack(spacing: 20) {
                     // 预览缩略图
                     ZStack {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(.regularMaterial)
+                            .fill(Color.ohanaCardSurface)
                             .frame(maxWidth: .infinity)
                             .frame(height: 200)
                         VStack(spacing: 8) {
@@ -369,10 +369,10 @@ struct PetVetPDFShareSheet: View {
                                 .foregroundStyle(pet.themeColor.color.opacity(0.8))
                             Text("\(pet.name)_兽医档案.pdf")
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.7))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                             Text("A4 · 兽医健康档案")
                                 .font(.system(size: 11))
-                                .foregroundStyle(.primary.opacity(0.35))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                         }
                     }
                     .padding(.horizontal, 20)
@@ -391,7 +391,7 @@ struct PetVetPDFShareSheet: View {
                         .padding(.vertical, 16)
                         .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                     .padding(.horizontal, 20)
 
                     Spacer()

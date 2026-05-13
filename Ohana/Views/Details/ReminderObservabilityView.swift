@@ -31,7 +31,7 @@ struct ReminderObservabilityView: View {
 
     var body: some View {
         ZStack {
-            ArkBackgroundView()
+            OhanaAppBackground()
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
                     healthHeader
@@ -58,7 +58,7 @@ struct ReminderObservabilityView: View {
                         .font(.system(size: 20, weight: .black, design: .rounded))
                     Text(score.message)
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 Text("\(score.value)")
@@ -152,7 +152,7 @@ struct ReminderObservabilityView: View {
                                 .lineLimit(1)
                             Text("\(reminder.status) · \(reminder.scheduledAt.formatted(.dateTime.month().day().hour().minute()))")
                                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                         }
                         Spacer()
                     }
@@ -210,7 +210,7 @@ struct ReminderObservabilityView: View {
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-            Text(label).font(.system(size: 10, weight: .bold, design: .rounded)).foregroundStyle(.secondary)
+            Text(label).font(.system(size: 10, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
@@ -228,7 +228,7 @@ struct ReminderObservabilityView: View {
     private func emptyText(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 12, weight: .medium, design: .rounded))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.ohanaSecondaryText)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
     }

@@ -64,7 +64,7 @@ enum CareType: String, CaseIterable, Codable {
         case .waterChange:    return "4ECDC4"
         case .filterClean:    return "A78BFA"
         case .cageCleaning:   return "80FFEA"
-        case .freeFlight:     return "C8FF00"
+        case .freeFlight:     return "F59E0B"
         case .misting:        return "00D4FF"
         case .substrateChange: return "D4A574"
         case .play:           return "FF6B6B"
@@ -84,6 +84,8 @@ final class PetCareLog {
     var amountGrams: Double  // 仅 feeding 用（喂食克数）
     var amountMl: Double     // 仅 watering 用（喂水毫升）
     var note: String
+    var foodKindRaw: String = FeedFoodKind.dry.rawValue
+    var treatKindRaw: String = ""
     var executorId: String?  // ArkSchemaV11: 执行该动作的 Human.id.uuidString
     var pet: Pet?
 
@@ -93,6 +95,8 @@ final class PetCareLog {
         amountGrams: Double = 0,
         amountMl: Double = 0,
         note: String = "",
+        foodKind: FeedFoodKind = .dry,
+        treatKind: FeedTreatKind? = nil,
         pet: Pet? = nil,
         executorId: String? = nil
     ) {
@@ -102,15 +106,21 @@ final class PetCareLog {
         self.amountGrams = amountGrams
         self.amountMl = amountMl
         self.note = note
+        self.foodKindRaw = foodKind.rawValue
+        self.treatKindRaw = treatKind?.rawValue ?? ""
         self.executorId = executorId
         self.pet = pet
     }
 
     var careType: CareType { CareType(rawValue: type) ?? .feeding }
+    var foodKind: FeedFoodKind { FeedFoodKind(rawValue: foodKindRaw) ?? .dry }
+    var treatKind: FeedTreatKind? { FeedTreatKind(rawValue: treatKindRaw) }
 
     // MARK: - 喂食来源（手动 vs 按计划，互斥展示用）
     /// 首页/详情「按计划」打卡写入 `ohana_plan_feed:` + eventId
     static let plannedFeedNotePrefix = "ohana_plan_feed:"
+    /// 首页/详情「按计划」喂水写入 `ohana_plan_water:` + eventId
+    static let plannedWaterNotePrefix = "ohana_plan_water:"
     /// 首页/详情「手动记录」打卡写入
     static let manualFeedNoteMarker = "ohana_manual_feed"
 
@@ -162,6 +172,7 @@ struct FeedTodayState {
     let pet: Pet
     let allEvents: [Event]
     let manualGoalCount: Int
+    let careLogs: [PetCareLog]?
     let now: Date
     let calendar: Calendar
 
@@ -169,14 +180,24 @@ struct FeedTodayState {
         pet: Pet,
         allEvents: [Event],
         manualGoalCount: Int,
+        careLogs: [PetCareLog]? = nil,
         now: Date = Date(),
         calendar: Calendar = .current
     ) {
         self.pet = pet
         self.allEvents = allEvents
         self.manualGoalCount = max(manualGoalCount, 1)
+        self.careLogs = careLogs
         self.now = now
         self.calendar = calendar
+    }
+
+    private var observedCareLogs: [PetCareLog] {
+        careLogs ?? pet.careLogs
+    }
+
+    func isPlanReminderSatisfied(_ reminder: Reminder) -> Bool {
+        reminder.isCompleted
     }
 
     var feedScheduleEvents: [Event] {
@@ -195,11 +216,15 @@ struct FeedTodayState {
     }
 
     var pendingTodayPlanReminders: [Reminder] {
-        todayPlanReminders.filter { $0.isPending || $0.isFailed }
+        todayPlanReminders.filter { ($0.isPending || $0.isFailed) && !isPlanReminderSatisfied($0) }
+    }
+
+    var missedTodayPlanReminders: [Reminder] {
+        todayPlanReminders.filter { !isPlanReminderSatisfied($0) && ($0.isFailed || ($0.isPending && $0.scheduledAt < now)) }
     }
 
     var completedTodayPlanReminders: [Reminder] {
-        todayPlanReminders.filter { $0.isCompleted }
+        todayPlanReminders.filter { isPlanReminderSatisfied($0) }
     }
 
     var nextPendingReminder: Reminder? {
@@ -211,8 +236,9 @@ struct FeedTodayState {
     }
 
     var manualTodayLogs: [PetCareLog] {
-        pet.careLogs
+        observedCareLogs
             .filter {
+                (careLogs == nil || $0.pet?.id == pet.id) &&
                 $0.careType == .feeding &&
                 $0.isManualFeedLogEntry &&
                 calendar.isDate($0.date, inSameDayAs: now)
@@ -221,8 +247,9 @@ struct FeedTodayState {
     }
 
     var plannedTodayLogs: [PetCareLog] {
-        pet.careLogs
+        observedCareLogs
             .filter {
+                (careLogs == nil || $0.pet?.id == pet.id) &&
                 $0.careType == .feeding &&
                 $0.isPlannedFeedLogEntry &&
                 calendar.isDate($0.date, inSameDayAs: now)
@@ -231,8 +258,9 @@ struct FeedTodayState {
     }
 
     var allTodayLogs: [PetCareLog] {
-        pet.careLogs
+        observedCareLogs
             .filter {
+                (careLogs == nil || $0.pet?.id == pet.id) &&
                 $0.careType == .feeding &&
                 calendar.isDate($0.date, inSameDayAs: now)
             }
@@ -264,7 +292,7 @@ struct FeedTodayState {
     }
 
     var hasOverduePlan: Bool {
-        pendingTodayPlanReminders.contains { $0.isFailed || $0.scheduledAt < now }
+        !missedTodayPlanReminders.isEmpty
     }
 
     var todayFeedGrams: Double {

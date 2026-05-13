@@ -30,7 +30,7 @@ struct HumanWishlistView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            ArkBackgroundView().ignoresSafeArea()
+            OhanaAppBackground().ignoresSafeArea()
 
             if isPrivacyLocked {
                 privacyLockedView
@@ -52,7 +52,7 @@ struct HumanWishlistView: View {
                     .background(Color.goPrimary, in: Capsule())
                     .shadow(color: Color.goPrimary.opacity(0.45), radius: 14, y: 5)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .padding(.bottom, 28)
             }
         }
@@ -101,7 +101,7 @@ struct HumanWishlistView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("我的椰子余额")
                         .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(.primary.opacity(0.5))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text("🥥")
                             .font(OhanaFont.title2())
@@ -112,16 +112,16 @@ struct HumanWishlistView: View {
                     }
                     Text("许愿消耗椰子，需攒够才能兑换")
                         .font(OhanaFont.caption())
-                        .foregroundStyle(.primary.opacity(0.35))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 6) {
                     Text("\(pendingItems.count)")
                         .font(OhanaFont.metric(size: 32))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Text("个待兑换")
                         .font(OhanaFont.caption())
-                        .foregroundStyle(.primary.opacity(0.4))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
             }
             .padding(20)
@@ -137,10 +137,10 @@ struct HumanWishlistView: View {
                 .foregroundStyle(Color.goYellow)
             Text("椰子资产仅本人可见")
                 .font(OhanaFont.title3(.black))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Text("当前家庭成员无权查看余额、心愿和兑换记录。")
                 .font(OhanaFont.callout())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
                 .multilineTextAlignment(.center)
         }
         .padding(24)
@@ -169,7 +169,7 @@ struct HumanWishlistView: View {
                         .strikethrough(redeemed)
                     Text(item.createdAt, format: .dateTime.month().day())
                         .font(OhanaFont.caption())
-                        .foregroundStyle(.primary.opacity(0.3))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                 }
                 Spacer()
 
@@ -185,7 +185,7 @@ struct HumanWishlistView: View {
                             )
                     }
                     .disabled(human.coconutBalance < item.cost)
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
 
                     Button {
                         modelContext.delete(item)
@@ -193,13 +193,13 @@ struct HumanWishlistView: View {
                     } label: {
                         Image(systemName: "trash")
                             .font(OhanaFont.footnote())
-                            .foregroundStyle(.primary.opacity(0.2))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 } else {
                     Text("已兑换 ✓")
                         .font(OhanaFont.caption(.semibold))
-                        .foregroundStyle(.primary.opacity(0.25))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                         .padding(.horizontal, 10).padding(.vertical, 6)
                         .background(.white.opacity(0.06), in: Capsule())
                 }
@@ -212,7 +212,7 @@ struct HumanWishlistView: View {
     private func sectionHeader(_ text: String) -> some View {
         Text(text)
             .font(OhanaFont.footnote(.black))
-            .foregroundStyle(.primary.opacity(0.5))
+            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -222,10 +222,10 @@ struct HumanWishlistView: View {
             Text("🌟").font(OhanaFont.metric(size: 56))
             Text("还没有心愿")
                 .font(OhanaFont.headline(.black))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Text("许下你想要的礼物\n让家人帮你兑换！")
                 .font(OhanaFont.callout())
-                .foregroundStyle(.primary.opacity(0.4))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 .multilineTextAlignment(.center)
         }
     }
@@ -233,7 +233,7 @@ struct HumanWishlistView: View {
     // MARK: - Add Wish Sheet
     private var addWishSheet: some View {
         ZStack {
-            ArkBackgroundView().ignoresSafeArea()
+            OhanaAppBackground().ignoresSafeArea()
 
             VStack(spacing: 0) {
                 Capsule()
@@ -243,7 +243,7 @@ struct HumanWishlistView: View {
 
                 Text("许一个愿 🌟")
                     .font(OhanaFont.title3(.black))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 24)
 
@@ -251,10 +251,10 @@ struct HumanWishlistView: View {
                     // 心愿标题
                     HStack {
                         Image(systemName: "sparkles")
-                            .foregroundStyle(.primary.opacity(0.3))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                         TextField("心愿内容（例如：新耳机）", text: $newTitle)
                             .font(OhanaFont.callout(.semibold))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                     }
                     .padding(.horizontal, 16).padding(.vertical, 14)
                     .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -265,7 +265,7 @@ struct HumanWishlistView: View {
                         HStack {
                             Text("兑换费用")
                                 .font(OhanaFont.callout(.bold))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                             Spacer()
                             HStack(spacing: 4) {
                                 Text("🥥 \(newCost)")
@@ -279,9 +279,9 @@ struct HumanWishlistView: View {
                         ), in: 5...500, step: 5)
                         .tint(Color.goYellow)
                         HStack {
-                            Text("5 🥥").font(OhanaFont.caption2()).foregroundStyle(.primary.opacity(0.4))
+                            Text("5 🥥").font(OhanaFont.caption2()).foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                             Spacer()
-                            Text("500 🥥").font(OhanaFont.caption2()).foregroundStyle(.primary.opacity(0.4))
+                            Text("500 🥥").font(OhanaFont.caption2()).foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }
                     }
                     .padding(.horizontal, 16).padding(.vertical, 14)
@@ -309,7 +309,7 @@ struct HumanWishlistView: View {
                                     in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
                 .disabled(newTitle.isEmpty)
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .padding(.horizontal, 24).padding(.bottom, 32)
             }
         }

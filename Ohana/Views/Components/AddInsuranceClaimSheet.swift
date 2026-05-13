@@ -60,7 +60,7 @@ struct AddInsuranceClaimSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                 ScrollView {
                     VStack(spacing: 14) {
                         // 保险公司提示
@@ -71,11 +71,11 @@ struct AddInsuranceClaimSheet: View {
                                     .foregroundStyle(Color.goPrimary)
                                 Text("\(insurance.productName) · \(insurance.companyName)")
                                     .font(.system(size: 13, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                                 Spacer()
                                 Text("保额 \(insurance.coverageAmount > 0 ? AppCurrency.format(insurance.coverageAmount, fractionDigits: 0) : "—")")
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                             }
                             .padding(12)
                             .background(Color.goPrimary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
@@ -104,7 +104,7 @@ struct AddInsuranceClaimSheet: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("关联花费记录（可选）")
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.45))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                             Button { showExpensePicker = true } label: {
                                 HStack {
                                     Image(systemName: "link.circle.fill")
@@ -114,15 +114,15 @@ struct AddInsuranceClaimSheet: View {
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(exp.note.isEmpty ? exp.expenseCategory.rawValue : exp.note)
                                                 .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                                .foregroundStyle(.primary)
+                                                .foregroundStyle(Color.ohanaPrimaryText)
                                             Text("\(exp.date.formatted(.dateTime.month().day())) · \(AppCurrency.format(exp.amount, fractionDigits: 0))")
                                                 .font(.system(size: 11, weight: .regular, design: .rounded))
-                                                .foregroundStyle(.secondary)
+                                                .foregroundStyle(Color.ohanaSecondaryText)
                                         }
                                     } else {
                                         Text("从医疗花费中关联")
                                             .font(.system(size: 13, weight: .medium, design: .rounded))
-                                            .foregroundStyle(.secondary)
+                                            .foregroundStyle(Color.ohanaSecondaryText)
                                     }
                                     Spacer()
                                     if selectedExpense != nil {
@@ -131,9 +131,9 @@ struct AddInsuranceClaimSheet: View {
                                         } label: {
                                             Image(systemName: "xmark.circle.fill")
                                                 .font(.system(size: 14))
-                                                .foregroundStyle(.secondary)
+                                                .foregroundStyle(Color.ohanaSecondaryText)
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(ScaleButtonStyle())
                                     } else {
                                         Image(systemName: "chevron.right")
                                             .font(.system(size: 12, weight: .semibold))
@@ -143,14 +143,14 @@ struct AddInsuranceClaimSheet: View {
                                 .padding(14)
                                 .goTranslucentCard(cornerRadius: 14)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ScaleButtonStyle())
                         }
 
                         // 初始状态
                         VStack(alignment: .leading, spacing: 8) {
                             Text("申请状态")
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.45))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                             HStack(spacing: 8) {
                                 ForEach(ClaimStatus.allCases, id: \.rawValue) { status in
                                     Button { initialStatus = status } label: {
@@ -168,7 +168,7 @@ struct AddInsuranceClaimSheet: View {
                                             in: Capsule()
                                         )
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(ScaleButtonStyle())
                                 }
                             }
                         }
@@ -197,7 +197,7 @@ struct AddInsuranceClaimSheet: View {
                                 in: RoundedRectangle(cornerRadius: 16)
                             )
                         }
-                        .buttonStyle(.plain).disabled(!canSave)
+                        .buttonStyle(ScaleButtonStyle()).disabled(!canSave)
                         Spacer(minLength: 40)
                     }
                     .padding(.horizontal, 16).padding(.top, 8)
@@ -206,7 +206,7 @@ struct AddInsuranceClaimSheet: View {
             .navigationTitle("新增报销申请").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }.foregroundStyle(.secondary)
+                    Button("取消") { dismiss() }.foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
             .sheet(isPresented: $showExpensePicker) {
@@ -244,7 +244,7 @@ struct AddInsuranceClaimSheet: View {
         HStack {
             Text(label)
                 .font(.system(size: 14, weight: .medium, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(AppCurrency.symbol)
@@ -320,13 +320,13 @@ private struct ExpenseLinkPickerSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                 Group {
                     if expenses.isEmpty {
                         VStack(spacing: 12) {
                             Text("暂无医疗花费记录")
                                 .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
@@ -340,10 +340,10 @@ private struct ExpenseLinkPickerSheet: View {
                                         VStack(alignment: .leading, spacing: 4) {
                                             Text(exp.note.isEmpty ? exp.expenseCategory.rawValue : exp.note)
                                                 .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                                .foregroundStyle(.primary)
+                                                .foregroundStyle(Color.ohanaPrimaryText)
                                             Text(exp.date.formatted(.dateTime.year().month().day()))
                                                 .font(.system(size: 12, weight: .regular, design: .rounded))
-                                                .foregroundStyle(.secondary)
+                                                .foregroundStyle(Color.ohanaSecondaryText)
                                         }
                                         Spacer()
                                         Text(AppCurrency.format(exp.amount, fractionDigits: 0))
@@ -354,7 +354,7 @@ private struct ExpenseLinkPickerSheet: View {
                                         }
                                     }
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(ScaleButtonStyle())
                             }
                         }
                         .listStyle(.plain)
@@ -364,7 +364,7 @@ private struct ExpenseLinkPickerSheet: View {
             .navigationTitle("选择关联花费").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }.foregroundStyle(.secondary)
+                    Button("取消") { dismiss() }.foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
         }

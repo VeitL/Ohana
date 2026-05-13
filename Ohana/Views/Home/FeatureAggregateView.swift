@@ -30,9 +30,11 @@ struct FeatureAggregateView: View {
 
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.name)   private var humans: [Human]
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
     private var visibleHumans: [Human] { humans.filter { $0.shouldShowOnHome } }
+    private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
 
     private func isDog(_ pet: Pet) -> Bool {
         pet.species.lowercased().contains("狗") || pet.species.lowercased().contains("dog")
@@ -45,6 +47,17 @@ struct FeatureAggregateView: View {
 
     // Features that show human chips
     private var showHumanChips: Bool { feature == .weight || feature == .expense }
+
+    private var humansForFeature: [Human] {
+        switch feature {
+        case .weight:
+            return PrivacyService.unlockedHumans(for: .weight, from: visibleHumans, viewedBy: activeHumanId)
+        case .expense:
+            return PrivacyService.unlockedHumans(for: .expense, from: visibleHumans, viewedBy: activeHumanId)
+        default:
+            return visibleHumans
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -86,16 +99,16 @@ struct FeatureAggregateView: View {
                     Button { parentPath.append(petDest(feature, pet: pet)) } label: {
                         entityChip(avatar: { FMPetAvatar(pet: pet, size: 24) }, name: pet.name)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
 
                 // Human chips (weight / expense)
                 if showHumanChips {
-                    ForEach(visibleHumans) { human in
+                    ForEach(humansForFeature) { human in
                         Button { parentPath.append(humanDest(feature, human: human)) } label: {
                             entityChip(avatar: { humanAvatarView(human) }, name: human.name)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                     }
                 }
             }
@@ -192,7 +205,7 @@ struct FeatureAggregateView: View {
                     }
                     .padding(.vertical, 4)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .listRowBackground(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.07)))
                 .listRowSeparatorTint(.white.opacity(0.08))
             }

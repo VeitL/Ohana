@@ -49,7 +49,7 @@ struct InsurancePolicyDetailSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                 ScrollView {
                     VStack(spacing: 16) {
                         // 顶部保单头
@@ -71,7 +71,7 @@ struct InsurancePolicyDetailSheet: View {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -98,7 +98,7 @@ struct InsurancePolicyDetailSheet: View {
                         } label: {
                             Image(systemName: "ellipsis.circle.fill")
                                 .symbolRenderingMode(.hierarchical)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                                 .font(.system(size: 20))
                         }
                     }
@@ -141,7 +141,7 @@ struct InsurancePolicyDetailSheet: View {
                     if !insurance.companyName.isEmpty {
                         Text(insurance.companyName)
                             .font(.system(size: 13, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
                 Spacer()
@@ -159,7 +159,7 @@ struct InsurancePolicyDetailSheet: View {
                 HStack {
                     Text(insurance.startDate.formatted(.dateTime.year().month().day()))
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                     Spacer()
                     Text(daysLabel)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
@@ -167,7 +167,7 @@ struct InsurancePolicyDetailSheet: View {
                     Spacer()
                     Text(insurance.renewalDate.formatted(.dateTime.year().month().day()))
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
@@ -216,10 +216,10 @@ struct InsurancePolicyDetailSheet: View {
             Spacer()
             Text(value)
                 .font(.system(size: 18, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Text(label)
                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
@@ -237,7 +237,7 @@ struct InsurancePolicyDetailSheet: View {
                 if !insurance.claims.isEmpty {
                     Text("\(insurance.claims.count) 条")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.primary.opacity(0.08), in: Capsule())
                 }
@@ -248,7 +248,7 @@ struct InsurancePolicyDetailSheet: View {
                         .foregroundStyle(Color.goPrimary)
                         .labelStyle(.titleAndIcon)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
 
             if sortedClaims.isEmpty {
@@ -272,10 +272,10 @@ struct InsurancePolicyDetailSheet: View {
         VStack(spacing: 8) {
             Text("暂无报销记录")
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
             Text("就诊后可新增报销申请，追踪报销进度")
                 .font(.system(size: 12, weight: .regular, design: .rounded))
-                .foregroundStyle(.secondary.opacity(0.7))
+                .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -287,7 +287,7 @@ struct InsurancePolicyDetailSheet: View {
             Circle().fill(Color(hex: hex)).frame(width: 8, height: 8)
             Text(label)
                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.ohanaSecondaryText)
             Text(value)
                 .font(.system(size: 13, weight: .black, design: .rounded))
         }
@@ -306,12 +306,12 @@ struct InsurancePolicyDetailSheet: View {
                         .font(.system(size: 13, weight: .black, design: .rounded))
                     Text("就诊")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 if !claim.note.isEmpty {
                     Text(claim.note)
                         .font(.system(size: 11, weight: .regular, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
                 }
             }

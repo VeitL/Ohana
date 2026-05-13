@@ -69,7 +69,7 @@ struct Day0PromiseSheet: View {
                         }
                         Text("勾选的承诺会自动进入「家庭悬赏榜」——任何家人都可以帮你完成并领取椰子。")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.4))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 6)
                     }
@@ -88,7 +88,7 @@ struct Day0PromiseSheet: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("跳过") { finish() }
-                        .foregroundStyle(.primary.opacity(0.55))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                 }
             }
         }
@@ -98,10 +98,10 @@ struct Day0PromiseSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("欢迎 \(petName) 🎉")
                 .font(.system(size: 22, weight: .black, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Text("勾选几条你今晚或明天愿意完成的小承诺——它们会自动成为家庭任务，让家人一起参与。")
                 .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(.primary.opacity(0.6))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -126,7 +126,7 @@ struct Day0PromiseSheet: View {
                 Text(p.emoji).font(.system(size: 22))
                 Text(p.title)
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 HStack(spacing: 3) {
@@ -149,7 +149,7 @@ struct Day0PromiseSheet: View {
                     )
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private var bottomBar: some View {
@@ -166,7 +166,7 @@ struct Day0PromiseSheet: View {
             .frame(maxWidth: .infinity, minHeight: 48)
             .background(Color.goPrimary, in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
         .padding(.horizontal, 20)
         .padding(.bottom, 24)
     }

@@ -21,7 +21,7 @@ struct GlobalCoconutButtonOverlay: View {
                     .overlay(Capsule().strokeBorder(Color.goYellow.opacity(0.3), lineWidth: 1))
                     .shadow(color: Color.goYellow.opacity(0.18), radius: 10, y: 4)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
             .padding(.trailing, 16)
             .padding(.top, 8)

@@ -37,7 +37,7 @@ extension Human {
         }
         let maxOtherExpense = otherExpenses.max() ?? 0
         if myExpense > 0 && myExpense >= maxOtherExpense {
-            badges.append(HumanBadge(emoji: "💸", title: "榜一大哥", color: "C8FF00"))
+            badges.append(HumanBadge(emoji: "💸", title: "榜一大哥", color: "F59E0B"))
         }
 
         // 规则 C："🥾 追风少年"（Walk 记录数 > 5）
@@ -51,7 +51,7 @@ extension Human {
     }
 
     // 主题色（V15 起直接读 themeColorHex 字段）
-    var themeColor: String { themeColorHex.isEmpty ? "4338FF" : themeColorHex }
+    var themeColor: String { safeThemeColorHex }
 
     var avatarInitial: String { String(name.prefix(1)) }
 }

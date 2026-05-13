@@ -119,7 +119,7 @@ struct BountyBoardView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
@@ -170,7 +170,7 @@ struct BountyBoardView: View {
                                             .foregroundStyle(tertiaryText)
                                             .padding(.vertical, 4)
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(ScaleButtonStyle())
                                         if showArchive {
                                             ForEach(archivedCompleted) { task in
                                                 taskCard(task, isActive: false)
@@ -189,7 +189,7 @@ struct BountyBoardView: View {
             }
             .navigationTitle("家庭悬赏榜")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbarBackground(Color.ohanaCardSurface, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
@@ -260,7 +260,7 @@ struct BountyBoardView: View {
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(Color.ohanaCardSurface)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
@@ -295,7 +295,7 @@ struct BountyBoardView: View {
                         .strokeBorder(selectedTab == idx ? Color.clear : Color.primary.opacity(0.12), lineWidth: 1)
                 )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     // MARK: - 任务卡片
@@ -391,7 +391,7 @@ struct BountyBoardView: View {
                                 .padding(.horizontal, 10).padding(.vertical, 5)
                                 .background(Color.goRed.opacity(0.1), in: Capsule())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                     } else if canComplete {
                         Button {
                             pendingCompleteId = task.id
@@ -407,7 +407,7 @@ struct BountyBoardView: View {
                             .padding(.horizontal, 12).padding(.vertical, 6)
                             .background(Color.goPrimary, in: Capsule())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                     } else {
                         Text("指派中")
                             .font(OhanaFont.caption2(.semibold))
@@ -624,7 +624,7 @@ struct BountyBoardView: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(Color.ohanaCardSurface)
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
@@ -775,7 +775,7 @@ struct AddBountyTaskSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ArkBackgroundView()
+                OhanaAppBackground()
                     .ignoresSafeArea()
 
                 ScrollView {
@@ -809,7 +809,7 @@ struct AddBountyTaskSheet: View {
                                                         )
                                                 )
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(ScaleButtonStyle())
                                     }
                                 }
                                 .padding(.horizontal, 2)
@@ -874,7 +874,7 @@ struct AddBountyTaskSheet: View {
                                                     )
                                             )
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(ScaleButtonStyle())
                                     }
                                 }
                                 .padding(.horizontal, 2)
@@ -937,7 +937,7 @@ struct AddBountyTaskSheet: View {
             }
             .navigationTitle("发布悬赏")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbarBackground(Color.ohanaCardSurface, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
@@ -1007,7 +1007,7 @@ struct AddBountyTaskSheet: View {
                     .frame(maxWidth: 60)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func formField<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -1019,7 +1019,7 @@ struct AddBountyTaskSheet: View {
                 .padding(.horizontal, 16).padding(.vertical, 14)
                 .background(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(.ultraThinMaterial)
+                        .fill(Color.ohanaCardSurface)
                         .overlay(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)

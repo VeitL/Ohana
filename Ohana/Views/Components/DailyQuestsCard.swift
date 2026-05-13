@@ -541,17 +541,17 @@ struct CoconutDropSheet: View {
                             .animation(.spring(response: 0.5, dampingFraction: 0.6), value: revealed)
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .disabled(revealed)
 
                 VStack(spacing: 12) {
                     Text(revealed ? "今日盲盒已开启！" : "敲开你的椰子")
                         .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
 
                     Text(revealed ? reward.text : "完成所有委托换取的神秘礼物")
                         .font(.system(size: 15, weight: .medium, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.6))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 40)
                 }
@@ -667,7 +667,7 @@ struct DailyQuestsCard: View {
                 .font(.system(size: 20))
             Text("今日岛屿委托全部完成！")
                 .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Image(systemName: "checkmark.seal.fill")
                 .font(.system(size: 18))
@@ -688,7 +688,7 @@ struct DailyQuestsCard: View {
                         .font(.system(size: 16))
                     Text("岛屿委托")
                         .font(.system(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                         .tracking(1)
                 }
                 Spacer()
@@ -746,7 +746,7 @@ struct DailyQuestsCard: View {
                         in: RoundedRectangle(cornerRadius: 14)
                     )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
                 .disabled(coconutClaimed)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }

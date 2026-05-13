@@ -9,13 +9,14 @@ import SwiftUI
 import SwiftData
 import BackgroundTasks
 import Foundation
+import Combine
 
 let ohanaProcessStartTime = CFAbsoluteTimeGetCurrent()
 
 @main
 struct OhanaApp: App {
-    let container: ModelContainer
     private static let bgTaskID = "com.guanchen.li.Ark.reminderRefill"
+    private let modelContainer: ModelContainer
     @AppStorage("appThemePreference") private var appThemePreference: String = "dark"
     @AppStorage("appLanguage") private var appLanguage: String = "zh"
     @AppStorage(AppCountry.storageKey) private var appCountry: String = AppCountry.detectedCode
@@ -25,11 +26,14 @@ struct OhanaApp: App {
     init() {
         let initStartedAt = CFAbsoluteTimeGetCurrent()
         AppCountry.ensureInitialized()
-        self.container = SharedModelContainer.make()
         OhanaApp.registerBGTasks()
+        let containerStartedAt = CFAbsoluteTimeGetCurrent()
+        modelContainer = SharedModelContainer.make()
         let initDurationMS = (CFAbsoluteTimeGetCurrent() - initStartedAt) * 1_000
+        let containerDurationMS = (CFAbsoluteTimeGetCurrent() - containerStartedAt) * 1_000
         Task { @MainActor in
-            AppPerformanceMonitor.shared.record("App init", valueMS: initDurationMS, note: "ModelContainer + BGTask")
+            AppPerformanceMonitor.shared.record("SwiftData container ready", valueMS: containerDurationMS, note: "Eager before RootView")
+            AppPerformanceMonitor.shared.record("App init", valueMS: initDurationMS, note: "BGTask + eager container")
             AppPerformanceMonitor.shared.record("进程到 App init 完成", startedAt: ohanaProcessStartTime)
         }
     }
@@ -45,17 +49,21 @@ struct OhanaApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
-                .modelContainer(container)
-                .tint(Color.goPrimary)
-                .preferredColorScheme(preferredScheme)
-                .environment(\.locale, AppLanguage.swiftUIPreferredLocale)
-                .ignoresSafeArea(.keyboard, edges: .bottom)
-                .onChange(of: appCountry) { _, _ in }
-                .onChange(of: appCurrency) { _, _ in }
-                .onChange(of: appMeasurementSystem) { _, _ in }
-                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
-                    OhanaApp.scheduleReminderRefill()
-                }
+                .modelContainer(modelContainer)
+            .tint(Color.goPrimary)
+            .preferredColorScheme(preferredScheme)
+            .environment(\.locale, AppLanguage.swiftUIPreferredLocale)
+            .ignoresSafeArea(.keyboard, edges: .bottom)
+            .onChange(of: appCountry) { _, _ in }
+            .onChange(of: appCurrency) { _, _ in }
+            .onChange(of: appMeasurementSystem) { _, _ in }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+                PetWalkingManager.shared.handleAppBackgroundTransition()
+                OhanaApp.scheduleReminderRefill()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
+                PetWalkingManager.shared.pauseForAppBackground()
+            }
         }
     }
 

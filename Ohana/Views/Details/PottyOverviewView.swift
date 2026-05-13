@@ -35,7 +35,7 @@ struct PottyOverviewView: View {
         NavigationStack {
             GeometryReader { geo in
                 ZStack(alignment: .bottom) {
-                    ArkBackgroundView()
+                    OhanaAppBackground()
 
                     VStack(spacing: 0) {
                         chartSection
@@ -54,7 +54,7 @@ struct PottyOverviewView: View {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.primary.opacity(0.7))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                     }
                 }
             }
@@ -69,17 +69,17 @@ struct PottyOverviewView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("便便追踪")
                         .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text("\(todayCount)")
                             .font(.system(size: 44, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text("次")
                             .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(Color.brown.opacity(0.9))
                         Text("· 今日")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.primary.opacity(0.4))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     }
                 }
                 Spacer()
@@ -103,7 +103,7 @@ struct PottyOverviewView: View {
                         if item.count > 0 {
                             Text("\(item.count)")
                                 .font(.system(size: 10, weight: .bold, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.7))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                         }
                         RoundedRectangle(cornerRadius: 5)
                             .fill(
@@ -116,7 +116,7 @@ struct PottyOverviewView: View {
                             .frame(height: max(6, CGFloat(item.count) * 18))
                         Text(item.date, format: .dateTime.weekday(.abbreviated))
                             .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.primary.opacity(0.4))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -135,13 +135,13 @@ struct PottyOverviewView: View {
                                 .foregroundStyle(pottyColor(type))
                             Text(type.rawValue)
                                 .font(.system(size: 10, weight: .bold, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.7))
+                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
                         .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
             .padding(.horizontal, 24)
@@ -155,7 +155,7 @@ struct PottyOverviewView: View {
     private var recordListLayer: some View {
         ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(.regularMaterial)
+                .fill(Color.ohanaCardSurface)
                 .ignoresSafeArea(edges: .bottom)
 
             VStack(spacing: 0) {
@@ -168,11 +168,11 @@ struct PottyOverviewView: View {
                 HStack {
                     Text("历史记录")
                         .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Text("\(sortedLogs.count) 条")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 12)
@@ -185,7 +185,7 @@ struct PottyOverviewView: View {
                         if sortedLogs.isEmpty {
                             Text("还没有记录\n点击上方按钮开始打卡")
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                                 .multilineTextAlignment(.center)
                                 .padding(.vertical, 40)
                         }
@@ -214,7 +214,7 @@ struct PottyOverviewView: View {
                     .foregroundStyle(.black.opacity(0.85))
                 Text(log.date, format: .dateTime.year().month().day())
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
 
             Spacer()
@@ -229,7 +229,7 @@ struct PottyOverviewView: View {
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary.opacity(0.5))
+                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.5))
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
@@ -251,7 +251,7 @@ struct PottyOverviewView: View {
         case .perfectPoop: return Color(red: 0.6, green: 0.4, blue: 0.2)
         case .softPoop:    return Color(hex: "F59E0B")
         case .liquidPoop:  return Color(hex: "EF4444")
-        case .pee:         return Color(hex: "3B82F6")
+        case .pee:         return Color(hex: "06B6D4")
         }
     }
 }

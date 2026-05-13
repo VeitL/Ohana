@@ -20,16 +20,16 @@ struct IslandEnergyBar: View {
             HStack(spacing: 6) {
                 Text("🌿 岛屿能量")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.7))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                 Spacer()
                 Text(levelLabel)
                     .font(.system(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goPrimary)
                 Text("·")
-                    .foregroundStyle(.secondary.opacity(0.4))
+                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
                 Text("\(Int(progress * 100))%")
                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
 
             // 进度条
@@ -58,7 +58,7 @@ struct IslandEnergyBar: View {
             // 升级提示
             Text(nextLevelHint)
                 .font(.system(size: 10, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary.opacity(0.6))
+                .foregroundStyle(Color.ohanaSecondaryText.opacity(0.6))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
