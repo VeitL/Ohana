@@ -102,6 +102,30 @@ struct FocusStackHomeTestView: View {
     @Binding var selectedPetTab: PetDetailTab
     let heroNS: Namespace.ID
 
+    init(
+        selectedPet: Binding<Pet?>,
+        selectedHuman: Binding<Human?>,
+        selectedPlant: Binding<Plant?>,
+        selectedPetTab: Binding<PetDetailTab>,
+        heroNS: Namespace.ID
+    ) {
+        self._selectedPet = selectedPet
+        self._selectedHuman = selectedHuman
+        self._selectedPlant = selectedPlant
+        self._selectedPetTab = selectedPetTab
+        self.heroNS = heroNS
+
+        // 首页只需要判断近期喂食状态；完整历史由粮食详情页负责加载。
+        // 收窄这条 Query 能避免启动时水合长期喂食历史，减少首次点卡片前的主线程压力。
+        let todayStart = Calendar.current.startOfDay(for: Date())
+        let recentFeedStart = Calendar.current.date(byAdding: .day, value: -2, to: todayStart) ?? todayStart
+        _allFeedCareLogs = Query(
+            filter: #Predicate<PetCareLog> { $0.type == "喂食" && $0.date >= recentFeedStart },
+            sort: \.date,
+            order: .reverse
+        )
+    }
+
     @Environment(\.ohanaDisplayCornerRadius) private var displayCornerRadius
     @Environment(\.modelContext) private var modelContext
     @Bindable private var questMgr = QuestManager.shared
@@ -203,6 +227,7 @@ struct FocusStackHomeTestView: View {
     @State private var homeCardReorderEnabled = false
     @State private var homeCardReorderModeActive = false
     @State private var didRecordHomeFirstFrame = false
+    @State private var homeDeferredContentReady = false
     @State private var avatarCacheRevision = 0
     @State private var quickActionClockTick = Date()
     @State private var homeCardSnapshot: [FocusCard] = []
@@ -364,6 +389,13 @@ struct FocusStackHomeTestView: View {
     private func runHomePostFirstFrameMaintenance() {
         Task { @MainActor in
             await Task.yield()
+            if !homeDeferredContentReady {
+                try? await Task.sleep(nanoseconds: 180_000_000)
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeOut(duration: 0.14)) {
+                    homeDeferredContentReady = true
+                }
+            }
             ensureTodayCheckIn()
             refreshHeaderStreak()
             syncWalkCardSurfaceVisibility()
@@ -1006,35 +1038,40 @@ extension FocusStackHomeTestView {
     private func todayFocusSection(activePets: [Pet]) -> some View {
         // Collapsed first screen answers: who needs care, what is urgent, what can be done now.
         if (!activePets.isEmpty || !humans.isEmpty) && !isExpanded {
-            TodayFocusCarousel(cardMargin: K.cardMargin, animation: walletAnimation) { cardWidth in
-                TodayFocusQuestCardHost(
-                    pets: activePets,
-                    plants: plants,
-                    reminders: pendingReminders,
-                    humans: humans,
-                    events: allEvents,
-                    activePet: todayFocusActivePet,
-                    onCompleteQuest: { completeQuestInFocusStack($0) },
-                    onTapNegativeSignal: { handleTodayFocusNegativeSignal($0) },
-                    onTapOasis: { showingOasisReward = true }
-                )
-                .frame(width: cardWidth)
-
-                if showFirstSuccessCard,
-                   !firstQuickCheckInCompleted,
-                   let pet = todayFocusActivePet {
-                    HomeFirstSuccessCard(
-                        pet: pet,
-                        onFeed: { completeFirstSuccessFeed(for: pet) },
-                        onPlay: { completeFirstSuccessPlay(for: pet) },
-                        onMoment: { startFirstSuccessMoment(for: pet) }
+            if homeDeferredContentReady {
+                TodayFocusCarousel(cardMargin: K.cardMargin, animation: walletAnimation) { cardWidth in
+                    TodayFocusQuestCardHost(
+                        pets: activePets,
+                        plants: plants,
+                        reminders: pendingReminders,
+                        humans: humans,
+                        events: allEvents,
+                        activePet: todayFocusActivePet,
+                        onCompleteQuest: { completeQuestInFocusStack($0) },
+                        onTapNegativeSignal: { handleTodayFocusNegativeSignal($0) },
+                        onTapOasis: { showingOasisReward = true }
                     )
                     .frame(width: cardWidth)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
 
+                    if showFirstSuccessCard,
+                       !firstQuickCheckInCompleted,
+                       let pet = todayFocusActivePet {
+                        HomeFirstSuccessCard(
+                            pet: pet,
+                            onFeed: { completeFirstSuccessFeed(for: pet) },
+                            onPlay: { completeFirstSuccessPlay(for: pet) },
+                            onMoment: { startFirstSuccessMoment(for: pet) }
+                        )
+                        .frame(width: cardWidth)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                }
+                .animation(walletAnimation, value: isExpanded)
+            } else {
+                Color.clear
+                    .frame(height: 232)
+                    .padding(.top, 12)
             }
-            .animation(walletAnimation, value: isExpanded)
         }
     }
 
@@ -2872,7 +2909,7 @@ extension FocusStackHomeTestView {
     private func homeFabOverlay(activeCard: FocusCard?) -> some View {
         VStack(alignment: .trailing, spacing: 14) {
             // Expanded action buttons (上方弹出)
-            if let activeCard {
+            if fabExpanded, let activeCard {
                 let activeItems = expandedCardFabShortcuts(for: activeCard)
                 ForEach(Array(activeItems.enumerated()), id: \.element.id) { idx, item in
                     fabActionRow(
@@ -2909,7 +2946,7 @@ extension FocusStackHomeTestView {
                     .allowsHitTesting(fabExpanded)
                     .accessibilityHidden(!fabExpanded)
                 }
-            } else {
+            } else if fabExpanded {
                 let fabItems = homeFabFunctionShortcuts
                 ForEach(Array(fabItems.enumerated()), id: \.element.id) { idx, item in
                     fabActionRow(item: item, rowHeight: 48)

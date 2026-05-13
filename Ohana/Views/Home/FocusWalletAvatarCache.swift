@@ -17,6 +17,7 @@ enum FocusWalletAvatarCache {
     }
 
     private static var entries: [UUID: Entry] = [:]
+    private static var inFlightKeys: Set<String> = []
 
     static func entry(for cardId: UUID, data: Data?) -> Entry {
         guard let data else {
@@ -38,7 +39,7 @@ enum FocusWalletAvatarCache {
     @discardableResult
     static func preload(payloads: [Payload]) async -> Bool {
         var didChange = false
-        let decodePayloads: [(UUID, Data, String)] = payloads.compactMap { payload in
+        let decodePayloads: [(UUID, Data, String, String)] = payloads.compactMap { payload in
             guard let data = payload.data else {
                 if entries.removeValue(forKey: payload.id) != nil {
                     didChange = true
@@ -51,25 +52,30 @@ enum FocusWalletAvatarCache {
                cached.isFinal {
                 return nil
             }
-            return (payload.id, data, signature)
+            let inFlightKey = "\(payload.id.uuidString):\(signature)"
+            guard !inFlightKeys.contains(inFlightKey) else { return nil }
+            inFlightKeys.insert(inFlightKey)
+            return (payload.id, data, signature, inFlightKey)
         }
         guard !decodePayloads.isEmpty else { return didChange }
 
         let decodeStartedAt = CFAbsoluteTimeGetCurrent()
         let decoded = await Task.detached(priority: .userInitiated) {
-            decodePayloads.map { id, data, signature in
+            decodePayloads.map { id, data, signature, inFlightKey in
                 let entry = decodedEntry(from: data, signature: signature)
                 return (
                     id,
                     entry.image,
                     entry.isTransparent,
                     entry.signature,
-                    entry.isFinal
+                    entry.isFinal,
+                    inFlightKey
                 )
             }
         }.value
 
-        for (id, image, isTransparent, signature, isFinal) in decoded {
+        for (id, image, isTransparent, signature, isFinal, inFlightKey) in decoded {
+            inFlightKeys.remove(inFlightKey)
             entries[id] = Entry(image: image, isTransparent: isTransparent, signature: signature, isFinal: isFinal)
         }
         AppPerformanceMonitor.shared.record("首页头像解码", startedAt: decodeStartedAt, note: "\(decoded.count) 张")
