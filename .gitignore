@@ -24,6 +24,7 @@ xcuserdata/
 .claude/
 .venv-l10n/
 scripts/.l10n_en_cache.json
+tmp/
 
 # Accidental duplicate git metadata (do not track)
 .git 2/
