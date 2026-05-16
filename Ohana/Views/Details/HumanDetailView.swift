@@ -157,7 +157,7 @@ struct HumanDetailView: View {
                     if isViewingOwnProfile {
                         Button { showingEditSheet = true } label: {
                             Image(systemName: "pencil.circle")
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(Color.ohanaPrimaryText)
                         }
                     }
                 }
@@ -167,7 +167,8 @@ struct HumanDetailView: View {
         .sheet(isPresented: $showingCoconutLog) { CoconutLogView() }
         .sheet(isPresented: $showWeightHistory) {
             NavigationStack { HumanWeightHistoryView(human: human) }
-                .presentationDetents([.large])
+                .presentationBackground(.clear)
+                .presentationDetents([.large]) // ui-v4: allow long weight history uses large sheet
                 .presentationDragIndicator(.visible)
         }
         .navigationDestination(isPresented: $showingWishlist) { HumanWishlistView(human: human) }
@@ -175,7 +176,8 @@ struct HumanDetailView: View {
         .navigationDestination(isPresented: $showingExpenses) { HumanExpenseDetailView(human: human) }
         .sheet(isPresented: $showingMedication) {
             NavigationStack { HumanMedicationView(human: human) }
-                .presentationDetents([.large])
+                .presentationBackground(.clear)
+                .presentationDetents([.large]) // ui-v4: allow long medication management uses large sheet
                 .presentationDragIndicator(.visible)
         }
         .navigationDestination(isPresented: $showingHealthReport) { HumanHealthReportView(human: human) }
@@ -215,7 +217,6 @@ struct HumanDetailView: View {
                         .frame(width: 100, height: 100)
                         .clipShape(Circle())
                         .overlay(Circle().strokeBorder(themeColor.opacity(0.35), lineWidth: 2.5))
-                        .shadow(color: Color(hex: "0C1640").opacity(0.12), radius: 12, y: 6)
                 } else {
                     ZStack {
                         Circle()
@@ -316,14 +317,13 @@ struct HumanDetailView: View {
         .padding(.vertical, 12)
         .padding(.horizontal, 6)
         .background(
-            Color(light: .white, dark: Color.white.opacity(0.08)),
+            Color.ohanaCardSurface,
             in: RoundedRectangle(cornerRadius: 14, style: .continuous)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.04), lineWidth: 1)
         )
-        .shadow(color: (colorScheme == .dark ? Color.black.opacity(0.18) : Color(hex: "0C1640").opacity(0.12)), radius: 4, y: 2)
     }
 
     // MARK: - Badges Card
@@ -411,7 +411,7 @@ struct HumanDetailView: View {
                         Circle().fill(Color.goRed).frame(width: 24, height: 24)
                         Text("\(myMeds.count)")
                             .font(OhanaFont.caption2(.bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.arkInk)
                     }
                 }
                 Image(systemName: "chevron.right")
@@ -463,7 +463,7 @@ struct HumanDetailView: View {
                         Circle().fill(Color.goTeal).frame(width: 24, height: 24)
                         Text("\(myReports.count)")
                             .font(OhanaFont.caption2(.bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.arkInk)
                     }
                 }
                 Image(systemName: "chevron.right")
@@ -703,7 +703,7 @@ struct HumanDetailView: View {
             } else {
                 ForEach(Array(humanReminders.enumerated()), id: \.element.id) { idx, reminder in
                     if idx > 0 {
-                        Rectangle().fill(Color.black.opacity(0.06)).frame(height: 1)
+                        Rectangle().fill(Color.ohanaDivider).frame(height: 1)
                     }
                     reminderRow(reminder)
                 }
@@ -807,7 +807,7 @@ struct HumanDetailView: View {
                 .frame(width: 3, height: 16)
             Text(text)
                 .font(OhanaFont.footnote(.black))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(Color.ohanaSecondaryText)
                 .textCase(.uppercase)
                 .tracking(1.2)
             Spacer()
@@ -1013,6 +1013,6 @@ struct EditHumanSheet: View {
             Toggle("", isOn: binding).tint(Color.goPrimary).labelsHidden()
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }

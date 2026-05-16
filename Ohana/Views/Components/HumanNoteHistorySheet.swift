@@ -2,25 +2,19 @@
 //  HumanNoteHistorySheet.swift
 //  Ohana
 //
-//  人类备注历史页 — 长按「备注」快捷操作后进入
-//  统一 chrome：隐私开关（leading）+ xmark 关闭（trailing）+ 底部 FAB
+//  V4 human note history.
 //
 
 import SwiftUI
 import SwiftData
-
-// MARK: - Note Entry Model
 
 struct HumanNoteEntry: Identifiable {
     let id: UUID
     let date: Date
     let dateString: String
     let text: String
-    /// 与 human.notes 中存储的原始段落完全匹配，用于删除时精确过滤
     let rawString: String
 }
-
-// MARK: - Main Sheet
 
 struct HumanNoteHistorySheet: View {
     let human: Human
@@ -28,169 +22,233 @@ struct HumanNoteHistorySheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var showAddSheet = false
 
+    private var l: L10n { L10n(appLanguage) }
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
+    private var isViewingOwnProfile: Bool { activeHumanId == human.id }
     private var isPrivacyLocked: Bool { human.isPrivate(.note, viewedBy: activeHumanId) }
-
     private var noteEntries: [HumanNoteEntry] { parseNotes() }
 
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .bottom) {
+            ZStack(alignment: .bottomTrailing) {
                 OhanaAppBackground().ignoresSafeArea()
 
                 if isPrivacyLocked {
                     privacyLockedView
                 } else {
                     ScrollView(showsIndicators: false) {
-                        VStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 18) {
+                            header
                             HumanPrivateDataNotice(human: human, field: .note)
-
-                            if noteEntries.isEmpty {
-                                emptyState
-                            } else {
-                                ForEach(noteEntries) { entry in
-                                    noteRow(entry)
-                                }
-                            }
+                            metricStrip
+                            notesSection
                         }
                         .padding(.horizontal, 16)
-                        .padding(.top, 16)
-                        .padding(.bottom, 120)
+                        .padding(.top, 18)
+                        .padding(.bottom, 110)
                     }
 
-                    // ── 底部 FAB
-                    Button { showAddSheet = true } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 16, weight: .black))
-                            Text("添加备注")
-                                .font(.system(size: 16, weight: .black, design: .rounded))
-                        }
-                        .foregroundStyle(Color.arkInk)
-                        .padding(.horizontal, 28).padding(.vertical, 14)
-                        .background(Color.goPrimary, in: Capsule())
-                        .shadow(color: Color.goPrimary.opacity(0.4), radius: 14, y: 5)
-                    }
-                    .padding(.bottom, 28)
+                    addButton
+                        .padding(.trailing, 18)
+                        .padding(.bottom, 24)
                 }
             }
-            .navigationTitle("备注记录")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    HumanPrivacyToggleButton(human: human, field: .note)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                    }
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showAddSheet) {
                 QuickHumanNoteSheet(human: human)
-                    .presentationDetents([.medium])
-                    .presentationDragIndicator(.visible)
             }
         }
     }
 
-    // MARK: - Note Row
-
-    private func noteRow(_ entry: HumanNoteEntry) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            // 左侧彩点 + 日期
-            VStack(alignment: .center, spacing: 4) {
-                Circle()
-                    .fill(Color.goPrimary)
-                    .frame(width: 8, height: 8)
-                    .padding(.top, 4)
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(entry.date, format: .dateTime.year().month().day())
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.goPrimary)
-                Text(entry.text)
-                    .font(OhanaFont.body())
+    private var header: some View {
+        HStack(spacing: 12) {
+            FeatureHubAvatar(
+                imageData: human.avatarImageData,
+                emoji: human.avatarEmoji,
+                fallback: "👤",
+                tint: Color(hex: human.safeThemeColorHex)
+            )
+            VStack(alignment: .leading, spacing: 3) {
+                Text(l.tr(zh: "备注记录", en: "Notes", de: "Notizen"))
+                    .font(OhanaFont.title2(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(human.name)
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
-
             Spacer()
-
-            Button {
-                withAnimation(.spring(response: 0.3)) {
-                    deleteNote(entry)
-                }
-            } label: {
-                Image(systemName: "trash")
-                    .font(OhanaFont.subheadline())
-                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.45))
+            if isViewingOwnProfile {
+                HumanPrivacyToggleButton(human: human, field: .note)
+            }
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .frame(width: 38, height: 38)
             }
             .buttonStyle(ScaleButtonStyle())
         }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.white.opacity(0.06))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
-                )
-        )
     }
 
-    // MARK: - Empty State
+    private var metricStrip: some View {
+        HStack(spacing: 10) {
+            metric(
+                title: l.tr(zh: "总记录", en: "Total", de: "Gesamt"),
+                value: "\(noteEntries.count)"
+            )
+            metric(
+                title: l.tr(zh: "最近", en: "Latest", de: "Letzte"),
+                value: latestNoteText
+            )
+        }
+    }
+
+    private func metric(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(OhanaFont.caption2(.black))
+                .foregroundStyle(Color.ohanaSecondaryText)
+            Text(value)
+                .font(OhanaFont.headline(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var notesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(l.tr(zh: "时间线", en: "Timeline", de: "Zeitlinie"))
+                .font(OhanaFont.headline(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+
+            if noteEntries.isEmpty {
+                emptyState
+            } else {
+                LazyVStack(spacing: 10) {
+                    ForEach(noteEntries) { entry in
+                        noteRow(entry)
+                    }
+                }
+            }
+        }
+    }
+
+    private func noteRow(_ entry: HumanNoteEntry) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "note.text")
+                    .font(.system(size: 13, weight: .black))
+                    .foregroundStyle(Color.goPrimary)
+                Text(entry.date, format: .dateTime.year().month().day())
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.goPrimary)
+                Spacer()
+                Button {
+                    withAnimation(GoMotion.feedback) {
+                        deleteNote(entry)
+                    }
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 13, weight: .black))
+                        .foregroundStyle(Color.ohanaTertiaryText)
+                        .frame(width: 34, height: 34)
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(l.tr(zh: "删除备注", en: "Delete note", de: "Notiz löschen"))
+            }
+
+            Text(entry.text)
+                .font(OhanaFont.body(.semibold))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+        }
+    }
 
     private var emptyState: some View {
-        VStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(Color.goPrimary.opacity(0.12))
-                    .frame(width: 72, height: 72)
-                Image(systemName: "note.text")
-                    .font(.system(size: 30, weight: .medium))
-                    .foregroundStyle(Color.goPrimary.opacity(0.7))
-            }
-            Text("还没有备注")
-                .font(OhanaFont.title3(.bold))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Text("点击下方按钮为 \(human.name) 添加第一条备注")
-                .font(OhanaFont.callout())
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .multilineTextAlignment(.center)
-        }
-        .padding(.top, 80)
-        .padding(.horizontal, 24)
-    }
-
-    // MARK: - Privacy Locked
-
-    private var privacyLockedView: some View {
         VStack(spacing: 12) {
-            Image(systemName: "lock.fill")
-                .font(.system(size: 34, weight: .bold))
-                .foregroundStyle(Color.goYellow)
-            Text("备注仅本人可见")
+            Image(systemName: "note.text")
+                .font(.system(size: 38, weight: .black))
+                .foregroundStyle(Color.goPrimary)
+            Text(l.tr(zh: "还没有备注", en: "No notes yet", de: "Noch keine Notizen"))
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text("当前家庭成员无权查看这些备注。")
-                .font(OhanaFont.callout())
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .multilineTextAlignment(.center)
+            Text(l.tr(
+                zh: "记录一句想法、身体感受或重要提醒。",
+                en: "Save a thought, body note, or reminder.",
+                de: "Speichere einen Gedanken, Körperhinweis oder eine Erinnerung."
+            ))
+            .font(OhanaFont.callout(.semibold))
+            .foregroundStyle(Color.ohanaSecondaryText)
+            .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+        }
+    }
+
+    private var addButton: some View {
+        Button { showAddSheet = true } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                    .font(.system(size: 15, weight: .black))
+                Text(l.tr(zh: "添加", en: "Add", de: "Hinzufügen"))
+                    .font(OhanaFont.callout(.black))
+            }
+            .foregroundStyle(Color.arkInk)
+            .padding(.horizontal, 22)
+            .frame(height: 54)
+            .background(Color.goPrimary, in: Capsule())
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+
+    private var privacyLockedView: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "lock.shield.fill")
+                .font(.system(size: 42, weight: .black))
+                .foregroundStyle(Color.goYellow)
+            Text(PrivacyService.lockedMessage(for: .note))
+                .font(OhanaFont.title3(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+            Text(l.tr(
+                zh: "当前家庭成员无权查看这些备注。",
+                en: "This family member cannot view these notes.",
+                de: "Dieses Familienmitglied kann diese Notizen nicht sehen."
+            ))
+            .font(OhanaFont.callout(.semibold))
+            .foregroundStyle(Color.ohanaSecondaryText)
+            .multilineTextAlignment(.center)
         }
         .padding(24)
-        .ohanaStandardCard(cornerRadius: 24)
-        .padding(.horizontal, 24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Parse & Delete
+    private var latestNoteText: String {
+        guard let latest = noteEntries.first else { return l.tr(zh: "无", en: "None", de: "Keine") }
+        let cal = Calendar.current
+        if cal.isDateInToday(latest.date) { return l.tr(zh: "今天", en: "Today", de: "Heute") }
+        if cal.isDateInYesterday(latest.date) { return l.tr(zh: "昨天", en: "Yesterday", de: "Gestern") }
+        return latest.date.formatted(date: .abbreviated, time: .omitted)
+    }
 
     private static let noteDateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -204,22 +262,28 @@ struct HumanNoteHistorySheet: View {
         return parts.compactMap { part in
             let trimmed = part.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return nil }
-            // 期望格式：[yyyy-MM-dd] 正文
             if trimmed.hasPrefix("["),
                let bracketEnd = trimmed.firstIndex(of: "]") {
                 let dateStr = String(trimmed[trimmed.index(after: trimmed.startIndex)..<bracketEnd])
                 let rest = String(trimmed[trimmed.index(after: bracketEnd)...])
                     .trimmingCharacters(in: .whitespaces)
                 if let date = Self.noteDateFormatter.date(from: dateStr) {
-                    return HumanNoteEntry(id: UUID(), date: date,
-                                         dateString: dateStr, text: rest,
-                                         rawString: trimmed)
+                    return HumanNoteEntry(
+                        id: UUID(),
+                        date: date,
+                        dateString: dateStr,
+                        text: rest,
+                        rawString: trimmed
+                    )
                 }
             }
-            // 没有日期标记的老备注
-            return HumanNoteEntry(id: UUID(), date: .distantPast,
-                                  dateString: "", text: trimmed,
-                                  rawString: trimmed)
+            return HumanNoteEntry(
+                id: UUID(),
+                date: .distantPast,
+                dateString: "",
+                text: trimmed,
+                rawString: trimmed
+            )
         }
         .sorted { $0.date > $1.date }
     }

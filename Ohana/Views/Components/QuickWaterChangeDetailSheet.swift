@@ -299,7 +299,7 @@ struct QuickWaterChangeDetailSheet: View {
             type: .waterChange,
             context: modelContext,
             executorId: eid,
-            reward: .general(humanReward: 15, petReward: 20, emoji: CareType.waterChange.emoji, title: "\(pet.name) 换水奖励")
+            reward: .general(humanReward: 15, petReward: 2, emoji: CareType.waterChange.emoji, title: "\(pet.name) 换水奖励")
         )
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
@@ -311,7 +311,7 @@ struct QuickWaterChangeDetailSheet: View {
             type: .filterClean,
             context: modelContext,
             executorId: eid,
-            reward: .general(humanReward: 25, petReward: 40, emoji: CareType.filterClean.emoji, title: "\(pet.name) 清理滤材报酬")
+            reward: .general(humanReward: 25, petReward: 2, emoji: CareType.filterClean.emoji, title: "\(pet.name) 清理滤材报酬")
         )
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }

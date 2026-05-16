@@ -400,6 +400,30 @@ struct SettingsView: View {
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
 
                             NavigationLink {
+                                FamilyCollaborationPlaygroundView()
+                            } label: {
+                                HStack(spacing: 12) {
+                                    settingsIcon("person.3.sequence.fill", color: Color.goPurple)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(l.tr(zh: "家庭协作体验测试", en: "Family collab playground", de: "Familien-Testbereich"))
+                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                            .foregroundStyle(primaryText)
+                                        Text(l.tr(zh: "任务盘、宠物地图、家人竞赛", en: "Board, pet map, family race", de: "Brett, Tierkarte, Familienrennen"))
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(tertiaryText)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(tertiaryText.opacity(0.6))
+                                }
+                                .frame(minHeight: 44)
+                            }
+                            .buttonStyle(ScaleButtonStyle())
+
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+
+                            NavigationLink {
                                 PerformanceDiagnosticsView()
                             } label: {
                                 HStack(spacing: 12) {

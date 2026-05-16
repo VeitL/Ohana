@@ -19,7 +19,7 @@ struct HomeBentoBoxes: View {
     var onStreakTap: (() -> Void)? = nil
 
     @State private var checkInStreak: Int = 0
-    private let checkedInKey = "oasis_checkedIn_dates"
+    @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
     private let questMgr = QuestManager.shared
 
     var body: some View {
@@ -57,30 +57,13 @@ struct HomeBentoBoxes: View {
             .buttonStyle(ScaleButtonStyle())
         }
         .onAppear { refreshCheckInStreak() }
+        .onChange(of: currentActiveHumanId) { _, _ in refreshCheckInStreak() }
         .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
             refreshCheckInStreak()
         }
     }
 
     private func refreshCheckInStreak() {
-        let calendar = Calendar.current
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = TimeZone.current
-
-        let checkedInDates = Set(UserDefaults.standard.stringArray(forKey: checkedInKey) ?? [])
-        var streak = 0
-        var day = Date()
-        while true {
-            let dayStr = formatter.string(from: day)
-            if checkedInDates.contains(dayStr) {
-                streak += 1
-                guard let prev = calendar.date(byAdding: .day, value: -1, to: day) else { break }
-                day = prev
-            } else {
-                break
-            }
-        }
-        checkInStreak = streak
+        checkInStreak = CheckInStreakStore.currentStreak(for: currentActiveHumanId)
     }
 }

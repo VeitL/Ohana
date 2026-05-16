@@ -94,7 +94,7 @@ struct AddPetWizardView: View {
     // MARK: - Computed helpers
     private var accentColor: Color { Color(hex: themeColorHex) }
     private var isCreatingFirstPet: Bool { existingPets.isEmpty }
-    private var totalCards: Int { isCreatingFirstPet ? 6 : 5 }
+    private var totalCards: Int { 5 }
     private var canUseAutomatic2DAvatar: Bool {
         Avatar2DAccess.usesFreeSlot(kind: .pet, existingCount: existingPets.count)
     }
@@ -103,6 +103,25 @@ struct AddPetWizardView: View {
             return wizardL10n.tr(zh: "推荐使用当前 2.5D 头像，可获得最佳卡片和首页体验。", en: "We recommend the current 2.5D avatar for the best card and Home experience.", de: "Wir empfehlen den aktuellen 2.5D-Avatar für die beste Karten- und Home-Erfahrung.")
         }
         return wizardL10n.tr(zh: "2.5D 头像需要后期在椰子商店购买，并指定给这个成员解锁。", en: "2.5D avatars can be unlocked later from the Coconut Shop for this member.", de: "2.5D-Avatare kannst du später im Kokosnuss-Shop für dieses Mitglied freischalten.")
+    }
+    private var petMeshBasicAndBio: String {
+        wizardL10n.tr(zh: "基础与生物 · 1/5", en: "BASICS & BIO · 1/5", de: "BASIS & BIO · 1/5")
+    }
+    private var petMeshAppearance: String {
+        isCreatingFirstPet
+            ? wizardL10n.tr(zh: "外貌与主题色 · 2/5", en: "LOOK & THEME · 2/5", de: "AUSSEHEN & THEMA · 2/5")
+            : wizardL10n.tr(zh: "外貌与主题色 · 3/5", en: "LOOK & THEME · 3/5", de: "AUSSEHEN & THEMA · 3/5")
+    }
+    private var petMeshAvatar: String {
+        isCreatingFirstPet
+            ? wizardL10n.tr(zh: "头像 · 3/5", en: "AVATAR · 3/5", de: "AVATAR · 3/5")
+            : wizardL10n.tr(zh: "头像 · 2/5", en: "AVATAR · 2/5", de: "AVATAR · 2/5")
+    }
+    private var petMeshTags: String {
+        wizardL10n.tr(zh: "性格 · 4/5", en: "VIBE TAGS · 4/5", de: "CHARAKTER · 4/5")
+    }
+    private var petMeshConfirm: String {
+        wizardL10n.tr(zh: "确认 · 5/5", en: "FINAL CHECK · 5/5", de: "ABSCHLUSS · 5/5")
     }
     private var themeUIColorBinding: Binding<Color> {
         Binding(
@@ -379,12 +398,11 @@ struct AddPetWizardView: View {
     private var wizardPagedContent: some View {
         TabView(selection: $wizardPageIndex) {
             if isCreatingFirstPet {
-                pagedCard(index: 0, content: { wizardCard1BasicInfo }).tag(0)
-                pagedCard(index: 1, content: { wizardCard3Bio }).tag(1)
-                pagedCard(index: 2, content: { wizardCard4Appearance }).tag(2)
-                pagedCard(index: 3, content: { wizardCard2Avatar }).tag(3)
-                pagedCard(index: 4, content: { wizardCard5Tags }).tag(4)
-                pagedCard(index: 5, content: { wizardCard6Confirm }).tag(5)
+                pagedCard(index: 0, content: { wizardCard1BasicAndBio }).tag(0)
+                pagedCard(index: 1, content: { wizardCard4Appearance }).tag(1)
+                pagedCard(index: 2, content: { wizardCard2Avatar }).tag(2)
+                pagedCard(index: 3, content: { wizardCard5Tags }).tag(3)
+                pagedCard(index: 4, content: { wizardCard6Confirm }).tag(4)
             } else {
                 pagedCard(index: 0, content: { wizardCard1BasicAndBio }).tag(0)
                 pagedCard(index: 1, content: { wizardCard2Avatar }).tag(1)
@@ -1001,7 +1019,7 @@ struct AddPetWizardView: View {
         let l = wizardL10n
         return ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
-                meshCardLabel(l.petWizMesh1).padding(.top, 14).padding(.horizontal, 20)
+                meshCardLabel(petMeshBasicAndBio).padding(.top, 14).padding(.horizontal, 20)
 
                 VStack(alignment: .leading, spacing: 6) {
                     PetWizardNameInputField(
@@ -1168,7 +1186,7 @@ struct AddPetWizardView: View {
     private var wizardCard2Avatar: some View {
         let l = wizardL10n
         return VStack(alignment: .leading, spacing: 14) {
-            meshCardLabel(l.petWizMesh4).padding(.top, 14).padding(.horizontal, 20)
+            meshCardLabel(petMeshAvatar).padding(.top, 14).padding(.horizontal, 20)
 
             HStack(spacing: 8) {
                 PhotosPicker(selection: $photosPickerItem, matching: .images) {
@@ -1313,7 +1331,7 @@ struct AddPetWizardView: View {
         let coatPatterns = PetCoatPattern.patterns(forBreed: bi)
 
         return VStack(alignment: .leading, spacing: 0) {
-            meshCardLabel(l.petWizMesh3).padding(.top, 14).padding(.horizontal, 20).padding(.bottom, 14)
+            meshCardLabel(petMeshAppearance).padding(.top, 14).padding(.horizontal, 20).padding(.bottom, 14)
 
             // 可滚动区域：内容超出卡片高度时可上下滑，底部留白让圆角可见
             ScrollView(.vertical, showsIndicators: false) {
@@ -1362,7 +1380,7 @@ struct AddPetWizardView: View {
         let topTags = PetPersonalityTag.allTags
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
-                meshCardLabel(l.petWizMesh5)
+                meshCardLabel(petMeshTags)
                 Spacer()
                 Text(l.petWizTagPicked(selectedPersonalityTagIds.count))
                     .font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.primary.opacity(0.55))
@@ -1476,7 +1494,7 @@ struct AddPetWizardView: View {
         let l = wizardL10n
         return ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
-                meshCardLabel(l.petWizMesh6).padding(.top, 14)
+                meshCardLabel(petMeshConfirm).padding(.top, 14)
 
                 HStack(spacing: 14) {
                     if let data = avatarImageData, let ui = UIImage(data: data) {

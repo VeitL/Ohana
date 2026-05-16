@@ -238,10 +238,10 @@ struct GoQuickActionCard: View {
     private var usesLightForeground: Bool { prefersLightForeground || isDarkMode }
     private var titleForeground: Color {
         if isCompletedToday { return Color.goPrimary }
-        return usesLightForeground ? Color.white.opacity(0.9) : Color.primary.opacity(0.75)
+        return Color.ohanaPrimaryText.opacity(usesLightForeground ? 0.9 : 0.75)
     }
     private var subtitleForeground: Color {
-        usesLightForeground ? Color.white.opacity(0.62) : Color.primary.opacity(0.35)
+        Color.ohanaSecondaryText.opacity(usesLightForeground ? 1.0 : 0.72)
     }
     
     @State private var animateGlow = false
@@ -353,6 +353,7 @@ struct GoQuickActionCard: View {
                         .font(.system(size: 26, weight: .semibold))
                         .foregroundStyle(quickActionIconForeground)
                         .scaleEffect(isPressed ? 0.90 : 1.0)
+                        .ohanaSymbolPulse(trigger: isCompletedToday)
                 }
 
                 if pendingReminder != nil || showsAttentionDot {
@@ -367,7 +368,7 @@ struct GoQuickActionCard: View {
                     Image(systemName: privacyIconName)
                         .font(.system(size: 10, weight: .black))
                         .foregroundStyle(privacyIconTint)
-                        .shadow(color: Color.black.opacity(0.35), radius: 2, x: 0, y: 1)
+                        .shadow(color: Color.arkInk.opacity(0.35), radius: 2, x: 0, y: 1) // ui-v4: allow tiny privacy badge legibility lift
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                         .offset(x: 3, y: -4)
                 }
@@ -422,6 +423,8 @@ struct GoQuickActionCard: View {
         .padding(.vertical, 8)
         .animation(GoMotion.feedback, value: isPressed)
         .animation(GoMotion.feedback, value: isCompletedToday)
+        .ohanaSelectionMotion(isSelected: isCompletedToday, scale: 1.015)
+        .ohanaStateMotion(pendingReminder?.id)
     }
 
     private func handleTapCandidate() {
@@ -772,7 +775,7 @@ struct AddQuickActionSheet: View {
                 ForEach(pets) { pet in
                     Button {
                         selectedPet = pet
-                        withAnimation(.spring(response: 0.3)) { step = 2 }
+                        withAnimation(GoMotion.selection) { step = 2 }
                     } label: {
                         HStack(spacing: 14) {
                             ZStack {
@@ -817,7 +820,7 @@ struct AddQuickActionSheet: View {
             // 头部：返回按鈕 + 宠物头像与名字融为一体
             HStack(spacing: 12) {
                 Button {
-                    withAnimation(.spring(response: 0.3)) { step = 1 }
+                    withAnimation(GoMotion.selection) { step = 1 }
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 15, weight: .bold))
@@ -911,7 +914,7 @@ struct AddQuickActionSheet: View {
                                     in: RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 )
                                 .scaleEffect(isPressed ? 0.90 : 1.0)
-                                .animation(.spring(response: 0.22, dampingFraction: 0.6), value: isPressed)
+                                .animation(GoMotion.tap, value: isPressed)
                             }
                             .buttonStyle(ScaleButtonStyle())
                             .disabled(selectedPetItemCount >= QuickActionLimit.maxItemsPerEntity)
@@ -1141,10 +1144,11 @@ private struct QuickActionWaterDropWithWaves: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     private var dropSize: CGFloat { 30 }
     private var shouldReduceWork: Bool {
-        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
+        powerSavingMode || reduceMotion || workloadPolicy.shouldReduceWork()
     }
 
     var body: some View {
@@ -1175,7 +1179,7 @@ private struct QuickActionWaterDropWithWaves: View {
                         }
                         context.stroke(
                             path,
-                            with: .color(Color.white.opacity(0.22 + 0.06 * (1 - Double(i) / 5))),
+                            with: .color(Color.ohanaPrimaryText.opacity(0.22 + 0.06 * (1 - Double(i) / 5))),
                             lineWidth: i < 2 ? 1.15 : 0.95
                         )
                     }
@@ -1392,7 +1396,7 @@ struct QADropDelegate: DropDelegate {
               let toIdx = items.firstIndex(where: { $0.id == targetItem.id })
         else { return }
 
-        withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
+        withAnimation(GoMotion.selection) {
             items.move(
                 fromOffsets: IndexSet(integer: fromIdx),
                 toOffset: toIdx > fromIdx ? toIdx + 1 : toIdx

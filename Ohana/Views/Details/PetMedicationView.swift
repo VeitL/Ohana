@@ -2,7 +2,7 @@
 //  PetMedicationView.swift
 //  Ohana
 //
-//  ArkSchemaV24：宠物用药管理页 + 详情 Sheet
+//  Pet medication cockpit using V4 interaction rules.
 //
 
 import SwiftUI
@@ -10,219 +10,484 @@ import SwiftData
 
 struct PetMedicationView: View {
     let pet: Pet
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Query(sort: \Event.startDate) private var allEvents: [Event]
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Query(sort: \Event.startDate, order: .reverse) private var allEvents: [Event]
+
     @State private var showingAddSheet = false
     @State private var selectedMedication: PetMedication?
-    @State private var doseRefreshToken = UUID() // 触发今日进度刷新
+    @State private var doseRefreshToken = UUID()
+    @State private var toastMessage: String?
+
+    private var l: L10n { L10n(appLanguage) }
+    private var chromeAccent: Color { colorScheme == .dark ? Color.goPrimary : Color.goBlue }
+    private var medicationEvents: [Event] {
+        let ids = Set(pet.medications.map { $0.id.uuidString })
+        return allEvents.filter {
+            $0.eventType == EventType.petMedicationDose.rawValue &&
+            $0.relatedEntityType == PetMedicationDoseLogging.relatedEntityTypeMedication &&
+            ids.contains($0.relatedEntityId)
+        }
+    }
 
     private var activeMeds: [PetMedication] {
-        pet.medications.filter { $0.isActiveToday }.sorted { $0.createdAt > $1.createdAt }
+        pet.medications
+            .filter(\.isActiveToday)
+            .sorted { medicationSortKey($0) < medicationSortKey($1) }
     }
+
     private var inactiveMeds: [PetMedication] {
-        pet.medications.filter { !$0.isActiveToday }.sorted { $0.createdAt > $1.createdAt }
+        pet.medications
+            .filter { !$0.isActiveToday }
+            .sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private var todayRequired: Int {
+        let _ = doseRefreshToken
+        return activeMeds.reduce(0) { $0 + PetMedicationDoseLogging.requiredDoses(on: Date(), for: $1) }
+    }
+
+    private var todayDone: Int {
+        let _ = doseRefreshToken
+        return activeMeds.reduce(0) {
+            $0 + min(
+                PetMedicationDoseLogging.todayDoseCount(events: medicationEvents, medicationId: $1.id),
+                max(0, PetMedicationDoseLogging.requiredDoses(on: Date(), for: $1))
+            )
+        }
+    }
+
+    private var pendingMedication: PetMedication? {
+        activeMeds.first { remainingDoses(for: $0) > 0 }
+    }
+
+    private var bodyTitle: String {
+        if pet.hasPassedAway {
+            return l.tr(zh: "纪念模式", en: "Memorial", de: "Gedenken")
+        }
+        if todayRequired == 0 {
+            return l.tr(zh: "没有固定剂量", en: "No scheduled dose", de: "Keine feste Dosis")
+        }
+        if todayDone >= todayRequired {
+            return l.tr(zh: "今天已完成", en: "Done today", de: "Heute erledigt")
+        }
+        return l.tr(
+            zh: "还需 \(todayRequired - todayDone) 次",
+            en: "\(todayRequired - todayDone) dose(s) left",
+            de: "\(todayRequired - todayDone) Dosis offen"
+        )
     }
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                OhanaAppBackground()
-                ScrollView {
-                    VStack(spacing: 16) {
+            ZStack(alignment: .bottom) {
+                OhanaAppBackground().ignoresSafeArea()
+
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 18) {
+                        header
+
+                        if pet.hasPassedAway {
+                            PetMemorialBanner(pet: pet)
+                        }
+
+                        summaryStrip
+
                         if pet.medications.isEmpty {
                             emptyState
                         } else {
+                            todayPanel
+
                             if !activeMeds.isEmpty {
-                                sectionHeader("当前用药")
-                                ForEach(activeMeds) { med in
-                                    medCard(med)
-                                }
+                                medicationSection(
+                                    title: l.tr(zh: "当前用药", en: "Current medication", de: "Aktuelle Medikamente"),
+                                    subtitle: l.tr(zh: "今天需要处理的剂量", en: "Doses to handle today", de: "Heutige Dosen"),
+                                    meds: activeMeds
+                                )
                             }
+
                             if !inactiveMeds.isEmpty {
-                                sectionHeader("历史用药")
-                                ForEach(inactiveMeds) { med in
-                                    medCard(med)
-                                }
+                                medicationSection(
+                                    title: l.tr(zh: "历史用药", en: "History", de: "Verlauf"),
+                                    subtitle: l.tr(zh: "已结束或未开始的疗程", en: "Stopped or not started", de: "Beendet oder noch nicht begonnen"),
+                                    meds: inactiveMeds
+                                )
                             }
                         }
-                        Spacer(minLength: 40)
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, 8)
+                    .padding(.top, 18)
+                    .padding(.bottom, 38)
+                    .petMemorialTone(isActive: pet.hasPassedAway)
+                }
+
+                if let toastMessage {
+                    Text(toastMessage)
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(Color.goPrimary, in: Capsule())
+                        .padding(.bottom, 18)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            .navigationTitle("\(pet.name) · 用药")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("关闭") { dismiss() }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingAddSheet = true
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(Color(hex: "FF5A00"))
-                            .font(.system(size: 26))
-                    }
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingAddSheet) {
                 AddPetMedicationSheet(pet: pet)
             }
             .sheet(item: $selectedMedication) { med in
                 PetMedicationDetailSheet(pet: pet, medication: med)
             }
+            .animation(GoMotion.stateChange, value: doseRefreshToken)
+            .animation(GoMotion.feedback, value: toastMessage)
         }
     }
 
-    // MARK: - Empty State
-    private var emptyState: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "pills.fill")
-                .font(.system(size: 48, weight: .semibold))
-                .foregroundStyle(Color(hex: "FF5A00").opacity(0.85))
-            Text("暂无用药记录")
-                .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Text("记录宠物当前的药物，按时提醒不漏服")
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .multilineTextAlignment(.center)
+    private var header: some View {
+        HStack(spacing: 12) {
+            FeatureHubAvatar(
+                imageData: pet.avatarImageData,
+                emoji: pet.avatarEmoji,
+                fallback: "🐾",
+                tint: Color(hex: pet.safeThemeColorHex)
+            )
+            VStack(alignment: .leading, spacing: 3) {
+                Text(l.tr(zh: "用药管理", en: "Medication", de: "Medikation"))
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                Text(pet.name)
+                    .font(OhanaFont.title2(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Text(bodyTitle)
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(1)
+            }
+            Spacer()
+            if !pet.hasPassedAway {
+                Button {
+                    showingAddSheet = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .black))
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
+                        .frame(width: 42, height: 42)
+                        .background(chromeAccent, in: Circle())
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(l.tr(zh: "添加药物", en: "Add medication", de: "Medikament hinzufügen"))
+            }
             Button {
-                showingAddSheet = true
+                dismiss()
             } label: {
-                Text("添加用药")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
-                    .padding(.horizontal, 28).padding(.vertical, 12)
-                    .background(Color.goPrimary, in: Capsule())
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .frame(width: 42, height: 42)
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
         }
-        .padding(.top, 60)
     }
 
-    // MARK: - Section Header
-    private func sectionHeader(_ title: String) -> some View {
-        HStack {
+    private var summaryStrip: some View {
+        HStack(spacing: 12) {
+            metricCell(
+                title: l.tr(zh: "今日", en: "Today", de: "Heute"),
+                value: todayRequired == 0 ? "—" : "\(todayDone)/\(todayRequired)"
+            )
+            metricCell(
+                title: l.tr(zh: "当前", en: "Active", de: "Aktiv"),
+                value: "\(activeMeds.count)"
+            )
+            metricCell(
+                title: l.tr(zh: "待处理", en: "Pending", de: "Offen"),
+                value: "\(max(0, todayRequired - todayDone))"
+            )
+        }
+    }
+
+    private func metricCell(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
             Text(title)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
-            Spacer()
+                .font(OhanaFont.caption2(.black))
+                .foregroundStyle(Color.ohanaSecondaryText)
+            Text(value)
+                .font(OhanaFont.title3(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .ohanaNumericMotion(value)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var todayPanel: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: todayDone >= todayRequired && todayRequired > 0 ? "checkmark.circle.fill" : "pills.fill")
+                    .font(.system(size: 22, weight: .black))
+                    .foregroundStyle(todayDone >= todayRequired && todayRequired > 0 ? Color.goTeal : chromeAccent)
+                    .frame(width: 42, height: 42)
+                    .background((todayDone >= todayRequired && todayRequired > 0 ? Color.goTeal : chromeAccent).opacity(0.14), in: Circle())
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(bodyTitle)
+                        .font(OhanaFont.headline(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(todayPanelSubtitle)
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(2)
+                }
+                Spacer()
+            }
+
+            ProgressView(value: todayRequired == 0 ? 0 : Double(min(todayDone, todayRequired)) / Double(todayRequired))
+                .tint(todayDone >= todayRequired && todayRequired > 0 ? Color.goTeal : chromeAccent)
+                .scaleEffect(x: 1, y: 1.35, anchor: .center)
+
+            if let pendingMedication, !pet.hasPassedAway {
+                Button {
+                    recordDose(for: pendingMedication)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text(l.tr(zh: "直接打卡", en: "Check in", de: "Abhaken"))
+                        Spacer()
+                        Text(pendingMedication.dosage.isEmpty ? l.tr(zh: "按医嘱", en: "As directed", de: "Nach Anweisung") : pendingMedication.dosage)
+                            .font(OhanaFont.caption(.black))
+                    }
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .background(chromeAccent, in: Capsule())
+                }
+                .buttonStyle(ScaleButtonStyle())
+            }
+        }
+        .padding(16)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    private var todayPanelSubtitle: String {
+        guard let pendingMedication else {
+            if todayRequired == 0 {
+                return l.tr(zh: "按需药物可在药物卡片里手动记录。", en: "As-needed medication can be logged from each card.", de: "Bedarfsmedikamente kannst du über die Karte eintragen.")
+            }
+            return l.tr(zh: "今日所有固定用药都已经记录。", en: "All scheduled doses are recorded today.", de: "Alle geplanten Dosen sind heute erledigt.")
+        }
+        let name = pendingMedication.name.isEmpty ? l.tr(zh: "未命名药物", en: "Unnamed medication", de: "Unbenanntes Medikament") : pendingMedication.name
+        return l.tr(
+            zh: "下一次：\(name) · \(pendingMedication.dosage.isEmpty ? "按医嘱" : pendingMedication.dosage)",
+            en: "Next: \(name) · \(pendingMedication.dosage.isEmpty ? "as directed" : pendingMedication.dosage)",
+            de: "Als Nächstes: \(name) · \(pendingMedication.dosage.isEmpty ? "nach Anweisung" : pendingMedication.dosage)"
+        )
+    }
+
+    private func medicationSection(title: String, subtitle: String, meds: [PetMedication]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(OhanaFont.headline(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text(subtitle)
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+
+            ForEach(meds) { med in
+                medicationCard(med)
+                    .ohanaSmoothAppear(index: meds.firstIndex(where: { $0.id == med.id }) ?? 0)
+            }
         }
     }
 
-    // MARK: - Med Card
-    private func medCard(_ med: PetMedication) -> some View {
-        let dosesPerDay = PetMedicationDoseLogging.requiredDoses(on: Date(), for: med)
-        let dosesTaken = PetMedicationDoseLogging.todayDoseCount(events: allEvents, medicationId: med.id)
-        let _ = doseRefreshToken // observe refresh token
+    private func medicationCard(_ med: PetMedication) -> some View {
+        let required = PetMedicationDoseLogging.requiredDoses(on: Date(), for: med)
+        let done = PetMedicationDoseLogging.todayDoseCount(events: medicationEvents, medicationId: med.id)
+        let remaining = max(0, required - done)
+        let tint = Color(hex: med.colorHex)
 
-        return Button {
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: "pills.fill")
+                    .font(.system(size: 18, weight: .black))
+                    .foregroundStyle(tint)
+                    .frame(width: 42, height: 42)
+                    .background(tint.opacity(0.14), in: Circle())
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(med.name.isEmpty ? l.tr(zh: "未命名药物", en: "Unnamed medication", de: "Unbenanntes Medikament") : med.name)
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .lineLimit(1)
+                    Text(medicationSubtitle(for: med))
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(1)
+                }
+                Spacer()
+                statusPill(for: med, remaining: remaining, required: required)
+            }
+
+            if med.isActiveToday && required > 0 {
+                ProgressView(value: Double(min(done, required)) / Double(required))
+                    .tint(remaining == 0 ? Color.goTeal : tint)
+                    .scaleEffect(x: 1, y: 1.25, anchor: .center)
+            }
+
+            HStack(spacing: 10) {
+                Button {
+                    selectedMedication = med
+                } label: {
+                    Text(l.tr(zh: "详情", en: "Details", de: "Details"))
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.ohanaControlFill, in: Capsule())
+                }
+                .buttonStyle(ScaleButtonStyle())
+
+                if !pet.hasPassedAway && med.isActiveToday {
+                    Button {
+                        recordDose(for: med)
+                    } label: {
+                        Text(remaining > 0 ? l.tr(zh: "打卡", en: "Check in", de: "Abhaken") : l.tr(zh: "加记一次", en: "Extra dose", de: "Extra"))
+                            .font(OhanaFont.caption(.black))
+                            .foregroundStyle(Color.ohanaPrimaryActionText)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(remaining > 0 ? chromeAccent : tint, in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .onTapGesture {
             selectedMedication = med
-        } label: {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 14) {
-                    Circle()
-                        .fill(Color(hex: med.colorHex))
-                        .frame(width: 10, height: 10)
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 6) {
-                            Text(med.name.isEmpty ? "未命名药物" : med.name)
-                                .font(.system(size: 15, weight: .black, design: .rounded))
-                                .foregroundStyle(Color.ohanaPrimaryText)
-                            Text(med.frequency.emoji)
-                                .font(.system(size: 13))
-                        }
-                        HStack(spacing: 8) {
-                            if !med.dosage.isEmpty {
-                                Text(med.dosage)
-                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(Color.ohanaSecondaryText)
-                            }
-                            Text(med.frequency.rawValue)
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(Color.ohanaSecondaryText)
-                        }
-                    }
-
-                    Spacer()
-
-                    Text(med.statusLabel)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(med.isActiveToday ? .black : .secondary)
-                        .padding(.horizontal, 10).padding(.vertical, 4)
-                        .background(med.isActiveToday ? Color.goPrimary : Color.primary.opacity(0.08), in: Capsule())
-
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                }
-
-                // 今日进度条（仅当 dosesPerDay > 0 且药物活跃）
-                if med.isActiveToday && dosesPerDay > 0 {
-                    HStack(spacing: 8) {
-                        // 进度条
-                        GeometryReader { g in
-                            ZStack(alignment: .leading) {
-                                Capsule().fill(Color.primary.opacity(0.1))
-                                    .frame(height: 5)
-                                Capsule()
-                                    .fill(dosesTaken >= dosesPerDay ? Color.goTeal : Color(hex: med.colorHex))
-                                    .frame(width: max(0, g.size.width * CGFloat(min(dosesTaken, dosesPerDay)) / CGFloat(dosesPerDay)), height: 5)
-                            }
-                        }
-                        .frame(height: 5)
-
-                        Text(dosesTaken >= dosesPerDay ? "✓ 今日完成" : "今日 \(dosesTaken)/\(dosesPerDay) 次")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundStyle(dosesTaken >= dosesPerDay ? Color.goTeal : Color.primary.opacity(0.5))
-                            .fixedSize()
-
-                        // 快速记录按钮
-                        if dosesTaken < dosesPerDay {
-                            Button {
-                                PetMedicationDoseLogging.recordDose(medication: med, pet: pet, modelContext: modelContext)
-                                MedicationReminderService.shared.scheduleMedicationReminders(for: pet, context: modelContext)
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                doseRefreshToken = UUID()
-                            } label: {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 18))
-                                    .foregroundStyle(Color(hex: med.colorHex))
-                            }
-                            .buttonStyle(ScaleButtonStyle())
-                        }
-                    }
-                    .padding(.leading, 24)
-                }
-            }
-            .padding(14)
-            .goTranslucentCard(cornerRadius: 16)
         }
-        .buttonStyle(ScaleButtonStyle())
-        .onAppear {
-            // 首次出现时调度通知
-            if med.isActiveToday {
-                MedicationReminderService.shared.scheduleMedicationReminders(for: pet, context: modelContext)
+    }
+
+    private func statusPill(for med: PetMedication, remaining: Int, required: Int) -> some View {
+        let done = required > 0 && remaining == 0
+        let text: String = {
+            if !med.isActive { return l.tr(zh: "停用", en: "Stopped", de: "Pausiert") }
+            if !med.isActiveToday { return l.tr(zh: "未开始", en: "Not started", de: "Noch nicht") }
+            if required == 0 { return l.tr(zh: "按需", en: "As needed", de: "Bedarf") }
+            return done ? l.tr(zh: "完成", en: "Done", de: "Fertig") : "\(required - remaining)/\(required)"
+        }()
+        let color = done ? Color.goTeal : (med.isActiveToday ? Color(hex: med.colorHex) : Color.ohanaSecondaryText)
+        return Text(text)
+            .font(OhanaFont.caption2(.black))
+            .foregroundStyle(done ? Color.arkInk : color)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(done ? Color.goTeal : color.opacity(0.14), in: Capsule())
+            .ohanaNumericMotion(text)
+    }
+
+    private var emptyState: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Image(systemName: "pills.fill")
+                .font(.system(size: 30, weight: .black))
+                .foregroundStyle(chromeAccent)
+                .frame(width: 58, height: 58)
+                .background(chromeAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            Text(l.tr(zh: "还没有用药计划", en: "No medication yet", de: "Noch keine Medikamente"))
+                .font(OhanaFont.title3(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+            Text(l.tr(zh: "添加药物后，Today Focus 可以直接打卡，不需要再跳进用药页。", en: "After adding medication, Today Focus can check in directly.", de: "Nach dem Hinzufügen kannst du direkt in Today Focus abhaken."))
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+            if !pet.hasPassedAway {
+                Button {
+                    showingAddSheet = true
+                } label: {
+                    Text(l.tr(zh: "添加药物", en: "Add medication", de: "Medikament hinzufügen"))
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .background(chromeAccent, in: Capsule())
+                }
+                .buttonStyle(ScaleButtonStyle())
             }
         }
-        .contextMenu {
-            Button(role: .destructive) {
-                modelContext.delete(med)
-                modelContext.safeSave()
-            } label: {
-                Label("删除", systemImage: "trash")
-            }
-            Button {
-                med.isActive.toggle()
-                modelContext.safeSave()
-            } label: {
-                Label(med.isActive ? "停用" : "恢复", systemImage: med.isActive ? "pause.circle" : "play.circle")
+        .padding(18)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    private func medicationSubtitle(for med: PetMedication) -> String {
+        let dose = med.dosage.isEmpty ? l.tr(zh: "按医嘱", en: "As directed", de: "Nach Anweisung") : med.dosage
+        return "\(localizedFrequency(med.frequency)) · \(dose)"
+    }
+
+    private func localizedFrequency(_ frequency: PetMedicationFrequency) -> String {
+        switch frequency {
+        case .daily:
+            return l.tr(zh: "每天", en: "Daily", de: "Täglich")
+        case .twiceDaily:
+            return l.tr(zh: "每天两次", en: "Twice daily", de: "Zweimal täglich")
+        case .threeTimesDaily:
+            return l.tr(zh: "每天三次", en: "Three times daily", de: "Dreimal täglich")
+        case .everyOtherDay:
+            return l.tr(zh: "隔天", en: "Every other day", de: "Alle zwei Tage")
+        case .weekly:
+            return l.tr(zh: "每周", en: "Weekly", de: "Wöchentlich")
+        case .asNeeded:
+            return l.tr(zh: "按需", en: "As needed", de: "Nach Bedarf")
+        case .custom:
+            return l.tr(zh: "自定义", en: "Custom", de: "Benutzerdefiniert")
+        }
+    }
+
+    private func medicationSortKey(_ med: PetMedication) -> Int {
+        remainingDoses(for: med) > 0 ? 0 : 1
+    }
+
+    private func remainingDoses(for med: PetMedication) -> Int {
+        let required = PetMedicationDoseLogging.requiredDoses(on: Date(), for: med)
+        guard required > 0 else { return 0 }
+        let done = PetMedicationDoseLogging.todayDoseCount(events: medicationEvents, medicationId: med.id)
+        return max(0, required - done)
+    }
+
+    @MainActor
+    private func recordDose(for med: PetMedication) {
+        guard !pet.hasPassedAway else { return }
+        PetMedicationDoseLogging.recordDose(
+            medication: med,
+            pet: pet,
+            modelContext: modelContext,
+            awardCoconut: true
+        )
+        MedicationReminderService.shared.scheduleMedicationReminders(for: pet, context: modelContext)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        doseRefreshToken = UUID()
+        showToast(l.tr(zh: "已记录喂药", en: "Dose logged", de: "Dosis erfasst"))
+    }
+
+    private func showToast(_ message: String) {
+        withAnimation(GoMotion.feedback) {
+            toastMessage = message
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.25) {
+            withAnimation(GoMotion.quick) {
+                if toastMessage == message {
+                    toastMessage = nil
+                }
             }
         }
     }

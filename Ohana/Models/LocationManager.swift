@@ -16,9 +16,20 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
     static let backgroundWalkTrackingEnabledKey = "ohana_walk_background_route_enabled_v2"
     private static let legacyBackgroundWalkTrackingEnabledKey = "ohana_walk_background_tracking_enabled"
     private static let backgroundUpgradePromptedKey = "ohana_walk_background_route_prompted_v2"
+
+    private enum LocationPurpose: String {
+        case none
+        case oneShot
+        case walkForeground
+        case walkBackground
+    }
     
     private let manager = CLLocationManager()
     private var backgroundSession: AnyObject?
+    private var isBackgroundDeliveryEnabled = false
+    private var activePurpose: LocationPurpose = .none
+    private var oneShotLocationHandler: ((Result<CLLocation, Error>) -> Void)?
+    private var pendingOneShotAccuracy: CLLocationAccuracy?
 
     var currentLocation: CLLocation?
     var collectedLocations: [CLLocation] = []
@@ -31,14 +42,16 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
     private let minimumRoutePointDistance: CLLocationDistance = 8
     private let maximumRoutePointInterval: TimeInterval = 18
     private let maximumPlausibleSpeed: CLLocationSpeed = 12
-    private var backgroundWalkTrackingEnabled: Bool {
-        UserDefaults.standard.bool(forKey: Self.backgroundWalkTrackingEnabledKey)
+    var canContinueCurrentWalkInBackground: Bool {
+        isTracking && (authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways)
     }
 
-    var canContinueCurrentWalkInBackground: Bool {
-        isTracking && backgroundWalkTrackingEnabled && (
-            authorizationStatus == .authorizedAlways || authorizationStatus == .authorizedWhenInUse
-        )
+    var isBackgroundWalkDeliveryActive: Bool {
+        isTracking && isBackgroundDeliveryEnabled
+    }
+
+    var debugLocationPurpose: String {
+        activePurpose.rawValue
     }
 
     private override init() {
@@ -50,6 +63,7 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         manager.pausesLocationUpdatesAutomatically = false
         authorizationStatus = manager.authorizationStatus
         UserDefaults.standard.set(false, forKey: Self.legacyBackgroundWalkTrackingEnabledKey)
+        UserDefaults.standard.set(false, forKey: Self.backgroundWalkTrackingEnabledKey)
         stopAllLocationActivity()
     }
     
@@ -60,16 +74,46 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         }
     }
 
+    func requestOneShotLocation(
+        accuracy: CLLocationAccuracy = kCLLocationAccuracyHundredMeters,
+        completion: @escaping (Result<CLLocation, Error>) -> Void
+    ) {
+        switch authorizationStatus {
+        case .notDetermined:
+            oneShotLocationHandler = completion
+            pendingOneShotAccuracy = accuracy
+            activePurpose = .oneShot
+            manager.requestWhenInUseAuthorization()
+        case .authorizedWhenInUse, .authorizedAlways:
+            if isTracking {
+                if let currentLocation {
+                    completion(.success(currentLocation))
+                } else {
+                    oneShotLocationHandler = completion
+                }
+                return
+            }
+            oneShotLocationHandler = completion
+            manager.desiredAccuracy = accuracy
+            manager.distanceFilter = kCLDistanceFilterNone
+            activePurpose = .oneShot
+            manager.requestLocation()
+        case .denied, .restricted:
+            completion(.failure(LocationManagerOneShotError.unauthorized))
+        @unknown default:
+            completion(.failure(LocationManagerOneShotError.unavailable))
+        }
+    }
+
     /// 是否已拥有 Always 权限（后台遛狗最优模式）
     var isAlwaysAuthorized: Bool { authorizationStatus == .authorizedAlways }
 
     func setBackgroundWalkTrackingEnabled(_ enabled: Bool) {
-        UserDefaults.standard.set(enabled, forKey: Self.backgroundWalkTrackingEnabledKey)
+        // Deprecated user-facing switch. Background delivery now follows only the
+        // active walk state: running walk = allowed, paused/stopped/no walk = off.
+        UserDefaults.standard.set(false, forKey: Self.backgroundWalkTrackingEnabledKey)
         if enabled {
             requestBackgroundTrackingAuthorizationIfNeeded()
-            if isTracking {
-                beginBackgroundTrackingIfNeeded()
-            }
         } else {
             endBackgroundTracking()
         }
@@ -100,6 +144,10 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
     
     // MARK: - Tracking
     func startTracking() {
+        startWalkSession()
+    }
+
+    func startWalkSession() {
         guard authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
             pendingStart = true
             requestPermission()
@@ -111,60 +159,111 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         isTracking = true
         manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
         manager.distanceFilter = 8
-        beginBackgroundTrackingIfNeeded()
+        manager.activityType = .fitness
+        manager.pausesLocationUpdatesAutomatically = false
+        endBackgroundTracking()
+        activePurpose = .walkForeground
 
         manager.startUpdatingLocation()
     }
     
     func stopTracking() {
+        stopWalkSession()
+    }
+
+    func stopWalkSession() {
         isTracking = false
         pendingStart = false
         manager.stopUpdatingLocation()
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
         manager.distanceFilter = kCLDistanceFilterNone
         endBackgroundTracking()
+        activePurpose = .none
     }
     
     func pauseTracking() {
+        pauseWalkSession()
+    }
+
+    func pauseWalkSession() {
         isTracking = false
         pendingStart = false
         manager.stopUpdatingLocation()
         endBackgroundTracking()
+        activePurpose = .none
     }
     
     func resumeTracking() {
+        resumeWalkSession()
+    }
+
+    func resumeWalkSession() {
         isTracking = true
         manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
         manager.distanceFilter = 8
-        beginBackgroundTrackingIfNeeded()
+        manager.activityType = .fitness
+        manager.pausesLocationUpdatesAutomatically = false
+        endBackgroundTracking()
+        activePurpose = .walkForeground
         manager.startUpdatingLocation()
     }
 
-    private func beginBackgroundTrackingIfNeeded() {
-        guard backgroundWalkTrackingEnabled else {
+    func promoteActiveWalkToBackgroundDelivery() {
+        guard isTracking, authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
             endBackgroundTracking()
             return
         }
 
         #if !targetEnvironment(simulator)
         if #available(iOS 17.0, *) {
-            if backgroundSession == nil {
-                backgroundSession = CLBackgroundActivitySession()
-            }
-        } else if authorizationStatus == .authorizedAlways {
-            manager.allowsBackgroundLocationUpdates = true
-            manager.showsBackgroundLocationIndicator = true
+            (backgroundSession as? CLBackgroundActivitySession)?.invalidate()
+            backgroundSession = nil
         }
+        manager.allowsBackgroundLocationUpdates = true
+        manager.showsBackgroundLocationIndicator = false
         #endif
+        isBackgroundDeliveryEnabled = true
+        activePurpose = .walkBackground
+        manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        manager.distanceFilter = 10
+        manager.activityType = .fitness
+        manager.pausesLocationUpdatesAutomatically = false
+        manager.startUpdatingLocation()
+    }
+
+    func returnActiveWalkToForegroundDelivery() {
+        guard isTracking else {
+            stopAllLocationActivity()
+            return
+        }
+        endBackgroundTracking()
+        activePurpose = .walkForeground
+        manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        manager.distanceFilter = 8
+        manager.activityType = .fitness
+        manager.pausesLocationUpdatesAutomatically = false
+        manager.startUpdatingLocation()
     }
 
     func stopAllLocationActivity() {
         isTracking = false
         pendingStart = false
+        oneShotLocationHandler = nil
+        pendingOneShotAccuracy = nil
         manager.stopUpdatingLocation()
+        manager.stopMonitoringSignificantLocationChanges()
+        manager.stopMonitoringVisits()
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
         manager.distanceFilter = kCLDistanceFilterNone
         endBackgroundTracking()
+        activePurpose = .none
+    }
+
+    func enforceNoLocationUnlessRunningWalk(_ isRunningWalk: Bool, reason: String) {
+        if !isRunningWalk {
+            stopAllLocationActivity()
+        }
+        recordLocationPolicy(reason: reason)
     }
 
     private func endBackgroundTracking() {
@@ -176,11 +275,33 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         manager.allowsBackgroundLocationUpdates = false
         manager.showsBackgroundLocationIndicator = false
         #endif
+        isBackgroundDeliveryEnabled = false
+        if activePurpose == .walkBackground {
+            activePurpose = isTracking ? .walkForeground : .none
+        }
     }
     
     // MARK: - CLLocationManagerDelegate
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard isTracking else { return }
+        if let handler = oneShotLocationHandler, let location = locations.last {
+            oneShotLocationHandler = nil
+            pendingOneShotAccuracy = nil
+            handler(.success(location))
+            if !isTracking {
+                manager.stopUpdatingLocation()
+                manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+                manager.distanceFilter = kCLDistanceFilterNone
+                endBackgroundTracking()
+                activePurpose = .none
+            }
+        }
+
+        guard isTracking else {
+            if activePurpose != .oneShot {
+                stopAllLocationActivity()
+            }
+            return
+        }
         currentLocation = locations.last
         for location in locations where shouldAcceptRoutePoint(location) {
             collectedLocations.append(location)
@@ -239,23 +360,44 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         authorizationStatus = manager.authorizationStatus
 
-        if backgroundWalkTrackingEnabled &&
-            (authorizationStatus == .denied || authorizationStatus == .restricted) {
+        if authorizationStatus == .denied || authorizationStatus == .restricted {
             UserDefaults.standard.set(false, forKey: Self.backgroundWalkTrackingEnabledKey)
-            endBackgroundTracking()
-        }
-
-        if backgroundWalkTrackingEnabled && authorizationStatus == .authorizedWhenInUse {
-            requestAlwaysUpgradeOnce()
+            stopAllLocationActivity()
         }
         
         if pendingStart && (authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways) {
             pendingStart = false
-            startTracking()
+            startWalkSession()
+        }
+
+        if let accuracy = pendingOneShotAccuracy,
+           authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways {
+            pendingOneShotAccuracy = nil
+            manager.desiredAccuracy = accuracy
+            manager.distanceFilter = kCLDistanceFilterNone
+            manager.requestLocation()
+        } else if pendingOneShotAccuracy != nil,
+                  authorizationStatus == .denied || authorizationStatus == .restricted {
+            let handler = oneShotLocationHandler
+            oneShotLocationHandler = nil
+            pendingOneShotAccuracy = nil
+            activePurpose = .none
+            handler?(.failure(LocationManagerOneShotError.unauthorized))
         }
     }
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        if let handler = oneShotLocationHandler {
+            oneShotLocationHandler = nil
+            pendingOneShotAccuracy = nil
+            handler(.failure(error))
+            if !isTracking {
+                manager.stopUpdatingLocation()
+                endBackgroundTracking()
+                activePurpose = .none
+            }
+        }
+
         #if DEBUG
         print("⚠️ LocationManager error: \(error.localizedDescription)")
         #endif
@@ -269,5 +411,31 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
             total += collectedLocations[i].distance(from: collectedLocations[i - 1])
         }
         return total
+    }
+
+    private func recordLocationPolicy(reason: String) {
+        let purpose = activePurpose.rawValue
+        let tracking = isTracking
+        let background = isBackgroundDeliveryEnabled
+        let auth = authorizationStatus.rawValue
+        Task { @MainActor in
+            AppPerformanceMonitor.shared.record(
+                "定位策略",
+                valueMS: 0,
+                note: "reason=\(reason), purpose=\(purpose), tracking=\(tracking), background=\(background), auth=\(auth)"
+            )
+        }
+    }
+}
+
+private enum LocationManagerOneShotError: LocalizedError {
+    case unauthorized
+    case unavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .unauthorized: return "Location permission is not available."
+        case .unavailable: return "Location is not available."
+        }
     }
 }

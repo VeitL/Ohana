@@ -166,21 +166,27 @@ struct HumanMedicationView: View {
             if showsDoneButton {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(Color.ohanaSecondaryText)
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
+                    .buttonStyle(ScaleButtonStyle())
+                    .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
                 }
             }
         }
         .sheet(isPresented: $showAddSheet) {
             AddMedicationSheet(human: human)
-                .presentationDetents([.large])
+                .presentationBackground(.clear)
+                .presentationDetents([.large]) // ui-v4: allow complex medication editor uses full-height system sheet
                 .presentationDragIndicator(.visible)
         }
         .sheet(item: $editingMed) { med in
             AddMedicationSheet(human: human, editing: med)
-                .presentationDetents([.large])
+                .presentationBackground(.clear)
+                .presentationDetents([.large]) // ui-v4: allow complex medication editor uses full-height system sheet
                 .presentationDragIndicator(.visible)
         }
     }
@@ -207,7 +213,7 @@ struct HumanMedicationView: View {
 
                     if !todayScheduleItems.isEmpty {
                         sectionLabel(l.tr(zh: "今日时间表", en: "Today", de: "Heute"))
-                        UltimateGlassCard {
+                        medicationSurface {
                             VStack(spacing: 0) {
                                 ForEach(Array(todayScheduleItems.enumerated()), id: \.element.id) { index, item in
                                     scheduleRow(item)
@@ -282,11 +288,12 @@ struct HumanMedicationView: View {
                     HStack(spacing: 8) {
                         Text(toastMessage)
                             .font(OhanaFont.subheadline(.bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Spacer()
                     }
                     .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(Color.black.opacity(0.85), in: Capsule())
+                    .background(Color.ohanaCardSurfaceElevated, in: Capsule())
+                    .overlay(Capsule().strokeBorder(Color.ohanaCardStroke, lineWidth: 1))
                     .padding(.horizontal, 16).padding(.bottom, 8)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
@@ -301,7 +308,6 @@ struct HumanMedicationView: View {
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 28).padding(.vertical, 14)
                     .background(Color.goPrimary, in: Capsule())
-                    .shadow(color: Color.goPrimary.opacity(0.4), radius: 14, y: 5)
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .padding(.bottom, 28)
@@ -349,7 +355,6 @@ struct HumanMedicationView: View {
             }
         }
         .padding(14)
-        .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private var privacyLockedView: some View {
@@ -376,7 +381,7 @@ struct HumanMedicationView: View {
     // MARK: - Summary Bento
 
     private var todayFocusCard: some View {
-        UltimateGlassCard {
+        medicationSurface {
             HStack(spacing: 18) {
                 medicationProgressRing
 
@@ -527,7 +532,7 @@ struct HumanMedicationView: View {
     }
 
     private var adherenceChartCard: some View {
-        UltimateGlassCard {
+        medicationSurface {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -632,7 +637,11 @@ struct HumanMedicationView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+        }
     }
 
     private func overviewPill(_ text: String, color: Color) -> some View {
@@ -805,7 +814,7 @@ struct HumanMedicationView: View {
     // MARK: - Medication Row
 
     private func manualMedicationRow(_ med: HumanMedication) -> some View {
-        UltimateGlassCard {
+        medicationSurface {
             HStack(spacing: 14) {
                 medicationIcon(for: med)
 
@@ -846,7 +855,6 @@ struct HumanMedicationView: View {
             }
             .padding(14)
         }
-        .goGlassBackground(RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     private func recordManualDose(for med: HumanMedication) {
@@ -862,7 +870,7 @@ struct HumanMedicationView: View {
     }
 
     private func medicationRow(_ med: HumanMedication) -> some View {
-        UltimateGlassCard {
+        medicationSurface {
             HStack(spacing: 14) {
                 medicationIcon(for: med)
 
@@ -929,7 +937,6 @@ struct HumanMedicationView: View {
             }
             .padding(14)
         }
-        .goGlassBackground(RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     private func medicationIcon(for med: HumanMedication) -> some View {
@@ -1013,7 +1020,7 @@ struct HumanMedicationView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        UltimateGlassCard {
+        medicationSurface {
             VStack(spacing: 16) {
                 ZStack {
                     Circle().fill(Color.goRed.opacity(0.12)).frame(width: 72, height: 72)
@@ -1039,6 +1046,15 @@ struct HumanMedicationView: View {
             .tracking(1.0)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 20)
+    }
+
+    private func medicationSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+            }
     }
 }
 
@@ -1227,11 +1243,12 @@ struct AddMedicationSheet: View {
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
                     .font(OhanaFont.callout(.black))
-                    .foregroundStyle(secondaryText)
-                    .frame(width: 36, height: 36)
-                    .background(controlFill, in: Circle())
+                    .foregroundStyle(primaryText)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
         }
     }
 
@@ -1596,7 +1613,11 @@ struct AddMedicationSheet: View {
     private func sheetCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
             .padding(16)
-            .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+            }
     }
 
     private func cardHeader(icon: String, color: Color, title: String) -> some View {

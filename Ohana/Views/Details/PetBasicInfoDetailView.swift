@@ -125,6 +125,8 @@ struct PetBasicInfoDetailView: View {
                     infoRow(label: "到家日", value: homeDate.formatted(.dateTime.year().month().day()))
                 }
                 infoRow(label: "相处天数", value: "\(pet.daysTogether) 天")
+                infoRow(label: "成长椰子", value: "\(pet.coconutBalance) 🥥")
+                infoRow(label: "主题色", value: "#\(pet.safeThemeColorHex.uppercased())")
             }
             if !pet.coatColor.isEmpty || !pet.eyeColor.isEmpty {
                 infoSection(title: "外貌特征", icon: "eye.fill", iconColor: Color.goCardCyan) {
@@ -162,15 +164,6 @@ struct PetBasicInfoDetailView: View {
                     if !pet.lineageInfo.isEmpty {
                         infoRow(label: "血统", value: pet.lineageInfo)
                     }
-                }
-            }
-            // 主题色预览
-            infoSection(title: "主题色", icon: "paintpalette.fill", iconColor: Color(hex: pet.safeThemeColorHex)) {
-                HStack(spacing: 10) {
-                    RoundedRectangle(cornerRadius: 8).fill(Color(hex: pet.safeThemeColorHex)).frame(width: 32, height: 32)
-                    Text("#\(pet.safeThemeColorHex.uppercased())")
-                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                 }
             }
             if !pet.notes.isEmpty {

@@ -11,6 +11,11 @@ import SwiftData
 // MARK: - Ohana 图鉴主视图
 
 struct CrewRosterOverlay: View {
+    private enum RosterMode: String {
+        case collaboration
+        case members
+    }
+
     let onSelectPet: (Pet) -> Void
     let onSelectHuman: (Human) -> Void
     var hideToolbar: Bool = false
@@ -24,13 +29,18 @@ struct CrewRosterOverlay: View {
     @Query(filter: #Predicate<Reminder> { $0.status == "pending" },
            sort: \Reminder.scheduledAt) private var pendingReminders: [Reminder]
 
-    @State private var searchText = ""
-    @State private var isSearchActive = false
     @State private var showingAddEntity = false
+    @State private var addEntityInitialType: EntityType? = nil
+    @State private var memberAddMenuExpanded = false
+    @State private var memberAddMenuItemsVisible = false
     @State private var showingCoconutLog = false
     @State private var familyActivityPet: Pet? = nil
     @State private var showingFamilyWeeklyReport = false
+    @State private var selectedRosterMode: RosterMode = .members
+    @State private var collaborationCreateTaskTrigger = 0
+    @State private var collaborationEditorPresented = false
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @Environment(\.colorScheme) private var colorScheme
 
     private var isMaterial: Bool { false }
@@ -39,18 +49,15 @@ struct CrewRosterOverlay: View {
     private var matAccent:  Color { Color(hex: "FF5A00") }
     private var l: L10n { L10n(appLanguage) }
 
-    private var filteredPets: [Pet] {
-        searchText.isEmpty ? Array(pets) : pets.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
-    }
-    private var filteredHumans: [Human] {
-        searchText.isEmpty ? Array(humans) : humans.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
-    }
-    private var filteredPlants: [Plant] {
-        searchText.isEmpty ? Array(plants) : plants.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
-    }
-    private var isEmpty: Bool { filteredPets.isEmpty && filteredHumans.isEmpty && filteredPlants.isEmpty }
+    private var filteredPets: [Pet] { Array(pets) }
+    private var filteredHumans: [Human] { Array(humans) }
+    private var filteredPlants: [Plant] { Array(plants) }
+    private var isEmpty: Bool { pets.isEmpty && humans.isEmpty && plants.isEmpty }
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
-    private var showsFamilyCollaboration: Bool { humans.count > 1 && !activePets.isEmpty && searchText.isEmpty }
+    private var showsFamilyCollaboration: Bool { humans.count > 1 && !activePets.isEmpty }
+    private var activeHumanCoconutBalance: Int {
+        humans.first { $0.id.uuidString == activeHumanIdStr }?.coconutBalance ?? 0
+    }
 
     var body: some View {
         NavigationStack {
@@ -63,23 +70,69 @@ struct CrewRosterOverlay: View {
                 VStack(spacing: 0) {
                     rosterTopChrome
 
-                    ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 20) {
-                            if isEmpty {
+                    if isEmpty {
+                        ScrollView(.vertical, showsIndicators: false) {
+                            VStack(spacing: 20) {
                                 emptyState
-                            } else {
-                                bentoDex
+                                Spacer(minLength: 60)
                             }
-                            Spacer(minLength: 60)
+                            .padding(.top, 4)
                         }
+                    } else if showsFamilyCollaboration && selectedRosterMode == .collaboration {
+                        FamilyCollaborationDashboardView(
+                            pets: activePets,
+                            humans: humans,
+                            pendingReminders: pendingReminders,
+                            createTaskTrigger: collaborationCreateTaskTrigger,
+                            onEditorVisibilityChanged: { isPresented in
+                                withAnimation(GoMotion.feedback) {
+                                    collaborationEditorPresented = isPresented
+                                }
+                            },
+                            onOpenPetActivity: { familyActivityPet = $0 },
+                            onOpenWeeklyReport: { showingFamilyWeeklyReport = true }
+                        )
                         .padding(.top, 4)
-                        .animation(.spring(response: 0.36, dampingFraction: 0.84), value: searchText)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .transition(.opacity.combined(with: .scale(scale: 0.985)))
+                    } else {
+                        ScrollView(.vertical, showsIndicators: false) {
+                            VStack(spacing: 20) {
+                                bentoDex
+                                Spacer(minLength: 60)
+                            }
+                            .padding(.top, 4)
+                            .animation(GoMotion.page, value: selectedRosterMode)
+                        }
                     }
+                }
+
+                if memberAddMenuExpanded && selectedRosterMode == .members {
+                    Color.black.opacity(0.001) // ui-v4: allow transparent tap shield for expanded FAB menu
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            closeMemberAddMenu()
+                        }
+                        .transition(.opacity)
+                }
+
+                if shouldShowRosterFab {
+                    rosterFloatingActionOverlay
+                        .padding(.trailing, 22)
+                        .padding(.bottom, 24)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                        .transition(.scale(scale: 0.86, anchor: .center).combined(with: .opacity))
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
-            .sheet(isPresented: $showingAddEntity) { AddEntityView() }
-            .sheet(isPresented: $showingCoconutLog) { CoconutLogView() }
+            .sheet(isPresented: $showingAddEntity, onDismiss: {
+                addEntityInitialType = nil
+                memberAddMenuItemsVisible = false
+                memberAddMenuExpanded = false
+            }) {
+                AddEntityView(initialType: addEntityInitialType)
+            }
+            .fullScreenCover(isPresented: $showingCoconutLog) { IslandWealthDashboardView() }
             .sheet(item: $familyActivityPet) { pet in
                 NavigationStack {
                     ScrollView {
@@ -117,11 +170,24 @@ struct CrewRosterOverlay: View {
                         }
                 }
             }
-            .onChange(of: searchTrigger) { _, _ in
-                withAnimation(.spring(response: 0.25)) { isSearchActive.toggle() }
-                if !isSearchActive { searchText = "" }
+            .onChange(of: addMemberTrigger) { _, _ in
+                addEntityInitialType = nil
+                memberAddMenuItemsVisible = false
+                memberAddMenuExpanded = false
+                showingAddEntity = true
             }
-            .onChange(of: addMemberTrigger) { _, _ in showingAddEntity = true }
+            .onAppear {
+                if showsFamilyCollaboration {
+                    selectedRosterMode = .collaboration
+                }
+            }
+            .onChange(of: showsFamilyCollaboration) { _, canCollaborate in
+                selectedRosterMode = canCollaborate ? .collaboration : .members
+                collaborationEditorPresented = false
+                memberAddMenuItemsVisible = false
+                memberAddMenuExpanded = false
+            }
+            .interactiveDismissDisabled(collaborationEditorPresented)
         }
     }
 
@@ -130,10 +196,7 @@ struct CrewRosterOverlay: View {
     private var rosterTopChrome: some View {
         VStack(spacing: 12) {
             rosterHeader
-            if !hideToolbar || isSearchActive {
-                searchArea
-            }
-            rosterMetrics
+            rosterControlRow
         }
         .padding(.horizontal, 18)
         .padding(.top, 16)
@@ -151,19 +214,90 @@ struct CrewRosterOverlay: View {
         }
     }
 
+    private var rosterControlRow: some View {
+        HStack(spacing: 8) {
+            Spacer()
+            if showsFamilyCollaboration {
+                if selectedRosterMode == .collaboration {
+                    rosterCoconutButton
+                }
+                rosterModeShortcutButton
+            }
+        }
+        .frame(height: showsFamilyCollaboration ? 34 : 0)
+    }
+
+    private var rosterCoconutButton: some View {
+        Button {
+            showingCoconutLog = true
+        } label: {
+            HStack(spacing: 7) {
+                Text("🥥")
+                    .font(.system(size: 12, weight: .black))
+                Text("\(activeHumanCoconutBalance)")
+                    .font(OhanaFont.caption(.black))
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
+            .foregroundStyle(Color.ohanaPrimaryActionText)
+            .padding(.horizontal, 13)
+            .frame(height: 34)
+            .background(Color.goPrimary, in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(l.tr(zh: "我的椰子 \(activeHumanCoconutBalance)", en: "My coconuts \(activeHumanCoconutBalance)", de: "Meine Kokosnuesse \(activeHumanCoconutBalance)"))
+    }
+
+    private var rosterModeShortcutButton: some View {
+        let showsMembers = selectedRosterMode == .members || !showsFamilyCollaboration
+        let title = showsMembers
+            ? l.tr(zh: "协作", en: "Care", de: "Pflege")
+            : l.tr(zh: "成员", en: "Members", de: "Mitglieder")
+        let icon = showsMembers ? "hands.sparkles.fill" : "person.2.fill"
+        return Button {
+            UISelectionFeedbackGenerator().selectionChanged()
+            withAnimation(GoMotion.feedback) {
+                selectedRosterMode = showsMembers && showsFamilyCollaboration ? .collaboration : .members
+                memberAddMenuItemsVisible = false
+                memberAddMenuExpanded = false
+            }
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .black))
+                Text(title)
+                    .font(OhanaFont.caption(.black))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(Color.ohanaPrimaryActionText)
+            .padding(.horizontal, 13)
+            .frame(height: 34)
+            .background(Color.goPrimary, in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(title)
+    }
+
     private var rosterHeader: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "person.2.crop.square.stack.fill")
+        let isCollaboration = showsFamilyCollaboration && selectedRosterMode == .collaboration
+        return HStack(spacing: 12) {
+            Image(systemName: isCollaboration ? "hands.sparkles.fill" : "person.2.crop.square.stack.fill")
                 .font(.system(size: 18, weight: .black))
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 42, height: 42)
                 .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(l.tr(zh: "Ohana 成员", en: "Ohana Members", de: "Ohana Mitglieder"))
+                Text(isCollaboration
+                     ? l.tr(zh: "家庭协作", en: "Family Care", de: "Familienpflege")
+                     : l.tr(zh: "Ohana 成员", en: "Ohana Members", de: "Ohana Mitglieder"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(l.tr(zh: "成员、协作和首页显示", en: "People, care, and home cards", de: "Mitglieder, Pflege und Startkarten"))
+                Text(isCollaboration
+                     ? l.tr(zh: "任务、悬赏和今日分工", en: "Tasks, bounties, and today's handoff", de: "Aufgaben, Prämien und heutige Übergabe")
+                     : l.tr(zh: "成员和首页显示", en: "Members and home cards", de: "Mitglieder und Startkarten"))
                     .font(OhanaFont.caption(.bold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
@@ -171,16 +305,6 @@ struct CrewRosterOverlay: View {
             }
 
             Spacer()
-
-            Button { showingAddEntity = true } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 15, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryActionText)
-                    .frame(width: 40, height: 40)
-                    .background(Color.goPrimary, in: Circle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "添加成员", en: "Add member", de: "Mitglied hinzufügen"))
 
             if !hideToolbar {
                 Button { dismiss() } label: {
@@ -196,103 +320,148 @@ struct CrewRosterOverlay: View {
         }
     }
 
-    private var searchArea: some View {
-        HStack(spacing: 10) {
-            dexSearchBar
-            if hideToolbar && isSearchActive {
-                Button {
-                    withAnimation(GoMotion.feedback) {
-                        isSearchActive = false
-                        searchText = ""
+    private var shouldShowRosterFab: Bool {
+        if showsFamilyCollaboration && selectedRosterMode == .collaboration {
+            return !collaborationEditorPresented
+        }
+        return selectedRosterMode == .members || isEmpty
+    }
+
+    private var rosterFloatingActionOverlay: some View {
+        VStack(alignment: .trailing, spacing: 14) {
+            if selectedRosterMode == .members && memberAddMenuExpanded {
+                ForEach(Array(memberAddMenuItems.enumerated()), id: \.element) { index, type in
+                    memberAddActionRow(type)
+                        .scaleEffect(memberAddMenuItemsVisible ? 1 : 0.6, anchor: .bottomTrailing)
+                        .opacity(memberAddMenuItemsVisible ? 1 : 0)
+                        .offset(y: memberAddMenuItemsVisible ? 0 : 22)
+                        .animation(
+                            GoMotion.fab
+                                .delay(memberAddMenuItemsVisible
+                                       ? Double(memberAddMenuItems.count - 1 - index) * 0.055
+                                       : Double(index) * 0.04),
+                            value: memberAddMenuItemsVisible
+                        )
+                        .allowsHitTesting(memberAddMenuItemsVisible)
+                        .accessibilityHidden(!memberAddMenuItemsVisible)
+                }
+            }
+
+            Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                if showsFamilyCollaboration && selectedRosterMode == .collaboration {
+                    withAnimation(GoMotion.page) {
+                        collaborationCreateTaskTrigger &+= 1
                     }
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 38, height: 38)
-                        .background(Color.ohanaControlFill, in: Circle())
+                } else {
+                    toggleMemberAddMenu()
                 }
-                .buttonStyle(ScaleButtonStyle())
-                .transition(.scale.combined(with: .opacity))
+            } label: {
+                Image(systemName: selectedRosterMode == .members && memberAddMenuExpanded ? "xmark" : "plus")
+                    .font(.system(size: 20, weight: .black))
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
+                    .frame(width: 58, height: 58)
+                    .background(Color.goPrimary, in: Circle())
+                    .rotationEffect(.degrees(selectedRosterMode == .members && memberAddMenuExpanded ? 90 : 0))
+                    .shadow(color: Color.goPrimary.opacity(0.28), radius: 18, x: 0, y: 10) // ui-v4: allow floating FAB lift shadow
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(fabAccessibilityLabel)
+        }
+    }
+
+    private var memberAddMenuItems: [EntityType] {
+        [.pet, .human, .plant]
+    }
+
+    private func openMemberAddMenu() {
+        guard !memberAddMenuExpanded else { return }
+        memberAddMenuItemsVisible = false
+        withAnimation(GoMotion.fab) {
+            memberAddMenuExpanded = true
+        }
+        DispatchQueue.main.async {
+            withAnimation(GoMotion.fab) {
+                memberAddMenuItemsVisible = true
             }
         }
     }
 
-    private var rosterMetrics: some View {
-        HStack(spacing: 8) {
-            rosterMetricChip(
-                icon: "pawprint.fill",
-                value: "\(pets.count)",
-                label: l.tr(zh: "宠物", en: "Pets", de: "Tiere"),
-                color: Color.goOrange
-            )
-            rosterMetricChip(
-                icon: "person.2.fill",
-                value: "\(humans.count)",
-                label: l.tr(zh: "人类", en: "Humans", de: "Menschen"),
-                color: Color.goPurple
-            )
-            rosterMetricChip(
-                icon: "leaf.fill",
-                value: "\(plants.count)",
-                label: l.tr(zh: "植物", en: "Plants", de: "Pflanzen"),
-                color: Color.goTeal
-            )
+    private func closeMemberAddMenu() {
+        guard memberAddMenuExpanded else { return }
+        withAnimation(GoMotion.fab) {
+            memberAddMenuItemsVisible = false
         }
-    }
-
-    private func rosterMetricChip(icon: String, value: String, label: String, color: Color) -> some View {
-        HStack(spacing: 7) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .black))
-                .foregroundStyle(color)
-            Text(value)
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .monospacedDigit()
-            Text(label)
-                .font(OhanaFont.caption2(.bold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .background(Color.ohanaControlFill, in: Capsule())
-    }
-
-    // MARK: - 搜索栏
-    private var dexSearchBar: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.ohanaTertiaryText)
-            TextField(l.tr(zh: "搜索成员", en: "Search members", de: "Mitglieder suchen"), text: $searchText)
-                .font(OhanaFont.callout(.bold))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .tint(Color.goPrimary)
-            if !searchText.isEmpty {
-                Button { searchText = "" } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .black))
-                        .foregroundStyle(Color.ohanaTertiaryText)
-                        .frame(width: 28, height: 28)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            if memberAddMenuExpanded && !memberAddMenuItemsVisible {
+                withAnimation(GoMotion.fab) {
+                    memberAddMenuExpanded = false
                 }
-                .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 14)
-        .frame(height: 42)
-        .background(Color.ohanaControlFill, in: Capsule())
+    }
+
+    private func toggleMemberAddMenu() {
+        memberAddMenuExpanded ? closeMemberAddMenu() : openMemberAddMenu()
+    }
+
+    private var fabAccessibilityLabel: String {
+        if showsFamilyCollaboration && selectedRosterMode == .collaboration {
+            return l.tr(zh: "发布协作任务", en: "Post collaboration task", de: "Aufgabe erstellen")
+        }
+        return memberAddMenuExpanded
+            ? l.tr(zh: "收起添加菜单", en: "Collapse add menu", de: "Menü einklappen")
+            : l.tr(zh: "添加成员", en: "Add member", de: "Mitglied hinzufügen")
+    }
+
+    private func memberAddActionRow(_ type: EntityType) -> some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            closeMemberAddMenu()
+            addEntityInitialType = type
+            showingAddEntity = true
+        } label: {
+            HStack(spacing: 10) {
+                HStack(spacing: 7) {
+                    Text(addEntityTitle(for: type))
+                        .font(OhanaFont.caption(.black))
+                        .lineLimit(1)
+                    if !type.isAvailable {
+                        Text(l.addEntityWIP)
+                            .font(OhanaFont.caption2(.black))
+                            .foregroundStyle(Color.goPrimary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.goPrimary.opacity(0.14), in: Capsule())
+                    }
+                }
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.ohanaCardSurface, in: Capsule())
+
+                Image(systemName: type.icon)
+                    .font(.system(size: 16, weight: .black))
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
+                    .frame(width: 48, height: 48)
+                    .background(Color.goPrimary, in: Circle())
+            }
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(addEntityTitle(for: type))
+    }
+
+    private func addEntityTitle(for type: EntityType) -> String {
+        switch type {
+        case .pet: return l.addEntityPetTitle
+        case .human: return l.addEntityHumanTitle
+        case .plant: return l.addEntityPlantTitle
+        }
     }
 
     // MARK: - Bento Dex 主体
     private var bentoDex: some View {
         VStack(spacing: 16) {
-            if showsFamilyCollaboration {
-                familyCollaborationSection
-            }
-
             // ── 宠物区（正方形卡片 2列 Bento）
             if !filteredPets.isEmpty {
                 dexSectionLabel(l.tr(zh: "宠物", en: "Pets", de: "Tiere"), count: filteredPets.count, symbol: "pawprint.fill")
@@ -324,31 +493,6 @@ struct CrewRosterOverlay: View {
                     .padding(.horizontal, 16)
                 }
             }
-
-            // ── 迎接新生命 Add 按钮
-            addNewLifeButton
-                .padding(.horizontal, 16)
-        }
-    }
-
-    private var familyCollaborationSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            dexSectionLabel(l.tr(zh: "今日协作", en: "Today Care", de: "Pflege heute"), count: humans.count, symbol: "hands.sparkles.fill")
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(activePets) { pet in
-                        HomeFamilyCollaborationCard(
-                            pet: pet,
-                            pendingReminders: pendingReminders,
-                            humans: humans,
-                            onOpenActivity: { familyActivityPet = pet },
-                            onOpenWeeklyReport: { showingFamilyWeeklyReport = true }
-                        )
-                        .frame(width: 330)
-                    }
-                }
-                .padding(.horizontal, 16)
-            }
         }
     }
 
@@ -373,48 +517,18 @@ struct CrewRosterOverlay: View {
         .padding(.horizontal, 20)
     }
 
-    // MARK: - 添加按钮
-    private var addNewLifeButton: some View {
-        let accent = Color.goPrimary
-        return Button { showingAddEntity = true } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "plus")
-                    .font(.system(size: 17, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryActionText)
-                    .frame(width: 42, height: 42)
-                    .background(accent, in: Circle())
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(l.tr(zh: "添加新成员", en: "Add a member", de: "Mitglied hinzufügen"))
-                        .font(OhanaFont.callout(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(zh: "宠物 · 人类 · 植物", en: "Pets · Humans · Plants", de: "Tiere · Menschen · Pflanzen"))
-                        .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.ohanaTertiaryText)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        }
-        .buttonStyle(ScaleButtonStyle())
-    }
-
     // MARK: - 空状态
     private var emptyState: some View {
         VStack(spacing: 14) {
-            Image(systemName: searchText.isEmpty ? "person.2.slash" : "magnifyingglass")
+            Image(systemName: "person.2.slash")
                 .font(.system(size: 34, weight: .black))
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 72, height: 72)
                 .background(Color.goPrimary.opacity(0.14), in: Circle())
-            Text(searchText.isEmpty ? l.tr(zh: "还没有成员", en: "No members yet", de: "Noch keine Mitglieder") : l.tr(zh: "没有找到成员", en: "No member found", de: "Kein Mitglied gefunden"))
+            Text(l.tr(zh: "还没有成员", en: "No members yet", de: "Noch keine Mitglieder"))
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text(searchText.isEmpty ? l.tr(zh: "添加宠物、人类或植物开始照顾。", en: "Add a pet, human, or plant to begin.", de: "Füge Tier, Mensch oder Pflanze hinzu.") : l.tr(zh: "试试其他关键词", en: "Try another keyword", de: "Versuche ein anderes Stichwort"))
+            Text(l.tr(zh: "添加宠物、人类或植物开始照顾。", en: "Add a pet, human, or plant to begin.", de: "Füge Tier, Mensch oder Pflanze hinzu."))
                 .font(OhanaFont.caption(.bold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .multilineTextAlignment(.center)
@@ -462,6 +576,7 @@ private struct PetSquareCard: View {
     @State private var suppressTapUntil = Date.distantPast
     @State private var showDeleteAlert = false
     @State private var showHomeStackFullAlert = false
+    @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
 
     private var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
@@ -471,6 +586,15 @@ private struct PetSquareCard: View {
         let trimmed = pet.name.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return "OHANA" }
         return String(trimmed.prefix(6)).uppercased()
+    }
+
+    private var deletePressAnimation: Animation? {
+        if isDeletePressing {
+            return workloadPolicy.shouldAnimate()
+            ? .easeInOut(duration: 0.09).repeatForever(autoreverses: true)
+            : .spring(response: 0.22, dampingFraction: 0.82)
+        }
+        return .spring(response: 0.22, dampingFraction: 0.82)
     }
 
     var body: some View {
@@ -483,7 +607,7 @@ private struct PetSquareCard: View {
             }
             .scaleEffect(isDeletePressing ? 0.97 : 1.0)
             .rotationEffect(.degrees(isDeletePressing ? -1.35 : 0))
-            .animation(isDeletePressing ? .easeInOut(duration: 0.09).repeatForever(autoreverses: true) : .spring(response: 0.22, dampingFraction: 0.82), value: isDeletePressing)
+            .animation(deletePressAnimation, value: isDeletePressing)
             .overlay(alignment: .topTrailing) {
                 if isDeletePressing {
                     deletePreviewBadge
@@ -652,7 +776,7 @@ private struct PetSquareCard: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.62) {
                 guard deletePressCandidate, deletePressToken == token else { return }
                 suppressTapUntil = Date().addingTimeInterval(1.1)
-                withAnimation(.easeInOut(duration: 0.09).repeatForever(autoreverses: true)) {
+                withAnimation(deletePressAnimation) {
                     isDeletePressing = true
                 }
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -956,11 +1080,21 @@ private struct HumanSquareCard: View {
     @State private var suppressTapUntil = Date.distantPast
     @State private var showDeleteAlert = false
     @State private var showHomeStackFullAlert = false
+    @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
 
     private var themeColor: Color { Color(hex: human.themeColor) }
     private var companionshipDays: Int {
         max(0, Calendar.current.dateComponents([.day], from: human.createdAt, to: Date()).day ?? 0)
+    }
+
+    private var deletePressAnimation: Animation? {
+        if isDeletePressing {
+            return workloadPolicy.shouldAnimate()
+            ? .easeInOut(duration: 0.09).repeatForever(autoreverses: true)
+            : .spring(response: 0.22, dampingFraction: 0.82)
+        }
+        return .spring(response: 0.22, dampingFraction: 0.82)
     }
 
     var body: some View {
@@ -973,7 +1107,7 @@ private struct HumanSquareCard: View {
             }
             .scaleEffect(isDeletePressing ? 0.97 : 1.0)
             .rotationEffect(.degrees(isDeletePressing ? -1.35 : 0))
-            .animation(isDeletePressing ? .easeInOut(duration: 0.09).repeatForever(autoreverses: true) : .spring(response: 0.22, dampingFraction: 0.82), value: isDeletePressing)
+            .animation(deletePressAnimation, value: isDeletePressing)
             .overlay(alignment: .topTrailing) {
                 if isDeletePressing {
                     deletePreviewBadge
@@ -1167,7 +1301,7 @@ private struct HumanSquareCard: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.62) {
                 guard deletePressCandidate, deletePressToken == token else { return }
                 suppressTapUntil = Date().addingTimeInterval(1.1)
-                withAnimation(.easeInOut(duration: 0.09).repeatForever(autoreverses: true)) {
+                withAnimation(deletePressAnimation) {
                     isDeletePressing = true
                 }
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()

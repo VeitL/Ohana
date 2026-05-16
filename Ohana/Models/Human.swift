@@ -181,6 +181,8 @@ final class Human {
     var pinSalt: String = ""
     var pinFailedAttempts: Int = 0
     var pinLockedUntil: Date? = nil
+    // ArkSchemaV43：人类纪念模式生命周期；nil = 在世
+    var passedAwayDate: Date? = nil
     // Relationships
     @Relationship(deleteRule: .cascade) var weightLogs: [HumanWeightLog]
     @Relationship(deleteRule: .cascade) var workoutLogs: [HumanWorkoutLog]
@@ -216,6 +218,7 @@ final class Human {
         self.pinSalt = ""
         self.pinFailedAttempts = 0
         self.pinLockedUntil = nil
+        self.passedAwayDate = nil
         self.weightLogs = []
         self.workoutLogs = []
     }
@@ -288,6 +291,24 @@ final class Human {
     
     var roleText: String {
         HumanPermissionRole.title(for: role)
+    }
+
+    // MARK: - Memorial Mode
+    var hasPassedAway: Bool { passedAwayDate != nil }
+
+    var ageAtPassingText: String {
+        guard let passedAwayDate else { return ageText }
+        guard let birthday else { return "未知" }
+        let years = max(0, Calendar.current.dateComponents([.year], from: birthday, to: passedAwayDate).year ?? 0)
+        if years >= 1 { return "\(years)岁" }
+        return "不满1岁"
+    }
+
+    var daysTogetherAtPassing: Int {
+        guard let passedAwayDate else {
+            return max(0, Calendar.current.dateComponents([.day], from: createdAt, to: Date()).day ?? 0)
+        }
+        return max(0, Calendar.current.dateComponents([.day], from: createdAt, to: passedAwayDate).day ?? 0)
     }
 
     var genderRaw: String {

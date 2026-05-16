@@ -110,9 +110,9 @@ struct HumanWorkoutCard: View {
 
             HStack(spacing: 0) {
                 workoutStatCell(value: "\(monthLogs.count)", label: "本月次数", color: .goPrimary)
-                Rectangle().fill(Color.black.opacity(0.06)).frame(width: 1, height: 32)
+                Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 32)
                 workoutStatCell(value: "\(totalMinutes)", label: "总分钟", color: .goCardCyan)
-                Rectangle().fill(Color.black.opacity(0.06)).frame(width: 1, height: 32)
+                Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 32)
                 workoutStatCell(value: String(format: "%.1f", totalKm), label: "总公里", color: .goOrange)
             }
             .padding(.horizontal, 16)
@@ -141,9 +141,9 @@ struct HumanWorkoutCard: View {
         .onReceive(hkManager.$rewardToast.compactMap { $0 }) { toast in
             toastMessage = toast.message
             toastColor = toast.color
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) { toastVisible = true }
+            withAnimation(GoMotion.feedback) { toastVisible = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                withAnimation(.easeOut(duration: 0.4)) { toastVisible = false }
+                withAnimation(GoMotion.quick) { toastVisible = false }
                 hkManager.rewardToast = nil
             }
         }
@@ -159,12 +159,11 @@ struct HumanWorkoutCard: View {
         HStack(spacing: 8) {
             Text(toastMessage)
                 .font(OhanaFont.subheadline(.bold))
-                .foregroundStyle(.black)
+                .foregroundStyle(Color.arkInk)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(toastColor, in: Capsule())
-        .shadow(color: toastColor.opacity(0.5), radius: 12, y: 4)
         .padding(.top, 8)
     }
 
@@ -542,7 +541,7 @@ struct HumanWorkoutHistoryView: View {
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 12)
                                     .background(
-                                        Color.white.opacity(0.03),
+                                        Color.ohanaControlFill,
                                         in: RoundedRectangle(cornerRadius: 12)
                                     )
                                 }
@@ -566,8 +565,8 @@ struct HumanWorkoutHistoryView: View {
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 28).padding(.vertical, 14)
                         .background(Color.goPrimary, in: Capsule())
-                        .shadow(color: Color.goPrimary.opacity(0.4), radius: 14, y: 5)
                     }
+                    .buttonStyle(ScaleButtonStyle())
                     .padding(.bottom, 28)
                 }
             }
@@ -587,7 +586,8 @@ struct HumanWorkoutHistoryView: View {
             }
             .sheet(isPresented: $showAddSheet) {
                 AddWorkoutSheet(human: human)
-                    .presentationDetents([.large])
+                    .presentationBackground(.clear)
+                    .presentationDetents([.large]) // ui-v4: allow complex workout editor uses full-height system sheet
                     .presentationDragIndicator(.visible)
             }
         }
@@ -613,9 +613,9 @@ struct HumanWorkoutHistoryView: View {
     private var summarySection: some View {
         HStack(spacing: 0) {
             summaryCell(value: "\(sortedLogs.count)", label: "手动记录", color: .goPrimary)
-            Divider().background(.white.opacity(0.2)).frame(height: 40)
+            Divider().background(Color.ohanaDivider).frame(height: 40)
             summaryCell(value: "\(sortedLogs.reduce(0) { $0 + $1.durationMinutes })", label: "总分钟", color: .goCardCyan)
-            Divider().background(.white.opacity(0.2)).frame(height: 40)
+            Divider().background(Color.ohanaDivider).frame(height: 40)
             summaryCell(value: String(format: "%.1f", sortedLogs.reduce(0) { $0 + $1.distanceKm }), label: "总公里", color: .goOrange)
         }
         .padding(.vertical, 14)

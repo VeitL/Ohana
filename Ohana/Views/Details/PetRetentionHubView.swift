@@ -2,111 +2,42 @@
 //  PetRetentionHubView.swift
 //  Ohana
 //
-//  Long-term retention hub: health trends, memories, cost, medical protection,
-//  and achievements in one per-pet archive.
+//  V4 growth archive dashboard for one pet.
 //
 
 import SwiftUI
 
 struct PetRetentionHubView: View {
     let pet: Pet
+    var showsCloseButton: Bool = false
 
-    private var weekInterval: DateInterval {
-        Calendar.current.dateInterval(of: .weekOfYear, for: Date())
-            ?? DateInterval(start: Date().addingTimeInterval(-6 * 86_400), duration: 7 * 86_400)
-    }
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+
+    @State private var isRenderingPDF = false
+    @State private var pdfShare: PetArchivePDFShare?
+
+    private var l: L10n { L10n(appLanguage) }
+    private var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
+    private var archiveSnapshot: ArchiveMemorySnapshot { ArchiveMemorySnapshot(pet: pet) }
 
     private var latestWeightText: String {
-        guard let latest = pet.weightLogs.sorted(by: { $0.date < $1.date }).last else { return "暂无" }
+        guard let latest = pet.weightLogs.sorted(by: { $0.date < $1.date }).last else {
+            return l.tr(zh: "未记录", en: "No record", de: "Kein Eintrag")
+        }
         return String(format: "%.1fkg", latest.weight)
     }
 
-    private var weightTrendText: String {
-        let sorted = pet.weightLogs.sorted { $0.date < $1.date }
-        guard let first = sorted.first, let last = sorted.last, sorted.count >= 2 else { return "\(pet.weightLogs.count) 条体重记录" }
-        let delta = last.weight - first.weight
-        if abs(delta) < 0.05 { return "体重基本稳定" }
-        return delta > 0 ? String(format: "累计 +%.1fkg", delta) : String(format: "累计 %.1fkg", delta)
-    }
-
-    private var healthInsightText: String {
-        let recent = pet.healthLogs.filter {
-            $0.date >= (Calendar.current.date(byAdding: .day, value: -90, to: Date()) ?? Date())
+    private var healthBaselineText: String {
+        if !pet.weightLogs.isEmpty { return latestWeightText }
+        if !pet.healthLogs.isEmpty {
+            return l.tr(zh: "\(pet.healthLogs.count) 条健康记录", en: "\(pet.healthLogs.count) health logs", de: "\(pet.healthLogs.count) Gesundheitsdaten")
         }
-        if recent.contains(where: { $0.healthLogType == .emergency || $0.healthLogType == .surgery }) {
-            return "近 90 天有急诊或手术记录，建议关注复诊与恢复趋势"
-        }
-        if pet.weightLogs.count >= 2 { return "\(weightTrendText)，继续保持周期称重" }
-        return "补充体重与体检记录后，会生成更完整的健康趋势"
+        return l.tr(zh: "缺少健康基线", en: "Missing baseline", de: "Basis fehlt")
     }
 
-    private var monthExpense: Double {
-        pet.expenseLogs.filter {
-            Calendar.current.isDate($0.date, equalTo: Date(), toGranularity: .month) && $0.amount > 0
-        }.reduce(0) { $0 + $1.amount }
-    }
-
-    private var projectedMonthlyExpense: Double {
-        let start = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? Date()
-        let elapsed = max(1, Calendar.current.dateComponents([.day], from: start, to: Date()).day ?? 1)
-        let daysInMonth = Calendar.current.range(of: .day, in: .month, for: Date())?.count ?? 30
-        return monthExpense / Double(elapsed) * Double(daysInMonth)
-    }
-
-    private var photoYearCount: Int {
-        pet.photoLogs.filter {
-            Calendar.current.isDate($0.date, equalTo: Date(), toGranularity: .year)
-        }.count
-    }
-
-    private var weekCareDates: [Date] {
-        let care = pet.careLogs.filter { weekInterval.contains($0.date) }.map(\.date)
-        let potty = pet.pottyLogs.filter { weekInterval.contains($0.date) }.map(\.date)
-        let walks = pet.walkLogs.filter { weekInterval.contains($0.startDate) }.map(\.startDate)
-        let health = pet.healthLogs.filter { weekInterval.contains($0.date) }.map(\.date)
-        let photos = pet.photoLogs.filter { weekInterval.contains($0.date) }.map(\.date)
-        return care + potty + walks + health + photos
-    }
-
-    private var weekActiveDays: Int {
-        let cal = Calendar.current
-        return Set(weekCareDates.map { cal.startOfDay(for: $0) }).count
-    }
-
-    private var latestWeekPhoto: PetPhotoLog? {
-        pet.photoLogs
-            .filter { weekInterval.contains($0.date) }
-            .sorted { $0.date > $1.date }
-            .first
-    }
-
-    private var weeklyWeightStory: String {
-        let logs = pet.weightLogs
-            .filter { $0.date < weekInterval.end }
-            .sorted { $0.date < $1.date }
-        guard let latest = logs.last else { return "还没有体重记录" }
-        let baseline = logs.last { $0.date < weekInterval.start } ?? logs.dropLast().last
-        guard let baseline else { return String(format: "最新 %.1fkg", latest.weight) }
-        let delta = latest.weight - baseline.weight
-        if abs(delta) < 0.05 { return String(format: "稳定在 %.1fkg", latest.weight) }
-        let sign = delta > 0 ? "+" : ""
-        return "\(sign)\(String(format: "%.1fkg", delta))"
-    }
-
-    private var weeklyArchiveStory: String {
-        if weekCareDates.isEmpty {
-            return "完成喂食、陪玩、照片或健康记录后，这里会沉淀成 \(pet.name) 的每周成长故事。"
-        }
-        let activeText = weekActiveDays > 0 ? "本周 \(weekActiveDays) 天有照护记录" : "本周已有照护记录"
-        let photoText = latestWeekPhoto == nil ? "还缺一张本周照片" : "留下了新的照片回忆"
-        return "\(activeText)，\(photoText)，体重 \(weeklyWeightStory)。"
-    }
-
-    private var medicalRecordCount: Int {
-        pet.healthLogs.filter { log in
-            [.vaccine, .medication, .dewormingInternal, .dewormingExternal, .surgery, .dental, .checkup, .emergency].contains(log.healthLogType)
-        }.count + pet.medications.count
-    }
+    private var memoryCount: Int { pet.photoLogs.count + pet.milestones.count }
+    private var protectionCount: Int { pet.documents.count + pet.insurances.count }
 
     private var expiringProtectionCount: Int {
         let expiringDocs = pet.documents.filter { $0.isExpired || $0.isExpiringSoon }.count
@@ -114,9 +45,30 @@ struct PetRetentionHubView: View {
         return expiringDocs + expiringInsurances
     }
 
-    private var nextAchievementHint: String {
-        let locked = AchievementManager.compute(for: pet).first { !$0.isUnlocked }
-        return locked.map { "下一枚：\($0.title) · \($0.description)" } ?? "成就墙已全部点亮，继续保持"
+    private var protectionStatus: String {
+        if expiringProtectionCount > 0 {
+            return l.tr(zh: "\(expiringProtectionCount) 项需关注", en: "\(expiringProtectionCount) needs attention", de: "\(expiringProtectionCount) prüfen")
+        }
+        if protectionCount > 0 {
+            return l.tr(zh: "保障资料正常", en: "Coverage looks good", de: "Schutz ist aktuell")
+        }
+        return l.tr(zh: "还没有证件", en: "No documents yet", de: "Noch keine Dokumente")
+    }
+
+    private var recentMemoryText: String {
+        let latestPhoto = pet.photoLogs.sorted { $0.date > $1.date }.first?.date
+        let latestMilestone = pet.milestones.sorted { $0.date > $1.date }.first?.date
+        guard let latest = [latestPhoto, latestMilestone].compactMap({ $0 }).max() else {
+            return l.tr(zh: "还没有回忆", en: "No memories yet", de: "Noch keine Erinnerungen")
+        }
+        return latest.formatted(.relative(presentation: .named))
+    }
+
+    private var profileStatus: String {
+        if archiveSnapshot.score >= archiveSnapshot.total {
+            return l.tr(zh: "档案完整", en: "Complete", de: "Vollständig")
+        }
+        return l.tr(zh: "还差 \(archiveSnapshot.total - archiveSnapshot.score) 项", en: "\(archiveSnapshot.total - archiveSnapshot.score) left", de: "\(archiveSnapshot.total - archiveSnapshot.score) offen")
     }
 
     private var achievementProgress: (unlocked: Int, total: Int) {
@@ -124,174 +76,279 @@ struct PetRetentionHubView: View {
         return (achievements.filter(\.isUnlocked).count, achievements.count)
     }
 
-    private var retentionScore: Int {
-        [
-            !pet.weightLogs.isEmpty || !pet.healthLogs.isEmpty,
-            !pet.photoLogs.isEmpty || !pet.milestones.isEmpty,
-            !pet.expenseLogs.isEmpty,
-            !pet.documents.isEmpty || !pet.insurances.isEmpty || !pet.medications.isEmpty,
-            achievementProgress.unlocked > 0 || pet.currentStreak > 0
-        ].filter { $0 }.count
-    }
-
     var body: some View {
-        ZStack {
-            OhanaAppBackground()
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 16) {
-                    heroCard
-                    weeklyStoryCard
-                    insightStrip
-                    sectionTitle("长期留存模块")
-                    retentionCard(
-                        icon: "waveform.path.ecg",
-                        accent: .goTeal,
-                        title: "健康趋势",
-                        value: latestWeightText,
-                        subtitle: healthInsightText,
-                        destination: PetHealthDetailView(pet: pet, isModal: false)
-                    )
-                    retentionCard(
-                        icon: "photo.on.rectangle.angled",
-                        accent: .goPrimary,
-                        title: "成长相册",
-                        value: "\(pet.photoLogs.count) 张",
-                        subtitle: "今年新增 \(photoYearCount) 张 · 重要时刻 \(pet.milestones.count) 个",
-                        destination: PetMomentsHubView(pet: pet)
-                    )
-                    retentionCard(
-                        icon: "chart.pie.fill",
-                        accent: .goYellow,
-                        title: "花费统计",
-                        value: AppCurrency.format(monthExpense, fractionDigits: 0),
-                        subtitle: "本月预测约 \(AppCurrency.format(projectedMonthlyExpense, fractionDigits: 0)) · 共 \(pet.expenseLogs.count) 条记录",
-                        destination: ExpenseHistoryView(pet: pet)
-                    )
-                    retentionCard(
-                        icon: "shield.lefthalf.filled",
-                        accent: .goOrange,
-                        title: "保险 / 医疗记录",
-                        value: "\(medicalRecordCount) 条",
-                        subtitle: expiringProtectionCount > 0 ? "\(expiringProtectionCount) 项保障需要关注" : "证件、保单、疫苗与用药集中归档",
-                        destination: DocumentsListView(pet: pet)
-                    )
-                    retentionCard(
-                        icon: "tree.fill",
-                        accent: .goLime,
-                        title: "生命树成就",
-                        value: "\(achievementProgress.unlocked)/\(achievementProgress.total)",
-                        subtitle: nextAchievementHint,
-                        destination: AchievementWallView(pet: pet)
-                    )
+        NavigationStack {
+            ZStack {
+                OhanaAppBackground().ignoresSafeArea()
+
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 18) {
+                        header
+
+                        if pet.hasPassedAway {
+                            memorialSummary
+                        }
+
+                        archiveOverview
+                        nextStepCard
+
+                        sectionTitle(l.tr(zh: "核心档案", en: "Core archive", de: "Kernarchiv"))
+                        coreArchiveCards
+
+                        sectionTitle(l.tr(zh: "更多", en: "More", de: "Mehr"))
+                        secondaryActions
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 18)
+                    .padding(.bottom, 36)
                 }
-                .padding(16)
-                .padding(.bottom, 40)
+                .scrollBounceBehavior(.basedOnSize)
+            }
+            .toolbar(.hidden, for: .navigationBar)
+            .sheet(item: $pdfShare) { share in
+                PetVetPDFShareSheet(pdfURL: share.url, pet: pet)
+                    // ui-v4: allow PDF share uses document preview sheet
+                    .presentationBackground(.clear)
             }
         }
-        .navigationTitle("\(pet.name) · 成长档案")
-        .navigationBarTitleDisplayMode(.inline)
+        .petMemorialTone(isActive: pet.hasPassedAway)
     }
 
-    private var heroCard: some View {
-        HStack(spacing: 14) {
-            FMPetAvatar(pet: pet, size: 58)
-            VStack(alignment: .leading, spacing: 5) {
-                Text("长期留存总览")
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+    private var header: some View {
+        HStack(spacing: 12) {
+            FeatureHubAvatar(
+                imageData: pet.avatarImageData,
+                emoji: pet.avatarEmoji,
+                fallback: pet.speciesEmoji,
+                tint: themeColor
+            )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(l.tr(zh: "成长档案", en: "Growth Archive", de: "Entwicklungsarchiv"))
+                    .font(OhanaFont.title2(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("已完善 \(retentionScore)/5 个长期价值模块")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .lineLimit(1)
+                Text("\(pet.name) · \(profileStatus)")
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                ProgressView(value: Double(retentionScore), total: 5)
-                    .tint(Color.goPrimary)
+                    .lineLimit(1)
             }
+
             Spacer()
+
+            if showsCloseButton {
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 15, weight: .black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+            }
         }
-        .padding(16)
-        .goTranslucentCard(cornerRadius: 22)
     }
 
-    private var weeklyStoryCard: some View {
+    private var archiveOverview: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label("这周的 \(pet.name)", systemImage: "sparkles")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+            HStack(alignment: .lastTextBaseline) {
+                Text("\(archiveSnapshot.score)/\(archiveSnapshot.total)")
+                    .font(.system(size: 38, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Spacer()
-                Text("\(weekInterval.start.formatted(.dateTime.month().day()))-\(weekInterval.end.formatted(.dateTime.month().day()))")
-                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .ohanaNumericMotion("\(archiveSnapshot.score)")
+                Text(l.tr(zh: "档案完整度", en: "archive complete", de: "Archiv komplett"))
+                    .font(OhanaFont.caption(.black))
                     .foregroundStyle(Color.ohanaSecondaryText)
+                Spacer()
             }
 
-            Text(weeklyArchiveStory)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .lineSpacing(3)
+            ProgressView(value: Double(archiveSnapshot.score), total: Double(archiveSnapshot.total))
+                .tint(Color.goPrimary)
 
-            HStack(spacing: 8) {
-                archiveStoryPill(icon: "calendar.badge.checkmark", title: "\(weekActiveDays)天", subtitle: "活跃照护", color: .goTeal)
-                archiveStoryPill(icon: "scalemass.fill", title: weeklyWeightStory, subtitle: "体重趋势", color: .goPrimary)
-                archiveStoryPill(icon: "photo.fill", title: latestWeekPhoto == nil ? "暂无" : "已记录", subtitle: "照片回忆", color: .goYellow)
-            }
-        }
-        .padding(16)
-        .goTranslucentCard(cornerRadius: 22)
-    }
-
-    private var insightStrip: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("本周建议")
-            HStack(spacing: 10) {
-                insightPill(icon: "heart.text.square.fill", title: protectionPrompt, color: expiringProtectionCount > 0 ? .goOrange : .goTeal)
-                insightPill(icon: "camera.fill", title: photoYearCount == 0 ? "补一张近照" : "今年 \(photoYearCount) 张照片", color: .goPrimary)
+            HStack(spacing: 16) {
+                metric(title: l.tr(zh: "回忆", en: "Memories", de: "Erinnerungen"), value: "\(memoryCount)")
+                metric(title: l.tr(zh: "保障", en: "Protection", de: "Schutz"), value: "\(protectionCount)")
+                metric(title: l.tr(zh: "健康基线", en: "Baseline", de: "Basis"), value: healthBaselineText)
             }
         }
     }
 
-    private var protectionPrompt: String {
-        if expiringProtectionCount > 0 { return "\(expiringProtectionCount) 项保障待处理" }
-        if pet.insurances.isEmpty && pet.documents.isEmpty { return "补齐证件保障" }
-        return "保障记录正常"
-    }
-
-    private func insightPill(icon: String, title: String, color: Color) -> some View {
-        HStack(spacing: 7) {
-            Image(systemName: icon).font(.system(size: 12, weight: .black))
-            Text(title).font(.system(size: 11, weight: .black, design: .rounded)).lineLimit(1)
-        }
-        .foregroundStyle(color)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 9)
-        .background(color.opacity(0.12), in: Capsule())
-    }
-
-    private func archiveStoryPill(icon: String, title: String, subtitle: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .black))
-                .foregroundStyle(color)
+    private func metric(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.system(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.caption2(.black))
+                .foregroundStyle(Color.ohanaSecondaryText)
+            Text(value)
+                .font(OhanaFont.callout(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
-                .minimumScaleFactor(0.68)
-            Text(subtitle)
-                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .minimumScaleFactor(0.72)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var nextStepCard: some View {
+        NavigationLink(destination: nextStepDestination(archiveSnapshot.nextStep.kind)) {
+            HStack(spacing: 12) {
+                Image(systemName: archiveSnapshot.nextStep.icon)
+                    .font(.system(size: 18, weight: .black))
+                    .foregroundStyle(Color.arkInk)
+                    .frame(width: 42, height: 42)
+                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(archiveSnapshot.nextStep.title)
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(archiveSnapshot.nextStep.subtitle)
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(2)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .black))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+            .padding(14)
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+            }
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+
+    private var coreArchiveCards: some View {
+        VStack(spacing: 10) {
+            archiveNavigationCard(
+                icon: "person.text.rectangle.fill",
+                accent: Color(hex: "6B82C4"),
+                title: l.tr(zh: "身份资料", en: "Profile", de: "Profil"),
+                value: pet.breed.isEmpty ? pet.species : pet.breed,
+                subtitle: l.tr(zh: "名字、品种、生日、到家日", en: "Name, breed, birthday, home day", de: "Name, Rasse, Geburtstag, Einzug"),
+                destination: PetBasicInfoDetailView(pet: pet)
+            )
+
+            archiveNavigationCard(
+                icon: "photo.on.rectangle.angled",
+                accent: Color(hex: "EC4899"),
+                title: l.tr(zh: "成长回忆", en: "Memories", de: "Erinnerungen"),
+                value: "\(memoryCount)",
+                subtitle: l.tr(zh: "最近：\(recentMemoryText)", en: "Latest: \(recentMemoryText)", de: "Zuletzt: \(recentMemoryText)"),
+                destination: PetMomentsHubView(pet: pet)
+            )
+
+            archiveNavigationCard(
+                icon: "doc.text.fill",
+                accent: Color(hex: "94A3B8"),
+                title: l.tr(zh: "保障文件", en: "Documents", de: "Dokumente"),
+                value: "\(protectionCount)",
+                subtitle: protectionStatus,
+                destination: DocumentsListView(pet: pet)
+            )
+        }
+    }
+
+    private var secondaryActions: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                compactNavigationAction(
+                    icon: "clock.arrow.circlepath",
+                    title: l.tr(zh: "完整时间轴", en: "Timeline", de: "Zeitachse"),
+                    value: "\(timelineCount)",
+                    tint: Color(hex: "8B5CF6"),
+                    destination: PetUnifiedTimelineSheet(pet: pet)
+                )
+
+                compactNavigationAction(
+                    icon: "trophy.fill",
+                    title: l.tr(zh: "成就墙", en: "Awards", de: "Erfolge"),
+                    value: "\(achievementProgress.unlocked)/\(achievementProgress.total)",
+                    tint: Color(hex: "F59E0B"),
+                    destination: AchievementWallView(pet: pet)
+                )
+            }
+
+            Button { renderPDF() } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: isRenderingPDF ? "hourglass" : "square.and.arrow.up.fill")
+                        .font(.system(size: 16, weight: .black))
+                        .foregroundStyle(Color.goTeal)
+                        .frame(width: 34, height: 34)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(l.tr(zh: "导出兽医档案", en: "Export Vet File", de: "Tierarztakte exportieren"))
+                            .font(OhanaFont.callout(.black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                        Text(l.tr(zh: "PDF · 体重、健康、用药、证件", en: "PDF · weight, health, meds, documents", de: "PDF · Gewicht, Gesundheit, Medikamente, Dokumente"))
+                            .font(OhanaFont.caption2(.semibold))
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    if isRenderingPDF {
+                        ProgressView()
+                            .tint(Color.goPrimary)
+                    } else {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .black))
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                    }
+                }
+                .padding(14)
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+                }
+            }
+            .disabled(isRenderingPDF)
+            .buttonStyle(ScaleButtonStyle())
+        }
+    }
+
+    private var memorialSummary: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(l.tr(zh: "纪念档案", en: "Memorial archive", de: "Gedenkarchiv"), systemImage: "sparkles")
+                .font(OhanaFont.callout(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+            Text(memorialDetail)
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(color.opacity(0.11), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var memorialDetail: String {
+        let days = pet.daysTogetherAtPassing
+        if let date = pet.passedAwayDate {
+            return l.tr(
+                zh: "离世 \(date.formatted(.dateTime.year().month().day())) · 相伴 \(days) 天 · 保留照片、故事和证件",
+                en: "Passed \(date.formatted(.dateTime.year().month().day())) · \(days) days together · photos, stories, and documents remain",
+                de: "Verstorben am \(date.formatted(.dateTime.year().month().day())) · \(days) Tage zusammen · Fotos, Geschichten und Dokumente bleiben"
+            )
+        }
+        return l.tr(
+            zh: "相伴 \(days) 天 · 保留照片、故事和证件",
+            en: "\(days) days together · photos, stories, and documents remain",
+            de: "\(days) Tage zusammen · Fotos, Geschichten und Dokumente bleiben"
+        )
+    }
+
+    private var timelineCount: Int {
+        pet.photoLogs.count + pet.milestones.count + pet.healthLogs.count + pet.weightLogs.count + pet.careLogs.count + pet.walkLogs.count
     }
 
     private func sectionTitle(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 12, weight: .black, design: .rounded))
+            .font(OhanaFont.caption(.black))
             .foregroundStyle(Color.ohanaSecondaryText)
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 2)
     }
 
-    private func retentionCard<Destination: View>(
+    private func archiveNavigationCard<Destination: View>(
         icon: String,
         accent: Color,
         title: String,
@@ -301,36 +358,109 @@ struct PetRetentionHubView: View {
     ) -> some View {
         NavigationLink(destination: destination) {
             HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(accent.opacity(0.18))
-                        .frame(width: 46, height: 46)
-                    Image(systemName: icon)
-                        .font(.system(size: 18, weight: .black))
-                        .foregroundStyle(accent)
-                }
-                VStack(alignment: .leading, spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 19, weight: .black))
+                    .foregroundStyle(accent)
+                    .frame(width: 44, height: 44)
+
+                VStack(alignment: .leading, spacing: 3) {
                     HStack {
                         Text(title)
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.callout(.black))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Spacer()
-                        Text(value)
-                            .font(.system(size: 14, weight: .black, design: .rounded))
+                        Text(value.isEmpty ? "--" : value)
+                            .font(OhanaFont.caption(.black))
                             .foregroundStyle(accent)
                     }
                     Text(subtitle)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(2)
                 }
+
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 12, weight: .black))
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             .padding(14)
-            .goTranslucentCard(cornerRadius: 20)
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+            }
         }
         .buttonStyle(ScaleButtonStyle())
     }
+
+    private func compactNavigationAction<Destination: View>(
+        icon: String,
+        title: String,
+        value: String,
+        tint: Color,
+        destination: Destination
+    ) -> some View {
+        NavigationLink(destination: destination) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: icon)
+                        .font(.system(size: 16, weight: .black))
+                        .foregroundStyle(tint)
+                    Spacer()
+                    Text(value)
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                Text(title)
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+            }
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+
+    @ViewBuilder
+    private func nextStepDestination(_ kind: ArchiveMemoryNextStepKind) -> some View {
+        switch kind {
+        case .basicInfo:
+            PetBasicInfoDetailView(pet: pet)
+        case .documents:
+            DocumentsListView(pet: pet)
+        case .moments:
+            PetMomentsHubView(pet: pet)
+        case .weight:
+            WeightHistoryView(pet: pet)
+        case .retention:
+            PetUnifiedTimelineSheet(pet: pet)
+        }
+    }
+
+    private func renderPDF() {
+        guard !isRenderingPDF else { return }
+        isRenderingPDF = true
+        Task {
+            let url = await PetVetSummaryPDFRenderer.render(pet: pet)
+            await MainActor.run {
+                isRenderingPDF = false
+                if let url {
+                    pdfShare = PetArchivePDFShare(url: url)
+                }
+            }
+        }
+    }
+}
+
+private struct PetArchivePDFShare: Identifiable {
+    let id = UUID()
+    let url: URL
 }

@@ -1055,12 +1055,14 @@ Zoom 目标页。背景 = 宠物主题渐变（与卡片正面无缝转场）。
 
 ### 椰子商店与百宝箱
 
-入口：`OasisRewardView`、`DailyStreakDetailView`、打卡补签包入口、`FunctionMenuSheet` 均可打开 `CoconutShopView`；已购外观/称号在 `InventoryView` 管理。补签包入口会自动跳到加成分类。
+入口：`OasisRewardView`、`DailyStreakDetailView`、打卡补签包入口、`FunctionMenuSheet` 均可打开 `CoconutShopView`；已购外观/称号/App Icon 在 `InventoryView` 管理。补签包入口会自动跳到加成道具分类。
 
+- 商店商品统一来自 `ShopCatalog`，避免商店和百宝箱维护两份清单。当前分类为 `App Icon`、`2.5D 头像`、`外观特效`、`称号`、`加成道具`。
+- App Icon 采用买断制：默认 Ohana 免费恢复，Lime Night / Clean Blue / Coconut / Paw Duo / Minimal O 预置在 `Assets.xcassets`，通过 `CFBundleAlternateIcons` + `AppIconService` 调用 `UIApplication.setAlternateIconName` 切换。切换失败不扣椰子。
 - 永久外观/称号购买后立即生效：青柠光晕、彩虹轨迹、星尘落雨、烟花庆典自动启用；守护者/先行者/首席厨师自动装备为当前称号。
 - 商店已购卡片可再次点击切换启用状态或装备称号；3D 破框卡片点击后直接选择宠物并打开 `EquipPopoutCardSheet`。
 - 百宝箱同样支持装备/卸下称号、启停外观、绑定 3D 破框卡片。
-- 当前消费 key：`purchasedShopItems`、`shop_equipped_title`、`shop_equip_fx_lime_glow`、`shop_equip_fx_rainbow`、`shop_equip_fx_stars`、`shop_equip_fx_firework`。
+- 当前消费 key：`purchasedShopItems`、`shop_selected_app_icon`、`shop_equipped_title`、`shop_equip_fx_lime_glow`、`shop_equip_fx_rainbow`、`shop_equip_fx_stars`、`shop_equip_fx_firework`。
 - 加成类：`boost_double` 通过 `shop_boostDoubleActive` 在下次椰子奖励中消耗；`boost_streak` 写入 `shop_streakShieldExpiry`；`boost_tree` 注入 `OasisTreeManager.injectedEnergy`；`boost_backdate_pack` 增加 `inventory_backdate_1day_count`；`boost_cooldown_reset` 清空 `quest_cooldownLogs`。
 - 椰子记录已合并到 `IslandWealthDashboard2`：财富榜下方展示椰子流水，椰子指南按钮与“我的百宝箱”并列。
 

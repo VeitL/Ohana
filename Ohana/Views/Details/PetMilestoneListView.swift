@@ -401,6 +401,7 @@ struct PetMilestoneListView: View {
                         )
                         modelContext.insert(m)
                         modelContext.safeSave()
+                        QuestManager.shared.awardAction(type: .milestone, pet: pet, context: modelContext)
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         newTitle = ""; newEmoji = "🎉"; newNotes = ""; newLocation = ""
                         newPhotoData = nil; newPhotoItem = nil

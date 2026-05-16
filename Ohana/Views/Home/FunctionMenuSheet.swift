@@ -12,7 +12,7 @@ enum FeatureGroup: String, Hashable, CaseIterable {
     //   • healthBody     — 健康：健康档案 / 用药 / 体重
     //   • archiveMemory  — 成长档案：单一聚合入口 (PetRetentionHub)；
     //                      子页（基本信息 / 证件 / 重要时刻 / 成就）只能通过 hub 访问
-    //   • householdHub   — 家：花费记录 / 照护分析 / 提醒 / 悬赏榜 / 家庭周报
+    //   • householdHub   — 家：花费记录 / 照护分析 / 提醒 / 家庭周报
     //                      (合并自旧 financeLedger + familyCollab)
     //   • oasisRewards / plants — 保留 case，供深链或未来菜单使用
     case dailyCare
@@ -162,7 +162,6 @@ struct FunctionMenuSheet: View {
         case .featureGroup,
              .featureAggregate,
              .calendar,
-             .bountyBoard,
              .familyWeeklyReport,
              .careLedgerAnalysis,
              .reminderObservability,
@@ -344,7 +343,7 @@ struct FunctionMenuSheet: View {
             return "成长 · 基本信息 · 证件 · 时刻"
         case .householdHub:
             return showsFamilyCollaboration
-                ? "花费 · 照护分析 · 提醒 · 悬赏 · 周报"
+                ? "花费 · 照护分析 · 提醒 · 周报"
                 : "花费 · 照护分析 · 提醒"
         case .oasisRewards:
             return "\(wealthSubtitle) · 商店 · 扭蛋"

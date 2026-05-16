@@ -92,9 +92,14 @@ struct AchievementWallView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("关闭") { dismiss() }
-                        .font(OhanaFont.body(.semibold))
-                        .foregroundStyle(Color.goPrimary)
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 17, weight: .black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("关闭")
                 }
             }
         }
@@ -125,11 +130,10 @@ struct AchievementWallView: View {
                                 .lineLimit(1)
                         }
                         .font(OhanaFont.caption(.black))
-                        .foregroundStyle(selectedPetId == item.id ? Color.arkInk : .white.opacity(0.72))
+                        .foregroundStyle(selectedPetId == item.id ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
-                        .background(selectedPetId == item.id ? Color.goPrimary : .white.opacity(0.08), in: Capsule())
-                        .overlay(Capsule().strokeBorder(.white.opacity(0.12), lineWidth: 1))
+                        .background(selectedPetId == item.id ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
@@ -147,11 +151,11 @@ struct AchievementWallView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(activePet.name)
                         .font(.system(size: 26, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     Text("\(unlocked.count)/\(achievements.count) 已解锁 · \(claimable.count) 个奖励待领取")
                         .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(.white.opacity(0.58))
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 Text("\(Int(percent * 100))%")
@@ -162,7 +166,7 @@ struct AchievementWallView: View {
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(.white.opacity(0.12))
+                    Capsule().fill(Color.ohanaControlFill)
                     Capsule()
                         .fill(LinearGradient(colors: [Color.goPrimary, Color.goTeal], startPoint: .leading, endPoint: .trailing))
                         .frame(width: geo.size.width * percent)
@@ -186,10 +190,10 @@ struct AchievementWallView: View {
             }
         }
         .padding(18)
-        .background(.white.opacity(0.075), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+                .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
         }
     }
 
@@ -213,23 +217,23 @@ struct AchievementWallView: View {
                                 .foregroundStyle(Color.goPrimary)
                             Text(next.title)
                                 .font(OhanaFont.callout(.black))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                             ProgressView(value: progress.fraction)
                                 .tint(next.color)
                             Text(progress.summary)
                                 .font(OhanaFont.caption2(.bold))
-                                .foregroundStyle(.white.opacity(0.52))
+                                .foregroundStyle(Color.ohanaSecondaryText)
                         }
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(OhanaFont.caption(.bold))
-                            .foregroundStyle(.white.opacity(0.32))
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     .padding(14)
-                    .background(.white.opacity(0.065), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                     .overlay {
                         RoundedRectangle(cornerRadius: 22, style: .continuous)
-                            .strokeBorder(.white.opacity(0.10), lineWidth: 1)
+                            .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
                     }
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -239,15 +243,15 @@ struct AchievementWallView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("全部成就已解锁")
                             .font(OhanaFont.callout(.black))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text("继续记录生活，新的成就体系会优先从这些数据扩展")
                             .font(OhanaFont.caption2(.bold))
-                            .foregroundStyle(.white.opacity(0.52))
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
                 }
                 .padding(14)
-                .background(.white.opacity(0.065), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             }
         }
     }
@@ -262,10 +266,10 @@ struct AchievementWallView: View {
                 } label: {
                     Text(filter.rawValue)
                         .font(OhanaFont.caption(.black))
-                        .foregroundStyle(selectedFilter == filter ? Color.arkInk : .white.opacity(0.62))
+                        .foregroundStyle(selectedFilter == filter ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
-                        .background(selectedFilter == filter ? Color.goPrimary : .white.opacity(0.08), in: Capsule())
+                        .background(selectedFilter == filter ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -299,20 +303,20 @@ struct AchievementWallView: View {
                     } else {
                         Text("\(Int(progress.fraction * 100))%")
                             .font(OhanaFont.caption2(.black))
-                            .foregroundStyle(.white.opacity(0.46))
+                            .foregroundStyle(Color.ohanaSecondaryText)
                             .monospacedDigit()
                     }
                 }
 
                 Text(badge.title)
                     .font(OhanaFont.callout(.black))
-                    .foregroundStyle(badge.isUnlocked ? .white : .white.opacity(0.42))
+                    .foregroundStyle(badge.isUnlocked ? Color.ohanaPrimaryText : Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
 
                 Text(badge.isUnlocked ? (claimed ? "奖励已领取" : "可领取 +\(rewardPerAchievement)🥥") : progress.summary)
                     .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(badge.isUnlocked ? Color.goPrimary : .white.opacity(0.42))
+                    .foregroundStyle(badge.isUnlocked ? Color.goPrimary : Color.ohanaSecondaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -324,12 +328,12 @@ struct AchievementWallView: View {
             .background(
                 badge.isUnlocked
                 ? badge.color.opacity(0.16)
-                : Color.white.opacity(0.055),
+                : Color.ohanaCardSurface,
                 in: RoundedRectangle(cornerRadius: 20, style: .continuous)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(badge.isUnlocked ? badge.color.opacity(0.35) : .white.opacity(0.09), lineWidth: 1)
+                    .strokeBorder(badge.isUnlocked ? badge.color.opacity(0.35) : Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
             }
         }
         .buttonStyle(ScaleButtonStyle())
@@ -350,23 +354,23 @@ struct AchievementWallView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(badge.title)
                             .font(.system(size: 24, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text(badge.isUnlocked ? "已解锁" : "进行中")
                             .font(OhanaFont.caption(.black))
-                            .foregroundStyle(badge.isUnlocked ? Color.goPrimary : .white.opacity(0.45))
+                            .foregroundStyle(badge.isUnlocked ? Color.goPrimary : Color.ohanaSecondaryText)
                     }
                     Spacer()
                 }
 
                 Text(badge.description)
                     .font(OhanaFont.body(.semibold))
-                    .foregroundStyle(.white.opacity(0.68))
+                    .foregroundStyle(Color.ohanaSecondaryText)
 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text(progress.actionTitle)
                             .font(OhanaFont.caption(.black))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Spacer()
                         Text(progress.summary)
                             .font(OhanaFont.caption(.black))
@@ -376,7 +380,7 @@ struct AchievementWallView: View {
                         .tint(badge.color)
                 }
                 .padding(14)
-                .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
                 if badge.isUnlocked && !claimed {
                     Button { claimReward(for: badge) } label: {

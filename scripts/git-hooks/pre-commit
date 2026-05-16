@@ -1,0 +1,64 @@
+#!/bin/sh
+set -eu
+
+max_file_bytes=$((10 * 1024 * 1024))
+max_total_bytes=$((50 * 1024 * 1024))
+
+blocked_paths_file=$(mktemp "${TMPDIR:-/tmp}/ohana-blocked-paths.XXXXXX")
+large_files_file=$(mktemp "${TMPDIR:-/tmp}/ohana-large-files.XXXXXX")
+sizes_file=$(mktemp "${TMPDIR:-/tmp}/ohana-staged-sizes.XXXXXX")
+trap 'rm -f "$blocked_paths_file" "$large_files_file" "$sizes_file"' EXIT
+
+format_bytes() {
+    awk -v bytes="$1" 'BEGIN {
+        if (bytes >= 1048576) {
+            printf "%.1f MiB", bytes / 1048576
+        } else {
+            printf "%.1f KiB", bytes / 1024
+        }
+    }'
+}
+
+git diff --cached --name-only --diff-filter=ACMR | while IFS= read -r path; do
+    case "$path" in
+        tmp/*|build/*|DerivedData/*|.build/*|*.xcresult|*.xcresult/*|*.ipa|*.dSYM|*.dSYM/*|*.dSYM.zip|*.hmap|Ai_Studio_New_UI/node_modules/*|.git\ 2/*|*' 2.'*)
+            printf '%s\n' "$path" >> "$blocked_paths_file"
+            ;;
+    esac
+
+    size=$(git cat-file -s ":$path" 2>/dev/null || printf '0')
+    printf '%s\n' "$size" >> "$sizes_file"
+
+    if [ "$size" -gt "$max_file_bytes" ]; then
+        printf '%s\t%s\n' "$(format_bytes "$size")" "$path" >> "$large_files_file"
+    fi
+done
+
+total_bytes=$(awk '{ total += $1 } END { print total + 0 }' "$sizes_file")
+
+if [ -s "$blocked_paths_file" ] || [ -s "$large_files_file" ] || [ "$total_bytes" -gt "$max_total_bytes" ]; then
+    echo "pre-commit: repository size guard blocked this commit."
+    echo
+
+    if [ -s "$blocked_paths_file" ]; then
+        echo "Blocked generated/local paths:"
+        sed 's/^/  - /' "$blocked_paths_file"
+        echo
+    fi
+
+    if [ -s "$large_files_file" ]; then
+        echo "Files over $(format_bytes "$max_file_bytes"):"
+        sed 's/^/  - /' "$large_files_file"
+        echo
+    fi
+
+    if [ "$total_bytes" -gt "$max_total_bytes" ]; then
+        echo "Total staged file payload is $(format_bytes "$total_bytes"), over $(format_bytes "$max_total_bytes")."
+        echo
+    fi
+
+    echo "Move generated files outside the repository, add an ignore rule, or use an external artifact store."
+    exit 1
+fi
+
+exit 0

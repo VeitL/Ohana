@@ -28,7 +28,7 @@ struct FeatureGroupDashboardView: View {
         }
     }
 
-    /// 家模块中悬赏榜/周报 在多家人时才展示（单家人没有协作语义）
+    /// 家模块中周报在多家人时才展示；悬赏已统一收进 Ohana 成员页协作。
     private var hasMultipleHumans: Bool { visibleHumans.count > 1 }
 
     private var items: [FeatureGroupItem] {
@@ -182,7 +182,6 @@ private struct FeatureGroupItem: Identifiable {
                 destination(id: "reminder-observability", title: "提醒健康", icon: "bell.badge.fill", .reminderObservability)
             ]
             if hasMultipleHumans {
-                items.append(destination(id: "bounty", title: "悬赏榜", icon: "megaphone.fill", .bountyBoard))
                 items.append(destination(id: "weekly-report", title: "家庭周报", icon: "chart.bar.doc.horizontal", .familyWeeklyReport))
             }
             return items

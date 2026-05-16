@@ -33,6 +33,9 @@ struct FocusCard: Identifiable {
     var themeColorHex: String = ""
     var daysTogether: Int = 0
     var breed: String = ""
+    var hasPassedAway: Bool = false
+    var passedAwayDate: Date? = nil
+    var daysTogetherAtPassing: Int = 0
     var isShownOnHome: Bool = true
     var isHuman: Bool = false
     var isDummy: Bool = false
@@ -123,21 +126,22 @@ extension FocusCard {
         let l = L10n(language)
         let usesEnglishFallback = AppLanguage.normalize(language) != "zh"
         let hour = Calendar.current.component(.hour, from: Date())
+        let togetherDays = pet.hasPassedAway ? pet.daysTogetherAtPassing : pet.daysTogether
         return FocusCard(
             id: pet.id,
             name: pet.name.isEmpty ? l.tr(zh: "未命名", en: "Unnamed", de: "Unbenannt") : pet.name,
-            kind: pet.species.isEmpty ? "PET" : pet.species,
+            kind: pet.hasPassedAway ? l.tr(zh: "彩虹桥", en: "Rainbow Bridge", de: "Regenbogenbrücke") : (pet.species.isEmpty ? "PET" : pet.species),
             emoji: pet.avatarEmoji.isEmpty ? "🐾" : pet.avatarEmoji,
             color: Color(hex: hex),
             streak: pet.currentStreak,
             coconutBalance: pet.coconutBalance,
             createdAt: pet.createdAt,
             daysTogetherText: pet.homeDate == nil ? nil : l.tr(
-                zh: "\(pet.daysTogether) 天",
-                en: "\(pet.daysTogether) days",
-                de: "\(pet.daysTogether) Tage"
+                zh: "\(togetherDays) 天",
+                en: "\(togetherDays) days",
+                de: "\(togetherDays) Tage"
             ),
-            ageText: pet.birthday.map { pet.localizedAgeTextForWallet(birthday: $0, l: l) },
+            ageText: pet.hasPassedAway ? pet.ageAtPassingText : pet.birthday.map { pet.localizedAgeTextForWallet(birthday: $0, l: l) },
             zodiacText: pet.birthday.map { Human.westernZodiacDisplay(for: $0, isEnglish: usesEnglishFallback) },
             humanEquivalentAgeText: pet.birthday.map { pet.humanEquivalentAgeTextForWallet(birthday: $0, l: l) },
             genderText: pet.genderSymbol + (pet.isNeutered ? l.tr(zh: " 已绝育", en: " neutered", de: " kastriert") : ""),
@@ -148,8 +152,11 @@ extension FocusCard {
             eyeColor: WalletPetCardTheme.silhouetteEyeColor(for: pet),
             patternName: WalletPetCardTheme.coatPatternName(for: pet),
             themeColorHex: hex,
-            daysTogether: pet.homeDate == nil ? 0 : pet.daysTogether,
+            daysTogether: pet.homeDate == nil ? 0 : togetherDays,
             breed: pet.breed,
+            hasPassedAway: pet.hasPassedAway,
+            passedAwayDate: pet.passedAwayDate,
+            daysTogetherAtPassing: pet.daysTogetherAtPassing,
             isReal: true,
             actions: Array(acts.prefix(4))
         )
@@ -157,14 +164,16 @@ extension FocusCard {
 
     static func from(_ human: Human) -> FocusCard {
         let hex = human.safeThemeColorHex
-        let days = max(0, Calendar.current.dateComponents([.day], from: human.createdAt, to: Date()).day ?? 0)
+        let days = human.hasPassedAway
+            ? human.daysTogetherAtPassing
+            : max(0, Calendar.current.dateComponents([.day], from: human.createdAt, to: Date()).day ?? 0)
         let language = AppLanguage.code
         let l = L10n(language)
         let usesEnglishFallback = language != "zh"
         return FocusCard(
             id: human.id,
             name: human.name.isEmpty ? l.tr(zh: "成员", en: "Human", de: "Mitglied") : human.name,
-            kind: human.roleText.isEmpty ? "HUMAN" : human.roleText,
+            kind: human.hasPassedAway ? l.tr(zh: "纪念", en: "Memorial", de: "Gedenken") : (human.roleText.isEmpty ? "HUMAN" : human.roleText),
             emoji: human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji,
             color: Color(hex: hex),
             streak: 0,
@@ -175,7 +184,7 @@ extension FocusCard {
                 en: "\(days) days",
                 de: "\(days) Tage"
             ),
-            ageText: human.birthday.map { human.localizedAgeTextForWallet(birthday: $0, l: l) },
+            ageText: human.hasPassedAway ? human.ageAtPassingText : human.birthday.map { human.localizedAgeTextForWallet(birthday: $0, l: l) },
             zodiacText: human.birthday.map { Human.westernZodiacDisplay(for: $0, isEnglish: usesEnglishFallback) },
             mbtiText: human.mbti.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : human.mbti.uppercased(),
             genderText: HumanGenderIdentity.title(for: human.genderRaw),
@@ -183,6 +192,9 @@ extension FocusCard {
             humanGender: human.genderRaw,
             themeColorHex: hex,
             daysTogether: days,
+            hasPassedAway: human.hasPassedAway,
+            passedAwayDate: human.passedAwayDate,
+            daysTogetherAtPassing: human.daysTogetherAtPassing,
             isShownOnHome: human.shouldShowOnHome,
             isHuman: true,
             isReal: true,

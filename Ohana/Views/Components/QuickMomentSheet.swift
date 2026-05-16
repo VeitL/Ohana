@@ -9,8 +9,17 @@ import SwiftUI
 import SwiftData
 import PhotosUI
 import CoreLocation
+import MapKit
 import UIKit
 import Combine
+
+private struct QuickMomentContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
 
 struct QuickMomentSheet: View {
     let pet: Pet?
@@ -19,6 +28,7 @@ struct QuickMomentSheet: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var noteText = ""
     @State private var selectedItems: [PhotosPickerItem] = []
@@ -31,8 +41,11 @@ struct QuickMomentSheet: View {
     @State private var isSaving = false
     @State private var savedSuccess = false
     @State private var showLocationInput = false
-
-    @Query(sort: \PetPhotoLog.date, order: .reverse) private var allPhotos: [PetPhotoLog]
+    @State private var adaptiveSheetHeight: CGFloat = 540
+    @State private var contentHeight: CGFloat = 0
+    @State private var popupVisible = false
+    @State private var isClosing = false
+    @State private var popupDragOffset: CGFloat = 0
 
     /// 记录时刻强调色：有宠物时用主题色
     private var momentAccent: Color {
@@ -41,75 +54,83 @@ struct QuickMomentSheet: View {
         return Color(hex: hex.isEmpty ? "FF7600" : hex)
     }
 
-    private var petPhotos: [PetPhotoLog] {
-        guard let pet else {
-            return Array(allPhotos.prefix(12))
-        }
-        return allPhotos.filter { $0.pet?.id == pet.id }.prefix(12).map { $0 }
-    }
-
     private var canSave: Bool {
-        !selectedPhotos.isEmpty || !noteText.trimmingCharacters(in: .whitespaces).isEmpty
+        !selectedPhotos.isEmpty || !trimmedNote.isEmpty
     }
 
     private let maxDraftPhotos = 9
+    private var l: L10n { L10n(appLanguage) }
+    private var trimmedNote: String { noteText.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var popupAnimation: Animation {
+        .interactiveSpring(response: 0.30, dampingFraction: 0.88, blendDuration: 0.12)
+    }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                OhanaAppBackground().ignoresSafeArea()
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 16) {
-                        momentHeader
+        GeometryReader { proxy in
+            let minPanelHeight: CGFloat = 440
+            let availableHeight = max(proxy.size.height, ScreenCompat.height * 0.90)
+            let maxPanelHeight = max(minPanelHeight, availableHeight * 0.92)
+            let scrollMaxHeight = max(260, maxPanelHeight - 150)
+            let measuredHeight = contentHeight > 1 ? contentHeight : 380
+            let scrollHeight = min(measuredHeight, scrollMaxHeight)
+            let panelHeightEstimate = min(maxPanelHeight, max(adaptiveSheetHeight, minPanelHeight))
+            let hiddenOffset = panelHeightEstimate + 72
 
-                        photoSection
+            ZStack(alignment: .bottom) {
+                popupBackdrop
+                    .opacity(popupVisible ? 1 : 0)
 
-                        moodAndNoteSection
+                VStack(spacing: 0) {
+                    popupDragHandle
+                        .padding(.top, 4)
 
-                        locationCompactSection
+                    header
 
-                        Spacer().frame(height: 8)
-
-                        saveButton
-
-                        if !petPhotos.isEmpty {
-                            recentSection
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 14) {
+                            photoSection
+                            moodAndNoteSection
+                            locationCompactSection
                         }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-                    .padding(.bottom, 40)
-                    .transaction { $0.disablesAnimations = false }
-                }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 12) {
-                        if onRemove != nil {
-                            Menu {
-                                Button(role: .destructive) {
-                                    onRemove?()
-                                    dismiss()
-                                } label: {
-                                    Label("移除此快捷入口", systemImage: "trash")
-                                }
-                            } label: {
-                                Image(systemName: "ellipsis.circle")
-                                    .font(.system(size: 22))
-                                    .foregroundStyle(Color.ohanaSecondaryText)
-                                    .symbolRenderingMode(.hierarchical)
+                        .padding(.bottom, 10)
+                        .background {
+                            GeometryReader { contentProxy in
+                                Color.clear
+                                    .preference(
+                                        key: QuickMomentContentHeightKey.self,
+                                        value: contentProxy.size.height
+                                    )
                             }
                         }
-                        Button { dismiss() } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(Color.ohanaSecondaryText)
-                        }
                     }
+                    .scrollDismissesKeyboard(.interactively)
+                    .frame(height: scrollHeight)
+
+                    saveButton
                 }
+                .background { OhanaPopupGlassSurface(cornerRadius: 52) }
+                .clipShape(RoundedRectangle(cornerRadius: 52, style: .continuous))
+                .shadow(color: Color.black.opacity(0.56), radius: 48, x: 0, y: -18) // ui-v4: allow short popup liftedAlert shadow token
+                .shadow(color: Color(hex: "0B102C").opacity(0.46), radius: 28, x: 0, y: 12) // ui-v4: allow short popup liftedAlert shadow token
+                .padding(.horizontal, 6)
+                .padding(.bottom, 8)
+                .offset(y: popupVisible ? popupDragOffset : hiddenOffset)
+                .frame(maxHeight: maxPanelHeight, alignment: .bottom)
+                .ohanaAdaptiveSheetContentHeight(
+                    $adaptiveSheetHeight,
+                    minHeight: minPanelHeight,
+                    maxHeight: maxPanelHeight,
+                    chromePadding: 18
+                )
             }
         }
+        .transition(.opacity)
+        .allowsHitTesting(popupVisible && !isClosing)
+        .animation(popupAnimation, value: popupVisible)
+        .presentationBackground(.clear)
+        .presentationDetents([.height(min(adaptiveSheetHeight, ScreenCompat.height * 0.94))])
+        .presentationDragIndicator(.hidden)
+        .presentationContentInteraction(.scrolls)
         .onChange(of: selectedItems) { _, newItems in
             Task {
                 var loaded: [MomentDraftPhoto] = []
@@ -135,6 +156,23 @@ struct QuickMomentSheet: View {
                 successOverlay
             }
         }
+        .onAppear {
+            popupVisible = false
+            isClosing = false
+            DispatchQueue.main.async {
+                withAnimation(popupAnimation) {
+                    popupVisible = true
+                }
+            }
+        }
+        .onPreferenceChange(QuickMomentContentHeightKey.self) { height in
+            guard height.isFinite, height > 0 else { return }
+            var transaction = Transaction()
+            transaction.animation = nil
+            withTransaction(transaction) {
+                contentHeight = height
+            }
+        }
         .fullScreenCover(isPresented: $showCamera) {
             PetCameraPickerView { img in
                 capturedImage = img
@@ -143,59 +181,135 @@ struct QuickMomentSheet: View {
                 showCamera = false
             }
         }
-        .alert("无法打开相机", isPresented: $showCameraPermissionAlert) {
-            Button("知道了", role: .cancel) {}
+        .alert(l.tr(zh: "无法打开相机", en: "Camera unavailable", de: "Kamera nicht verfügbar"), isPresented: $showCameraPermissionAlert) {
+            Button(l.tr(zh: "知道了", en: "OK", de: "OK"), role: .cancel) {}
         } message: {
-            Text("请在系统设置中允许 Ohana 访问相机。")
+            Text(l.tr(
+                zh: "请在系统设置中允许 Ohana 访问相机。",
+                en: "Allow Ohana to access the camera in system settings.",
+                de: "Erlaube Ohana den Kamerazugriff in den Systemeinstellungen."
+            ))
         }
     }
 
-    // MARK: - Header（Scroll 内：为谁记录）
+    // MARK: - Popup Chrome
 
-    private var momentHeader: some View {
-        HStack(spacing: 10) {
+    private var popupBackdrop: some View {
+        LinearGradient(
+            colors: [
+                Color.black.opacity(0.06), // ui-v4: allow short popup scrimGradient token
+                Color.black.opacity(0.30) // ui-v4: allow short popup scrimGradient token
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea()
+        .contentShape(Rectangle())
+        .onTapGesture { close() }
+    }
+
+    private var popupDragHandle: some View {
+        OhanaPopupDragHandle()
+            .gesture(
+                DragGesture(minimumDistance: 4)
+                    .onChanged { value in
+                        popupDragOffset = max(0, value.translation.height)
+                    }
+                    .onEnded { value in
+                        if value.translation.height > 70 || value.predictedEndTranslation.height > 130 {
+                            close()
+                        } else {
+                            withAnimation(popupAnimation) { popupDragOffset = 0 }
+                        }
+                    }
+            )
+    }
+
+    private func close() {
+        guard !isClosing else { return }
+        isClosing = true
+        withAnimation(popupAnimation) {
+            popupVisible = false
+            popupDragOffset = 0
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+            dismiss()
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 14) {
             if let pet {
                 ZStack {
-                    Circle()
-                        .strokeBorder(Color.white.opacity(0.9), lineWidth: 1.5)
-                        .frame(width: 40, height: 40)
-                    Circle()
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .fill(momentAccent.opacity(0.15))
-                        .frame(width: 40, height: 40)
                     if let data = pet.avatarImageData, let img = UIImage(data: data) {
                         Image(uiImage: img)
-                            .resizable().scaledToFill()
-                            .frame(width: 40, height: 40)
-                            .clipShape(Circle())
+                            .resizable()
+                            .scaledToFill()
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     } else {
-                        Text(pet.avatarEmoji).font(.system(size: 20))
+                        Text(pet.avatarEmoji)
+                            .font(.system(size: 24))
                     }
                 }
+                .frame(width: 58, height: 58)
+
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("记录时刻")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                    Text("为 \(pet.name)")
-                        .font(.system(size: 13, weight: .regular, design: .rounded))
+                    Text(l.tr(zh: "快速记录", en: "Quick Moment", de: "Schneller Moment"))
+                        .font(OhanaFont.title3(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(pet.name)
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             } else {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("记录时刻")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                    Text("照片与文字将保存到相册")
-                        .font(.system(size: 13, weight: .regular, design: .rounded))
+                    Text(l.tr(zh: "快速记录", en: "Quick Moment", de: "Schneller Moment"))
+                        .font(OhanaFont.title3(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(l.tr(zh: "文字和照片会进入记录中心", en: "Text and photos go to Moments", de: "Text und Fotos landen in Momente"))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
             Spacer(minLength: 0)
+
+            if onRemove != nil {
+                Button {
+                    onRemove?()
+                    close()
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 14, weight: .black))
+                        .foregroundStyle(Color.goRed)
+                        .frame(width: 40, height: 40)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(ScaleButtonStyle())
+            }
+
+            OhanaPopupCloseButton { close() }
         }
-        .padding(.bottom, 4)
+        .padding(.horizontal, 22)
+        .padding(.top, 10)
+        .padding(.bottom, 14)
     }
 
     private var resolvedPlaceDisplay: String {
         let m = manualPlace.trimmingCharacters(in: .whitespacesAndNewlines)
         if !m.isEmpty { return m }
-        return locationModel.statusText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let status = locationModel.statusText.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch status {
+        case "已获取位置":
+            return l.tr(zh: "已获取位置", en: "Place captured", de: "Ort erfasst")
+        case "已获取坐标":
+            return l.tr(zh: "已获取坐标", en: "Location captured", de: "Standort erfasst")
+        case "定位不可用":
+            return l.tr(zh: "定位不可用", en: "Location unavailable", de: "Standort nicht verfügbar")
+        default:
+            return status
+        }
     }
 
     @MainActor
@@ -233,10 +347,12 @@ struct QuickMomentSheet: View {
                     }
                 } else {
                     Button {
-                        showLocationInput.toggle()
+                        withAnimation(GoMotion.quick) {
+                            showLocationInput.toggle()
+                        }
                     } label: {
-                        Text("添加位置（可选）")
-                            .font(.system(size: 15, design: .rounded))
+                        Text(l.tr(zh: "地点可选", en: "Place optional", de: "Ort optional"))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -244,28 +360,38 @@ struct QuickMomentSheet: View {
                     Button {
                         locationModel.requestFix()
                     } label: {
-                        Text("定位")
-                            .font(.system(size: 13, weight: .medium, design: .rounded))
-                            .foregroundStyle(momentAccent)
+                        Text(l.tr(zh: "定位", en: "Locate", de: "Orten"))
+                            .font(OhanaFont.caption(.black))
+                            .foregroundStyle(Color.arkInk)
                             .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(Capsule().fill(momentAccent.opacity(0.12)))
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(momentAccent))
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 12))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+            }
 
             if showLocationInput {
-                TextField("输入地点", text: $manualPlace)
-                    .font(.system(size: 15, design: .rounded))
+                TextField(l.tr(zh: "输入地点", en: "Enter place", de: "Ort eingeben"), text: $manualPlace)
+                    .font(OhanaFont.callout(.semibold))
                     .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 12))
+                    .padding(.vertical, 12)
+                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
             }
         }
+        .padding(.horizontal, 22)
     }
 
     // MARK: - Photo Section
@@ -285,40 +411,47 @@ struct QuickMomentSheet: View {
                 .scrollTargetBehavior(.viewAligned)
             }
 
-            ZStack {
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
-                    .foregroundStyle(Color.secondary.opacity(0.28))
-
-                VStack(spacing: 12) {
-                    HStack(spacing: 12) {
-                        PhotosPicker(selection: $selectedItems, maxSelectionCount: max(1, maxDraftPhotos - selectedPhotos.count), matching: .images) {
-                            photoActionLabel(icon: "photo.on.rectangle.angled", title: selectedPhotos.isEmpty ? "从相册选择" : "继续添加", color: momentAccent)
-                        }
-                        .buttonStyle(ScaleButtonStyle())
-                        .disabled(selectedPhotos.count >= maxDraftPhotos)
-
-                        Button { presentMomentCamera() } label: {
-                            photoActionLabel(icon: "camera.fill", title: "拍照", color: Color.goTeal)
-                        }
-                        .buttonStyle(ScaleButtonStyle())
-                        .disabled(selectedPhotos.count >= maxDraftPhotos)
+            VStack(spacing: 12) {
+                HStack(spacing: 12) {
+                    PhotosPicker(selection: $selectedItems, maxSelectionCount: max(1, maxDraftPhotos - selectedPhotos.count), matching: .images) {
+                        photoActionLabel(
+                            icon: "photo.on.rectangle.angled",
+                            title: selectedPhotos.isEmpty
+                                ? l.tr(zh: "相册", en: "Album", de: "Album")
+                                : l.tr(zh: "继续添加", en: "Add More", de: "Mehr hinzufügen"),
+                            color: momentAccent
+                        )
                     }
+                    .buttonStyle(ScaleButtonStyle())
+                    .disabled(selectedPhotos.count >= maxDraftPhotos)
 
-                    Text(selectedPhotos.isEmpty ? "可以跳过照片，仅写下文字" : "已添加 \(selectedPhotos.count)/\(maxDraftPhotos) 张，保存后都会进入历史记录")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.tertiary)
+                    Button { presentMomentCamera() } label: {
+                        photoActionLabel(icon: "camera.fill", title: l.tr(zh: "拍照", en: "Camera", de: "Kamera"), color: Color.goTeal)
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .disabled(selectedPhotos.count >= maxDraftPhotos)
                 }
-                .padding(16)
+
+                Text(selectedPhotos.isEmpty
+                     ? l.tr(zh: "可以只写文字，不一定要加照片", en: "Text only is fine too", de: "Nur Text ist auch okay")
+                     : l.tr(zh: "已添加 \(selectedPhotos.count)/\(maxDraftPhotos) 张", en: "\(selectedPhotos.count)/\(maxDraftPhotos) photos added", de: "\(selectedPhotos.count)/\(maxDraftPhotos) Fotos hinzugefügt"))
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.ohanaTertiaryText)
             }
-            .frame(height: selectedPhotos.isEmpty ? 140 : 126)
+            .padding(14)
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+            }
         }
+        .padding(.horizontal, 22)
     }
 
     private func draftPhotoCard(_ photo: MomentDraftPhoto) -> some View {
         ZStack(alignment: .topTrailing) {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.black.opacity(0.88))
+                .fill(Color.ohanaCardSurface)
                 .overlay {
                     Image(uiImage: photo.image)
                         .resizable()
@@ -327,15 +460,15 @@ struct QuickMomentSheet: View {
                 }
 
             Button {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                withAnimation(GoMotion.quick) {
                     selectedPhotos.removeAll { $0.id == photo.id }
                 }
             } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 24))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.white)
-                    .shadow(radius: 4)
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .black))
+                    .foregroundStyle(Color.arkInk)
+                    .frame(width: 28, height: 28)
+                    .background(Color.goRed, in: Circle())
             }
             .padding(10)
         }
@@ -343,27 +476,34 @@ struct QuickMomentSheet: View {
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+                .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
     }
 
     private func photoActionLabel(icon: String, title: String, color: Color) -> some View {
-        VStack(spacing: 6) {
+        HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 26, weight: .bold))
-                .foregroundStyle(color)
+                .font(.system(size: 15, weight: .black))
             Text(title)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
+                .font(OhanaFont.callout(.black))
         }
+        .foregroundStyle(Color.arkInk)
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
-        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.vertical, 12)
+        .background(color, in: Capsule())
     }
 
     // MARK: - 心情标签 + 文字
 
-    private let moodTags = ["😊 开心", "😴 困了", "🎉 有趣", "💕 爱你", "🌟 棒棒"]
+    private var moodTags: [String] {
+        [
+            l.tr(zh: "😊 开心", en: "😊 Happy", de: "😊 Glücklich"),
+            l.tr(zh: "😴 困了", en: "😴 Sleepy", de: "😴 Müde"),
+            l.tr(zh: "🎉 有趣", en: "🎉 Fun", de: "🎉 Lustig"),
+            l.tr(zh: "💕 爱你", en: "💕 Love", de: "💕 Liebe"),
+            l.tr(zh: "🌟 棒棒", en: "🌟 Great", de: "🌟 Toll")
+        ]
+    }
 
     private var moodAndNoteSection: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -372,10 +512,10 @@ struct QuickMomentSheet: View {
                     ForEach(moodTags, id: \.self) { tag in
                         Button { appendMoodTag(tag) } label: {
                             Text(tag)
-                                .font(.system(size: 13, design: .rounded))
+                                .font(OhanaFont.caption(.black))
                                 .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(Capsule().fill(Color.primary.opacity(0.07)))
+                                .padding(.vertical, 7)
+                                .background(Capsule().fill(Color.ohanaControlFill))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                         }
                         .buttonStyle(ScaleButtonStyle())
@@ -385,26 +525,32 @@ struct QuickMomentSheet: View {
 
             ZStack(alignment: .topLeading) {
                 if noteText.isEmpty {
-                    Text("记录此刻的心情、趣事……")
-                        .font(.system(size: 15, design: .rounded))
-                        .foregroundStyle(.tertiary)
-                        .padding(.top, 12)
-                        .padding(.leading, 16)
+                    Text(l.tr(zh: "记录此刻的心情、趣事……", en: "Write what happened right now…", de: "Was ist gerade passiert?"))
+                        .font(OhanaFont.body(.semibold))
+                        .foregroundStyle(Color.ohanaTertiaryText)
+                        .padding(.top, 16)
+                        .padding(.leading, 18)
                         .allowsHitTesting(false)
                 }
                 TextEditor(text: $noteText)
-                    .font(.system(size: 15, design: .rounded))
-                    .frame(minHeight: 100, maxHeight: 140)
+                    .font(OhanaFont.body(.semibold))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .frame(minHeight: 118, maxHeight: 154)
                     .padding(.horizontal, 12)
                     .scrollContentBackground(.hidden)
             }
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 12))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+            }
 
             Text("\(noteText.count)/140")
-                .font(.system(size: 12))
-                .foregroundStyle(.tertiary)
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(Color.ohanaTertiaryText)
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
+        .padding(.horizontal, 22)
         .onChange(of: noteText) { _, new in
             if new.count > 140 {
                 noteText = String(new.prefix(140))
@@ -427,75 +573,27 @@ struct QuickMomentSheet: View {
                     Image(systemName: canSave ? "checkmark.circle.fill" : "lock.fill")
                         .font(.system(size: 18))
                 }
-                Text(
-                    isSaving ? "保存中…"
-                        : (canSave ? "保存这一刻 🌟" : "写点什么或添加照片")
-                )
-                .font(.system(size: 17, weight: .bold, design: .rounded))
+                Text(isSaving
+                     ? l.tr(zh: "保存中…", en: "Saving…", de: "Speichern…")
+                     : (canSave
+                        ? l.tr(zh: "保存这一刻", en: "Save Moment", de: "Moment speichern")
+                        : l.tr(zh: "写点什么或添加照片", en: "Add text or a photo", de: "Text oder Foto hinzufügen")))
+                    .font(OhanaFont.body(.black))
             }
-            .foregroundStyle(canSave ? Color.arkInk : Color.secondary)
+            .foregroundStyle(canSave ? Color.arkInk : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(canSave ? Color(hex: "C6FF00") : Color.primary.opacity(0.08))
+                Capsule()
+                    .fill(canSave ? Color.goPrimary : Color.ohanaControlFill)
             )
-            .animation(.spring(response: 0.3), value: canSave)
+            .animation(GoMotion.quick, value: canSave)
         }
         .buttonStyle(ScaleButtonStyle())
         .disabled(!canSave || isSaving)
-    }
-
-    // MARK: - Recent Section
-
-    private var recentSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("近期时刻", systemImage: "photo.stack.fill")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .padding(.horizontal, 4)
-
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
-                ForEach(petPhotos) { photo in
-                    if let img = UIImage(data: photo.imageData) {
-                        ZStack(alignment: .bottomLeading) {
-                            Image(uiImage: img)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(height: 100)
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-
-                            if !photo.note.isEmpty {
-                                LinearGradient(
-                                    colors: [.black.opacity(0.6), .clear],
-                                    startPoint: .bottom, endPoint: .center
-                                )
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-
-                                Text(photo.note)
-                                    .font(.system(size: 9, weight: .medium))
-                                    .foregroundStyle(.white)
-                                    .lineLimit(2)
-                                    .padding(6)
-                            }
-                        }
-                    } else {
-                        // 纯文字记录
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(momentAccent.opacity(0.12))
-                            .frame(height: 100)
-                            .overlay {
-                                Text(photo.note)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
-                                    .multilineTextAlignment(.center)
-                                    .lineLimit(4)
-                                    .padding(8)
-                            }
-                    }
-                }
-            }
-        }
+        .padding(.horizontal, 22)
+        .padding(.top, 8)
+        .padding(.bottom, 18)
     }
 
     // MARK: - Success Overlay
@@ -505,11 +603,11 @@ struct QuickMomentSheet: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 48))
                 .foregroundStyle(momentAccent)
-            Text("时刻已记录！")
-                .font(.system(size: 18, weight: .black, design: .rounded))
+            Text(l.tr(zh: "时刻已记录！", en: "Moment saved!", de: "Moment gespeichert!"))
+                .font(OhanaFont.title3(.black))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.ohanaCardSurface)
+        .background(Color.black.opacity(0.18)) // ui-v4: allow transient success overlay scrim
         .transition(.opacity)
     }
 
@@ -520,7 +618,7 @@ struct QuickMomentSheet: View {
         isSaving = true
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
 
-        let note = noteText.trimmingCharacters(in: .whitespaces)
+        let note = trimmedNote
 
         let placeName: String = {
             let m = manualPlace.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -581,11 +679,11 @@ struct QuickMomentSheet: View {
             )
         }
 
-        withAnimation(.spring(response: 0.3)) { savedSuccess = true }
+        withAnimation(GoMotion.feedback) { savedSuccess = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
             isSaving = false
             onSaved?()
-            dismiss()
+            close()
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             noteText = ""
@@ -593,7 +691,7 @@ struct QuickMomentSheet: View {
             selectedItems = []
             manualPlace = ""
             locationModel.reset()
-            withAnimation(.easeOut(duration: 0.25)) { savedSuccess = false }
+            withAnimation(GoMotion.quick) { savedSuccess = false }
         }
     }
 
@@ -602,7 +700,7 @@ struct QuickMomentSheet: View {
         guard !photos.isEmpty else { return }
         let remaining = max(0, maxDraftPhotos - selectedPhotos.count)
         guard remaining > 0 else { return }
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
+        withAnimation(GoMotion.quick) {
             selectedPhotos.append(contentsOf: photos.prefix(remaining))
         }
     }
@@ -623,53 +721,47 @@ private struct MomentDraftPhoto: Identifiable {
 
 // MARK: - 定位
 
-private final class MomentLocationModel: NSObject, ObservableObject, CLLocationManagerDelegate {
+private final class MomentLocationModel: ObservableObject {
     @Published var statusText = ""
     @Published var latitude = 0.0
     @Published var longitude = 0.0
-    private let manager = CLLocationManager()
-
-    override init() {
-        super.init()
-        manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
-    }
 
     func reset() {
         statusText = ""
         latitude = 0
         longitude = 0
-        manager.stopUpdatingLocation()
     }
 
     func requestFix() {
-        manager.requestWhenInUseAuthorization()
-        manager.requestLocation()
-    }
-
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        manager.stopUpdatingLocation()
-        guard let l = locations.last else { return }
-        latitude = l.coordinate.latitude
-        longitude = l.coordinate.longitude
-        let geo = CLGeocoder()
-        geo.reverseGeocodeLocation(l) { [weak self] marks, _ in
+        LocationManager.shared.requestOneShotLocation { [weak self] result in
             guard let self else { return }
             DispatchQueue.main.async {
-                if let t = marks?.first {
-                    let parts = [t.name, t.thoroughfare, t.locality].compactMap { $0 }
-                    self.statusText = parts.isEmpty ? "已获取位置" : parts.joined(separator: " · ")
-                } else {
-                    self.statusText = "已获取坐标"
+                switch result {
+                case .success(let location):
+                    self.latitude = location.coordinate.latitude
+                    self.longitude = location.coordinate.longitude
+                    self.reverseGeocode(location)
+                case .failure:
+                    self.statusText = "定位不可用"
                 }
             }
         }
     }
 
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        manager.stopUpdatingLocation()
-        DispatchQueue.main.async {
-            self.statusText = "定位不可用"
+    private func reverseGeocode(_ location: CLLocation) {
+        guard let request = MKReverseGeocodingRequest(location: location) else {
+            statusText = "已获取坐标"
+            return
+        }
+        request.getMapItems { [weak self] mapItems, _ in
+            guard let self else { return }
+            let item = mapItems?.first
+            let address = item?.addressRepresentations?.fullAddress(includingRegion: false, singleLine: true)
+            let parts = [item?.name, address].compactMap { value in
+                let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed?.isEmpty == false ? trimmed : nil
+            }
+            self.statusText = parts.isEmpty ? "已获取坐标" : parts.joined(separator: " · ")
         }
     }
 }

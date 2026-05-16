@@ -438,6 +438,7 @@ struct AddVaccineSheet: View {
         }
 
         modelContext.safeSave()
+        QuestManager.shared.awardAction(type: .health, pet: pet, context: modelContext)
         if let reminderToSchedule {
             Task { @MainActor in
                 await ReminderSchedulingService.scheduleIfNeeded(reminder: reminderToSchedule, context: modelContext, source: .detail)

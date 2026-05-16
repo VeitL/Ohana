@@ -24,6 +24,12 @@ struct WealthBarData: Identifiable {
     let amount: Int
 }
 
+struct WealthBalancePoint: Identifiable {
+    let id = UUID()
+    let bucket: Date
+    let balance: Int
+}
+
 // MARK: - Leaderboard Row（直接用实体余额）
 struct WealthLeaderRow: Identifiable {
     let id = UUID()
@@ -39,6 +45,7 @@ struct WealthLeaderRow: Identifiable {
 final class IslandWealthViewModel {
     var timeRange: WealthTimeRange = .week
     var showSystemCoconuts: Bool = true
+    var selectedActorId: String? = nil
 
     // 注入实体列表（由 View 从 @Query 传入）
     var pets: [Pet] = []
@@ -50,6 +57,17 @@ final class IslandWealthViewModel {
     // 当前查看者可见的全岛总资产；隐私成员的个人椰子余额不计入展示。
     var totalAssets: Int {
         pets.reduce(0) { $0 + $1.coconutBalance } + humans.reduce(0) { $0 + $1.coconutBalance }
+    }
+
+    var displayedAssets: Int {
+        guard let selectedActorId else { return totalAssets }
+        if let pet = pets.first(where: { $0.id.uuidString == selectedActorId }) {
+            return pet.coconutBalance
+        }
+        if let human = humans.first(where: { $0.id.uuidString == selectedActorId }) {
+            return human.coconutBalance
+        }
+        return 0
     }
 
     // MARK: - 排行榜（直接读个人余额，不从 log 聚合）
@@ -71,7 +89,9 @@ final class IslandWealthViewModel {
 
     // MARK: - 图表数据（按时间桶聚合 log，仅用于趋势图）
     private var logs: [CoconutLogEntry] {
-        QuestManager.shared.coconutLogs.filter { !hiddenHumanIds.contains($0.actorId ?? "") }
+        let visibleLogs = QuestManager.shared.coconutLogs.filter { !hiddenHumanIds.contains($0.actorId ?? "") }
+        guard let selectedActorId else { return visibleLogs }
+        return visibleLogs.filter { $0.actorId == selectedActorId }
     }
 
     // 按时间范围过滤（不区分正负）
@@ -106,6 +126,7 @@ final class IslandWealthViewModel {
     // MARK: - 收支汇总
     var periodIncome:   Int { filteredIncome.reduce(0)   { $0 + $1.amount } }
     var periodSpending: Int { filteredSpending.reduce(0) { $0 + abs($1.amount) } }
+    var periodNet: Int { periodIncome - periodSpending }
 
     // 时间段内活跃实体名集合（用于图例）
     var activeEntityNames: [String] {
@@ -121,6 +142,54 @@ final class IslandWealthViewModel {
         case .month: return .day
         case .all:   return .month
         }
+    }
+
+    private var rangeStartDate: Date {
+        let cal = Calendar.current
+        let now = Date()
+        switch timeRange {
+        case .day:
+            return cal.startOfDay(for: now)
+        case .week:
+            return cal.dateInterval(of: .weekOfYear, for: now)?.start ?? cal.startOfDay(for: now)
+        case .month:
+            return cal.dateInterval(of: .month, for: now)?.start ?? cal.startOfDay(for: now)
+        case .all:
+            if let earliest = logs.map(\.date).min() {
+                return cal.dateInterval(of: bucketComponent, for: earliest)?.start ?? earliest
+            }
+            return cal.date(byAdding: .day, value: -1, to: now) ?? now
+        }
+    }
+
+    var wealthTrendPoints: [WealthBalancePoint] {
+        let cal = Calendar.current
+        let component = bucketComponent
+        var bucketDeltas: [Date: Int] = [:]
+        for log in filteredByTimeRange {
+            let bucket = cal.dateInterval(of: component, for: log.date)?.start ?? log.date
+            bucketDeltas[bucket, default: 0] += log.amount
+        }
+
+        let sortedBuckets = bucketDeltas.keys.sorted()
+        let periodNetChange = sortedBuckets.reduce(0) { $0 + (bucketDeltas[$1] ?? 0) }
+        let startBucket = cal.dateInterval(of: component, for: rangeStartDate)?.start ?? rangeStartDate
+        var runningBalance = max(0, displayedAssets - periodNetChange)
+        var points = [WealthBalancePoint(bucket: startBucket, balance: runningBalance)]
+
+        for bucket in sortedBuckets {
+            runningBalance += bucketDeltas[bucket] ?? 0
+            points.append(WealthBalancePoint(bucket: bucket, balance: max(0, runningBalance)))
+        }
+
+        let now = Date()
+        if let last = points.last {
+            let isCurrentBucket = cal.isDate(last.bucket, equalTo: now, toGranularity: component)
+            if !isCurrentBucket || points.count == 1 {
+                points.append(WealthBalancePoint(bucket: now, balance: displayedAssets))
+            }
+        }
+        return points
     }
 
     var chartBars: [WealthBarData] {
@@ -174,7 +243,7 @@ final class IslandWealthViewModel {
             if humans.contains(where: { $0.name == name }) {
                 return Color.goLime
             }
-            return Color.white.opacity(0.35)   // system / 其他
+            return Color.ohanaSecondaryText.opacity(0.7)
         }
     }
 
@@ -200,7 +269,7 @@ final class IslandWealthViewModel {
         Color(hex: "FF8C42"), Color(hex: "FF4757"), Color(hex: "80FFEA")
     ]
     func color(for entityId: String) -> Color {
-        if entityId == "system" { return Color.white.opacity(0.35) }
+        if entityId == "system" { return Color.ohanaSecondaryText.opacity(0.7) }
         if let petColor = petColorMap[entityId] { return petColor }
         // human：从调色板取稳定色
         let idx = abs(entityId.hashValue) % Self.palette.count

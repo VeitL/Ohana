@@ -70,6 +70,7 @@ enum CareLedgerService {
         sourceEventId: String? = nil,
         sourceReminderId: String? = nil,
         coconutDelta: Int = 0,
+        metadataJSON: String = "",
         context: ModelContext
     ) {
         let amount: (Double, String) = {
@@ -94,6 +95,7 @@ enum CareLedgerService {
             legacyModelName: "PetCareLog",
             legacyModelId: log.id.uuidString,
             coconutDelta: coconutDelta,
+            metadataJSON: metadataJSON,
             context: context
         )
     }
@@ -104,6 +106,7 @@ enum CareLedgerService {
         pet: Pet,
         source: CareLedgerSource,
         coconutDelta: Int = 0,
+        metadataJSON: String = "",
         context: ModelContext
     ) {
         record(
@@ -118,6 +121,7 @@ enum CareLedgerService {
             legacyModelName: "PetPottyLog",
             legacyModelId: log.id.uuidString,
             coconutDelta: coconutDelta,
+            metadataJSON: metadataJSON,
             context: context
         )
     }
@@ -189,5 +193,12 @@ enum CareLedgerService {
     static func rewardDelta(_ reward: (humanGot: Int, petGot: Int)?) -> Int {
         guard let reward else { return 0 }
         return max(0, reward.humanGot) + max(0, reward.petGot)
+    }
+
+    static func rewardMetadata(_ reward: (humanGot: Int, petGot: Int)?) -> String {
+        guard let reward else { return "" }
+        return """
+        {"humanCoconuts":\(max(0, reward.humanGot)),"petCoconuts":\(max(0, reward.petGot)),"economy":"humanWallet_petBond"}
+        """
     }
 }

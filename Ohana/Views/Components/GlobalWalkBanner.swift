@@ -21,6 +21,7 @@ struct GlobalWalkBanner: View {
     @State private var showSummaryCard = false       // 结束后翻到背面
     @State private var summaryRotation: Double = 0   // 翻转角度
     @State private var isStopped = false             // B2: 结束状态，隐藏展开卡
+    @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     // 气泡拖动位置（Y轴，锚点在屏幕右侧）
     @State private var bubbleAnchorY: CGFloat = 0    // B1: 拖动结束后保存的Y
@@ -30,6 +31,9 @@ struct GlobalWalkBanner: View {
     private let flipCardHeight: CGFloat = 272
     private var shouldShowFloatingControl: Bool {
         isActive && !mgr.isWalkCardExpandedSurfaceVisible
+    }
+    private var walkClockInterval: TimeInterval {
+        workloadPolicy.shouldRunTimer(isVisible: shouldShowFloatingControl) ? 1 : 60
     }
     private var walkPanelFill: Color {
         colorScheme == .dark ? Color(hex: "10180F") : Color(hex: "F7FAEF")
@@ -105,7 +109,7 @@ struct GlobalWalkBanner: View {
                 .overlay(Circle().strokeBorder(Color.goPrimary.opacity(0.5), lineWidth: 2))
                 .shadow(color: Color.goPrimary.opacity(0.35), radius: 12)
             VStack(spacing: 1) {
-                TimelineView(.periodic(from: .now, by: 1)) { _ in
+                TimelineView(.periodic(from: .now, by: walkClockInterval)) { _ in
                     Text(formatElapsed(mgr.elapsedTime))
                         .font(.system(size: 10, weight: .black, design: .monospaced))
                         .foregroundStyle(Color.goPrimary)
@@ -179,7 +183,7 @@ struct GlobalWalkBanner: View {
             // 数据行
             HStack(spacing: 0) {
                 walkStatCell(label: "时长", accent: .goPrimary) {
-                    TimelineView(.periodic(from: .now, by: 1)) { _ in
+                TimelineView(.periodic(from: .now, by: walkClockInterval)) { _ in
                         Text(formatElapsed(mgr.elapsedTime))
                             .font(.system(size: 26, weight: .black, design: .monospaced))
                             .foregroundStyle(Color.ohanaPrimaryText)

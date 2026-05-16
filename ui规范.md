@@ -79,7 +79,19 @@
 - `GoMotion.hero`：首页卡片、头像主体、Today Focus 卡片切换。
 - `GoMotion.fab`：FAB 菜单、奖励弹出、较强反馈。
 - `GoMotion.feedback`：按钮、色块、segment、轻量状态切换。
+- `GoMotion.tap`：所有按钮/可点击块的短按反馈，轻微缩放、轻微变暗，不做夸张弹跳。
+- `GoMotion.selection`：chip、segment、tab、模式切换、干湿粮切换等选中态移动/扩散。
+- `GoMotion.stateChange`：卡片状态、任务状态、完成/待办、空/有数据之间的稳定过渡。
+- `GoMotion.sheet`：普通 sheet 或 inline popup 的出入场节奏。
 - `GoMotion.quick` / `GoMotion.reduced`：短淡出、低功耗/减弱动态模式。
+
+默认实现规则：
+
+- 点击：使用 `ScaleButtonStyle()`，只做 `0.965` 左右的短促按压、轻微暗化和 soft haptic；不要给普通按钮加夸张 bounce。
+- 选中：使用共享 selection motion 或 matched transition，选中块应“滑过去/长出来”，不要瞬移。
+- 数字：余额、次数、克数、完成率、排行榜数字使用 `contentTransition(.numericText())` 或 `ohanaNumericMotion`。
+- 列表/菜单：功能入口、FAB 子菜单、添加菜单使用 35ms 左右的 stagger 入场，上限约 240ms，保证高级但不拖沓。
+- 反馈：奖励、完成、错误、需要注意才使用 pop / ping / shine / shake；高频页面避免常驻循环装饰。
 
 全局过渡规则：
 

@@ -2,9 +2,46 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleIcons</key>
+	<dict>
+		<key>CFBundlePrimaryIcon</key>
+		<dict>
+			<key>CFBundleIconName</key>
+			<string>AppIcon</string>
+		</dict>
+		<key>CFBundleAlternateIcons</key>
+		<dict>
+			<key>AppIconLimeNight</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconLimeNight</string>
+			</dict>
+			<key>AppIconCleanBlue</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconCleanBlue</string>
+			</dict>
+			<key>AppIconCoconut</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconCoconut</string>
+			</dict>
+			<key>AppIconPawDuo</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconPawDuo</string>
+			</dict>
+			<key>AppIconMinimalO</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconMinimalO</string>
+			</dict>
+		</dict>
+	</dict>
 	<key>CFBundleLocalizations</key>
 	<array>
 		<string>en</string>
+		<string>de</string>
 		<string>zh-Hans</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
@@ -12,7 +49,9 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>用于在「记录时刻」中附加当前地点，以及在你主动开始遛狗时记录路线。</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>仅当你在遛狗时主动开启「锁屏继续记录路线」，用于切到后台或锁屏后继续记录本次路线。</string>
+	<string>仅当你开始遛狗时，用于切到后台或锁屏后继续记录本次路线。</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>仅当你开始遛狗并需要锁屏或后台继续记录路线时使用。</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>com.guanchen.li.Ark.reminderRefill</string>

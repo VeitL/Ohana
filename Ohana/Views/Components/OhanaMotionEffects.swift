@@ -1,0 +1,288 @@
+import SwiftUI
+
+private enum OhanaPopPhase: CaseIterable {
+    case resting
+    case lifted
+    case settled
+
+    var scale: CGFloat {
+        switch self {
+        case .resting: return 1
+        case .lifted: return 1.08
+        case .settled: return 0.98
+        }
+    }
+
+    var yOffset: CGFloat {
+        switch self {
+        case .resting: return 0
+        case .lifted: return -3
+        case .settled: return 0
+        }
+    }
+}
+
+private struct OhanaPhasePopModifier<Trigger: Equatable>: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let trigger: Trigger
+    let enabled: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if enabled && !reduceMotion {
+            content
+                .phaseAnimator(OhanaPopPhase.allCases, trigger: trigger) { view, phase in
+                    view
+                        .scaleEffect(phase.scale)
+                        .offset(y: phase.yOffset)
+                } animation: { phase in
+                    switch phase {
+                    case .resting:
+                        GoMotion.quick
+                    case .lifted:
+                        .bouncy(duration: 0.28, extraBounce: 0.26)
+                    case .settled:
+                        GoMotion.feedback
+                    }
+                }
+        } else {
+            content
+                .animation(GoMotion.reduced, value: "\(trigger)")
+        }
+    }
+}
+
+private struct OhanaBreathingGlowModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let accent: Color
+    let isActive: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isActive && !reduceMotion {
+            PhaseAnimator([false, true]) { phase in
+                content
+                    .shadow(color: accent.opacity(phase ? 0.26 : 0.08), radius: phase ? 18 : 8, x: 0, y: phase ? 8 : 3) // ui-v4: allow semantic attention glow
+                    .scaleEffect(phase ? 1.006 : 1)
+            } animation: { _ in
+                .easeInOut(duration: 1.9)
+            }
+        } else {
+            content
+        }
+    }
+}
+
+private struct OhanaMarchingBorderModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var dashPhase: CGFloat = 42
+    let accent: Color
+    let cornerRadius: CGFloat
+    let isActive: Bool
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        content
+            .overlay {
+                if isActive {
+                    shape
+                        .strokeBorder(
+                            accent.opacity(0.72),
+                            style: StrokeStyle(lineWidth: 1.6, lineCap: .round, dash: [8, 8], dashPhase: dashPhase)
+                        )
+                        .allowsHitTesting(false)
+                        .onAppear {
+                            guard !reduceMotion else { return }
+                            dashPhase = 42
+                            withAnimation(.linear(duration: 1.35).repeatForever(autoreverses: false)) { // ui-v4: allow continuous dashPhase attention border
+                                dashPhase = -42
+                            }
+                        }
+                }
+            }
+    }
+}
+
+private struct OhanaPingModifier<Trigger: Equatable>: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var phase: CGFloat = 1
+    let trigger: Trigger
+    let accent: Color
+    let isEnabled: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                if isEnabled && !reduceMotion {
+                    Circle()
+                        .strokeBorder(accent.opacity(0.5), lineWidth: 2)
+                        .scaleEffect(0.72 + phase * 1.25)
+                        .opacity(1 - phase)
+                        .allowsHitTesting(false)
+                }
+            }
+            .onChange(of: trigger) { _, _ in
+                guard isEnabled && !reduceMotion else { return }
+                phase = 0
+                withAnimation(GoMotion.feedback) {
+                    phase = 1
+                }
+            }
+    }
+}
+
+private struct OhanaShineModifier<Trigger: Equatable>: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var phase: CGFloat = -0.7
+    let trigger: Trigger
+    let cornerRadius: CGFloat
+    let isEnabled: Bool
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        content
+            .overlay {
+                if isEnabled && !reduceMotion {
+                    GeometryReader { proxy in
+                        let width = max(proxy.size.width, 1)
+                        LinearGradient(
+                            colors: [
+                                Color.ohanaPrimaryText.opacity(0),
+                                Color.ohanaPrimaryText.opacity(0.28),
+                                Color.ohanaPrimaryText.opacity(0)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(width: width * 0.34, height: proxy.size.height * 1.75)
+                        .rotationEffect(.degrees(24))
+                        .offset(x: width * phase, y: -proxy.size.height * 0.36)
+                    }
+                    .mask(shape)
+                    .blendMode(.screen)
+                    .allowsHitTesting(false)
+                }
+            }
+            .onChange(of: trigger) { _, _ in
+                guard isEnabled && !reduceMotion else { return }
+                phase = -0.7
+                withAnimation(GoMotion.page) {
+                    phase = 1.38
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.82) {
+                    phase = -0.7
+                }
+            }
+    }
+}
+
+private struct OhanaShakeEffect: GeometryEffect {
+    var amount: CGFloat = 7
+    var shakesPerUnit: CGFloat = 3
+    var animatableData: CGFloat
+
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        ProjectionTransform(CGAffineTransform(translationX: amount * sin(animatableData * .pi * shakesPerUnit), y: 0))
+    }
+}
+
+private struct OhanaShakeModifier<Trigger: Equatable>: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var shakePhase: CGFloat = 0
+    let trigger: Trigger
+    let amount: CGFloat
+    let isEnabled: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .modifier(OhanaShakeEffect(amount: isEnabled && !reduceMotion ? amount : 0, animatableData: shakePhase))
+            .onChange(of: trigger) { _, _ in
+                guard isEnabled && !reduceMotion else { return }
+                withAnimation(GoMotion.feedback) {
+                    shakePhase += 1
+                }
+            }
+    }
+}
+
+private struct OhanaSelectionMotionModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let isSelected: Bool
+    let scale: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(reduceMotion ? 1 : (isSelected ? scale : 1))
+            .animation(reduceMotion ? GoMotion.reduced : GoMotion.selection, value: isSelected)
+    }
+}
+
+private struct OhanaStateMotionModifier<Value: Equatable>: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let value: Value
+
+    func body(content: Content) -> some View {
+        content
+            .animation(reduceMotion ? GoMotion.reduced : GoMotion.stateChange, value: value)
+    }
+}
+
+extension AnyTransition {
+    static var ohanaPop: AnyTransition {
+        .asymmetric(
+            insertion: .scale(scale: 0.86).combined(with: .opacity),
+            removal: .scale(scale: 0.94).combined(with: .opacity)
+        )
+    }
+
+    static var ohanaSoftBlur: AnyTransition {
+        .asymmetric(
+            insertion: .opacity.combined(with: .scale(scale: 0.97)),
+            removal: .opacity.combined(with: .scale(scale: 0.98))
+        )
+    }
+}
+
+extension View {
+    func ohanaPhasePop<Trigger: Equatable>(trigger: Trigger, enabled: Bool = true) -> some View {
+        modifier(OhanaPhasePopModifier(trigger: trigger, enabled: enabled))
+    }
+
+    func ohanaBreathingGlow(accent: Color = Color.goPrimary, isActive: Bool = true) -> some View {
+        modifier(OhanaBreathingGlowModifier(accent: accent, isActive: isActive))
+    }
+
+    func ohanaMarchingBorder(accent: Color, cornerRadius: CGFloat = 22, isActive: Bool = true) -> some View {
+        modifier(OhanaMarchingBorderModifier(accent: accent, cornerRadius: cornerRadius, isActive: isActive))
+    }
+
+    func ohanaSymbolPulse<Trigger: Equatable>(trigger: Trigger) -> some View {
+        symbolEffect(.bounce.byLayer, value: trigger)
+            .symbolEffect(.pulse.byLayer, value: trigger)
+    }
+
+    func ohanaNumericMotion<Value: Equatable>(_ value: Value) -> some View {
+        contentTransition(.numericText())
+            .animation(GoMotion.feedback, value: value)
+    }
+
+    func ohanaSelectionMotion(isSelected: Bool, scale: CGFloat = 1.012) -> some View {
+        modifier(OhanaSelectionMotionModifier(isSelected: isSelected, scale: scale))
+    }
+
+    func ohanaStateMotion<Value: Equatable>(_ value: Value) -> some View {
+        modifier(OhanaStateMotionModifier(value: value))
+    }
+
+    func ohanaPing<Trigger: Equatable>(trigger: Trigger, accent: Color = Color.goPrimary, isEnabled: Bool = true) -> some View {
+        modifier(OhanaPingModifier(trigger: trigger, accent: accent, isEnabled: isEnabled))
+    }
+
+    func ohanaShine<Trigger: Equatable>(trigger: Trigger, cornerRadius: CGFloat = 22, isEnabled: Bool = true) -> some View {
+        modifier(OhanaShineModifier(trigger: trigger, cornerRadius: cornerRadius, isEnabled: isEnabled))
+    }
+
+    func ohanaShake<Trigger: Equatable>(trigger: Trigger, amount: CGFloat = 7, isEnabled: Bool = true) -> some View {
+        modifier(OhanaShakeModifier(trigger: trigger, amount: amount, isEnabled: isEnabled))
+    }
+}

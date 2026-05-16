@@ -10,11 +10,11 @@ import SwiftData
 
 struct DailyStreakDetailView: View {
     let pets: [Pet]
+    var onClose: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \Human.createdAt) private var humans: [Human]
-    @AppStorage("user_login_streak") private var loginStreak: Int = 0
-    @AppStorage("user_last_login_date") private var lastLoginDateStr: String = ""
-    @AppStorage("user_login_history") private var loginHistoryJSON: String = ""
+    @Query(sort: \CareLedgerEvent.occurredAt, order: .reverse) private var ledgerEvents: [CareLedgerEvent]
+    @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
     @State private var selectedMonth = Date()
     @State private var checkedInDates: Set<String> = []
     @State private var makeupDates: Set<String> = []
@@ -22,12 +22,15 @@ struct DailyStreakDetailView: View {
     @State private var showMakeupConfirm: String? = nil
     @State private var showCoconutShop = false
     @State private var showingCoconutLog = false
-    @AppStorage("checkIn_lastClaimedMilestone") private var lastClaimedMilestone: Int = 0
+    @State private var lastClaimedMilestone = 0
 
     private let cal = Calendar.current
-    private let checkedInKey = "oasis_checkedIn_dates"
-    private let makeupDatesKey = "oasis_makeup_dates"
-    private let makeupPackKey = "inventory_backdate_1day_count"
+    private var activeHuman: Human? {
+        humans.first { $0.id.uuidString == currentActiveHumanId } ?? humans.first
+    }
+    private var activeHumanIdForStreak: String {
+        activeHuman?.id.uuidString ?? currentActiveHumanId
+    }
 
     private var safeTop: CGFloat {
         (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
@@ -43,6 +46,9 @@ struct DailyStreakDetailView: View {
                 VStack(spacing: 16) {
                     Spacer().frame(height: navBarHeight)
                     myStreakCard
+                    if humans.count > 1 {
+                        familyCompetitionSection
+                    }
                     checkInCalendarSection
                     Spacer(minLength: 40)
                 }
@@ -52,6 +58,11 @@ struct DailyStreakDetailView: View {
         .navigationBarHidden(true)
         .overlay(alignment: .top) { navBar }
         .onAppear {
+            selectedMonth = Date()
+            loadCheckInData()
+            triggerTodayCheckIn()
+        }
+        .onChange(of: currentActiveHumanId) { _, _ in
             selectedMonth = Date()
             loadCheckInData()
             triggerTodayCheckIn()
@@ -72,7 +83,7 @@ struct DailyStreakDetailView: View {
         }
         .sheet(isPresented: $showCoconutShop) {
             CoconutShopView(initialCategory: .boost)
-                .presentationDetents([.large])
+                .presentationDetents([.large]) // ui-v4: allow long shop overview
                 .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showingCoconutLog) {
@@ -87,13 +98,14 @@ struct DailyStreakDetailView: View {
 
     private var navBar: some View {
         HStack {
-            Button { dismiss() } label: {
+            Button { closePage() } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: 17, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 36, height: 36)
-                    .background(.white.opacity(0.12), in: Circle())
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
+            .accessibilityLabel("关闭")
             .buttonStyle(ScaleButtonStyle())
 
             Spacer()
@@ -104,7 +116,7 @@ struct DailyStreakDetailView: View {
 
             Spacer()
 
-            CoconutBalanceCapsule { showingCoconutLog = true }
+            CoconutBalanceCapsule(balance: activeHuman?.coconutBalance ?? 0) { showingCoconutLog = true }
         }
         .padding(.horizontal, 20)
         .padding(.top, safeTop + 8)
@@ -112,10 +124,13 @@ struct DailyStreakDetailView: View {
         .background(Color.ohanaCardSurface.opacity(0.01))
     }
 
+    private func closePage() {
+        onClose?()
+        dismiss()
+    }
+
     // MARK: - 我的连击卡片
     private var myStreakCard: some View {
-        let boundId = UserDefaults.standard.string(forKey: "currentActiveHumanId") ?? ""
-        let activeHuman = humans.first(where: { $0.id.uuidString == boundId }) ?? humans.first
         return VStack(spacing: 16) {
             HStack(spacing: 14) {
                 ZStack {
@@ -145,7 +160,7 @@ struct DailyStreakDetailView: View {
                     HStack(alignment: .firstTextBaseline, spacing: 3) {
                         Text("\(currentStreak)")
                             .font(.system(size: 44, weight: .black, design: .rounded))
-                            .foregroundStyle(currentStreak > 0 ? Color.goOrange : .primary.opacity(0.25))
+                            .foregroundStyle(currentStreak > 0 ? Color.goOrange : Color.ohanaPrimaryText.opacity(0.25))
                             .contentTransition(.numericText())
                         Text("天")
                             .font(.system(size: 16, weight: .bold, design: .rounded))
@@ -175,7 +190,7 @@ struct DailyStreakDetailView: View {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(.primary.opacity(0.1))
+                                .fill(Color.ohanaPrimaryText.opacity(0.1))
                                 .frame(height: 8)
                             RoundedRectangle(cornerRadius: 4)
                                 .fill(LinearGradient(colors: [Color.goOrange, Color.goYellow], startPoint: .leading, endPoint: .trailing))
@@ -187,7 +202,66 @@ struct DailyStreakDetailView: View {
             }
         }
         .padding(18)
-        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
+        }
+    }
+
+    private var familyCompetitionSection: some View {
+        let leaderboard = familyLeaderboard
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("家庭连击")
+                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text("本周照护贡献，谁最稳一眼就知道")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
+                Spacer()
+                Image(systemName: "flame.fill")
+                    .font(.system(size: 18, weight: .black))
+                    .foregroundStyle(Color.goOrange)
+            }
+
+            VStack(spacing: 8) {
+                ForEach(Array(leaderboard.prefix(4).enumerated()), id: \.element.human.id) { index, entry in
+                    HStack(spacing: 10) {
+                        Text(index == 0 ? "🏆" : "\(index + 1)")
+                            .font(.system(size: index == 0 ? 20 : 13, weight: .black, design: .rounded))
+                            .foregroundStyle(index == 0 ? Color.goYellow : Color.ohanaSecondaryText)
+                            .frame(width: 28)
+                        humanAvatar(entry.human, size: 32)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(entry.human.name)
+                                .font(.system(size: 14, weight: .black, design: .rounded))
+                                .foregroundStyle(Color.ohanaPrimaryText)
+                                .lineLimit(1)
+                            Text(entry.count == 0 ? "本周还没有记录" : "\(entry.count) 次照护 · +\(entry.coconuts)🥥")
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color.ohanaSecondaryText)
+                        }
+                        Spacer()
+                        Text("\(entry.count)")
+                            .font(.system(size: 20, weight: .black, design: .rounded))
+                            .foregroundStyle(index == 0 ? Color.goPrimary : Color.ohanaPrimaryText)
+                            .monospacedDigit()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(index == 0 ? Color.goPrimary.opacity(0.14) : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
+        }
     }
 
     private var checkInCalendarSection: some View {
@@ -215,11 +289,11 @@ struct DailyStreakDetailView: View {
 
             checkInStatsRow
 
-            OhanaDashedDivider(color: .white.opacity(0.08))
+            OhanaDashedDivider(color: Color.ohanaPrimaryText.opacity(0.08))
 
             HStack {
                 Button {
-                    withAnimation(.spring(response: 0.3)) {
+                    withAnimation(GoMotion.selection) {
                         selectedMonth = cal.date(byAdding: .month, value: -1, to: selectedMonth) ?? selectedMonth
                     }
                 } label: {
@@ -227,7 +301,7 @@ struct DailyStreakDetailView: View {
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                         .frame(width: 36, height: 36)
-                        .goGlassBackground(Circle())
+                        .background(Color.ohanaControlFill, in: Circle())
                 }
 
                 Spacer()
@@ -241,7 +315,7 @@ struct DailyStreakDetailView: View {
                 Button {
                     let next = cal.date(byAdding: .month, value: 1, to: selectedMonth) ?? selectedMonth
                     if next <= Date() {
-                        withAnimation(.spring(response: 0.3)) {
+                        withAnimation(GoMotion.selection) {
                             selectedMonth = next
                         }
                     }
@@ -250,11 +324,11 @@ struct DailyStreakDetailView: View {
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(
                             cal.isDate(selectedMonth, equalTo: Date(), toGranularity: .month)
-                            ? Color.primary.opacity(0.15)
-                            : Color.primary.opacity(0.5)
+                            ? Color.ohanaPrimaryText.opacity(0.15)
+                            : Color.ohanaPrimaryText.opacity(0.5)
                         )
                         .frame(width: 36, height: 36)
-                        .goGlassBackground(Circle())
+                        .background(Color.ohanaControlFill, in: Circle())
                 }
                 .disabled(cal.isDate(selectedMonth, equalTo: Date(), toGranularity: .month))
             }
@@ -275,7 +349,7 @@ struct DailyStreakDetailView: View {
                 }
             }
 
-            OhanaDashedDivider(color: .white.opacity(0.08))
+            OhanaDashedDivider(color: Color.ohanaPrimaryText.opacity(0.08))
 
             HStack(spacing: 12) {
                 HStack(spacing: 4) {
@@ -285,7 +359,7 @@ struct DailyStreakDetailView: View {
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                     Text("×\(makeupPackCount)")
                         .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(makeupPackCount > 0 ? Color.goPrimary : .primary.opacity(0.3))
+                        .foregroundStyle(makeupPackCount > 0 ? Color.goPrimary : Color.ohanaPrimaryText.opacity(0.3))
                 }
                 Spacer()
                 if makeupPackCount > 0 {
@@ -307,7 +381,11 @@ struct DailyStreakDetailView: View {
             }
         }
         .padding(16)
-        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
+        }
     }
 
     private var checkInStatsRow: some View {
@@ -333,7 +411,7 @@ struct DailyStreakDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var checkInMilestoneRow: some View {
@@ -344,7 +422,7 @@ struct DailyStreakDetailView: View {
         let lastClaimed = lastClaimedMilestone
 
         return VStack(spacing: 8) {
-            OhanaDashedDivider(color: .white.opacity(0.08))
+            OhanaDashedDivider(color: Color.ohanaPrimaryText.opacity(0.08))
 
             if let nextMilestone {
                 HStack(spacing: 6) {
@@ -366,11 +444,11 @@ struct DailyStreakDetailView: View {
                             .font(.system(size: 16))
                         Text("\(milestone.days) 天连胜达成！")
                             .font(.system(size: 13, weight: .black, design: .rounded))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(Color.ohanaPrimaryActionText)
                         Spacer()
                         Text("+\(milestone.reward)🥥 领取")
                             .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .foregroundStyle(.black.opacity(0.7))
+                            .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
@@ -388,24 +466,6 @@ struct DailyStreakDetailView: View {
         let isChecked: Bool
         let isMakeup: Bool
         let isFuture: Bool
-    }
-
-    private var parsedLoginHistory: [Date] {
-        guard !loginHistoryJSON.isEmpty,
-              let data = loginHistoryJSON.data(using: .utf8),
-              let arr = try? JSONDecoder().decode([String].self, from: data) else {
-            if !lastLoginDateStr.isEmpty {
-                let fmt = DateFormatter()
-                fmt.dateFormat = "yyyy-MM-dd"
-                if let d = fmt.date(from: lastLoginDateStr) {
-                    return [d]
-                }
-            }
-            return []
-        }
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        return arr.compactMap { fmt.date(from: $0) }
     }
 
     private func monthCalendarCells(for month: Date) -> [CalendarCell] {
@@ -462,19 +522,19 @@ struct DailyStreakDetailView: View {
                         if cell.isMakeup {
                             Image(systemName: "arrow.uturn.backward")
                                 .font(.system(size: 9, weight: .black))
-                                .foregroundStyle(.black.opacity(0.7))
+                                .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
                         } else {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 10, weight: .black))
-                                .foregroundStyle(.black)
+                                .foregroundStyle(Color.ohanaPrimaryActionText)
                         }
                     } else {
                         Text("\(cell.day)")
                             .font(.system(size: 13, weight: cell.isToday ? .black : .medium, design: .rounded))
                             .foregroundStyle(
-                                cell.isFuture ? .primary.opacity(0.2) :
+                                cell.isFuture ? Color.ohanaPrimaryText.opacity(0.2) :
                                 cell.isToday ? Color.goPrimary :
-                                .primary.opacity(0.7)
+                                Color.ohanaPrimaryText.opacity(0.7)
                             )
                     }
                 }
@@ -493,8 +553,49 @@ struct DailyStreakDetailView: View {
         } else if cell.isToday {
             return Color.goPrimary.opacity(0.22)
         } else {
-            return Color.white.opacity(0.05)
+            return Color.ohanaControlFill
         }
+    }
+
+    @ViewBuilder
+    private func humanAvatar(_ human: Human, size: CGFloat) -> some View {
+        if let data = human.avatarImageData, let image = UIImage(data: data) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: size, height: size)
+                .clipShape(Circle())
+        } else {
+            Text(human.avatarEmoji.isEmpty ? "🧑" : human.avatarEmoji)
+                .font(.system(size: size * 0.52))
+                .frame(width: size, height: size)
+                .background(Color(hex: human.safeThemeColorHex).opacity(0.18), in: Circle())
+        }
+    }
+
+    private var familyLeaderboard: [(human: Human, count: Int, coconuts: Int)] {
+        let start = cal.dateInterval(of: .weekOfYear, for: Date())?.start
+            ?? cal.date(byAdding: .day, value: -7, to: Date())
+            ?? Date()
+        let interval = DateInterval(start: start, end: Date())
+        let livingPets = pets.filter { !$0.hasPassedAway }
+        let entries = CareLedgerStatsService.reportEntries(
+            events: ledgerEvents,
+            pets: livingPets,
+            humans: humans,
+            interval: interval
+        )
+        return humans
+            .map { human in
+                let id = human.id.uuidString
+                let mine = entries.filter { $0.actorId == id }
+                return (human, mine.count, mine.reduce(0) { $0 + $1.coconuts })
+            }
+            .sorted {
+                if $0.count != $1.count { return $0.count > $1.count }
+                if $0.coconuts != $1.coconuts { return $0.coconuts > $1.coconuts }
+                return $0.human.createdAt < $1.human.createdAt
+            }
     }
 
     private var shortDateFormatter: DateFormatter {
@@ -516,45 +617,15 @@ struct DailyStreakDetailView: View {
     }
 
     private func todayStr() -> String {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        return fmt.string(from: Date())
+        CheckInStreakStore.dateString()
     }
 
     private var currentStreak: Int {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        var streak = 0
-        var day = Date()
-        while true {
-            let value = fmt.string(from: day)
-            if checkedInDates.contains(value) {
-                streak += 1
-                day = cal.date(byAdding: .day, value: -1, to: day) ?? day
-            } else {
-                break
-            }
-        }
-        return streak
+        CheckInStreakStore.currentStreak(for: activeHumanIdForStreak, calendar: cal)
     }
 
     private var longestStreak: Int {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        let sorted = checkedInDates.compactMap { fmt.date(from: $0) }.sorted()
-        guard !sorted.isEmpty else { return 0 }
-        var longest = 1
-        var current = 1
-        for index in 1..<sorted.count {
-            if let expected = cal.date(byAdding: .day, value: 1, to: sorted[index - 1]),
-               cal.isDate(expected, inSameDayAs: sorted[index]) {
-                current += 1
-                longest = max(longest, current)
-            } else {
-                current = 1
-            }
-        }
-        return longest
+        CheckInStreakStore.longestStreak(for: activeHumanIdForStreak, calendar: cal)
     }
 
     private var monthCheckInRate: Int {
@@ -577,37 +648,35 @@ struct DailyStreakDetailView: View {
     }
 
     private func loadCheckInData() {
-        if let arr = UserDefaults.standard.stringArray(forKey: checkedInKey) {
-            checkedInDates = Set(arr)
-        }
-        if let arr = UserDefaults.standard.stringArray(forKey: makeupDatesKey) {
-            makeupDates = Set(arr)
-        }
-        makeupPackCount = UserDefaults.standard.integer(forKey: makeupPackKey)
+        checkedInDates = CheckInStreakStore.checkedInDates(for: activeHumanIdForStreak)
+        makeupDates = CheckInStreakStore.makeupDates(for: activeHumanIdForStreak)
+        makeupPackCount = UserDefaults.standard.integer(forKey: CheckInStreakStore.makeupPackKey)
+        lastClaimedMilestone = CheckInStreakStore.lastClaimedMilestone(for: activeHumanIdForStreak)
     }
 
     private func triggerTodayCheckIn() {
         let today = todayStr()
         guard !checkedInDates.contains(today) else { return }
         checkedInDates.insert(today)
-        UserDefaults.standard.set(Array(checkedInDates), forKey: checkedInKey)
+        CheckInStreakStore.setCheckedInDates(checkedInDates, for: activeHumanIdForStreak)
         QuestManager.shared.addCoconuts(1, emoji: "📅", title: "每日打卡奖励")
     }
 
     private func applyMakeup(date: String) {
         guard makeupPackCount > 0, !checkedInDates.contains(date) else { return }
         makeupPackCount -= 1
-        UserDefaults.standard.set(makeupPackCount, forKey: makeupPackKey)
+        UserDefaults.standard.set(makeupPackCount, forKey: CheckInStreakStore.makeupPackKey)
         checkedInDates.insert(date)
         makeupDates.insert(date)
-        UserDefaults.standard.set(Array(checkedInDates), forKey: checkedInKey)
-        UserDefaults.standard.set(Array(makeupDates), forKey: makeupDatesKey)
+        CheckInStreakStore.setCheckedInDates(checkedInDates, for: activeHumanIdForStreak)
+        CheckInStreakStore.setMakeupDates(makeupDates, for: activeHumanIdForStreak)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
     private func claimMilestone(_ days: Int, reward: Int, emoji: String) {
         QuestManager.shared.addCoconuts(reward, emoji: emoji, title: "\(days)天连胜奖励")
         lastClaimedMilestone = days
+        CheckInStreakStore.setLastClaimedMilestone(days, for: activeHumanIdForStreak)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 }

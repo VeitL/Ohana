@@ -1,6 +1,9 @@
-// PetAllFeaturesSheet.swift
-// Single-pet feature entry sheet — same visual style as FunctionMenuSheet
-// but routes directly to per-pet views without any aggregate step.
+//
+//  PetAllFeaturesSheet.swift
+//  Ohana
+//
+//  Single-pet V4 feature hub.
+//
 
 import SwiftUI
 import SwiftData
@@ -20,134 +23,88 @@ enum PetAllFeatureDestination: Hashable {
     case retention
     case weight
     case expense
+    case bondVault
+}
+
+extension PetAllFeatureDestination: Identifiable {
+    var id: String {
+        switch self {
+        case .health: return "health"
+        case .medications: return "medications"
+        case .food: return "food"
+        case .hygiene: return "hygiene"
+        case .walks: return "walks"
+        case .potty: return "potty"
+        case .basicInfo: return "basicInfo"
+        case .documents: return "documents"
+        case .moments: return "moments"
+        case .timeline: return "timeline"
+        case .achievements: return "achievements"
+        case .retention: return "retention"
+        case .weight: return "weight"
+        case .expense: return "expense"
+        case .bondVault: return "bondVault"
+        }
+    }
 }
 
 struct PetAllFeaturesSheet: View {
     let pet: Pet
 
     @Environment(\.dismiss) private var dismiss
-    @State private var path: [PetAllFeatureDestination] = []
+    @State private var activeDestination: PetAllFeatureDestination?
 
-    private var isDog: Bool { pet.species.lowercased().contains("狗") || pet.species.lowercased().contains("dog") }
+    private var l: L10n { L10n() }
+    private var isDog: Bool {
+        pet.species.localizedCaseInsensitiveContains("狗") ||
+        pet.species.localizedCaseInsensitiveContains("dog")
+    }
     private var archiveSnapshot: ArchiveMemorySnapshot { ArchiveMemorySnapshot(pet: pet) }
 
     var body: some View {
-        NavigationStack(path: $path) {
-            ZStack {
-                LinearGradient(
-                    colors: [Color(hex: "1A2E8A"), Color(hex: "0C1640")],
-                    startPoint: .top, endPoint: .bottom
-                )
-                .ignoresSafeArea()
-
-                ScrollView {
-                    VStack(spacing: 14) {
-                        petFeatureHero
-
-                        HStack(spacing: 12) {
-                            featureTile(
-                                icon: "fork.knife",
-                                color: Color(hex: "F59E0B"),
-                                title: "饮食",
-                                value: todayFeedMetric,
-                                subtitle: foodSub,
-                                destination: .food,
-                                height: 142
-                            )
-                            featureTile(
-                                icon: "cross.fill",
-                                color: Color(hex: "EF4444"),
-                                title: "健康",
-                                value: "\(pet.healthLogs.count)",
-                                subtitle: healthSub,
-                                destination: .health,
-                                height: 142
-                            )
-                        }
-
-                        HStack(spacing: 12) {
-                            featureTile(
-                                icon: "scalemass.fill",
-                                color: Color(hex: "16A34A"),
-                                title: "体重",
-                                value: latestWeightText,
-                                subtitle: weightSub,
-                                destination: .weight,
-                                height: 156
-                            )
-                            VStack(spacing: 12) {
-                                compactFeatureTile(
-                                    icon: "pills.fill",
-                                    color: Color(hex: "8B5CF6"),
-                                    title: "用药",
-                                    subtitle: medSub,
-                                    destination: .medications
-                                )
-                                compactFeatureTile(
-                                    icon: "bubbles.and.sparkles.fill",
-                                    color: Color(hex: "06B6D4"),
-                                    title: "清洁护理",
-                                    subtitle: hygieneSub,
-                                    destination: .hygiene
-                                )
-                            }
-                        }
-
-                        HStack(spacing: 12) {
-                            if isDog {
-                                featureTile(
-                                    icon: "figure.walk",
-                                    color: Color(hex: "14B8A6"),
-                                    title: "遛狗",
-                                    value: weekWalkText,
-                                    subtitle: walkSub,
-                                    destination: .walks,
-                                    height: 138
-                                )
-                            }
-                            featureTile(
-                                icon: "drop.fill",
-                                color: Color(hex: "D97706"),
-                                title: "便便",
-                                value: todayPottyMetric,
-                                subtitle: pottySub,
-                                destination: .potty,
-                                height: 138
-                            )
-                            featureTile(
-                                icon: "creditcard.fill",
-                                color: Color(hex: "F97316"),
-                                title: "花费",
-                                value: expenseMetric,
-                                subtitle: expenseSub,
-                                destination: .expense,
-                                height: 138
-                            )
-                        }
-
-                        archiveBento
+        NavigationStack {
+            FeatureHubScaffold {
+                FeatureHubHeader(
+                    title: pet.name,
+                    subtitle: petSubtitle,
+                    eyebrow: l.tr(zh: "全部功能", en: "All Features", de: "Alle Funktionen"),
+                    onClose: { dismiss() },
+                    avatar: {
+                        FeatureHubAvatar(
+                            imageData: pet.avatarImageData,
+                            emoji: pet.avatarEmoji,
+                            fallback: pet.speciesEmoji,
+                            tint: Color(hex: pet.safeThemeColorHex)
+                        )
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 28)
+                )
+            } content: {
+                if pet.hasPassedAway {
+                    PetMemorialBanner(pet: pet)
+                }
+
+                FeatureHubMetricStrip(metrics: petMetrics)
+
+                ForEach(petSections) { section in
+                    FeatureHubSectionActionView(section: section) { destination in
+                        withAnimation(GoMotion.page) {
+                            activeDestination = destination
+                        }
+                    }
                 }
             }
-            .navigationTitle("\(pet.name) 的功能")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { dismiss() }
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.goLime)
-                }
-            }
-            .navigationDestination(for: PetAllFeatureDestination.self) { dest in
-                destView(dest)
+            .toolbar(.hidden, for: .navigationBar)
+            .petMemorialTone(isActive: pet.hasPassedAway)
+        }
+        .fullScreenCover(item: $activeDestination) { destination in
+            FeatureHubDestinationHost(
+                onClose: { activeDestination = nil },
+                showsCloseButton: destinationNeedsHostClose(destination)
+            ) {
+                destView(destination)
             }
         }
     }
-
-    // MARK: - Destination Views
 
     @ViewBuilder
     private func destView(_ dest: PetAllFeatureDestination) -> some View {
@@ -163,85 +120,305 @@ struct PetAllFeaturesSheet: View {
         case .moments:       PetMomentsHubView(pet: pet)
         case .timeline:      PetUnifiedTimelineSheet(pet: pet)
         case .achievements:  AchievementWallView(pet: pet)
-        case .retention:     PetRetentionHubView(pet: pet)
+        case .retention:     PetRetentionHubView(pet: pet, showsCloseButton: true)
         case .weight:        WeightHistoryView(pet: pet)
-        case .expense:       ExpenseHistoryView(pet: pet)
+        case .expense:       ExpenseHistoryView(pet: pet, showsCloseButton: true)
+        case .bondVault:     PetBondVaultView(pet: pet)
         }
     }
 
-    // MARK: - Subtitles
+    private func destinationNeedsHostClose(_ destination: PetAllFeatureDestination) -> Bool {
+        switch destination {
+        case .food, .basicInfo, .documents, .weight:
+            return true
+        case .health, .medications, .hygiene, .walks, .potty, .moments, .timeline, .achievements, .retention, .expense, .bondVault:
+            return false
+        }
+    }
+
+    private var petSections: [FeatureHubSectionData<PetAllFeatureDestination>] {
+        [
+            FeatureHubSectionData(
+                id: "daily",
+                title: l.tr(zh: "高频照护", en: "Daily Care", de: "Tägliche Pflege"),
+                subtitle: l.tr(zh: "打卡与日常管理", en: "Logs and routines", de: "Einträge und Routinen"),
+                items: dailyItems
+            ),
+            FeatureHubSectionData(
+                id: "health",
+                title: l.tr(zh: "健康身体", en: "Health", de: "Gesundheit"),
+                subtitle: l.tr(zh: "状态、用药、趋势", en: "Status, meds, trends", de: "Status, Medikamente, Trends"),
+                items: healthItems
+            ),
+            FeatureHubSectionData(
+                id: "archive",
+                title: l.tr(zh: "档案记忆", en: "Archive", de: "Archiv"),
+                subtitle: l.tr(zh: "资料、证件、时刻", en: "Profile, documents, moments", de: "Profil, Dokumente, Momente"),
+                items: archiveItems
+            ),
+            FeatureHubSectionData(
+                id: "finance",
+                title: l.tr(zh: "财务保障", en: "Money & Protection", de: "Kosten & Schutz"),
+                subtitle: l.tr(zh: "花费与保障资料", en: "Spending and coverage", de: "Ausgaben und Schutz"),
+                items: financeItems
+            )
+        ]
+    }
+
+    private var dailyItems: [FeatureHubDestinationItem<PetAllFeatureDestination>] {
+        var items: [FeatureHubDestinationItem<PetAllFeatureDestination>] = [
+            item(
+                id: "food",
+                title: l.tr(zh: "饮食", en: "Food", de: "Futter"),
+                value: todayFeedMetric,
+                subtitle: foodSub,
+                icon: "fork.knife",
+                tint: Color(hex: "F59E0B"),
+                destination: .food
+            ),
+            item(
+                id: "hygiene",
+                title: l.tr(zh: "清洁护理", en: "Care", de: "Pflege"),
+                value: "\(pet.careLogs.filter { $0.careType != .feeding }.count)",
+                subtitle: hygieneSub,
+                icon: "bubbles.and.sparkles.fill",
+                tint: Color.goTeal,
+                destination: .hygiene
+            ),
+            item(
+                id: "potty",
+                title: l.tr(zh: "便便", en: "Potty", de: "Kot"),
+                value: todayPottyMetric,
+                subtitle: pottySub,
+                icon: "drop.fill",
+                tint: Color(hex: "D97706"),
+                destination: .potty
+            )
+        ]
+        if isDog {
+            items.insert(
+                item(
+                    id: "walk",
+                    title: l.tr(zh: "遛狗", en: "Walks", de: "Gassi"),
+                    value: weekWalkText,
+                    subtitle: walkSub,
+                    icon: "figure.walk",
+                    tint: Color(hex: "14B8A6"),
+                    destination: .walks
+                ),
+                at: 2
+            )
+        }
+        return items
+    }
+
+    private var healthItems: [FeatureHubDestinationItem<PetAllFeatureDestination>] {
+        [
+            item(
+                id: "health",
+                title: l.tr(zh: "健康", en: "Health", de: "Gesundheit"),
+                value: "\(pet.healthLogs.count)",
+                subtitle: healthSub,
+                icon: "cross.fill",
+                tint: Color.goRed,
+                destination: .health
+            ),
+            item(
+                id: "meds",
+                title: l.tr(zh: "用药", en: "Meds", de: "Medikamente"),
+                value: "\(pet.medications.filter { $0.isActiveToday }.count)",
+                subtitle: medSub,
+                icon: "pills.fill",
+                tint: Color.goPurple,
+                destination: .medications
+            ),
+            item(
+                id: "weight",
+                title: l.tr(zh: "体重", en: "Weight", de: "Gewicht"),
+                value: latestWeightText,
+                subtitle: weightSub,
+                icon: "scalemass.fill",
+                tint: Color(hex: "16A34A"),
+                destination: .weight
+            )
+        ]
+    }
+
+    private var archiveItems: [FeatureHubDestinationItem<PetAllFeatureDestination>] {
+        [
+            item(
+                id: "retention",
+                title: l.tr(zh: "成长档案", en: "Growth", de: "Entwicklung"),
+                value: "\(archiveSnapshot.score)/\(archiveSnapshot.total)",
+                subtitle: archiveSnapshot.nextStep.title,
+                icon: "sparkles.rectangle.stack.fill",
+                tint: Color(hex: pet.safeThemeColorHex),
+                destination: .retention
+            ),
+            item(
+                id: "moments",
+                title: l.tr(zh: "记录中心", en: "Moments", de: "Momente"),
+                value: "\(pet.photoLogs.count)",
+                subtitle: momentsSub,
+                icon: "sparkles",
+                tint: Color(hex: "EC4899"),
+                destination: .moments
+            ),
+            item(
+                id: "documents",
+                title: l.tr(zh: "证件保障", en: "Documents", de: "Dokumente"),
+                value: "\(pet.documents.count + pet.insurances.count)",
+                subtitle: documentsSub,
+                icon: "doc.fill",
+                tint: Color(hex: "94A3B8"),
+                destination: .documents
+            )
+        ]
+    }
+
+    private var financeItems: [FeatureHubDestinationItem<PetAllFeatureDestination>] {
+        [
+            item(
+                id: "bondVault",
+                title: l.tr(zh: "宠物小金库", en: "Bond Vault", de: "Bindungs-Tresor"),
+                value: "🥥 \(pet.coconutBalance)",
+                subtitle: l.tr(zh: "宠物专属成长资产", en: "Pet-only bond assets", de: "Nur Haustier-Bindung"),
+                icon: "pawprint.circle.fill",
+                tint: Color.goYellow,
+                destination: .bondVault
+            ),
+            item(
+                id: "expense",
+                title: l.tr(zh: "花费", en: "Expenses", de: "Ausgaben"),
+                value: expenseMetric,
+                subtitle: expenseSub,
+                icon: "creditcard.fill",
+                tint: Color.goOrange,
+                destination: .expense
+            )
+        ]
+    }
+
+    private func item(
+        id: String,
+        title: String,
+        value: String,
+        subtitle: String,
+        icon: String,
+        tint: Color,
+        destination: PetAllFeatureDestination
+    ) -> FeatureHubDestinationItem<PetAllFeatureDestination> {
+        FeatureHubDestinationItem(
+            data: FeatureHubTileData(
+                id: id,
+                title: title,
+                value: value.isEmpty ? "--" : value,
+                subtitle: subtitle,
+                icon: icon,
+                tint: tint
+            ),
+            destination: destination
+        )
+    }
+
+    private var petMetrics: [FeatureHubMetric] {
+        [
+            FeatureHubMetric(id: "today", title: l.tr(zh: "今日照护", en: "Today", de: "Heute"), value: "\(todayCareCount)"),
+            FeatureHubMetric(id: "records", title: l.tr(zh: "记录", en: "Logs", de: "Einträge"), value: "\(timelineCount)"),
+            FeatureHubMetric(id: "archive", title: l.tr(zh: "档案", en: "Archive", de: "Archiv"), value: "\(archiveScore)/5"),
+            FeatureHubMetric(id: "bond", title: l.tr(zh: "成长椰子", en: "Bond", de: "Bindung"), value: "🥥 \(pet.coconutBalance)")
+        ]
+    }
+
+    private var petSubtitle: String {
+        if !pet.breed.isEmpty { return "\(pet.species) · \(pet.breed)" }
+        if !pet.species.isEmpty { return pet.species }
+        return l.tr(zh: "宠物成员", en: "Pet member", de: "Tiermitglied")
+    }
 
     private var healthSub: String  {
-        let n = pet.healthLogs.count; return n > 0 ? "\(n)条记录" : "暂无记录"
+        pet.healthLogs.isEmpty
+            ? l.tr(zh: "暂无记录", en: "No records", de: "Keine Einträge")
+            : l.tr(zh: "\(pet.healthLogs.count)条记录", en: "\(pet.healthLogs.count) records", de: "\(pet.healthLogs.count) Einträge")
     }
     private var weightSub: String  {
-        let n = pet.weightLogs.count; return n > 0 ? "\(n)条记录" : "暂无记录"
+        pet.weightLogs.isEmpty
+            ? l.tr(zh: "暂无记录", en: "No records", de: "Keine Einträge")
+            : l.tr(zh: "\(pet.weightLogs.count)条记录", en: "\(pet.weightLogs.count) records", de: "\(pet.weightLogs.count) Einträge")
     }
-    private var medSub: String     {
-        let n = pet.medications.filter { $0.isActiveToday }.count
-        return n > 0 ? "当前\(n)种药物" : "暂无用药"
+    private var medSub: String {
+        let count = pet.medications.filter { $0.isActiveToday }.count
+        return count > 0
+            ? l.tr(zh: "当前\(count)种药物", en: "\(count) active meds", de: "\(count) aktive Medikamente")
+            : l.tr(zh: "暂无用药", en: "No medication", de: "Keine Medikamente")
     }
-    private var foodSub: String    {
-        let n = pet.careLogs.filter { $0.careType == .feeding && Calendar.current.isDateInToday($0.date) }.count
-        return n > 0 ? "今日喂食\(n)次" : "今日未喂食"
+    private var foodSub: String {
+        let count = pet.careLogs.filter { $0.careType == .feeding && Calendar.current.isDateInToday($0.date) }.count
+        return count > 0
+            ? l.tr(zh: "今日喂食\(count)次", en: "\(count) feeds today", de: "\(count) Fütterungen heute")
+            : l.tr(zh: "今日未喂食", en: "No feed today", de: "Heute kein Futter")
     }
     private var hygieneSub: String {
-        let n = pet.careLogs.filter { $0.careType != .feeding }.count
-        return n > 0 ? "\(n)条护理记录" : "暂无记录"
+        let count = pet.careLogs.filter { $0.careType != .feeding }.count
+        return count > 0
+            ? l.tr(zh: "\(count)条护理记录", en: "\(count) care logs", de: "\(count) Pflegeeinträge")
+            : l.tr(zh: "暂无记录", en: "No records", de: "Keine Einträge")
     }
-    private var walkSub: String    {
-        let n = pet.walkLogs.count; return n > 0 ? "\(n)次遛狗" : "暂无记录"
+    private var walkSub: String {
+        pet.walkLogs.isEmpty
+            ? l.tr(zh: "暂无记录", en: "No walks yet", de: "Noch keine Gassi-Runden")
+            : l.tr(zh: "\(pet.walkLogs.count)次遛狗", en: "\(pet.walkLogs.count) walks", de: "\(pet.walkLogs.count) Runden")
     }
-    private var pottySub: String   {
-        let n = pet.pottyLogs.filter { Calendar.current.isDateInToday($0.date) }.count
-        return n > 0 ? "今日\(n)次" : "今日暂无记录"
+    private var pottySub: String {
+        let count = pet.pottyLogs.filter { Calendar.current.isDateInToday($0.date) }.count
+        return count > 0
+            ? l.tr(zh: "今日\(count)次", en: "\(count) today", de: "\(count) heute")
+            : l.tr(zh: "今日暂无记录", en: "No logs today", de: "Heute keine Einträge")
     }
     private var expenseSub: String {
-        let n = pet.expenseLogs.count; return n > 0 ? "\(n)条花费记录" : "暂无记录"
+        pet.expenseLogs.isEmpty
+            ? l.tr(zh: "暂无记录", en: "No expenses", de: "Keine Ausgaben")
+            : l.tr(zh: "\(pet.expenseLogs.count)条花费记录", en: "\(pet.expenseLogs.count) expense logs", de: "\(pet.expenseLogs.count) Ausgaben")
     }
     private var momentsSub: String {
-        let n = pet.photoLogs.count; return n > 0 ? "\(n)个时刻" : "暂无时刻"
+        pet.photoLogs.isEmpty
+            ? l.tr(zh: "暂无时刻", en: "No moments", de: "Keine Momente")
+            : l.tr(zh: "\(pet.photoLogs.count)个时刻", en: "\(pet.photoLogs.count) moments", de: "\(pet.photoLogs.count) Momente")
     }
     private var basicInfoSub: String {
-        if !pet.breed.isEmpty { return pet.breed }
-        if !pet.species.isEmpty { return pet.species }
-        return "完善基本信息"
+        if !pet.breed.isEmpty { return l.tr(zh: "品种已设置", en: "Breed set", de: "Rasse gesetzt") }
+        if !pet.species.isEmpty { return l.tr(zh: "补充品种/日期", en: "Add breed or dates", de: "Rasse oder Daten ergänzen") }
+        return l.tr(zh: "完善基本信息", en: "Complete profile", de: "Profil ergänzen")
     }
     private var documentsSub: String {
         let documentCount = pet.documents.count
         let insuranceCount = pet.insurances.count
-        if documentCount > 0 && insuranceCount > 0 {
-            return "\(documentCount)份证件 · \(insuranceCount)份保险"
+        if documentCount > 0 || insuranceCount > 0 {
+            return l.tr(zh: "\(documentCount)份证件 · \(insuranceCount)份保险", en: "\(documentCount) docs · \(insuranceCount) policies", de: "\(documentCount) Dokumente · \(insuranceCount) Policen")
         }
-        if documentCount > 0 { return "\(documentCount)份证件" }
-        if insuranceCount > 0 { return "\(insuranceCount)份保险" }
-        return "证件/保险资料"
+        return l.tr(zh: "证件/保险资料", en: "Documents and coverage", de: "Dokumente und Schutz")
     }
     private var timelineSub: String {
-        let total = pet.photoLogs.count + pet.milestones.count + pet.healthLogs.count + pet.weightLogs.count
-        return total > 0 ? "\(total)条记录" : "暂无记录"
+        timelineCount > 0
+            ? l.tr(zh: "\(timelineCount)条记录", en: "\(timelineCount) logs", de: "\(timelineCount) Einträge")
+            : l.tr(zh: "暂无记录", en: "No logs", de: "Keine Einträge")
     }
     private var achievementsSub: String {
-        let n = pet.milestones.count
-        return n > 0 ? "\(n)个里程碑" : "暂无成就"
-    }
-    private var retentionSub: String {
-        "长期模块 \(archiveSnapshot.score)/5"
+        pet.milestones.isEmpty
+            ? l.tr(zh: "暂无成就", en: "No awards", de: "Keine Erfolge")
+            : l.tr(zh: "\(pet.milestones.count)个里程碑", en: "\(pet.milestones.count) milestones", de: "\(pet.milestones.count) Meilensteine")
     }
 
     private var todayFeedMetric: String {
         "\(pet.careLogs.filter { $0.careType == .feeding && Calendar.current.isDateInToday($0.date) }.count)"
     }
-
     private var todayPottyMetric: String {
         "\(pet.pottyLogs.filter { Calendar.current.isDateInToday($0.date) }.count)"
     }
-
     private var latestWeightText: String {
-        guard let latest = pet.weightLogs.sorted(by: { $0.date > $1.date }).first else { return "--" }
+        guard let latest = pet.weightLogs.max(by: { $0.date < $1.date }) else { return "--" }
         return String(format: "%.1f", latest.weightInKg)
     }
-
     private var weekWalkText: String {
         let start = Calendar.current.date(byAdding: .day, value: -6, to: Date()) ?? Date()
         let km = pet.walkLogs
@@ -249,354 +426,19 @@ struct PetAllFeaturesSheet: View {
             .reduce(0.0) { $0 + $1.distanceMeters } / 1000
         return km >= 10 ? String(format: "%.0fkm", km) : String(format: "%.1fkm", km)
     }
-
     private var expenseMetric: String {
-        let total = pet.expenseLogs.reduce(0.0) { $0 + $1.amount }
-        return AppCurrency.formatCompact(total)
+        AppCurrency.formatCompact(pet.expenseLogs.reduce(0.0) { $0 + $1.amount })
     }
-
-    // MARK: - Bento Builders
-
-    private var petFeatureHero: some View {
-        NavigationLink(value: PetAllFeatureDestination.retention) {
-            ZStack(alignment: .topLeading) {
-                MeshGradient(
-                    width: 3,
-                    height: 3,
-                    points: [
-                        SIMD2(0.0, 0.0), SIMD2(0.5, 0.0), SIMD2(1.0, 0.0),
-                        SIMD2(0.0, 0.5), SIMD2(0.55, 0.35), SIMD2(1.0, 0.5),
-                        SIMD2(0.0, 1.0), SIMD2(0.5, 1.0), SIMD2(1.0, 1.0)
-                    ],
-                    colors: [
-                        Color(hex: pet.safeThemeColorHex).mix(with: .white, by: 0.22),
-                        Color.goTeal.opacity(0.62),
-                        Color.goOrange.opacity(0.48),
-                        Color(hex: pet.safeThemeColorHex).opacity(0.85),
-                        Color(hex: "1A2E8A"),
-                        Color(hex: "F97316").opacity(0.72),
-                        Color(hex: "0C1640"),
-                        Color(hex: pet.themeColorHex).mix(with: .black, by: 0.2),
-                        Color(hex: "050816")
-                    ]
-                )
-
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("OHANA OS")
-                                .font(OhanaFont.caption2(.black))
-                                .tracking(2.6)
-                                .foregroundStyle(.white.opacity(0.55))
-                            Text(pet.name)
-                                .font(.system(size: 32, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.62)
-                            Text(pet.breed.isEmpty ? pet.species : "\(pet.species) · \(pet.breed)")
-                                .font(OhanaFont.caption(.bold))
-                                .foregroundStyle(.white.opacity(0.62))
-                                .lineLimit(1)
-                        }
-                        Spacer()
-                        petAvatar(size: 54)
-                    }
-
-                    HStack(spacing: 9) {
-                        heroChip(title: "今日照护", value: "\(todayCareCount)")
-                        heroChip(title: "记录", value: "\(pet.careLogs.count + pet.healthLogs.count + pet.weightLogs.count)")
-                        heroChip(title: "档案", value: "\(archiveScore)/5")
-                    }
-                }
-                .padding(18)
-
-                Image(systemName: "sparkles.rectangle.stack.fill")
-                    .font(.system(size: 84, weight: .black))
-                    .foregroundStyle(.white.opacity(0.08))
-                    .offset(x: 250, y: 78)
-            }
-            .frame(height: 188)
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .strokeBorder(.white.opacity(0.16), lineWidth: 1)
-            }
-            .shadow(color: Color(hex: pet.themeColorHex).opacity(0.28), radius: 22, y: 12)
-            .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        }
-        .buttonStyle(ScaleButtonStyle())
+    private var timelineCount: Int {
+        pet.photoLogs.count + pet.milestones.count + pet.healthLogs.count + pet.weightLogs.count
     }
-
-    private var archiveBento: some View {
-        let snapshot = archiveSnapshot
-        return VStack(alignment: .leading, spacing: 12) {
-            sectionHeader(icon: "folder.fill", title: "档案与记忆", label: "\(snapshot.score)/\(snapshot.total)")
-
-            HStack(spacing: 12) {
-                featureTile(
-                    icon: snapshot.nextStep.icon,
-                    color: Color.goLime,
-                    title: "档案完整度",
-                    value: "\(snapshot.score)/\(snapshot.total)",
-                    subtitle: "下一步 · \(snapshot.nextStep.title)",
-                    destination: snapshot.nextStep.destination,
-                    height: 156
-                )
-                VStack(spacing: 12) {
-                    compactFeatureTile(
-                        icon: "person.fill",
-                        color: Color(hex: "6B82C4"),
-                        title: "基本信息",
-                        subtitle: basicInfoSub,
-                        destination: .basicInfo
-                    )
-                    compactFeatureTile(
-                        icon: "doc.fill",
-                        color: Color(hex: "94A3B8"),
-                        title: "证件保障",
-                        subtitle: documentsSub,
-                        destination: .documents
-                    )
-                }
-            }
-
-            HStack(spacing: 12) {
-                compactFeatureTile(
-                    icon: "sparkles.rectangle.stack.fill",
-                    color: Color.goPrimary,
-                    title: "成长档案",
-                    subtitle: retentionSub,
-                    destination: .retention
-                )
-                compactFeatureTile(
-                    icon: "clock.arrow.circlepath",
-                    color: Color(hex: "8B5CF6"),
-                    title: "时间轴",
-                    subtitle: timelineSub,
-                    destination: .timeline
-                )
-            }
-
-            HStack(spacing: 12) {
-                compactFeatureTile(
-                    icon: "sparkles",
-                    color: Color(hex: "EC4899"),
-                    title: "重要时刻",
-                    subtitle: momentsSub,
-                    destination: .moments
-                )
-                compactFeatureTile(
-                    icon: "trophy.fill",
-                    color: Color(hex: "F59E0B"),
-                    title: "成就",
-                    subtitle: achievementsSub,
-                    destination: .achievements
-                )
-            }
-        }
-        .padding(14)
-        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .strokeBorder(.white.opacity(0.1), lineWidth: 1)
-        }
-    }
-
     private var todayCareCount: Int {
-        let cal = Calendar.current
-        let care = pet.careLogs.filter { cal.isDateInToday($0.date) }.count
-        let potty = pet.pottyLogs.filter { cal.isDateInToday($0.date) }.count
-        let walks = pet.walkLogs.filter { cal.isDateInToday($0.startDate) }.count
-        return care + potty + walks
+        let calendar = Calendar.current
+        return pet.careLogs.filter { calendar.isDateInToday($0.date) }.count
+        + pet.pottyLogs.filter { calendar.isDateInToday($0.date) }.count
+        + pet.walkLogs.filter { calendar.isDateInToday($0.startDate) }.count
     }
-
-    private var archiveScore: Int {
-        archiveSnapshot.score
-    }
-
-    private func featureTile(
-        icon: String,
-        color: Color,
-        title: String,
-        value: String,
-        subtitle: String,
-        destination: PetAllFeatureDestination,
-        height: CGFloat
-    ) -> some View {
-        NavigationLink(value: destination) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Image(systemName: icon)
-                        .font(.system(size: 17, weight: .black))
-                        .foregroundStyle(.black)
-                        .frame(width: 34, height: 34)
-                        .background(color, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(.white.opacity(0.36))
-                }
-                Spacer(minLength: 4)
-                Text(value)
-                    .font(.system(size: 29, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.58)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(OhanaFont.callout(.black))
-                        .foregroundStyle(.white.opacity(0.92))
-                    Text(subtitle)
-                        .font(OhanaFont.caption2(.bold))
-                        .foregroundStyle(.white.opacity(0.45))
-                        .lineLimit(2)
-                }
-            }
-            .padding(14)
-            .frame(maxWidth: .infinity, minHeight: height, maxHeight: height, alignment: .topLeading)
-            .background(
-                LinearGradient(
-                    colors: [color.opacity(0.28), Color.white.opacity(0.07), Color.black.opacity(0.08)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                in: RoundedRectangle(cornerRadius: 24, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(.white.opacity(0.11), lineWidth: 1)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        }
-        .buttonStyle(ScaleButtonStyle())
-    }
-
-    private func compactFeatureTile(
-        icon: String,
-        color: Color,
-        title: String,
-        subtitle: String,
-        destination: PetAllFeatureDestination
-    ) -> some View {
-        NavigationLink(value: destination) {
-            VStack(alignment: .leading, spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 14, weight: .black))
-                    .foregroundStyle(color)
-                    .frame(width: 28, height: 28)
-                    .background(color.opacity(0.16), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                Spacer(minLength: 0)
-                Text(title)
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
-                Text(subtitle)
-                    .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(.white.opacity(0.43))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, minHeight: 72, maxHeight: 72, alignment: .leading)
-            .background(.white.opacity(0.075), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(.white.opacity(0.09), lineWidth: 1)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        }
-        .buttonStyle(ScaleButtonStyle())
-    }
-
-    private func heroChip(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(value)
-                .font(OhanaFont.callout(.black))
-                .foregroundStyle(.white)
-            Text(title)
-                .font(OhanaFont.caption2(.bold))
-                .foregroundStyle(.white.opacity(0.48))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
-        .background(.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    @ViewBuilder
-    private func petAvatar(size: CGFloat) -> some View {
-        ZStack {
-            Circle()
-                .fill(.white.opacity(0.12))
-                .frame(width: size, height: size)
-            if let data = pet.avatarImageData, let ui = UIImage(data: data) {
-                Image(uiImage: ui)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: size, height: size)
-                    .clipShape(Circle())
-            } else {
-                Text(pet.speciesEmoji)
-                    .font(.system(size: size * 0.48))
-            }
-        }
-    }
-
-    // MARK: - Row / Header Builders
-
-    private var rowBg: some View {
-        RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.07))
-    }
-
-    @ViewBuilder
-    private func row(icon: String, color: String, title: String, subtitle: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 14) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color(hex: color).opacity(0.2))
-                        .frame(width: 36, height: 36)
-                    Image(systemName: icon)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color(hex: color))
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
-                    Text(subtitle)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.3))
-            }
-            .padding(.vertical, 4)
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .listRowSeparatorTint(.white.opacity(0.08))
-    }
-
-    @ViewBuilder
-    private func sectionHeader(icon: String, title: String, label: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(Color.goLime.opacity(0.8))
-            Text(title)
-                .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
-            Spacer()
-            Text(label)
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(Color.goLime.opacity(0.6))
-                .tracking(2)
-        }
-        .padding(.bottom, 2)
-    }
+    private var archiveScore: Int { archiveSnapshot.score }
 }
 
 enum ArchiveMemoryNextStepKind: Equatable {
@@ -615,16 +457,11 @@ struct ArchiveMemoryNextStep {
 
     var destination: PetAllFeatureDestination {
         switch kind {
-        case .basicInfo:
-            return .basicInfo
-        case .documents:
-            return .documents
-        case .moments:
-            return .moments
-        case .weight:
-            return .weight
-        case .retention:
-            return .retention
+        case .basicInfo: return .basicInfo
+        case .documents: return .documents
+        case .moments: return .moments
+        case .weight: return .weight
+        case .retention: return .retention
         }
     }
 }
@@ -666,42 +503,43 @@ struct ArchiveMemorySnapshot {
         hasMemory: Bool,
         hasHealthOrWeight: Bool
     ) -> ArchiveMemoryNextStep {
+        let l = L10n()
         if !hasBasicProfile {
             return ArchiveMemoryNextStep(
                 kind: .basicInfo,
-                title: "完善基础档案",
-                subtitle: "补充生日、品种或到家日",
+                title: l.tr(zh: "完善基础档案", en: "Complete profile", de: "Profil ergänzen"),
+                subtitle: l.tr(zh: "补充生日、品种或到家日", en: "Add birthday, breed, or home date", de: "Geburtstag, Rasse oder Einzug ergänzen"),
                 icon: "person.fill"
             )
         }
         if !hasDocumentsOrInsurance {
             return ArchiveMemoryNextStep(
                 kind: .documents,
-                title: "添加证件/保障",
-                subtitle: "上传疫苗、证件或保险资料",
+                title: l.tr(zh: "添加证件/保障", en: "Add documents", de: "Dokumente hinzufügen"),
+                subtitle: l.tr(zh: "上传疫苗、证件或保险资料", en: "Add vaccine, ID, or insurance files", de: "Impfung, Ausweis oder Versicherung hinzufügen"),
                 icon: "doc.badge.plus"
             )
         }
         if !hasMemory {
             return ArchiveMemoryNextStep(
                 kind: .moments,
-                title: "留下第一段回忆",
-                subtitle: "添加照片或重要时刻",
+                title: l.tr(zh: "留下第一段回忆", en: "Add first moment", de: "Ersten Moment speichern"),
+                subtitle: l.tr(zh: "添加照片或重要时刻", en: "Add a photo or milestone", de: "Foto oder Meilenstein hinzufügen"),
                 icon: "camera.fill"
             )
         }
         if !hasHealthOrWeight {
             return ArchiveMemoryNextStep(
                 kind: .weight,
-                title: "补一条健康基线",
-                subtitle: "记录体重或健康档案",
+                title: l.tr(zh: "补一条健康基线", en: "Add health baseline", de: "Gesundheitsbasis ergänzen"),
+                subtitle: l.tr(zh: "记录体重或健康档案", en: "Log weight or health data", de: "Gewicht oder Gesundheit eintragen"),
                 icon: "scalemass.fill"
             )
         }
         return ArchiveMemoryNextStep(
             kind: .retention,
-            title: "查看成长档案",
-            subtitle: "回顾长期趋势与照护故事",
+            title: l.tr(zh: "查看成长档案", en: "View growth archive", de: "Entwicklungsarchiv ansehen"),
+            subtitle: l.tr(zh: "回顾长期趋势与照护故事", en: "Review trends and care story", de: "Trends und Pflegegeschichte ansehen"),
             icon: "sparkles.rectangle.stack.fill"
         )
     }

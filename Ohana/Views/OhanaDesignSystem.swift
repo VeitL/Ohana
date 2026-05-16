@@ -18,28 +18,45 @@ enum GoMotion {
     static let feedback: Animation = .spring(response: 0.26, dampingFraction: 0.74)
     static let quick: Animation = .easeInOut(duration: 0.18)
     static let reduced: Animation = .easeInOut(duration: 0.14)
+
+    static let tap: Animation = .interactiveSpring(response: 0.20, dampingFraction: 0.82, blendDuration: 0.10)
+    static let selection: Animation = .interactiveSpring(response: 0.30, dampingFraction: 0.84, blendDuration: 0.18)
+    static let stateChange: Animation = .interactiveSpring(response: 0.36, dampingFraction: 0.88, blendDuration: 0.22)
+    static let sheet: Animation = .interactiveSpring(response: 0.42, dampingFraction: 0.86, blendDuration: 0.28)
+
+    static func staggerDelay(_ index: Int, step: Double = 0.035, maxDelay: Double = 0.24) -> Double {
+        min(Double(max(index, 0)) * step, maxDelay)
+    }
 }
 
 // MARK: - Global Coconut Balance Capsule
 struct CoconutBalanceCapsule: View {
     @State private var questManager = QuestManager.shared
-    @State private var previousCount: Int = QuestManager.shared.coconutCount
+    @State private var previousCount: Int
     @State private var pulse = false
     @State private var floatingDelta: Int? = nil
+    private let balanceOverride: Int?
+    private let showsDeltaAnimation: Bool
     let onTap: () -> Void
 
-    init(onTap: @escaping () -> Void = {}) {
+    init(balance: Int? = nil, showsDeltaAnimation: Bool? = nil, onTap: @escaping () -> Void = {}) {
+        self.balanceOverride = balance
+        self.showsDeltaAnimation = showsDeltaAnimation ?? (balance == nil)
         self.onTap = onTap
+        _previousCount = State(initialValue: balance ?? QuestManager.shared.coconutCount)
+    }
+
+    private var visibleCount: Int {
+        balanceOverride ?? questManager.coconutCount
     }
 
     private var capsuleCore: some View {
         HStack(spacing: 3) {
             Text("🥥").font(OhanaFont.metric(size: 9, .medium))
-            Text("\(questManager.coconutCount)")
+            Text("\(visibleCount)")
                 .font(OhanaFont.caption2(.black))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
-                .contentTransition(.numericText())
-                .animation(GoMotion.feedback, value: questManager.coconutCount)
+                .ohanaNumericMotion(visibleCount)
         }
         .padding(.horizontal, 7).padding(.vertical, 4)
         .frame(height: 26)
@@ -69,13 +86,17 @@ struct CoconutBalanceCapsule: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .onAppear {
-            previousCount = questManager.coconutCount
+            previousCount = visibleCount
         }
-        .onChange(of: questManager.coconutCount) { oldValue, newValue in
+        .onChange(of: visibleCount) { oldValue, newValue in
             let baseline = max(previousCount, oldValue)
             let delta = newValue - baseline
             previousCount = newValue
-            guard delta > 0 else { return }
+            guard showsDeltaAnimation, delta > 0 else {
+                floatingDelta = nil
+                pulse = false
+                return
+            }
             floatingDelta = delta
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             withAnimation(GoMotion.feedback) {

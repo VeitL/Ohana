@@ -96,12 +96,12 @@ struct BatchAction: Identifiable, Codable {
             qm.batchAward(type: .potty(isLitter: false), pets: pets, context: context)
         case .litter:
             qm.batchAward(
-                type: .general(humanReward: 5, petReward: 8, emoji: "🧹", title: "铲砂打卡"),
+                type: .general(humanReward: 4, petReward: 1, emoji: "🧹", title: "铲砂打卡"),
                 pets: pets, context: context
             )
         case .play:
             qm.batchAward(
-                type: .general(humanReward: 10, petReward: 12, emoji: "🎾", title: "陪玩打卡"),
+                type: .general(humanReward: 3, petReward: 2, emoji: "🎾", title: "陪玩打卡"),
                 pets: pets, context: context
             )
         }

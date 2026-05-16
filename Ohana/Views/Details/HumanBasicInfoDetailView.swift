@@ -340,7 +340,7 @@ struct HumanBasicInfoDetailView: View {
                             ZStack {
                                 Circle().fill(Color(hex: hex)).frame(width: 38, height: 38)
                                 if eThemeColorHex.uppercased() == hex.uppercased() {
-                                    Circle().strokeBorder(.white, lineWidth: 2.5)
+                                    Circle().strokeBorder(Color.ohanaPrimaryText, lineWidth: 2.5)
                                     Image(systemName: "checkmark")
                                         .font(.system(size: 11, weight: .black))
                                         .foregroundStyle(Color.ohanaPrimaryText)
@@ -752,7 +752,7 @@ private struct HumanDeleteConfirmationSheet: View {
                     Button(action: onDelete) {
                         Text("删除")
                             .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(canDelete ? Color.white : Color.primary.opacity(0.32))
+                            .foregroundStyle(canDelete ? Color.white : Color.ohanaTertiaryText) // ui-v4: allow destructive red button needs white contrast
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
                             .background(canDelete ? Color.goRed : Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))

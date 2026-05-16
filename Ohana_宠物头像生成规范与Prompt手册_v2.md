@@ -38,8 +38,8 @@ Ohana 需要一套视觉统一、适合 iOS 宠物卡片展示的默认宠物头
 | 材质 | 柔软短绒毛，细腻毛绒纤维，plush toy / stuffed animal / soft fabric doll 质感 |
 | 脸部 | 圆润可爱，表情生动，有亲和力；允许半眯眼、侧眼、坏笑、托脸、眨眼等更多元表情，但不写实、不恐怖、不攻击性 |
 | 眼睛 | 夸张大号卡通眼，**眼白保持白色**，统一黑色虹膜观感和黑色卡通瞳孔，明显高光 |
-| 姿势 | 像人一样站立，根据物种、品种性格、性别变化姿势；允许抱胸、交叉腿、半侧身、托脸、挥手、轻街头感站姿等 |
-| 服装 | 简单可爱、轻量装饰，允许更多元的轻街头/学院/软萌穿搭，不遮挡毛色、眼睛和品种轮廓 |
+| 姿势 | 像人一样站立，先根据物种与品种特性决定姿势和表情，再叠加性别气质；允许抱胸、交叉腿、半侧身、托脸、挥手、轻街头感站姿等 |
+| 服装 | 简单可爱、轻量装饰，允许更多元的轻街头/学院/软萌穿搭，不遮挡毛色、眼睛和品种轮廓；禁止鞋子和袜子，必须露出圆润毛绒脚掌 / 爪爪 |
 | 背景 | 最终交付必须是真透明 alpha，无纯色底、无渐变底、无场景、无文字、无水印 |
 | 用途 | 宠物头像、贴纸、品牌吉祥物、App 卡片默认头像 |
 
@@ -61,8 +61,9 @@ The eyes are oversized cartoon eyes with clearly visible pure white sclera, a bl
 The eyes must not have colored sclera or colored irises.
 
 The character stands upright like a human and poses in a cute anthropomorphic way.
-Choose a pose based on breed personality and gender, such as arms crossed, hands on cheeks, tilted head, one leg crossed, waving hand, or confident standing pose.
-Dress the character in simple cute clothing or light accessories based on gender, while keeping coat color, eyes, ears, face shape, tail, and breed silhouette clearly visible.
+Choose the expression and pose from the breed's personality and physical traits first, then apply gender styling: boy avatars should feel cooler, more confident, and stylish; girl avatars should feel cuter, sweeter, and more charming.
+Dress the character in simple cute clothing or light accessories based on breed and gender, while keeping coat color, eyes, ears, face shape, tail, and breed silhouette clearly visible.
+Strict footwear rule: no shoes, no sneakers, no boots, no socks, no sandals, no slippers, and no shoe soles. The character must be barefoot as an animal, with visible rounded furry plush paws/feet integrated with the legs.
 
 Overall style: high-resolution 3D CGI render, premium plush mascot character design, toy product render quality, soft studio lighting, soft shadows, sharp clean edges, detailed fur texture, polished app avatar quality.
 Transparent PNG background, no scenery, no floor, no text, no watermark.
@@ -82,9 +83,9 @@ The result should feel cute, fluffy, rounded, healing, friendly, and suitable fo
 脸部圆润可爱，眼睛为夸张的大号卡通眼睛，眼白必须保持纯白色，虹膜观感统一为黑色，瞳孔为更卡通的黑色大圆瞳，眼睛有清晰高光。
 注意：不要生成绿色、蓝色、黄色或异瞳等彩色虹膜，也不要把眼白染色。
 
-表情根据性别和品种性格选择，可为傲娇微笑、开心吐舌、无辜大眼、慵懒半眯眼、害羞微笑等。
-角色采用拟人化姿势，像人一样站立，根据物种特性和性别摆出不同姿势，比如双手抱胸、双手托脸、歪头站立、交叉腿、挥手、自信站姿。
-穿着简单可爱的衣服或轻量配饰，比如白色 T 恤和红色短裤、白色 T 恤和粉色百褶裙、连帽衫、背带裤、小围巾、蝴蝶结等，衣服同样有柔软布料质感。
+表情和姿势必须先根据品种特性决定，再叠加性别气质：男生整体偏酷酷风、自信、有态度；女生整体偏可爱风、甜美、灵动。可为傲娇微笑、开心吐舌、无辜大眼、慵懒半眯眼、害羞微笑等，但不能让性别风格覆盖品种性格。
+角色采用拟人化姿势，像人一样站立，根据物种与品种特性摆出不同姿势，比如双手抱胸、双手托脸、歪头站立、交叉腿、挥手、自信站姿。
+穿着简单可爱的衣服或轻量配饰，比如白色 T 恤和红色短裤、白色 T 恤和粉色百褶裙、连帽衫、背带裤、小围巾、蝴蝶结等，衣服同样有柔软布料质感。禁止穿鞋子、袜子、靴子、拖鞋或任何鞋底，必须露出圆润毛绒的动物脚掌 / 爪爪。
 
 必须保留 <breed_cn> 的关键品种特征：<breed_traits_cn>。
 毛色和花纹必须严格匹配 <coat_cn>。
@@ -197,14 +198,14 @@ Devon Rex specific traits: extremely large low-set ears, oversized bat-like ears
 
 ## 9. 性别差异化规则
 
-性别差异只通过气质、姿势、轻量配饰和服装细节表达，不改变品种体型和关键识别特征。
+性别差异只通过气质、姿势、表情、轻量配饰和服装细节表达，不改变品种体型和关键识别特征。
 
-注意：性别差异不能覆盖品种性格。每张头像先根据品种特性确定性格方向、表情、姿势和服装风格，再在这个基础上做 boy / girl 的差异化。
+注意：性别差异不能覆盖品种性格。每张头像先根据品种特性确定性格方向、表情、姿势和服装风格，再在这个基础上做 boy / girl 的差异化：`boy` 统一偏酷酷风、自信、有态度；`girl` 统一偏可爱风、甜美、灵动。
 
 | 性别 | 推荐方向 | 可用姿势 | 可用服装 / 配饰 |
 |---|---|---|---|
-| `boy` | 更稳、更酷、更调皮、更自信 | 双手抱胸、自信站姿、交叉腿、半眯侧眼、歪头坏笑、单手挥手 | 白 T + 红短裤、小领巾、简洁连帽衫、小背带、短款马甲、轻街头感短裤 |
-| `girl` | 更灵动、更甜、更优雅、更撒娇 | 双手托脸、歪头站立、交叉腿、开心吐舌、挥手、眨眼、害羞微笑 | 白 T + 粉色百褶裙、蝴蝶结、小发夹、柔色围巾、圆领上衣、学院风小裙 |
+| `boy` | 酷酷风、更稳、更酷、更调皮、更自信 | 双手抱胸、自信站姿、交叉腿、半眯侧眼、歪头坏笑、单手挥手 | 白 T + 红短裤、小领巾、简洁连帽衫、小背带、短款马甲、轻街头感短裤 |
+| `girl` | 可爱风、更灵动、更甜、更优雅、更撒娇 | 双手托脸、歪头站立、交叉腿、开心吐舌、挥手、眨眼、害羞微笑 | 白 T + 粉色百褶裙、蝴蝶结、小发夹、柔色围巾、圆领上衣、学院风小裙 |
 
 ---
 
@@ -217,7 +218,7 @@ Devon Rex specific traits: extremely large low-set ears, oversized bat-like ears
 1. 先确定品种识别特征：耳朵、脸型、鼻口、尾巴、毛量、体型。
 2. 再确定品种性格类型：活泼 / 好动 / 乖巧 / 冷静 / 傲娇 / 亲人 / 警觉 / 优雅等。
 3. 根据品种性格选择表情、姿势和服装。
-4. 最后叠加性别气质：boy 更稳、更 cool 或更调皮；girl 更甜、更灵动或更优雅。
+4. 最后叠加性别气质：boy 固定偏酷酷风、自信、有态度；girl 固定偏可爱风、甜美、灵动。
 
 ### 10.2 性格类型到视觉表现
 
@@ -282,6 +283,7 @@ teal neckerchief
 - 不要复杂服饰，不要遮挡毛色和花纹。
 - 不要戴大帽子遮住耳朵，特别是德文卷毛、法斗、柯基等靠耳朵识别的品种。
 - 不要把配饰作为品种特征的替代。
+- 不要穿鞋子、袜子、靴子、拖鞋、凉鞋或任何鞋底；脚部必须是裸露的圆润毛绒动物脚掌 / 爪爪。
 - 不要加入品牌 logo、文字、图案水印。
 
 ---
@@ -295,6 +297,7 @@ teal neckerchief
 | 源图目标尺寸 | 直接生成 `600x800` 竖版源图；若生成器返回尺寸略有偏差，后处理仅校正到 `600x800` |
 | 背景 | 最终文件必须为真透明 alpha，不要纯色底、阴影底、渐变底 |
 | 主体 | 全身完整可见，头顶、耳朵、尾巴、脚掌不能裁切 |
+| 脚部 | 禁止鞋子和袜子，脚部必须是符合物种的裸露圆润毛绒脚掌 / 爪爪 |
 | 主体高度 | alpha bbox 高度约占画布 `92% - 98%` |
 | 上下留白 | 顶部和底部各约 `2% - 4%` |
 | 左右留白 | 尽量少，只保留耳朵、尾巴、衣服不被裁切的呼吸空间 |
@@ -485,6 +488,7 @@ realistic animal photo, hyper-realistic anatomy, ordinary pet photo, scary, aggr
 - [ ] 是否为 `RGBA` 且真透明背景，四角 alpha 为 `0`，不是黑底、灰底、渐变底或棋盘格底。
 - [ ] 是否经过 `600x800` chroma key 源图生成、本地 alpha 移除、透明验证和尺寸校正后再入库。
 - [ ] 主体是否全身完整可见，耳朵、尾巴、脚掌未裁切。
+- [ ] 是否完全没有鞋子、袜子、靴子、拖鞋、凉鞋或鞋底，脚部是否为裸露圆润毛绒动物脚掌 / 爪爪。
 - [ ] 主体是否占画布高度约 `92% - 98%`，没有过多透明边距。
 - [ ] 是否符合大头小身、短四肢、毛绒玩偶、3D CGI 风格。
 - [ ] 品种关键特征是否明显，例如德文卷毛必须有超大耳朵和精灵脸。
@@ -678,18 +682,19 @@ Output: dog_french_bulldog_boy_fawn_black_mask.png
 
 | 维度 | 可变化内容 | 不应变化内容 |
 |---|---|---|
-| 性别 | 在品种性格基础上调整表情气质、轻量配饰、衣服细节、动作姿态 | 不改变品种体型和关键识别特征，不覆盖品种性格 |
+| 性别 | 在品种性格基础上调整表情气质、轻量配饰、衣服细节、动作姿态；男生酷酷风，女生可爱风 | 不改变品种体型和关键识别特征，不覆盖品种性格 |
 | 品种性格 | 法斗可憨厚放松，柴犬可自信傲娇，金毛可温暖友好，德文卷毛可机灵好奇；必须驱动表情、姿势和服装 | 不做夸张拟人化，不破坏宠物头像属性，不让所有品种使用同一套动作和衣服 |
 | 品种特征 | 耳朵、脸型、尾巴、毛量、身体比例、代表性花纹 | 不把不同品种画成同一套脸 |
 | 毛色 / 花纹 | 严格匹配组合表 | 不额外加入未选择的颜色 |
 | 服装/装饰 | 白 T、背带、丝巾、小领结、发夹等轻量元素 | 不遮挡毛色、眼睛和品种轮廓 |
+| 脚部 | 裸露圆润毛绒动物脚掌 / 爪爪，颜色跟随毛色和花纹 | 不穿鞋子、袜子、靴子、拖鞋、凉鞋，不出现鞋底 |
 
 性别差异建议：
 
 | 性别 | 表现方向 |
 |---|---|
-| `boy` | 更稳、更酷或更调皮；可用简洁 T 恤、短裤、小领巾、单肩包等细节 |
-| `girl` | 更灵动、更甜或更优雅；可用小发夹、蝴蝶结、裙摆、柔色围巾等细节 |
+| `boy` | 酷酷风：更稳、更酷、更自信、有态度；可用简洁 T 恤、短裤、小领巾、单肩包等细节 |
+| `girl` | 可爱风：更灵动、更甜、更软萌、更亲和；可用小发夹、蝴蝶结、裙摆、柔色围巾等细节 |
 
 品种性格提示应写进每张图的 prompt，并转化为具体的 expression / pose / outfit。例如德文卷毛可以强调“大耳朵、卷毛、机灵、好奇、精力充沛”，并对应半眯坏笑、交叉腿、轻街头穿搭；法斗可以强调“短鼻、蝙蝠耳、敦实、憨厚、放松自信”，并对应放松憨笑、稳稳站姿、宽松 T 恤。
 
@@ -701,12 +706,13 @@ Species: <dog/cat>.
 Breed: <breed>.
 Breed personality: <short personality direction based on breed traits>.
 Breed personality type: <active/warm/calm/proud/elegant/alert/goofy/reliable>.
-Gender styling: <boy/girl>, customize expression, pose, outfit, or accessory based on gender while keeping the same overall Ohana avatar style.
+Gender styling: <boy/girl>; choose expression and pose from breed traits first, then style boy avatars cooler and more confident, girl avatars cuter and sweeter, while keeping the same overall Ohana avatar style.
 Coat color and pattern: <coat>.
 Eye design: unified black cartoon eyes with pure white sclera.
 Expression: <breed-driven expression, then gender-adjusted>.
 Pose: <breed-driven pose, then gender-adjusted>.
 Outfit: <breed-driven lightweight outfit, then gender-adjusted>.
+Footwear rule: no shoes, no socks, no boots, no sandals, no slippers, no shoe soles; show bare rounded furry animal paws/feet.
 Style: soft fuzzy plush texture, rounded toy-like proportions, expressive friendly face, polished app avatar, premium character render.
 Composition: centered full-body avatar, consistent camera angle, generous padding.
 Background: transparent PNG, no scenery, no floor, no text, no watermark.

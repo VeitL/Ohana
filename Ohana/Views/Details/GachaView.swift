@@ -197,10 +197,13 @@ struct GachaView: View {
                     Button {
                         dismiss()
                     } label: {
-                        Text("关闭")
-                            .font(OhanaFont.body(.semibold))
-                            .foregroundStyle(Color.goPrimary)
+                        Image(systemName: "xmark")
+                            .font(.system(size: 17, weight: .black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
+                    .accessibilityLabel("关闭")
                 }
             }
         }
@@ -410,10 +413,10 @@ struct GachaView: View {
         .padding(.horizontal, 16).padding(.vertical, 14)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.primary.opacity(colorScheme == .dark ? 0.06 : 0.05))
+                .fill(Color.ohanaCardSurface)
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.1), lineWidth: 1)
+                        .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
                 )
         )
     }

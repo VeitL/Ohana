@@ -1158,6 +1158,19 @@ enum WaterOperatingMode: String, CaseIterable, Identifiable, Equatable {
     case reminder
 
     var id: String { rawValue }
+
+    static func stored(_ petId: UUID) -> WaterOperatingMode? {
+        let raw = UserDefaults.standard.string(forKey: storageKey(petId))
+        return raw.flatMap(WaterOperatingMode.init(rawValue:))
+    }
+
+    static func set(_ petId: UUID, mode: WaterOperatingMode) {
+        UserDefaults.standard.set(mode.rawValue, forKey: storageKey(petId))
+    }
+
+    private static func storageKey(_ petId: UUID) -> String {
+        "water_operating_mode_\(petId.uuidString)"
+    }
 }
 
 struct WaterRuleState {
@@ -1178,7 +1191,10 @@ struct WaterRuleState {
     }
 
     var operatingMode: WaterOperatingMode {
-        planEvents.isEmpty ? .manual : .reminder
+        if let stored = WaterOperatingMode.stored(pet.id) {
+            return stored == .reminder && planEvents.isEmpty ? .manual : stored
+        }
+        return planEvents.isEmpty ? .manual : .reminder
     }
 
     var todayPlanReminders: [Reminder] {

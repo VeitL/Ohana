@@ -88,6 +88,31 @@ enum PetAvatarAssetCatalog {
         "persian"
     ]
 
+    private static let scottishFoldBreedNames: Set<String> = [
+        "苏格兰折耳猫",
+        "苏格兰折耳",
+        "折耳猫",
+        "Scottish Fold",
+        "scottish fold"
+    ]
+
+    private static let norwegianForestBreedNames: Set<String> = [
+        "挪威森林猫",
+        "挪威森林",
+        "Norwegian Forest Cat",
+        "norwegian forest cat",
+        "Norwegian Forest",
+        "norwegian forest"
+    ]
+
+    private static let burmeseBreedNames: Set<String> = [
+        "缅甸猫",
+        "Burmese",
+        "burmese",
+        "Burmese Cat",
+        "burmese cat"
+    ]
+
     private static let liHuaBreedNames: Set<String> = [
         "狸花猫",
         "狸花",
@@ -132,6 +157,41 @@ enum PetAvatarAssetCatalog {
         "somali",
         "Somali Cat",
         "somali cat"
+    ]
+
+    private static let sphynxBreedNames: Set<String> = [
+        "斯芬克斯无毛猫",
+        "斯芬克斯猫",
+        "斯芬克斯",
+        "无毛猫",
+        "Sphynx",
+        "sphynx",
+        "Sphynx Cat",
+        "sphynx cat"
+    ]
+
+    private static let turkishAngoraBreedNames: Set<String> = [
+        "土耳其安哥拉猫",
+        "土耳其安哥拉",
+        "安哥拉猫",
+        "Turkish Angora",
+        "turkish angora",
+        "Turkish Angora Cat",
+        "turkish angora cat"
+    ]
+
+    private static let domesticShorthairBreedNames: Set<String> = [
+        "中华田园猫",
+        "中华田园",
+        "田园猫",
+        "家猫",
+        "中国家猫",
+        "Domestic Shorthair",
+        "domestic shorthair",
+        "Domestic Short Hair",
+        "domestic short hair",
+        "Chinese Domestic Cat",
+        "chinese domestic cat"
     ]
 
     private static let shibaInuBreedNames: Set<String> = [
@@ -231,6 +291,17 @@ enum PetAvatarAssetCatalog {
         "萨摩耶",
         "Samoyed",
         "samoyed"
+    ]
+
+    private static let poodleBreedNames: Set<String> = [
+        "泰迪/贵宾犬",
+        "泰迪",
+        "贵宾犬",
+        "贵宾",
+        "Toy Poodle",
+        "toy poodle",
+        "Poodle",
+        "poodle"
     ]
 
     private static let miniatureSchnauzerBreedNames: Set<String> = [
@@ -341,6 +412,33 @@ enum PetAvatarAssetCatalog {
         .init(coatName: "蓝色", coatSlug: "blue", coatHex: "7A9AAF")
     ]
 
+    static let scottishFoldAppearances: [Appearance] = [
+        .init(coatName: "蓝灰色", coatSlug: "blue_gray", coatHex: "7A9AAF"),
+        .init(coatName: "白色", coatSlug: "white", coatHex: "F5F5F0"),
+        .init(coatName: "黑色", coatSlug: "black", coatHex: "1A1A1A"),
+        .init(coatName: "金色", coatSlug: "golden", coatHex: "D4A017"),
+        .init(coatName: "银色", coatSlug: "silver", coatHex: "C0C0C0"),
+        .init(coatName: "虎斑", coatSlug: "tabby", coatHex: "7A5C3A"),
+        .init(coatName: "玳瑁", coatSlug: "tortoiseshell", coatHex: "6E2C00")
+    ]
+
+    static let norwegianForestAppearances: [Appearance] = [
+        .init(coatName: "棕虎斑白", coatSlug: "brown_tabby_white", coatHex: "7A5C3A", coatAliases: ["棕虎斑配白"]),
+        .init(coatName: "黑白", coatSlug: "black_white", coatHex: "2A2A2A"),
+        .init(coatName: "红白", coatSlug: "red_white", coatHex: "B5451B"),
+        .init(coatName: "蓝白", coatSlug: "blue_white", coatHex: "7A9AAF"),
+        .init(coatName: "奶油色", coatSlug: "cream", coatHex: "F5E6C8")
+    ]
+
+    static let burmeseAppearances: [Appearance] = [
+        .init(coatName: "貂褐色", coatSlug: "sable", coatHex: "4A2A10", coatAliases: ["貂色", "海豹褐色"]),
+        .init(coatName: "蓝色", coatSlug: "blue", coatHex: "7A9AAF"),
+        .init(coatName: "巧克力色", coatSlug: "chocolate", coatHex: "4A2C1A"),
+        .init(coatName: "丁香色", coatSlug: "lilac", coatHex: "C0B0C0"),
+        .init(coatName: "红色", coatSlug: "red", coatHex: "B5451B"),
+        .init(coatName: "奶油色", coatSlug: "cream", coatHex: "F5E6C8")
+    ]
+
     static let liHuaAppearances: [Appearance] = [
         .init(coatName: "棕狸花", coatSlug: "brown_mackerel_tabby", coatHex: "7A5C3A"),
         .init(coatName: "银灰狸花", coatSlug: "silver_mackerel_tabby", coatHex: "9A9A92")
@@ -372,6 +470,30 @@ enum PetAvatarAssetCatalog {
         .init(coatName: "红色", coatSlug: "sorrel", coatHex: "B5451B"),
         .init(coatName: "蓝色", coatSlug: "blue", coatHex: "7A9AAF"),
         .init(coatName: "栗色", coatSlug: "fawn", coatHex: "7B4F2E")
+    ]
+
+    static let sphynxAppearances: [Appearance] = [
+        .init(coatName: "桃色肤色", coatSlug: "pink_skin", coatHex: "F0C8A0", coatAliases: ["桃色", "粉色肤色"]),
+        .init(coatName: "黑色肤色", coatSlug: "black_skin", coatHex: "3A2A1A"),
+        .init(coatName: "蓝色肤色", coatSlug: "blue_skin", coatHex: "7A9AAF"),
+        .init(coatName: "虎纹肤色", coatSlug: "tabby_skin", coatHex: "7A5C3A", coatAliases: ["虎斑肤色"])
+    ]
+
+    static let turkishAngoraAppearances: [Appearance] = [
+        .init(coatName: "白色", coatSlug: "white", coatHex: "F5F5F0"),
+        .init(coatName: "黑色", coatSlug: "black", coatHex: "1A1A1A"),
+        .init(coatName: "蓝色", coatSlug: "blue", coatHex: "7A9AAF"),
+        .init(coatName: "红色", coatSlug: "red", coatHex: "B5451B")
+    ]
+
+    static let domesticShorthairAppearances: [Appearance] = [
+        .init(coatName: "橘猫", coatSlug: "orange_tabby", coatHex: "C8622A", coatAliases: ["橘虎斑", "橘色"]),
+        .init(coatName: "黑猫", coatSlug: "black", coatHex: "1A1A1A", coatAliases: ["黑色"]),
+        .init(coatName: "白猫", coatSlug: "white", coatHex: "F5F5F0", coatAliases: ["白色"]),
+        .init(coatName: "三花（黑白橘）", coatSlug: "calico", coatHex: "D4B896", coatAliases: ["三花", "三花猫"]),
+        .init(coatName: "狸花（虎斑）", coatSlug: "brown_tabby", coatHex: "7A5C3A", coatAliases: ["狸花", "虎斑", "棕虎斑"]),
+        .init(coatName: "玳瑁", coatSlug: "tortoiseshell", coatHex: "6E2C00"),
+        .init(coatName: "奶牛（黑白）", coatSlug: "black_white", coatHex: "F5F5F0", coatAliases: ["奶牛猫", "黑白"])
     ]
 
     static let shibaInuAppearances: [Appearance] = [
@@ -451,6 +573,16 @@ enum PetAvatarAssetCatalog {
         .init(coatName: "奶白色", coatSlug: "cream_white", coatHex: "F5E6C8")
     ]
 
+    static let poodleAppearances: [Appearance] = [
+        .init(coatName: "白色", coatSlug: "white", coatHex: "F5F5F0"),
+        .init(coatName: "杏色", coatSlug: "apricot", coatHex: "E8C49A"),
+        .init(coatName: "红色", coatSlug: "red", coatHex: "B5451B"),
+        .init(coatName: "黑色", coatSlug: "black", coatHex: "1A1A1A"),
+        .init(coatName: "棕色", coatSlug: "brown", coatHex: "7B4F2E"),
+        .init(coatName: "银色", coatSlug: "silver", coatHex: "C0C0C0"),
+        .init(coatName: "蓝灰色", coatSlug: "blue_gray", coatHex: "7A9AAF")
+    ]
+
     static let miniatureSchnauzerAppearances: [Appearance] = [
         .init(coatName: "椒盐色", coatSlug: "salt_pepper", coatHex: "9E9E9E"),
         .init(coatName: "黑色", coatSlug: "black", coatHex: "1A1A1A"),
@@ -475,12 +607,18 @@ enum PetAvatarAssetCatalog {
             "abyssinian": abyssinianAppearances,
             "maine_coon": maineCoonAppearances,
             "persian": persianAppearances,
+            "scottish_fold": scottishFoldAppearances,
+            "norwegian_forest": norwegianForestAppearances,
+            "burmese": burmeseAppearances,
             "li_hua": liHuaAppearances,
             "russian_blue": russianBlueAppearances,
             "silver_shaded": silverShadedAppearances,
             "golden_shaded": goldenShadedAppearances,
             "bengal": bengalAppearances,
-            "somali": somaliAppearances
+            "somali": somaliAppearances,
+            "sphynx": sphynxAppearances,
+            "turkish_angora": turkishAngoraAppearances,
+            "domestic_shorthair": domesticShorthairAppearances
         ]
     }
 
@@ -499,6 +637,7 @@ enum PetAvatarAssetCatalog {
             "afghan_hound": afghanHoundAppearances,
             "yorkshire_terrier": yorkshireTerrierAppearances,
             "samoyed": samoyedAppearances,
+            "poodle": poodleAppearances,
             "miniature_schnauzer": miniatureSchnauzerAppearances,
             "alaskan_malamute": alaskanMalamuteAppearances
         ]
@@ -616,6 +755,15 @@ enum PetAvatarAssetCatalog {
         if persianBreedNames.contains(trimmed) {
             return "persian"
         }
+        if scottishFoldBreedNames.contains(trimmed) {
+            return "scottish_fold"
+        }
+        if norwegianForestBreedNames.contains(trimmed) {
+            return "norwegian_forest"
+        }
+        if burmeseBreedNames.contains(trimmed) {
+            return "burmese"
+        }
         if liHuaBreedNames.contains(trimmed) {
             return "li_hua"
         }
@@ -633,6 +781,15 @@ enum PetAvatarAssetCatalog {
         }
         if somaliBreedNames.contains(trimmed) {
             return "somali"
+        }
+        if sphynxBreedNames.contains(trimmed) {
+            return "sphynx"
+        }
+        if turkishAngoraBreedNames.contains(trimmed) {
+            return "turkish_angora"
+        }
+        if domesticShorthairBreedNames.contains(trimmed) {
+            return "domestic_shorthair"
         }
         if shibaInuBreedNames.contains(trimmed) {
             return "shiba_inu"
@@ -672,6 +829,9 @@ enum PetAvatarAssetCatalog {
         }
         if samoyedBreedNames.contains(trimmed) {
             return "samoyed"
+        }
+        if poodleBreedNames.contains(trimmed) {
+            return "poodle"
         }
         if miniatureSchnauzerBreedNames.contains(trimmed) {
             return "miniature_schnauzer"

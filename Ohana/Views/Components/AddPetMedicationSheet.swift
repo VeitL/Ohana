@@ -15,6 +15,9 @@ struct AddPetMedicationSheet: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
 
     @State private var name = ""
     @State private var doseAmount = ""
@@ -45,6 +48,11 @@ struct AddPetMedicationSheet: View {
     private let colorPresets = ["FF6B6B", "FF9500", "FFDD44", "4ECDC4", "5B9FFF", "A78BFA"]
 
     private var themeColor: Color { Color(hex: pet.themeColorHex) }
+    private var chromeAccent: Color { colorScheme == .dark ? Color.goPrimary : Color.goBlue }
+    private var l: L10n { L10n(appLanguage) }
+    private var commonMedicationNames: [String] {
+        PetMedicationQuickCatalog.names(for: appCountry)
+    }
 
     private var composedDosage: String {
         let amt = doseAmount.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -73,13 +81,35 @@ struct AddPetMedicationSheet: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 16) {
                         labeledField("药品名称 *") {
-                            GoDraftTextField(
-                                "例：阿莫西林、肠胃宝…",
-                                text: $name,
-                                capitalization: .words,
-                                autoFocusDelay: 0.25
-                            )
-                                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            VStack(alignment: .leading, spacing: 12) {
+                                GoDraftTextField(
+                                    "例：阿莫西林、肠胃宝…",
+                                    text: $name,
+                                    capitalization: .words,
+                                    autoFocusDelay: 0.25
+                                )
+                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 8) {
+                                        ForEach(commonMedicationNames, id: \.self) { option in
+                                            Button {
+                                                withAnimation(GoMotion.selection) {
+                                                    name = option
+                                                }
+                                            } label: {
+                                                Text(option)
+                                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                                    .foregroundStyle(name == option ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
+                                                    .padding(.horizontal, 12)
+                                                    .padding(.vertical, 8)
+                                                    .background(name == option ? chromeAccent : Color.ohanaControlFill, in: Capsule())
+                                            }
+                                            .buttonStyle(ScaleButtonStyle())
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         labeledField("每次剂量 *") {
@@ -94,7 +124,7 @@ struct AddPetMedicationSheet: View {
                                     .multilineTextAlignment(.center)
                                     .padding(.vertical, 10)
                                     .frame(maxWidth: 120)
-                                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 12))
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 8) {
                                         ForEach(doseUnits, id: \.self) { u in
@@ -114,9 +144,9 @@ struct AddPetMedicationSheet: View {
                                         } label: {
                                             Text(label)
                                                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                                                .foregroundStyle(frequency == freq ? Color.arkInk : .primary)
+                                                .foregroundStyle(frequency == freq ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                                 .padding(.horizontal, 12).padding(.vertical, 8)
-                                                .background(frequency == freq ? Color.goPrimary : Color.primary.opacity(0.08), in: Capsule())
+                                                .background(frequency == freq ? chromeAccent : Color.ohanaControlFill, in: Capsule())
                                         }
                                         .buttonStyle(ScaleButtonStyle())
                                     }
@@ -143,9 +173,9 @@ struct AddPetMedicationSheet: View {
                                                 } label: {
                                                     Text("\(d)天")
                                                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                                                        .foregroundStyle(coursePresetDays == d && customCourseDays.isEmpty ? Color.arkInk : .primary)
+                                                        .foregroundStyle(coursePresetDays == d && customCourseDays.isEmpty ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                                         .padding(.horizontal, 14).padding(.vertical, 8)
-                                                        .background(coursePresetDays == d && customCourseDays.isEmpty ? Color.goPrimary : Color.primary.opacity(0.08), in: Capsule())
+                                                        .background(coursePresetDays == d && customCourseDays.isEmpty ? chromeAccent : Color.ohanaControlFill, in: Capsule())
                                                 }
                                                 .buttonStyle(ScaleButtonStyle())
                                             }
@@ -158,7 +188,7 @@ struct AddPetMedicationSheet: View {
                                                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                                                 .frame(width: 72)
                                                 .padding(.horizontal, 10).padding(.vertical, 8)
-                                                .background(Color.primary.opacity(0.06), in: Capsule())
+                                                .background(Color.ohanaControlFill, in: Capsule())
                                                 .onChange(of: customCourseDays) { _, new in
                                                     if !new.isEmpty { coursePresetDays = nil }
                                                 }
@@ -181,9 +211,9 @@ struct AddPetMedicationSheet: View {
                                         } label: {
                                             Text(opt)
                                                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                                                .foregroundStyle(administrationTag == opt ? Color.arkInk : .primary)
+                                                .foregroundStyle(administrationTag == opt ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                                 .padding(.horizontal, 12).padding(.vertical, 8)
-                                                .background(administrationTag == opt ? themeColor.opacity(0.35) : Color.primary.opacity(0.08), in: Capsule())
+                                                .background(administrationTag == opt ? chromeAccent : Color.ohanaControlFill, in: Capsule())
                                         }
                                         .buttonStyle(ScaleButtonStyle())
                                     }
@@ -202,7 +232,7 @@ struct AddPetMedicationSheet: View {
                                     )
                                         .font(.system(size: 15, weight: .semibold, design: .rounded))
                                         .padding(12)
-                                        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                                        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 12))
                                     Text(doseUnit)
                                         .font(.system(size: 13, weight: .medium, design: .rounded))
                                         .foregroundStyle(Color.ohanaSecondaryText)
@@ -223,7 +253,7 @@ struct AddPetMedicationSheet: View {
                                             .fill(Color(hex: hex))
                                             .frame(width: 28, height: 28)
                                             .overlay {
-                                                Circle().strokeBorder(Color.white.opacity(0.9), lineWidth: colorHex == hex ? 2 : 0)
+                                                Circle().strokeBorder(Color.ohanaPrimaryText.opacity(0.9), lineWidth: colorHex == hex ? 2 : 0)
                                             }
                                     }
                                     .buttonStyle(ScaleButtonStyle())
@@ -249,7 +279,7 @@ struct AddPetMedicationSheet: View {
                                 .foregroundStyle(Color.arkInk)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
-                                .background(canSave ? Color.goPrimary : Color.primary.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
+                                .background(canSave ? chromeAccent : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 16))
                         }
                         .buttonStyle(ScaleButtonStyle())
                         .disabled(!canSave)
@@ -265,22 +295,22 @@ struct AddPetMedicationSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("返回") { dismiss() }
+                    Button(l.tr(zh: "返回", en: "Back", de: "Zurück")) { dismiss() }
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { saveAfterKeyboardDismiss() }
+                    Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { saveAfterKeyboardDismiss() }
                         .fontWeight(.bold)
                         .disabled(!canSave)
-                        .foregroundStyle(canSave ? Color(hex: "FF5A00") : .secondary)
+                        .foregroundStyle(canSave ? chromeAccent : Color.ohanaSecondaryText)
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("完成") {
+                    Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
                         GoKeyboard.dismiss()
                     }
                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.goLime)
+                    .foregroundStyle(chromeAccent)
                 }
             }
             .onAppear {
@@ -322,7 +352,7 @@ struct AddPetMedicationSheet: View {
             content()
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
     }
 
@@ -332,9 +362,9 @@ struct AddPetMedicationSheet: View {
         } label: {
             Text(u)
                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(doseUnit == u ? Color.arkInk : .primary)
+                .foregroundStyle(doseUnit == u ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                 .padding(.horizontal, 12).padding(.vertical, 8)
-                .background(doseUnit == u ? Color.goPrimary : Color.primary.opacity(0.08), in: Capsule())
+                .background(doseUnit == u ? chromeAccent : Color.ohanaControlFill, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -418,5 +448,22 @@ struct AddPetMedicationSheet: View {
         }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         dismiss()
+    }
+}
+
+private enum PetMedicationQuickCatalog {
+    static func names(for countryCode: String) -> [String] {
+        switch AppCountry.normalize(countryCode) {
+        case "US", "GB":
+            return ["Amoxicillin", "Metronidazole", "Gabapentin", "Apoquel", "Simparica", "Revolution"]
+        case "DE":
+            return ["Amoxicillin", "Metronidazol", "Gabapentin", "Apoquel", "Milbemax", "Advocate"]
+        case "JP":
+            return ["アモキシシリン", "メトロニダゾール", "ガバペンチン", "ネクスガード", "レボリューション", "ミルベマックス"]
+        case "HK", "TW":
+            return ["阿莫西林", "甲硝唑", "加巴喷丁", "益生菌", "全能貓", "寵愛"]
+        default:
+            return ["阿莫西林", "甲硝唑", "加巴喷丁", "益生菌", "拜有利", "大宠爱"]
+        }
     }
 }

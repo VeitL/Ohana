@@ -78,6 +78,29 @@ struct PetAvatarAssetCatalogTests {
         #expect(eyes.map(\.name) == ["黑色"])
     }
 
+    @Test func newestCatBreedsUseGeneratedCoatOptionsAndBlackEyes() {
+        let scottishFoldCoats = PetAvatarAssetCatalog.coatColors(species: "猫", breed: "苏格兰折耳猫") ?? []
+        #expect(scottishFoldCoats.map(\.name) == ["蓝灰色", "白色", "黑色", "金色", "银色", "虎斑", "玳瑁"])
+
+        let norwegianForestCoats = PetAvatarAssetCatalog.coatColors(species: "猫", breed: "Norwegian Forest Cat") ?? []
+        #expect(norwegianForestCoats.map(\.name) == ["棕虎斑白", "黑白", "红白", "蓝白", "奶油色"])
+
+        let burmeseCoats = PetAvatarAssetCatalog.coatColors(species: "猫", breed: "缅甸猫") ?? []
+        #expect(burmeseCoats.map(\.name) == ["貂褐色", "蓝色", "巧克力色", "丁香色", "红色", "奶油色"])
+
+        let sphynxCoats = PetAvatarAssetCatalog.coatColors(species: "猫", breed: "Sphynx") ?? []
+        #expect(sphynxCoats.map(\.name) == ["桃色肤色", "黑色肤色", "蓝色肤色", "虎纹肤色"])
+
+        let turkishAngoraCoats = PetAvatarAssetCatalog.coatColors(species: "猫", breed: "土耳其安哥拉猫") ?? []
+        #expect(turkishAngoraCoats.map(\.name) == ["白色", "黑色", "蓝色", "红色"])
+
+        let domesticShorthairCoats = PetAvatarAssetCatalog.coatColors(species: "猫", breed: "Chinese Domestic Cat") ?? []
+        #expect(domesticShorthairCoats.map(\.name) == ["橘猫", "黑猫", "白猫", "三花（黑白橘）", "狸花（虎斑）", "玳瑁", "奶牛（黑白）"])
+
+        let eyes = PetAvatarAssetCatalog.eyeColors(species: "猫", breed: "中华田园猫", coatColor: "奶牛（黑白）") ?? []
+        #expect(eyes.map(\.name) == ["黑色"])
+    }
+
     @Test func generatedDogBreedsUseGeneratedCoatOptionsAndBlackEyes() {
         let shibaCoats = PetAvatarAssetCatalog.coatColors(species: "狗", breed: "柴犬") ?? []
         #expect(shibaCoats.map(\.name) == ["赤色", "黑褐色", "奶油色", "胡麻色"])
@@ -117,6 +140,9 @@ struct PetAvatarAssetCatalogTests {
 
         let samoyedCoats = PetAvatarAssetCatalog.coatColors(species: "狗", breed: "萨摩耶") ?? []
         #expect(samoyedCoats.map(\.name) == ["纯白", "奶白色"])
+
+        let poodleCoats = PetAvatarAssetCatalog.coatColors(species: "狗", breed: "泰迪/贵宾犬") ?? []
+        #expect(poodleCoats.map(\.name) == ["白色", "杏色", "红色", "黑色", "棕色", "银色", "蓝灰色"])
 
         let schnauzerCoats = PetAvatarAssetCatalog.coatColors(species: "狗", breed: "迷你雪纳瑞") ?? []
         #expect(schnauzerCoats.map(\.name) == ["椒盐色", "黑色", "黑银色", "白色"])
@@ -292,6 +318,16 @@ struct PetAvatarAssetCatalogTests {
         #expect(
             PetAvatarAssetCatalog.avatarFilename(
                 species: "狗",
+                breed: "Poodle",
+                gender: "female",
+                coatColor: "杏色",
+                eyeColor: "琥珀色"
+            ) == "dog_poodle_girl_apricot.png"
+        )
+
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "狗",
                 breed: "迷你雪纳瑞",
                 gender: "male",
                 coatColor: "椒盐色",
@@ -357,6 +393,68 @@ struct PetAvatarAssetCatalogTests {
                 coatColor: "栗色",
                 eyeColor: "琥珀色"
             ) == "cat_somali_girl_fawn.png"
+        )
+    }
+
+    @Test func newestCatBreedDatabaseCoatNamesMapToGeneratedAvatarAssets() {
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "猫",
+                breed: "苏格兰折耳猫",
+                gender: "female",
+                coatColor: "虎斑",
+                eyeColor: "金色"
+            ) == "cat_scottish_fold_girl_tabby.png"
+        )
+
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "猫",
+                breed: "Norwegian Forest Cat",
+                gender: "male",
+                coatColor: "棕虎斑白",
+                eyeColor: "绿色"
+            ) == "cat_norwegian_forest_boy_brown_tabby_white.png"
+        )
+
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "猫",
+                breed: "缅甸猫",
+                gender: "female",
+                coatColor: "貂褐色",
+                eyeColor: "金色"
+            ) == "cat_burmese_girl_sable.png"
+        )
+
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "猫",
+                breed: "Sphynx",
+                gender: "male",
+                coatColor: "虎纹肤色",
+                eyeColor: "蓝色"
+            ) == "cat_sphynx_boy_tabby_skin.png"
+        )
+
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "猫",
+                breed: "土耳其安哥拉猫",
+                gender: "female",
+                coatColor: "白色",
+                eyeColor: "异瞳"
+            ) == "cat_turkish_angora_girl_white.png"
+        )
+
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "猫",
+                breed: "Chinese Domestic Cat",
+                gender: "female",
+                coatColor: "奶牛（黑白）",
+                eyeColor: "黄色"
+            ) == "cat_domestic_shorthair_girl_black_white.png"
         )
     }
 

@@ -32,6 +32,7 @@ struct AddHumanWizardView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("appLanguage") private var appLanguage = "zh"
+    @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
     @AppStorage(AppMeasurementSystem.storageKey) private var appMeasurementSystem = AppMeasurementSystem.fallbackCode
     @AppStorage(AppCurrency.storageKey) private var appCurrency = AppCurrency.fallbackCode
     @Query(sort: \Pet.createdAt)   private var existingPets:   [Pet]
@@ -55,8 +56,6 @@ struct AddHumanWizardView: View {
     @State private var birthday    = Date()
     @State private var bloodType   = ""
     @State private var mbti        = ""
-    @State private var showBirthdayPickerSheet = false
-    @State private var birthdayPickerDraft     = Date()
 
     // ── Family（权限 / 性别身份 / 国籍 / 现居地：写入 role / notes / Human.nationality / Human.city）
     @State private var nationalityCountry   = ""
@@ -68,6 +67,7 @@ struct AddHumanWizardView: View {
     // ── Body data
     @State private var heightText      = ""
     @State private var weightText      = ""
+    @State private var activeBodyMetric: BodyMetricField? = nil
     @State private var privateWeight   = false
     @State private var privateWorkout  = false
     @State private var privateMedication = false
@@ -89,14 +89,23 @@ struct AddHumanWizardView: View {
     @State private var decodedAvatar:           UIImage? = nil
     @State private var decodedAvatarTransparent = false
 
-    private var totalCards: Int { isCreatingFirstHuman ? HumanWizardStep.allCases.count : 5 }
+    private var totalCards: Int { 5 }
+
+    private enum BodyMetricField: Equatable {
+        case height
+        case weight
+    }
 
     private let bloodTypes     = ["A", "B", "AB", "O"]
     private let mbtiOptions: [String] = [
         "INTJ", "INTP", "ENTJ", "ENTP", "INFJ", "INFP", "ENFJ", "ENFP",
         "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP"
     ]
-    private let genderOptions = HumanProfileOptions.genderOptions
+    private var genderOptions: [(key: String, icon: String)] {
+        HumanProfileOptions.genderOptions.filter {
+            HumanProfileOptions.normalizedGender($0.key) != "不透露"
+        }
+    }
     private let themeColorOptions: [(hex: String, label: String)] = [
         ("FF7600","橙色"), ("EC4899","粉色"), ("A855F7","紫色"),
         ("FF4757","红色"), ("F59E0B","金色"), ("14B8A6","青色"),
@@ -126,6 +135,7 @@ struct AddHumanWizardView: View {
     private var draftWalletSubtitle: String {
         var parts: [String] = []
         if !gender.isEmpty { parts.append(l.humanGenderDisplay(gender)) }
+        if !bloodType.isEmpty { parts.append(l.humanWizBloodTag(bloodType)) }
         if !nationalityCountry.isEmpty {
             parts.append(l.isEn ? "From \(nationalityCountry)" : "国籍 \(nationalityCountry)")
         }
@@ -149,6 +159,10 @@ struct AddHumanWizardView: View {
                 parts.append("不满1岁")
             }
         }
+        let cleanHeight = heightText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !cleanHeight.isEmpty { parts.append("\(cleanHeight) cm") }
+        let cleanWeight = weightText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !cleanWeight.isEmpty { parts.append("\(cleanWeight) kg") }
         return parts.joined(separator: " · ")
     }
 
@@ -283,9 +297,23 @@ struct AddHumanWizardView: View {
             } message: {
                 Text("请在系统设置中允许 Ohana 访问相机。")
             }
-            .sheet(isPresented: $showBirthdayPickerSheet) { birthdayPickerSheet }
-            .onChange(of: hasBirthday) { _, on in
-                if !on { showBirthdayPickerSheet = false }
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button {
+                        GoKeyboard.dismiss()
+                    } label: {
+                        Label(
+                            l.tr(
+                                zh: "隐藏键盘",
+                                en: "Hide keyboard",
+                                de: "Tastatur ausblenden"
+                            ),
+                            systemImage: "keyboard.chevron.compact.down"
+                        )
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                    }
+                }
             }
     }
 
@@ -322,35 +350,26 @@ struct AddHumanWizardView: View {
         .padding(.horizontal, 7)   // 与首页卡片堆 K.cardMargin 保持一致
         .padding(.top, 8)
         .padding(.bottom, 6)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: name)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: gender)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: avatarImageData?.count)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: themeColorHex)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: nationalityCountry)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: residenceCountry)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: hasBirthday)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: birthday)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: mbti)
+        .animation(GoMotion.feedback, value: name)
+        .animation(GoMotion.feedback, value: gender)
+        .animation(GoMotion.feedback, value: avatarImageData?.count)
+        .animation(GoMotion.feedback, value: themeColorHex)
+        .animation(GoMotion.feedback, value: nationalityCountry)
+        .animation(GoMotion.feedback, value: residenceCountry)
+        .animation(GoMotion.feedback, value: hasBirthday)
+        .animation(GoMotion.feedback, value: birthday)
+        .animation(GoMotion.feedback, value: mbti)
     }
 
     // MARK: - Paged cards
 
     private var pagedCards: some View {
         TabView(selection: $wizardPageIndex) {
-            if isCreatingFirstHuman {
-                pagedCard { card1Identity }.tag(0)
-                pagedCard { card2Profile }.tag(1)
-                pagedCard { card3Avatar }.tag(2)
-                pagedCard { card4Family }.tag(3)
-                pagedCard { card5Body }.tag(4)
-                pagedCard { card6Confirm }.tag(5)
-            } else {
-                pagedCard { card1IdentityAndProfile }.tag(0)
-                pagedCard { card3Avatar }.tag(1)
-                pagedCard { card4Family }.tag(2)
-                pagedCard { card5Body }.tag(3)
-                pagedCard { card6Confirm }.tag(4)
-            }
+            pagedCard { card1IdentityAndProfile }.tag(0)
+            pagedCard { card3Avatar }.tag(1)
+            pagedCard { card4Family }.tag(2)
+            pagedCard { card5Body }.tag(3)
+            pagedCard { card6Confirm }.tag(4)
         }
         .id(wizardTabViewRemountID)
         .tabViewStyle(.page(indexDisplayMode: .never))
@@ -371,7 +390,7 @@ struct AddHumanWizardView: View {
     private func wizardPageDotButton(index i: Int) -> some View {
         Button {
             GoKeyboard.dismiss()
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+            withAnimation(GoMotion.feedback) {
                 wizardPageIndex = i
             }
         } label: {
@@ -380,7 +399,7 @@ struct AddHumanWizardView: View {
                 .frame(width: i == wizardPageIndex ? 20 : 6, height: 6)
         }
         .buttonStyle(ScaleButtonStyle())
-        .animation(.spring(response: 0.3), value: wizardPageIndex)
+        .animation(GoMotion.feedback, value: wizardPageIndex)
     }
 
     /// 与 `AddPetWizardView.pagedCard` 同构
@@ -397,6 +416,26 @@ struct AddHumanWizardView: View {
             .foregroundStyle(Color.primary.opacity(0.6))
             .tracking(0.8)
             .textCase(.uppercase)
+    }
+
+    private var meshIdentityProfile: String {
+        l.tr(zh: "身份资料 · 1/5", en: "IDENTITY · 1/5", de: "IDENTITÄT · 1/5")
+    }
+
+    private var meshAvatar: String {
+        l.tr(zh: "头像 · 2/5", en: "AVATAR · 2/5", de: "AVATAR · 2/5")
+    }
+
+    private var meshFamily: String {
+        l.tr(zh: "资料与权限 · 3/5", en: "DETAILS & PERMISSION · 3/5", de: "DETAILS & RECHTE · 3/5")
+    }
+
+    private var meshBody: String {
+        l.tr(zh: "身体隐私 · 4/5", en: "BODY & PRIVACY · 4/5", de: "KÖRPER & PRIVATSPHÄRE · 4/5")
+    }
+
+    private var meshConfirm: String {
+        l.tr(zh: "确认 · 5/5", en: "FINAL CHECK · 5/5", de: "ABSCHLUSS · 5/5")
     }
 
     // MARK: - Card 1: Identity (Name)
@@ -417,7 +456,7 @@ struct AddHumanWizardView: View {
     private var card1IdentityAndProfile: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 18) {
-                meshCardLabel(l.humanWizMesh1).padding(.top, 14).padding(.horizontal, 20)
+                meshCardLabel(meshIdentityProfile).padding(.top, 14).padding(.horizontal, 20)
                 humanNameSection
                 Divider().opacity(0.15)
                 VStack(spacing: 22) {
@@ -509,7 +548,7 @@ struct AddHumanWizardView: View {
                                 .strokeBorder(gender == opt.key ? Color.goPrimary : .clear, lineWidth: 1.5)
                         )
                         .scaleEffect(gender == opt.key ? 0.97 : 1.0)
-                        .animation(.spring(response: 0.25), value: gender)
+                        .animation(GoMotion.feedback, value: gender)
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
@@ -527,36 +566,37 @@ struct AddHumanWizardView: View {
                     .labelsHidden()
             }
             if hasBirthday {
-                Button {
-                    GoKeyboard.dismiss()
-                    birthdayPickerDraft = birthday
-                    showBirthdayPickerSheet = true
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                } label: {
-                    HStack(alignment: .center, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(birthday.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted)))
-                                .font(.system(size: 17, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color.ohanaPrimaryText)
-                            Text(Human.westernZodiacDisplay(for: birthday, isEnglish: l.isEn))
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color.goPrimary)
-                        }
-                        Spacer()
-                        Image(systemName: "calendar")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Color.primary.opacity(0.45))
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(birthday.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted)))
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                        Text(Human.westernZodiacDisplay(for: birthday, isEnglish: l.isEn))
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.goPrimary)
                     }
-                    .padding(.horizontal, 14).padding(.vertical, 12)
-                    .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    Spacer()
+                    DatePicker("", selection: $birthday, in: birthdaySelectableRange, displayedComponents: .date)
+                        .labelsHidden()
+                        .datePickerStyle(.compact)
+                        .tint(Color.goPrimary)
+                        .simultaneousGesture(TapGesture().onEnded {
+                            GoKeyboard.dismiss()
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        })
                 }
-                .buttonStyle(ScaleButtonStyle())
+                .padding(.horizontal, 14).padding(.vertical, 12)
+                .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+                )
                 Text(l.humanWizBirthdayHint)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.55))
             }
         }
-        .animation(.spring(response: 0.35), value: hasBirthday)
+        .animation(GoMotion.feedback, value: hasBirthday)
 
         Divider().opacity(0.15)
 
@@ -577,7 +617,7 @@ struct AddHumanWizardView: View {
                                 in: RoundedRectangle(cornerRadius: 14, style: .continuous)
                             )
                             .scaleEffect(bloodType == bt ? 0.96 : 1.0)
-                            .animation(.spring(response: 0.25), value: bloodType)
+                            .animation(GoMotion.feedback, value: bloodType)
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
@@ -624,7 +664,7 @@ struct AddHumanWizardView: View {
     private var card3Avatar: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 18) {
-                meshCardLabel(l.humanWizMesh3).padding(.top, 14).padding(.horizontal, 20)
+                meshCardLabel(meshAvatar).padding(.top, 14).padding(.horizontal, 20)
 
                 VStack(spacing: 10) {
                     cardSectionLabel(l.humanWizAvatarPhoto)
@@ -668,7 +708,7 @@ struct AddHumanWizardView: View {
     private var card4Family: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 22) {
-                meshCardLabel(l.humanWizMesh4).padding(.top, 14).padding(.horizontal, 20)
+                meshCardLabel(meshFamily).padding(.top, 14).padding(.horizontal, 20)
 
                 // Permission
                 VStack(alignment: .leading, spacing: 10) {
@@ -856,25 +896,45 @@ struct AddHumanWizardView: View {
     private var card5Body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 22) {
-                meshCardLabel(l.humanWizMesh5).padding(.top, 14).padding(.horizontal, 20)
+                meshCardLabel(meshBody).padding(.top, 14).padding(.horizontal, 20)
 
                 // Height
                 VStack(alignment: .leading, spacing: 8) {
                     cardSectionLabel(l.humanWizBodyLabel)
                     HStack(spacing: 12) {
-                        bodyDataField(
+                        bodyDataMetricButton(
+                            field: .height,
                             icon: "ruler", iconColor: Color(hex: "00E5C8"),
                             label: l.humanWizHeightLabel, placeholder: l.humanWizHeightPh, unit: "cm", text: $heightText
                         )
-                        bodyDataField(
+                        bodyDataMetricButton(
+                            field: .weight,
                             icon: "scalemass.fill", iconColor: Color.goPrimary,
                             label: l.humanWizWeightLabel, placeholder: l.humanWizWeightPh, unit: "kg", text: $weightText
                         )
+                    }
+                    if let activeBodyMetric {
+                        EmbeddedDecimalKeypad(
+                            text: activeBodyMetric == .height ? $heightText : $weightText,
+                            countryCode: appCountry,
+                            maxFractionDigits: 1,
+                            accent: Color.goPrimary,
+                            isMini: true,
+                            showsSubmitButton: true
+                        ) {
+                            withAnimation(GoMotion.feedback) {
+                                self.activeBodyMetric = nil
+                            }
+                        }
+                        .padding(10)
+                        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
                     }
                     Text(l.humanWizWeightFootnote)
                         .font(.system(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText.opacity(0.5))
                 }
+                .animation(GoMotion.feedback, value: activeBodyMetric)
 
                 Divider().opacity(0.15)
 
@@ -904,7 +964,7 @@ struct AddHumanWizardView: View {
     private var card6Confirm: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 22) {
-                meshCardLabel(l.humanWizMesh6).padding(.top, 14).padding(.horizontal, 20)
+                meshCardLabel(meshConfirm).padding(.top, 14).padding(.horizontal, 20)
 
                 // Theme color
                 VStack(alignment: .leading, spacing: 12) {
@@ -922,16 +982,12 @@ struct AddHumanWizardView: View {
                                             .frame(width: 36, height: 36)
                                             .overlay(
                                                 Circle().strokeBorder(
-                                                    themeColorHex == opt.hex ? Color.white : Color.clear,
+                                                    themeColorHex == opt.hex ? Color.ohanaCardSurface : Color.clear,
                                                     lineWidth: 2.5
                                                 )
                                             )
-                                            .shadow(
-                                                color: Color(hex: opt.hex).opacity(themeColorHex == opt.hex ? 0.6 : 0),
-                                                radius: 8
-                                            )
                                             .scaleEffect(themeColorHex == opt.hex ? 1.15 : 1.0)
-                                            .animation(.spring(response: 0.25), value: themeColorHex)
+                                            .animation(GoMotion.feedback, value: themeColorHex)
                                         Text(l.humanThemeSwatchLabel(opt.label))
                                             .font(.system(size: 10, weight: .bold, design: .rounded))
                                             .foregroundStyle(Color.ohanaPrimaryText.opacity(themeColorHex == opt.hex ? 1 : 0.4))
@@ -1106,49 +1162,6 @@ struct AddHumanWizardView: View {
             .foregroundStyle(Color.ohanaSecondaryText)
     }
 
-    /// 生日滚轮 Sheet：选日期后点「完成」写回 `birthday`
-    private var birthdayPickerSheet: some View {
-        let range = birthdaySelectableRange
-        return NavigationStack {
-            VStack(spacing: 14) {
-                DatePicker("", selection: $birthdayPickerDraft, in: range, displayedComponents: .date)
-                    .datePickerStyle(.wheel)
-                    .labelsHidden()
-                    .frame(maxWidth: .infinity)
-                Text(Human.westernZodiacDisplay(for: birthdayPickerDraft, isEnglish: l.isEn))
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.goPrimary)
-                Button {
-                    let lo = range.lowerBound
-                    let hi = range.upperBound
-                    birthday = min(max(birthdayPickerDraft, lo), hi)
-                    showBirthdayPickerSheet = false
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                } label: {
-                    Text(l.done)
-                        .font(.system(size: 16, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.arkInk)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 15)
-                        .background(Color.goPrimary, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .padding(.horizontal, 20)
-                Spacer(minLength: 8)
-            }
-            .padding(.top, 8)
-            .navigationTitle(l.humanWizBirthdaySheetTitle)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel) { showBirthdayPickerSheet = false }
-                }
-            }
-        }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-    }
-
     private func avatarActionButton(icon: String, label: String, accent: Color = Color.goPrimary) -> some View {
         VStack(spacing: 5) {
             Image(systemName: icon)
@@ -1166,39 +1179,47 @@ struct AddHumanWizardView: View {
         )
     }
 
-    private func bodyDataField(
+    private func bodyDataMetricButton(
+        field: BodyMetricField,
         icon: String, iconColor: Color,
         label: String, placeholder: String, unit: String,
         text: Binding<String>
     ) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(iconColor)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                GoDraftTextField(
-                    placeholder,
-                    text: text,
-                    commitDelayNanoseconds: 140_000_000,
-                    keyboardType: .decimalPad,
-                    submitLabel: .done,
-                    capitalization: .never
-                )
-                    .keyboardType(.decimalPad)
-                    .font(.system(size: 17, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .transaction { $0.animation = nil }
+        let isActive = activeBodyMetric == field
+        return Button {
+            GoKeyboard.dismiss()
+            withAnimation(GoMotion.feedback) {
+                activeBodyMetric = isActive ? nil : field
             }
-            Text(unit)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(iconColor)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                    Text(text.wrappedValue.isEmpty ? placeholder : text.wrappedValue)
+                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .foregroundStyle(text.wrappedValue.isEmpty ? Color.ohanaSecondaryText.opacity(0.45) : Color.ohanaPrimaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                }
+                Text(unit)
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity)
+            .background(isActive ? Color.goPrimary.opacity(0.14) : Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(isActive ? Color.goPrimary.opacity(0.5) : Color.clear, lineWidth: 1.5)
+            )
         }
-        .padding(14)
-        .frame(maxWidth: .infinity)
-        .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func privacyRow(_ title: String, emoji: String, binding: Binding<Bool>) -> some View {
@@ -1256,7 +1277,7 @@ struct AddHumanWizardView: View {
             )
         }
         .buttonStyle(ScaleButtonStyle())
-        .animation(.spring(response: 0.25), value: role)
+        .animation(GoMotion.feedback, value: role)
     }
 
     // MARK: - Photo handling
@@ -1390,7 +1411,7 @@ struct AddHumanWizardView: View {
         )
         human.shouldShowOnHome = true
         human.mbti = mbti.trimmingCharacters(in: .whitespaces).uppercased()
-        if let h = Double(heightText), h > 0 { human.heightCm = h }
+        if let h = decimalValue(from: heightText), h > 0 { human.heightCm = h }
 
         human.setPrivate(.weight, privateWeight)
         human.setPrivate(.workout, privateWorkout)
@@ -1403,10 +1424,11 @@ struct AddHumanWizardView: View {
             Avatar2DAccess.consumeIfNeeded(kind: .human, existingCount: existingHumans.count)
         }
 
-        if let w = Double(weightText), w > 0 {
+        if let w = decimalValue(from: weightText), w > 0 {
             let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
                 .flatMap { $0.isEmpty ? nil : $0 }
             modelContext.insert(HumanWeightLog(date: Date(), weight: w, human: human, executorId: executorId))
+            IslandQuestEngine.markInitialHumanWeightRecorded(humanId: human.id)
         }
         if hasBirthday {
             let l10 = L10n.current
@@ -1423,6 +1445,10 @@ struct AddHumanWizardView: View {
         modelContext.safeSave()
         onHumanSaved?(human)
         onComplete()
+    }
+
+    private func decimalValue(from text: String) -> Double? {
+        CountryDecimalInput.parse(text, countryCode: appCountry)
     }
 }
 

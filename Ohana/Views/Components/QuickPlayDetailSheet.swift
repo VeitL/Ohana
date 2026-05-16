@@ -351,7 +351,7 @@ struct QuickPlayDetailSheet: View {
 
     private func commitPlay() {
         let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        let oat = QuestManager.OhanaActionType.general(humanReward: 10, petReward: 12, emoji: "🎾", title: "\(pet.name) 互动奖励")
+        let oat = QuestManager.OhanaActionType.general(humanReward: 3, petReward: 2, emoji: "🎾", title: "\(pet.name) 互动奖励")
         CareEventService.recordCare(pet: pet, type: .play, context: modelContext, executorId: eid, reward: oat)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }

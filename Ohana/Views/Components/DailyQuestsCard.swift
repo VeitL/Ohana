@@ -22,6 +22,8 @@ struct IslandQuest: Identifiable, Equatable {
 
 // MARK: - Quest Engine
 struct IslandQuestEngine {
+    private static let initialHumanWeightRecordedPrefix = "ohana.initialHumanWeightRecorded."
+
     static func todayQuests(
         pets: [Pet],
         reminders: [Reminder],
@@ -238,8 +240,38 @@ struct IslandQuestEngine {
         humans
             .filter { $0.shouldShowOnHome }
             .first { human in
+                !hasInitialHumanWeightRecordedToday(humanId: human.id, calendar: calendar, now: now) &&
                 !human.weightLogs.contains { calendar.isDate($0.date, inSameDayAs: now) }
             }
+    }
+
+    static func markInitialHumanWeightRecorded(humanId: UUID, date: Date = Date()) {
+        let key = initialHumanWeightRecordedKey(humanId: humanId, date: date, calendar: .current)
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    private static func hasInitialHumanWeightRecordedToday(
+        humanId: UUID,
+        calendar: Calendar,
+        now: Date
+    ) -> Bool {
+        UserDefaults.standard.bool(forKey: initialHumanWeightRecordedKey(
+            humanId: humanId,
+            date: now,
+            calendar: calendar
+        ))
+    }
+
+    private static func initialHumanWeightRecordedKey(
+        humanId: UUID,
+        date: Date,
+        calendar: Calendar
+    ) -> String {
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        let year = components.year ?? 0
+        let month = components.month ?? 0
+        let day = components.day ?? 0
+        return "\(initialHumanWeightRecordedPrefix)\(humanId.uuidString).\(year)-\(month)-\(day)"
     }
 
     private static func humanWeightSubtitle(

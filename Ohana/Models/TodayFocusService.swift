@@ -10,6 +10,8 @@ import Foundation
 enum TodayFocusService {
     enum Content {
         case quest(IslandQuest)
+        case familyTask(FamilyCollaborationTask)
+        case coconutExchange(CoconutExchangeRequest)
         case negative(IslandNegativeSignal)
         case memory(MemoryFragment)
         case celebrate(pets: [Pet])
@@ -90,6 +92,10 @@ enum TodayFocusService {
         switch content {
         case .quest:
             return "去打卡"
+        case .familyTask:
+            return "发给你"
+        case .coconutExchange:
+            return "待确认"
         case .negative(let signal):
             return signal.severity == .critical ? "紧急" : "需要关注"
         case .memory:

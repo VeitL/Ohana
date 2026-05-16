@@ -50,7 +50,6 @@ struct HumanWishlistView: View {
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 24).padding(.vertical, 14)
                     .background(Color.goPrimary, in: Capsule())
-                    .shadow(color: Color.goPrimary.opacity(0.45), radius: 14, y: 5)
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .padding(.bottom, 28)
@@ -96,7 +95,7 @@ struct HumanWishlistView: View {
     }
 
     private var balanceCard: some View {
-        UltimateGlassCard {
+        wishlistSurface {
             HStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("我的椰子余额")
@@ -150,7 +149,7 @@ struct HumanWishlistView: View {
 
     // MARK: - Balance Card (inner)
     private func wishCard(item: WishlistItem, redeemed: Bool) -> some View {
-        UltimateGlassCard {
+        wishlistSurface {
             HStack(spacing: 14) {
                 // 椰子数量徽章
                 VStack(spacing: 2) {
@@ -180,7 +179,7 @@ struct HumanWishlistView: View {
                             .foregroundStyle(human.coconutBalance >= item.cost ? Color.arkInk : .primary.opacity(0.3))
                             .padding(.horizontal, 14).padding(.vertical, 8)
                             .background(
-                                human.coconutBalance >= item.cost ? Color.goYellow : Color.white.opacity(0.08),
+                                human.coconutBalance >= item.cost ? Color.goYellow : Color.ohanaControlFill,
                                 in: Capsule()
                             )
                     }
@@ -201,7 +200,7 @@ struct HumanWishlistView: View {
                         .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                         .padding(.horizontal, 10).padding(.vertical, 6)
-                        .background(.white.opacity(0.06), in: Capsule())
+                        .background(Color.ohanaControlFill, in: Capsule())
                 }
             }
             .padding(16)
@@ -237,7 +236,7 @@ struct HumanWishlistView: View {
 
             VStack(spacing: 0) {
                 Capsule()
-                    .fill(Color.white.opacity(0.2))
+                    .fill(Color.ohanaDivider)
                     .frame(width: 40, height: 4)
                     .padding(.top, 12).padding(.bottom, 20)
 
@@ -257,8 +256,8 @@ struct HumanWishlistView: View {
                             .foregroundStyle(Color.ohanaPrimaryText)
                     }
                     .padding(.horizontal, 16).padding(.vertical, 14)
-                    .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.white.opacity(0.1), lineWidth: 1))
+                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.ohanaCardStroke, lineWidth: 1))
 
                     // 椰子费用
                     VStack(alignment: .leading, spacing: 8) {
@@ -285,8 +284,8 @@ struct HumanWishlistView: View {
                         }
                     }
                     .padding(.horizontal, 16).padding(.vertical, 14)
-                    .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.white.opacity(0.1), lineWidth: 1))
+                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.ohanaCardStroke, lineWidth: 1))
                 }
                 .padding(.horizontal, 24).padding(.top, 20)
 
@@ -336,5 +335,14 @@ struct HumanWishlistView: View {
         modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         withAnimation { showConfetti = true }
+    }
+
+    private func wishlistSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+            }
     }
 }

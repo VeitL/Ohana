@@ -46,13 +46,15 @@ enum PetMedicationDoseLogging {
         }.count
     }
 
+    @discardableResult
     @MainActor
     static func recordDose(
         medication: PetMedication,
         pet: Pet,
         modelContext: ModelContext,
-        decrementRemaining: Bool = true
-    ) {
+        decrementRemaining: Bool = true,
+        awardCoconut: Bool = false
+    ) -> Event {
         let event = Event(
             title: "💊 \(pet.name) 服用 \(medication.name)",
             startDate: Date(),
@@ -90,5 +92,21 @@ enum PetMedicationDoseLogging {
                 UserDefaults.standard.set(max(0, cur - 1), forKey: key)
             }
         }
+
+        MedicationReminderService.recordDose(for: medication.id)
+
+        if awardCoconut {
+            QuestManager.shared.addCoconuts(1, emoji: "💊", title: "记录喂药 +1🥥")
+            CareLedgerService.recordCoconut(
+                delta: 1,
+                title: "记录喂药",
+                actorId: event.assigneeId,
+                actorName: nil,
+                source: .economy,
+                context: modelContext
+            )
+        }
+
+        return event
     }
 }

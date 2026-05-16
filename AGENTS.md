@@ -33,6 +33,18 @@ Only adopt iOS 26 Liquid Glass APIs when a task explicitly asks for that migrati
 
 Use Swift and SwiftUI conventions already present in the project: four-space indentation, `PascalCase` for types, `camelCase` for properties/functions, and descriptive service/view names such as `ReminderSchedulingService` or `FocusStackHomeTestView`. Keep views focused and move business logic into `Utilities/`, `ViewModels/`, or domain services. Prefer `MARK:` sections for larger Swift files. Do not introduce broad reformatting in unrelated files.
 
+## Architecture, Compliance & Energy Guardrails
+
+Use `docs/app-architecture-governance.md` as the engineering source of truth for app architecture boundaries, App Store-sensitive background behavior, privacy, energy, runtime observability, and long-term maintainability. UI-specific rules still come from `ui规范.selection.json`.
+
+Cross-page runtime policy belongs in `Ohana/Utilities/AppRuntimePolicy.swift`. Do not create parallel low-power, Reduce Motion, scene phase, performance monitor, or background-work policies inside individual views. Views should consume `AppWorkloadPolicy` and keep foreground visible interactions visually unchanged.
+
+Core Location must stay centralized in `LocationManager` and `PetWalkingManager`. Only a running dog walk may keep background location active; paused, stopped, or non-walk app states must stop location updates. Do not create `CLLocationManager`, set `allowsBackgroundLocationUpdates = true`, or request Always authorization outside that flow.
+
+Repeating work must be visible and intentional. New `Timer.publish`, `TimelineView(.animation)`, `repeatForever`, Canvas loops, particle loops, or Map live updates must be paused or downgraded through `AppWorkloadPolicy` when the page is invisible, app is backgrounded, Low Power Mode is on, Reduce Motion is enabled, or app power-saving mode is enabled. Use elapsed-time calculations instead of background timers for durations.
+
+Before reporting runtime, energy, background-location, or animation-loop work complete, run `scripts/audit-runtime-guardrails.sh`. Fix warnings or add `// runtime-guardrail: allow <reason>` only for deliberate exceptions.
+
 ## UI Design Source of Truth
 
 Use `ui规范.selection.json` at the repository root as the single machine-readable source of truth for Ohana UI design tokens. Before changing app views, shared UI components, colors, cards, buttons, inputs, sheets, charts, calendars, or motion, read this file first and apply its selected tokens.
@@ -56,6 +68,20 @@ Cards are reserved for tappable, navigable, expandable, or editable grouped surf
 For new pages or major view refactors, start from `docs/ui-v4-new-page-template.md`. New SwiftUI views should use `OhanaAppBackground()`, semantic Ohana text colors, shared card/button/sheet helpers, `ScaleButtonStyle()`, and `GoMotion` tokens by default.
 
 Before reporting UI work complete, run `scripts/audit-ui-v4.sh --changed` or a path-specific scan such as `scripts/audit-ui-v4.sh Ohana/Views/Components/NewView.swift`. Fix warnings, or add an inline `// ui-v4: allow <reason>` only for intentional exceptions like modal scrims or asset-specific ink colors.
+
+## UI UX Pro Max Advisory Skill
+
+The repository may include `.codex/skills/ui-ux-pro-max/`, installed from `nextlevelbuilder/ui-ux-pro-max-skill`, and the local companion note `docs/ui-ux-pro-max-ohana-adaptation.md`. Treat this skill as an advisory UI/UX review and idea-generation layer only.
+
+`ui规范.selection.json` remains the single machine-readable UI source of truth. If `ui-ux-pro-max` suggests colors, fonts, shadows, sheets, navigation, or component behavior that conflicts with Ohana V4, ignore the suggestion or translate it into existing V4 tokens instead. Do not import generated palettes, Google Fonts, landing-page structures, or web-specific rules into the app.
+
+Use `ui-ux-pro-max` for broad UX questions, accessibility checks, SwiftUI form/chart/sheet guidance, and product-category inspiration. Then implement through Ohana shared components and verify with `scripts/audit-ui-v4.sh` and `scripts/build-debug-fast.sh`.
+
+## Animation Pattern Memory
+
+Use `docs/open-swiftui-animations-memory.md` and `docs/pow-animation-memory.md` as Ohana's local memory for patterns learned from `amosgyamfi/open-swiftui-animations` and `EmergeTools/Pow`. Treat them as inspiration and implementation guidance, not as vendored source code.
+
+When adding motion, prefer the shared helpers in `Ohana/Views/Components/OhanaMotionEffects.swift` and existing `GoMotion` tokens. Reuse `PhaseAnimator`, `contentTransition(.numericText())`, `symbolEffect`, `dashPhase`, staged spring entrances, ping, shine, shake, and pop-style transitions where they add clear meaning: rewards, attention states, counters, FAB/menu reveal, chart/progress entry, validation errors, pending task review, and success feedback. Respect Reduce Motion and avoid decorative loops on high-frequency screens.
 
 ## Localization Source of Truth
 

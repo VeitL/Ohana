@@ -20,6 +20,7 @@ struct FocusWalletCardView: View {
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
     @AppStorage("shop_equipped_title") private var equippedTitle: String = ""
     @AppStorage("shop_equip_fx_lime_glow") private var equipFxLimeGlow: Bool = false
+    @AppStorage(PetBondVaultStore.revisionKey) private var petBondVaultRevision: Int = 0
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -89,16 +90,61 @@ struct FocusWalletCardView: View {
                 topIdentityBar(usesFullBleed: usesFullBleed)
                     .opacity(isHeroExpanded ? 0 : 1)
             }
+            .petMemorialTone(isActive: card.hasPassedAway)
+            .overlay(alignment: .topTrailing) {
+                if card.hasPassedAway {
+                    PetMemorialBadge(
+                        passedAwayDate: card.passedAwayDate,
+                        daysTogether: card.daysTogetherAtPassing
+                    )
+                    .padding(.top, isHeroExpanded ? 16 : 12)
+                    .padding(.trailing, isHeroExpanded ? 16 : 12)
+                    .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .topTrailing)))
+                }
+            }
             .animation(walletAnimation, value: isHeroExpanded)
+            .animation(GoMotion.page, value: card.hasPassedAway)
         }
         .frame(height: isHeroExpanded ? K.expandedCardH : K.cardH)
         .clipShape(RoundedRectangle(cornerRadius: HeroAnim.stackCardCorner, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: HeroAnim.stackCardCorner, style: .continuous)
-                .strokeBorder(equipFxLimeGlow ? Color.goPrimary.opacity(0.72) : .white.opacity(0.15), lineWidth: equipFxLimeGlow ? 1.4 : 0.5)
+                .strokeBorder(cardBorderColor, lineWidth: cardBorderWidth)
         )
-        .shadow(color: equipFxLimeGlow ? Color.goPrimary.opacity(0.34) : .clear, radius: equipFxLimeGlow ? 18 : 0, y: 0)
+        .shadow(color: cardBorderShadow, radius: cardBorderShadowRadius, y: 0)
         .modifier(RealPetTransitionModifier(card: card, heroNS: heroNS))
+    }
+
+    private var petBondBorderActive: Bool {
+        !card.isHuman &&
+        petBondVaultRevision >= 0 &&
+        PetBondVaultStore.isUnlocked(.cardBorder, for: card.id)
+    }
+
+    private var petBondNameplateActive: Bool {
+        !card.isHuman &&
+        petBondVaultRevision >= 0 &&
+        PetBondVaultStore.isUnlocked(.nameplate, for: card.id)
+    }
+
+    private var cardBorderColor: Color {
+        if petBondBorderActive { return Color.goYellow.opacity(0.78) }
+        if equipFxLimeGlow { return Color.goPrimary.opacity(0.72) }
+        return .white.opacity(0.15)
+    }
+
+    private var cardBorderWidth: CGFloat {
+        petBondBorderActive ? 1.8 : (equipFxLimeGlow ? 1.4 : 0.5)
+    }
+
+    private var cardBorderShadow: Color {
+        if petBondBorderActive { return Color.goYellow.opacity(0.32) }
+        if equipFxLimeGlow { return Color.goPrimary.opacity(0.34) }
+        return .clear
+    }
+
+    private var cardBorderShadowRadius: CGFloat {
+        (petBondBorderActive || equipFxLimeGlow) ? 18 : 0
     }
 
     private func avatarContentWidthRatio(hasPopout: Bool, avatarExpanded: Bool) -> CGFloat {
@@ -451,6 +497,15 @@ struct FocusWalletCardView: View {
                 .foregroundStyle(cardPrimaryText(usesFullBleed: usesFullBleed).opacity(0.9))
                 .lineLimit(1)
                 .minimumScaleFactor(0.65)
+            if petBondNameplateActive {
+                Text(L10n(AppLanguage.code).tr(zh: "羁绊", en: "Bond", de: "Bindung"))
+                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.arkInk)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Color.goYellow, in: Capsule())
+                    .transition(.scale.combined(with: .opacity))
+            }
             Spacer(minLength: 0)
             if let title = equippedTitleBadge {
                 Text(title)

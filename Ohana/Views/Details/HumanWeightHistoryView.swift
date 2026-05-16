@@ -14,6 +14,7 @@ struct HumanWeightHistoryView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var isInlineWeightComposerVisible = false
     @State private var newWeightText = ""
@@ -22,6 +23,7 @@ struct HumanWeightHistoryView: View {
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isViewingOwnProfile: Bool { activeHumanId == human.id }
     private var isPrivacyLocked: Bool { human.isPrivate(.weight, viewedBy: activeHumanId) }
+    private var l: L10n { L10n(appLanguage) }
 
     private var sortedLogs: [HumanWeightLog] {
         human.weightLogs.sorted { $0.date > $1.date }
@@ -47,18 +49,25 @@ struct HumanWeightHistoryView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            OhanaAppBackground()
+            OhanaAppBackground().ignoresSafeArea()
 
-            if isPrivacyLocked {
-                privacyLockedView
-            } else {
-                VStack(spacing: 0) {
+            VStack(spacing: 0) {
+                pageHeader
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
+
+                if isPrivacyLocked {
+                    Spacer(minLength: 24)
+                    privacyLockedView
+                    Spacer()
+                } else {
                     chartSection.frame(maxHeight: .infinity)
                     recordListLayer.frame(height: 320)
                 }
-                .ignoresSafeArea(edges: .bottom)
+            }
+            .ignoresSafeArea(edges: .bottom)
 
-                // ── 底部 FAB
+            if !isPrivacyLocked {
                 Button {
                     withAnimation(GoMotion.feedback) {
                         isInlineWeightComposerVisible.toggle()
@@ -67,35 +76,19 @@ struct HumanWeightHistoryView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "plus")
                             .font(.system(size: 16, weight: .black))
-                        Text("添加体重")
+                        Text(l.tr(zh: "添加体重", en: "Add weight", de: "Gewicht hinzufügen"))
                             .font(.system(size: 16, weight: .black, design: .rounded))
                     }
                     .foregroundStyle(Color.arkInk)
-                    .padding(.horizontal, 28).padding(.vertical, 14)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 14)
                     .background(Color.goPrimary, in: Capsule())
-                    .shadow(color: Color.goPrimary.opacity(0.4), radius: 14, y: 5)
                 }
+                .buttonStyle(ScaleButtonStyle())
                 .padding(.bottom, 28)
             }
         }
-        .navigationTitle("体重追踪")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                if isViewingOwnProfile {
-                    HumanPrivacyToggleButton(human: human, field: .weight)
-                }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .black))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .frame(width: 34, height: 34)
-                }
-                .buttonStyle(ScaleButtonStyle())
-            }
-        }
+        .toolbar(.hidden, for: .navigationBar)
         .onChange(of: newWeightText) { _, value in
             let sanitized = CountryDecimalInput.sanitize(value, countryCode: appCountry, maxFractionDigits: 2)
             if sanitized != value {
@@ -104,15 +97,57 @@ struct HumanWeightHistoryView: View {
         }
     }
 
+    private var pageHeader: some View {
+        HStack(spacing: 12) {
+            if let data = human.avatarImageData, let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 46, height: 46)
+                    .clipShape(Circle())
+            } else {
+                Text(human.avatarEmoji)
+                    .font(.system(size: 28))
+                    .frame(width: 46, height: 46)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(human.name)
+                    .font(OhanaFont.headline(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
+                Text(l.tr(zh: "体重追踪", en: "Weight tracking", de: "Gewicht"))
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+
+            Spacer()
+
+            if isViewingOwnProfile {
+                HumanPrivacyToggleButton(human: human, field: .weight)
+            }
+
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+        }
+    }
+
     private var privacyLockedView: some View {
         VStack(spacing: 12) {
             Image(systemName: "lock.fill")
                 .font(.system(size: 34, weight: .bold))
                 .foregroundStyle(Color.goYellow)
-            Text("体重记录仅本人可见")
+            Text(l.tr(zh: "体重记录仅本人可见", en: "Weight is private", de: "Gewicht ist privat"))
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text("当前家庭成员无权查看这些数据。")
+            Text(l.tr(zh: "当前家庭成员无权查看这些数据。", en: "This household member cannot view these records.", de: "Dieses Familienmitglied kann diese Daten nicht sehen."))
                 .font(OhanaFont.callout())
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
@@ -126,7 +161,7 @@ struct HumanWeightHistoryView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("体重趋势")
+                    Text(l.tr(zh: "体重趋势", en: "Weight trend", de: "Gewichtsverlauf"))
                         .font(OhanaFont.title2(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     if let latest = sortedLogs.first {
@@ -141,15 +176,12 @@ struct HumanWeightHistoryView: View {
                     }
                 }
                 Spacer()
-                if let data = human.avatarImageData, let img = UIImage(data: data) {
-                    Image(uiImage: img)
-                        .resizable().scaledToFill()
-                        .frame(width: 56, height: 56)
-                        .clipShape(Circle())
-                        .overlay(Circle().strokeBorder(.white.opacity(0.2), lineWidth: 2))
-                } else {
-                    Text(human.avatarEmoji).font(.system(size: 40))
-                }
+                Text("\(sortedLogs.count)")
+                    .font(OhanaFont.metric(size: 26))
+                    .foregroundStyle(Color.goPrimary)
+                Text(l.tr(zh: "条", en: "logs", de: "Einträge"))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             .padding(.horizontal, 24).padding(.top, 16)
 
@@ -186,9 +218,9 @@ struct HumanWeightHistoryView: View {
                     .padding(.horizontal, 24)
                 }
             } else {
-                Text("记录 2 条以上体重后可显示趋势图")
+                Text(l.tr(zh: "记录 2 条以上体重后可显示趋势图", en: "Add at least 2 weight logs to show a trend.", de: "Mindestens 2 Einträge zeigen einen Verlauf."))
                     .font(OhanaFont.subheadline())
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
+                    .foregroundStyle(Color.ohanaTertiaryText)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 40)
             }
@@ -205,16 +237,16 @@ struct HumanWeightHistoryView: View {
 
             VStack(spacing: 0) {
                 Capsule()
-                    .fill(Color.white.opacity(0.25))
+                    .fill(Color.ohanaDivider)
                     .frame(width: 40, height: 4)
                     .padding(.top, 12).padding(.bottom, 8)
 
                 HStack {
-                    Text("历史记录")
+                    Text(l.tr(zh: "历史记录", en: "History", de: "Verlauf"))
                         .font(OhanaFont.title3(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
-                    Text("\(sortedLogs.count) 条")
+                    Text(l.tr(zh: "\(sortedLogs.count) 条", en: "\(sortedLogs.count) logs", de: "\(sortedLogs.count) Einträge"))
                         .font(OhanaFont.footnote(.bold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
@@ -233,7 +265,7 @@ struct HumanWeightHistoryView: View {
                             weightRow(log: log)
                         }
                         if sortedLogs.isEmpty {
-                            Text("还没有体重记录\n点击下方按钮在这里记录")
+                            Text(l.tr(zh: "还没有体重记录\n点击下方按钮在这里记录", en: "No weight logs yet\nTap the button below to add one.", de: "Noch keine Gewichtseinträge\nTippe unten zum Hinzufügen."))
                                 .font(OhanaFont.callout())
                                 .foregroundStyle(Color.ohanaSecondaryText)
                                 .multilineTextAlignment(.center)
@@ -255,10 +287,10 @@ struct HumanWeightHistoryView: View {
                     .frame(width: 42, height: 42)
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("添加体重")
+                    Text(l.tr(zh: "添加体重", en: "Add weight", de: "Gewicht hinzufügen"))
                         .font(OhanaFont.title3(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text("记录面板已嵌入当前页面")
+                    Text(l.tr(zh: "记录面板已嵌入当前页面", en: "The recorder stays inside this page.", de: "Die Eingabe bleibt auf dieser Seite."))
                         .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
@@ -324,7 +356,7 @@ struct HumanWeightHistoryView: View {
                     .font(.system(size: 13, weight: .black))
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 24)
-                Text("日期")
+                    Text(l.tr(zh: "日期", en: "Date", de: "Datum"))
                     .font(OhanaFont.subheadline(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
@@ -339,7 +371,7 @@ struct HumanWeightHistoryView: View {
             Button(action: saveInlineWeight) {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
-                    Text("保存体重")
+                    Text(l.tr(zh: "保存体重", en: "Save weight", de: "Gewicht sichern"))
                 }
                 .font(OhanaFont.body(.black))
                 .foregroundStyle(Color.arkInk)
@@ -384,7 +416,7 @@ struct HumanWeightHistoryView: View {
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func saveInlineWeight() {
@@ -429,7 +461,7 @@ struct HumanWeightLineChart: View {
                         p.move(to: CGPoint(x: 0, y: y))
                         p.addLine(to: CGPoint(x: w, y: y))
                     }
-                    .stroke(Color.white.opacity(0.06), style: StrokeStyle(lineWidth: 1, dash: [4, 6]))
+                    .stroke(Color.ohanaDivider, style: StrokeStyle(lineWidth: 1, dash: [4, 6]))
                 }
 
                 if logs.count >= 2 {

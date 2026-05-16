@@ -183,6 +183,24 @@ final class QuestManager {
         Self.defaults.set(dict, forKey: Keys.cooldownLogs)
     }
 
+    private func walkDailyRewardKey(humanId: String, date: Date = Date()) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd"
+        return "quest_walkReward_\(humanId)_\(formatter.string(from: date))"
+    }
+
+    private func remainingWalkRewardToday(for humanId: String) -> Int {
+        max(0, 40 - Self.defaults.integer(forKey: walkDailyRewardKey(humanId: humanId)))
+    }
+
+    private func recordWalkRewardToday(_ amount: Int, humanId: String) {
+        guard amount > 0 else { return }
+        let key = walkDailyRewardKey(humanId: humanId)
+        Self.defaults.set(Self.defaults.integer(forKey: key) + amount, forKey: key)
+    }
+
     /// 清空某宠物的任务冷却 key，并从椰子流水中移除该 `actorId` 的条目（与 `Pet.clearAllActivityRecords` 配套）。
     func clearPerPetAuxiliaryState(forPetId petId: UUID) {
         let pid = petId.uuidString
@@ -235,30 +253,31 @@ final class QuestManager {
         var baseRewards: (human: Int, pet: Int) {
             switch self {
             case .walk(let d):
-                let v = max(1, Int(d / 100))
-                return (v, v)
+                let human = min(20, max(1, Int(d / 300)))
+                let pet = min(10, max(1, Int(d / 600)))
+                return (human, pet)
             case .potty(let isLitter):
-                return isLitter ? (5, 8) : (2, 5)
+                return isLitter ? (4, 1) : (1, 1)
             case .feed:
-                return (2, 3)
+                return (2, 1)
             case .water:
-                return (2, 3)
+                return (2, 1)
             case .care(let t):
                 switch t {
-                case .bath:     return (15, 10)
-                case .teeth:    return (8, 5)
-                case .nails:    return (8, 5)
-                case .brushing: return (5, 4)
-                case .ears:     return (6, 5)
+                case .bath:     return (12, 2)
+                case .teeth:    return (6, 2)
+                case .nails:    return (6, 2)
+                case .brushing: return (5, 2)
+                case .ears:     return (6, 2)
                 }
             case .health:
-                return (20, 20)
+                return (20, 3)
             case .expense:
-                return (10, 0)
+                return (3, 0)
             case .weight:
-                return (5, 5)
+                return (5, 1)
             case .milestone:
-                return (50, 50)
+                return (50, 10)
             case .general(let h, let p, _, _):
                 return (h, p)
             }
@@ -412,6 +431,10 @@ final class QuestManager {
         context: ModelContext,
         quality: QualityBonus = .none
     ) -> (humanGot: Int, petGot: Int) {
+        if pet?.hasPassedAway == true {
+            return (0, 0)
+        }
+
         // ── 冷却检查：冷却期内返回 (0,0)，数据层已在上层写入
         if isOnCooldown(petId: pet?.id, type: type) {
             return (0, 0)
@@ -441,10 +464,7 @@ final class QuestManager {
             UserDefaults.standard.removeObject(forKey: "shop_boostDoubleActive")
         }
 
-        // ── 1. 宠物账户
-        if finalPet > 0 { pet?.coconutBalance += finalPet }
-
-        // ── 2. 人类账户（从 context fetch，安全降级）
+        // ── 1. 人类账户（从 context fetch，安全降级）
         var human: Human? = nil
         let humanIdStr = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
         if let hid = humanIdStr {
@@ -454,14 +474,23 @@ final class QuestManager {
                 print("⚠️ [QuestManager] humanId=\(hid) 在 context 中找不到，跳过人类分润")
             }
         }
+
+        if case .walk = type, let humanId = human?.id.uuidString {
+            finalHuman = min(finalHuman, remainingWalkRewardToday(for: humanId))
+        }
+
+        // ── 2. 宠物账户
+        if finalPet > 0 { pet?.coconutBalance += finalPet }
+
+        // ── 3. 人类账户
         if finalHuman > 0 { human?.coconutBalance += finalHuman }
 
-        // ── 3. 全岛总库 = pet 到账 + human 到账（严格一致）
+        // ── 4. 全岛总库 = pet 到账 + human 到账（严格一致）
         let islandDelta = (finalPet > 0 && pet != nil ? finalPet : 0)
                         + (finalHuman > 0 && human != nil ? finalHuman : 0)
         if islandDelta > 0 { coconutCount += islandDelta }
 
-        // ── 4. 日志（拆分：宠物和人类各生成独立条目）
+        // ── 5. 日志（拆分：宠物和人类各生成独立条目）
         let logEmoji = crit.isCrit && crit.multiplier == 5 ? "🎁" : type.emoji
         var baseTitle = crit.isCrit ? crit.title : type.title(pet: pet)
         // 非暴击时，将质量加成 badge 附到标题末尾
@@ -498,10 +527,13 @@ final class QuestManager {
             ))
         }
 
-        // ── 5. 持久化（先存 SwiftData，成功后再 flush UserDefaults）
+        // ── 6. 持久化（先存 SwiftData，成功后再 flush UserDefaults）
         do {
             try context.save()
             flushToDefaults()
+            if case .walk = type, let humanId = human?.id.uuidString {
+                recordWalkRewardToday(finalHuman, humanId: humanId)
+            }
             // 记录冷却时间戳（持久化成功后才记录）
             recordCooldown(petId: pet?.id, type: type)
             // TASK C: 检查 Streak 里程碑奖励
@@ -547,6 +579,26 @@ final class QuestManager {
         coconutCount += finalAmount
         appendLog(CoconutLogEntry(emoji: finalEmoji, title: finalTitle, amount: finalAmount,
                                   actorId: actorId, actorName: actorName))
+        flushToDefaults()
+    }
+
+    /// 记录确定金额的椰子变动，不触发暴击、双倍券或质量加成。用于商店消费、兑换退款等经济账。
+    func recordCoconutDelta(
+        _ amount: Int,
+        emoji: String = "🥥",
+        title: String,
+        actorId: String? = nil,
+        actorName: String? = nil
+    ) {
+        guard amount != 0 else { return }
+        coconutCount += amount
+        appendLog(CoconutLogEntry(
+            emoji: emoji,
+            title: title,
+            amount: amount,
+            actorId: actorId,
+            actorName: actorName
+        ))
         flushToDefaults()
     }
 

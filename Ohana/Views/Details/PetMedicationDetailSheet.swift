@@ -14,12 +14,16 @@ struct PetMedicationDetailSheet: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @Query(sort: \Event.startDate, order: .reverse) private var allEvents: [Event]
 
     @State private var showingEdit = false
 
     private var themeColor: Color { Color(hex: pet.themeColorHex) }
+    private var chromeAccent: Color { colorScheme == .dark ? Color.goPrimary : Color.goBlue }
+    private var l: L10n { L10n(appLanguage) }
 
     private var medEvents: [Event] {
         let idStr = medication.id.uuidString
@@ -59,6 +63,7 @@ struct PetMedicationDetailSheet: View {
                 OhanaAppBackground()
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 16) {
+                        detailChrome
                         headerBlock
 
                         if todayRequired > 0 && todayDone < todayRequired {
@@ -87,51 +92,80 @@ struct PetMedicationDetailSheet: View {
 
                         Spacer(minLength: 40)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 18)
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("返回") { dismiss() }
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 12) {
-                        Button {
-                            showingEdit = true
-                        } label: {
-                            Text("编辑")
-                                .fontWeight(.semibold)
-                                .foregroundStyle(themeColor)
-                        }
-                        Menu {
-                            Button(role: .destructive) {
-                                modelContext.delete(medication)
-                                modelContext.safeSave()
-                                dismiss()
-                            } label: {
-                                Label("删除此用药", systemImage: "trash")
-                            }
-                            Button {
-                                medication.isActive.toggle()
-                                modelContext.safeSave()
-                            } label: {
-                                Label(medication.isActive ? "标记为停用" : "恢复用药", systemImage: medication.isActive ? "pause.circle" : "play.circle")
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                                .font(.system(size: 22))
-                                .foregroundStyle(Color.ohanaSecondaryText)
-                                .symbolRenderingMode(.hierarchical)
-                        }
-                    }
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingEdit) {
                 AddPetMedicationSheet(pet: pet, existing: medication)
             }
+        }
+    }
+
+    private var detailChrome: some View {
+        HStack(spacing: 12) {
+            FeatureHubAvatar(
+                imageData: pet.avatarImageData,
+                emoji: pet.avatarEmoji,
+                fallback: "🐾",
+                tint: themeColor
+            )
+            VStack(alignment: .leading, spacing: 3) {
+                Text(l.tr(zh: "用药详情", en: "Medication detail", de: "Medikationsdetail"))
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                Text(pet.name)
+                    .font(OhanaFont.title3(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Button {
+                showingEdit = true
+            } label: {
+                Image(systemName: "pencil")
+                    .font(.system(size: 15, weight: .black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .frame(width: 42, height: 42)
+                    .background(Color.ohanaControlFill, in: Circle())
+            }
+            .buttonStyle(ScaleButtonStyle())
+
+            Menu {
+                Button(role: .destructive) {
+                    modelContext.delete(medication)
+                    modelContext.safeSave()
+                    dismiss()
+                } label: {
+                    Label(l.tr(zh: "删除此用药", en: "Delete medication", de: "Medikation löschen"), systemImage: "trash")
+                }
+                Button {
+                    medication.isActive.toggle()
+                    modelContext.safeSave()
+                } label: {
+                    Label(
+                        medication.isActive ? l.tr(zh: "标记为停用", en: "Pause medication", de: "Medikation pausieren") : l.tr(zh: "恢复用药", en: "Resume medication", de: "Medikation fortsetzen"),
+                        systemImage: medication.isActive ? "pause.circle" : "play.circle"
+                    )
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 16, weight: .black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .frame(width: 42, height: 42)
+            }
+            .buttonStyle(ScaleButtonStyle())
+
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .frame(width: 42, height: 42)
+            }
+            .buttonStyle(ScaleButtonStyle())
         }
     }
 
@@ -152,16 +186,13 @@ struct PetMedicationDetailSheet: View {
 
     private var recordDoseButton: some View {
         Button {
-            PetMedicationDoseLogging.recordDose(medication: medication, pet: pet, modelContext: modelContext)
-            QuestManager.shared.addCoconuts(1, emoji: "💊", title: "记录喂药 +1🥥")
-            CareLedgerService.recordCoconut(
-                delta: 1,
-                title: "记录喂药",
-                actorId: UserDefaults.standard.string(forKey: "currentActiveHumanId"),
-                actorName: nil,
-                source: .economy,
-                context: modelContext
+            PetMedicationDoseLogging.recordDose(
+                medication: medication,
+                pet: pet,
+                modelContext: modelContext,
+                awardCoconut: true
             )
+            MedicationReminderService.shared.scheduleMedicationReminders(for: pet, context: modelContext)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         } label: {
             HStack {
@@ -172,9 +203,9 @@ struct PetMedicationDetailSheet: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             .font(.system(size: 16, weight: .bold, design: .rounded))
-            .foregroundStyle(.black)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .padding(14)
-            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(chromeAccent, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -212,7 +243,7 @@ struct PetMedicationDetailSheet: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private var bentoTodayStatus: some View {
@@ -240,7 +271,7 @@ struct PetMedicationDetailSheet: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private var bentoAdministration: some View {
@@ -258,7 +289,7 @@ struct PetMedicationDetailSheet: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private var remainingCard: some View {
@@ -282,7 +313,7 @@ struct PetMedicationDetailSheet: View {
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .padding(16)
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private var historySection: some View {

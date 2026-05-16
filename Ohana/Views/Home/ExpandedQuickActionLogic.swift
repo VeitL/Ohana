@@ -38,10 +38,13 @@ enum ExpandedHumanQuickRoute {
     case workoutQuick
     case medicationAdd
     case noteQuick
+    case expenseQuick
     case weightDetail
     case workoutDetail
     case medicationDetail
     case noteDetail
+    case expenseDetail
+    case allFeatures
     case selectHuman
     case none
 }
@@ -74,6 +77,15 @@ enum ExpandedQuickActionLogic {
 
     static func waterRuleState(for pet: Pet, allEvents: [Event]) -> WaterRuleState {
         WaterRuleState(pet: pet, allEvents: allEvents)
+    }
+
+    static func playPlanEvent(for pet: Pet, allEvents: [Event]) -> Event? {
+        let key = pet.id.uuidString
+        let title = "\(pet.name) 陪玩计划"
+        return allEvents
+            .filter { $0.relatedEntityId == key && $0.title == title }
+            .sorted { $0.startDate < $1.startDate }
+            .first
     }
 
     static func defaultWaterAmountMl(for pet: Pet) -> Double? {
@@ -120,6 +132,11 @@ enum ExpandedQuickActionLogic {
         allFeedCareLogs: [PetCareLog],
         now: Date
     ) -> Bool {
+        if item.actionType == "play", let event = playPlanEvent(for: pet, allEvents: allEvents) {
+            let cal = Calendar.current
+            let todayDone = pet.careLogs.contains { $0.type == CareType.play.rawValue && cal.isDateInToday($0.date) }
+            return !todayDone && cal.startOfDay(for: event.startDate) <= cal.startOfDay(for: now)
+        }
         guard item.actionType == "feed" else { return false }
         let dashboard = feedDashboard(for: pet, allEvents: allEvents, allFeedCareLogs: allFeedCareLogs, now: now)
         return dashboard.operatingMode == .manualReminder && dashboard.hasMissedManualPlan
@@ -246,7 +263,14 @@ enum ExpandedQuickActionLogic {
             return scoopQuickStatusText(for: pet, calendar: cal)
         case "play":
             let count = pet.careLogs.filter { $0.type == CareType.play.rawValue && cal.isDateInToday($0.date) }.count
-            return count > 0 ? "今日逗玩 \(count)次" : "今日未逗玩"
+            if count > 0 { return "今日陪玩 \(count)次" }
+            if let event = playPlanEvent(for: pet, allEvents: allEvents) {
+                let eventDay = cal.startOfDay(for: event.startDate)
+                let today = cal.startOfDay(for: now)
+                if eventDay <= today { return "计划待陪" }
+                return "计划 \(relativeFutureDayText(for: event.startDate, calendar: cal))"
+            }
+            return "今日未陪"
         case "weight":
             if let last = pet.weightLogs.max(by: { $0.date < $1.date }) {
                 return String(format: "%.1fkg", last.weight)
@@ -257,6 +281,13 @@ enum ExpandedQuickActionLogic {
                 .filter { cal.isDate($0.date, equalTo: Date(), toGranularity: .month) }
                 .reduce(0.0) { $0 + $1.amount }
             return total > 0 ? "本月 \(AppCurrency.format(total, fractionDigits: 0))" : nil
+        case "moment":
+            let todayCount = pet.photoLogs.filter { cal.isDateInToday($0.date) }.count
+            if todayCount > 0 { return "今天 \(todayCount) 条" }
+            if let last = pet.photoLogs.max(by: { $0.date < $1.date }) {
+                return "最近：\(relativeDayText(for: last.date, calendar: cal))"
+            }
+            return "还没有记录"
         case "filterClean":
             if let last = pet.careLogs.filter({ $0.type == CareType.filterClean.rawValue }).max(by: { $0.date < $1.date }) {
                 let days = cal.dateComponents([.day], from: last.date, to: Date()).day ?? 0
@@ -333,6 +364,8 @@ enum ExpandedQuickActionLogic {
         case "humanWorkout": return .workoutQuick
         case "humanMedication": return .medicationAdd
         case "humanNote": return .noteQuick
+        case "humanExpense": return .expenseQuick
+        case "humanAllFeatures": return .allFeatures
         default: return .selectHuman
         }
     }
@@ -344,6 +377,8 @@ enum ExpandedQuickActionLogic {
         case "humanWorkout": return .workoutDetail
         case "humanMedication": return .medicationDetail
         case "humanNote": return .noteDetail
+        case "humanExpense": return .expenseDetail
+        case "humanAllFeatures": return .allFeatures
         default: return .selectHuman
         }
     }
@@ -353,6 +388,7 @@ enum ExpandedQuickActionLogic {
         human: Human,
         isLocked: Bool,
         todayMedicationLogs: [HumanMedicationLog],
+        expenses: [PetExpenseLog] = [],
         calendar cal: Calendar = .current
     ) -> Bool {
         guard !isLocked else { return false }
@@ -368,6 +404,8 @@ enum ExpandedQuickActionLogic {
                 cal.isDateInToday($0.scheduledTime) &&
                 $0.status == .taken
             }
+        case "humanExpense":
+            return latestHumanExpenseDate(for: human, in: expenses).map { cal.isDateInToday($0) } ?? false
         default:
             return false
         }
@@ -379,6 +417,7 @@ enum ExpandedQuickActionLogic {
         isLocked: Bool,
         activeMedications: [HumanMedication],
         todayMedicationLogs: [HumanMedicationLog],
+        expenses: [PetExpenseLog] = [],
         calendar cal: Calendar = .current
     ) -> String? {
         guard !isLocked else { return nil }
@@ -417,6 +456,20 @@ enum ExpandedQuickActionLogic {
                 return "上次 \(relativeDayText(for: last, calendar: cal))"
             }
             return human.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "还没有备注" : "已有备注"
+        case "humanExpense":
+            let myExpenses = expenses.filter { $0.executorId == human.id.uuidString }
+            if let latest = myExpenses.max(by: { $0.date < $1.date }) {
+                let totalThisMonth = myExpenses
+                    .filter { cal.isDate($0.date, equalTo: Date(), toGranularity: .month) }
+                    .reduce(0.0) { $0 + $1.amount }
+                if totalThisMonth > 0 {
+                    return "本月 \(AppCurrency.format(totalThisMonth, fractionDigits: 0))"
+                }
+                return "上次 \(relativeDayText(for: latest.date, calendar: cal))"
+            }
+            return "还没有花费"
+        case "humanAllFeatures":
+            return "全部入口"
         default:
             return nil
         }
@@ -434,7 +487,7 @@ enum ExpandedQuickActionLogic {
     static func humanPrivacyIconTint(for item: QuickActionItem, human: Human) -> Color {
         guard let field = humanPrivacyField(for: item.actionType),
               human.privateFields.contains(field.rawValue) else {
-            return Color.white.opacity(0.72)
+            return Color.ohanaSecondaryText
         }
         return Color.goYellow
     }
@@ -547,10 +600,25 @@ enum ExpandedQuickActionLogic {
             .max()
     }
 
+    private static func latestHumanExpenseDate(for human: Human, in expenses: [PetExpenseLog]) -> Date? {
+        expenses
+            .filter { $0.executorId == human.id.uuidString }
+            .map(\.date)
+            .max()
+    }
+
     private static func relativeDayText(for date: Date, calendar: Calendar) -> String {
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: Date())).day ?? 0
         if days <= 0 { return "今天" }
         if days == 1 { return "昨天" }
         return "\(days)天前"
+    }
+
+    private static func relativeFutureDayText(for date: Date, calendar: Calendar) -> String {
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: Date()), to: calendar.startOfDay(for: date)).day ?? 0
+        if days <= 0 { return "今天" }
+        if days == 1 { return "明天" }
+        if days == 2 { return "后天" }
+        return "\(days)天后"
     }
 }

@@ -344,15 +344,9 @@ private struct ExpandedPetQuickActionGridItem: View {
                 prefersLightForeground: true,
                 onTap: handleTap,
                 onLongPress: isEditMode ? nil : { onLongPress(item) },
-                onGroomCheckIn: (!isEditMode && item.actionType == "groom") ? { raw in
-                    onGroomCheckIn(raw)
-                } : nil,
-                onPottySelect: (!isEditMode && item.actionType == "potty") ? { raw in
-                    onPottySelect(raw)
-                } : nil,
-                onHealthSelect: (!isEditMode && item.actionType == "health") ? { raw in
-                    onHealthSelect(raw)
-                } : nil
+                onGroomCheckIn: nil,
+                onPottySelect: nil,
+                onHealthSelect: nil
             )
             .allowsHitTesting(!isEditMode)
 

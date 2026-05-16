@@ -10,6 +10,7 @@ import SwiftData
 import BackgroundTasks
 import Foundation
 import Combine
+import UIKit
 
 let ohanaProcessStartTime = CFAbsoluteTimeGetCurrent()
 
@@ -58,8 +59,17 @@ struct OhanaApp: App {
             .onChange(of: appCurrency) { _, _ in }
             .onChange(of: appMeasurementSystem) { _, _ in }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+                AppWorkloadPolicy.shared.updateScenePhase(.background)
                 PetWalkingManager.shared.handleAppBackgroundTransition()
                 OhanaApp.scheduleReminderRefill()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+                PetWalkingManager.shared.handleAppInactiveTransition()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                AppWorkloadPolicy.shared.updateScenePhase(.active)
+                UIApplication.shared.isIdleTimerDisabled = false
+                PetWalkingManager.shared.handleAppForegroundTransition()
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
                 PetWalkingManager.shared.pauseForAppBackground()

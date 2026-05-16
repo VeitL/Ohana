@@ -81,6 +81,7 @@ struct CalendarPetChipFilterBar: View {
 
 struct CalendarView: View {
     var preselectedPetId: String? = nil
+    var preselectedHumanId: String? = nil
     var hideToolbar: Bool = false
     var addEventTrigger: Bool = false
     
@@ -91,6 +92,7 @@ struct CalendarView: View {
     @Query(sort: \Plant.createdAt) private var plants: [Plant]
     @Query(sort: \PetInsurance.createdAt) private var insurances: [PetInsurance]
     @Query(sort: \PetMedication.createdAt) private var petMedications: [PetMedication]
+    @Query(sort: \HumanMedication.createdAt) private var humanMedications: [HumanMedication]
     
     @State private var selectedDate = Date()
     @AppStorage("calendar_filterPetId") private var calendarFilterPetId: String = ""
@@ -126,10 +128,18 @@ struct CalendarView: View {
         return calendarFilterPetId.isEmpty ? nil : calendarFilterPetId
     }
 
+    /// 从人类卡片进入时固定为该成员；首页默认不筛选，继续显示全部日历项目。
+    private var effectiveHumanFilterId: String? {
+        preselectedHumanId
+    }
+
     private var filteredEvents: [Event] {
         var result = events.filter { $0.eventType != EventType.foodChange.rawValue }
         if let petId = effectivePetFilterId {
             result = result.filter { eventIsRelatedToPet($0, petId: petId) }
+        }
+        if let humanId = effectiveHumanFilterId {
+            result = result.filter { eventIsRelatedToHuman($0, humanId: humanId) }
         }
         return result
     }
@@ -150,11 +160,26 @@ struct CalendarView: View {
         return false
     }
 
+    private func eventIsRelatedToHuman(_ event: Event, humanId: String) -> Bool {
+        let entityType = event.relatedEntityType.lowercased()
+        if event.assigneeId == humanId {
+            return true
+        }
+        if event.relatedEntityId == humanId {
+            return entityType == EntityKind.human.rawValue.lowercased()
+                || entityType == "human"
+        }
+        if entityType == "human_medication" {
+            return humanMedications.first { $0.id.uuidString == event.relatedEntityId }?.humanId == humanId
+        }
+        return false
+    }
+
     /// 首页嵌入时为全局顶栏 + 外层宠物条预留空间。
     private var overviewCalendarEmbedTopInset: CGFloat { 98 }
 
     private var shouldShowInlinePetChips: Bool {
-        preselectedPetId == nil && (!hideToolbar || isMaterial)
+        preselectedPetId == nil && preselectedHumanId == nil && (!hideToolbar || isMaterial)
     }
 
     // D1: 展开重复事件 → 生成虚拟 (Event, occurrenceDate) 对，用于列表视图分组

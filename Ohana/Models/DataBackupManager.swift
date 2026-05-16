@@ -11,7 +11,7 @@ import SwiftData
 
 // MARK: - 顶层备份结构
 struct OhanaBackup: Codable {
-    var schemaVersion: Int = 17
+    var schemaVersion: Int = 20
     var exportedAt: String
     // 核心实体
     var pets: [PetBackup]
@@ -45,6 +45,8 @@ struct OhanaBackup: Codable {
     var waterLogs: [WaterLogBackup]
     var wishlistItems: [WishlistItemBackup]
     var careLedgerEvents: [CareLedgerEventBackup]?
+    var familyCollaborationTasks: [FamilyCollaborationTaskBackup]?
+    var coconutExchangeRequests: [CoconutExchangeRequestBackup]?
     // App 状态
     var appState: AppStateBackup
 }
@@ -55,6 +57,7 @@ struct AppStateBackup: Codable {
     var coconutLogsJSON: String
     var bountyTasksJSON: String
     var purchasedShopItems: String
+    var selectedAppIcon: String?
     var gachaHistoryJSON: String
     var celebratedMilestoneDays: String
 }
@@ -288,6 +291,48 @@ struct CareLedgerEventBackup: Codable {
     var createdAt: String
 }
 
+struct FamilyCollaborationTaskBackup: Codable {
+    var id: String
+    var title: String
+    var note: String
+    var kindRaw: String
+    var statusRaw: String
+    var relatedPetId: String?
+    var relatedEventId: String?
+    var relatedReminderId: String?
+    var createdById: String
+    var createdByName: String
+    var assignedToId: String?
+    var assignedToName: String?
+    var claimedById: String?
+    var claimedByName: String?
+    var completedById: String?
+    var completedByName: String?
+    var rewardCoconuts: Int
+    var dueAt: String?
+    var completedAt: String?
+    var createdAt: String
+    var updatedAt: String
+    var emoji: String
+}
+
+struct CoconutExchangeRequestBackup: Codable {
+    var id: String
+    var senderId: String
+    var senderName: String
+    var receiverId: String
+    var receiverName: String
+    var coconutCost: Int
+    var currencyCode: String
+    var localAmount: Double
+    var statusRaw: String
+    var createdAt: String
+    var confirmedAt: String?
+    var cancelledAt: String?
+    var updatedAt: String
+    var note: String
+}
+
 // MARK: - DataBackupManager
 @MainActor
 final class DataBackupManager {
@@ -319,7 +364,7 @@ final class DataBackupManager {
         let decoder = JSONDecoder()
         let backup = try decoder.decode(OhanaBackup.self, from: data)
 
-        guard backup.schemaVersion <= 17 else {
+        guard backup.schemaVersion <= 19 else {
             throw BackupError.unsupportedVersion(backup.schemaVersion)
         }
 
@@ -358,6 +403,8 @@ final class DataBackupManager {
         let waterLogs   = try context.fetch(FetchDescriptor<WaterLog>())
         let wishlist    = try context.fetch(FetchDescriptor<WishlistItem>())
         let ledger      = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let familyTasks = try context.fetch(FetchDescriptor<FamilyCollaborationTask>())
+        let exchanges   = try context.fetch(FetchDescriptor<CoconutExchangeRequest>())
 
         let ud = UserDefaults.standard
         let coconutLogsJSON: String = {
@@ -372,6 +419,7 @@ final class DataBackupManager {
             coconutLogsJSON:        coconutLogsJSON,
             bountyTasksJSON:        ud.string(forKey: "bountyTasks") ?? "[]",
             purchasedShopItems:     ud.string(forKey: "purchasedShopItems") ?? "",
+            selectedAppIcon:        ud.string(forKey: AppIconCatalog.selectedIconKey),
             gachaHistoryJSON:       ud.string(forKey: "gachaHistory") ?? "[]",
             celebratedMilestoneDays: ud.string(forKey: "celebratedMilestoneDays") ?? ""
         )
@@ -408,6 +456,8 @@ final class DataBackupManager {
             waterLogs:        waterLogs.map(encodeWaterLog),
             wishlistItems:    wishlist.map(encodeWishlist),
             careLedgerEvents: ledger.map(encodeCareLedgerEvent),
+            familyCollaborationTasks: familyTasks.map(encodeFamilyCollaborationTask),
+            coconutExchangeRequests: exchanges.map(encodeCoconutExchangeRequest),
             appState:         appState
         )
     }
@@ -423,6 +473,8 @@ final class DataBackupManager {
         let existingEventIds = Set((try? context.fetch(FetchDescriptor<Event>()))?.map { $0.id.uuidString } ?? [])
         let existingReminderIds = Set((try? context.fetch(FetchDescriptor<Reminder>()))?.map { $0.id.uuidString } ?? [])
         let existingLedgerIds = Set((try? context.fetch(FetchDescriptor<CareLedgerEvent>()))?.map { $0.id.uuidString } ?? [])
+        let existingFamilyTaskIds = Set((try? context.fetch(FetchDescriptor<FamilyCollaborationTask>()))?.map { $0.id.uuidString } ?? [])
+        let existingExchangeIds = Set((try? context.fetch(FetchDescriptor<CoconutExchangeRequest>()))?.map { $0.id.uuidString } ?? [])
         let existingDocumentAttachmentIds = Set((try? context.fetch(FetchDescriptor<PetDocumentAttachment>()))?.map { $0.id.uuidString } ?? [])
         let existingPhotoIds = Set((try? context.fetch(FetchDescriptor<PetPhotoLog>()))?.map { $0.id.uuidString } ?? [])
         let existingInsuranceIds = Set((try? context.fetch(FetchDescriptor<PetInsurance>()))?.map { $0.id.uuidString } ?? [])
@@ -521,6 +573,12 @@ final class DataBackupManager {
         for dto in backup.careLedgerEvents ?? [] where !existingLedgerIds.contains(dto.id) {
             context.insert(decodeCareLedgerEvent(dto))
         }
+        for dto in backup.familyCollaborationTasks ?? [] where !existingFamilyTaskIds.contains(dto.id) {
+            context.insert(decodeFamilyCollaborationTask(dto))
+        }
+        for dto in backup.coconutExchangeRequests ?? [] where !existingExchangeIds.contains(dto.id) {
+            context.insert(decodeCoconutExchangeRequest(dto))
+        }
 
         try context.save()
 
@@ -537,6 +595,9 @@ final class DataBackupManager {
         }
         if !s.bountyTasksJSON.isEmpty    { ud.set(s.bountyTasksJSON,    forKey: "bountyTasks") }
         if !s.purchasedShopItems.isEmpty { ud.set(s.purchasedShopItems, forKey: "purchasedShopItems") }
+        if let selectedAppIcon = s.selectedAppIcon, !selectedAppIcon.isEmpty {
+            ud.set(selectedAppIcon, forKey: AppIconCatalog.selectedIconKey)
+        }
         if !s.gachaHistoryJSON.isEmpty   { ud.set(s.gachaHistoryJSON,   forKey: "gachaHistory") }
         if !s.celebratedMilestoneDays.isEmpty { ud.set(s.celebratedMilestoneDays, forKey: "celebratedMilestoneDays") }
     }
@@ -897,6 +958,52 @@ final class DataBackupManager {
             privacyFieldRaw: e.privacyFieldRaw,
             metadataJSON: e.metadataJSON,
             createdAt: d(e.createdAt)
+        )
+    }
+
+    private func encodeFamilyCollaborationTask(_ task: FamilyCollaborationTask) -> FamilyCollaborationTaskBackup {
+        FamilyCollaborationTaskBackup(
+            id: task.id.uuidString,
+            title: task.title,
+            note: task.note,
+            kindRaw: task.kindRaw,
+            statusRaw: task.statusRaw,
+            relatedPetId: task.relatedPetId,
+            relatedEventId: task.relatedEventId,
+            relatedReminderId: task.relatedReminderId,
+            createdById: task.createdById,
+            createdByName: task.createdByName,
+            assignedToId: task.assignedToId,
+            assignedToName: task.assignedToName,
+            claimedById: task.claimedById,
+            claimedByName: task.claimedByName,
+            completedById: task.completedById,
+            completedByName: task.completedByName,
+            rewardCoconuts: task.rewardCoconuts,
+            dueAt: d(task.dueAt),
+            completedAt: d(task.completedAt),
+            createdAt: d(task.createdAt),
+            updatedAt: d(task.updatedAt),
+            emoji: task.emoji
+        )
+    }
+
+    private func encodeCoconutExchangeRequest(_ request: CoconutExchangeRequest) -> CoconutExchangeRequestBackup {
+        CoconutExchangeRequestBackup(
+            id: request.id.uuidString,
+            senderId: request.senderId,
+            senderName: request.senderName,
+            receiverId: request.receiverId,
+            receiverName: request.receiverName,
+            coconutCost: request.coconutCost,
+            currencyCode: request.currencyCode,
+            localAmount: request.localAmount,
+            statusRaw: request.statusRaw,
+            createdAt: d(request.createdAt),
+            confirmedAt: d(request.confirmedAt),
+            cancelledAt: d(request.cancelledAt),
+            updatedAt: d(request.updatedAt),
+            note: request.note
         )
     }
 
@@ -1317,6 +1424,54 @@ final class DataBackupManager {
         )
         if let uuid = UUID(uuidString: dto.id) { event.id = uuid }
         return event
+    }
+
+    private func decodeFamilyCollaborationTask(_ dto: FamilyCollaborationTaskBackup) -> FamilyCollaborationTask {
+        let task = FamilyCollaborationTask(
+            title: dto.title,
+            note: dto.note,
+            kind: FamilyCollaborationTaskKind(rawValue: dto.kindRaw) ?? .householdTask,
+            status: FamilyCollaborationTaskStatus(rawValue: dto.statusRaw) ?? .active,
+            relatedPetId: dto.relatedPetId,
+            relatedEventId: dto.relatedEventId,
+            relatedReminderId: dto.relatedReminderId,
+            createdById: dto.createdById,
+            createdByName: dto.createdByName,
+            assignedToId: dto.assignedToId,
+            assignedToName: dto.assignedToName,
+            rewardCoconuts: dto.rewardCoconuts,
+            dueAt: parseDate(dto.dueAt),
+            emoji: dto.emoji,
+            createdAt: parseDate(dto.createdAt) ?? Date()
+        )
+        if let uuid = UUID(uuidString: dto.id) { task.id = uuid }
+        task.claimedById = dto.claimedById
+        task.claimedByName = dto.claimedByName
+        task.completedById = dto.completedById
+        task.completedByName = dto.completedByName
+        task.completedAt = parseDate(dto.completedAt)
+        task.updatedAt = parseDate(dto.updatedAt) ?? task.createdAt
+        return task
+    }
+
+    private func decodeCoconutExchangeRequest(_ dto: CoconutExchangeRequestBackup) -> CoconutExchangeRequest {
+        let request = CoconutExchangeRequest(
+            senderId: dto.senderId,
+            senderName: dto.senderName,
+            receiverId: dto.receiverId,
+            receiverName: dto.receiverName,
+            coconutCost: dto.coconutCost,
+            currencyCode: dto.currencyCode,
+            localAmount: dto.localAmount,
+            status: CoconutExchangeRequestStatus(rawValue: dto.statusRaw) ?? .pending,
+            createdAt: parseDate(dto.createdAt) ?? Date(),
+            confirmedAt: parseDate(dto.confirmedAt),
+            cancelledAt: parseDate(dto.cancelledAt),
+            updatedAt: parseDate(dto.updatedAt) ?? Date(),
+            note: dto.note
+        )
+        if let uuid = UUID(uuidString: dto.id) { request.id = uuid }
+        return request
     }
 }
 

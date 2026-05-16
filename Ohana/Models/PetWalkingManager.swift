@@ -39,6 +39,11 @@ final class PetWalkingManager {
     private let locationManager = LocationManager.shared
     
     private init() {}
+
+    var hasActiveLocationWalk: Bool {
+        guard case .running = phase else { return false }
+        return currentPet != nil && startTime != nil
+    }
     
     // MARK: - Actions
     func start(pet: Pet) {
@@ -55,7 +60,7 @@ final class PetWalkingManager {
         lastCompletedWalk = nil
         lastCompletedRouteCoordinates = []
         
-        locationManager.startTracking()
+        locationManager.startWalkSession()
         startTimer()
     }
     
@@ -66,14 +71,14 @@ final class PetWalkingManager {
         }
         resumeTime = nil
         phase = .paused
-        locationManager.pauseTracking()
+        locationManager.pauseWalkSession()
         stopTimer()
     }
     
     func resume() {
         resumeTime = Date()
         phase = .running
-        locationManager.resumeTracking()
+        locationManager.resumeWalkSession()
         startTimer()
     }
     
@@ -86,7 +91,7 @@ final class PetWalkingManager {
         resumeTime = nil
 
         stopTimer()
-        locationManager.stopTracking()
+        locationManager.stopWalkSession()
         
         let elapsed = elapsedTime
         let poop = poopCount
@@ -173,6 +178,9 @@ final class PetWalkingManager {
     }
 
     func pauseForAppBackground() {
+        // Used only when the app is terminating or when background route delivery
+        // is unavailable. Normal background/lock-screen transitions keep a
+        // running walk alive and only stop the UI timer.
         if case .running = phase {
             if let r = resumeTime {
                 pausedElapsed += Date().timeIntervalSince(r)
@@ -187,13 +195,44 @@ final class PetWalkingManager {
 
     func handleAppBackgroundTransition() {
         guard case .running = phase else {
-            locationManager.stopAllLocationActivity()
+            locationManager.enforceNoLocationUnlessRunningWalk(false, reason: "appBackgroundNoRunningWalk")
             return
         }
-        if locationManager.canContinueCurrentWalkInBackground {
+        guard hasActiveLocationWalk else {
+            locationManager.enforceNoLocationUnlessRunningWalk(false, reason: "appBackgroundInvalidWalk")
             return
         }
-        pauseForAppBackground()
+        updateElapsedFromClock()
+        stopTimer()
+        locationManager.promoteActiveWalkToBackgroundDelivery()
+    }
+
+    func handleAppInactiveTransition() {
+        locationManager.enforceNoLocationUnlessRunningWalk(
+            hasActiveLocationWalk,
+            reason: "appInactive"
+        )
+    }
+
+    func handleAppForegroundTransition() {
+        guard case .running = phase else {
+            stopLocationIfNoActiveWalk()
+            return
+        }
+        guard hasActiveLocationWalk else {
+            locationManager.enforceNoLocationUnlessRunningWalk(false, reason: "appForegroundInvalidWalk")
+            return
+        }
+        updateElapsedFromClock()
+        locationManager.returnActiveWalkToForegroundDelivery()
+        startTimer()
+    }
+
+    func stopLocationIfNoActiveWalk() {
+        guard hasActiveLocationWalk else {
+            locationManager.enforceNoLocationUnlessRunningWalk(false, reason: "noActiveWalk")
+            return
+        }
     }
     
     func addPoop() {
@@ -202,6 +241,7 @@ final class PetWalkingManager {
     
     // MARK: - Timer
     private func startTimer() {
+        stopTimer()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self, let r = self.resumeTime else { return }
             self.elapsedTime = self.pausedElapsed + Date().timeIntervalSince(r)
@@ -211,6 +251,11 @@ final class PetWalkingManager {
     private func stopTimer() {
         timer?.invalidate()
         timer = nil
+    }
+
+    private func updateElapsedFromClock() {
+        guard let r = resumeTime else { return }
+        elapsedTime = pausedElapsed + Date().timeIntervalSince(r)
     }
     
     // MARK: - Map Snapshot

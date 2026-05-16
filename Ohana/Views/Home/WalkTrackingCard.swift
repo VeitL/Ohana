@@ -16,7 +16,8 @@ struct WalkTrackingCard: View {
 
     private var mgr: PetWalkingManager { PetWalkingManager.shared }
     private var locationMgr: LocationManager { LocationManager.shared }
-    @AppStorage(LocationManager.backgroundWalkTrackingEnabledKey) private var backgroundWalkTrackingEnabled = false
+    @AppStorage("appLanguage") private var appLanguage: String = "zh"
+    @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     @State private var showFloatingPoop = false
     @State private var showWalkDetail: PetWalkLog? = nil
@@ -35,6 +36,17 @@ struct WalkTrackingCard: View {
         case .running, .paused: return true
         default: return false
         }
+    }
+    private var isRunningWalk: Bool {
+        guard isActivePet else { return false }
+        if case .running = mgr.phase { return true }
+        return false
+    }
+    private var walkClockInterval: TimeInterval {
+        workloadPolicy.shouldRunTimer(isVisible: isWalking) ? 1 : 60
+    }
+    private var liveRouteCoordinates: [CLLocationCoordinate2D] {
+        routeCoordinates(from: locationMgr.collectedLocations, maxCount: 320)
     }
 
     var body: some View {
@@ -93,7 +105,7 @@ struct WalkTrackingCard: View {
             // ── 控制层：半透明玻璃条
             VStack(spacing: 0) {
                 if isActivePet {
-                    backgroundRoutePill
+                    walkLocationStatusPill
                 }
                 controlPanel
             }
@@ -106,11 +118,11 @@ struct WalkTrackingCard: View {
 
     @ViewBuilder
     private var mapBackground: some View {
-        if isWalking {
+        if isRunningWalk {
             // 活跃遛狗中：实时位置地图
             Map(position: $cameraPosition) {
                 UserAnnotation()
-                MapPolyline(coordinates: locationMgr.collectedLocations.map(\.coordinate))
+                MapPolyline(coordinates: liveRouteCoordinates)
                     .stroke(Color.goPrimary, style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round))
             }
             .mapStyle(.standard)
@@ -124,6 +136,25 @@ struct WalkTrackingCard: View {
                     .padding(.horizontal, 10).padding(.vertical, 4)
                     .background(Color.black.opacity(0.6), in: Capsule())
                     .padding(8)
+            }
+        } else if isWalking {
+            let coords = liveRouteCoordinates
+            if coords.count >= 2, let region = routeRegion(for: coords) {
+                Map(initialPosition: .region(region)) {
+                    MapPolyline(coordinates: coords)
+                        .stroke(Color.goYellow, style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round))
+                }
+                .mapStyle(.standard)
+                .overlay(alignment: .topTrailing) {
+                    Text(distanceText)
+                        .font(OhanaFont.footnote(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .background(Color.black.opacity(0.6), in: Capsule())
+                        .padding(8)
+                }
+            } else {
+                pausedRoutePlaceholder
             }
         } else {
             // 待出发：显示上次遛狗地图快照
@@ -157,42 +188,90 @@ struct WalkTrackingCard: View {
         }
     }
 
+    private var pausedRoutePlaceholder: some View {
+        LinearGradient(
+            colors: [Color(hex: "1A2744"), Color(hex: "0D1526")],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .overlay(
+            VStack(spacing: 6) {
+                Image(systemName: "pause.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(Color.goYellow.opacity(0.7))
+                Text(L10n(appLanguage).tr(zh: "遛狗已暂停", en: "Walk paused", de: "Gassi pausiert"))
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(.white.opacity(0.62))
+            }
+        )
+    }
+
     private var distanceText: String {
         AppMeasurementSystem.formatDistanceMeters(locationMgr.totalDistance)
     }
 
-    private var backgroundRoutePill: some View {
-        Button {
-            let next = !backgroundWalkTrackingEnabled
-            backgroundWalkTrackingEnabled = next
-            locationMgr.setBackgroundWalkTrackingEnabled(next)
-            UIImpactFeedbackGenerator(style: next ? .medium : .light).impactOccurred()
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: backgroundWalkTrackingEnabled ? "lock.iphone" : "iphone")
-                    .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(backgroundWalkTrackingEnabled ? Color.goPrimary : .primary.opacity(0.62))
-                Text("锁屏继续路线")
-                    .font(OhanaFont.caption(.bold))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.82))
-                Spacer(minLength: 8)
-                Text(backgroundWalkTrackingEnabled ? "开" : "关")
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(backgroundWalkTrackingEnabled ? Color.arkInk : .primary.opacity(0.58))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(
-                        backgroundWalkTrackingEnabled ? Color.goPrimary : Color.primary.opacity(0.08),
-                        in: Capsule()
-                    )
-            }
-            .padding(.horizontal, 14)
-            .padding(.top, 9)
-            .padding(.bottom, 2)
-            .contentShape(Rectangle())
+    private var walkLocationStatusPill: some View {
+        let status = walkLocationStatus
+        return HStack(spacing: 8) {
+            Image(systemName: status.icon)
+                .font(OhanaFont.caption2(.bold))
+                .foregroundStyle(status.tint)
+            Text(status.title)
+                .font(OhanaFont.caption(.bold))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.82))
+            Spacer(minLength: 8)
+            Text(status.detail)
+                .font(OhanaFont.caption2(.black))
+                .foregroundStyle(status.tint)
+                .lineLimit(1)
         }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(backgroundWalkTrackingEnabled ? "关闭锁屏继续记录路线" : "开启锁屏继续记录路线")
+        .padding(.horizontal, 14)
+        .padding(.top, 9)
+        .padding(.bottom, 2)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var walkLocationStatus: (icon: String, title: String, detail: String, tint: Color) {
+        let l = L10n(appLanguage)
+        switch mgr.phase {
+        case .running:
+            if locationMgr.authorizationStatus == .authorizedAlways {
+                return (
+                    "lock.iphone",
+                    l.tr(zh: "路线记录中", en: "Route recording", de: "Route wird aufgezeichnet"),
+                    l.tr(zh: "锁屏继续", en: "Lock screen OK", de: "Sperrbildschirm OK"),
+                    Color.goPrimary
+                )
+            }
+            if locationMgr.authorizationStatus == .authorizedWhenInUse {
+                return (
+                    "location.fill",
+                    l.tr(zh: "路线记录中", en: "Route recording", de: "Route wird aufgezeichnet"),
+                    l.tr(zh: "后台会提示", en: "Background indicator", de: "Hintergrundhinweis"),
+                    Color.goYellow
+                )
+            }
+            return (
+                "location.slash.fill",
+                l.tr(zh: "等待定位授权", en: "Location needed", de: "Standort benötigt"),
+                l.tr(zh: "前台记录", en: "Foreground only", de: "Nur Vordergrund"),
+                Color.goYellow
+            )
+        case .paused:
+            return (
+                "pause.circle.fill",
+                l.tr(zh: "已暂停", en: "Paused", de: "Pausiert"),
+                l.tr(zh: "不使用定位", en: "Location off", de: "Standort aus"),
+                Color.goYellow
+            )
+        default:
+            return (
+                "location.slash.fill",
+                l.tr(zh: "定位已关闭", en: "Location off", de: "Standort aus"),
+                l.tr(zh: "省电", en: "Saving power", de: "Energiesparend"),
+                Color.ohanaSecondaryText
+            )
+        }
     }
 
     // MARK: - Control Panel
@@ -240,7 +319,7 @@ struct WalkTrackingCard: View {
         let h = elapsed / 3600
         let m = (elapsed % 3600) / 60
         let s = elapsed % 60
-        return TimelineView(.periodic(from: .now, by: 1)) { _ in
+        return TimelineView(.periodic(from: .now, by: walkClockInterval)) { _ in
             Text(h > 0
                  ? String(format: "%d:%02d:%02d", h, m, s)
                  : String(format: "%02d:%02d", m, s))
@@ -253,26 +332,61 @@ struct WalkTrackingCard: View {
     // MARK: - Finished Back Face
 
     private var walkSummaryBackFace: some View {
-        let walk = latestWalk
-        let elapsed = finishedElapsed
-        let distance = finishedDistance(walk)
-        let poop = finishedPoopCount
+        GeometryReader { geo in
+            let walk = latestWalk
+            let elapsed = finishedElapsed
+            let distance = finishedDistance(walk)
+            let poop = finishedPoopCount
+            let contentHeight = max(0, geo.size.height - 28)
+            let mapHeight = max(160, contentHeight - 74)
 
-        return ZStack {
-            LinearGradient(
-                colors: [Color(hex: "12264A"), Color(hex: "07111F")],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            ZStack {
+                LinearGradient(
+                    colors: [Color(hex: "12264A"), Color(hex: "07111F")],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
 
-            VStack(spacing: 10) {
-                HStack(alignment: .center, spacing: 10) {
+                VStack(spacing: 12) {
+                    summaryMapPanel(walk: walk, distance: distance)
+                        .frame(height: mapHeight)
+
+                    HStack(spacing: 8) {
+                        summaryStatCell(label: "时间", value: formatElapsed(elapsed), accent: .goPrimary)
+                        summaryStatCell(label: "距离", value: distanceText(distance), accent: .goTeal)
+                        summaryStatCell(label: "便便", value: "\(poop)次", accent: .goYellow)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 14)
+                .padding(.bottom, 14)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
+    }
+
+    private func summaryMapPanel(walk: PetWalkLog?, distance: Double) -> some View {
+        ZStack {
+            summaryRouteMap(walk: walk)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .strokeBorder(.white.opacity(0.16), lineWidth: 1)
+                }
+                .clipped()
+
+            VStack(spacing: 0) {
+                HStack(alignment: .top, spacing: 10) {
                     petAvatar(pet: pet, size: 38)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("本次遛狗")
                             .font(OhanaFont.caption2(.black))
                             .foregroundStyle(Color.goPrimary)
-                            .tracking(1.4)
+                            .tracking(1.2)
                         Text("\(pet.name) 到家啦")
                             .font(OhanaFont.callout(.black))
                             .foregroundStyle(.white)
@@ -280,51 +394,47 @@ struct WalkTrackingCard: View {
                     }
                     Spacer()
                     Button { closeSummaryBack() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 28, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.82))
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .black))
+                            .foregroundStyle(.white)
+                            .frame(width: 40, height: 40)
+                            .background(Color.black.opacity(0.42), in: Circle())
+                            .overlay {
+                                Circle().strokeBorder(.white.opacity(0.18), lineWidth: 1)
+                            }
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .accessibilityLabel("关闭遛狗摘要")
                 }
 
-                summaryRouteMap(walk: walk)
-                    .frame(height: 110)
+                Spacer(minLength: 14)
 
-                HStack(spacing: 8) {
-                    summaryStatCell(label: "时间", value: formatElapsed(elapsed), accent: .goPrimary)
-                    summaryStatCell(label: "距离", value: distanceText(distance), accent: .goTeal)
-                    summaryStatCell(label: "便便", value: "\(poop)次", accent: .goYellow)
-                }
-
-                summaryGoalRow(distance: distance)
+                summaryGoalOverlay(distance: distance)
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(12)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .clipped()
     }
 
     @ViewBuilder
     private func summaryRouteMap(walk: PetWalkLog?) -> some View {
         let coords = routeCoordinates(for: walk)
         if let walk, let data = walk.mapSnapshotData, let ui = UIImage(data: data) {
-            Image(uiImage: ui)
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(alignment: .bottomLeading) {
-                    Label("本次轨迹", systemImage: "map.fill")
-                        .font(OhanaFont.caption2(.bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .background(.black.opacity(0.46), in: Capsule())
-                        .padding(8)
-                }
+            GeometryReader { geo in
+                Image(uiImage: ui)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .clipped()
+                    .overlay(alignment: .bottomLeading) {
+                        Label("本次轨迹", systemImage: "map.fill")
+                            .font(OhanaFont.caption2(.bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(.black.opacity(0.46), in: Capsule())
+                            .padding(10)
+                    }
+            }
         } else if !coords.isEmpty, let region = routeRegion(for: coords) {
             Map(initialPosition: .region(region)) {
                 if coords.count >= 2 {
@@ -350,8 +460,7 @@ struct WalkTrackingCard: View {
             }
             .mapStyle(.standard(elevation: .flat))
             .allowsHitTesting(false)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .clipped()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .overlay(alignment: .bottomLeading) {
                 Label(coords.count >= 2 ? "本次轨迹" : "本次定位", systemImage: "map.fill")
                     .font(OhanaFont.caption2(.bold))
@@ -359,7 +468,7 @@ struct WalkTrackingCard: View {
                     .padding(.horizontal, 9)
                     .padding(.vertical, 5)
                     .background(.black.opacity(0.46), in: Capsule())
-                    .padding(8)
+                    .padding(10)
             }
         } else {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -374,74 +483,132 @@ struct WalkTrackingCard: View {
                             .foregroundStyle(.white.opacity(0.38))
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
     @ViewBuilder
-    private func summaryGoalRow(distance: Double) -> some View {
+    private func summaryGoalOverlay(distance: Double) -> some View {
         if pet.weeklyWalkGoalKm > 0 {
             let progress = weeklyProgress
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .stroke(.white.opacity(0.14), lineWidth: 6)
-                    Circle()
-                        .trim(from: 0, to: progress)
-                        .stroke(Color.goPrimary, style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                        .animation(.spring(response: 0.55, dampingFraction: 0.82), value: progress)
-                    Text("\(Int(progress * 100))%")
-                        .font(OhanaFont.caption2(.black))
-                        .foregroundStyle(.white)
-                }
-                .frame(width: 42, height: 42)
+            goalOverlayContainer {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) {
+                        goalProgressRing(progress: progress)
+                        goalTextBlock(
+                            title: "本周目标完成率",
+                            subtitle: String(format: "%.1f / %.0f km", thisWeekDistanceKm, pet.weeklyWalkGoalKm)
+                        )
+                        Spacer(minLength: 8)
+                        editGoalButton
+                    }
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("本周目标完成率")
-                        .font(OhanaFont.caption2(.bold))
-                        .foregroundStyle(.white.opacity(0.52))
-                    Text(String(format: "%.1f / %.0f km", thisWeekDistanceKm, pet.weeklyWalkGoalKm))
-                        .font(OhanaFont.footnote(.black))
-                        .foregroundStyle(.white)
+                    VStack(alignment: .leading, spacing: 9) {
+                        HStack(spacing: 10) {
+                            goalProgressRing(progress: progress)
+                            goalTextBlock(
+                                title: "本周目标完成率",
+                                subtitle: String(format: "%.1f / %.0f km", thisWeekDistanceKm, pet.weeklyWalkGoalKm)
+                            )
+                            Spacer(minLength: 0)
+                        }
+                        editGoalButton
+                    }
                 }
-                Spacer()
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         } else {
-            HStack(spacing: 10) {
-                Image(systemName: "flag.checkered")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(Color.goPrimary)
-                    .frame(width: 42, height: 42)
-                    .background(Color.goPrimary.opacity(0.14), in: Circle())
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("还没有遛狗目标")
-                        .font(OhanaFont.footnote(.black))
-                        .foregroundStyle(.white)
-                    Text("设一个每周目标，之后会显示完成率")
-                        .font(OhanaFont.caption2(.medium))
-                        .foregroundStyle(.white.opacity(0.48))
+            goalOverlayContainer {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) {
+                        goalFlagIcon
+                        goalTextBlock(
+                            title: "还没有遛狗目标",
+                            subtitle: "设一个每周目标，之后会显示完成率"
+                        )
+                        Spacer(minLength: 8)
+                        editGoalButton
+                    }
+
+                    VStack(alignment: .leading, spacing: 9) {
+                        HStack(spacing: 10) {
+                            goalFlagIcon
+                            goalTextBlock(
+                                title: "还没有遛狗目标",
+                                subtitle: "设一个每周目标，之后会显示完成率"
+                            )
+                            Spacer(minLength: 0)
+                        }
+                        editGoalButton
+                    }
                 }
-                Spacer()
-                Button {
-                    goalDraft = max(3, pet.weeklyWalkGoalKm)
-                    showingGoalSetter = true
-                } label: {
-                    Text("编辑目标")
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(Color.goPrimary, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
             }
+        }
+    }
+
+    private func goalOverlayContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(Color.black.opacity(0.48), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(.white.opacity(0.16), lineWidth: 1)
+            }
+    }
+
+    private func goalTextBlock(title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(OhanaFont.caption2(.bold))
+                .foregroundStyle(.white.opacity(0.58))
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+            Text(subtitle)
+                .font(OhanaFont.footnote(.black))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
         }
+    }
+
+    private func goalProgressRing(progress: Double) -> some View {
+        ZStack {
+            Circle()
+                .stroke(.white.opacity(0.14), lineWidth: 6)
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(Color.goPrimary, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .animation(.spring(response: 0.55, dampingFraction: 0.82), value: progress)
+            Text("\(Int(progress * 100))%")
+                .font(OhanaFont.caption2(.black))
+                .foregroundStyle(.white)
+        }
+        .frame(width: 42, height: 42)
+    }
+
+    private var goalFlagIcon: some View {
+        Image(systemName: "flag.checkered")
+            .font(.system(size: 18, weight: .bold))
+            .foregroundStyle(Color.goPrimary)
+            .frame(width: 42, height: 42)
+            .background(Color.black.opacity(0.34), in: Circle())
+    }
+
+    private var editGoalButton: some View {
+        Button {
+            goalDraft = max(3, pet.weeklyWalkGoalKm)
+            showingGoalSetter = true
+        } label: {
+            Text("编辑目标")
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(Color.arkInk)
+                .lineLimit(1)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(Color.goPrimary, in: Capsule())
+        }
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private var walkGoalSetterSheet: some View {
@@ -579,6 +746,29 @@ struct WalkTrackingCard: View {
             guard let lat = dict["lat"], let lon = dict["lon"] else { return nil }
             return CLLocationCoordinate2D(latitude: lat, longitude: lon)
         }
+    }
+
+    private func routeCoordinates(from locations: [CLLocation], maxCount: Int) -> [CLLocationCoordinate2D] {
+        guard locations.count > maxCount, maxCount >= 2 else {
+            return locations.map(\.coordinate)
+        }
+        let step = Double(locations.count - 1) / Double(maxCount - 1)
+        var result: [CLLocationCoordinate2D] = []
+        result.reserveCapacity(maxCount)
+        var lastIndex = -1
+        for i in 0..<maxCount {
+            let index = min(locations.count - 1, Int((Double(i) * step).rounded()))
+            if index != lastIndex {
+                result.append(locations[index].coordinate)
+                lastIndex = index
+            }
+        }
+        if let last = locations.last?.coordinate, let renderedLast = result.last {
+            if renderedLast.latitude != last.latitude || renderedLast.longitude != last.longitude {
+                result[result.count - 1] = last
+            }
+        }
+        return result
     }
 
     private func routeRegion(for coords: [CLLocationCoordinate2D]) -> MKCoordinateRegion? {
@@ -742,14 +932,14 @@ struct WalkTrackingCard: View {
         summaryRotation = 0
         let updates = { summaryRotation = 180.0 }
         if animated {
-            withAnimation(.easeInOut(duration: 0.46)) { updates() }
+            withAnimation(GoMotion.page) { updates() }
         } else {
             updates()
         }
     }
 
     private func closeSummaryBack() {
-        withAnimation(.easeInOut(duration: 0.24)) {
+        withAnimation(GoMotion.page) {
             summaryRotation = 0
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {

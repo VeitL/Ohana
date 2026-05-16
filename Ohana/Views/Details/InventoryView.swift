@@ -11,6 +11,7 @@ import SwiftData
 struct InventoryView: View {
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
+    @AppStorage("appLanguage") private var appLanguage = "zh"
     @AppStorage("purchasedShopItems") private var purchasedRaw: String = ""
     
     // Equip states
@@ -19,6 +20,7 @@ struct InventoryView: View {
     @AppStorage("shop_equip_fx_rainbow") private var equipFxRainbow: Bool = false
     @AppStorage("shop_equip_fx_stars") private var equipFxStars: Bool = false
     @AppStorage("shop_equip_fx_firework") private var equipFxFirework: Bool = false
+    @AppStorage(AppIconCatalog.selectedIconKey) private var selectedAppIcon: String = AppIconCatalog.defaultItemId
     
     // Inventory states
     @AppStorage("inventory_backdate_1day_count") private var backdatePacks: Int = 0
@@ -27,24 +29,16 @@ struct InventoryView: View {
     @State private var showPetPickerForPopout = false
     @State private var equipPopoutPet: Pet? = nil
     
-    // All items reference (mirrors CoconutShopView)
+    // All items reference (shared with CoconutShopView)
     private var allEffectsAndTitles: [ShopItem] {
-        [
-            ShopItem(id: "fx_popout_card", emoji: "🃏", name: "3D 破框卡片",  description: "宠物主体从卡片破框悬浮而出（前往商城进行绑定）", cost: 0, category: .effect),
-            ShopItem(id: "fx_lime_glow",   emoji: "💚", name: "青柠光晕",   description: "打卡时宠物卡片发出青柠光芒特效",          cost: 0,  category: .effect),
-            ShopItem(id: "fx_rainbow",     emoji: "🌈", name: "彩虹轨迹",   description: "遛狗路线地图显示彩虹轨迹风格",            cost: 0,  category: .effect),
-            ShopItem(id: "fx_stars",       emoji: "⭐️", name: "星尘落雨",   description: "完成每日委托时触发星尘粒子特效",           cost: 0,  category: .effect),
-            ShopItem(id: "fx_firework",    emoji: "🎆", name: "烟花庆典",   description: "达成里程碑时升级烟花动画",                cost: 0, category: .effect),
-            
-            ShopItem(id: "title_guardian", emoji: "🛡️", name: "守护者",     description: "称号 · 显示在首页头像旁",                  cost: 0, category: .title_),
-            ShopItem(id: "title_pioneer",  emoji: "🚀", name: "先行者",     description: "称号 · 解锁岛屿探索徽章",                  cost: 0, category: .title_),
-            ShopItem(id: "title_chef",     emoji: "👨‍🍳", name: "首席厨师",   description: "称号 · 喂食打卡额外 +1🥥",               cost: 0, category: .title_)
-        ]
+        ShopCatalog.allItems(purchasedSet: purchasedSet)
     }
     
     private var purchasedSet: Set<String> {
         Set(purchasedRaw.split(separator: ",").map(String.init))
     }
+
+    private var l: L10n { L10n(appLanguage) }
     
     private var myEffects: [ShopItem] {
         allEffectsAndTitles.filter { $0.category == .effect && purchasedSet.contains($0.id) }
@@ -52,6 +46,10 @@ struct InventoryView: View {
     
     private var myTitles: [ShopItem] {
         allEffectsAndTitles.filter { $0.category == .title_ && purchasedSet.contains($0.id) }
+    }
+
+    private var myAppIcons: [ShopItem] {
+        allEffectsAndTitles.filter { $0.category == .appIcon && $0.isPurchased }
     }
     
     var body: some View {
@@ -61,6 +59,14 @@ struct InventoryView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
+                        if !myAppIcons.isEmpty {
+                            inventorySection(title: "App Icon", icon: "app.badge.fill") {
+                                ForEach(myAppIcons) { item in
+                                    appIconRow(item)
+                                }
+                            }
+                        }
+
                         // 1. 称号区
                         if !myTitles.isEmpty {
                             inventorySection(title: "我的称号", icon: "rosette") {
@@ -95,7 +101,7 @@ struct InventoryView: View {
                             }
                         }
                         
-                        if myTitles.isEmpty && myEffects.isEmpty && backdatePacks == 0 && !isShieldActive && !doubleBoostActive {
+                        if myAppIcons.isEmpty && myTitles.isEmpty && myEffects.isEmpty && backdatePacks == 0 && !isShieldActive && !doubleBoostActive {
                             VStack(spacing: 12) {
                                 Image(systemName: "shippingbox")
                                     .font(.system(size: 40))
@@ -134,6 +140,45 @@ struct InventoryView: View {
                 .presentationDragIndicator(.visible)
         }
     }
+
+    private func appIconRow(_ item: ShopItem) -> some View {
+        let descriptor = item.appIcon ?? AppIconCatalog.icons[0]
+        let isActive = AppIconService.currentDescriptor.itemId == descriptor.itemId
+        return HStack(spacing: 14) {
+            AppIconInventoryPreview(descriptor: descriptor)
+                .frame(width: 48, height: 48)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.name)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text(isActive ? l.tr(zh: "当前使用中", en: "Currently active", de: "Aktuell aktiv") : l.tr(zh: "可随时切换", en: "Ready to switch", de: "Bereit zum Wechseln"))
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
+            }
+            Spacer()
+
+            Button {
+                AppIconService.setIcon(descriptor) { result in
+                    if case .success = result {
+                        selectedAppIcon = descriptor.itemId
+                    }
+                }
+            } label: {
+                Text(isActive ? l.tr(zh: "使用中", en: "In use", de: "Aktiv") : l.tr(zh: "切换", en: "Switch", de: "Wechseln"))
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(isActive ? Color.goDarkBlue : Color.ohanaPrimaryText)
+                    .padding(.horizontal, 14).padding(.vertical, 6)
+                    .background(isActive ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .disabled(isActive)
+        }
+        .padding(16)
+        .overlay(alignment: .bottom) {
+            Divider().background(Color.ohanaPrimaryText.opacity(0.1)).padding(.leading, 60)
+        }
+    }
     
     // MARK: - Section Helper
     private func inventorySection(title: String, icon: String, @ViewBuilder content: () -> some View) -> some View {
@@ -150,8 +195,8 @@ struct InventoryView: View {
             VStack(spacing: 0) {
                 content()
             }
-            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.1), lineWidth: 1))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1))
         }
     }
     
@@ -190,7 +235,7 @@ struct InventoryView: View {
         }
         .padding(16)
         .overlay(alignment: .bottom) {
-            Divider().background(.white.opacity(0.1)).padding(.leading, 60)
+            Divider().background(Color.ohanaPrimaryText.opacity(0.1)).padding(.leading, 60)
         }
     }
     
@@ -257,7 +302,7 @@ struct InventoryView: View {
         }
         .padding(16)
         .overlay(alignment: .bottom) {
-            Divider().background(.white.opacity(0.1)).padding(.leading, 60)
+            Divider().background(Color.ohanaPrimaryText.opacity(0.1)).padding(.leading, 60)
         }
     }
     
@@ -282,11 +327,32 @@ struct InventoryView: View {
         }
         .padding(16)
         .overlay(alignment: .bottom) {
-            Divider().background(.white.opacity(0.1)).padding(.leading, 60)
+            Divider().background(Color.ohanaPrimaryText.opacity(0.1)).padding(.leading, 60)
         }
     }
 
     private func loadStreakShieldExpiry() {
         streakShieldExpiry = UserDefaults.standard.object(forKey: "shop_streakShieldExpiry") as? Date
+    }
+}
+
+private struct AppIconInventoryPreview: View {
+    let descriptor: AppIconShopDescriptor
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: descriptor.gradientHex.map { Color(hex: $0) },
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            Image(systemName: descriptor.previewSymbol)
+                .font(.system(size: 20, weight: .black))
+                .foregroundStyle(descriptor.itemId == "appicon_minimal_o" ? Color.arkInk : Color.white) // ui-v4: allow asset-specific icon ink
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }

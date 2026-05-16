@@ -6,61 +6,6 @@
 //
 
 import SwiftUI
-import UIKit
-import Foundation
-import Combine
-
-enum AppPerformanceMode {
-    static let powerSavingKey = "appPowerSavingMode"
-
-    static var systemPrefersReducedWork: Bool {
-        ProcessInfo.processInfo.isLowPowerModeEnabled || UIAccessibility.isReduceMotionEnabled
-    }
-}
-
-@MainActor
-final class AppPerformanceMonitor: ObservableObject {
-    struct Sample: Identifiable {
-        let id = UUID()
-        let name: String
-        let valueMS: Double
-        let timestamp: Date
-        let note: String?
-    }
-
-    static let shared = AppPerformanceMonitor()
-
-    @Published private(set) var samples: [Sample] = []
-    private var starts: [String: CFAbsoluteTime] = [:]
-
-    private init() {}
-
-    func markStart(_ key: String) {
-        starts[key] = CFAbsoluteTimeGetCurrent()
-    }
-
-    func markEnd(_ key: String, name: String, note: String? = nil) {
-        guard let startedAt = starts.removeValue(forKey: key) else { return }
-        record(name, startedAt: startedAt, note: note)
-    }
-
-    func record(_ name: String, startedAt: CFAbsoluteTime, note: String? = nil) {
-        let elapsed = max(0, (CFAbsoluteTimeGetCurrent() - startedAt) * 1_000)
-        record(name, valueMS: elapsed, note: note)
-    }
-
-    func record(_ name: String, valueMS: Double, note: String? = nil) {
-        samples.insert(Sample(name: name, valueMS: valueMS, timestamp: Date(), note: note), at: 0)
-        if samples.count > 80 {
-            samples.removeLast(samples.count - 80)
-        }
-    }
-
-    func clear() {
-        starts.removeAll()
-        samples.removeAll()
-    }
-}
 
 // MARK: - 背景风格枚举
 enum AppBackgroundStyle: String, CaseIterable, Identifiable {
@@ -247,13 +192,14 @@ struct ArkBackgroundView: View {
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
+    @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     private var style: AppBackgroundStyle {
         AppBackgroundStyle(rawValue: styleRaw) ?? .goDefault
     }
 
     private var shouldReduceWork: Bool {
-        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
+        powerSavingMode || reduceMotion || workloadPolicy.shouldReduceWork()
     }
 
     var body: some View {

@@ -39,7 +39,15 @@ enum CareEventService {
             pet: pet,
             source: .quickAction,
             coconutDelta: CareLedgerService.rewardDelta(reward),
+            metadataJSON: CareLedgerService.rewardMetadata(reward),
             context: context
+        )
+        QuickActionReminderCompletionSyncService.completeNearestPetCareReminder(
+            pet: pet,
+            type: .feeding,
+            context: context,
+            executorId: executorId,
+            now: date
         )
         return reward
     }
@@ -111,6 +119,7 @@ enum CareEventService {
             source: .reminder,
             context: context
         )
+        FamilyTaskService.syncCompletedReminder(reminder, completedBy: executorId, context: context)
 
         QuestManager.shared.recordFirstMeal()
         let reward = CoconutEconomyService.awardCareAction(type: .feed, pet: pet, context: context, quality: quality)
@@ -121,6 +130,7 @@ enum CareEventService {
             sourceEventId: event.id.uuidString,
             sourceReminderId: reminder.id.uuidString,
             coconutDelta: CareLedgerService.rewardDelta(reward),
+            metadataJSON: CareLedgerService.rewardMetadata(reward),
             context: context
         )
         return reward
@@ -161,6 +171,7 @@ enum CareEventService {
             source: .reminder,
             context: context
         )
+        FamilyTaskService.syncCompletedReminder(reminder, completedBy: executorId, context: context)
 
         let reward = CoconutEconomyService.awardCareAction(type: .water, pet: pet, context: context)
         CareLedgerService.recordPetCare(
@@ -170,6 +181,7 @@ enum CareEventService {
             sourceEventId: event.id.uuidString,
             sourceReminderId: reminder.id.uuidString,
             coconutDelta: CareLedgerService.rewardDelta(reward),
+            metadataJSON: CareLedgerService.rewardMetadata(reward),
             context: context
         )
         return reward
@@ -203,7 +215,15 @@ enum CareEventService {
             pet: pet,
             source: .quickAction,
             coconutDelta: CareLedgerService.rewardDelta(award),
+            metadataJSON: CareLedgerService.rewardMetadata(award),
             context: context
+        )
+        QuickActionReminderCompletionSyncService.completeNearestPetCareReminder(
+            pet: pet,
+            type: type,
+            context: context,
+            executorId: executorId,
+            now: date
         )
         return award
     }
@@ -227,7 +247,14 @@ enum CareEventService {
             pet: pet,
             source: .quickAction,
             coconutDelta: CareLedgerService.rewardDelta(reward),
+            metadataJSON: CareLedgerService.rewardMetadata(reward),
             context: context
+        )
+        QuickActionReminderCompletionSyncService.completeNearestPetPottyReminder(
+            pet: pet,
+            context: context,
+            executorId: executorId,
+            now: date
         )
         return reward
     }
@@ -536,6 +563,7 @@ enum ReminderCompletionService {
         NotificationManager.shared.cancel(notificationId: reminder.notificationId)
         context.safeSave()
         CareLedgerService.recordReminderState(reminder: reminder, actionType: "complete", actorId: humanId, source: .service, context: context)
+        FamilyTaskService.syncCompletedReminder(reminder, completedBy: humanId, context: context)
     }
 
     @MainActor
@@ -560,6 +588,7 @@ enum ReminderCompletionService {
         }
         context.safeSave()
         CareLedgerService.recordReminderState(reminder: reminder, actionType: "reopen", actorId: humanId, source: .service, context: context)
+        FamilyTaskService.syncReopenedReminder(reminder, context: context)
     }
 
     @MainActor
@@ -576,6 +605,168 @@ enum ReminderCompletionService {
         }
         context.safeSave()
         CareLedgerService.recordReminderState(reminder: reminder, actionType: "snoozeOneDay", actorId: humanId, source: .service, context: context)
+    }
+}
+
+enum QuickActionReminderCompletionSyncService {
+    @discardableResult
+    @MainActor
+    static func completeNearestPetCareReminder(
+        pet: Pet,
+        type: CareType,
+        context: ModelContext,
+        executorId: String?,
+        now: Date = Date()
+    ) -> Reminder? {
+        completeNearestPetReminder(
+            pet: pet,
+            context: context,
+            executorId: executorId,
+            now: now
+        ) { event in
+            matchesCare(event, type: type)
+        }
+    }
+
+    @discardableResult
+    @MainActor
+    static func completeNearestPetPottyReminder(
+        pet: Pet,
+        context: ModelContext,
+        executorId: String?,
+        now: Date = Date()
+    ) -> Reminder? {
+        completeNearestPetReminder(
+            pet: pet,
+            context: context,
+            executorId: executorId,
+            now: now
+        ) { event in
+            matchesAny(normalizedText(for: event), [
+                "便", "尿", "potty", "poop", "pee", "kot", "urin"
+            ])
+        }
+    }
+
+    @discardableResult
+    @MainActor
+    static func completeNearestPetHygieneReminder(
+        pet: Pet,
+        type: HygieneType,
+        context: ModelContext,
+        executorId: String?,
+        now: Date = Date()
+    ) -> Reminder? {
+        completeNearestPetReminder(
+            pet: pet,
+            context: context,
+            executorId: executorId,
+            now: now
+        ) { event in
+            matchesHygiene(event, type: type)
+        }
+    }
+
+    @discardableResult
+    @MainActor
+    private static func completeNearestPetReminder(
+        pet: Pet,
+        context: ModelContext,
+        executorId: String?,
+        now: Date,
+        matches: (Event) -> Bool
+    ) -> Reminder? {
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: now)
+        let end = calendar.date(byAdding: .day, value: 1, to: start) ?? now
+        let pending = ReminderStatus.pending.rawValue
+        let failed = ReminderStatus.failed.rawValue
+        var descriptor = FetchDescriptor<Reminder>(
+            predicate: #Predicate<Reminder> { reminder in
+                reminder.scheduledAt >= start &&
+                reminder.scheduledAt < end &&
+                (reminder.status == pending || reminder.status == failed)
+            },
+            sortBy: [SortDescriptor(\.scheduledAt)]
+        )
+        descriptor.fetchLimit = 96
+
+        let reminders = (try? context.fetch(descriptor)) ?? []
+        let petId = pet.id.uuidString
+        let matched = reminders.filter { reminder in
+            guard let event = reminder.event,
+                  isPetEvent(event, petId: petId) else { return false }
+            return matches(event)
+        }
+        guard !matched.isEmpty else { return nil }
+
+        let due = matched.filter { $0.scheduledAt <= now }
+        let selected = due.max { $0.scheduledAt < $1.scheduledAt }
+            ?? matched.min { $0.scheduledAt < $1.scheduledAt }
+        guard let selected else { return nil }
+        ReminderCompletionService.complete(selected, by: executorId, context: context)
+        return selected
+    }
+
+    private static func isPetEvent(_ event: Event, petId: String) -> Bool {
+        let type = event.relatedEntityType.lowercased()
+        return (type == EntityKind.pet.rawValue.lowercased() || type == "pet") &&
+            event.relatedEntityId == petId
+    }
+
+    private static func matchesCare(_ event: Event, type: CareType) -> Bool {
+        let text = normalizedText(for: event)
+        switch type {
+        case .feeding:
+            return event.eventType == EventType.foodChange.rawValue ||
+                matchesAny(text, ["喂食", "喂", "吃", "粮", "feed", "food", "meal", "futter", "fütter"])
+        case .watering:
+            return matchesAny(text, ["喂水", "喝水", "饮水", "water", "drink", "wasser"])
+        case .litter:
+            return event.eventType == EventType.litterBox.rawValue ||
+                matchesAny(text, ["铲", "猫砂", "litter", "scoop", "toilet", "klo"])
+        case .waterChange:
+            return matchesAny(text, ["换水", "water change", "wasserwechsel"])
+        case .filterClean:
+            return matchesAny(text, ["滤", "filter"])
+        case .cageCleaning:
+            return matchesAny(text, ["清笼", "鸟笼", "cage", "käfig"])
+        case .freeFlight:
+            return matchesAny(text, ["放飞", "free flight", "freiflug"])
+        case .misting:
+            return matchesAny(text, ["保湿", "喷水", "mist", "spray", "befeuchten"])
+        case .substrateChange:
+            return matchesAny(text, ["垫材", "substrate", "substrat"])
+        case .play:
+            return matchesAny(text, ["陪玩", "逗", "play", "spielen"])
+        }
+    }
+
+    private static func matchesHygiene(_ event: Event, type: HygieneType) -> Bool {
+        let text = normalizedText(for: event)
+        let isGrooming = event.eventType == EventType.grooming.rawValue ||
+            matchesAny(text, ["护理", "groom", "pflege", "洗", "刷", "剪", "耳", "梳"])
+        guard isGrooming else { return false }
+        switch type {
+        case .teeth:
+            return matchesAny(text, ["刷牙", "teeth", "tooth", "zahn"])
+        case .nails:
+            return matchesAny(text, ["剪甲", "剪", "nail", "claw", "kralle"])
+        case .ears:
+            return matchesAny(text, ["清耳", "耳", "ear", "ohr"])
+        case .brushing:
+            return matchesAny(text, ["梳", "brush", "comb", "bürst"])
+        case .bath:
+            return matchesAny(text, ["洗", "澡", "bath", "shower", "bad"])
+        }
+    }
+
+    private static func normalizedText(for event: Event) -> String {
+        "\(event.title) \(event.eventType)".lowercased()
+    }
+
+    private static func matchesAny(_ text: String, _ keywords: [String]) -> Bool {
+        keywords.contains { text.contains($0.lowercased()) }
     }
 }
 

@@ -26,7 +26,6 @@ struct OasisRewardView: View {
     @State private var showCoconutShop      = false
     @State private var coconutShopInitialCategory: ShopItem.ShopCategory = .effect
     @State private var showGacha            = false
-    @State private var showBountyBoard      = false
     @State private var showInventory        = false
     @State private var showCoconutRules     = false
     @State private var showCheckInCalendar  = false
@@ -36,12 +35,11 @@ struct OasisRewardView: View {
     @State private var checkedInDates: Set<String> = []   // "yyyy-MM-dd" 格式
     @State private var makeupPackCount: Int = 0            // 补签包数量
     @State private var showMakeupConfirm: String? = nil    // 待确认补签的日期
-    private let checkedInKey = "oasis_checkedIn_dates"
-    private let makeupDatesKey = "oasis_makeup_dates"      // 补签日期独立记录
-    private let makeupPackKey = "inventory_backdate_1day_count" // 与椰子商店统一 key
     @State private var makeupDates: Set<String> = []       // 补签过的日期集合
-    @AppStorage("checkIn_lastClaimedMilestone") private var lastClaimedMilestone: Int = 0
+    @State private var lastClaimedMilestone: Int = 0
+    @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
     @Environment(\.colorScheme) private var colorScheme
+    @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     private var isMaterial: Bool { false }
     private var matBg:      Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
@@ -58,8 +56,13 @@ struct OasisRewardView: View {
     @State private var flyCoconut: Bool     = false
     @State private var flyOpacity: Double   = 0
     @State private var harvestedCoconutIndices: Set<Int> = []
+    @State private var isVisible = false
 
     private let treeMgr = OasisTreeManager.shared
+
+    private var shouldRunAmbientMotion: Bool {
+        workloadPolicy.shouldAnimate(isVisible: isVisible)
+    }
 
     private struct EnergyParticle: Identifiable {
         let id = UUID()
@@ -83,18 +86,17 @@ struct OasisRewardView: View {
             Image(systemName: systemName)
                 .font(.system(size: 15, weight: .semibold))
                 .symbolRenderingMode(.monochrome)
-                .foregroundStyle(.white)
-                .frame(width: 32, height: 32)
-                .background(Color.goPrimary.opacity(0.18), in: Circle())
-                .overlay(Circle().strokeBorder(Color.goPrimary.opacity(0.35), lineWidth: 1))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .frame(width: 40, height: 40)
+                .background(Color.ohanaControlFill, in: Circle())
         }
         .buttonStyle(ScaleButtonStyle())
     }
 
     var body: some View {
         ZStack {
-            // ── Navy gradient background
-            navyBackground
+            OhanaAppBackground()
+                .ignoresSafeArea()
 
             // task21: 粒子特效放在最外层 ZStack，不被 ScrollView 裁剪
             ForEach(energyParticles) { p in
@@ -117,11 +119,13 @@ struct OasisRewardView: View {
                             Button {
                                 dismiss()
                             } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 24, weight: .semibold))
-                                    .symbolRenderingMode(.hierarchical)
-                                    .foregroundStyle(.white.opacity(0.9))
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 17, weight: .black))
+                                    .foregroundStyle(Color.ohanaPrimaryText)
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
                             }
+                            .accessibilityLabel("关闭")
                             .buttonStyle(ScaleButtonStyle())
 
                             Spacer()
@@ -196,18 +200,30 @@ struct OasisRewardView: View {
             GachaView()
                 .presentationDetents([.large])
         }
-        .sheet(isPresented: $showBountyBoard) {
-            BountyBoardView()
-                .presentationDetents([.large])
-        }
         .sheet(isPresented: $showCheckInSheet) {
-            DailyStreakDetailView(pets: pets)
+            DailyStreakDetailView(pets: pets, onClose: { showCheckInSheet = false })
                 .presentationDetents([.large])
         }
         .onAppear {
+            isVisible = true
             treeMgr.refreshEnergy(modelContext: modelContext, pets: pets, humans: humans, plants: plants)
             lastLevel = treeMgr.treeLevel
-            startBreathing()
+            startAmbientMotionIfNeeded()
+            loadCheckInData()
+            triggerTodayCheckIn()
+        }
+        .onDisappear {
+            isVisible = false
+            stopAmbientMotion()
+        }
+        .onChange(of: shouldRunAmbientMotion) { _, shouldAnimate in
+            if shouldAnimate {
+                startAmbientMotionIfNeeded()
+            } else {
+                stopAmbientMotion()
+            }
+        }
+        .onChange(of: currentActiveHumanId) { _, _ in
             loadCheckInData()
             triggerTodayCheckIn()
         }
@@ -271,10 +287,10 @@ struct OasisRewardView: View {
                 Text("OASIS · 绿洲")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .kerning(1.2)
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(Color.ohanaSecondaryText)
                 Text("生命之树")
                     .font(.system(size: 28, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.ohanaPrimaryText)
             }
             Spacer()
             Button {
@@ -286,10 +302,10 @@ struct OasisRewardView: View {
                         .font(.system(size: 15))
                     Text("\(QuestManager.shared.coconutCount)")
                         .font(.system(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                     Image(systemName: "chart.pie.fill")
                         .font(.system(size: 10, weight: .black))
-                        .foregroundStyle(.black.opacity(0.72))
+                        .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
                 }
                 .padding(.horizontal, 14).padding(.vertical, 7)
                 .background(Color.goPrimary, in: Capsule())
@@ -362,13 +378,23 @@ struct OasisRewardView: View {
                 ))
                 .frame(width: 320, height: 320)
                 .scaleEffect(glowBreathing ? 1.08 : 0.92)
-                .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: glowBreathing)
+                .animation(
+                    shouldRunAmbientMotion
+                    ? .easeInOut(duration: 2.4).repeatForever(autoreverses: true)
+                    : nil,
+                    value: glowBreathing
+                )
 
             Circle()
                 .stroke(Color.goPrimary.opacity(glowBreathing ? 0.22 : 0.06), lineWidth: 2)
                 .frame(width: 240, height: 240)
                 .blur(radius: glowBreathing ? 6 : 2)
-                .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: glowBreathing)
+                .animation(
+                    shouldRunAmbientMotion
+                    ? .easeInOut(duration: 2.4).repeatForever(autoreverses: true)
+                    : nil,
+                    value: glowBreathing
+                )
 
             // BeautifulCoconutTree
             ZStack(alignment: .bottom) {
@@ -418,14 +444,14 @@ struct OasisRewardView: View {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text("点击采摘今日推落")
                                     .font(.system(size: 13, weight: .black, design: .rounded))
-                                    .foregroundStyle(.black)
+                                    .foregroundStyle(Color.arkInk)
                                 Text("+\(treeMgr.passiveIncomeAmount) 椰子")
                                     .font(.system(size: 10, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.black.opacity(0.6))
+                                    .foregroundStyle(Color.arkInk.opacity(0.62))
                             }
                             Image(systemName: "arrow.up.circle.fill")
                                 .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(.black.opacity(0.5))
+                                .foregroundStyle(Color.arkInk.opacity(0.52))
                         }
                         .padding(.horizontal, 16).padding(.vertical, 10)
                         .background(
@@ -436,12 +462,17 @@ struct OasisRewardView: View {
                         .shadow(color: Color.goYellow.opacity(harvestBubbleBounce ? 0.75 : 0.35),
                                 radius: harvestBubbleBounce ? 16 : 8, x: 0, y: 4)
                         .scaleEffect(harvestBubbleBounce ? 1.06 : 1.0)
-                        .animation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true), value: harvestBubbleBounce)
+                        .animation(
+                            shouldRunAmbientMotion
+                            ? .easeInOut(duration: 0.85).repeatForever(autoreverses: true)
+                            : nil,
+                            value: harvestBubbleBounce
+                        )
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .padding(.bottom, 10)
                     .transition(.scale.combined(with: .opacity))
-                    .onAppear { harvestBubbleBounce = true }
+                    .onAppear { updateHarvestBubbleMotion() }
                 }
             }
 
@@ -461,7 +492,7 @@ struct OasisRewardView: View {
                     Text("升级 · Lv.\(treeMgr.treeLevel.rawValue)")
                         .font(.system(size: 13, weight: .black, design: .rounded))
                 }
-                .foregroundStyle(.black)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .background(Color.goPrimary, in: Capsule())
@@ -476,7 +507,7 @@ struct OasisRewardView: View {
             HStack(spacing: 5) {
                 Text("Lv.\(treeMgr.treeLevel.rawValue) · \(treeMgr.treeLevel.displayName)")
                     .font(.system(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
             }
             .padding(.horizontal, 12).padding(.vertical, 6)
             .background(Color.goPrimary, in: Capsule())
@@ -491,9 +522,7 @@ struct OasisRewardView: View {
         )
         .onAppear {
             justHarvested = !treeMgr.canHarvestToday
-            withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
-                glowBreathing = true
-            }
+            updateGlowMotion()
         }
         .onChange(of: treeMgr.treeLevel) { oldLevel, newLevel in
             justHarvested = !treeMgr.canHarvestToday
@@ -511,18 +540,18 @@ struct OasisRewardView: View {
             HStack {
                 Text("成长进度")
                     .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text("能量 \(treeMgr.totalEnergy) · 下一级 \(treeMgr.nextLevelThreshold)")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
 
             // Progress bar
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(Color.white.opacity(0.1))
+                        .fill(Color.ohanaControlFill)
                         .frame(height: 8)
                     Capsule()
                         .fill(LinearGradient(
@@ -545,7 +574,7 @@ struct OasisRewardView: View {
                     label: "被动收入",
                     color: treeMgr.passiveIncomeAmount > 0
                         ? Color.goPrimary
-                        : Color.white.opacity(0.3)
+                        : Color.ohanaSecondaryText.opacity(0.6)
                 )
                 progressStatCell(
                     value: "\(humans.count + pets.count)成员",
@@ -560,10 +589,10 @@ struct OasisRewardView: View {
             }
         }
         .padding(18)
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+                .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
         )
     }
 
@@ -574,7 +603,7 @@ struct OasisRewardView: View {
                 .foregroundStyle(color)
             Text(label)
                 .font(.system(size: 10, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.45))
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)
     }
@@ -602,19 +631,19 @@ struct OasisRewardView: View {
                 Text("⚡")
                 Text("注入能量")
                     .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                 Text("(-10🥥)")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(.black.opacity(0.5))
+                    .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.55))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(
-                canInject ? Color.goPrimary : Color.white.opacity(0.1),
+                canInject ? Color.goPrimary : Color.ohanaControlFill,
                 in: Capsule()
             )
             .overlay(Capsule().strokeBorder(
-                canInject ? Color.clear : Color.white.opacity(0.2),
+                canInject ? Color.clear : Color.ohanaPrimaryText.opacity(0.08),
                 lineWidth: 1
             ))
         }
@@ -663,14 +692,14 @@ struct OasisRewardView: View {
                     if isMaxLevel {
                         Text("已达最高境界")
                             .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text("生命之树已至巅峰，繁荣永续")
                             .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     } else {
                         Text("Lv.\(nextLv) · \(nextLevel.displayName)")
                             .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text("解锁被动收益 +\(passiveIncomeForLevel(nextLevel))🥥/日")
                             .font(.system(size: 12, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.goPrimary.opacity(0.8))
@@ -682,14 +711,14 @@ struct OasisRewardView: View {
                 if !isMaxLevel {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
             .padding(16)
-            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+                    .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
             )
         }
         .buttonStyle(ScaleButtonStyle())
@@ -881,11 +910,11 @@ struct OasisRewardView: View {
                             Text(m.emoji).font(.system(size: 16))
                             Text("\(m.days) 天连胜达成！")
                                 .font(.system(size: 13, weight: .black, design: .rounded))
-                                .foregroundStyle(.black)
+                                .foregroundStyle(Color.ohanaPrimaryActionText)
                             Spacer()
                             Text("+\(m.reward)🥥 领取")
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.black.opacity(0.7))
+                                .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
                         }
                         .padding(.horizontal, 14).padding(.vertical, 10)
                         .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -961,18 +990,18 @@ struct OasisRewardView: View {
                         if cell.isMakeup {
                             Image(systemName: "arrow.uturn.backward")
                                 .font(.system(size: 9, weight: .black))
-                                .foregroundStyle(.black.opacity(0.7))
+                                .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
                         } else {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 10, weight: .black))
-                                .foregroundStyle(.black)
+                                .foregroundStyle(Color.ohanaPrimaryActionText)
                         }
                     } else {
                         Text("\(cell.day)")
                             .font(.system(size: 11, weight: cell.isToday ? .black : .medium, design: .rounded))
                             .foregroundStyle(
-                                cell.isFuture ? .white.opacity(0.15) :
-                                cell.isToday ? Color.goPrimary : .white.opacity(0.4)
+                                cell.isFuture ? Color.ohanaSecondaryText.opacity(0.35) :
+                                cell.isToday ? Color.goPrimary : Color.ohanaSecondaryText
                             )
                     }
                 }
@@ -990,7 +1019,7 @@ struct OasisRewardView: View {
         } else if cell.isToday {
             return Color.goPrimary.opacity(0.22)
         } else {
-            return Color.white.opacity(0.05)
+            return Color.ohanaControlFill
         }
     }
 
@@ -1004,40 +1033,15 @@ struct OasisRewardView: View {
     // MARK: - 打卡工具函数
 
     private func todayStr() -> String {
-        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"; return fmt.string(from: Date())
+        CheckInStreakStore.dateString()
     }
 
     private var currentStreak: Int {
-        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
-        let cal = Calendar.current
-        var streak = 0
-        var day = Date()
-        while true {
-            let s = fmt.string(from: day)
-            if checkedInDates.contains(s) {
-                streak += 1
-                day = cal.date(byAdding: .day, value: -1, to: day)!
-            } else { break }
-        }
-        return streak
+        CheckInStreakStore.currentStreak(for: currentActiveHumanId)
     }
 
     private var longestStreak: Int {
-        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
-        let cal = Calendar.current
-        let sorted = checkedInDates.compactMap { fmt.date(from: $0) }.sorted()
-        guard !sorted.isEmpty else { return 0 }
-        var longest = 1, current = 1
-        for i in 1..<sorted.count {
-            if let expected = cal.date(byAdding: .day, value: 1, to: sorted[i-1]),
-               cal.isDate(expected, inSameDayAs: sorted[i]) {
-                current += 1
-                longest = max(longest, current)
-            } else {
-                current = 1
-            }
-        }
-        return longest
+        CheckInStreakStore.longestStreak(for: currentActiveHumanId)
     }
 
     private var monthCheckInRate: Int {
@@ -1058,37 +1062,35 @@ struct OasisRewardView: View {
     }
 
     private func loadCheckInData() {
-        if let arr = UserDefaults.standard.stringArray(forKey: checkedInKey) {
-            checkedInDates = Set(arr)
-        }
-        if let arr = UserDefaults.standard.stringArray(forKey: makeupDatesKey) {
-            makeupDates = Set(arr)
-        }
-        makeupPackCount = UserDefaults.standard.integer(forKey: makeupPackKey)
+        checkedInDates = CheckInStreakStore.checkedInDates(for: currentActiveHumanId)
+        makeupDates = CheckInStreakStore.makeupDates(for: currentActiveHumanId)
+        makeupPackCount = UserDefaults.standard.integer(forKey: CheckInStreakStore.makeupPackKey)
+        lastClaimedMilestone = CheckInStreakStore.lastClaimedMilestone(for: currentActiveHumanId)
     }
 
     private func triggerTodayCheckIn() {
         let today = todayStr()
         guard !checkedInDates.contains(today) else { return }
         checkedInDates.insert(today)
-        UserDefaults.standard.set(Array(checkedInDates), forKey: checkedInKey)
+        CheckInStreakStore.setCheckedInDates(checkedInDates, for: currentActiveHumanId)
         QuestManager.shared.addCoconuts(1, emoji: "📅", title: "每日打卡奖励")
     }
 
     private func applyMakeup(date: String) {
         guard makeupPackCount > 0, !checkedInDates.contains(date) else { return }
         makeupPackCount -= 1
-        UserDefaults.standard.set(makeupPackCount, forKey: makeupPackKey)
+        UserDefaults.standard.set(makeupPackCount, forKey: CheckInStreakStore.makeupPackKey)
         checkedInDates.insert(date)
         makeupDates.insert(date)
-        UserDefaults.standard.set(Array(checkedInDates), forKey: checkedInKey)
-        UserDefaults.standard.set(Array(makeupDates), forKey: makeupDatesKey)
+        CheckInStreakStore.setCheckedInDates(checkedInDates, for: currentActiveHumanId)
+        CheckInStreakStore.setMakeupDates(makeupDates, for: currentActiveHumanId)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
     private func claimMilestone(_ days: Int, reward: Int, emoji: String) {
         QuestManager.shared.addCoconuts(reward, emoji: emoji, title: "\(days)天连胜奖励")
         lastClaimedMilestone = days
+        CheckInStreakStore.setLastClaimedMilestone(days, for: currentActiveHumanId)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
@@ -1138,30 +1140,15 @@ struct OasisRewardView: View {
                     })
                 bentoMiniCard(emoji: "🏆", title: "成就解锁",
                     subtitle: noPet ? "添加宠物后解锁 🐾" : "\(unlockedCount)/\(totalCount)",
-                    accent: noPet ? Color.white.opacity(0.35) : Color.goTeal,
+                    accent: noPet ? Color.ohanaSecondaryText : Color.goTeal,
                     action: { if !noPet { showAchievements = true } })
                     .opacity(noPet ? 0.55 : 1)
             }
-            // 行二：扭蛋机 + 悬赏榜
+            // 行二：扭蛋机（家庭协作统一放在 Ohana 成员页）
             HStack(spacing: 8) {
                 bentoMiniCard(emoji: "🎰", title: "欧气扭蛋机",
                     subtitle: gachaSubtitle, accent: Color.goPrimary,
                     action: { showGacha = true })
-                bentoMiniCard(emoji: "📋", title: "家庭悬赏榜",
-                    subtitle: bountySubtitle, accent: Color.goOrange,
-                    action: { showBountyBoard = true })
-                    .overlay(alignment: .topTrailing) {
-                        if bountyAssignedBadge > 0 {
-                            Text("\(bountyAssignedBadge)")
-                                .font(.system(size: 10, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
-                                .frame(minWidth: 16, minHeight: 16)
-                                .padding(.horizontal, 4)
-                                .background(Color.goRed, in: Capsule())
-                                .overlay(Capsule().strokeBorder(Color.white, lineWidth: 1.5))
-                                .offset(x: -6, y: 6)
-                        }
-                    }
             }
             // 行三：打卡日历（全宽）
             bentoMiniCard(emoji: "📅", title: "打卡日历",
@@ -1178,26 +1165,26 @@ struct OasisRewardView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Text(subtitle)
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(accent.opacity(0.75))
+                        .foregroundStyle(accent)
                         .lineLimit(1)
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.2))
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             .padding(.horizontal, 14).padding(.vertical, 11)
             .frame(maxWidth: .infinity)
             .background(
-                Color.white.opacity(0.08),
+                Color.ohanaCardSurface,
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+                    .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
             )
         }
         .buttonStyle(ScaleButtonStyle())
@@ -1205,7 +1192,33 @@ struct OasisRewardView: View {
 
     // MARK: - Animations
 
+    private func startAmbientMotionIfNeeded() {
+        updateGlowMotion()
+        updateHarvestBubbleMotion()
+        startBreathing()
+    }
+
+    private func stopAmbientMotion() {
+        glowBreathing = false
+        harvestBubbleBounce = false
+        treeScale = 1.0
+        treeGlow = 0.4
+    }
+
+    private func updateGlowMotion() {
+        glowBreathing = shouldRunAmbientMotion
+    }
+
+    private func updateHarvestBubbleMotion() {
+        harvestBubbleBounce = shouldRunAmbientMotion
+    }
+
     private func startBreathing() {
+        guard shouldRunAmbientMotion else {
+            treeScale = 1.0
+            treeGlow = 0.4
+            return
+        }
         withAnimation(.easeInOut(duration: 2.8).repeatForever(autoreverses: true)) {
             treeScale = 1.055
             treeGlow  = 0.7
@@ -1282,11 +1295,7 @@ private struct CoconutRulesSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(hex: "060E24").ignoresSafeArea()
-                LinearGradient(
-                    colors: [Color.goPrimary.opacity(0.15), Color(hex: "060E24")],
-                    startPoint: .top, endPoint: .bottom
-                ).ignoresSafeArea()
+                OhanaAppBackground().ignoresSafeArea()
 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 24) {
@@ -1314,9 +1323,9 @@ private struct CoconutRulesSheet: View {
                             doubleAccountRow(emoji: "🏝️", title: "全岛总库", desc: "所有椰子之和，用于商店与扭蛋")
                         }
                         .padding(14)
-                        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .strokeBorder(.white.opacity(0.08), lineWidth: 1))
+                            .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1))
 
                         // ── 底部口号
                         HStack {
@@ -1342,7 +1351,14 @@ private struct CoconutRulesSheet: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("关闭") { dismiss() }
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 17, weight: .black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("关闭")
                 }
             }
         }
@@ -1394,19 +1410,12 @@ private struct CoconutRulesSheet: View {
         .padding(14)
         .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
         .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(.white.opacity(0.04))
-                RadialGradient(
-                    colors: [card.glowColor.opacity(0.18), .clear],
-                    center: .topLeading, startRadius: 0, endRadius: 80
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            }
+            Color.ohanaCardSurface,
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(card.glowColor.opacity(0.2), lineWidth: 1)
+                .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
         )
         .scaleEffect(appeared ? 1 : 0.88)
         .opacity(appeared ? 1 : 0)

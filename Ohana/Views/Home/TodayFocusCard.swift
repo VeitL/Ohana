@@ -27,6 +27,7 @@ struct TodayFocusCard: View {
     var onTapNegativeSignal: (IslandNegativeSignal) -> Void = { _ in }
     var onTapMemory: () -> Void = {}
     var onTapOasis: () -> Void = {}
+    var onTapFamilyTask: (FamilyCollaborationTask) -> Void = { _ in }
 
     // Live @Query arrays — scoped to today so the home card does not hydrate
     // the full care history on every launch.
@@ -34,6 +35,8 @@ struct TodayFocusCard: View {
     @Query(sort: \PetWalkLog.startDate, order: .reverse) private var liveWalks: [PetWalkLog]
     @Query(sort: \PetPottyLog.date, order: .reverse) private var livePotty: [PetPottyLog]
     @Query(sort: \HumanWeightLog.date, order: .reverse) private var liveHumanWeights: [HumanWeightLog]
+    @Query(sort: \FamilyCollaborationTask.updatedAt, order: .reverse) private var familyTasks: [FamilyCollaborationTask]
+    @Query(sort: \CoconutExchangeRequest.createdAt, order: .reverse) private var exchangeRequests: [CoconutExchangeRequest]
 
     @State private var bounceEmoji = false
     @State private var pulse: CGFloat = 0
@@ -43,7 +46,13 @@ struct TodayFocusCard: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.modelContext) private var modelContext
+    @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @AppStorage("currentActiveHumanId") private var activeHumanId = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+
+    private var l: L10n { L10n(appLanguage) }
 
     init(
         pets: [Pet],
@@ -54,7 +63,8 @@ struct TodayFocusCard: View {
         onCompleteQuest: @escaping (IslandQuest) -> Void = { _ in },
         onTapNegativeSignal: @escaping (IslandNegativeSignal) -> Void = { _ in },
         onTapMemory: @escaping () -> Void = {},
-        onTapOasis: @escaping () -> Void = {}
+        onTapOasis: @escaping () -> Void = {},
+        onTapFamilyTask: @escaping (FamilyCollaborationTask) -> Void = { _ in }
     ) {
         self.pets = pets
         self.plants = plants
@@ -65,6 +75,7 @@ struct TodayFocusCard: View {
         self.onTapNegativeSignal = onTapNegativeSignal
         self.onTapMemory = onTapMemory
         self.onTapOasis = onTapOasis
+        self.onTapFamilyTask = onTapFamilyTask
 
         let todayStart = Calendar.current.startOfDay(for: Date())
         _liveCare = Query(
@@ -90,7 +101,7 @@ struct TodayFocusCard: View {
     }
 
     private var shouldReduceWork: Bool {
-        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
+        powerSavingMode || reduceMotion || workloadPolicy.shouldReduceWork()
     }
 
     private var refreshedQuests: [IslandQuest] {
@@ -109,6 +120,29 @@ struct TodayFocusCard: View {
         refreshedQuests.filter { !$0.isCompleted && !skippedFocusKeys.contains(questSkipKey($0)) }
     }
 
+    private var assignedFamilyTasks: [FamilyCollaborationTask] {
+        guard !activeHumanId.isEmpty else { return [] }
+        return familyTasks
+            .filter {
+                !$0.isFinished &&
+                (($0.status == .pendingReview && $0.createdById == activeHumanId) ||
+                 ($0.status != .pendingReview && ($0.assignedToId == activeHumanId || $0.claimedById == activeHumanId))) &&
+                !skippedFocusKeys.contains(familyTaskSkipKey($0))
+            }
+            .sorted { ($0.dueAt ?? $0.createdAt) < ($1.dueAt ?? $1.createdAt) }
+    }
+
+    private var pendingExchangeRequests: [CoconutExchangeRequest] {
+        guard !activeHumanId.isEmpty else { return [] }
+        return exchangeRequests
+            .filter {
+                $0.status == .pending &&
+                $0.receiverId == activeHumanId &&
+                !skippedFocusKeys.contains(exchangeSkipKey($0))
+            }
+            .sorted { $0.createdAt < $1.createdAt }
+    }
+
     private var negativeSignals: [IslandNegativeSignal] {
         IslandNegativeFeedback.signals(pets: pets, plants: plants)
             .filter { !closedNegativeKeys.contains(negativeSkipKey($0)) }
@@ -116,7 +150,18 @@ struct TodayFocusCard: View {
 
     private var focusCards: [TodayFocusService.Content] {
         if !negativeSignals.isEmpty {
-            return negativeSignals.prefix(2).map { .negative($0) } + pendingQuests.map { .quest($0) }
+                return negativeSignals.prefix(2).map { .negative($0) } +
+                assignedFamilyTasks.map { .familyTask($0) } +
+                pendingExchangeRequests.map { .coconutExchange($0) } +
+                pendingQuests.map { .quest($0) }
+        }
+        if !assignedFamilyTasks.isEmpty {
+            return assignedFamilyTasks.map { .familyTask($0) } +
+                pendingExchangeRequests.map { .coconutExchange($0) } +
+                pendingQuests.map { .quest($0) }
+        }
+        if !pendingExchangeRequests.isEmpty {
+            return pendingExchangeRequests.map { .coconutExchange($0) } + pendingQuests.map { .quest($0) }
         }
         if !pendingQuests.isEmpty {
             return pendingQuests.map { .quest($0) }
@@ -134,14 +179,34 @@ struct TodayFocusCard: View {
     }
 
     private var focusStatusText: String {
-        if case .negative = content {
+        switch content {
+        case .quest(let quest):
+            return indexedStatus(
+                current: pendingQuests.firstIndex { questSkipKey($0) == questSkipKey(quest) },
+                total: pendingQuests.count,
+                zh: "个任务",
+                en: "tasks",
+                de: "Aufgaben"
+            )
+        case .familyTask(let task):
+            return indexedStatus(
+                current: assignedFamilyTasks.firstIndex { familyTaskSkipKey($0) == familyTaskSkipKey(task) },
+                total: assignedFamilyTasks.count,
+                zh: "协作",
+                en: "collab",
+                de: "Team"
+            )
+        case .coconutExchange(let request):
+            return indexedStatus(
+                current: pendingExchangeRequests.firstIndex { exchangeSkipKey($0) == exchangeSkipKey(request) },
+                total: pendingExchangeRequests.count,
+                zh: "待收款",
+                en: "to confirm",
+                de: "offen"
+            )
+        case .negative, .memory, .celebrate, .welcome:
             return TodayFocusService.statusText(for: content)
         }
-        let pending = pendingQuests.count
-        if pending > 0 {
-            return "\(pending)/\(max(refreshedQuests.count, pending)) 个任务"
-        }
-        return TodayFocusService.statusText(for: content)
     }
 
     // MARK: - Body
@@ -165,7 +230,9 @@ struct TodayFocusCard: View {
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(Color.primary.opacity(0.07), in: Capsule())
+                        .background(Color.ohanaControlFill, in: Capsule())
+                        .contentTransition(.numericText())
+                        .animation(GoMotion.feedback, value: focusStatusText)
                     if case .quest(let q) = content {
                         rewardChip(IslandQuestEngine.coconutReward(forQuestId: q.id))
                     }
@@ -187,8 +254,15 @@ struct TodayFocusCard: View {
 
         }
         .onAppear {
-            guard !shouldReduceWork else { return }
-            withAnimation(.easeInOut(duration: 2.6).repeatForever(autoreverses: true)) { pulse = 1 }
+            startAmbientPulseIfNeeded()
+        }
+        .onChange(of: shouldReduceWork) { _, reduced in
+            if reduced {
+                pulse = 0
+                bounceEmoji = false
+            } else {
+                startAmbientPulseIfNeeded()
+            }
         }
         .onChange(of: focusCards.count) { _, count in
             if selectedFocusIndex >= count {
@@ -196,6 +270,12 @@ struct TodayFocusCard: View {
             }
         }
         .animation(GoMotion.hero, value: contentIdentity)
+    }
+
+    private func startAmbientPulseIfNeeded() {
+        guard !shouldReduceWork else { return }
+        withAnimation(.easeInOut(duration: 2.6).repeatForever(autoreverses: true)) { pulse = 1 } // ui-v4: allow Today Focus ambient pulse micro-motion
+        withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { bounceEmoji = true } // ui-v4: allow Today Focus celebration bounce micro-motion
     }
 
     // MARK: - Card switcher
@@ -226,6 +306,8 @@ struct TodayFocusCard: View {
     private func cardContent(_ content: TodayFocusService.Content) -> some View {
         switch content {
         case .quest(let q):      questCard(q)
+        case .familyTask(let t): familyTaskCard(t)
+        case .coconutExchange(let request): exchangeCard(request)
         case .negative(let s):   negativeCard(s)
         case .memory(let m):     memoryCard(m)
         case .celebrate:         celebrateCard
@@ -237,6 +319,11 @@ struct TodayFocusCard: View {
 
     private func questCard(_ q: IslandQuest) -> some View {
         let accent = Color.goPrimary
+        let isMedicationQuest = IslandQuestEngine.medicationId(fromQuestId: q.id) != nil
+        let actionTitle = isMedicationQuest
+            ? l.tr(zh: "打卡", en: "Check in", de: "Abhaken")
+            : l.tr(zh: "去完成", en: "Open", de: "Öffnen")
+        let actionIcon = isMedicationQuest ? "checkmark" : "arrow.right"
         return HStack(spacing: 14) {
             iconBubble(emoji: q.emoji, accent: accent)
 
@@ -259,9 +346,9 @@ struct TodayFocusCard: View {
                     onCompleteQuest(q)
                 } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: "arrow.right")
+                        Image(systemName: actionIcon)
                             .font(.system(size: 12, weight: .black))
-                        Text("去完成")
+                        Text(actionTitle)
                             .font(.system(size: 13, weight: .black, design: .rounded))
                     }
                     .foregroundStyle(Color.arkInk)
@@ -271,6 +358,106 @@ struct TodayFocusCard: View {
                 .buttonStyle(ScaleButtonStyle())
 
                 skipButton(for: .quest(q), accent: accent)
+            }
+        }
+        .padding(14)
+        .background(cardBackground(accent))
+    }
+
+    private func familyTaskCard(_ task: FamilyCollaborationTask) -> some View {
+        let accent = task.hasReward ? Color.goTeal : Color.goPurple
+        let rewardText = task.rewardCoconuts > 0 ? " · +\(task.rewardCoconuts)🥥" : ""
+        let performer = task.completedByName ?? l.tr(zh: "对方", en: "Someone", de: "Jemand")
+        let subtitle = task.status == .pendingReview
+            ? l.tr(
+                zh: "\(performer) 提交了任务\(rewardText)",
+                en: "\(performer) submitted the task\(rewardText)",
+                de: "\(performer) hat die Aufgabe eingereicht\(rewardText)"
+            )
+            : "\(task.createdByName) → 你\(rewardText)"
+        let actionTitle = task.status == .pendingReview
+            ? l.tr(zh: "去确认", en: "Review", de: "Prüfen")
+            : l.tr(zh: "去处理", en: "Open", de: "Öffnen")
+        return HStack(spacing: 14) {
+            iconBubble(emoji: task.emoji, accent: accent)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(task.title)
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(2)
+                Text(subtitle)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 6)
+
+            VStack(spacing: 6) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    onTapFamilyTask(task)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 12, weight: .black))
+                        Text(actionTitle)
+                            .font(.system(size: 13, weight: .black, design: .rounded))
+                    }
+                    .foregroundStyle(Color.arkInk)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(accent, in: Capsule())
+                }
+                .buttonStyle(ScaleButtonStyle())
+
+                skipButton(for: .familyTask(task), accent: accent)
+            }
+        }
+        .padding(14)
+        .background(cardBackground(accent))
+        .ohanaPing(trigger: task.statusRaw, accent: Color.goYellow, isEnabled: task.status == .pendingReview && task.hasReward)
+        .ohanaShine(trigger: task.statusRaw, cornerRadius: 20, isEnabled: task.status == .pendingReview)
+    }
+
+    private func exchangeCard(_ request: CoconutExchangeRequest) -> some View {
+        let accent = Color.goYellow
+        let amount = CoconutExchangeOption.format(request.localAmount, currencyCode: request.currencyCode)
+        return HStack(spacing: 14) {
+            iconBubble(emoji: "💱", accent: accent)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(l.tr(zh: "确认线下收款", en: "Confirm cash received", de: "Zahlung bestätigen"))
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(2)
+                Text("\(request.senderName) → \(amount) · \(request.coconutCost)🥥")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 6)
+
+            VStack(spacing: 6) {
+                Button {
+                    confirmExchange(request)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 12, weight: .black))
+                        Text(l.tr(zh: "已收到", en: "Received", de: "Erhalten"))
+                            .font(.system(size: 13, weight: .black, design: .rounded))
+                    }
+                    .foregroundStyle(Color.arkInk)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(accent, in: Capsule())
+                }
+                .buttonStyle(ScaleButtonStyle())
+
+                skipButton(for: .coconutExchange(request), accent: accent)
             }
         }
         .padding(14)
@@ -385,12 +572,6 @@ struct TodayFocusCard: View {
                 Text("🎉")
                     .font(.system(size: 30))
                     .scaleEffect(bounceEmoji ? 1.1 : 1)
-                    .onAppear {
-                        guard !shouldReduceWork else { return }
-                        withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
-                            bounceEmoji = true
-                        }
-                    }
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -465,8 +646,11 @@ struct TodayFocusCard: View {
             Text("+\(amount)")
                 .font(.system(size: 11, weight: .black, design: .rounded))
                 .foregroundStyle(Color.goYellow)
+                .contentTransition(.numericText())
+                .animation(GoMotion.feedback, value: amount)
             Text("🥥")
                 .font(.system(size: 10))
+                .ohanaSymbolPulse(trigger: amount)
         }
         .padding(.horizontal, 8).padding(.vertical, 4)
         .background(Color.goYellow.opacity(0.15), in: Capsule())
@@ -476,13 +660,24 @@ struct TodayFocusCard: View {
         HStack(spacing: 5) {
             ForEach(0..<count, id: \.self) { idx in
                 Capsule()
-                    .fill(idx == selected ? Color.goPrimary : Color.primary.opacity(0.18))
+                    .fill(idx == selected ? Color.goPrimary : Color.ohanaControlFill)
                     .frame(width: idx == selected ? 16 : 5, height: 5)
                     .animation(GoMotion.feedback, value: selected)
+                    .ohanaPhasePop(trigger: selected, enabled: idx == selected)
             }
         }
         .frame(maxWidth: .infinity)
         .accessibilityLabel("今日任务 \(min(selected + 1, count)) / \(count)")
+    }
+
+    private func indexedStatus(current: Int?, total: Int, zh: String, en: String, de: String) -> String {
+        guard total > 0 else { return TodayFocusService.statusText(for: content) }
+        let position = (current ?? 0) + 1
+        return l.tr(
+            zh: "\(position)/\(total) \(zh)",
+            en: "\(position)/\(total) \(en)",
+            de: "\(position)/\(total) \(de)"
+        )
     }
 
     private var contentIdentity: String {
@@ -493,9 +688,21 @@ struct TodayFocusCard: View {
         ].joined(separator: "|")
     }
 
+    private func confirmExchange(_ request: CoconutExchangeRequest) {
+        guard let receiver = humans.first(where: { $0.id.uuidString == activeHumanId }) else { return }
+        do {
+            try CoconutExchangeService.confirm(request, by: receiver, context: modelContext)
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        } catch {
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+        }
+    }
+
     private func contentKey(_ content: TodayFocusService.Content) -> String {
         switch content {
         case .quest(let q): return questSkipKey(q)
+        case .familyTask(let task): return familyTaskSkipKey(task)
+        case .coconutExchange(let request): return exchangeSkipKey(request)
         case .negative(let s): return negativeSkipKey(s)
         case .memory(let m): return "memory:\(m.headline)"
         case .celebrate: return "celebrate"
@@ -505,6 +712,14 @@ struct TodayFocusCard: View {
 
     private func questSkipKey(_ quest: IslandQuest) -> String {
         "quest:\(quest.id)"
+    }
+
+    private func familyTaskSkipKey(_ task: FamilyCollaborationTask) -> String {
+        "familyTask:\(task.id.uuidString)"
+    }
+
+    private func exchangeSkipKey(_ request: CoconutExchangeRequest) -> String {
+        "coconutExchange:\(request.id.uuidString)"
     }
 
     private func negativeSkipKey(_ signal: IslandNegativeSignal) -> String {
@@ -527,7 +742,7 @@ struct TodayFocusCard: View {
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.58))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .background(Color.primary.opacity(0.06), in: Capsule())
+                .background(Color.ohanaControlFill, in: Capsule())
                 .overlay(Capsule().strokeBorder(accent.opacity(0.18), lineWidth: 0.8))
         }
         .buttonStyle(ScaleButtonStyle())
@@ -584,11 +799,12 @@ struct TodayFocusCard: View {
     }
 
     private func cardBackground(_ accent: Color) -> some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Color.ohanaCardSurface)
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(accent.opacity(0.25), lineWidth: 1)
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        return ZStack {
+            shape
+                .fill(.clear)
+                .glassEffect(.regular.interactive(false), in: shape) // ui-v4: allow Today Focus card glass preview
+                .ohanaBreathingGlow(accent: accent, isActive: true)
         }
     }
 }

@@ -376,6 +376,7 @@ struct AddHealthRecordSheet: View {
         }
 
         modelContext.safeSave()
+        QuestManager.shared.awardAction(type: .health, pet: pet, context: modelContext)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         dismiss()
     }

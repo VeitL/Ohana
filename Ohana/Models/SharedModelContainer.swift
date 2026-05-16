@@ -697,6 +697,42 @@ enum ArkSchemaV42: VersionedSchema {
     }
 }
 
+// MARK: - Schema V43（Human 新增离世纪念模式日期）
+enum ArkSchemaV43: VersionedSchema {
+    static var versionIdentifier = Schema.Version(43, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV42.models
+    }
+}
+
+// MARK: - Schema V44（预留：人类/宠物纪念模式后续轻量字段）
+enum ArkSchemaV44: VersionedSchema {
+    static var versionIdentifier = Schema.Version(44, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV43.models
+    }
+}
+
+// MARK: - Schema V45（统一家庭协作任务）
+enum ArkSchemaV45: VersionedSchema {
+    static var versionIdentifier = Schema.Version(45, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV44.models + [FamilyCollaborationTask.self]
+    }
+}
+
+// MARK: - Schema V46（椰子货币兑换记录）
+enum ArkSchemaV46: VersionedSchema {
+    static var versionIdentifier = Schema.Version(46, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV45.models + [CoconutExchangeRequest.self]
+    }
+}
+
 // MARK: - Migration Plan
 // NOTE: 只保留有真实 custom logic 的 stage。
 // SwiftData 的 lightweight migration 对于"只新增字段/模型"完全不需要显式 stage——
@@ -714,7 +750,8 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
          ArkSchemaV25.self, ArkSchemaV26.self, ArkSchemaV27.self, ArkSchemaV28.self, ArkSchemaV29.self,
          ArkSchemaV30.self, ArkSchemaV31.self, ArkSchemaV32.self, ArkSchemaV33.self, ArkSchemaV34.self,
          ArkSchemaV35.self, ArkSchemaV36.self, ArkSchemaV37.self, ArkSchemaV38.self, ArkSchemaV39.self,
-         ArkSchemaV40.self, ArkSchemaV41.self, ArkSchemaV42.self]
+         ArkSchemaV40.self, ArkSchemaV41.self, ArkSchemaV42.self, ArkSchemaV43.self, ArkSchemaV44.self,
+         ArkSchemaV45.self, ArkSchemaV46.self]
     }
 
     static var stages: [MigrationStage] { [] }
@@ -744,7 +781,7 @@ struct SharedModelContainer {
     }
 
     private static func createPersistentContainer() -> ModelContainer {
-        let schema = Schema(ArkSchemaV42.models)
+        let schema = Schema(ArkSchemaV46.models)
         let defaultConfig = ModelConfiguration(
             isStoredInMemoryOnly: false,
             cloudKitDatabase: .none

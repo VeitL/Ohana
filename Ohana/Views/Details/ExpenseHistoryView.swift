@@ -12,6 +12,7 @@ import Charts
 struct ExpenseHistoryView: View {
     let pet: Pet
     var onRemove: (() -> Void)? = nil
+    var showsCloseButton: Bool = false
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
@@ -162,7 +163,7 @@ struct ExpenseHistoryView: View {
                             .font(.system(size: 44, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .contentTransition(.numericText())
-                            .animation(.spring(response: 0.4), value: rangeTotal)
+                            .animation(GoMotion.feedback, value: rangeTotal)
                     }
                 }
                 Spacer()
@@ -173,6 +174,17 @@ struct ExpenseHistoryView: View {
                 } else {
                     Text(pet.avatarEmoji).font(.system(size: 36))
                 }
+                if showsCloseButton {
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .frame(width: 38, height: 38)
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .contentShape(Circle())
+                    .accessibilityLabel("关闭")
+                }
             }
             .padding(.horizontal, 24)
             .padding(.top, 16)
@@ -180,7 +192,7 @@ struct ExpenseHistoryView: View {
             // 时间范围选择器
             HStack(spacing: 8) {
                 ForEach(TimeRange.allCases, id: \.self) { range in
-                    Button { withAnimation(.spring(response: 0.3)) { selectedRange = range } } label: {
+                    Button { withAnimation(GoMotion.feedback) { selectedRange = range } } label: {
                         Text(range.rawValue)
                             .font(.system(size: 12, weight: .bold, design: .rounded))
                             .foregroundStyle(selectedRange == range ? Color.arkInk : .primary.opacity(0.5))
@@ -488,7 +500,7 @@ struct ExpenseHistoryView: View {
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
         }
         .padding(12)
@@ -523,7 +535,7 @@ struct ExpenseHistoryView: View {
                     if isReimbursement {
                         Text("到账")
                             .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(Color.arkInk)
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(accentColor, in: Capsule())
                     }

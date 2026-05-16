@@ -26,6 +26,7 @@ struct QuickFeedDetailSheet: View {
     @Query(sort: \PetFoodRecord.startDate) private var allFoodRecords: [PetFoodRecord]
     @AppStorage("appLanguage") private var appLanguage = "zh"
     @AppStorage("defaultFeedGrams") private var defaultFeedGrams: Double = 0
+    @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     @State private var activeSheet: ActiveFeedSheet?
     @State private var adaptiveSheetHeight: CGFloat = ActiveFeedSheet.defaultAdaptiveHeight
@@ -159,6 +160,9 @@ struct QuickFeedDetailSheet: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 16) {
                         petHeader
+                        if pet.hasPassedAway {
+                            PetMemorialBanner(pet: pet)
+                        }
                         feedingHeroCard
                         coreCards
                         recentRecordsCard
@@ -202,6 +206,7 @@ struct QuickFeedDetailSheet: View {
                 }
             }
             .ignoresSafeArea(.keyboard, edges: .bottom)
+            .petMemorialTone(isActive: pet.hasPassedAway)
             .navigationTitle("")
             .toolbar(.hidden, for: .navigationBar)
             .toolbar {
@@ -249,6 +254,7 @@ struct QuickFeedDetailSheet: View {
                 ZStack {
                     Color.clear.ignoresSafeArea()
                     sheetContent(sheet)
+                        .petMemorialTone(isActive: pet.hasPassedAway)
                 }
                 .feedSheetScrollChrome()
                     .navigationBarTitleDisplayMode(.inline)
@@ -296,6 +302,7 @@ struct QuickFeedDetailSheet: View {
             }
         }
         .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { date in
+            guard workloadPolicy.shouldRunTimer() else { return }
             clockTick = date
         }
         .alert(antiRepeatTitle, isPresented: $showingAntiRepeatAlert) {
@@ -642,9 +649,17 @@ struct QuickFeedDetailSheet: View {
                 secondaryIcon: "slider.horizontal.3",
                 cardAction: { activeSheet = .stockOverview }
             ) {
+                guard !pet.hasPassedAway else {
+                    activeSheet = .stockOverview
+                    return
+                }
                 prepareStockSheet()
                 activeSheet = .stock
             } secondaryAction: {
+                guard !pet.hasPassedAway else {
+                    activeSheet = .stockOverview
+                    return
+                }
                 prepareStockManageSheet()
                 activeSheet = .stockManage
             }
@@ -661,6 +676,10 @@ struct QuickFeedDetailSheet: View {
                 secondaryIcon: "chart.pie.fill",
                 cardAction: { activeSheet = .treatOverview }
             ) {
+                guard !pet.hasPassedAway else {
+                    activeSheet = .treatOverview
+                    return
+                }
                 openTreatFeedSheet()
             } secondaryAction: {
                 activeSheet = .treatOverview
@@ -1259,6 +1278,7 @@ struct QuickFeedDetailSheet: View {
             .feedFlatBlockSurface(cornerRadius: 20)
         }
         .buttonStyle(ScaleButtonStyle())
+        .disabled(pet.hasPassedAway)
     }
 
     private var managedStockRecords: [PetFoodRecord] {
@@ -3121,11 +3141,19 @@ struct QuickFeedDetailSheet: View {
     // MARK: - Actions
 
     private func openManualFeedSheet() {
+        guard !pet.hasPassedAway else {
+            activeSheet = .feedingOverview
+            return
+        }
         prepareManualSheet()
         activeSheet = .manual
     }
 
     private func openTreatFeedSheet() {
+        guard !pet.hasPassedAway else {
+            activeSheet = .treatOverview
+            return
+        }
         prepareTreatSheet()
         activeSheet = .treat
     }
@@ -3149,6 +3177,10 @@ struct QuickFeedDetailSheet: View {
     }
 
     private func handleFeedPrimaryTap() {
+        guard !pet.hasPassedAway else {
+            activeSheet = .feedingOverview
+            return
+        }
         switch activeFeedingMode {
         case .manual:
             guard pet.dailyPortionGrams > 0 else {
@@ -3164,6 +3196,10 @@ struct QuickFeedDetailSheet: View {
     }
 
     private func handleFeedSettingsTap() {
+        guard !pet.hasPassedAway else {
+            activeSheet = .feedingOverview
+            return
+        }
         switch activeFeedingMode {
         case .manual:
             openManualFeedSheet()
@@ -3175,8 +3211,10 @@ struct QuickFeedDetailSheet: View {
     }
 
     private func bootstrap() {
-        materializeAutoFeedLogs()
-        ensureUpcomingPlanReminders()
+        if !pet.hasPassedAway {
+            materializeAutoFeedLogs()
+            ensureUpcomingPlanReminders()
+        }
         if manualGramsText.isEmpty, let grams = currentPortionAmount {
             manualGramsText = String(format: "%.0f", grams)
         }

@@ -25,6 +25,14 @@ xcuserdata/
 .venv-l10n/
 scripts/.l10n_en_cache.json
 tmp/
+*.tmp
+*.log
+*.bak
+*.orig
+* 2.*
+!* 2.swift
+*_backup_*/
+*Backup_*/
 
 # Accidental duplicate git metadata (do not track)
 .git 2/

@@ -68,8 +68,11 @@ struct ContentView: View {
             }
         }
         .onAppear {
+            allowSystemAutoLock()
+            AppWorkloadPolicy.shared.updateScenePhase(scenePhase)
+            AppWorkloadPolicy.shared.refresh(reason: "contentAppear")
             reconcileHumanProfileRequirement()
-            stopLocationIfNoWalkIsRunning()
+            handleAppForegroundTransition()
         }
         .onChange(of: hasOnboarded) { _, _ in
             reconcileHumanProfileRequirement()
@@ -162,19 +165,27 @@ struct ContentView: View {
         )
     }
 
-    private func stopLocationIfNoWalkIsRunning() {
-        if case .running = PetWalkingManager.shared.phase {
-            return
+    private func handleScenePhaseChange(_ phase: ScenePhase) {
+        AppWorkloadPolicy.shared.updateScenePhase(phase)
+        switch phase {
+        case .background:
+            PetWalkingManager.shared.handleAppBackgroundTransition()
+        case .inactive:
+            PetWalkingManager.shared.handleAppInactiveTransition()
+        case .active:
+            allowSystemAutoLock()
+            handleAppForegroundTransition()
+        @unknown default:
+            PetWalkingManager.shared.handleAppInactiveTransition()
         }
-        LocationManager.shared.stopAllLocationActivity()
     }
 
-    private func handleScenePhaseChange(_ phase: ScenePhase) {
-        if phase == .background {
-            PetWalkingManager.shared.handleAppBackgroundTransition()
-        } else {
-            stopLocationIfNoWalkIsRunning()
-        }
+    private func allowSystemAutoLock() {
+        UIApplication.shared.isIdleTimerDisabled = false
+    }
+
+    private func handleAppForegroundTransition() {
+        PetWalkingManager.shared.handleAppForegroundTransition()
     }
 }
 

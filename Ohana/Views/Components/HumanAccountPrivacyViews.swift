@@ -39,7 +39,11 @@ struct HumanAccountSwitcherSheet: View {
     }
 
     private var activeHuman: Human? {
-        humans.first { $0.id.uuidString == activeHumanId }
+        humans.first { $0.id.uuidString == activeHumanId && !$0.hasPassedAway }
+    }
+
+    private var switchableHumans: [Human] {
+        humans.filter { !$0.hasPassedAway }
     }
 
     var body: some View {
@@ -126,7 +130,7 @@ struct HumanAccountSwitcherSheet: View {
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .padding(.horizontal, 2)
 
-            ForEach(humans) { human in
+            ForEach(switchableHumans) { human in
                 accountRow(for: human)
             }
         }
@@ -377,7 +381,11 @@ struct HumanExecutorSwitchSheet: View {
     @State private var now = Date()
 
     private var activeHuman: Human? {
-        humans.first { $0.id.uuidString == activeHumanId }
+        humans.first { $0.id.uuidString == activeHumanId && !$0.hasPassedAway }
+    }
+
+    private var switchableHumans: [Human] {
+        humans.filter { !$0.hasPassedAway }
     }
 
     var body: some View {
@@ -433,7 +441,7 @@ struct HumanExecutorSwitchSheet: View {
     private var accountRows: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 9) {
-                ForEach(humans) { human in
+                ForEach(switchableHumans) { human in
                     accountRow(for: human)
                 }
             }
