@@ -136,7 +136,7 @@ struct IslandPottyDashboard: View {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.goCardWhite)
                     .frame(width: 36, height: 36)
                     .goGlassBackground(Circle())
             }
@@ -144,7 +144,7 @@ struct IslandPottyDashboard: View {
             Spacer()
             Text("便便电台")
                 .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.goCardWhite)
             Spacer()
             Color.clear.frame(width: 36, height: 36)
         }
@@ -186,25 +186,25 @@ struct IslandPottyDashboard: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("今日节奏")
                     .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.56))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.56))
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Text("\(todayLogs.count)")
                         .font(.system(size: 44, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.goCardWhite)
                     Text("次")
                         .font(.system(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(pottyBrown)
                 }
                 Text(weekLogs.isEmpty ? "还没有形成规律" : "7 天共 \(weekLogs.count) 次 · \(dominantType?.rawValue ?? "混合记录")最多")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.52))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.52))
                     .lineLimit(2)
             }
             Spacer()
         }
         .padding(18)
         .background(
-            LinearGradient(colors: [pottyBrown.opacity(0.22), Color.white.opacity(0.07)], startPoint: .topLeading, endPoint: .bottomTrailing),
+            LinearGradient(colors: [pottyBrown.opacity(0.22), Color.goCardWhite.opacity(0.07)], startPoint: .topLeading, endPoint: .bottomTrailing),
             in: RoundedRectangle(cornerRadius: 26, style: .continuous)
         )
         .overlay {
@@ -238,17 +238,17 @@ struct IslandPottyDashboard: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("10 日节奏条")
                 .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.white.opacity(0.72))
+                .foregroundStyle(Color.goCardWhite.opacity(0.72))
 
             HStack(alignment: .bottom, spacing: 6) {
                 ForEach(dayPulses) { pulse in
                     VStack(spacing: 5) {
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(pulse.count > 0 ? pottyBrown.gradient : Color.white.opacity(0.08).gradient)
+                            .fill(pulse.count > 0 ? pottyBrown.gradient : Color.goCardWhite.opacity(0.08).gradient)
                             .frame(height: max(10, CGFloat(pulse.count) * 17 * pulseProgress))
                         Text(pulse.date, format: .dateTime.weekday(.narrow))
                             .font(.system(size: 9, weight: .black, design: .rounded))
-                            .foregroundStyle(.white.opacity(Calendar.current.isDateInToday(pulse.date) ? 0.78 : 0.36))
+                            .foregroundStyle(Color.goCardWhite.opacity(Calendar.current.isDateInToday(pulse.date) ? 0.78 : 0.36))
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -256,14 +256,14 @@ struct IslandPottyDashboard: View {
             .frame(height: 104, alignment: .bottom)
         }
         .padding(16)
-        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.07), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private var pottyRows: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("成员便便状态")
                 .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.goCardWhite)
             ForEach(petSummaries) { summary in
                 Button { open(summary.pet) } label: {
                     HStack(spacing: 12) {
@@ -272,25 +272,25 @@ struct IslandPottyDashboard: View {
                             HStack(spacing: 6) {
                                 Text(summary.pet.name)
                                     .font(.system(size: 15, weight: .black, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Color.goCardWhite)
                                 Text(summary.latestType?.rawValue ?? "暂无")
                                     .font(.system(size: 11, weight: .bold, design: .rounded))
                                     .foregroundStyle((summary.latestType.map(pottyColor) ?? .white).opacity(0.72))
                             }
                             Text("今日 \(summary.todayCount) 次 · 7 天 \(summary.weekCount) 次")
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.48))
+                                .foregroundStyle(Color.goCardWhite.opacity(0.48))
                         }
                         Spacer()
                         Text(summary.latestDate.map(relativeDayText) ?? "--")
                             .font(.system(size: 11, weight: .black, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.42))
+                            .foregroundStyle(Color.goCardWhite.opacity(0.42))
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .black))
-                            .foregroundStyle(.white.opacity(0.3))
+                            .foregroundStyle(Color.goCardWhite.opacity(0.3))
                     }
                     .padding(14)
-                    .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .background(Color.goCardWhite.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -308,7 +308,7 @@ struct IslandPottyDashboard: View {
             .foregroundStyle(isSelected ? .black : .white)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(isSelected ? Color.goLime : Color.white.opacity(0.12), in: Capsule())
+            .background(isSelected ? Color.goLime : Color.goCardWhite.opacity(0.12), in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -340,7 +340,7 @@ struct IslandPottyDashboard: View {
 
     private func animatePulse() {
         pulseProgress = 0
-        withAnimation(.spring(response: 0.62, dampingFraction: 0.82)) {
+        withAnimation(GoMotion.page) {
             pulseProgress = 1
         }
     }

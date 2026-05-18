@@ -25,6 +25,7 @@ struct ExpenseHistoryView: View {
     }
 
     @State private var selectedRange: TimeRange = .month
+    @State private var showingExpensePopup = false
     @State private var isInlineExpenseComposerVisible = false
     @State private var newAmount = ""
     @State private var newCategory: ExpenseCategory = .food
@@ -109,33 +110,35 @@ struct ExpenseHistoryView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            OhanaAppBackground()
-
-            VStack(spacing: 0) {
-                chartSection.frame(maxHeight: .infinity)
-                recordListLayer.frame(height: 420)
-            }
-            .ignoresSafeArea(edges: .bottom)
-        }
-        .navigationTitle("花费记录")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
+        ZStack {
+            PetExpenseDashboardContent(
+                pet: pet,
+                showsCloseButton: showsCloseButton,
+                onClose: { dismiss() },
+                onAdd: {
+                    selectedPayerId = currentActiveHumanId
                     withAnimation(GoMotion.feedback) {
-                        isInlineExpenseComposerVisible.toggle()
+                        showingExpensePopup = true
                     }
-                    if isInlineExpenseComposerVisible, selectedPayerId == nil {
-                        selectedPayerId = currentActiveHumanId
+                },
+                onRemove: onRemove
+            )
+
+            if showingExpensePopup {
+                AddExpenseSheet(
+                    pet: pet,
+                    preselectedPayerId: selectedPayerId ?? currentActiveHumanId,
+                    onDismiss: {
+                        withAnimation(GoMotion.feedback) {
+                            showingExpensePopup = false
+                        }
                     }
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(Color.goPrimary)
-                }
+                )
+                .zIndex(20)
+                .transition(.opacity)
             }
         }
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             if selectedPayerId == nil {
                 selectedPayerId = currentActiveHumanId

@@ -210,6 +210,9 @@ enum PetBreedDatabase {
         BreedInfo(name: "西伯利亚哈士奇",
                   coatColors: [CoatColor(name: "黑白", hex: "2A2A2A"), CoatColor(name: "灰白", hex: "9E9E9E"), CoatColor(name: "红白", hex: "8B3A1A"), CoatColor(name: "纯白", hex: "F5F5F0"), CoatColor(name: "银白", hex: "E0E0E0")],
                   eyeColors: [EyeColor(name: "冰蓝色", hex: "9EC8E8"), EyeColor(name: "棕色", hex: "6B3A2A"), EyeColor(name: "异瞳", hex: "7A3A7A")], suggestedThemeHex: "90A4AE"),
+        BreedInfo(name: "西高地白梗",
+                  coatColors: [CoatColor(name: "白色", hex: "F5F5F0"), CoatColor(name: "黑色", hex: "1A1A1A")],
+                  eyeColors: [EyeColor(name: "深棕色", hex: "3D1F0D"), EyeColor(name: "黑色", hex: "1C1C1C")], suggestedThemeHex: "FAFAFA"),
         BreedInfo(name: "西施犬",
                   coatColors: [CoatColor(name: "金白色", hex: "D4A017"), CoatColor(name: "白色", hex: "F5F5F0"), CoatColor(name: "黑白", hex: "2A2A2A"), CoatColor(name: "红白", hex: "B5451B"), CoatColor(name: "多色", hex: "C8B4A0")],
                   eyeColors: [EyeColor(name: "深棕色", hex: "3D1F0D")], suggestedThemeHex: "FFC107"),
@@ -449,6 +452,7 @@ enum PetBreedDatabase {
     static let breedCareTips: [String: [String]] = [
         // 狗
         "边境牧羊犬": ["每日需≥2小时高强度运动，智力游戏不可少", "每周梳毛3次，换毛期每天梳", "高能量犬种，适合有经验的主人"],
+        "澳大利亚牧羊犬": ["每日需要充足运动和互动训练", "中长毛每周梳理2-3次，换毛期增加频率", "聪明敏感，适合嗅闻、敏捷和服从游戏"],
         "金毛寻回犬": ["每周梳毛2-3次，洗澡约4-6周一次", "每日散步≥1小时，喜欢游泳", "关注关节健康，体重控制很重要"],
         "拉布拉多寻回犬": ["食欲旺盛，注意控制饮食防止肥胖", "每日运动1-2小时，喜欢游泳", "每周梳毛2次，换毛期每天梳"],
         "柴犬": ["独立性强，需耐心社会化训练", "每周梳毛1-2次，换毛期每天梳", "每日散步30-60分钟即可"],
@@ -461,6 +465,7 @@ enum PetBreedDatabase {
         "哈士奇": ["换毛期大量掉毛，每天梳毛必不可少", "需要大量运动，每日≥2小时", "聪明但独立，逃跑能力强，需防护"],
         "阿拉斯加雪橇犬": ["毛量惊人，换毛期需每日梳毛", "体型大，需充足运动空间", "不耐热，夏季注意防暑"],
         "萨摩耶": ["白色毛发需定期清洁，每周梳毛2-3次", "活泼友善，需要陪伴和运动", "微笑天使，但掉毛量惊人"],
+        "西高地白梗": ["白色被毛需定期清洁，避免泪痕和口周染色", "活泼自信，每日散步和嗅闻游戏不可少", "注意皮肤敏感和耳朵清洁"],
         "博美": ["双层毛发，每周梳毛2-3次", "体型小但活力十足", "膝盖骨脱臼高发，注意关节保护"],
         "法国斗牛犬": ["短鼻犬种，注意呼吸道护理", "清洁皮肤褶皱，防止细菌滋生", "不耐热，夏季避免剧烈运动"],
         "英国斗牛犬": ["清洁面部皱褶非常重要，每天擦拭", "短鼻犬种，高温下谨慎运动", "体重管理严格，关节负担大"],

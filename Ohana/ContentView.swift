@@ -66,6 +66,9 @@ struct ContentView: View {
                 GlobalWalkBanner()
                     .zIndex(80)
             }
+
+            CoconutRewardFeedbackOverlay()
+                .zIndex(120)
         }
         .onAppear {
             allowSystemAutoLock()

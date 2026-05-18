@@ -30,7 +30,7 @@ private struct AnimatedWeightSparkline: View {
 
     private func playAnimation() {
         revealProgress = 0
-        withAnimation(.easeOut(duration: 0.7)) {
+        withAnimation(GoMotion.page) {
             revealProgress = 1
         }
     }
@@ -42,7 +42,7 @@ private struct AnimatedWeightSparkline: View {
                 y: .value("kg", point.weight)
             )
             .foregroundStyle(accentColor)
-            .interpolationMethod(.catmullRom)
+            .interpolationMethod(OhanaChartStyle.trendInterpolation)
             .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
         }
         .chartXAxis(.hidden)
@@ -500,7 +500,7 @@ struct IslandWeightDashboard: View {
 
     private func playChartReveal() {
         chartRevealProgress = 0
-        withAnimation(.easeOut(duration: 0.85)) {
+        withAnimation(GoMotion.page) {
             chartRevealProgress = 1
         }
     }
@@ -521,7 +521,7 @@ struct IslandWeightDashboard: View {
                             startPoint: .top, endPoint: .bottom
                         )
                     )
-                    .interpolationMethod(.catmullRom)
+                    .interpolationMethod(OhanaChartStyle.trendInterpolation)
                 }
 
                 ForEach(series.points) { pt in
@@ -531,7 +531,7 @@ struct IslandWeightDashboard: View {
                         series: .value("s", series.seriesID)
                     )
                     .foregroundStyle(c)
-                    .interpolationMethod(.catmullRom)
+                    .interpolationMethod(OhanaChartStyle.trendInterpolation)
                     .lineStyle(StrokeStyle(lineWidth: 2.6, lineCap: .round, lineJoin: .round))
                 }
 

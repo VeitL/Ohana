@@ -1,4 +1,47 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
+
+enum OhanaFeedback {
+    static func light() {
+        impact(.light)
+    }
+
+    static func medium() {
+        impact(.medium)
+    }
+
+    static func strong() {
+        impact(.heavy)
+    }
+
+    static func success() {
+        notification(.success)
+    }
+
+    static func warning() {
+        notification(.warning)
+    }
+
+    static func error() {
+        notification(.error)
+    }
+
+    private static func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
+        #if os(iOS)
+        guard !ProcessInfo.processInfo.isLowPowerModeEnabled else { return }
+        UIImpactFeedbackGenerator(style: style).impactOccurred()
+        #endif
+    }
+
+    private static func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
+        #if os(iOS)
+        guard !ProcessInfo.processInfo.isLowPowerModeEnabled else { return }
+        UINotificationFeedbackGenerator().notificationOccurred(type)
+        #endif
+    }
+}
 
 private enum OhanaPopPhase: CaseIterable {
     case resting
@@ -227,6 +270,46 @@ private struct OhanaStateMotionModifier<Value: Equatable>: ViewModifier {
     }
 }
 
+private struct OhanaStaggeredMenuItemModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    let isVisible: Bool
+    let index: Int
+    let total: Int
+    let anchor: UnitPoint
+
+    private var canAnimate: Bool {
+        !reduceMotion && workloadPolicy.shouldAnimate(isVisible: true)
+    }
+
+    private var delay: Double {
+        let visibleIndex = max(total - 1 - index, 0)
+        return isVisible
+            ? GoMotion.staggerDelay(visibleIndex, step: 0.052, maxDelay: 0.28)
+            : GoMotion.staggerDelay(index, step: 0.032, maxDelay: 0.18)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(canAnimate ? (isVisible ? 1 : 0.68) : 1, anchor: anchor)
+            .opacity(isVisible ? 1 : 0)
+            .offset(y: canAnimate ? (isVisible ? 0 : 22) : 0)
+            .animation(canAnimate ? GoMotion.fab.delay(delay) : GoMotion.reduced, value: isVisible)
+    }
+}
+
+private struct OhanaInlineMenuMotionModifier<Trigger: Equatable>: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    let trigger: Trigger
+
+    func body(content: Content) -> some View {
+        content
+            .transition(.ohanaPop)
+            .ohanaPhasePop(trigger: trigger, enabled: !reduceMotion && workloadPolicy.shouldAnimate(isVisible: true))
+    }
+}
+
 extension AnyTransition {
     static var ohanaPop: AnyTransition {
         .asymmetric(
@@ -272,6 +355,14 @@ extension View {
 
     func ohanaStateMotion<Value: Equatable>(_ value: Value) -> some View {
         modifier(OhanaStateMotionModifier(value: value))
+    }
+
+    func ohanaStaggeredMenuItem(isVisible: Bool, index: Int, total: Int, anchor: UnitPoint = .bottomTrailing) -> some View {
+        modifier(OhanaStaggeredMenuItemModifier(isVisible: isVisible, index: index, total: total, anchor: anchor))
+    }
+
+    func ohanaInlineMenuMotion<Trigger: Equatable>(trigger: Trigger) -> some View {
+        modifier(OhanaInlineMenuMotionModifier(trigger: trigger))
     }
 
     func ohanaPing<Trigger: Equatable>(trigger: Trigger, accent: Color = Color.goPrimary, isEnabled: Bool = true) -> some View {

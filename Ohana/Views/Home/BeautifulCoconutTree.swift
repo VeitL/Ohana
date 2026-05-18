@@ -66,6 +66,10 @@ private let maxLeafSlots = 22
 struct BeautifulCoconutTree: View {
     var level: Int           // 1-10
     var isInjecting: Bool    // 注入能量脉冲
+    var growthProgress: Double = 0
+    var injectionPulseToken: Int = 0
+    var pendingUpgradeCoconutCount: Int = 0
+    var allowsAmbientMotion: Bool = true
     var harvestedCoconuts: Set<Int> = []        // 已采摘的椰子索引
     var onHarvest: ((Int) -> Void)? = nil       // 采摘回调
 
@@ -97,7 +101,7 @@ struct BeautifulCoconutTree: View {
 
             // ── 背景光效（Sunbeams, Lv9+)
             if level >= 9 {
-                SunbeamsView()
+                SunbeamsView(allowsAmbientMotion: allowsAmbientMotion)
                     .offset(y: -100)
             }
 
@@ -143,6 +147,13 @@ struct BeautifulCoconutTree: View {
                 .allowsHitTesting(false)
             }
 
+            if isInjecting {
+                EnergyRootPulseView(token: injectionPulseToken, color: glowColor)
+                    .offset(x: bend * 0.18, y: 2)
+                    .transition(.scale(scale: 0.82).combined(with: .opacity))
+                    .allowsHitTesting(false)
+            }
+
             if level <= 4 {
                 ForEach(0..<sproutCount, id: \.self) { i in
                     GroundSproutView(color: leafColor(index: i))
@@ -178,9 +189,9 @@ struct BeautifulCoconutTree: View {
                         style: StrokeStyle(lineWidth: max(CGFloat(3), trunkW * 0.11), lineCap: .round)
                     )
                     .frame(width: trunkW * 4 + bend + 40, height: trunkH + 10)
-                    .shadow(color: Color(hex: "84CC16").opacity(0.6), radius: 4)
+                    .shadow(color: Color(hex: "84CC16").opacity(0.6), radius: 4) // ui-v4: allow tree illustration vine glow
                     .opacity(0.8)
-                    .animation(.easeOut(duration: 2.0), value: vineProgress)
+                    .animation(GoMotion.hero, value: vineProgress)
             }
 
             // ── 神圣光环 (Divine Halo, Lv6+)
@@ -188,7 +199,8 @@ struct BeautifulCoconutTree: View {
                 DivineHaloView(
                     isSwaying: isSwaying,
                     tier: cfg.auraTier,
-                    size: 184 + CGFloat(cfg.auraTier) * 30
+                    size: 184 + CGFloat(cfg.auraTier) * 30,
+                    allowsAmbientMotion: allowsAmbientMotion
                 )
                     .offset(x: bend + trunkW * 0.4, y: -trunkH - 8)
             }
@@ -265,6 +277,7 @@ struct BeautifulCoconutTree: View {
                             index: i,
                             isMax: isMax,
                             isHarvested: isHarvested,
+                            allowsAmbientMotion: allowsAmbientMotion,
                             onTap: { onHarvest?(i) }
                         )
                         .offset(x: pos.x * positionScale, y: pos.y * positionScale)
@@ -278,12 +291,12 @@ struct BeautifulCoconutTree: View {
 
                 // ── 符文 (Runes, Lv10)
                 if isMax {
-                    RunesView(isSwaying: isSwaying)
+                    RunesView(isSwaying: isSwaying, allowsAmbientMotion: allowsAmbientMotion)
                 }
 
                 // ── 星尘 (Stardust, Lv8+)
                 if level >= 8 {
-                    StardustView()
+                    StardustView(allowsAmbientMotion: allowsAmbientMotion)
                 }
             }
             // 树冠对齐树干顶端（对应 React animate.x/y）
@@ -292,7 +305,9 @@ struct BeautifulCoconutTree: View {
             // 持续摇摆
             .rotationEffect(.degrees(isSwaying ? 2 : -2), anchor: .bottom)
             .animation(
-                .easeInOut(duration: 6).repeatForever(autoreverses: true),
+                allowsAmbientMotion
+                    ? .easeInOut(duration: 6).repeatForever(autoreverses: true) // runtime-guardrail: allow AppWorkloadPolicy-gated tree sway
+                    : nil,
                 value: isSwaying
             )
             // 注入能量脉冲
@@ -310,6 +325,10 @@ struct BeautifulCoconutTree: View {
                     vineProgress = 1.0
                 }
             }
+            isSwaying = allowsAmbientMotion
+        }
+        .onChange(of: allowsAmbientMotion) { _, shouldAnimate in
+            isSwaying = shouldAnimate
         }
         .onChange(of: level) { oldVal, newVal in
             if newVal > oldVal { triggerShockwave() }
@@ -321,6 +340,14 @@ struct BeautifulCoconutTree: View {
                 }
             }
         }
+        .overlay(alignment: .bottom) {
+            if pendingUpgradeCoconutCount > 0 {
+                PendingUpgradeCoconutHint(count: pendingUpgradeCoconutCount)
+                    .offset(x: -86, y: -18)
+                    .transition(.scale.combined(with: .opacity))
+                    .allowsHitTesting(false)
+            }
+        }
     }
 
     // MARK: - 升级冲击波
@@ -328,7 +355,7 @@ struct BeautifulCoconutTree: View {
         burstKey += 1
         shockwaveScale = 0
         shockwaveOpacity = 1
-        withAnimation(.easeOut(duration: 1.35)) {
+        withAnimation(GoMotion.hero) {
             shockwaveScale = 1
             shockwaveOpacity = 0
         }
@@ -373,6 +400,71 @@ private struct LevelUpBurstView: View {
         }
         .blendMode(.screen)
         .allowsHitTesting(false)
+    }
+}
+
+private struct EnergyRootPulseView: View {
+    let token: Int
+    let color: Color
+
+    @State private var scale: CGFloat = 0.72
+    @State private var opacity: Double = 0.9
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(color.opacity(0.9), lineWidth: 3)
+                .frame(width: 44, height: 44)
+                .scaleEffect(scale)
+                .opacity(opacity)
+            Circle()
+                .fill(color.opacity(0.18))
+                .frame(width: 36, height: 36)
+                .scaleEffect(scale * 0.84)
+                .opacity(opacity)
+        }
+        .blendMode(.screen)
+        .onAppear { run() }
+        .onChange(of: token) { _, _ in run() }
+    }
+
+    private func run() {
+        scale = 0.72
+        opacity = 0.9
+        withAnimation(GoMotion.feedback) {
+            scale = 2.4
+            opacity = 0
+        }
+    }
+}
+
+private struct PendingUpgradeCoconutHint: View {
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: -7) {
+            ForEach(0..<min(count, 3), id: \.self) { index in
+                Text("🥥")
+                    .font(.system(size: 17))
+                    .frame(width: 25, height: 25)
+                    .background(Color.goPrimary.opacity(0.16), in: Circle())
+                    .overlay(alignment: .topTrailing) {
+                        if index == 0 {
+                            Circle()
+                                .fill(Color.goPrimary)
+                                .frame(width: 7, height: 7)
+                        }
+                    }
+            }
+            if count > 3 {
+                Text("+\(count - 3)")
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
+                    .frame(width: 25, height: 25)
+                    .background(Color.goPrimary, in: Circle())
+                    .padding(.leading, 4)
+            }
+        }
     }
 }
 
@@ -422,7 +514,7 @@ private struct BlossomView: View {
                 .frame(width: 5, height: 5)
         }
         .frame(width: 18, height: 18)
-        .shadow(color: petalColor.opacity(isMax ? 0.75 : 0.35), radius: isMax ? 5 : 2)
+        .shadow(color: petalColor.opacity(isMax ? 0.75 : 0.35), radius: isMax ? 5 : 2) // ui-v4: allow tree blossom glow
     }
 }
 
@@ -432,6 +524,7 @@ private struct InteractiveCoconut: View {
     let index: Int
     let isMax: Bool
     let isHarvested: Bool
+    let allowsAmbientMotion: Bool
     let onTap: () -> Void
 
     @State private var breatheScale: CGFloat = 0.8
@@ -449,13 +542,9 @@ private struct InteractiveCoconut: View {
                     .blur(radius: 4)
                     .allowsHitTesting(false)
                     .onAppear {
-                        withAnimation(
-                            .easeInOut(duration: 2).repeatForever(autoreverses: true)
-                        ) {
-                            breatheScale  = 1.4
-                            breatheOpacity = 0.5
-                        }
+                        updateBreathing()
                     }
+                    .onChange(of: allowsAmbientMotion) { _, _ in updateBreathing() }
             }
 
             // 椰子本体
@@ -463,11 +552,23 @@ private struct InteractiveCoconut: View {
                 .scaleEffect(isHarvested ? 0.001 : 1.0)
                 .opacity(isHarvested ? 0 : 1)
                 .animation(
-                    .spring(response: 0.4, dampingFraction: 0.6),
+                    GoMotion.feedback,
                     value: isHarvested
                 )
         }
         .onTapGesture { if !isHarvested { onTap() } }
+    }
+
+    private func updateBreathing() {
+        if allowsAmbientMotion {
+            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) { // ui-v4: allow AppWorkloadPolicy-gated coconut affordance; runtime-guardrail: allow AppWorkloadPolicy-gated coconut affordance
+                breatheScale = 1.4
+                breatheOpacity = 0.5
+            }
+        } else {
+            breatheScale = 1.0
+            breatheOpacity = 0.18
+        }
     }
 }
 
@@ -584,7 +685,7 @@ struct CoconutView: View {
                 .mask(
                     VStack(spacing: 0) {
                         Color.clear.frame(height: h / 2)
-                        Color.black.frame(height: h / 2)
+                        Color.arkInk.frame(height: h / 2)
                     }
                 )
                 .opacity(0.8)
@@ -609,6 +710,7 @@ struct CoconutView: View {
 // MARK: - Special Visual Effects (AI Studio Features)
 
 struct SunbeamsView: View {
+    var allowsAmbientMotion: Bool = true
     @State private var breathe = false
     var body: some View {
         Path { path in
@@ -623,9 +725,20 @@ struct SunbeamsView: View {
         .blendMode(.screen)
         .allowsHitTesting(false)
         .onAppear {
-            withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) {
+            updateMotion()
+        }
+        .onChange(of: allowsAmbientMotion) { _, _ in
+            updateMotion()
+        }
+    }
+
+    private func updateMotion() {
+        if allowsAmbientMotion {
+            withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) { // ui-v4: allow AppWorkloadPolicy-gated sunbeams; runtime-guardrail: allow AppWorkloadPolicy-gated sunbeams
                 breathe = true
             }
+        } else {
+            breathe = false
         }
     }
 }
@@ -634,6 +747,7 @@ struct DivineHaloView: View {
     var isSwaying: Bool
     var tier: Int = 1
     var size: CGFloat = 240
+    var allowsAmbientMotion: Bool = true
 
     var body: some View {
         ZStack {
@@ -673,7 +787,12 @@ struct DivineHaloView: View {
             }
         }
         .rotationEffect(.degrees(isSwaying ? 360 : 0))
-        .animation(.linear(duration: 25).repeatForever(autoreverses: false), value: isSwaying)
+        .animation(
+            allowsAmbientMotion
+                ? .linear(duration: 25).repeatForever(autoreverses: false) // runtime-guardrail: allow AppWorkloadPolicy-gated halo
+                : nil,
+            value: isSwaying
+        )
         .opacity(0.72 + min(Double(tier), 4) * 0.06)
         .allowsHitTesting(false)
     }
@@ -681,6 +800,7 @@ struct DivineHaloView: View {
 
 struct RunesView: View {
     var isSwaying: Bool
+    var allowsAmbientMotion: Bool = true
     private let runes = ["✧", "✦", "✺", "✵", "❂", "❀"]
     var body: some View {
         ZStack {
@@ -689,19 +809,25 @@ struct RunesView: View {
                 Text(runes[i])
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(Color(hex: "84CC16"))
-                    .shadow(color: Color(hex: "00FFD1"), radius: 4)
+                    .shadow(color: Color(hex: "00FFD1"), radius: 4) // ui-v4: allow max-level rune glow
                     .offset(y: -130)
                     .rotationEffect(.degrees(angle))
             }
         }
         .rotationEffect(.degrees(isSwaying ? -360 : 0))
-        .animation(.linear(duration: 30).repeatForever(autoreverses: false), value: isSwaying)
+        .animation(
+            allowsAmbientMotion
+                ? .linear(duration: 30).repeatForever(autoreverses: false) // runtime-guardrail: allow AppWorkloadPolicy-gated runes
+                : nil,
+            value: isSwaying
+        )
         .opacity(0.9)
         .allowsHitTesting(false)
     }
 }
 
 struct StardustView: View {
+    var allowsAmbientMotion: Bool = true
     @State private var animate = false
 
     private let dust: [(x: CGFloat, h: CGFloat, startY: CGFloat, endY: CGFloat, duration: Double, delay: Double)] = [
@@ -724,7 +850,7 @@ struct StardustView: View {
             ForEach(0..<dust.count, id: \.self) { i in
                 let item = dust[i]
                 Capsule()
-                    .fill(Color.white)
+                    .fill(Color.ohanaPrimaryActionText)
                     .frame(width: 2, height: item.h)
                     .opacity(animate ? 0.1 : 0.8)
                     .offset(
@@ -732,15 +858,20 @@ struct StardustView: View {
                         y: animate ? item.endY : item.startY
                     )
                     .animation(
-                        .linear(duration: item.duration)
-                            .repeatForever(autoreverses: false)
-                            .delay(item.delay),
+                        allowsAmbientMotion
+                            ? .linear(duration: item.duration)
+                                .repeatForever(autoreverses: false) // runtime-guardrail: allow AppWorkloadPolicy-gated stardust
+                                .delay(item.delay)
+                            : nil,
                         value: animate
                     )
             }
         }
         .allowsHitTesting(false)
-        .onAppear { animate = true }
+        .onAppear { animate = allowsAmbientMotion }
+        .onChange(of: allowsAmbientMotion) { _, shouldAnimate in
+            animate = shouldAnimate
+        }
     }
 }
 
@@ -774,7 +905,7 @@ struct StardustView: View {
                         }
                         .padding(.horizontal, 20).padding(.vertical, 10)
                         .background(Color.goPrimary, in: Capsule())
-                        .foregroundStyle(.black)
+                        .foregroundStyle(Color.arkInk)
 
                         Button("注入能量") {
                             isInjecting = true
@@ -783,12 +914,12 @@ struct StardustView: View {
                             }
                         }
                         .padding(.horizontal, 20).padding(.vertical, 10)
-                        .background(.white.opacity(0.15), in: Capsule())
+                        .background(Color.ohanaControlFill, in: Capsule())
                         .foregroundStyle(Color.ohanaPrimaryText)
 
                         Button("重置椰子") { harvested = [] }
                         .padding(.horizontal, 20).padding(.vertical, 10)
-                        .background(.white.opacity(0.15), in: Capsule())
+                        .background(Color.ohanaControlFill, in: Capsule())
                         .foregroundStyle(Color.ohanaPrimaryText)
                     }
                     .font(.system(size: 14, weight: .bold, design: .rounded))

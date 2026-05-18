@@ -114,6 +114,7 @@ struct PoopCoreCard: View {
     var secondaryTitle: String?
     var secondaryAction: (() -> Void)?
     var tapAction: (() -> Void)?
+    var feedbackToken: CheckInFeedbackToken? = nil
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -122,37 +123,44 @@ struct PoopCoreCard: View {
     }
 
     var body: some View {
-        HStack(spacing: 14) {
-            tappableInfo
+        ZStack(alignment: .topLeading) {
+            HStack(spacing: 14) {
+                tappableInfo
 
-            VStack(spacing: 8) {
-                Button(action: primaryAction) {
-                    HStack(spacing: 5) {
-                        Image(systemName: primaryIcon)
-                            .font(.system(size: 11, weight: .black))
-                        Text(primaryTitle)
-                            .font(.system(size: 13, weight: .black, design: .rounded))
-                    }
-                    .foregroundStyle(Color.arkInk)
-                    .frame(minWidth: 72)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                    .background(tint, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
-
-                if let secondaryTitle, let secondaryAction {
-                    Button(action: secondaryAction) {
-                        Text(secondaryTitle)
-                            .font(.system(size: 12, weight: .black, design: .rounded))
-                            .foregroundStyle(tint)
-                            .frame(minWidth: 72)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 7)
-                            .background(Color.ohanaCardSurfaceElevated, in: Capsule())
+                VStack(spacing: 8) {
+                    Button(action: primaryAction) {
+                        HStack(spacing: 5) {
+                            Image(systemName: primaryIcon)
+                                .font(.system(size: 11, weight: .black))
+                            Text(primaryTitle)
+                                .font(.system(size: 13, weight: .black, design: .rounded))
+                        }
+                        .foregroundStyle(Color.arkInk)
+                        .frame(minWidth: 72)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
+                        .background(tint, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
+
+                    if let secondaryTitle, let secondaryAction {
+                        Button(action: secondaryAction) {
+                            Text(secondaryTitle)
+                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .foregroundStyle(tint)
+                                .frame(minWidth: 72)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .background(Color.ohanaCardSurfaceElevated, in: Capsule())
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                    }
                 }
+            }
+
+            if let feedbackToken {
+                CheckInFeedbackBadge(token: feedbackToken)
+                    .offset(x: 58, y: 4)
             }
         }
         .padding(16)
@@ -161,6 +169,7 @@ struct PoopCoreCard: View {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         )
+        .checkInPulse(feedbackToken)
     }
 
     @ViewBuilder
@@ -194,6 +203,7 @@ struct PoopCoreCard: View {
                     .foregroundStyle(tint)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
+                    .contentTransition(.numericText())
                 Text(subtitle)
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)

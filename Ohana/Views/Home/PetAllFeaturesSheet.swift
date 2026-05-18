@@ -116,12 +116,12 @@ struct PetAllFeaturesSheet: View {
         case .walks:         WalkSummarySheet(pet: pet)
         case .potty:         PottyOverviewView(pet: pet)
         case .basicInfo:     PetBasicInfoDetailView(pet: pet)
-        case .documents:     DocumentsListView(pet: pet)
+        case .documents:     DocumentsListView(pet: pet, showsCloseButton: true)
         case .moments:       PetMomentsHubView(pet: pet)
         case .timeline:      PetUnifiedTimelineSheet(pet: pet)
         case .achievements:  AchievementWallView(pet: pet)
         case .retention:     PetRetentionHubView(pet: pet, showsCloseButton: true)
-        case .weight:        WeightHistoryView(pet: pet)
+        case .weight:        WeightHistoryView(pet: pet, showsCloseButton: true)
         case .expense:       ExpenseHistoryView(pet: pet, showsCloseButton: true)
         case .bondVault:     PetBondVaultView(pet: pet)
         }
@@ -129,9 +129,9 @@ struct PetAllFeaturesSheet: View {
 
     private func destinationNeedsHostClose(_ destination: PetAllFeatureDestination) -> Bool {
         switch destination {
-        case .food, .basicInfo, .documents, .weight:
+        case .food, .basicInfo:
             return true
-        case .health, .medications, .hygiene, .walks, .potty, .moments, .timeline, .achievements, .retention, .expense, .bondVault:
+        case .health, .medications, .hygiene, .walks, .potty, .documents, .moments, .timeline, .achievements, .retention, .weight, .expense, .bondVault:
             return false
         }
     }

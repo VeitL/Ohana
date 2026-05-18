@@ -42,10 +42,10 @@ struct AddInsuranceClaimSheet: View {
     }
 
     private var totalExpenseDouble: Double {
-        Double(totalExpenseInput.replacingOccurrences(of: ",", with: ".")) ?? 0
+        CountryDecimalInput.parse(totalExpenseInput, countryCode: AppCountry.code) ?? 0
     }
     private var claimedDouble: Double {
-        Double(claimedAmountInput.replacingOccurrences(of: ",", with: ".")) ?? 0
+        CountryDecimalInput.parse(claimedAmountInput, countryCode: AppCountry.code) ?? 0
     }
     private var canSave: Bool {
         totalExpenseDouble > 0 && claimedDouble > 0 && claimedDouble <= totalExpenseDouble
@@ -250,11 +250,20 @@ struct AddInsuranceClaimSheet: View {
                 Text(AppCurrency.symbol)
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goPrimary)
-                TextField(placeholder, text: text)
-                    .keyboardType(.decimalPad)
-                    .font(.system(size: 17, weight: .black, design: .rounded))
-                    .multilineTextAlignment(.trailing)
-                    .frame(maxWidth: 120)
+                InlineNumericInput(
+                    text: text,
+                    placeholder: placeholder,
+                    maxFractionDigits: 2,
+                    accent: Color.goPrimary,
+                    step: 10,
+                    valueFont: .system(size: 17, weight: .black, design: .rounded),
+                    valueAlignment: .trailing,
+                    fill: Color.clear,
+                    cornerRadius: 12,
+                    horizontalPadding: 4,
+                    verticalPadding: 0
+                )
+                .frame(maxWidth: 128)
             }
         }
         .padding(14)

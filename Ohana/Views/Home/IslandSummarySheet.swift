@@ -99,10 +99,6 @@ struct IslandSummarySheet: View {
                 Text(moodText)
                     .font(.system(size: 17, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("根据今日喂食/用药/连击/植物护理综合判断")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
-                    .lineLimit(2)
             }
             Spacer(minLength: 0)
         }
@@ -127,9 +123,6 @@ struct IslandSummarySheet: View {
                 Text("连续打卡 \(checkInStreak) 天")
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(checkInStreak >= 7 ? "火苗燃烧中，继续保持 🔥" : "每天至少 1 次打卡维持连击")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             }
             Spacer()
         }
@@ -184,9 +177,6 @@ struct IslandSummarySheet: View {
                 Text("一切安好")
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("当前没有需要关注的信号，继续享受岛屿生活吧")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             }
             Spacer()
         }

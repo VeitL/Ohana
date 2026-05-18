@@ -154,7 +154,7 @@ struct HomeHighlightDeck: View {
                         Capsule()
                             .fill(idx == currentIndex ? Color.goPrimary : Color.primary.opacity(0.18))
                             .frame(width: idx == currentIndex ? 18 : 5, height: 5)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentIndex)
+                            .animation(GoMotion.feedback, value: currentIndex)
                     }
                 }
             }
@@ -167,7 +167,7 @@ struct HomeHighlightDeck: View {
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 18).padding(.vertical, 9)
                     .background(Color.goPrimary, in: Capsule())
-                    .shadow(color: Color.goPrimary.opacity(0.45), radius: 10, y: 3)
+                    .shadow(color: Color.goPrimary.opacity(0.45), radius: 10, y: 3) // ui-v4: allow short-lived reward toast lift
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .padding(.top, 4)
                     .allowsHitTesting(false)
@@ -180,7 +180,7 @@ struct HomeHighlightDeck: View {
                 pets: pets,
                 reward: IslandQuestEngine.coconutReward(forQuestId: quest.id)
             ) {
-                withAnimation(.spring(response: 0.3)) {
+                withAnimation(GoMotion.feedback) {
                     onCompleteQuest(quest)
                 }
                 pendingCompleteQuest = nil
@@ -194,9 +194,9 @@ struct HomeHighlightDeck: View {
             coconutClaimed = true
             toastMessage = "🥥 今日椰子盲盒已领取！"
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { showRewardToast = true }
+            withAnimation(GoMotion.feedback) { showRewardToast = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
-                withAnimation(.easeOut(duration: 0.3)) { showRewardToast = false }
+                withAnimation(GoMotion.quick) { showRewardToast = false }
             }
         }) {
             CoconutDropSheet(isPresented: $showCoconut)
@@ -253,7 +253,7 @@ struct HomeHighlightDeck: View {
                     },
                     onSkip: {
                         let qid = quest.id
-                        _ = withAnimation(.spring(response: 0.3)) {
+                            _ = withAnimation(GoMotion.feedback) {
                             skippedIds.insert(qid)
                         }
                         onSkipQuest(quest)
@@ -270,7 +270,7 @@ struct HomeHighlightDeck: View {
             }
         case .questEmpty:
             DeckQuestEmptyCard {
-                withAnimation(.spring(response: 0.3)) {
+                withAnimation(GoMotion.feedback) {
                     skippedIds.removeAll()
                 }
                 let key = HomeHighlightDeck.todayKey("hd_skip")
@@ -328,14 +328,14 @@ private struct DeckHumanStatusCard: View {
                         startPoint: .topLeading, endPoint: .bottomTrailing
                     ))
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(.black.opacity(0.15))
+                    .fill(Color.arkInk.opacity(0.15))
                     .blendMode(.multiply)
 
                 HStack(spacing: 16) {
                     // 头像
                     ZStack {
                         Circle()
-                            .fill(.white.opacity(0.15))
+                            .fill(Color.goCardWhite.opacity(0.15))
                             .frame(width: 60, height: 60)
                         if let data = human.avatarImageData, let img = UIImage(data: data) {
                             Image(uiImage: img)
@@ -353,19 +353,19 @@ private struct DeckHumanStatusCard: View {
                         HStack(spacing: 6) {
                             Text(human.name.isEmpty ? "岛民" : human.name)
                                 .font(.system(size: 18, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Color.goCardWhite)
                                 .lineLimit(1)
                             Text(human.roleText)
                                 .font(.system(size: 10, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.75))
+                                .foregroundStyle(Color.goCardWhite.opacity(0.75))
                                 .padding(.horizontal, 7).padding(.vertical, 3)
-                                .background(.white.opacity(0.2), in: Capsule())
+                                .background(Color.goCardWhite.opacity(0.2), in: Capsule())
                         }
                         if let bday = human.birthday {
                             let years = Calendar.current.dateComponents([.year], from: bday, to: Date()).year ?? 0
                             Text("\(years) 岁")
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(Color.goCardWhite.opacity(0.7))
                         }
 
                         Spacer(minLength: 6)
@@ -398,10 +398,10 @@ private struct DeckHumanStatusCard: View {
             Text(icon).font(.system(size: 11))
             Text(value)
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(Color.goCardWhite.opacity(0.9))
         }
         .padding(.horizontal, 8).padding(.vertical, 4)
-        .background(.white.opacity(0.15), in: Capsule())
+        .background(Color.goCardWhite.opacity(0.15), in: Capsule())
     }
 }
 
@@ -448,7 +448,7 @@ private struct DeckPetStatusCard: View {
                         .font(OhanaFont.title3())
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
-                    Text(totalToday == 0 ? "今天还没有打卡记录" : "今日已完成 \(totalToday) 项打卡")
+                    Text(totalToday == 0 ? "0 项" : "\(totalToday) 项")
                         .font(OhanaFont.caption())
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
@@ -581,7 +581,7 @@ private struct DeckCheckInStreakCard: View {
                         .font(OhanaFont.caption(.bold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Spacer()
-                    Text("🎯 下一里程碑 \(nextMilestone) 天")
+                    Text("\(nextMilestone)d")
                         .font(OhanaFont.caption2())
                         .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
                 }
@@ -617,7 +617,7 @@ private struct DeckCheckInStreakCard: View {
                     }
                     .frame(height: 6)
 
-                    Text(daysToNext == 0 ? "🎉 里程碑达成！" : "距 \(nextMilestone) 天里程碑还差 \(daysToNext) 天")
+                    Text(daysToNext == 0 ? "🎉" : "-\(daysToNext)d")
                         .font(OhanaFont.caption2())
                         .foregroundStyle(Color.ohanaSecondaryText.opacity(0.65))
                 }
@@ -680,7 +680,7 @@ private struct DeckQuestCard: View {
                 avatarView
                 Text(typeLabel)
                     .font(OhanaFont.caption(.bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(Color.goPrimary.opacity(0.85), in: Capsule())
                 Spacer()
@@ -722,7 +722,7 @@ private struct DeckQuestCard: View {
                 } label: {
                     Text("去完成")
                         .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 14).padding(.vertical, 6)
                         .background(Color.goPrimary, in: Capsule())
                 }
@@ -779,9 +779,6 @@ private struct DeckQuestDoneCard: View {
                 Text("今日委托全部完成！")
                     .font(OhanaFont.body(.bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("岛屿很平静，居民们很满足 🌴")
-                    .font(OhanaFont.caption())
-                    .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -809,9 +806,6 @@ private struct DeckCoconutCallCard: View {
                         Text("今日盲盒已领取！")
                             .font(OhanaFont.body(.bold))
                             .foregroundStyle(Color.ohanaPrimaryText)
-                        Text("感谢认真照料你的宠物 🌴")
-                            .font(OhanaFont.caption())
-                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -825,7 +819,7 @@ private struct DeckCoconutCallCard: View {
                             Text("领取今日椰子盲盒！")
                                 .font(OhanaFont.body(.bold))
                                 .foregroundStyle(Color.arkInk)
-                            Text("全勤奖励 · 额外 +5 🥥")
+                            Text("+5 🥥")
                                 .font(OhanaFont.caption())
                                 .foregroundStyle(Color.arkInk.opacity(0.65))
                         }
@@ -834,9 +828,6 @@ private struct DeckCoconutCallCard: View {
                             .font(OhanaFont.footnote(.bold))
                             .foregroundStyle(Color.arkInk.opacity(0.5))
                     }
-                    Text("所有委托已完成，快来领奖吧！")
-                        .font(OhanaFont.caption(.semibold))
-                        .foregroundStyle(Color.arkInk.opacity(0.7))
                 }
                 .padding(14)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -863,9 +854,6 @@ private struct DeckQuestEmptyCard: View {
                 Text("暂无委托")
                     .font(OhanaFont.body(.bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("今日委托已跳过或暂无任务")
-                    .font(OhanaFont.caption())
-                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -937,7 +925,7 @@ private struct DeckLevelCard: View {
                                 startPoint: .leading, endPoint: .trailing
                             ))
                             .frame(width: geo.size.width * animatedProgress, height: 7)
-                            .shadow(color: accentColor.opacity(0.45), radius: 4, y: 0)
+                            .shadow(color: accentColor.opacity(0.45), radius: 4, y: 0) // ui-v4: allow progress fill glow for island growth
                     }
                 }
                 .frame(height: 7)
@@ -957,12 +945,12 @@ private struct DeckLevelCard: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .onAppear {
-            withAnimation(.easeOut(duration: 0.8).delay(0.15)) {
+            withAnimation(GoMotion.page.delay(0.15)) {
                 animatedProgress = mgr.progressToNextLevel
             }
         }
         .onChange(of: mgr.progressToNextLevel) { _, v in
-            withAnimation(.easeOut(duration: 0.5)) { animatedProgress = v }
+            withAnimation(GoMotion.page) { animatedProgress = v }
         }
     }
 }

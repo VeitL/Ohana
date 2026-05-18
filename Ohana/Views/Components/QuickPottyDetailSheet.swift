@@ -19,6 +19,8 @@ struct QuickPottyDetailSheet: View {
     @Query(sort: \Event.startDate) private var allEvents: [Event]
 
     @State private var activeSheet: ActiveSheet?
+    @State private var nestedInlineSheet: ActiveSheet?
+    @State private var pottySheetReturnStack: [ActiveSheet] = []
     @State private var scoopIntervalDays: Int = 1
     @State private var scoopAnchorDate: Date = Date()
     @State private var scoopReminderOn = false
@@ -36,6 +38,10 @@ struct QuickPottyDetailSheet: View {
     @State private var inlineSheetDragOffset: CGFloat = 0
     @State private var adaptiveSheetHeight: CGFloat = 430
     @State private var selectedFocus: PottyFocus = .potty
+    @State private var pottyFeedbackToken: CheckInFeedbackToken?
+    @State private var scoopFeedbackToken: CheckInFeedbackToken?
+    @State private var litterFeedbackToken: CheckInFeedbackToken?
+    @State private var feedbackClearTask: Task<Void, Never>?
 
     private enum PottyFocus: String, CaseIterable, Identifiable {
         case potty
@@ -105,6 +111,13 @@ struct QuickPottyDetailSheet: View {
     private var scoopTint: Color { isDark ? Color.goPrimary : Color(hex: CareType.litter.accentColorHex) }
     private var litterTint: Color { Color(hex: "D4A574") }
     private var chromeTint: Color { isDark ? Color.goPrimary : themeColor }
+    private var isCatPet: Bool {
+        let text = "\(pet.species) \(pet.breed)".lowercased()
+        return text.contains("猫") || text.contains("cat")
+    }
+    private var availableFocuses: [PottyFocus] {
+        isCatPet ? [.potty, .scoop, .litter] : [.potty]
+    }
 
     private var todayPottyLogs: [PetPottyLog] {
         pet.pottyLogs
@@ -128,6 +141,7 @@ struct QuickPottyDetailSheet: View {
 
     private var recentItems: [PoopLogItem] {
         let pottyItems = pottyLogs.map(PoopLogItem.potty)
+        guard isCatPet else { return Array(pottyItems.prefix(12)) }
         let litterItems = litterLogs.map(PoopLogItem.litter)
         return Array((pottyItems + litterItems).sorted { $0.date > $1.date }.prefix(12))
     }
@@ -137,16 +151,22 @@ struct QuickPottyDetailSheet: View {
             get: { activeSheet?.usesInlineOverlay == true ? nil : activeSheet },
             set: { newValue in
                 if let newValue {
-                    activeSheet = newValue
+                    openRootPottySheet(newValue)
                 } else if activeSheet?.usesInlineOverlay != true {
+                    nestedInlineSheet = nil
+                    pottySheetReturnStack.removeAll()
                     activeSheet = nil
                 }
             }
         )
     }
 
+    private var activeInlineSheet: ActiveSheet? {
+        nestedInlineSheet ?? (activeSheet?.usesInlineOverlay == true ? activeSheet : nil)
+    }
+
     private var inlineOverlayBlocksBackground: Bool {
-        activeSheet?.usesInlineOverlay == true
+        activeInlineSheet != nil
     }
 
     private var lastPottyLog: PetPottyLog? { pottyLogs.first }
@@ -225,18 +245,35 @@ struct QuickPottyDetailSheet: View {
             .toolbar(.hidden, for: .navigationBar)
             .sheet(item: systemSheetBinding) { sheet in
                 NavigationStack {
-                    sheetContent(sheet)
-                        .petMemorialTone(isActive: pet.hasPassedAway)
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                OhanaPopupCloseButton(tint: Color.ohanaPrimaryText) {
-                                    activeSheet = nil
-                                }
-                            }
+                    ZStack {
+                        VStack(spacing: 0) {
+                            pottySheetTopChrome(sheet)
+                                .padding(.horizontal, 20)
+                                .padding(.top, 12)
+                                .padding(.bottom, 4)
+
+                            sheetContent(sheet)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                                .allowsHitTesting(nestedInlineSheet == nil)
+                                .petMemorialTone(isActive: pet.hasPassedAway)
                         }
+
+                        if nestedInlineSheet != nil {
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .ignoresSafeArea()
+                                .zIndex(35)
+                        }
+
+                        if let nestedInlineSheet {
+                            inlinePoopSheetOverlay(nestedInlineSheet)
+                                .zIndex(40)
+                                .ignoresSafeArea(.container, edges: .bottom)
+                        }
+                    }
+                    .toolbar(.hidden, for: .navigationBar)
                 }
-                .presentationDetents([.large])
+                .presentationDetents([.large]) // ui-v4: allow long overview/history uses system sheet
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color.ohanaCardSurface)
                 .presentationCornerRadius(30)
@@ -252,6 +289,10 @@ struct QuickPottyDetailSheet: View {
         .onAppear {
             loadSettings()
             guard !pet.hasPassedAway else { return }
+            if !isCatPet {
+                selectedFocus = .potty
+                return
+            }
             if scoopReminderOn {
                 syncScoopPlan(showToast: false)
             }
@@ -275,7 +316,14 @@ struct QuickPottyDetailSheet: View {
                 }
             }
         }
-        .interactiveDismissDisabled(activeSheet?.usesInlineOverlay == true)
+        .onChange(of: nestedInlineSheet?.id) { _, _ in
+            adaptiveSheetHeight = nestedInlineSheet?.inlineHeight ?? activeSheet?.inlineHeight ?? 430
+            inlineSheetDragOffset = 0
+            if nestedInlineSheet == nil && activeSheet?.usesInlineOverlay != true {
+                inlineSheetVisible = false
+            }
+        }
+        .interactiveDismissDisabled(activeInlineSheet != nil)
     }
 
     // MARK: - Main UI
@@ -316,8 +364,8 @@ struct QuickPottyDetailSheet: View {
                 .background { PoopInlineSheetGlassSurface(cornerRadius: cornerRadius) }
                 .clipShape(shape)
                 .frame(width: panelWidth)
-                .shadow(color: Color.black.opacity(inlineSheetVisible ? 0.56 : 0), radius: 48, x: 0, y: -18)
-                .shadow(color: Color(hex: "0B102C").opacity(inlineSheetVisible ? 0.46 : 0), radius: 28, x: 0, y: 12)
+                .shadow(color: Color.black.opacity(inlineSheetVisible ? 0.56 : 0), radius: 48, x: 0, y: -18) // ui-v4: allow popup liftedAlert shadow
+                .shadow(color: Color(hex: "0B102C").opacity(inlineSheetVisible ? 0.46 : 0), radius: 28, x: 0, y: 12) // ui-v4: allow popup liftedAlert shadow
                 .offset(y: inlineSheetVisible ? inlineSheetDragOffset : hiddenOffset)
                 .opacity(inlineSheetVisible ? 1 : 0.94)
                 .scaleEffect(inlineSheetVisible ? 1 : 0.982, anchor: .bottom)
@@ -338,9 +386,9 @@ struct QuickPottyDetailSheet: View {
 
     private var inlineSheetBackdrop: some View {
         ZStack {
-            Color.black.opacity(inlineSheetVisible ? 0.16 : 0)
+            Color.black.opacity(inlineSheetVisible ? 0.16 : 0) // ui-v4: allow modal scrim
             LinearGradient(
-                colors: [Color.clear, Color.black.opacity(inlineSheetVisible ? 0.26 : 0)],
+                colors: [Color.clear, Color.black.opacity(inlineSheetVisible ? 0.26 : 0)], // ui-v4: allow modal scrim
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -367,16 +415,67 @@ struct QuickPottyDetailSheet: View {
     }
 
     private func dismissInlinePoopSheet() {
-        let dismissingSheetID = activeSheet?.id
+        let dismissingSheetID = activeInlineSheet?.id
         withAnimation(GoMotion.page) {
             inlineSheetVisible = false
             inlineSheetDragOffset = 0
         }
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 260_000_000)
-            if activeSheet?.id == dismissingSheetID {
-                activeSheet = nil
+            if nestedInlineSheet?.id == dismissingSheetID {
+                nestedInlineSheet = nil
+            } else if activeSheet?.id == dismissingSheetID {
+                closeActivePottySheet()
             }
+        }
+    }
+
+    private func openRootPottySheet(_ sheet: ActiveSheet) {
+        nestedInlineSheet = nil
+        pottySheetReturnStack.removeAll()
+        activeSheet = normalizedSheetForPet(sheet)
+    }
+
+    private func openPottySheet(_ sheet: ActiveSheet) {
+        let sheet = normalizedSheetForPet(sheet)
+        if activeSheet?.usesInlineOverlay == false, sheet.usesInlineOverlay {
+            nestedInlineSheet = sheet
+            return
+        }
+        if activeSheet?.usesInlineOverlay == true, sheet.usesInlineOverlay {
+            activeSheet = sheet
+            return
+        }
+
+        if let current = activeSheet, current.id != sheet.id {
+            pottySheetReturnStack.append(current)
+        } else if activeSheet == nil {
+            pottySheetReturnStack.removeAll()
+        }
+        activeSheet = sheet
+    }
+
+    private func normalizedSheetForPet(_ sheet: ActiveSheet) -> ActiveSheet {
+        guard !isCatPet else { return sheet }
+        switch sheet {
+        case .scoopCheckIn, .litterChangeCheckIn, .scoopSettings, .litterSettings, .scoopOverview, .litterOverview:
+            return .pottyOverview
+        case .scoopHistory, .litterHistory:
+            return .pottyHistory
+        default:
+            return sheet
+        }
+    }
+
+    private func closeActivePottySheet() {
+        if nestedInlineSheet != nil {
+            nestedInlineSheet = nil
+            return
+        }
+        if let returnSheet = pottySheetReturnStack.popLast() {
+            activeSheet = returnSheet
+        } else {
+            activeSheet = nil
         }
     }
 
@@ -402,7 +501,7 @@ struct QuickPottyDetailSheet: View {
                 Text(pet.name)
                     .font(.system(size: 17, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("便便 / 铲屎 / 猫砂")
+                Text(isCatPet ? "便便 / 铲屎 / 猫砂" : "便便记录")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -447,7 +546,7 @@ struct QuickPottyDetailSheet: View {
                 }
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("便便管理")
+                    Text(isCatPet ? "便便管理" : "便便记录")
                         .font(.system(size: 24, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(pottyDashboardSubtitle)
@@ -460,12 +559,19 @@ struct QuickPottyDetailSheet: View {
             }
 
             HStack(spacing: 8) {
-                pottySummaryPill(title: "便便", value: "\(todayPottyLogs.count)次", tint: pottyTint)
-                pottySummaryPill(title: "铲屎", value: dueText(daysUntil: daysUntilScoop), tint: scoopTint)
-                pottySummaryPill(title: "猫砂", value: dueText(daysUntil: daysUntilLitterChange), tint: litterTint)
+                pottySummaryPill(title: isCatPet ? "便便" : "今日", value: "\(todayPottyLogs.count)次", tint: pottyTint)
+                if isCatPet {
+                    pottySummaryPill(title: "铲屎", value: dueText(daysUntil: daysUntilScoop), tint: scoopTint)
+                    pottySummaryPill(title: "猫砂", value: dueText(daysUntil: daysUntilLitterChange), tint: litterTint)
+                } else {
+                    pottySummaryPill(title: "最近", value: lastPottyLog.map { relativeDayText(for: $0.date) } ?? "暂无", tint: pottyTint)
+                    pottySummaryPill(title: "异常", value: "\(Int(last7AbnormalRatio * 100))%", tint: last7AbnormalRatio > 0.3 ? Color.goRed : pottyTint)
+                }
             }
 
-            pottyFocusSelector
+            if isCatPet {
+                pottyFocusSelector
+            }
         }
         .padding(.vertical, 2)
     }
@@ -483,7 +589,7 @@ struct QuickPottyDetailSheet: View {
 
     private var pottyFocusSelector: some View {
         HStack(spacing: 8) {
-            ForEach(PottyFocus.allCases) { focus in
+            ForEach(availableFocuses) { focus in
                 pottyFocusChip(focus)
             }
         }
@@ -550,7 +656,7 @@ struct QuickPottyDetailSheet: View {
     }
 
     private var coreCardOrder: [PottyFocus] {
-        [.potty, .scoop, .litter]
+        availableFocuses
     }
 
     @ViewBuilder
@@ -578,21 +684,22 @@ struct QuickPottyDetailSheet: View {
             primaryAction: {
                 guard !pet.hasPassedAway else {
                     selectedFocus = .potty
-                    activeSheet = .pottyOverview
+                    openRootPottySheet(.pottyOverview)
                     return
                 }
                 selectedFocus = .potty
-                activeSheet = .pottyType
+                openPottySheet(.pottyType)
             },
             secondaryTitle: "历史",
             secondaryAction: {
                 selectedFocus = .potty
-                activeSheet = .pottyHistory
+                openPottySheet(.pottyHistory)
             },
             tapAction: {
                 selectedFocus = .potty
-                activeSheet = .pottyOverview
-            }
+                openRootPottySheet(.pottyOverview)
+            },
+            feedbackToken: pottyFeedbackToken
         )
     }
 
@@ -609,21 +716,26 @@ struct QuickPottyDetailSheet: View {
             primaryAction: {
                 guard !pet.hasPassedAway else {
                     selectedFocus = .scoop
-                    activeSheet = .scoopOverview
+                    openRootPottySheet(.scoopOverview)
                     return
                 }
                 selectedFocus = .scoop
-                activeSheet = .scoopCheckIn
+                openPottySheet(.scoopCheckIn)
             },
             secondaryTitle: "管理",
             secondaryAction: {
                 selectedFocus = .scoop
-                activeSheet = pet.hasPassedAway ? .scoopOverview : .scoopSettings
+                if pet.hasPassedAway {
+                    openRootPottySheet(.scoopOverview)
+                } else {
+                    openPottySheet(.scoopSettings)
+                }
             },
             tapAction: {
                 selectedFocus = .scoop
-                activeSheet = .scoopOverview
-            }
+                openRootPottySheet(.scoopOverview)
+            },
+            feedbackToken: scoopFeedbackToken
         )
     }
 
@@ -640,21 +752,26 @@ struct QuickPottyDetailSheet: View {
             primaryAction: {
                 guard !pet.hasPassedAway else {
                     selectedFocus = .litter
-                    activeSheet = .litterOverview
+                    openRootPottySheet(.litterOverview)
                     return
                 }
                 selectedFocus = .litter
-                activeSheet = .litterChangeCheckIn
+                openPottySheet(.litterChangeCheckIn)
             },
             secondaryTitle: "管理",
             secondaryAction: {
                 selectedFocus = .litter
-                activeSheet = pet.hasPassedAway ? .litterOverview : .litterSettings
+                if pet.hasPassedAway {
+                    openRootPottySheet(.litterOverview)
+                } else {
+                    openPottySheet(.litterSettings)
+                }
             },
             tapAction: {
                 selectedFocus = .litter
-                activeSheet = .litterOverview
-            }
+                openRootPottySheet(.litterOverview)
+            },
+            feedbackToken: litterFeedbackToken
         )
     }
 
@@ -666,7 +783,7 @@ struct QuickPottyDetailSheet: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 Button {
-                    activeSheet = .history
+                    openPottySheet(.history)
                 } label: {
                     Text("管理")
                         .font(.system(size: 12, weight: .black, design: .rounded))
@@ -700,7 +817,7 @@ struct QuickPottyDetailSheet: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
             .background(chromeTint, in: Capsule())
-            .shadow(color: chromeTint.opacity(0.32), radius: 12, y: 6)
+            .shadow(color: chromeTint.opacity(0.32), radius: 12, y: 6) // ui-v4: allow toast elevation
             .padding(.top, 8)
             .transition(.move(edge: .top).combined(with: .opacity))
     }
@@ -809,7 +926,7 @@ struct QuickPottyDetailSheet: View {
                     dismissInlinePoopSheet()
                 },
                 secondaryAction: {
-                    activeSheet = .scoopSettings
+                    openPottySheet(.scoopSettings)
                 }
             )
             .ohanaAdaptiveSheetContentHeight(
@@ -833,7 +950,7 @@ struct QuickPottyDetailSheet: View {
                     dismissInlinePoopSheet()
                 },
                 secondaryAction: {
-                    activeSheet = .litterSettings
+                    openPottySheet(.litterSettings)
                 }
             )
             .ohanaAdaptiveSheetContentHeight(
@@ -933,7 +1050,6 @@ struct QuickPottyDetailSheet: View {
     private var pottyOverviewSheet: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                poopOverviewHero(icon: "seal.fill", title: "便便总览", subtitle: pottySubtitle, tint: pottyTint)
                 poopOverviewRangePicker(tint: pottyTint)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                     poopOverviewMetric(title: "今日次数", value: "\(todayPottyLogs.count)", icon: "number.circle.fill", tint: pottyTint)
@@ -963,13 +1079,12 @@ struct QuickPottyDetailSheet: View {
             }
             .padding(20)
         }
-        .navigationTitle("便便")
+        .navigationTitle("")
     }
 
     private var scoopOverviewSheet: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                poopOverviewHero(icon: "trash.fill", title: "铲屎总览", subtitle: scoopSubtitle, tint: scoopTint)
                 poopOverviewRangePicker(tint: scoopTint)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                     poopOverviewMetric(title: "今日", value: todayLitterLogs.isEmpty ? "未完成" : "已完成", icon: "checkmark.seal.fill", tint: scoopTint)
@@ -985,10 +1100,10 @@ struct QuickPottyDetailSheet: View {
                 )
                 HStack(spacing: 10) {
                     PoopPrimaryButton(title: scoopPrimaryTitle == "已完成" ? "今天已完成" : scoopPrimaryTitle, icon: "checkmark", tint: scoopTint, isDisabled: scoopPrimaryTitle == "已完成") {
-                        activeSheet = .scoopCheckIn
+                        openPottySheet(.scoopCheckIn)
                     }
                     Button {
-                        activeSheet = .scoopSettings
+                        openPottySheet(.scoopSettings)
                     } label: {
                         Label("管理", systemImage: "slider.horizontal.3")
                             .font(.system(size: 14, weight: .black, design: .rounded))
@@ -1012,13 +1127,12 @@ struct QuickPottyDetailSheet: View {
             }
             .padding(20)
         }
-        .navigationTitle("铲屎")
+        .navigationTitle("")
     }
 
     private var litterOverviewSheet: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                poopOverviewHero(icon: "tray.full.fill", title: "猫砂总览", subtitle: litterChangeSubtitle, tint: litterTint)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                     poopOverviewMetric(title: "周期", value: "\(litterChangeIntervalDays)天", icon: "repeat", tint: litterTint)
                     poopOverviewMetric(title: "下次", value: dueText(daysUntil: daysUntilLitterChange), icon: "calendar", tint: daysUntilLitterChange < 0 ? Color.goRed : litterTint)
@@ -1026,10 +1140,10 @@ struct QuickPottyDetailSheet: View {
                 poopProgressBlock(title: "换砂周期", elapsed: litterElapsedDays, interval: litterChangeIntervalDays, tint: litterTint)
                 HStack(spacing: 10) {
                     PoopPrimaryButton(title: litterPrimaryTitle, icon: "arrow.2.circlepath", tint: litterTint) {
-                        activeSheet = .litterChangeCheckIn
+                        openPottySheet(.litterChangeCheckIn)
                     }
                     Button {
-                        activeSheet = .litterSettings
+                        openPottySheet(.litterSettings)
                     } label: {
                         Label("管理", systemImage: "slider.horizontal.3")
                             .font(.system(size: 14, weight: .black, design: .rounded))
@@ -1045,18 +1159,17 @@ struct QuickPottyDetailSheet: View {
             }
             .padding(20)
         }
-        .navigationTitle("猫砂")
+        .navigationTitle("")
     }
 
     private var litterHistorySheet: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                poopOverviewHero(icon: "tray.full.fill", title: "换砂历史", subtitle: litterChangeSubtitle, tint: litterTint)
                 litterHistorySheetContent
             }
             .padding(20)
         }
-        .navigationTitle("换砂历史")
+        .navigationTitle("")
     }
 
     @ViewBuilder
@@ -1133,6 +1246,49 @@ struct QuickPottyDetailSheet: View {
         }
     }
 
+    @ViewBuilder
+    private func pottySheetTopChrome(_ sheet: ActiveSheet) -> some View {
+        HStack(spacing: 12) {
+            pottySheetChromeTitle(sheet)
+            Spacer(minLength: 12)
+            OhanaPopupCloseButton(tint: Color.ohanaPrimaryText) {
+                closeActivePottySheet()
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
+    }
+
+    @ViewBuilder
+    private func pottySheetChromeTitle(_ sheet: ActiveSheet) -> some View {
+        switch sheet {
+        case .pottyOverview:
+            pottySheetChromeTitleContent(icon: "seal.fill", title: "便便总览", tint: pottyTint)
+        case .scoopOverview:
+            pottySheetChromeTitleContent(icon: "trash.fill", title: "铲屎总览", tint: scoopTint)
+        case .litterOverview:
+            pottySheetChromeTitleContent(icon: "tray.full.fill", title: "猫砂总览", tint: litterTint)
+        case .litterHistory:
+            pottySheetChromeTitleContent(icon: "tray.full.fill", title: "换砂历史", tint: litterTint)
+        default:
+            EmptyView()
+        }
+    }
+
+    private func pottySheetChromeTitleContent(icon: String, title: String, tint: Color) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .black))
+                .foregroundStyle(tint)
+                .frame(width: 30, height: 34)
+            Text(title)
+                .font(.system(size: 18, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
     private func poopOverviewMetric(title: String, value: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
@@ -1169,23 +1325,31 @@ struct QuickPottyDetailSheet: View {
                 emptyInlineState(icon: "chart.line.uptrend.xyaxis", text: emptyText)
                     .frame(height: 160)
             } else {
-                Chart(points) { point in
+                let yDomain = OhanaChartStyle.yDomain(values: points.map(\.value), includeZero: true)
+                let renderedPoints = points.map {
+                    PoopChartPoint(date: $0.date, value: $0.value * overviewChartProgress)
+                }
+                Chart(renderedPoints) { point in
                     AreaMark(
                         x: .value("Day", point.date),
-                        y: .value("Value", point.value * overviewChartProgress)
+                        y: .value("Value", point.value)
                     )
-                    .foregroundStyle(LinearGradient(colors: [tint.opacity(0.32), tint.opacity(0.04)], startPoint: .top, endPoint: .bottom))
+                    .foregroundStyle(OhanaChartStyle.areaGradient(for: tint, topOpacity: 0.26))
+                    .interpolationMethod(OhanaChartStyle.trendInterpolation)
+
                     LineMark(
                         x: .value("Day", point.date),
-                        y: .value("Value", point.value * overviewChartProgress)
+                        y: .value("Value", point.value)
                     )
-                    .interpolationMethod(.catmullRom)
+                    .interpolationMethod(OhanaChartStyle.trendInterpolation)
                     .foregroundStyle(tint)
-                    .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                    .lineStyle(OhanaChartStyle.trendLineStyle)
                 }
+                .chartYScale(domain: yDomain)
                 .chartXAxis(.hidden)
                 .chartYAxis(.hidden)
                 .frame(height: 160)
+                .animation(GoMotion.page, value: overviewChartProgress)
             }
         }
         .padding(.vertical, 8)
@@ -1404,6 +1568,8 @@ struct QuickPottyDetailSheet: View {
         )
         let delta = reward.humanGot + reward.petGot
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+        pottyFeedbackToken = CheckInFeedbackToken(kind: .gain, deltaText: "+1", tint: pottyTint)
+        scheduleFeedbackClear()
         showSaveConfirmation(delta > 0 ? "\(type.emoji) +\(delta)🥥" : "已记录便便")
     }
 
@@ -1428,6 +1594,8 @@ struct QuickPottyDetailSheet: View {
         syncScoopPlan(showToast: false)
         let delta = reward.humanGot + reward.petGot
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+        scoopFeedbackToken = CheckInFeedbackToken(kind: .done, deltaText: "✓", tint: scoopTint)
+        scheduleFeedbackClear()
         showSaveConfirmation(delta > 0 ? "铲屎 +\(delta)🥥" : "已记录铲屎")
     }
 
@@ -1450,7 +1618,22 @@ struct QuickPottyDetailSheet: View {
         syncScoopPlan(showToast: false)
         syncLitterChangePlan(showToast: false)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+        litterFeedbackToken = CheckInFeedbackToken(kind: .done, deltaText: "✓", tint: litterTint)
+        scheduleFeedbackClear()
         showSaveConfirmation("已记录换砂")
+    }
+
+    private func scheduleFeedbackClear() {
+        feedbackClearTask?.cancel()
+        feedbackClearTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_250_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(GoMotion.quick) {
+                pottyFeedbackToken = nil
+                scoopFeedbackToken = nil
+                litterFeedbackToken = nil
+            }
+        }
     }
 
     private func deleteItem(_ item: PoopLogItem) {

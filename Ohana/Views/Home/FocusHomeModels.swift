@@ -84,7 +84,7 @@ struct FunctionMenuPresentation: Identifiable {
 }
 
 extension FocusCard {
-    static func from(_ pet: Pet) -> FocusCard {
+    static func from(_ pet: Pet, includeAvatarData: Bool = true) -> FocusCard {
         let isDog = pet.species.contains("狗") || pet.species.lowercased().contains("dog")
         let isCat = pet.species.contains("猫") || pet.species.lowercased().contains("cat")
         let isFish = pet.species.contains("鱼") || pet.species.lowercased().contains("fish")
@@ -146,7 +146,7 @@ extension FocusCard {
             humanEquivalentAgeText: pet.birthday.map { pet.humanEquivalentAgeTextForWallet(birthday: $0, l: l) },
             genderText: pet.genderSymbol + (pet.isNeutered ? l.tr(zh: " 已绝育", en: " neutered", de: " kastriert") : ""),
             personalityHint: PetTagGreeting.homeSubtitleHint(pet: pet, hour: hour, l: L10n(language)),
-            avatarImageData: pet.avatarImageData,
+            avatarImageData: includeAvatarData ? pet.avatarImageData : nil,
             petSpecies: pet.species,
             coatColor: WalletPetCardTheme.silhouetteCoatColor(for: pet),
             eyeColor: WalletPetCardTheme.silhouetteEyeColor(for: pet),
@@ -162,7 +162,7 @@ extension FocusCard {
         )
     }
 
-    static func from(_ human: Human) -> FocusCard {
+    static func from(_ human: Human, includeAvatarData: Bool = true) -> FocusCard {
         let hex = human.safeThemeColorHex
         let days = human.hasPassedAway
             ? human.daysTogetherAtPassing
@@ -188,7 +188,7 @@ extension FocusCard {
             zodiacText: human.birthday.map { Human.westernZodiacDisplay(for: $0, isEnglish: usesEnglishFallback) },
             mbtiText: human.mbti.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : human.mbti.uppercased(),
             genderText: HumanGenderIdentity.title(for: human.genderRaw),
-            avatarImageData: human.avatarImageData,
+            avatarImageData: includeAvatarData ? human.avatarImageData : nil,
             humanGender: human.genderRaw,
             themeColorHex: hex,
             daysTogether: days,

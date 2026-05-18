@@ -71,6 +71,7 @@ struct HumanMedicationView: View {
     private var controlFill: Color { Color.ohanaControlFill }
     private var l: L10n { L10n(appLanguage) }
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
+    private var isViewingOwnProfile: Bool { activeHumanId == human.id }
     private var isPrivacyLocked: Bool { human.isPrivate(.medication, viewedBy: activeHumanId) }
 
     private var todayLogs: [HumanMedicationLog] {
@@ -156,27 +157,7 @@ struct HumanMedicationView: View {
                 medicationContent
             }
         }
-        .navigationTitle(l.tr(zh: "吃药提醒", en: "Medication", de: "Medikamente"))
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            // 隐私开关（leading）
-            ToolbarItem(placement: .topBarLeading) {
-                HumanPrivacyToggleButton(human: human, field: .medication)
-            }
-            if showsDoneButton {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 15, weight: .black))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-                }
-            }
-        }
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showAddSheet) {
             AddMedicationSheet(human: human)
                 .presentationBackground(.clear)
@@ -317,30 +298,13 @@ struct HumanMedicationView: View {
 
     // MARK: - Human Identity Header
     private var humanIdentityHeader: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color(hex: human.themeColorHex).opacity(0.18))
-                    .frame(width: 48, height: 48)
-                if let data = human.avatarImageData, let img = UIImage(data: data) {
-                    Image(uiImage: img)
-                        .resizable().scaledToFill()
-                        .frame(width: 48, height: 48)
-                        .clipShape(Circle())
-                } else {
-                    Text(human.avatarEmoji).font(.system(size: 24))
-                }
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(human.name)
-                    .font(OhanaFont.headline(.bold))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(l.tr(zh: "用药管理", en: "Medication", de: "Medikamente"))
-                    .font(OhanaFont.caption())
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
-            Spacer()
-            // 今日完成进度
+        HumanModulePageHeader(
+            human: human,
+            title: l.tr(zh: "用药管理", en: "Medication", de: "Medikamente"),
+            subtitle: human.name,
+            showsCloseButton: showsDoneButton,
+            onClose: { dismiss() }
+        ) {
             let todayTotal = todayScheduleItems.count
             let todayDone  = todayScheduleItems.filter { $0.log?.status == .taken }.count
             if todayTotal > 0 {
@@ -353,28 +317,33 @@ struct HumanMedicationView: View {
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
+            if isViewingOwnProfile {
+                HumanPrivacyToggleButton(human: human, field: .medication)
+            }
         }
-        .padding(14)
     }
 
     private var privacyLockedView: some View {
         ZStack {
             OhanaAppBackground().ignoresSafeArea()
-            VStack(spacing: 12) {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(Color.goYellow)
-                Text(l.tr(zh: "吃药提醒仅本人可见", en: "Medication is private", de: "Medikamente sind privat"))
-                    .font(OhanaFont.title3(.black))
-                    .foregroundStyle(primaryText)
-                Text(l.tr(zh: "当前家庭成员无权查看用药计划、剂量和服药记录。", en: "This household member cannot view medication plans, doses, or logs.", de: "Dieses Haushaltsmitglied kann Medikamentenpläne, Dosen oder Protokolle nicht sehen."))
-                    .font(OhanaFont.callout())
-                    .foregroundStyle(secondaryText)
-                    .multilineTextAlignment(.center)
+            VStack(spacing: 20) {
+                HumanModulePageHeader(
+                    human: human,
+                    title: l.tr(zh: "用药管理", en: "Medication", de: "Medikamente"),
+                    subtitle: human.name,
+                    showsCloseButton: showsDoneButton,
+                    onClose: { dismiss() }
+                )
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+
+                Spacer(minLength: 16)
+                HumanModulePrivacyLockedView(
+                    title: l.tr(zh: "吃药提醒仅本人可见", en: "Medication is private", de: "Medikamente sind privat"),
+                    message: l.tr(zh: "当前家庭成员无权查看用药计划、剂量和服药记录。", en: "This household member cannot view medication plans, doses, or logs.", de: "Dieses Haushaltsmitglied kann Medikamentenpläne, Dosen oder Protokolle nicht sehen.")
+                )
+                Spacer()
             }
-            .padding(24)
-            .ohanaStandardCard(cornerRadius: 24)
-            .padding(.horizontal, 24)
         }
     }
 

@@ -283,7 +283,7 @@ struct IslandWealthDashboardView: View {
                             endPoint: .bottom
                         )
                     )
-                    .interpolationMethod(.catmullRom)
+                    .interpolationMethod(OhanaChartStyle.trendInterpolation)
 
                     LineMark(
                         x: .value("时间", point.bucket, unit: unit),
@@ -291,7 +291,7 @@ struct IslandWealthDashboardView: View {
                     )
                     .foregroundStyle(accent)
                     .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                    .interpolationMethod(.catmullRom)
+                    .interpolationMethod(OhanaChartStyle.trendInterpolation)
                 }
             }
             .frame(height: 150)

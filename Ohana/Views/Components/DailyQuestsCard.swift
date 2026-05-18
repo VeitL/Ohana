@@ -23,6 +23,9 @@ struct IslandQuest: Identifiable, Equatable {
 // MARK: - Quest Engine
 struct IslandQuestEngine {
     private static let initialHumanWeightRecordedPrefix = "ohana.initialHumanWeightRecorded."
+    static let oasisPetWizardQuestId = "q_oasis_pet_wizard"
+    static let oasisFirstMealQuestId = "q_oasis_first_meal"
+    static let oasisThemeQuestId = "q_oasis_theme_color"
 
     static func todayQuests(
         pets: [Pet],
@@ -64,6 +67,11 @@ struct IslandQuestEngine {
             if !quests.contains(where: { $0.id == quest.id }) {
                 quests.append(quest)
             }
+        }
+
+        for quest in oasisBuildQuests(activePets: activePets, humans: humans) {
+            guard quests.count < 3 else { break }
+            quests.append(quest)
         }
 
         if quests.count < 3,
@@ -194,6 +202,18 @@ struct IslandQuestEngine {
         return UUID(uuidString: String(id.dropFirst(prefix.count)))
     }
 
+    static func isInitialHumanWeightRecordedToday(
+        humanId: UUID,
+        calendar: Calendar = .current,
+        now: Date = Date()
+    ) -> Bool {
+        hasInitialHumanWeightRecordedToday(humanId: humanId, calendar: calendar, now: now)
+    }
+
+    static func isOasisBuildQuest(_ id: String) -> Bool {
+        id == oasisPetWizardQuestId || id == oasisFirstMealQuestId || id == oasisThemeQuestId
+    }
+
     private enum RoutineKind {
         case feeding
         case watering
@@ -230,6 +250,51 @@ struct IslandQuestEngine {
             break
         }
         return fallback
+    }
+
+    private static func oasisBuildQuests(activePets: [Pet], humans: [Human]) -> [IslandQuest] {
+        let manager = QuestManager.shared
+        var quests: [IslandQuest] = []
+        let hasAnyMember = !activePets.isEmpty || !humans.isEmpty
+
+        if !manager.isPetWizardCompleted && activePets.isEmpty {
+            let needsFirstHuman = humans.isEmpty
+            quests.append(IslandQuest(
+                id: oasisPetWizardQuestId,
+                emoji: needsFirstHuman ? "👤" : "🐾",
+                title: needsFirstHuman ? "迎接第一位家人" : "迎接第一只宠物",
+                subtitle: needsFirstHuman ? "先建立照护者身份" : "让第一位伙伴住进岛屿 · +50🥥",
+                isCompleted: false,
+                targetPetId: nil,
+                targetPlantId: nil
+            ))
+        }
+
+        if !manager.isFirstMealRecorded && !activePets.isEmpty {
+            quests.append(IslandQuest(
+                id: oasisFirstMealQuestId,
+                emoji: "🍗",
+                title: "记录第一顿美餐",
+                subtitle: "完成一次喂食，让岛屿开始运转 · +15🥥",
+                isCompleted: false,
+                targetPetId: nil,
+                targetPlantId: nil
+            ))
+        }
+
+        if !manager.isThemeColorSet && hasAnyMember {
+            quests.append(IslandQuest(
+                id: oasisThemeQuestId,
+                emoji: "🎨",
+                title: "设置主题颜色",
+                subtitle: "给家人或宠物一个专属视觉身份 · +10🥥",
+                isCompleted: false,
+                targetPetId: nil,
+                targetPlantId: nil
+            ))
+        }
+
+        return quests
     }
 
     private static func preferredHumanForWeight(
@@ -520,8 +585,10 @@ struct IslandQuestEngine {
 // MARK: - Coconut Drop Sheet
 struct CoconutDropSheet: View {
     @Binding var isPresented: Bool
+    @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var revealed = false
     @State private var bounce = false
+    @State private var isVisible = false
 
     private let rewards: [(emoji: String, text: String)] = [
         ("🥥", "今日解锁：椰子咖啡主题"),
@@ -535,6 +602,9 @@ struct CoconutDropSheet: View {
         // 用今日日期做种子，保证同天拿到同一个奖励
         let day = Calendar.current.ordinality(of: .day, in: .year, for: Date()) ?? 1
         return rewards[day % rewards.count]
+    }
+    private var shouldAnimate: Bool {
+        workloadPolicy.shouldAnimate(isVisible: isVisible)
     }
 
     var body: some View {
@@ -564,8 +634,7 @@ struct CoconutDropSheet: View {
                             .frame(width: 120, height: 120)
                             .shadow(color: Color(hex: "A8711A").opacity(0.5), radius: 20, y: 8)
                             .scaleEffect(bounce ? 1.08 : 1.0)
-                            .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: bounce)
-                            .onAppear { bounce = true }
+                            .animation(shouldAnimate ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true) : nil, value: bounce)
 
                         Text(revealed ? reward.emoji : "🥥")
                             .font(.system(size: 52))
@@ -605,6 +674,17 @@ struct CoconutDropSheet: View {
 
                 Spacer()
             }
+        }
+        .onAppear {
+            isVisible = true
+            bounce = shouldAnimate
+        }
+        .onDisappear {
+            isVisible = false
+            bounce = false
+        }
+        .onChange(of: shouldAnimate) { _, canAnimate in
+            bounce = canAnimate
         }
     }
 }
@@ -727,13 +807,13 @@ struct DailyQuestsCard: View {
                 // 动态进度文案
                 Group {
                     if allDone {
-                        Text("✅ 今日委托全部完成！")
+                        Text("✅ 完成")
                             .foregroundStyle(Color.goPrimary)
                     } else if quests.isEmpty {
-                        Text("🌴 今天岛上很平静")
+                        Text("🌴 清空")
                             .foregroundStyle(Color.secondary)
                     } else {
-                        Text("⚔️ 还有 \(remaining) 个委托等你")
+                        Text("\(remaining)")
                             .foregroundStyle(Color.goYellow)
                     }
                 }
@@ -760,7 +840,7 @@ struct DailyQuestsCard: View {
                                 .font(.system(size: 14, weight: .bold, design: .rounded))
                                 .foregroundStyle(coconutClaimed ? .white.opacity(0.4) : Color.arkInk)
                             if !coconutClaimed {
-                                Text("完成所有委托的专属奖励 · 全勤额外 +5🥥")
+                                Text("+5🥥")
                                     .font(.system(size: 11, weight: .medium))
                                     .foregroundStyle(Color.arkInk.opacity(0.6))
                             }

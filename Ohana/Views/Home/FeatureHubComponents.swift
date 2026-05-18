@@ -187,14 +187,9 @@ struct FeatureHubSectionView<Destination: Hashable>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(section.title)
-                    .font(OhanaFont.headline(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(section.subtitle)
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
+            Text(section.title)
+                .font(OhanaFont.headline(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
 
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                 ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
@@ -215,14 +210,9 @@ struct FeatureHubSectionActionView<Destination: Hashable>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(section.title)
-                    .font(OhanaFont.headline(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(section.subtitle)
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
+            Text(section.title)
+                .font(OhanaFont.headline(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
 
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                 ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
@@ -267,7 +257,7 @@ private struct FeatureHubTile: View {
                 Text(data.subtitle)
                     .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(2)
+                    .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
         }

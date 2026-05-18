@@ -15,6 +15,7 @@ struct CoconutShopView: View {
     @AppStorage("shop_equipped_title") private var equippedTitle = ""
     @AppStorage("shop_equip_fx_lime_glow") private var equipFxLimeGlow = false
     @AppStorage("shop_equip_fx_rainbow") private var equipFxRainbow = false
+    @AppStorage("shop_equip_fx_rainbow_poop") private var equipFxRainbowPoop = false
     @AppStorage("shop_equip_fx_stars") private var equipFxStars = false
     @AppStorage("shop_equip_fx_firework") private var equipFxFirework = false
     @AppStorage(AppIconCatalog.selectedIconKey) private var selectedAppIcon = AppIconCatalog.defaultItemId
@@ -428,7 +429,7 @@ struct CoconutShopView: View {
         } label: {
             VStack(alignment: .leading, spacing: 10) {
                 itemPreview(item)
-                    .frame(height: item.category == .appIcon ? 108 : 72)
+                    .frame(height: previewHeight(for: item))
                     .frame(maxWidth: .infinity)
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -460,7 +461,9 @@ struct CoconutShopView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                     Spacer()
-                    if state.showCost {
+                    if item.isPurchased, isToggleableEffect(item) {
+                        shopTogglePill(isOn: state.isEquipped)
+                    } else if state.showCost {
                         Text("🥥 \(item.cost)")
                             .font(OhanaFont.caption(.black))
                             .foregroundStyle(canAfford(item) ? Color.goYellow : tertiaryText)
@@ -468,7 +471,7 @@ struct CoconutShopView: View {
                 }
             }
             .padding(12)
-            .frame(maxWidth: .infinity, minHeight: item.category == .appIcon ? 214 : 176, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: item.category == .appIcon ? 214 : 198, alignment: .topLeading)
             .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -487,23 +490,24 @@ struct CoconutShopView: View {
         if let icon = item.appIcon {
             AppIconPreview(descriptor: icon, isSelected: itemState(item).isEquipped)
         } else {
-            ZStack {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(previewTint(for: item).opacity(colorScheme == .dark ? 0.22 : 0.16))
-                Text(item.emoji)
-                    .font(.system(size: 38))
-            }
+            ShopAppliedPreview(
+                item: item,
+                human: currentHuman,
+                pet: pets.first,
+                isEquipped: itemState(item).isEquipped,
+                appLanguage: appLanguage
+            )
         }
     }
 
-    private func previewTint(for item: ShopItem) -> Color {
+    private func previewHeight(for item: ShopItem) -> CGFloat {
         switch item.category {
-        case .appIcon: return Color.goPrimary
-        case .avatar2d: return Color.goTeal
-        case .cashExchange: return Color.goYellow
-        case .effect: return Color.goPurple
-        case .title_: return Color.goYellow
-        case .boost: return Color.goOrange
+        case .appIcon:
+            return 108
+        case .avatar2d, .effect, .title_, .boost:
+            return 96
+        case .cashExchange:
+            return 92
         }
     }
 
@@ -1158,7 +1162,7 @@ struct CoconutShopView: View {
         switch item.id {
         case "boost_tree", "boost_tree_large":
             OasisTreeManager.shared.injectedEnergy += item.id == "boost_tree_large" ? 110 : 30
-            OasisTreeManager.shared.checkAndRewardLevelUp()
+            OasisTreeManager.shared.checkAndRewardLevelUp(modelContext: modelContext)
         case "boost_double":
             UserDefaults.standard.set(true, forKey: "shop_boostDoubleActive")
         case "boost_streak":
@@ -1180,6 +1184,8 @@ struct CoconutShopView: View {
             equipFxLimeGlow = true
         case "fx_rainbow":
             equipFxRainbow = true
+        case "fx_rainbow_poop":
+            equipFxRainbowPoop = true
         case "fx_stars":
             equipFxStars = true
         case "fx_firework":
@@ -1198,6 +1204,8 @@ struct CoconutShopView: View {
             equipFxLimeGlow.toggle()
         case "fx_rainbow":
             equipFxRainbow.toggle()
+        case "fx_rainbow_poop":
+            equipFxRainbowPoop.toggle()
         case "fx_stars":
             equipFxStars.toggle()
         case "fx_firework":
@@ -1218,6 +1226,8 @@ struct CoconutShopView: View {
             return equipFxLimeGlow ? l.tr(zh: "已启用", en: "On", de: "Aktiv") : l.tr(zh: "未启用", en: "Off", de: "Aus")
         case "fx_rainbow":
             return equipFxRainbow ? l.tr(zh: "已启用", en: "On", de: "Aktiv") : l.tr(zh: "未启用", en: "Off", de: "Aus")
+        case "fx_rainbow_poop":
+            return equipFxRainbowPoop ? l.tr(zh: "已启用", en: "On", de: "Aktiv") : l.tr(zh: "未启用", en: "Off", de: "Aus")
         case "fx_stars":
             return equipFxStars ? l.tr(zh: "已启用", en: "On", de: "Aktiv") : l.tr(zh: "未启用", en: "Off", de: "Aus")
         case "fx_firework":
@@ -1235,11 +1245,35 @@ struct CoconutShopView: View {
         switch item.id {
         case "fx_lime_glow": return equipFxLimeGlow
         case "fx_rainbow": return equipFxRainbow
+        case "fx_rainbow_poop": return equipFxRainbowPoop
         case "fx_stars": return equipFxStars
         case "fx_firework": return equipFxFirework
         case "title_guardian", "title_pioneer", "title_chef": return equippedTitle == item.id
         default: return false
         }
+    }
+
+    private func isToggleableEffect(_ item: ShopItem) -> Bool {
+        switch item.id {
+        case "fx_lime_glow", "fx_rainbow", "fx_rainbow_poop", "fx_stars", "fx_firework":
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func shopTogglePill(isOn: Bool) -> some View {
+        Capsule()
+            .fill(isOn ? Color.goPrimary : Color.ohanaControlFill)
+            .frame(width: 46, height: 26)
+            .overlay(alignment: isOn ? .trailing : .leading) {
+                Circle()
+                    .fill(isOn ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.58))
+                    .frame(width: 18, height: 18)
+                    .padding(.horizontal, 4)
+            }
+            .animation(GoMotion.selection, value: isOn)
+            .accessibilityLabel(isOn ? l.tr(zh: "已启用", en: "On", de: "Aktiv") : l.tr(zh: "未启用", en: "Off", de: "Aus"))
     }
 
     private func activeConsumableStatus(for item: ShopItem) -> String? {
@@ -1321,36 +1355,476 @@ struct CoconutShopView: View {
     }
 }
 
+private struct ShopAppliedPreview: View {
+    let item: ShopItem
+    let human: Human?
+    let pet: Pet?
+    let isEquipped: Bool
+    let appLanguage: String
+
+    @State private var animate = false
+
+    private var l: L10n { L10n(appLanguage) }
+    private var accent: Color {
+        switch item.category {
+        case .appIcon: return Color.goPrimary
+        case .avatar2d: return Color.goTeal
+        case .cashExchange: return Color.goYellow
+        case .effect: return Color.goPurple
+        case .title_: return Color.goYellow
+        case .boost: return Color.goOrange
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            accent.opacity(0.22),
+                            Color.ohanaControlFill,
+                            Color.ohanaCardSurface
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            switch item.category {
+            case .avatar2d:
+                avatarPassPreview
+            case .effect:
+                effectPreview
+            case .title_:
+                titlePreview
+            case .boost:
+                boostPreview
+            case .cashExchange:
+                cashPreview
+            case .appIcon:
+                EmptyView()
+            }
+
+            if isEquipped {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 16, weight: .black))
+                    .foregroundStyle(Color.goPrimary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(10)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .onAppear {
+            withAnimation(GoMotion.page) {
+                animate = true
+            }
+        }
+    }
+
+    private var avatarPassPreview: some View {
+        HStack(spacing: 9) {
+            VStack(spacing: 3) {
+                memberAvatar(size: 36)
+                Text(l.tr(zh: "当前", en: "Now", de: "Jetzt"))
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(Color.ohanaTertiaryText)
+            }
+            Image(systemName: "arrow.right")
+                .font(.system(size: 12, weight: .black))
+                .foregroundStyle(accent)
+            VStack(spacing: 3) {
+                ZStack(alignment: .bottom) {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(accent.opacity(0.18))
+                        .frame(width: 48, height: 42)
+                    petAvatar(size: 54)
+                        .offset(y: animate ? -4 : 2)
+                }
+                Text("2.5D")
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(accent)
+            }
+        }
+        .padding(.horizontal, 12)
+    }
+
+    @ViewBuilder
+    private var effectPreview: some View {
+        switch item.id {
+        case "fx_popout_card":
+            popoutCardPreview
+        case "fx_lime_glow":
+            limeGlowPreview
+        case "fx_rainbow":
+            rainbowRoutePreview
+        case "fx_rainbow_poop":
+            rainbowPoopPreview
+        case "fx_stars":
+            stardustPreview
+        case "fx_firework":
+            fireworkPreview
+        default:
+            stardustPreview
+        }
+    }
+
+    private var popoutCardPreview: some View {
+        ZStack(alignment: .bottomLeading) {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(hex: pet?.safeThemeColorHex ?? "5A67D8").opacity(0.34))
+                .frame(height: 58)
+                .padding(.horizontal, 14)
+                .padding(.bottom, 10)
+            petAvatar(size: 78)
+                .offset(x: 22, y: animate ? -13 : -4)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(pet?.name ?? l.tr(zh: "宠物", en: "Pet", de: "Tier"))
+                    .font(OhanaFont.caption(.black))
+                Text(l.tr(zh: "破框悬浮", en: "Popout", de: "Popout"))
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+            .foregroundStyle(Color.ohanaPrimaryText)
+            .padding(.leading, 86)
+            .padding(.bottom, 24)
+        }
+    }
+
+    private var limeGlowPreview: some View {
+        HStack(spacing: 10) {
+            petAvatar(size: 50)
+                .padding(5)
+                .background(Color.goPrimary.opacity(0.22), in: Circle())
+                .overlay {
+                    Circle()
+                        .strokeBorder(Color.goPrimary.opacity(animate ? 0.82 : 0.28), lineWidth: 2)
+                        .scaleEffect(animate ? 1.10 : 0.88)
+                }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(l.tr(zh: "打卡完成", en: "Check-in done", de: "Check-in fertig"))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text("+2🥥")
+                    .font(OhanaFont.metric(size: 20, .black))
+                    .foregroundStyle(Color.goPrimary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+    }
+
+    private var rainbowRoutePreview: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "figure.walk")
+                    .font(.system(size: 14, weight: .black))
+                    .foregroundStyle(Color.goPrimary)
+                Text(l.tr(zh: "遛狗路线", en: "Walk route", de: "Gassi-Route"))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Spacer()
+                Text("1.8 km")
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+            HStack(spacing: 0) {
+                ForEach([Color.goRed, .goOrange, .goYellow, .goTeal, .goPurple], id: \.description) { color in
+                    Capsule()
+                        .fill(color)
+                        .frame(height: 7)
+                        .scaleEffect(x: animate ? 1 : 0.45, anchor: .leading)
+                }
+            }
+            .clipShape(Capsule())
+        }
+        .padding(.horizontal, 16)
+    }
+
+    private var rainbowPoopPreview: some View {
+        HStack(spacing: 12) {
+            RainbowPoopPin(isRainbow: true, isFlowing: animate, size: 38)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(l.tr(zh: "路线事件", en: "Route event", de: "Routenereignis"))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text(l.tr(zh: "便便标记发光", en: "Poop marker glows", de: "Kotmarker leuchtet"))
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+    }
+
+    private var stardustPreview: some View {
+        ZStack {
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 28, weight: .black))
+                    .foregroundStyle(Color.goPrimary)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(l.tr(zh: "每日委托", en: "Daily quest", de: "Tagesquest"))
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(l.tr(zh: "星尘反馈", en: "Stardust feedback", de: "Sternenstaub"))
+                        .font(OhanaFont.caption2(.bold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+
+            ForEach(0..<5, id: \.self) { index in
+                Image(systemName: index.isMultiple(of: 2) ? "sparkle" : "star.fill")
+                    .font(.system(size: 9 + CGFloat(index), weight: .black))
+                    .foregroundStyle(index.isMultiple(of: 2) ? Color.goYellow : Color.goPurple)
+                    .offset(x: CGFloat(index * 18 - 26), y: animate ? CGFloat(-22 + index * 3) : 4)
+                    .opacity(animate ? 1 : 0)
+            }
+        }
+    }
+
+    private var fireworkPreview: some View {
+        ZStack {
+            VStack(spacing: 4) {
+                Image(systemName: "rosette")
+                    .font(.system(size: 34, weight: .black))
+                    .foregroundStyle(Color.goYellow)
+                    .scaleEffect(animate ? 1 : 0.72)
+                Text(l.tr(zh: "里程碑庆典", en: "Milestone", de: "Meilenstein"))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+            }
+            ForEach(0..<8, id: \.self) { index in
+                Circle()
+                    .fill([Color.goYellow, .goOrange, .goPurple, .goTeal][index % 4])
+                    .frame(width: 5, height: 5)
+                    .offset(
+                        x: animate ? cos(CGFloat(index) * .pi / 4) * 42 : 0,
+                        y: animate ? sin(CGFloat(index) * .pi / 4) * 28 : 0
+                    )
+            }
+        }
+    }
+
+    private var titlePreview: some View {
+        HStack(spacing: 10) {
+            memberAvatar(size: 42)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(human?.name ?? l.tr(zh: "当前用户", en: "Current user", de: "Aktueller Nutzer"))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
+                Text(item.name(l))
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(Color.arkInk)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .background(Color.goYellow, in: Capsule())
+                    .scaleEffect(animate ? 1 : 0.86)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+    }
+
+    @ViewBuilder
+    private var boostPreview: some View {
+        switch item.id {
+        case "boost_double":
+            rewardBoostPreview(from: "+2🥥", to: "+4🥥", icon: "bolt.fill")
+        case "boost_streak":
+            streakShieldPreview
+        case "boost_tree", "boost_tree_large":
+            treeEnergyPreview
+        case "boost_backdate_single", "boost_backdate_pack":
+            backdatePreview
+        default:
+            rewardBoostPreview(from: "+2🥥", to: "+4🥥", icon: "bolt.fill")
+        }
+    }
+
+    private func rewardBoostPreview(from: String, to: String, icon: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 24, weight: .black))
+                .foregroundStyle(Color.goOrange)
+                .frame(width: 38, height: 38)
+                .background(Color.goOrange.opacity(0.16), in: Circle())
+            Text(from)
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(Color.ohanaSecondaryText)
+            Image(systemName: "arrow.right")
+                .font(.system(size: 11, weight: .black))
+                .foregroundStyle(Color.ohanaTertiaryText)
+            Text(to)
+                .font(OhanaFont.metric(size: 21, .black))
+                .foregroundStyle(Color.goYellow)
+                .contentTransition(.numericText())
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+    }
+
+    private var streakShieldPreview: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Image(systemName: "shield.fill")
+                    .foregroundStyle(Color.goTeal)
+                Text(l.tr(zh: "连击保护", en: "Streak shield", de: "Streak-Schutz"))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Spacer()
+            }
+            HStack(spacing: 5) {
+                ForEach(0..<7, id: \.self) { index in
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(index == 4 ? Color.goTeal : Color.goPrimary.opacity(0.72))
+                        .frame(height: 18)
+                        .overlay {
+                            if index == 4 {
+                                Image(systemName: "shield.fill")
+                                    .font(.system(size: 8, weight: .black))
+                                    .foregroundStyle(Color.arkInk)
+                            }
+                        }
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+    }
+
+    private var treeEnergyPreview: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "tree.fill")
+                .font(.system(size: 30, weight: .black))
+                .foregroundStyle(Color.goTeal)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(l.tr(zh: "生命树能量", en: "Tree energy", de: "Baumenergie"))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.ohanaCardSurface)
+                        Capsule()
+                            .fill(Color.goPrimary)
+                            .frame(width: proxy.size.width * (animate ? 0.72 : 0.36))
+                    }
+                }
+                .frame(height: 9)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+    }
+
+    private var backdatePreview: some View {
+        HStack(spacing: 10) {
+            VStack(spacing: 2) {
+                Text(l.tr(zh: "昨天", en: "Yest.", de: "Gest."))
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(Color.ohanaTertiaryText)
+                Text("✓")
+                    .font(OhanaFont.metric(size: 24, .black))
+                    .foregroundStyle(Color.goPrimary)
+            }
+            .frame(width: 54, height: 58)
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(l.tr(zh: "补签入库", en: "Backdate pass", de: "Nachtragspass"))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text(item.id == "boost_backdate_pack" ? "×3" : "×1")
+                    .font(OhanaFont.metric(size: 22, .black))
+                    .foregroundStyle(Color.goYellow)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+    }
+
+    private var cashPreview: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "banknote.fill")
+                .font(.system(size: 28, weight: .black))
+                .foregroundStyle(Color.goYellow)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("1000🥥 → \(CoconutExchangeOption.options().dropFirst().first?.formattedAmount ?? "$1")")
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text(l.tr(zh: "家庭线下确认", en: "Offline confirm", de: "Offline bestätigen"))
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+    }
+
+    @ViewBuilder
+    private func memberAvatar(size: CGFloat) -> some View {
+        if let human, let data = human.avatarImageData, let image = UIImage(data: data) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: size, height: size)
+                .clipShape(Circle())
+        } else {
+            Text(human?.avatarEmoji ?? "👤")
+                .font(.system(size: size * 0.58))
+                .frame(width: size, height: size)
+                .background(Color.ohanaCardSurface, in: Circle())
+        }
+    }
+
+    @ViewBuilder
+    private func petAvatar(size: CGFloat) -> some View {
+        if let pet, let data = pet.avatarImageData, let image = UIImage(data: data) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .frame(width: size, height: size)
+        } else if let pet {
+            PetSilhouetteView(
+                species: pet.species,
+                coatColor: Color(hex: pet.coatColor.isEmpty ? "E8C49A" : pet.coatColor),
+                eyeColor: Color(hex: pet.eyeColor.isEmpty ? "6B3A2A" : pet.eyeColor),
+                isAnimationEnabled: false
+            )
+            .frame(width: size, height: size)
+        } else {
+            Image(systemName: "pawprint.fill")
+                .font(.system(size: size * 0.42, weight: .black))
+                .foregroundStyle(accent)
+                .frame(width: size, height: size)
+        }
+    }
+}
+
 private struct AppIconPreview: View {
     let descriptor: AppIconShopDescriptor
     let isSelected: Bool
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: descriptor.gradientHex.map { Color(hex: $0) },
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            if let image = UIImage(named: assetName) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: descriptor.gradientHex.map { Color(hex: $0) },
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
-                .overlay(alignment: .topLeading) {
-                    Circle()
-                        .fill(Color.white.opacity(0.22)) // ui-v4: allow app icon preview highlight
-                        .frame(width: 64, height: 64)
-                        .blur(radius: 8)
-                        .offset(x: -8, y: -8)
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 26, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.24), lineWidth: 1) // ui-v4: allow app icon preview stroke
-                }
-
-            Image(systemName: descriptor.previewSymbol)
-                .font(.system(size: 42, weight: .black))
-                .foregroundStyle(descriptor.itemId == "appicon_minimal_o" ? Color.arkInk : Color.white) // ui-v4: allow asset-specific icon ink
-                .shadow(color: Color.black.opacity(0.18), radius: 10, x: 0, y: 5) // ui-v4: allow asset preview shadow
+                Image(systemName: descriptor.previewSymbol)
+                    .font(.system(size: 42, weight: .black))
+                    .foregroundStyle(descriptor.itemId == "appicon_minimal_o" ? Color.arkInk : Color.ohanaPrimaryActionText)
+            }
 
             if isSelected {
                 VStack {
@@ -1366,5 +1840,9 @@ private struct AppIconPreview: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+    }
+
+    private var assetName: String {
+        descriptor.alternateIconName ?? "AppIcon"
     }
 }

@@ -38,93 +38,59 @@ struct HumanExpenseDetailView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            OhanaAppBackground().ignoresSafeArea()
-
-            if isPrivacyLocked {
-                privacyLockedView
-            } else {
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 18) {
-                        header
-                        HumanPrivateDataNotice(human: human, field: .expense)
-                        metricStrip
-                        historySection
+        ZStack {
+            HumanExpenseDashboardContent(
+                human: human,
+                allExpenses: allExpenses,
+                onClose: { dismiss() },
+                onAdd: {
+                    withAnimation(GoMotion.feedback) {
+                        showingQuickExpense = true
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 18)
-                    .padding(.bottom, 110)
                 }
-
-                addButton
-                    .padding(.trailing, 18)
-                    .padding(.bottom, 24)
+            )
+            if showingQuickExpense {
+                QuickHumanExpenseSheet(
+                    human: human,
+                    onDismiss: {
+                        withAnimation(GoMotion.feedback) {
+                            showingQuickExpense = false
+                        }
+                    }
+                )
+                .zIndex(20)
+                .transition(.opacity)
             }
         }
         .toolbar(.hidden, for: .navigationBar)
-        .sheet(isPresented: $showingQuickExpense) {
-            QuickHumanExpenseSheet(human: human)
-        }
     }
 
     private var header: some View {
-        HStack(spacing: 12) {
-            FeatureHubAvatar(
-                imageData: human.avatarImageData,
-                emoji: human.avatarEmoji,
-                fallback: "👤",
-                tint: Color(hex: human.safeThemeColorHex)
-            )
-            VStack(alignment: .leading, spacing: 3) {
-                Text(l.tr(zh: "花费记录", en: "Expenses", de: "Kosten"))
-                    .font(OhanaFont.title2(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(human.name)
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
-            Spacer()
+        HumanModulePageHeader(
+            human: human,
+            title: l.tr(zh: "花费记录", en: "Expenses", de: "Kosten"),
+            subtitle: human.name,
+            onClose: { dismiss() }
+        ) {
             if isViewingOwnProfile {
                 HumanPrivacyToggleButton(human: human, field: .expense)
             }
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 38, height: 38)
-            }
-            .buttonStyle(ScaleButtonStyle())
         }
     }
 
     private var metricStrip: some View {
-        HStack(spacing: 10) {
-            metric(
+        HumanModuleMetricStrip(metrics: [
+            FeatureHubMetric(
+                id: "month",
                 title: l.tr(zh: "本月", en: "This month", de: "Diesen Monat"),
                 value: AppCurrency.format(monthAmount, fractionDigits: 0)
-            )
-            metric(
+            ),
+            FeatureHubMetric(
+                id: "total",
                 title: l.tr(zh: "累计", en: "Total", de: "Gesamt"),
                 value: AppCurrency.format(totalAmount, fractionDigits: 0)
             )
-        }
-    }
-
-    private func metric(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(title)
-                .font(OhanaFont.caption2(.black))
-                .foregroundStyle(Color.ohanaSecondaryText)
-            Text(value)
-                .font(OhanaFont.title3(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        ])
     }
 
     private var historySection: some View {
@@ -198,37 +164,19 @@ struct HumanExpenseDetailView: View {
     }
 
     private var addButton: some View {
-        Button {
+        HumanModuleFloatingActionButton(
+            title: l.tr(zh: "记一笔", en: "Add", de: "Eintragen"),
+            icon: "plus"
+        ) {
             showingQuickExpense = true
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "plus")
-                    .font(.system(size: 15, weight: .black))
-                Text(l.tr(zh: "记一笔", en: "Add", de: "Eintragen"))
-                    .font(OhanaFont.callout(.black))
-            }
-            .foregroundStyle(Color.arkInk)
-            .padding(.horizontal, 22)
-            .frame(height: 54)
-            .background(Color.goPrimary, in: Capsule())
         }
-        .buttonStyle(ScaleButtonStyle())
     }
 
     private var privacyLockedView: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "lock.shield.fill")
-                .font(.system(size: 42, weight: .black))
-                .foregroundStyle(Color.goYellow)
-            Text(PrivacyService.lockedMessage(for: .expense))
-                .font(OhanaFont.title3(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Text(l.tr(zh: "请切换到本人档案后再查看。", en: "Switch to this account to view it.", de: "Wechsle zu diesem Konto, um es zu sehen."))
-                .font(OhanaFont.callout(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-        }
-        .multilineTextAlignment(.center)
-        .padding(24)
+        HumanModulePrivacyLockedView(
+            title: PrivacyService.lockedMessage(for: .expense),
+            message: l.tr(zh: "请切换到本人档案后再查看。", en: "Switch to this account to view it.", de: "Wechsle zu diesem Konto, um es zu sehen.")
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

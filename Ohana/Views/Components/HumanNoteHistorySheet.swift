@@ -7,12 +7,14 @@
 
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct HumanNoteEntry: Identifiable {
     let id: UUID
     let date: Date
     let dateString: String
     let text: String
+    let attachments: [HumanNoteAttachmentReference]
     let rawString: String
 }
 
@@ -56,72 +58,46 @@ struct HumanNoteHistorySheet: View {
                         .padding(.trailing, 18)
                         .padding(.bottom, 24)
                 }
+
+                if showAddSheet {
+                    QuickHumanNoteSheet(
+                        human: human,
+                        onDismiss: { showAddSheet = false }
+                    )
+                    .zIndex(20)
+                    .transition(.opacity)
+                }
             }
             .toolbar(.hidden, for: .navigationBar)
-            .sheet(isPresented: $showAddSheet) {
-                QuickHumanNoteSheet(human: human)
-            }
         }
     }
 
     private var header: some View {
-        HStack(spacing: 12) {
-            FeatureHubAvatar(
-                imageData: human.avatarImageData,
-                emoji: human.avatarEmoji,
-                fallback: "👤",
-                tint: Color(hex: human.safeThemeColorHex)
-            )
-            VStack(alignment: .leading, spacing: 3) {
-                Text(l.tr(zh: "备注记录", en: "Notes", de: "Notizen"))
-                    .font(OhanaFont.title2(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(human.name)
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
-            Spacer()
+        HumanModulePageHeader(
+            human: human,
+            title: l.tr(zh: "备注记录", en: "Notes", de: "Notizen"),
+            subtitle: human.name,
+            onClose: { dismiss() }
+        ) {
             if isViewingOwnProfile {
                 HumanPrivacyToggleButton(human: human, field: .note)
             }
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 38, height: 38)
-            }
-            .buttonStyle(ScaleButtonStyle())
         }
     }
 
     private var metricStrip: some View {
-        HStack(spacing: 10) {
-            metric(
+        HumanModuleMetricStrip(metrics: [
+            FeatureHubMetric(
+                id: "total",
                 title: l.tr(zh: "总记录", en: "Total", de: "Gesamt"),
                 value: "\(noteEntries.count)"
-            )
-            metric(
+            ),
+            FeatureHubMetric(
+                id: "latest",
                 title: l.tr(zh: "最近", en: "Latest", de: "Letzte"),
                 value: latestNoteText
             )
-        }
-    }
-
-    private func metric(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(title)
-                .font(OhanaFont.caption2(.black))
-                .foregroundStyle(Color.ohanaSecondaryText)
-            Text(value)
-                .font(OhanaFont.headline(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        ])
     }
 
     private var notesSection: some View {
@@ -170,12 +146,53 @@ struct HumanNoteHistorySheet: View {
                 .font(OhanaFont.body(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .fixedSize(horizontal: false, vertical: true)
+
+            if !entry.attachments.isEmpty {
+                attachmentStrip(entry.attachments)
+            }
         }
         .padding(14)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+        }
+    }
+
+    private func attachmentStrip(_ attachments: [HumanNoteAttachmentReference]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(attachments) { attachment in
+                    attachmentPreview(attachment)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func attachmentPreview(_ attachment: HumanNoteAttachmentReference) -> some View {
+        if attachment.isImage,
+           let url = HumanNoteAttachmentStore.url(for: attachment),
+           let data = try? Data(contentsOf: url),
+           let image = UIImage(data: data) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 74, height: 74)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        } else {
+            HStack(spacing: 7) {
+                Image(systemName: attachment.isImage ? "photo.fill" : "doc.fill")
+                    .font(.system(size: 12, weight: .black))
+                    .foregroundStyle(Color.goPurple)
+                Text(attachment.fileName)
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 36)
+            .background(Color.ohanaControlFill, in: Capsule())
         }
     }
 
@@ -206,39 +223,23 @@ struct HumanNoteHistorySheet: View {
     }
 
     private var addButton: some View {
-        Button { showAddSheet = true } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "plus")
-                    .font(.system(size: 15, weight: .black))
-                Text(l.tr(zh: "添加", en: "Add", de: "Hinzufügen"))
-                    .font(OhanaFont.callout(.black))
-            }
-            .foregroundStyle(Color.arkInk)
-            .padding(.horizontal, 22)
-            .frame(height: 54)
-            .background(Color.goPrimary, in: Capsule())
+        HumanModuleFloatingActionButton(
+            title: l.tr(zh: "添加", en: "Add", de: "Hinzufügen"),
+            icon: "plus"
+        ) {
+            showAddSheet = true
         }
-        .buttonStyle(ScaleButtonStyle())
     }
 
     private var privacyLockedView: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "lock.shield.fill")
-                .font(.system(size: 42, weight: .black))
-                .foregroundStyle(Color.goYellow)
-            Text(PrivacyService.lockedMessage(for: .note))
-                .font(OhanaFont.title3(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Text(l.tr(
+        HumanModulePrivacyLockedView(
+            title: PrivacyService.lockedMessage(for: .note),
+            message: l.tr(
                 zh: "当前家庭成员无权查看这些备注。",
                 en: "This family member cannot view these notes.",
                 de: "Dieses Familienmitglied kann diese Notizen nicht sehen."
-            ))
-            .font(OhanaFont.callout(.semibold))
-            .foregroundStyle(Color.ohanaSecondaryText)
-            .multilineTextAlignment(.center)
-        }
-        .padding(24)
+            )
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -268,20 +269,24 @@ struct HumanNoteHistorySheet: View {
                 let rest = String(trimmed[trimmed.index(after: bracketEnd)...])
                     .trimmingCharacters(in: .whitespaces)
                 if let date = Self.noteDateFormatter.date(from: dateStr) {
+                    let parsed = HumanNoteAttachmentStore.visibleTextAndAttachments(from: rest)
                     return HumanNoteEntry(
                         id: UUID(),
                         date: date,
                         dateString: dateStr,
-                        text: rest,
+                        text: parsed.text,
+                        attachments: parsed.attachments,
                         rawString: trimmed
                     )
                 }
             }
+            let parsed = HumanNoteAttachmentStore.visibleTextAndAttachments(from: trimmed)
             return HumanNoteEntry(
                 id: UUID(),
                 date: .distantPast,
                 dateString: "",
-                text: trimmed,
+                text: parsed.text,
+                attachments: parsed.attachments,
                 rawString: trimmed
             )
         }

@@ -355,10 +355,19 @@ struct AddVaccineSheet: View {
                             HStack {
                                 Image(systemName: AppCurrency.systemIconName)
                                     .foregroundStyle(Color.goYellow).frame(width: 22)
-                                TextField("费用（\(AppCurrency.symbol)，可选）", text: $costText)
-                                    .keyboardType(.decimalPad)
-                                    .font(.system(size: 15, weight: .medium, design: .rounded))
-                                    .foregroundStyle(Color.ohanaPrimaryText)
+                                InlineNumericInput(
+                                    text: $costText,
+                                    placeholder: "0",
+                                    maxFractionDigits: 2,
+                                    accent: Color.goYellow,
+                                    step: 10,
+                                    valueFont: .system(size: 15, weight: .medium, design: .rounded),
+                                    valueAlignment: .leading,
+                                    fill: Color.clear,
+                                    cornerRadius: 12,
+                                    horizontalPadding: 4,
+                                    verticalPadding: 0
+                                )
                             }
                         }
 
@@ -366,7 +375,7 @@ struct AddVaccineSheet: View {
                         Button(action: save) {
                             Text("保存疫苗记录")
                                 .font(.system(size: 17, weight: .black, design: .rounded))
-                                .foregroundStyle(.black)
+                                .foregroundStyle(Color.arkInk)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
                                 .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 16))
@@ -404,12 +413,12 @@ struct AddVaccineSheet: View {
                                pet: pet,
                                executorId: executorId)
         log.vetName = vetName
-        log.cost = Double(costText) ?? 0
+        log.cost = CountryDecimalInput.parse(costText, countryCode: AppCountry.code) ?? 0
         if hasExpiry { log.expirationDate = expiryDate }
         modelContext.insert(log)
 
         // 费用同步
-        if let amount = Double(costText), amount > 0 {
+        if let amount = CountryDecimalInput.parse(costText, countryCode: AppCountry.code), amount > 0 {
             let expense = PetExpenseLog(date: date, amount: amount, category: .medical,
                                         note: vaccineName.isEmpty ? "疫苗接种" : vaccineName, pet: pet, executorId: executorId)
             modelContext.insert(expense)

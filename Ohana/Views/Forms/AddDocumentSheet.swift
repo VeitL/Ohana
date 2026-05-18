@@ -234,7 +234,7 @@ struct AddDocumentSheet: View {
                                                         }
                                                         if isSelected {
                                                             Circle()
-                                                                .strokeBorder(.white, lineWidth: 2)
+                                                                .strokeBorder(Color.arkInk, lineWidth: 2)
                                                                 .frame(width: 40, height: 40)
                                                         }
                                                     }
@@ -383,9 +383,9 @@ struct AddDocumentSheet: View {
                 }
             }
         }
-        .presentationDetents([.large])
+        .presentationDetents([.large]) // ui-v4: allow long document editor
         .presentationDragIndicator(.visible)
-        .presentationBackground(.bar)
+        .presentationBackground(.clear)
         // B4: 拍照 sheet — onDismiss 后处理 pending image，避免 sheet 嵌套冲突
         .fullScreenCover(isPresented: $showingCamera, onDismiss: {
             if let img = pendingCapturedImage {
@@ -411,7 +411,7 @@ struct AddDocumentSheet: View {
         .fullScreenCover(item: $previewAttachment) { att in
             if let ui = UIImage(data: att.data) {
                 ZStack {
-                    Color.black.ignoresSafeArea()
+                    Color.arkInk.ignoresSafeArea()
                     Image(uiImage: ui)
                         .resizable()
                         .scaledToFit()
@@ -423,7 +423,6 @@ struct AddDocumentSheet: View {
                                 Image(systemName: "xmark.circle.fill")
                                     .font(.system(size: 28))
                                     .foregroundStyle(Color.ohanaPrimaryText)
-                                    .shadow(radius: 4)
                             }
                             .padding(16)
                         }
@@ -847,9 +846,9 @@ struct EditDocumentSheet: View {
                 }
             }
         }
-        .presentationDetents([.large])
+        .presentationDetents([.large]) // ui-v4: allow long document editor
         .presentationDragIndicator(.visible)
-        .presentationBackground(.bar)
+        .presentationBackground(.clear)
         .fullScreenCover(isPresented: $showingCamera, onDismiss: {
             if let img = pendingCapturedImage { attachmentImage = img; pendingCapturedImage = nil }
         }) {
@@ -868,7 +867,7 @@ struct EditDocumentSheet: View {
         .fullScreenCover(isPresented: $showingPreview) {
             if let img = attachmentImage {
                 ZStack {
-                    Color.black.ignoresSafeArea()
+                    Color.arkInk.ignoresSafeArea()
                     Image(uiImage: img).resizable().scaledToFit().ignoresSafeArea()
                     VStack { HStack { Spacer(); Button { showingPreview = false } label: {
                         Image(systemName: "xmark.circle.fill").font(.system(size: 28)).foregroundStyle(Color.ohanaPrimaryText).padding(16)

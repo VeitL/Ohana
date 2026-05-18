@@ -18,6 +18,8 @@ private struct QuickHumanExpenseContentHeightKey: PreferenceKey {
 
 struct QuickHumanExpenseSheet: View {
     let human: Human
+    var onSaved: (() -> Void)? = nil
+    var onDismiss: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -296,7 +298,11 @@ struct QuickHumanExpenseSheet: View {
             popupDragOffset = 0
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-            dismiss()
+            if let onDismiss {
+                onDismiss()
+            } else {
+                dismiss()
+            }
         }
     }
 
@@ -335,6 +341,7 @@ struct QuickHumanExpenseSheet: View {
             context: modelContext
         )
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+        onSaved?()
         close()
     }
 }

@@ -244,10 +244,6 @@ private struct NormalTaskCard: View {
                                 .background(textColor.opacity(0.18), in: Capsule())
                         }
                     }
-                    Text(task.subtitle)
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(textColor.opacity(0.6))
-                        .lineLimit(2)
                 }
                 Spacer()
             }
@@ -307,7 +303,7 @@ private struct GoldenRewardRow: View {
                     Text(didFeed ? "🍖" : "🎁")
                         .font(.system(size: 30))
                         .scaleEffect(feedScale)
-                        .animation(.spring(response: 0.25, dampingFraction: 0.5), value: feedScale)
+                        .animation(GoMotion.feedback, value: feedScale)
                 }
 
                 VStack(alignment: .leading, spacing: 5) {
@@ -322,9 +318,6 @@ private struct GoldenRewardRow: View {
                             .padding(.horizontal, 7).padding(.vertical, 3)
                             .background(Color.arkInk.opacity(0.12), in: Capsule())
                     }
-                    Text("奖励宠物零食 🍖 庆祝这个特别时刻～")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.arkInk.opacity(0.6))
                 }
                 Spacer()
 
@@ -357,15 +350,15 @@ private struct GoldenRewardRow: View {
         }
         // 金色发光底板
         .background(Color.goYellow, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: Color.goYellow.opacity(sparkleOpacity), radius: 14, x: 0, y: 0)
-        .shadow(color: Color.goYellow.opacity(sparkleOpacity * 0.5), radius: 28, x: 0, y: 4)
+        .shadow(color: Color.goYellow.opacity(sparkleOpacity), radius: 14, x: 0, y: 0) // ui-v4: allow milestone reward glow
+        .shadow(color: Color.goYellow.opacity(sparkleOpacity * 0.5), radius: 28, x: 0, y: 4) // ui-v4: allow milestone reward glow
         .coconutRewardOverlay(trigger: $showCoconutDrop, amount: milestoneReward)
         .onAppear {
             guard !shouldReduceWork else {
                 sparkleOpacity = 0.18
                 return
             }
-            withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) {
+            withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) { // ui-v4: allow gated milestone sparkle loop
                 sparkleOpacity = 0.65
             }
         }

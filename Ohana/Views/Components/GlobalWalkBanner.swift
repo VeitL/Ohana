@@ -39,7 +39,7 @@ struct GlobalWalkBanner: View {
         colorScheme == .dark ? Color(hex: "10180F") : Color(hex: "F7FAEF")
     }
     private var walkPanelStroke: Color {
-        colorScheme == .dark ? Color.white.opacity(0.14) : Color.arkInk.opacity(0.08)
+        Color.ohanaGlassStroke
     }
 
     private var isActive: Bool {
@@ -75,8 +75,8 @@ struct GlobalWalkBanner: View {
                         .zIndex(1000)
                 }
             }
-            .animation(.easeInOut(duration: 0.2), value: isMinimized)
-            .animation(.easeInOut(duration: 0.15), value: isStopped)
+            .animation(GoMotion.quick, value: isMinimized)
+            .animation(GoMotion.quick, value: isStopped)
         }
         .ignoresSafeArea(edges: .bottom)
         .allowsHitTesting(shouldShowFloatingControl || showSummaryCard)
@@ -107,7 +107,7 @@ struct GlobalWalkBanner: View {
             Circle()
                 .fill(Color(hex: "0D1A0D").opacity(0.97))
                 .overlay(Circle().strokeBorder(Color.goPrimary.opacity(0.5), lineWidth: 2))
-                .shadow(color: Color.goPrimary.opacity(0.35), radius: 12)
+                .shadow(color: Color.goPrimary.opacity(0.35), radius: 12) // ui-v4: allow active walk floating control glow
             VStack(spacing: 1) {
                 TimelineView(.periodic(from: .now, by: walkClockInterval)) { _ in
                     Text(formatElapsed(mgr.elapsedTime))
@@ -158,7 +158,7 @@ struct GlobalWalkBanner: View {
                                     .background(Color.goYellow.opacity(0.15), in: Capsule())
                             } else {
                                 Circle().fill(Color.goPrimary).frame(width: 7, height: 7)
-                                    .shadow(color: Color.goPrimary.opacity(0.8), radius: 4)
+                                    .shadow(color: Color.goPrimary.opacity(0.8), radius: 4) // ui-v4: allow live walk status glow
                                 Text("巡岛中")
                                     .font(.system(size: 11, weight: .bold, design: .rounded))
                                     .foregroundStyle(Color.goPrimary)
@@ -189,7 +189,7 @@ struct GlobalWalkBanner: View {
                             .foregroundStyle(Color.ohanaPrimaryText)
                     }
                 }
-                Rectangle().fill(.white.opacity(0.1)).frame(width: 1, height: 40)
+                Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 40)
                 walkStatCell(label: "距离", accent: .goTeal) {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text(String(format: "%.2f", LocationManager.shared.totalDistance / 1000))
@@ -198,7 +198,7 @@ struct GlobalWalkBanner: View {
                         Text("km").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.goTeal)
                     }
                 }
-                Rectangle().fill(.white.opacity(0.1)).frame(width: 1, height: 40)
+                Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 40)
                 walkStatCell(label: "便便", accent: .goYellow) {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text("\(mgr.poopCount)")
@@ -224,7 +224,7 @@ struct GlobalWalkBanner: View {
                         systemImage: mgr.phase == .running ? "pause.fill" : "play.fill"
                     )
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity).padding(.vertical, 13)
                     .background(mgr.phase == .running ? Color.goYellow : Color.goTeal,
                                 in: RoundedRectangle(cornerRadius: 14))
@@ -235,7 +235,7 @@ struct GlobalWalkBanner: View {
                 } label: {
                     Text("💩").font(.system(size: 20))
                         .frame(width: 48, height: 48)
-                        .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
+                        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 Button {
                     UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
@@ -260,7 +260,7 @@ struct GlobalWalkBanner: View {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .strokeBorder(walkPanelStroke, lineWidth: 1)
         }
-        .shadow(color: .black.opacity(0.25), radius: 16, x: 0, y: 6)
+        .shadow(color: Color.arkInk.opacity(0.25), radius: 16, x: 0, y: 6) // ui-v4: allow active walk card elevation
     }
 
     // MARK: - 结束后翻转详情卡（B2 重写）
@@ -298,13 +298,13 @@ struct GlobalWalkBanner: View {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .strokeBorder(walkPanelStroke, lineWidth: 1)
         }
-        .shadow(color: .black.opacity(0.25), radius: 16, x: 0, y: 6)
+        .shadow(color: Color.arkInk.opacity(0.25), radius: 16, x: 0, y: 6) // ui-v4: allow walk summary card elevation
         .padding(.horizontal, 16)
         .padding(.bottom, safeBottom(geo) + 160)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .onAppear {
             summaryRotation = 0
-            withAnimation(.easeInOut(duration: 0.42)) {
+            withAnimation(GoMotion.hero) {
                 summaryRotation = 180
             }
         }
@@ -332,7 +332,7 @@ struct GlobalWalkBanner: View {
                 }
                 Spacer()
                 Button {
-                    withAnimation(.easeOut(duration: 0.2)) {
+                    withAnimation(GoMotion.quick) {
                         showSummaryCard = false
                         summaryRotation = 0
                         isStopped = false
@@ -369,7 +369,7 @@ struct GlobalWalkBanner: View {
                                 }
                                 .foregroundStyle(Color.ohanaPrimaryText)
                                 .padding(.horizontal, 10).padding(.vertical, 5)
-                                .background(.black.opacity(0.45), in: Capsule())
+                                .background(Color.arkInk.opacity(0.45), in: Capsule()) // ui-v4: allow map label scrim
                                 .padding(8),
                                 alignment: .bottomTrailing
                             )
@@ -394,7 +394,7 @@ struct GlobalWalkBanner: View {
                                 Circle()
                                     .fill(Color.goRed)
                                     .frame(width: 18, height: 18)
-                                    .overlay(Circle().fill(.white).frame(width: 7, height: 7))
+                                    .overlay(Circle().fill(Color.ohanaPrimaryText).frame(width: 7, height: 7))
                             }
                         }
                     }
@@ -409,15 +409,15 @@ struct GlobalWalkBanner: View {
                             Text(coords.count >= 2 ? "本次轨迹" : "本次定位")
                                 .font(.system(size: 11, weight: .bold, design: .rounded))
                         }
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                         .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(.black.opacity(0.45), in: Capsule())
+                        .background(Color.arkInk.opacity(0.45), in: Capsule()) // ui-v4: allow map label scrim
                         .padding(8),
                         alignment: .bottomTrailing
                     )
                 } else {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(.white.opacity(0.06))
+                        .fill(Color.ohanaControlFill)
                         .frame(maxWidth: .infinity).frame(height: 108)
                         .overlay(
                             HStack(spacing: 6) {
@@ -433,11 +433,11 @@ struct GlobalWalkBanner: View {
 
             HStack(spacing: 0) {
                 summaryStatCell(label: "时长", value: formatElapsed(elapsed), accent: .goPrimary)
-                Rectangle().fill(.white.opacity(0.1)).frame(width: 1, height: 36)
+                Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 36)
                 summaryStatCell(label: "距离", value: distance >= 1000
                     ? String(format: "%.2f km", distance / 1000)
                     : String(format: "%.0f m", distance), accent: .goTeal)
-                Rectangle().fill(.white.opacity(0.1)).frame(width: 1, height: 36)
+                Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 36)
                 summaryStatCell(label: "便便", value: "\(poop) 💩", accent: .goYellow)
             }
             .padding(.horizontal, 4)

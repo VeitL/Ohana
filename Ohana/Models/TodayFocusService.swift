@@ -162,7 +162,24 @@ enum TodayFocusService {
             let relationshipDone = humans.first(where: { $0.id == humanId })?.weightLogs.contains {
                 calendar.isDate($0.date, inSameDayAs: now)
             } == true
-            return liveDone || relationshipDone
+            let initialWeightDone = IslandQuestEngine.isInitialHumanWeightRecordedToday(
+                humanId: humanId,
+                calendar: calendar,
+                now: now
+            )
+            return liveDone || relationshipDone || initialWeightDone
+        }
+        if IslandQuestEngine.isOasisBuildQuest(quest.id) {
+            switch quest.id {
+            case IslandQuestEngine.oasisPetWizardQuestId:
+                return QuestManager.shared.isPetWizardCompleted
+            case IslandQuestEngine.oasisFirstMealQuestId:
+                return QuestManager.shared.isFirstMealRecorded
+            case IslandQuestEngine.oasisThemeQuestId:
+                return QuestManager.shared.isThemeColorSet
+            default:
+                return false
+            }
         }
         if quest.id.hasPrefix("q_moment_"), let petId = quest.targetPetId {
             return pets.first(where: { $0.id == petId })?.photoLogs.contains { calendar.isDate($0.date, inSameDayAs: now) } == true

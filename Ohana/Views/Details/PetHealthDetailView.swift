@@ -2168,10 +2168,19 @@ private struct PetHealthRecordInlinePopup: View {
                     }
 
                     inlineField(icon: AppCurrency.systemIconName, tint: Color.goYellow) {
-                        TextField(l.tr(zh: "费用（可选）", en: "Cost (optional)", de: "Kosten (optional)"), text: $cost)
-                            .keyboardType(.decimalPad)
-                            .font(OhanaFont.subheadline(.semibold))
-                            .foregroundStyle(Color.ohanaPrimaryText)
+                        InlineNumericInput(
+                            text: $cost,
+                            placeholder: l.tr(zh: "费用（可选）", en: "Cost (optional)", de: "Kosten (optional)"),
+                            maxFractionDigits: 2,
+                            accent: Color.goYellow,
+                            step: 10,
+                            valueFont: OhanaFont.subheadline(.semibold),
+                            valueAlignment: .leading,
+                            fill: Color.clear,
+                            cornerRadius: 12,
+                            horizontalPadding: 4,
+                            verticalPadding: 0
+                        )
                     }
 
                     inlineField(icon: "note.text", tint: Color.ohanaSecondaryText) {
@@ -2324,7 +2333,7 @@ private struct PetHealthRecordInlinePopup: View {
             .flatMap { $0.isEmpty ? nil : $0 }
         let log = PetHealthLog(date: date, type: selectedType, note: finalNote, pet: pet, executorId: executorId)
         log.vetName = vetName
-        log.cost = Double(cost.replacingOccurrences(of: ",", with: ".")) ?? 0
+        log.cost = CountryDecimalInput.parse(cost, countryCode: AppCountry.code) ?? 0
         log.expirationDate = (showsExpiration && hasExpiration) ? expirationDate : nil
         log.nextCheckupDate = (showsNextCheckup && hasNextCheckup) ? nextCheckupDate : nil
         modelContext.insert(log)

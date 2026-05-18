@@ -53,7 +53,7 @@ struct PetHygieneCard: View {
                                     undoLabel = type.rawValue
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                                         if undoLog?.id == log.id {
-                                            withAnimation(.spring(response: 0.3)) { undoLog = nil }
+                                            withAnimation(GoMotion.feedback) { undoLog = nil }
                                         }
                                     }
                                 }) {
@@ -78,7 +78,7 @@ struct PetHygieneCard: View {
                             modelContext.delete(log)
                             modelContext.safeSave()
                         }
-                        withAnimation(.spring(response: 0.3)) { undoLog = nil }
+                        withAnimation(GoMotion.feedback) { undoLog = nil }
                     } label: {
                         Text("撤回")
                             .font(.system(size: 13, weight: .black, design: .rounded))
@@ -86,12 +86,12 @@ struct PetHygieneCard: View {
                     }
                 }
                 .padding(.horizontal, 14).padding(.vertical, 10)
-                .background(Color.black.opacity(0.8), in: Capsule())
+                .background(Color.arkInk.opacity(0.8), in: Capsule())
                 .padding(.horizontal, 8).padding(.bottom, 4)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             }
-            .animation(.spring(response: 0.3), value: undoLog != nil)
+            .animation(GoMotion.feedback, value: undoLog != nil)
             .sheet(item: $longPressedType) { type in
                 HygieneTodoSheet(pet: pet, type: type, accent: Color(hex: pet.safeThemeColorHex))
                     .presentationDetents([.height(520)])
@@ -105,8 +105,6 @@ private struct HygieneDetailSheet: View {
     let pet: Pet
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-
-    @State private var showingPottyOverview = false
 
     private var isLitterPet: Bool {
         ["猫", "兔子", "仓鼠", "龙猫", "豚鼠"].contains(pet.species)
@@ -209,7 +207,7 @@ private struct HygieneDetailSheet: View {
 
                     VStack(spacing: 0) {
                         Capsule()
-                            .fill(Color.black.opacity(0.1))
+                            .fill(Color.arkInk.opacity(0.1))
                             .frame(width: 36, height: 4)
                             .padding(.top, 10).padding(.bottom, 12)
 
@@ -218,7 +216,6 @@ private struct HygieneDetailSheet: View {
                                 ForEach(HygieneType.allCases, id: \.rawValue) { type in
                                     hygieneSectionCard(type)
                                 }
-                                pottyRadioSection
                             }
                             .padding(.horizontal, 16)
                             .padding(.bottom, 48)
@@ -228,164 +225,6 @@ private struct HygieneDetailSheet: View {
                 .frame(maxHeight: .infinity)
             }
         }
-        .sheet(isPresented: $showingPottyOverview) {
-            PottyOverviewView(pet: pet)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-        }
-    }
-
-    private var pottyRadioSection: some View {
-        let cal = Calendar.current
-        let todayPotty = pet.pottyLogs.filter { cal.isDateInToday($0.date) }.count
-        let todayLitter = isLitterPet
-            ? pet.careLogs.filter { $0.type == CareType.litter.rawValue && cal.isDateInToday($0.date) }.count
-            : 0
-        let recentPotty = pet.pottyLogs.sorted { $0.date > $1.date }.prefix(5)
-        let recentLitter = isLitterPet
-            ? pet.careLogs.filter { $0.type == CareType.litter.rawValue }.sorted { $0.date > $1.date }.prefix(5)
-            : []
-
-        return VStack(alignment: .leading, spacing: 12) {
-            // 标题 + 入口
-            HStack(spacing: 6) {
-                Text("💩").font(.system(size: 16))
-                Text("噗噗电台")
-                    .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(.black)
-                Spacer()
-                Button { showingPottyOverview = true } label: {
-                    HStack(spacing: 3) {
-                        Text("完整分析")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
-                    }
-                    .foregroundStyle(Color.goYellow)
-                    .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(Color.goYellow.opacity(0.12), in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
-            }
-
-            // 今日统计行
-            HStack(spacing: 12) {
-                // 便便
-                VStack(spacing: 4) {
-                    Text("💩").font(.system(size: 22))
-                    Text("\(todayPotty)").font(.system(size: 20, weight: .black, design: .rounded)).foregroundStyle(.black)
-                    Text("今日便便").font(.system(size: 10, weight: .medium)).foregroundStyle(Color.ohanaSecondaryText)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(Color.goYellow.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
-
-                // 铲屎（仅猫/兔等）
-                if isLitterPet {
-                    VStack(spacing: 4) {
-                        Text("🪣").font(.system(size: 22))
-                        Text("\(todayLitter)").font(.system(size: 20, weight: .black, design: .rounded)).foregroundStyle(.black)
-                        Text("今日铲屎").font(.system(size: 10, weight: .medium)).foregroundStyle(Color.ohanaSecondaryText)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color(hex: "E8E0FF").opacity(0.6), in: RoundedRectangle(cornerRadius: 14))
-                }
-            }
-
-            // 快速打卡按钮行
-            HStack(spacing: 10) {
-                Button {
-                    let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-                        .flatMap { $0.isEmpty ? nil : $0 }
-                    let log = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet, executorId: executorId)
-                    modelContext.insert(log)
-                    modelContext.safeSave()
-                    QuestManager.shared.awardAction(type: .potty(isLitter: false), pet: pet, context: modelContext)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                } label: {
-                    Label("便便打卡", systemImage: "plus")
-                        .font(.system(size: 13, weight: .black, design: .rounded))
-                        .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.goYellow, in: RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(ScaleButtonStyle())
-
-                if isLitterPet {
-                    Button {
-                        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-                            .flatMap { $0.isEmpty ? nil : $0 }
-                        let log = PetCareLog(date: Date(), type: .litter, pet: pet, executorId: executorId)
-                        modelContext.insert(log)
-                        modelContext.safeSave()
-                        QuestManager.shared.awardAction(type: .potty(isLitter: true), pet: pet, context: modelContext)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    } label: {
-                        Label("铲屎打卡", systemImage: "plus")
-                            .font(.system(size: 13, weight: .black, design: .rounded))
-                            .foregroundStyle(Color(hex: "6B4EFF"))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(Color(hex: "E8E0FF"), in: RoundedRectangle(cornerRadius: 12))
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                }
-            }
-
-            // 近期便便记录
-            if !recentPotty.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("便便记录")
-                        .font(.system(size: 11, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                    ForEach(recentPotty) { log in
-                        HStack {
-                            Text("💩").font(.system(size: 13))
-                            Text(log.date, format: .dateTime.month().day().hour().minute())
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(.black.opacity(0.7))
-                            Spacer()
-                            Button {
-                                modelContext.delete(log); modelContext.safeSave()
-                            } label: {
-                                Image(systemName: "trash").font(.system(size: 11)).foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
-                            }
-                        }
-                        .padding(.horizontal, 10).padding(.vertical, 6)
-                        .background(Color.white, in: RoundedRectangle(cornerRadius: 10))
-                    }
-                }
-            }
-
-            // 近期铲屎记录（仅猫/兔等）
-            if isLitterPet && !recentLitter.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("铲屎记录")
-                        .font(.system(size: 11, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                    ForEach(recentLitter) { log in
-                        HStack {
-                            Text("🪣").font(.system(size: 13))
-                            Text(log.date, format: .dateTime.month().day().hour().minute())
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(.black.opacity(0.7))
-                            Spacer()
-                            Button {
-                                modelContext.delete(log); modelContext.safeSave()
-                            } label: {
-                                Image(systemName: "trash").font(.system(size: 11)).foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
-                            }
-                        }
-                        .padding(.horizontal, 10).padding(.vertical, 6)
-                        .background(Color.white, in: RoundedRectangle(cornerRadius: 10))
-                    }
-                }
-            }
-        }
-        .padding(14)
-        .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func hygieneSectionCard(_ type: HygieneType) -> some View {
@@ -403,7 +242,7 @@ private struct HygieneDetailSheet: View {
                     .foregroundStyle(color)
                 Text(type.rawValue)
                     .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Color.arkInk)
                 Spacer()
                 if let d = days {
                     Text(d == 0 ? "今天已打卡" : "\(d)天前 · 每\(type.cycleDays)天一次")
@@ -419,7 +258,7 @@ private struct HygieneDetailSheet: View {
                 ForEach(Array(bars.enumerated()), id: \.offset) { _, v in
                     let h = max(4, CGFloat(v) / CGFloat(maxBar) * 28)
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(v > 0 ? color : Color.black.opacity(0.06))
+                        .fill(v > 0 ? color : Color.arkInk.opacity(0.06))
                         .frame(maxWidth: .infinity, minHeight: 4, maxHeight: h)
                 }
             }
@@ -435,7 +274,7 @@ private struct HygieneDetailSheet: View {
                         HStack {
                             Text(log.date, format: .dateTime.month().day().hour().minute())
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(.black.opacity(0.7))
+                                .foregroundStyle(Color.arkInk.opacity(0.7))
                             Spacer()
                             Button {
                                 modelContext.delete(log); modelContext.safeSave()
@@ -446,7 +285,7 @@ private struct HygieneDetailSheet: View {
                             }
                         }
                         .padding(.horizontal, 10).padding(.vertical, 6)
-                        .background(Color.white, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .background(Color.goCardWhite, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                 }
             }
@@ -516,7 +355,7 @@ private struct HygieneCheckButton: View {
         modelContext.insert(log)
         modelContext.safeSave()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        withAnimation(.spring(response: 0.3)) { justChecked = true }
+        withAnimation(GoMotion.feedback) { justChecked = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             withAnimation { justChecked = false }
         }
@@ -691,7 +530,7 @@ struct HygieneTodoSheet: View {
                     Text("添加到日历")
                 }
                 .font(.system(size: 16, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.goCardWhite)
                 .frame(maxWidth: .infinity).padding(.vertical, 14)
                 .background(accent, in: RoundedRectangle(cornerRadius: 14))
             }

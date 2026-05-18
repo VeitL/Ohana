@@ -115,7 +115,7 @@ enum WalletPetCardTheme {
     static func foreground(for hex: String, opacity: Double = 1) -> Color {
         prefersDarkForeground(for: hex)
             ? Color.arkInk.opacity(opacity)
-            : Color.white.opacity(opacity)
+            : Color.goCardWhite.opacity(opacity)
     }
 }
 
@@ -243,7 +243,7 @@ struct PetWalletStack: View {
                 idleBreath = 0
                 return
             }
-            withAnimation(.easeInOut(duration: 3.5).repeatForever(autoreverses: true)) {
+            withAnimation(.easeInOut(duration: 3.5).repeatForever(autoreverses: true)) { // ui-v4: allow gated idle card breathing uses a reversible loop, disabled by reduce-work policy.
                 idleBreath = 1
             }
         }
@@ -312,9 +312,9 @@ struct PetWalletStack: View {
         .brightness(brightness)
         .opacity(isVisible ? 1 : 0)
         .compositingGroup()
-        .shadow(color: .black.opacity(isActive ? 0.35 : 0.15), radius: isActive ? 24 : 12, y: isActive ? 8 : 4)
+        .shadow(color: Color.arkInk.opacity(isActive ? 0.35 : 0.15), radius: isActive ? 24 : 12, y: isActive ? 8 : 4) // ui-v4: allow wallet deck depth shadow, not a flat business card.
         .allowsHitTesting(isActive)
-        .animation(.spring(response: 0.42, dampingFraction: 0.82), value: activeIndex)
+        .animation(GoMotion.page, value: activeIndex)
     }
 
     // MARK: - Drag to Cycle (highPriorityGesture 避免与页面 ScrollView 冲突)
@@ -324,7 +324,7 @@ struct PetWalletStack: View {
                 isDragging = true
                 onDraggingChanged?(true)
                 let clamped = max(-120, min(120, value.translation.height))
-                withAnimation(.interactiveSpring()) {
+                withAnimation(GoMotion.feedback) {
                     dragOffset = clamped
                 }
             }
@@ -337,12 +337,12 @@ struct PetWalletStack: View {
                 if abs(dy) > abs(dx) + 8, abs(dy) > threshold, items.count > 1 {
                     // 上滑 → 下一张；下滑 → 上一张。首页数据源已限制为最多 7 张。
                     let direction = dy < 0 ? 1 : -1
-                    withAnimation(.spring(response: 0.42, dampingFraction: 0.80)) {
+                    withAnimation(GoMotion.page) {
                         activeIndex = (activeIndex + direction + items.count) % items.count
                         dragOffset = 0
                     }
                 } else {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                    withAnimation(GoMotion.feedback) {
                         dragOffset = 0
                     }
                 }
@@ -534,7 +534,7 @@ struct WalletPetCardFront: View {
             let hasPopout = isTransparent && avatarImage != nil
             let usesFullBleedPhoto = avatarImage != nil && !isTransparent
             let useDarkText = !usesFullBleedPhoto && WalletPetCardTheme.prefersDarkForeground(for: pet.themeColorHex)
-            let primaryText = useDarkText ? Color.arkInk : Color.white
+            let primaryText = useDarkText ? Color.arkInk : Color.goCardWhite
             let secondaryText = primaryText.opacity(useDarkText ? 0.72 : 0.70)
 
             ZStack {
@@ -552,8 +552,8 @@ struct WalletPetCardFront: View {
                             colors: [
                                 .clear,
                                 useDarkText
-                                    ? Color.white.opacity(0.20)
-                                    : Color.black.opacity(usesFullBleedPhoto ? 0.12 : 0.22)
+                                    ? Color.goCardWhite.opacity(0.20)
+                                    : Color.arkInk.opacity(usesFullBleedPhoto ? 0.12 : 0.22)
                             ],
                             startPoint: .top,
                             endPoint: .bottom
@@ -591,7 +591,7 @@ struct WalletPetCardFront: View {
                     if pet.currentStreak > 1 {
                         Text("🔥 \(pet.currentStreak)天连续")
                             .font(.system(size: 10, weight: .black, design: .rounded))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(Color.arkInk)
                             .padding(.horizontal, 9)
                             .padding(.vertical, 4)
                             .background(Color.goPrimary, in: Capsule())
@@ -629,7 +629,7 @@ struct WalletPetCardFront: View {
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                             .fill(
                                 LinearGradient(
-                                    colors: [Color.black.opacity(0.6), Color(hex: pet.themeColorHex).opacity(0.3)],
+                                    colors: [Color.arkInk.opacity(0.6), Color(hex: pet.themeColorHex).opacity(0.3)],
                                     startPoint: .top, endPoint: .bottom
                                 )
                             )
@@ -638,15 +638,15 @@ struct WalletPetCardFront: View {
                         VStack(spacing: 8) {
                             Text("✨")
                                 .font(.system(size: 32))
-                                .shadow(color: .white.opacity(0.8), radius: 10, x: 0, y: 0)
+                                .shadow(color: Color.goCardWhite.opacity(0.8), radius: 10, x: 0, y: 0) // ui-v4: allow memorial star glow.
                             Text("化作星星，守护着你")
                                 .font(.system(size: 13, weight: .black, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.95))
+                                .foregroundStyle(Color.goCardWhite.opacity(0.95))
                             if let d = pet.passedAwayDate {
                                 let years = Calendar.current.dateComponents([.year], from: d, to: Date()).year ?? 0
                                 Text("相伴 \(pet.daysTogetherAtPassing) 天" + (years > 0 ? " · 离开 \(years) 年" : ""))
                                     .font(.system(size: 10, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.7))
+                                    .foregroundStyle(Color.goCardWhite.opacity(0.7))
                             }
                         }
                     }
@@ -655,9 +655,9 @@ struct WalletPetCardFront: View {
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(equipFxLimeGlow ? Color.goPrimary.opacity(0.72) : .white.opacity(0.15), lineWidth: equipFxLimeGlow ? 1.4 : 0.5)
+                    .strokeBorder(equipFxLimeGlow ? Color.goPrimary.opacity(0.72) : Color.goCardWhite.opacity(0.15), lineWidth: equipFxLimeGlow ? 1.4 : 0.5)
             )
-            .shadow(color: equipFxLimeGlow ? Color.goPrimary.opacity(0.34) : .clear, radius: equipFxLimeGlow ? 18 : 0, y: 0)
+            .shadow(color: equipFxLimeGlow ? Color.goPrimary.opacity(0.34) : .clear, radius: equipFxLimeGlow ? 18 : 0, y: 0) // ui-v4: allow equipped cosmetic glow.
         }
     }
 
@@ -677,8 +677,8 @@ struct WalletPetCardFront: View {
                     .frame(width: w * 0.52, height: h, alignment: .bottomLeading)
                     .offset(x: w * 0.015, y: h * 0.025)
                     // Subtle white halo preserves the "pop-out" depth cue
-                    .shadow(color: .white.opacity(0.50), radius: 3, x: 0, y: 0)
-                    .shadow(color: .black.opacity(0.30), radius: 18, x: 0, y: 12)
+                    .shadow(color: Color.goCardWhite.opacity(0.50), radius: 3, x: 0, y: 0) // ui-v4: allow transparent avatar halo.
+                    .shadow(color: Color.arkInk.opacity(0.30), radius: 18, x: 0, y: 12) // ui-v4: allow transparent avatar grounding shadow.
             } else {
                 EmptyView()
             }
@@ -688,7 +688,7 @@ struct WalletPetCardFront: View {
                              (species == "cat" || pet.species == "猫") ? "猫" : pet.species
             ZStack {
                 Ellipse()
-                    .fill(Color.black.opacity(0.16))
+                    .fill(Color.arkInk.opacity(0.16))
                     .frame(width: w * 0.28, height: 24)
                     .blur(radius: 10)
                     .offset(y: h * 0.14)
@@ -787,7 +787,7 @@ struct WalletPetCardDraftFront: View {
             let hasPopout = isTransparent && avatarImage != nil
             let usesFullBleedPhoto = avatarImage != nil && !isTransparent
             let useDarkText = !usesFullBleedPhoto && WalletPetCardTheme.prefersDarkForeground(for: themeColorHex)
-            let primaryText = useDarkText ? Color.arkInk : Color.white
+            let primaryText = useDarkText ? Color.arkInk : Color.goCardWhite
             let secondaryText = primaryText.opacity(useDarkText ? 0.72 : 0.70)
 
             ZStack {
@@ -807,8 +807,8 @@ struct WalletPetCardDraftFront: View {
                             colors: [
                                 .clear,
                                 useDarkText
-                                    ? Color.white.opacity(0.20)
-                                    : Color.black.opacity(usesFullBleedPhoto ? 0.12 : 0.22)
+                                    ? Color.goCardWhite.opacity(0.20)
+                                    : Color.arkInk.opacity(usesFullBleedPhoto ? 0.12 : 0.22)
                             ],
                             startPoint: .top,
                             endPoint: .bottom
@@ -869,7 +869,7 @@ struct WalletPetCardDraftFront: View {
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
+                    .strokeBorder(Color.goCardWhite.opacity(0.15), lineWidth: 0.5)
             )
         }
     }
@@ -884,8 +884,8 @@ struct WalletPetCardDraftFront: View {
                     .frame(width: w * 0.68, height: h * 1.42, alignment: .bottom)
                     .frame(width: w, height: h, alignment: .bottomLeading)
                     .offset(x: w * 0.01, y: h * 0.42)
-                    .shadow(color: .white.opacity(0.50), radius: 3, x: 0, y: 0)
-                    .shadow(color: .black.opacity(0.30), radius: 18, x: 0, y: 12)
+                    .shadow(color: Color.goCardWhite.opacity(0.50), radius: 3, x: 0, y: 0) // ui-v4: allow transparent draft avatar halo.
+                    .shadow(color: Color.arkInk.opacity(0.30), radius: 18, x: 0, y: 12) // ui-v4: allow transparent draft avatar grounding shadow.
             } else {
                 EmptyView()
             }
@@ -895,7 +895,7 @@ struct WalletPetCardDraftFront: View {
                 (sp == "cat" || species == "猫") ? "猫" : species
             ZStack {
                 Ellipse()
-                    .fill(Color.black.opacity(0.16))
+                    .fill(Color.arkInk.opacity(0.16))
                     .frame(width: w * 0.28, height: 24)
                     .blur(radius: 10)
                     .offset(y: h * 0.14)
@@ -935,7 +935,7 @@ struct WalletPetCardDraftFront: View {
 
 struct HumanSilhouetteView: View {
     let gender: String
-    var accent: Color = .white.opacity(0.8)
+    var accent: Color = Color.goCardWhite.opacity(0.8)
 
     private var normalizedGender: String {
         HumanProfileOptions.normalizedGender(gender)
@@ -959,7 +959,7 @@ struct HumanSilhouetteView: View {
 
             ZStack {
                 Ellipse()
-                    .fill(Color.black.opacity(0.18))
+                    .fill(Color.arkInk.opacity(0.18))
                     .frame(width: w * 0.56, height: h * 0.08)
                     .blur(radius: 7)
                     .position(x: cx, y: h * 0.91)
@@ -1019,7 +1019,7 @@ struct HumanSilhouetteView: View {
                     .frame(width: w * 0.16, height: h * 0.28)
                     .position(x: w * 0.58, y: h * 0.83)
             }
-            .shadow(color: .black.opacity(0.22), radius: 12, x: 0, y: 8)
+            .shadow(color: Color.arkInk.opacity(0.22), radius: 12, x: 0, y: 8) // ui-v4: allow silhouette grounding shadow inside wallet art.
         }
         .aspectRatio(0.72, contentMode: .fit)
     }
@@ -1071,7 +1071,7 @@ struct WalletHumanCardFront: View {
                 // 全幅照片模式下作为半透明水印；抠图模式下透过主体透明区域可见。
                 Text(String(human.name.prefix(4)).uppercased())
                     .font(.system(size: w * 0.22, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(usesFullBleedPhoto ? 0.28 : 0.35))
+                    .foregroundStyle(Color.goCardWhite.opacity(usesFullBleedPhoto ? 0.28 : 0.35))
                     .lineLimit(1)
                     .minimumScaleFactor(0.25)
                     .padding(.top, 6)
@@ -1092,16 +1092,16 @@ struct WalletHumanCardFront: View {
                     Spacer()
                     Text(human.name)
                         .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.goCardWhite)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
                     Text(L10n.current.humanWalletResident)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(Color.goCardWhite.opacity(0.6))
                     if let title = equippedTitleBadge {
                         Text(title)
                             .font(.system(size: 11, weight: .black, design: .rounded))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(Color.arkInk)
                             .lineLimit(1)
                             .padding(.horizontal, 9)
                             .padding(.vertical, 4)
@@ -1116,30 +1116,30 @@ struct WalletHumanCardFront: View {
                             if let age = human.walletAgeChip(isEnglish: isEn) {
                                 Text(age)
                                     .font(.system(size: 11, weight: .black, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.95))
+                                    .foregroundStyle(Color.goCardWhite.opacity(0.95))
                                     .padding(.horizontal, 10).padding(.vertical, 4)
-                                    .background(Capsule().fill(.white.opacity(0.22)))
+                                    .background(Capsule().fill(Color.goCardWhite.opacity(0.22)))
                             }
                             if let b = human.birthday {
                                 Text(Human.westernZodiacDisplay(for: b, isEnglish: isEn))
                                     .font(.system(size: 11, weight: .black, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.95))
+                                    .foregroundStyle(Color.goCardWhite.opacity(0.95))
                                     .padding(.horizontal, 10).padding(.vertical, 4)
-                                    .background(Capsule().fill(.white.opacity(0.22)))
+                                    .background(Capsule().fill(Color.goCardWhite.opacity(0.22)))
                             }
                             if hasMbti {
                                 Text(mbtiTrim.uppercased())
                                     .font(.system(size: 11, weight: .black, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.95))
+                                    .foregroundStyle(Color.goCardWhite.opacity(0.95))
                                     .padding(.horizontal, 10).padding(.vertical, 4)
-                                    .background(Capsule().fill(.white.opacity(0.22)))
+                                    .background(Capsule().fill(Color.goCardWhite.opacity(0.22)))
                             }
                         }
                     }
                     HStack(alignment: .bottom, spacing: 2) {
                         ForEach([14, 8, 12, 6, 10, 16, 5, 11, 9, 13], id: \.self) { bh in
                             RoundedRectangle(cornerRadius: 1.2)
-                                .fill(.white.opacity(0.85))
+                                .fill(Color.goCardWhite.opacity(0.85))
                                 .frame(width: 2, height: CGFloat(bh))
                         }
                     }
@@ -1152,7 +1152,7 @@ struct WalletHumanCardFront: View {
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
+                    .strokeBorder(Color.goCardWhite.opacity(0.15), lineWidth: 0.5)
             )
         }
     }
@@ -1177,8 +1177,8 @@ struct WalletHumanCardFront: View {
                 .frame(width: w * 0.46, height: h * 1.02, alignment: .bottom)
                 .frame(width: w * 0.48, height: h, alignment: .bottomLeading)
                 .offset(x: w * 0.015, y: h * 0.025)
-                .shadow(color: .white.opacity(0.50), radius: 3, x: 0, y: 0)
-                .shadow(color: .black.opacity(0.30), radius: 18, x: 0, y: 12)
+                .shadow(color: Color.goCardWhite.opacity(0.50), radius: 3, x: 0, y: 0) // ui-v4: allow transparent human avatar halo.
+                .shadow(color: Color.arkInk.opacity(0.30), radius: 18, x: 0, y: 12) // ui-v4: allow transparent human avatar grounding shadow.
         } else if avatarImage == nil {
             HumanSilhouetteView(gender: human.genderRaw, accent: Color.goTeal.opacity(0.72))
                 .scaleEffect(0.88)
@@ -1227,7 +1227,7 @@ struct WalletHumanCardDraftFront: View {
             let hasPopout = isTransparent && avatarImage != nil
             let usesFullBleedPhoto = avatarImage != nil && !isTransparent
             let useDarkText = !usesFullBleedPhoto && WalletPetCardTheme.prefersDarkForeground(for: themeColorHex)
-            let primaryText = useDarkText ? Color.arkInk : Color.white
+            let primaryText = useDarkText ? Color.arkInk : Color.goCardWhite
 
             ZStack {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -1244,7 +1244,7 @@ struct WalletHumanCardDraftFront: View {
 
                 Text(String(name.prefix(4)).uppercased())
                     .font(.system(size: w * 0.2, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.22))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.22))
                     .lineLimit(1)
                     .minimumScaleFactor(0.2)
                     .padding(.top, 6)
@@ -1313,7 +1313,7 @@ struct WalletHumanCardDraftFront: View {
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
+                    .strokeBorder(Color.goCardWhite.opacity(0.15), lineWidth: 0.5)
             )
         }
     }
@@ -1328,13 +1328,13 @@ struct WalletHumanCardDraftFront: View {
                     .frame(width: w * 0.46, height: h * 1.02, alignment: .bottom)
                     .frame(width: w * 0.48, height: h, alignment: .bottomLeading)
                     .offset(x: w * 0.015, y: h * 0.025)
-                    .shadow(color: .white.opacity(0.50), radius: 3, x: 0, y: 0)
-                    .shadow(color: .black.opacity(0.30), radius: 18, x: 0, y: 12)
+                    .shadow(color: Color.goCardWhite.opacity(0.50), radius: 3, x: 0, y: 0) // ui-v4: allow transparent draft human avatar halo.
+                    .shadow(color: Color.arkInk.opacity(0.30), radius: 18, x: 0, y: 12) // ui-v4: allow transparent draft human avatar grounding shadow.
             } else {
                 EmptyView()
             }
         } else {
-            HumanSilhouetteView(gender: gender, accent: .white.opacity(0.76))
+            HumanSilhouetteView(gender: gender, accent: Color.goCardWhite.opacity(0.76))
                 .scaleEffect(0.9)
                 .frame(width: w * 0.34, height: h * 0.7)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)

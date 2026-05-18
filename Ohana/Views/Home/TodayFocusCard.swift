@@ -216,11 +216,11 @@ struct TodayFocusCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("TODAY FOCUS")
+                        Text(l.tr(zh: "今日", en: "TODAY", de: "HEUTE"))
                             .font(.system(size: 10, weight: .black, design: .rounded))
                             .tracking(2.2)
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.36))
-                        Text("今天要做什么")
+                        Text(l.tr(zh: "任务盘", en: "Task board", de: "Aufgabenbrett"))
                             .font(.system(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.9))
                     }
@@ -332,10 +332,7 @@ struct TodayFocusCard: View {
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
-                Text(q.subtitle)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
-                    .lineLimit(2)
+                questMetaRow(q)
             }
 
             Spacer(minLength: 6)
@@ -368,13 +365,6 @@ struct TodayFocusCard: View {
         let accent = task.hasReward ? Color.goTeal : Color.goPurple
         let rewardText = task.rewardCoconuts > 0 ? " · +\(task.rewardCoconuts)🥥" : ""
         let performer = task.completedByName ?? l.tr(zh: "对方", en: "Someone", de: "Jemand")
-        let subtitle = task.status == .pendingReview
-            ? l.tr(
-                zh: "\(performer) 提交了任务\(rewardText)",
-                en: "\(performer) submitted the task\(rewardText)",
-                de: "\(performer) hat die Aufgabe eingereicht\(rewardText)"
-            )
-            : "\(task.createdByName) → 你\(rewardText)"
         let actionTitle = task.status == .pendingReview
             ? l.tr(zh: "去确认", en: "Review", de: "Prüfen")
             : l.tr(zh: "去处理", en: "Open", de: "Öffnen")
@@ -386,10 +376,10 @@ struct TodayFocusCard: View {
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
-                Text(subtitle)
+                Text(taskStatusLine(task, performer: performer, rewardText: rewardText))
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
-                    .lineLimit(2)
+                    .lineLimit(1)
             }
 
             Spacer(minLength: 6)
@@ -464,6 +454,73 @@ struct TodayFocusCard: View {
         .background(cardBackground(accent))
     }
 
+    @ViewBuilder
+    private func questMetaRow(_ quest: IslandQuest) -> some View {
+        if IslandQuestEngine.isOasisBuildQuest(quest.id) {
+            let tokens = refreshedQuests.filter { IslandQuestEngine.isOasisBuildQuest($0.id) }.prefix(3)
+            HStack(spacing: 5) {
+                ForEach(Array(tokens), id: \.id) { token in
+                    HStack(spacing: 4) {
+                        Text(token.emoji)
+                            .font(.system(size: 10))
+                        Image(systemName: token.isCompleted ? "checkmark" : "circle.fill")
+                            .font(.system(size: token.isCompleted ? 8 : 5, weight: .black))
+                    }
+                    .foregroundStyle(token.isCompleted ? Color.goPrimary : Color.ohanaSecondaryText)
+                    .frame(width: 36, height: 20)
+                    .background(Color.ohanaControlFill, in: Capsule())
+                }
+            }
+            .accessibilityLabel(l.tr(zh: "岛屿建设任务", en: "Oasis build quests", de: "Oase-Aufgaben"))
+        } else if let name = questTargetName(quest) {
+            compactMetaChip(icon: "person.crop.circle.fill", text: name, tint: Color.goPrimary)
+        } else {
+            compactMetaChip(icon: "clock.fill", text: l.tr(zh: "今天", en: "Today", de: "Heute"), tint: Color.goPrimary)
+        }
+    }
+
+    private func compactMetaChip(icon: String, text: String, tint: Color) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 9, weight: .black))
+            Text(text)
+                .font(.system(size: 10, weight: .black, design: .rounded))
+                .lineLimit(1)
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(tint.opacity(0.14), in: Capsule())
+    }
+
+    private func questTargetName(_ quest: IslandQuest) -> String? {
+        if let petId = quest.targetPetId,
+           let pet = pets.first(where: { $0.id == petId }) {
+            return pet.name
+        }
+        if let plantId = quest.targetPlantId,
+           let plant = plants.first(where: { $0.id == plantId }) {
+            return plant.name
+        }
+        if let humanId = IslandQuestEngine.humanWeightId(fromQuestId: quest.id),
+           let human = humans.first(where: { $0.id == humanId }) {
+            return human.name
+        }
+        return nil
+    }
+
+    private func taskStatusLine(_ task: FamilyCollaborationTask, performer: String, rewardText: String) -> String {
+        if task.status == .pendingReview {
+            return l.tr(
+                zh: "\(performer) 待确认\(rewardText)",
+                en: "\(performer) · review\(rewardText)",
+                de: "\(performer) · prüfen\(rewardText)"
+            )
+        }
+        let target = task.assignedToName ?? task.claimedByName ?? l.tr(zh: "全家", en: "Open", de: "Offen")
+        return "\(task.createdByName) → \(target)\(rewardText)"
+    }
+
     // MARK: - Negative signal card
 
     private func negativeCard(_ s: IslandNegativeSignal) -> some View {
@@ -484,10 +541,10 @@ struct TodayFocusCard: View {
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
-                Text(s.detail)
+                Text(negativeStatusText(for: s))
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
-                    .lineLimit(2)
+                    .foregroundStyle(accent)
+                    .lineLimit(1)
             }
 
             Spacer(minLength: 6)
@@ -516,14 +573,20 @@ struct TodayFocusCard: View {
     private func negativeActionTitle(for signal: IslandNegativeSignal) -> String {
         switch signal.healthAlertType {
         case .weightGainAlert, .weightLossAlert:
-            return "查看趋势"
+            return l.tr(zh: "趋势", en: "Trend", de: "Trend")
         case .drinkingWeightAlert:
-            return "查看健康"
+            return l.tr(zh: "健康", en: "Health", de: "Gesundheit")
         case .none:
-            return signal.severity == .critical ? "立即处理" : "去查看"
+            return signal.severity == .critical ? l.tr(zh: "处理", en: "Act", de: "Los") : l.tr(zh: "查看", en: "Open", de: "Öffnen")
         default:
-            return signal.severity == .critical ? "立即处理" : "去处理"
+            return signal.severity == .critical ? l.tr(zh: "处理", en: "Act", de: "Los") : l.tr(zh: "查看", en: "Open", de: "Öffnen")
         }
+    }
+
+    private func negativeStatusText(for signal: IslandNegativeSignal) -> String {
+        signal.severity == .critical
+            ? l.tr(zh: "紧急", en: "Urgent", de: "Dringend")
+            : l.tr(zh: "关注", en: "Watch", de: "Achten")
     }
 
     // MARK: - Memory fragment card
@@ -575,14 +638,12 @@ struct TodayFocusCard: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(skippedFocusKeys.isEmpty ? "今日任务已清空" : "今天已暂时跳过")
+                Text(skippedFocusKeys.isEmpty
+                     ? l.tr(zh: "今日清空", en: "All clear", de: "Alles klar")
+                     : l.tr(zh: "已暂时跳过", en: "Skipped today", de: "Heute übersprungen"))
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
-                Text(skippedFocusKeys.isEmpty ? "没有需要处理的任务，安心享受今天" : "跳过的卡明天会自动回来")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
-                    .lineLimit(2)
             }
 
             Spacer(minLength: 6)
@@ -594,7 +655,9 @@ struct TodayFocusCard: View {
                     restoreSkippedFocusCards()
                 }
             } label: {
-                Text(skippedFocusKeys.isEmpty ? "去绿洲" : "恢复")
+                Text(skippedFocusKeys.isEmpty
+                     ? l.tr(zh: "绿洲", en: "Oasis", de: "Oase")
+                     : l.tr(zh: "恢复", en: "Restore", de: "Zurück"))
                     .font(.system(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 14).padding(.vertical, 10)
@@ -613,12 +676,9 @@ struct TodayFocusCard: View {
         return HStack(spacing: 14) {
             iconBubble(emoji: "🏝️", accent: accent)
             VStack(alignment: .leading, spacing: 4) {
-                Text("岛屿欢迎你")
+                Text(l.tr(zh: "岛屿欢迎你", en: "Welcome home", de: "Willkommen"))
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("添加第一位家人，开启 Ohana 之旅")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
             }
             Spacer()
         }
@@ -737,7 +797,7 @@ struct TodayFocusCard: View {
         return Button {
             skipFocusCard(content)
         } label: {
-            Text(isNegative ? "关闭" : "跳过")
+            Text(isNegative ? l.tr(zh: "关闭", en: "Close", de: "Schließen") : l.tr(zh: "跳过", en: "Skip", de: "Überspringen"))
                 .font(.system(size: 10, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.58))
                 .padding(.horizontal, 10)
@@ -746,7 +806,7 @@ struct TodayFocusCard: View {
                 .overlay(Capsule().strokeBorder(accent.opacity(0.18), lineWidth: 0.8))
         }
         .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(isNegative ? "关闭这条 Today Focus 警告" : "跳过这张 Today Focus 卡")
+        .accessibilityLabel(isNegative ? l.tr(zh: "关闭这条提醒", en: "Close this alert", de: "Hinweis schließen") : l.tr(zh: "跳过这张卡", en: "Skip this card", de: "Karte überspringen"))
     }
 
     private func skipFocusCard(_ content: TodayFocusService.Content) {
@@ -804,7 +864,9 @@ struct TodayFocusCard: View {
             shape
                 .fill(.clear)
                 .glassEffect(.regular.interactive(false), in: shape) // ui-v4: allow Today Focus card glass preview
-                .ohanaBreathingGlow(accent: accent, isActive: true)
+                .ohanaBreathingGlow(accent: accent, isActive: !shouldReduceWork)
         }
+        .clipShape(shape)
+        .compositingGroup()
     }
 }

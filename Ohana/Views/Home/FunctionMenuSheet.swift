@@ -191,47 +191,69 @@ struct FunctionMenuSheet: View {
                     }
             } else {
                 ZStack {
-                    LinearGradient(
-                        colors: [Color(hex: "1A2E8A"), Color(hex: "0C1640")],
-                        startPoint: .top, endPoint: .bottom
-                    )
-                    .ignoresSafeArea()
+                    OhanaAppBackground()
+                        .ignoresSafeArea()
 
-                    List {
-                        Section {
-                            ForEach(functionMenuGroups, id: \.self) { group in
-                                fmRow(icon: group.icon, iconColor: group.color,
-                                      title: group.title, subtitle: subtitle(for: group)) {
-                                    path.append(destination(for: group))
+                    ScrollView(showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 18) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("更多功能")
+                                    .font(OhanaFont.title(.black))
+                                    .foregroundStyle(Color.ohanaPrimaryText)
+                                Text("入口盘")
+                                    .font(OhanaFont.caption(.black))
+                                    .foregroundStyle(Color.ohanaSecondaryText)
+                            }
+                            .padding(.top, 10)
+
+                            VStack(alignment: .leading, spacing: 10) {
+                                fmSectionHeader(icon: "square.grid.2x2.fill", title: "功能", label: "CORE")
+                                LazyVGrid(columns: fmColumns, spacing: 10) {
+                                    ForEach(functionMenuGroups, id: \.self) { group in
+                                        fmTile(
+                                            icon: group.icon,
+                                            iconColor: group.color,
+                                            title: group.title,
+                                            status: compactSubtitle(for: subtitle(for: group))
+                                        ) {
+                                            path.append(destination(for: group))
+                                        }
+                                    }
                                 }
                             }
-                        } header: {
-                            fmSectionHeader(icon: "square.grid.2x2.fill", title: "聚合功能", label: "FUNCTIONS")
-                        }
-                        .listRowBackground(rowBackground)
 
-                        Section {
-                            ForEach(toolEntries, id: \.id) { entry in
-                                fmRow(icon: entry.icon, iconColor: entry.color,
-                                      title: entry.title, subtitle: entry.subtitle) {
-                                    path.append(entry.destination)
+                            VStack(alignment: .leading, spacing: 10) {
+                                fmSectionHeader(icon: "wrench.and.screwdriver.fill", title: "工具", label: "TOOLS")
+                                LazyVGrid(columns: fmColumns, spacing: 10) {
+                                    ForEach(toolEntries, id: \.id) { entry in
+                                        fmTile(
+                                            icon: entry.icon,
+                                            iconColor: entry.color,
+                                            title: entry.title,
+                                            status: compactSubtitle(for: entry.subtitle)
+                                        ) {
+                                            path.append(entry.destination)
+                                        }
+                                    }
                                 }
                             }
-                        } header: {
-                            fmSectionHeader(icon: "wrench.and.screwdriver.fill", title: "核心工具", label: "TOOLS")
                         }
-                        .listRowBackground(rowBackground)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 30)
                     }
-                    .listStyle(.insetGrouped)
-                    .scrollContentBackground(.hidden)
                 }
-                .navigationTitle("更多功能")
-                .navigationBarTitleDisplayMode(.large)
+                .navigationTitle("")
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("完成") { dismiss() }
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Color.goLime)
+                        Button { dismiss() } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 15, weight: .black))
+                                .foregroundStyle(Color.ohanaPrimaryText)
+                                .frame(width: 38, height: 38)
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                        .accessibilityLabel("关闭")
                     }
                 }
                 .navigationDestination(for: FMDest.self) { dest in
@@ -446,40 +468,51 @@ struct FunctionMenuSheet: View {
 
     // MARK: - Row / Header Builders
 
-    private var rowBackground: some View {
-        RoundedRectangle(cornerRadius: 12)
-            .fill(Color.white.opacity(0.07))
+    private var fmColumns: [GridItem] {
+        [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
+    }
+
+    private func compactSubtitle(for subtitle: String) -> String {
+        if subtitle.contains("待完成") || subtitle.contains("任务") { return subtitle.components(separatedBy: " · ").first ?? subtitle }
+        if subtitle.contains("全家庭") { return "全家" }
+        if subtitle.contains("椰子") { return "椰子" }
+        if subtitle.contains("提醒") { return "提醒" }
+        if subtitle.contains("花费") { return "花费" }
+        return subtitle.components(separatedBy: " · ").first ?? subtitle
     }
 
     @ViewBuilder
-    private func fmRow(icon: String, iconColor: Color, title: String, subtitle: String, action: @escaping () -> Void) -> some View {
+    private func fmTile(icon: String, iconColor: Color, title: String, status: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 14) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(iconColor.opacity(0.2))
-                        .frame(width: 36, height: 36)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
                     Image(systemName: icon)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 18, weight: .black))
                         .foregroundStyle(iconColor)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .black))
+                        .foregroundStyle(Color.ohanaSecondaryText.opacity(0.6))
                 }
-                VStack(alignment: .leading, spacing: 2) {
+
+                VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
-                    Text(subtitle)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                    Text(status)
+                        .font(OhanaFont.caption2(.black))
+                        .foregroundStyle(iconColor)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.3))
             }
-            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
+            .padding(14)
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
-        .listRowSeparatorTint(.white.opacity(0.08))
     }
 
     @ViewBuilder
@@ -490,7 +523,7 @@ struct FunctionMenuSheet: View {
                 .foregroundStyle(Color.goLime.opacity(0.8))
             Text(title)
                 .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Text(label)
                 .font(.system(size: 9, weight: .bold))

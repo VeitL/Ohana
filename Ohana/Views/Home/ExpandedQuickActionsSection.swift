@@ -36,6 +36,7 @@ struct ExpandedPetQuickActionsSection: View {
     let onPottySelect: (String) -> Void
     let onHealthSelect: (String) -> Void
     let onLimitReached: () -> Void
+    @State private var openActionId: String? = nil
 
     var body: some View {
         VStack(spacing: 8) {
@@ -65,16 +66,25 @@ struct ExpandedPetQuickActionsSection: View {
                             isEditMode: isEditMode,
                             jiggle: jiggle,
                             shouldReduceWork: shouldReduceWork,
+                            isMenuOpen: !isEditMode && openActionId == item.id,
                             waterManagementLabel: waterManagementLabel,
                             showsAttentionDot: showsAttentionDot,
                             countText: countText,
                             isCompleted: isCompleted,
-                            onTap: onTap,
-                            onLongPress: onLongPress,
+                            onToggleMenu: { toggleMenu(for: item) },
+                            onQuick: {
+                                closeMenu()
+                                onTap(item)
+                            },
+                            onDetail: {
+                                closeMenu()
+                                onLongPress(item)
+                            },
                             onGroomCheckIn: onGroomCheckIn,
                             onPottySelect: onPottySelect,
                             onHealthSelect: onHealthSelect
                         )
+                        .zIndex(openActionId == item.id ? 20 : Double(items.count - idx))
                     }
 
                     if isEditMode && QuickActionLimit.count(for: pet, in: editItems) < QuickActionLimit.maxItemsPerEntity {
@@ -92,22 +102,36 @@ struct ExpandedPetQuickActionsSection: View {
             }
         }
         .padding(.horizontal, 2)
+        .onChange(of: isEditMode) { _, _ in closeMenu() }
+    }
+
+    private func toggleMenu(for item: QuickActionItem) {
+        OhanaFeedback.light()
+        withAnimation(GoMotion.feedback) {
+            openActionId = openActionId == item.id ? nil : item.id
+        }
+    }
+
+    private func closeMenu() {
+        withAnimation(GoMotion.feedback) {
+            openActionId = nil
+        }
     }
 
     private var header: some View {
         HStack(spacing: 8) {
             Text(title)
                 .font(OhanaFont.caption2(.black))
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.9))
                 .tracking(2.6)
             Spacer(minLength: 4)
             Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                OhanaFeedback.light()
                 onToggleEdit()
             } label: {
                 Image(systemName: isEditMode ? "checkmark.circle.fill" : "pencil")
                     .font(OhanaFont.callout(.bold))
-                    .foregroundStyle(isEditMode ? Color.goLime : .white.opacity(0.78))
+                    .foregroundStyle(isEditMode ? Color.goPrimary : Color.ohanaPrimaryText.opacity(0.78))
                     .frame(width: 28, height: 24)
             }
             .buttonStyle(ScaleButtonStyle())
@@ -116,9 +140,9 @@ struct ExpandedPetQuickActionsSection: View {
     }
 
     private var limitText: some View {
-        Text("最多 8 个快捷操作")
+        Text("8 max")
             .font(OhanaFont.caption2(.medium))
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(Color.ohanaTertiaryText)
             .frame(maxWidth: .infinity)
             .padding(.top, 2)
             .transition(.opacity)
@@ -126,6 +150,7 @@ struct ExpandedPetQuickActionsSection: View {
 }
 
 struct ExpandedHumanQuickActionsSection: View {
+    let title: String
     let human: Human
     let items: [QuickActionItem]
     let defaultItems: [QuickActionItem]
@@ -143,9 +168,12 @@ struct ExpandedHumanQuickActionsSection: View {
     let privacyIconTint: (QuickActionItem) -> Color
     let isPrivacyLocked: (QuickActionItem) -> Bool
     let isCompleted: (QuickActionItem) -> Bool
+    let feedbackActionKey: String?
+    let feedbackToken: CheckInFeedbackToken?
     let onTap: (QuickActionItem) -> Void
     let onLongPress: (QuickActionItem) -> Void
     let onLimitReached: () -> Void
+    @State private var openActionId: String? = nil
 
     var body: some View {
         VStack(spacing: 8) {
@@ -168,14 +196,24 @@ struct ExpandedHumanQuickActionsSection: View {
                         isEditMode: isEditMode,
                         jiggle: jiggle,
                         shouldReduceWork: shouldReduceWork,
+                        isMenuOpen: !isEditMode && openActionId == item.id,
                         countText: countText,
                         privacyIconName: privacyIconName,
                         privacyIconTint: privacyIconTint,
                         isPrivacyLocked: isPrivacyLocked,
                         isCompleted: isCompleted,
-                        onTap: onTap,
-                        onLongPress: onLongPress
+                        feedbackToken: feedbackActionKey == actionKey(for: item) ? feedbackToken : nil,
+                        onToggleMenu: { toggleMenu(for: item) },
+                        onQuick: {
+                            closeMenu()
+                            onTap(item)
+                        },
+                        onDetail: {
+                            closeMenu()
+                            onLongPress(item)
+                        }
                     )
+                    .zIndex(openActionId == item.id ? 20 : Double(items.count - idx))
                 }
 
                 if isEditMode && editItems.count < QuickActionLimit.maxItemsPerEntity {
@@ -192,22 +230,40 @@ struct ExpandedHumanQuickActionsSection: View {
             }
         }
         .padding(.horizontal, 2)
+        .onChange(of: isEditMode) { _, _ in closeMenu() }
+    }
+
+    private func toggleMenu(for item: QuickActionItem) {
+        OhanaFeedback.light()
+        withAnimation(GoMotion.feedback) {
+            openActionId = openActionId == item.id ? nil : item.id
+        }
+    }
+
+    private func closeMenu() {
+        withAnimation(GoMotion.feedback) {
+            openActionId = nil
+        }
+    }
+
+    private func actionKey(for item: QuickActionItem) -> String {
+        "\(human.id.uuidString):\(item.actionType)"
     }
 
     private var header: some View {
         HStack(spacing: 8) {
-            Text("快捷操作")
+            Text(title)
                 .font(OhanaFont.caption2(.black))
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.9))
                 .tracking(2.6)
             Spacer(minLength: 4)
             Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                OhanaFeedback.light()
                 onToggleEdit()
             } label: {
                 Image(systemName: isEditMode ? "checkmark.circle.fill" : "pencil")
                     .font(OhanaFont.callout(.bold))
-                    .foregroundStyle(isEditMode ? Color.goLime : .white.opacity(0.78))
+                    .foregroundStyle(isEditMode ? Color.goPrimary : Color.ohanaPrimaryText.opacity(0.78))
                     .frame(width: 28, height: 24)
             }
             .buttonStyle(ScaleButtonStyle())
@@ -216,9 +272,9 @@ struct ExpandedHumanQuickActionsSection: View {
     }
 
     private var limitText: some View {
-        Text("最多 8 个快捷操作")
+        Text("8 max")
             .font(OhanaFont.caption2(.medium))
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(Color.ohanaTertiaryText)
             .frame(maxWidth: .infinity)
             .padding(.top, 2)
             .transition(.opacity)
@@ -245,12 +301,12 @@ struct LegacyExpandedQuickModulesView: View {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(titleForAction(action.label))
                                 .font(.system(size: 13, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.72)
                             Text(card.isReal && !card.isHuman ? "快速打卡" : "查看")
                                 .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.48))
+                                .foregroundStyle(Color.ohanaTertiaryText)
                                 .lineLimit(1)
                         }
                     }
@@ -274,7 +330,7 @@ private struct ExpandedFirstSuccessPrompt: View {
         HStack(spacing: 8) {
             button(title: "喂食", icon: "fork.knife", action: onFeed)
             button(title: "陪玩", icon: "tennisball.fill", action: onPlay)
-            button(title: "记录照片", icon: "camera.fill", action: onMoment)
+            button(title: "记录", icon: "camera.fill", action: onMoment)
         }
         .padding(8)
         .background(Color.ohanaCardSurface.opacity(0.52), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -286,7 +342,7 @@ private struct ExpandedFirstSuccessPrompt: View {
 
     private func button(title: String, icon: String, action: @escaping () -> Void) -> some View {
         Button {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            OhanaFeedback.medium()
             action()
         } label: {
             VStack(spacing: 6) {
@@ -296,7 +352,7 @@ private struct ExpandedFirstSuccessPrompt: View {
                     .frame(width: 28, height: 28)
                 Text(title)
                     .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.76)
             }
@@ -319,12 +375,14 @@ private struct ExpandedPetQuickActionGridItem: View {
     let isEditMode: Bool
     let jiggle: Bool
     let shouldReduceWork: Bool
+    let isMenuOpen: Bool
     let waterManagementLabel: String
     let showsAttentionDot: (QuickActionItem) -> Bool
     let countText: (QuickActionItem) -> String?
     let isCompleted: (QuickActionItem) -> Bool
-    let onTap: (QuickActionItem) -> Void
-    let onLongPress: (QuickActionItem) -> Void
+    let onToggleMenu: () -> Void
+    let onQuick: () -> Void
+    let onDetail: () -> Void
     let onGroomCheckIn: (String) -> Void
     let onPottySelect: (String) -> Void
     let onHealthSelect: (String) -> Void
@@ -343,12 +401,24 @@ private struct ExpandedPetQuickActionGridItem: View {
                 isCompletedToday: !isEditMode && isCompleted(item),
                 prefersLightForeground: true,
                 onTap: handleTap,
-                onLongPress: isEditMode ? nil : { onLongPress(item) },
+                onLongPress: isEditMode ? nil : onToggleMenu,
                 onGroomCheckIn: nil,
                 onPottySelect: nil,
                 onHealthSelect: nil
             )
             .allowsHitTesting(!isEditMode)
+
+            if isMenuOpen {
+                ExpandedQuickInlineActionMenu(
+                    accent: Color(hex: item.colorHex),
+                    isQuickDisabled: quickDisabled,
+                    onQuick: onQuick,
+                    onDetail: onDetail
+                )
+                .offset(y: 52)
+                .ohanaInlineMenuMotion(trigger: isMenuOpen)
+                .zIndex(12)
+            }
 
             if isEditMode {
                 QAEditModeDragLayer(item: item, themeHex: themeHex, draggingItemId: $draggingItemId)
@@ -357,8 +427,8 @@ private struct ExpandedPetQuickActionGridItem: View {
         .rotationEffect(.degrees(isEditMode ? (jiggle ? -2.5 : 2.5) : 0))
         .animation(
             isEditMode
-                ? (shouldReduceWork ? nil : .easeInOut(duration: 0.12 + Double(idx % 4) * 0.015).repeatForever(autoreverses: true))
-                : .easeOut(duration: 0.2),
+                ? (shouldReduceWork ? nil : GoMotion.quick.repeatForever(autoreverses: true))
+                : GoMotion.stateChange,
             value: jiggle
         )
         .overlay(alignment: .topLeading) {
@@ -372,16 +442,20 @@ private struct ExpandedPetQuickActionGridItem: View {
     private func handleTap() {
         guard !isEditMode else { return }
         pressedActionId = item.id
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        OhanaFeedback.medium()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
             pressedActionId = nil
-            onTap(item)
+            onToggleMenu()
         }
+    }
+
+    private var quickDisabled: Bool {
+        ExpandedQuickActionLogic.singleUseLabel(for: item.actionType) != nil && isCompleted(item)
     }
 
     private var removeButton: some View {
         Button {
-            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+            OhanaFeedback.strong()
             withAnimation(HeroAnim.buttonSpring) {
                 editItems.removeAll { $0.id == item.id }
             }
@@ -390,7 +464,7 @@ private struct ExpandedPetQuickActionGridItem: View {
                 Circle().fill(Color.goRed).frame(width: 20, height: 20)
                 Image(systemName: "minus")
                     .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.arkInk)
             }
         }
         .buttonStyle(ScaleButtonStyle())
@@ -410,13 +484,16 @@ private struct ExpandedHumanQuickActionGridItem: View {
     let isEditMode: Bool
     let jiggle: Bool
     let shouldReduceWork: Bool
+    let isMenuOpen: Bool
     let countText: (QuickActionItem) -> String?
     let privacyIconName: (QuickActionItem) -> String?
     let privacyIconTint: (QuickActionItem) -> Color
     let isPrivacyLocked: (QuickActionItem) -> Bool
     let isCompleted: (QuickActionItem) -> Bool
-    let onTap: (QuickActionItem) -> Void
-    let onLongPress: (QuickActionItem) -> Void
+    let feedbackToken: CheckInFeedbackToken?
+    let onToggleMenu: () -> Void
+    let onQuick: () -> Void
+    let onDetail: () -> Void
 
     var body: some View {
         ZStack {
@@ -432,9 +509,28 @@ private struct ExpandedHumanQuickActionGridItem: View {
                 isCompletedToday: !isEditMode && isCompleted(item),
                 prefersLightForeground: true,
                 onTap: handleTap,
-                onLongPress: isEditMode ? nil : { onLongPress(item) }
+                onLongPress: isEditMode ? nil : onToggleMenu
             )
             .allowsHitTesting(!isEditMode)
+            .checkInPulse(feedbackToken)
+            .overlay(alignment: .topTrailing) {
+                if let feedbackToken {
+                    CheckInFeedbackBadge(token: feedbackToken)
+                        .offset(x: 5, y: -5)
+                }
+            }
+
+            if isMenuOpen {
+                ExpandedQuickInlineActionMenu(
+                    accent: Color(hex: item.colorHex),
+                    isQuickDisabled: false,
+                    onQuick: onQuick,
+                    onDetail: onDetail
+                )
+                .offset(y: 52)
+                .ohanaInlineMenuMotion(trigger: isMenuOpen)
+                .zIndex(12)
+            }
 
             if isEditMode {
                 QAEditModeDragLayer(item: item, themeHex: themeHex, draggingItemId: $draggingItemId)
@@ -443,8 +539,8 @@ private struct ExpandedHumanQuickActionGridItem: View {
         .rotationEffect(.degrees(isEditMode ? (jiggle ? -2.5 : 2.5) : 0))
         .animation(
             isEditMode
-                ? (shouldReduceWork ? nil : .easeInOut(duration: 0.12 + Double(idx % 4) * 0.015).repeatForever(autoreverses: true))
-                : .easeOut(duration: 0.2),
+                ? (shouldReduceWork ? nil : GoMotion.quick.repeatForever(autoreverses: true))
+                : GoMotion.stateChange,
             value: jiggle
         )
         .overlay(alignment: .topLeading) {
@@ -458,16 +554,16 @@ private struct ExpandedHumanQuickActionGridItem: View {
     private func handleTap() {
         guard !isEditMode else { return }
         pressedActionId = item.id
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        OhanaFeedback.medium()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
             pressedActionId = nil
-            onTap(item)
+            onToggleMenu()
         }
     }
 
     private var removeButton: some View {
         Button {
-            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+            OhanaFeedback.strong()
             withAnimation(HeroAnim.buttonSpring) {
                 editItems.removeAll { $0.id == item.id }
             }
@@ -476,11 +572,71 @@ private struct ExpandedHumanQuickActionGridItem: View {
                 Circle().fill(Color.goRed).frame(width: 20, height: 20)
                 Image(systemName: "minus")
                     .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.arkInk)
             }
         }
         .buttonStyle(ScaleButtonStyle())
         .offset(x: -4, y: -4)
+    }
+}
+
+private struct ExpandedQuickInlineActionMenu: View {
+    let accent: Color
+    let isQuickDisabled: Bool
+    let onQuick: () -> Void
+    let onDetail: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            iconButton(
+                icon: isQuickDisabled ? "checkmark" : "checkmark.circle.fill",
+                tint: isQuickDisabled ? Color.ohanaControlFill : accent,
+                foreground: isQuickDisabled ? Color.ohanaSecondaryText : Color.ohanaPrimaryActionText,
+                accessibility: isQuickDisabled ? "今日已完成" : "快速打卡",
+                isDisabled: isQuickDisabled,
+                action: onQuick
+            )
+
+            iconButton(
+                icon: "chart.line.uptrend.xyaxis",
+                tint: Color.ohanaCardSurface,
+                foreground: Color.ohanaPrimaryText,
+                accessibility: "查看详情",
+                isDisabled: false,
+                action: onDetail
+            )
+        }
+        .padding(5)
+        .background(Color.ohanaControlFill, in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+        }
+        .shadow(color: Color.black.opacity(0.18), radius: 14, x: 0, y: 8) // ui-v4: allow floating submenu lift
+    }
+
+    private func iconButton(
+        icon: String,
+        tint: Color,
+        foreground: Color,
+        accessibility: String,
+        isDisabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            guard !isDisabled else { return }
+            OhanaFeedback.medium()
+            action()
+        } label: {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .black))
+                .foregroundStyle(foreground)
+                .frame(width: 34, height: 34)
+                .background(tint, in: Circle())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .disabled(isDisabled)
+        .accessibilityLabel(accessibility)
     }
 }
 
@@ -492,7 +648,7 @@ private struct ExpandedPetQuickAddButton: View {
 
     var body: some View {
         Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            OhanaFeedback.light()
             guard QuickActionLimit.count(for: pet, in: editItems) < QuickActionLimit.maxItemsPerEntity else {
                 onLimitReached()
                 return
@@ -523,7 +679,7 @@ private struct ExpandedPetQuickAddButton: View {
                 .frame(width: 44, height: 44)
             Text("添加")
                 .font(OhanaFont.caption2(.bold))
-                .foregroundStyle(.white.opacity(0.86))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.86))
         }
         .frame(maxWidth: .infinity, minHeight: 80)
         .padding(.horizontal, 8)
@@ -572,7 +728,7 @@ private struct ExpandedHumanQuickAddButton: View {
                 .frame(width: 44, height: 44)
             Text("添加")
                 .font(OhanaFont.caption2(.bold))
-                .foregroundStyle(.white.opacity(0.86))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.86))
         }
         .frame(maxWidth: .infinity, minHeight: 80)
         .padding(.horizontal, 8)

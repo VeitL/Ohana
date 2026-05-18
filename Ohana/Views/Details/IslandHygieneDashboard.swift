@@ -138,7 +138,7 @@ struct IslandHygieneDashboard: View {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.goCardWhite)
                     .frame(width: 36, height: 36)
                     .goGlassBackground(Circle())
             }
@@ -147,7 +147,7 @@ struct IslandHygieneDashboard: View {
             Spacer()
             Text("清洁护理")
                 .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.goCardWhite)
             Spacer()
             Color.clear.frame(width: 36, height: 36)
         }
@@ -200,19 +200,19 @@ struct IslandHygieneDashboard: View {
             VStack(alignment: .leading, spacing: 7) {
                 Text("清洁站")
                     .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.56))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.56))
                 Text(overdueCount > 0 ? "\(overdueCount) 项待补" : "护理节奏正常")
                     .font(.system(size: 24, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.goCardWhite)
                 Text("今日 \(todayCount) 次 · 7 天 \(weekCount) 次")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.52))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.52))
             }
             Spacer()
         }
         .padding(18)
         .background(
-            LinearGradient(colors: [Color.goTeal.opacity(0.2), Color.white.opacity(0.07)], startPoint: .topLeading, endPoint: .bottomTrailing),
+            LinearGradient(colors: [Color.goTeal.opacity(0.2), Color.goCardWhite.opacity(0.07)], startPoint: .topLeading, endPoint: .bottomTrailing),
             in: RoundedRectangle(cornerRadius: 26, style: .continuous)
         )
     }
@@ -222,11 +222,11 @@ struct IslandHygieneDashboard: View {
             HStack {
                 Label("近 14 天护理频率", systemImage: "chart.bar.fill")
                     .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.82))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.82))
                 Spacer()
                 Text("次数")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.45))
             }
 
             if dailyPoints.allSatisfy({ $0.count == 0 }) {
@@ -246,14 +246,14 @@ struct IslandHygieneDashboard: View {
             }
         }
         .padding(16)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     private var hygieneRows: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("成员护理状态")
                 .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.goCardWhite)
 
             ForEach(petSummaries) { summary in
                 Button {
@@ -274,14 +274,14 @@ struct IslandHygieneDashboard: View {
                 HStack(spacing: 6) {
                     Text(summary.pet.name)
                         .font(.system(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.goCardWhite)
                     Text(summary.pet.species)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(Color.goCardWhite.opacity(0.5))
                 }
                 Text(summary.latestTitle)
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.58))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.58))
                     .lineLimit(1)
                 HStack(spacing: 8) {
                     pill("今日 \(summary.todayCount)", color: Color.goLime)
@@ -297,14 +297,14 @@ struct IslandHygieneDashboard: View {
             if let date = summary.latestDate {
                 Text(relativeDayText(date))
                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.5))
             }
             Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(.white.opacity(0.32))
+                .foregroundStyle(Color.goCardWhite.opacity(0.32))
         }
         .padding(14)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private func metricCard(title: String, value: String, subtitle: String, icon: String, tint: Color) -> some View {
@@ -318,19 +318,19 @@ struct IslandHygieneDashboard: View {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
                     .font(.system(size: 30, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.goCardWhite)
                     .monospacedDigit()
                 Text(subtitle)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.48))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.48))
             }
             Text(title)
                 .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.58))
+                .foregroundStyle(Color.goCardWhite.opacity(0.58))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     @ViewBuilder
@@ -341,10 +341,10 @@ struct IslandHygieneDashboard: View {
                 Text(title)
                     .font(.system(size: 13, weight: .bold, design: .rounded))
             }
-            .foregroundStyle(isSelected ? .black : .white)
+            .foregroundStyle(isSelected ? Color.arkInk : Color.goCardWhite)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(isSelected ? Color.goLime : Color.white.opacity(0.12), in: Capsule())
+            .background(isSelected ? Color.goLime : Color.ohanaControlFill, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -369,7 +369,7 @@ struct IslandHygieneDashboard: View {
         Text(text)
             .multilineTextAlignment(.center)
             .font(.system(size: 13, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white.opacity(0.42))
+            .foregroundStyle(Color.goCardWhite.opacity(0.42))
             .frame(maxWidth: .infinity, minHeight: 130)
     }
 
@@ -414,7 +414,7 @@ struct IslandHygieneDashboard: View {
 
     private func playScrubAnimation() {
         scrubProgress = 0
-        withAnimation(.spring(response: 0.58, dampingFraction: 0.78)) {
+        withAnimation(GoMotion.page) {
             scrubProgress = 1
         }
     }

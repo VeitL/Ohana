@@ -111,7 +111,7 @@ struct FocusWalletCardView: View {
             RoundedRectangle(cornerRadius: HeroAnim.stackCardCorner, style: .continuous)
                 .strokeBorder(cardBorderColor, lineWidth: cardBorderWidth)
         )
-        .shadow(color: cardBorderShadow, radius: cardBorderShadowRadius, y: 0)
+        .shadow(color: cardBorderShadow, radius: cardBorderShadowRadius, y: 0) // ui-v4: allow equipped/pet-bond card border glow
         .modifier(RealPetTransitionModifier(card: card, heroNS: heroNS))
     }
 
@@ -212,8 +212,8 @@ struct FocusWalletCardView: View {
             colors: [
                 .clear,
                 useDarkText
-                    ? Color.white.opacity(isHeroExpanded ? 0.30 : 0.20)
-                    : Color.black.opacity(usesFullBleed ? 0.12 : 0.28)
+                    ? Color.goCardWhite.opacity(isHeroExpanded ? 0.30 : 0.20)
+                    : Color.arkInk.opacity(usesFullBleed ? 0.12 : 0.28)
             ],
             startPoint: .top, endPoint: .bottom
         )
@@ -310,7 +310,7 @@ struct FocusWalletCardView: View {
             let silSpecies = FocusWalletCardView.normalizeSpecies(species)
             ZStack {
                 Ellipse()
-                    .fill(Color.black.opacity(0.16))
+                    .fill(Color.arkInk.opacity(0.16))
                     .frame(width: w * (isHeroExpanded ? 0.32 : 0.28), height: isHeroExpanded ? 26 : 24)
                     .blur(radius: 10)
                     .offset(y: h * (isHeroExpanded ? 0.18 : 0.14))
@@ -349,7 +349,7 @@ struct FocusWalletCardView: View {
             .frame(width: w, height: h, alignment: .bottomLeading)
             .offset(x: w * 0.01, y: h * 0.42)
             .allowsHitTesting(false)
-            .shadow(color: .black.opacity(0.28), radius: 18, x: 0, y: 12)
+            .shadow(color: Color.arkInk.opacity(0.28), radius: 18, x: 0, y: 12) // ui-v4: allow transparent avatar grounding
     }
 
     private func fullTransparentAvatar(_ image: UIImage, avatarExpanded: Bool, w: CGFloat, h: CGFloat) -> some View {
@@ -366,7 +366,7 @@ struct FocusWalletCardView: View {
             .frame(width: w, height: h, alignment: .bottomLeading)
             .offset(x: avatarOffsetX, y: avatarOffsetY)
             .allowsHitTesting(false)
-            .shadow(color: .black.opacity(0.28), radius: 18, x: 0, y: 12)
+            .shadow(color: Color.arkInk.opacity(0.28), radius: 18, x: 0, y: 12) // ui-v4: allow transparent avatar grounding
     }
 
     private func rightInfoColumn(h: CGFloat, usesFullBleed: Bool) -> some View {
@@ -374,7 +374,7 @@ struct FocusWalletCardView: View {
             if card.streak > 1 {
                 Text("🔥 \(card.streak)天连续")
                     .font(.system(size: 10, weight: .black, design: .rounded))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 9).padding(.vertical, 4)
                     .background(Color.goPrimary, in: Capsule())
             }
@@ -401,7 +401,7 @@ struct FocusWalletCardView: View {
             if let title = equippedTitleBadge {
                 Text(title)
                     .font(.system(size: isHeroExpanded ? 11 : 9, weight: .black, design: .rounded))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Color.arkInk)
                     .lineLimit(1)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -480,13 +480,13 @@ struct FocusWalletCardView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
         }
-        .foregroundStyle(isShown ? Color.arkInk : Color.white.opacity(0.74))
+        .foregroundStyle(isShown ? Color.arkInk : Color.goCardWhite.opacity(0.74))
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(isShown ? Color.goLime : Color.black.opacity(0.26), in: Capsule())
+        .background(isShown ? Color.goLime : Color.arkInk.opacity(0.26), in: Capsule())
         .overlay(
             Capsule()
-                .strokeBorder(isShown ? Color.clear : Color.white.opacity(0.16), lineWidth: 0.6)
+                .strokeBorder(isShown ? Color.clear : Color.goCardWhite.opacity(0.16), lineWidth: 0.6)
         )
     }
 
@@ -510,7 +510,7 @@ struct FocusWalletCardView: View {
             if let title = equippedTitleBadge {
                 Text(title)
                     .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Color.arkInk)
                     .lineLimit(1)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
@@ -548,7 +548,7 @@ struct FocusWalletCardView: View {
     }
 
     private func cardPrimaryText(usesFullBleed: Bool) -> Color {
-        useDarkCardText(usesFullBleed: usesFullBleed) ? Color.arkInk : Color.white
+        useDarkCardText(usesFullBleed: usesFullBleed) ? Color.arkInk : Color.goCardWhite
     }
 
     private func cardSecondaryText(usesFullBleed: Bool, opacity: Double) -> Color {
@@ -557,8 +557,8 @@ struct FocusWalletCardView: View {
 
     private func topIdentityScrimColors(usesFullBleed: Bool) -> [Color] {
         useDarkCardText(usesFullBleed: usesFullBleed)
-            ? [Color.white.opacity(0.34), Color.white.opacity(0.10), .clear]
-            : [Color.black.opacity(0.22), Color.black.opacity(0.06), .clear]
+            ? [Color.goCardWhite.opacity(0.34), Color.goCardWhite.opacity(0.10), .clear]
+            : [Color.arkInk.opacity(0.22), Color.arkInk.opacity(0.06), .clear]
     }
 
     private static func normalizeSpecies(_ s: String) -> String {

@@ -34,26 +34,56 @@ struct HumanPrivacyToggleButton: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         } label: {
             ZStack {
-                Color.clear
-                    .frame(width: 58, height: 30)
+                Capsule()
+                    .fill(trackFill)
+                    .frame(width: 68, height: 34)
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(trackStroke, lineWidth: 1.25)
+                    }
 
                 Circle()
-                    .fill(isFieldPrivate ? Color.goYellow : Color.primary.opacity(0.14))
-                    .frame(width: 24, height: 24)
-                    .shadow(color: .black.opacity(0.14), radius: 6, x: 0, y: 2)
+                    .fill(knobFill)
+                    .frame(width: 26, height: 26)
+                    .overlay {
+                        Circle()
+                            .strokeBorder(Color.ohanaCardStroke.opacity(isFieldPrivate ? 0.25 : 0.9), lineWidth: 1)
+                    }
                     .overlay {
                         Image(systemName: isFieldPrivate ? "lock.fill" : "lock.open.fill")
                             .font(.system(size: 10, weight: .black))
-                            .foregroundStyle(isFieldPrivate ? Color.arkInk : Color.primary.opacity(0.82))
+                            .foregroundStyle(knobIconColor)
                     }
-                    .offset(x: isFieldPrivate ? 14 : -14)
+                    .offset(x: isFieldPrivate ? 17 : -17)
             }
-            .animation(.spring(response: 0.28, dampingFraction: 0.78), value: isFieldPrivate)
+            .frame(width: 74, height: 44)
+            .contentShape(Rectangle())
+            .animation(GoMotion.feedback, value: isFieldPrivate)
             .accessibilityLabel(isFieldPrivate ? "隐私已开启，仅本人可见" : "隐私已关闭，家庭成员可见")
         }
         .buttonStyle(ScaleButtonStyle())
         .opacity(isOwner ? 1 : 0.5)
         .disabled(!isOwner)
+    }
+
+    private var trackFill: Color {
+        isFieldPrivate
+            ? Color.goYellow.opacity(0.16)
+            : Color.ohanaControlFill
+    }
+
+    private var trackStroke: Color {
+        isFieldPrivate
+            ? Color.goYellow.opacity(0.55)
+            : Color.ohanaCardStroke.opacity(0.95)
+    }
+
+    private var knobFill: Color {
+        isFieldPrivate ? Color.goYellow : Color.ohanaCardSurfaceElevated
+    }
+
+    private var knobIconColor: Color {
+        isFieldPrivate ? Color.arkInk : Color.ohanaSecondaryText
     }
 }
 

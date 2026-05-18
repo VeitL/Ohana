@@ -2,26 +2,13 @@
 //  AddHumanWizardView.swift
 //  Ohana
 //
-//  参照 AddPetWizardView：GO 岛景底 + 钱包比例顶卡 + 玻璃分页卡 + 分页点（翻页与保存与宠物向导同构）
-//  - 国籍：`PetBreedDatabase.countries` 横向列表
-//  - 现居地：国家列表 + `PetBreedDatabase.cities(for:)` 城市网格（含「其他」手填）
+//  Lightweight RPG-style human creation wizard.
 //
 
 import SwiftUI
 import SwiftData
 import PhotosUI
 import Foundation
-
-// MARK: - Human wizard steps
-
-private enum HumanWizardStep: Int, CaseIterable {
-    case identity = 0   // 名字
-    case profile  = 1   // 性别/身份 + 生日 + 血型
-    case avatar   = 2   // 头像确认
-    case family   = 3   // 权限 + 国籍
-    case body     = 4   // 身高体重 + 隐私
-    case confirm  = 5   // 主题色 + 确认
-}
 
 // MARK: - AddHumanWizardView
 
@@ -84,6 +71,8 @@ struct AddHumanWizardView: View {
 
     // ── Alerts
     @State private var showDuplicateNameAlert = false
+    @State private var showJoinCelebration = false
+    @State private var joinedHumanName = ""
 
     // ── Avatar decoded cache (avoid re-decoding on each keystroke)
     @State private var decodedAvatar:           UIImage? = nil
@@ -126,6 +115,16 @@ struct AddHumanWizardView: View {
     /// 标准信用卡比例 1.586:1，左右各 7pt 边距（与首页 K.cardH / K.cardMargin 保持一致）
     private var walletDraftCardHeight: CGFloat { (ScreenCompat.width - 7 * 2) / 1.586 }
     private let walletCardCorner: CGFloat = 24
+
+    private var wizardStages: [AddWizardStageItem] {
+        [
+            AddWizardStageItem(id: 0, title: l.tr(zh: "身份卡", en: "Identity", de: "Identität"), systemImage: "person.text.rectangle.fill"),
+            AddWizardStageItem(id: 1, title: l.tr(zh: "形象", en: "Avatar", de: "Avatar"), systemImage: "sparkles"),
+            AddWizardStageItem(id: 2, title: l.tr(zh: "权限", en: "Role", de: "Rolle"), systemImage: "crown.fill"),
+            AddWizardStageItem(id: 3, title: l.tr(zh: "身体档案", en: "Body", de: "Körper"), systemImage: "heart.text.square.fill"),
+            AddWizardStageItem(id: 4, title: l.tr(zh: "加入 Ohana", en: "Join", de: "Beitreten"), systemImage: "checkmark.seal.fill")
+        ]
+    }
 
     private func fallbackAvatarEmoji(for gender: String) -> String {
         HumanGenderIdentity.fallbackAvatarEmoji(for: gender)
@@ -200,17 +199,30 @@ struct AddHumanWizardView: View {
         Avatar2DAccess.usesFreeSlot(kind: .human, existingCount: existingHumans.count)
     }
 
-    private var avatar2DStatusText: String {
-        if Avatar2DAccess.usesFreeSlot(kind: .human, existingCount: existingHumans.count) {
-            return l.tr(zh: "推荐使用当前 2.5D 头像，可获得最佳卡片和首页体验。", en: "We recommend the current 2.5D avatar for the best card and Home experience.", de: "Wir empfehlen den aktuellen 2.5D-Avatar für die beste Karten- und Home-Erfahrung.")
-        }
-        return l.tr(zh: "2.5D 头像需要后期在椰子商店购买，并指定给这个成员解锁。", en: "2.5D avatars can be unlocked later from the Coconut Shop for this member.", de: "2.5D-Avatare kannst du später im Kokosnuss-Shop für dieses Mitglied freischalten.")
-    }
-
     // MARK: - Body
 
     var body: some View {
-        wizardMainColumn
+        ZStack {
+            OhanaAppBackground()
+            wizardMainColumn
+            if showJoinCelebration {
+                AddWizardJoinCelebrationOverlay(
+                    title: l.tr(
+                        zh: "\(joinedHumanName) 已加入 Ohana",
+                        en: "\(joinedHumanName) joined Ohana",
+                        de: "\(joinedHumanName) ist bei Ohana"
+                    ),
+                    subtitle: l.tr(
+                        zh: "成员卡已准备好",
+                        en: "The member card is ready",
+                        de: "Die Mitgliedskarte ist bereit"
+                    ),
+                    systemImage: "person.crop.circle.badge.checkmark",
+                    accent: Color.goPrimary
+                )
+                .zIndex(40)
+            }
+        }
             .onAppear {
                 refreshAutomaticAvatarAssetData()
                 scheduleAvatarDecode()
@@ -347,6 +359,24 @@ struct AddHumanWizardView: View {
             cornerRadius: walletCardCorner
         )
         .frame(height: walletDraftCardHeight)
+        .overlay(alignment: .bottomLeading) {
+            HStack(spacing: 8) {
+                AddWizardStatusBadge(
+                    title: l.tr(zh: "角色卡", en: "Character card", de: "Charakterkarte"),
+                    systemImage: "sparkles",
+                    tint: Color.goPrimary
+                )
+                AddWizardStatusBadge(
+                    title: canUseAutomatic2DAvatar
+                        ? l.tr(zh: "推荐 2.5D", en: "2.5D pick", de: "2.5D Tipp")
+                        : l.tr(zh: "商店解锁", en: "Shop unlock", de: "Shop-Freischaltung"),
+                    systemImage: canUseAutomatic2DAvatar ? "wand.and.stars" : "lock.fill",
+                    tint: canUseAutomatic2DAvatar ? Color.goTeal : Color.ohanaCardSurfaceElevated
+                )
+            }
+            .padding(.leading, 16)
+            .padding(.bottom, 14)
+        }
         .padding(.horizontal, 7)   // 与首页卡片堆 K.cardMargin 保持一致
         .padding(.top, 8)
         .padding(.bottom, 6)
@@ -376,30 +406,17 @@ struct AddHumanWizardView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Dot row（与 AddPetWizardView.wizardPageDotRow 一致）
+    // MARK: - Stage row
 
     private var wizardPageDotRow: some View {
-        HStack(spacing: 6) {
-            ForEach(0..<totalCards, id: \.self) { i in
-                wizardPageDotButton(index: i)
-            }
-        }
-        .padding(.top, 8).padding(.bottom, 4)
-    }
-
-    private func wizardPageDotButton(index i: Int) -> some View {
-        Button {
+        AddWizardStageProgress(stages: wizardStages, currentIndex: wizardPageIndex) { index in
             GoKeyboard.dismiss()
             withAnimation(GoMotion.feedback) {
-                wizardPageIndex = i
+                wizardPageIndex = index
             }
-        } label: {
-            Capsule()
-                .fill(i == wizardPageIndex ? Color.goPrimary : Color.primary.opacity(0.2))
-                .frame(width: i == wizardPageIndex ? 20 : 6, height: 6)
         }
-        .buttonStyle(ScaleButtonStyle())
-        .animation(GoMotion.feedback, value: wizardPageIndex)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
     }
 
     /// 与 `AddPetWizardView.pagedCard` 同构
@@ -419,38 +436,23 @@ struct AddHumanWizardView: View {
     }
 
     private var meshIdentityProfile: String {
-        l.tr(zh: "身份资料 · 1/5", en: "IDENTITY · 1/5", de: "IDENTITÄT · 1/5")
+        l.tr(zh: "身份卡 · 1/5", en: "IDENTITY CARD · 1/5", de: "IDENTITÄTSKARTE · 1/5")
     }
 
     private var meshAvatar: String {
-        l.tr(zh: "头像 · 2/5", en: "AVATAR · 2/5", de: "AVATAR · 2/5")
+        l.tr(zh: "形象确认 · 2/5", en: "AVATAR CHECK · 2/5", de: "AVATAR-CHECK · 2/5")
     }
 
     private var meshFamily: String {
-        l.tr(zh: "资料与权限 · 3/5", en: "DETAILS & PERMISSION · 3/5", de: "DETAILS & RECHTE · 3/5")
+        l.tr(zh: "权限徽章 · 3/5", en: "ROLE BADGE · 3/5", de: "ROLLENABZEICHEN · 3/5")
     }
 
     private var meshBody: String {
-        l.tr(zh: "身体隐私 · 4/5", en: "BODY & PRIVACY · 4/5", de: "KÖRPER & PRIVATSPHÄRE · 4/5")
+        l.tr(zh: "身体档案 · 4/5", en: "BODY FILE · 4/5", de: "KÖRPERAKTE · 4/5")
     }
 
     private var meshConfirm: String {
-        l.tr(zh: "确认 · 5/5", en: "FINAL CHECK · 5/5", de: "ABSCHLUSS · 5/5")
-    }
-
-    // MARK: - Card 1: Identity (Name)
-
-    private var card1Identity: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 18) {
-                meshCardLabel(l.humanWizMesh1).padding(.top, 14).padding(.horizontal, 20)
-
-                humanNameSection
-
-                Spacer(minLength: 20)
-            }
-            .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 16)
-        }
+        l.tr(zh: "加入 Ohana · 5/5", en: "JOIN OHANA · 5/5", de: "OHANA BEITRETEN · 5/5")
     }
 
     private var card1IdentityAndProfile: some View {
@@ -500,20 +502,6 @@ struct AddHumanWizardView: View {
                     .foregroundStyle(Color(hex: "FF6B00"))
                     .padding(.leading, 4)
             }
-        }
-    }
-
-    // MARK: - Card 2: Profile (Gender + Birthday + Blood type)
-
-    private var card2Profile: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 22) {
-                meshCardLabel(l.humanWizMesh2).padding(.top, 14).padding(.horizontal, 20)
-                humanProfileFields
-
-                Spacer(minLength: 20)
-            }
-            .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 16)
         }
     }
 
@@ -666,6 +654,8 @@ struct AddHumanWizardView: View {
             VStack(spacing: 18) {
                 meshCardLabel(meshAvatar).padding(.top, 14).padding(.horizontal, 20)
 
+                avatarPreviewHero
+
                 VStack(spacing: 10) {
                     cardSectionLabel(l.humanWizAvatarPhoto)
                     HStack(spacing: 10) {
@@ -676,9 +666,16 @@ struct AddHumanWizardView: View {
                             avatarActionButton(icon: "camera.fill", label: l.humanWizCamera)
                         }
                     }
-                    Text(avatar2DStatusText)
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(canUseAutomatic2DAvatar ? Color.goPrimary.opacity(0.85) : .secondary.opacity(0.65))
+                    HStack {
+                        AddWizardStatusBadge(
+                            title: canUseAutomatic2DAvatar
+                                ? l.tr(zh: "推荐当前 2.5D", en: "Use this 2.5D", de: "Diesen 2.5D nutzen")
+                                : l.tr(zh: "2.5D 商店解锁", en: "2.5D in shop", de: "2.5D im Shop"),
+                            systemImage: canUseAutomatic2DAvatar ? "sparkles" : "lock.fill",
+                            tint: canUseAutomatic2DAvatar ? Color.goPrimary : Color.ohanaCardSurfaceElevated
+                        )
+                        Spacer()
+                    }
                     if canUseAutomatic2DAvatar && !usesAutomaticAvatarAsset {
                         Button {
                             restoreAutomaticAvatarAsset()
@@ -1179,6 +1176,44 @@ struct AddHumanWizardView: View {
         )
     }
 
+    private var avatarPreviewHero: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color.ohanaCardSurfaceElevated)
+            if let decodedAvatar {
+                Image(uiImage: decodedAvatar)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(decodedAvatarTransparent ? 18 : 28)
+            } else {
+                Text(fallbackAvatarEmoji(for: gender))
+                    .font(.system(size: 74))
+            }
+            VStack {
+                HStack {
+                    AddWizardStatusBadge(
+                        title: usesAutomaticAvatarAsset
+                            ? l.tr(zh: "自动形象", en: "Auto avatar", de: "Auto-Avatar")
+                            : l.tr(zh: "手动形象", en: "Custom avatar", de: "Eigenes Bild"),
+                        systemImage: usesAutomaticAvatarAsset ? "wand.and.stars" : "photo.fill",
+                        tint: usesAutomaticAvatarAsset ? Color.goTeal : accentColor
+                    )
+                    Spacer()
+                }
+                Spacer()
+            }
+            .padding(14)
+        }
+        .frame(height: 164)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+        )
+        .animation(GoMotion.feedback, value: avatarImageData?.count)
+        .animation(GoMotion.feedback, value: usesAutomaticAvatarAsset)
+    }
+
     private func bodyDataMetricButton(
         field: BodyMetricField,
         icon: String, iconColor: Color,
@@ -1444,7 +1479,16 @@ struct AddHumanWizardView: View {
 
         modelContext.safeSave()
         onHumanSaved?(human)
-        onComplete()
+        joinedHumanName = trimmed
+        withAnimation(GoMotion.sheet) {
+            showJoinCelebration = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
+            withAnimation(GoMotion.quick) {
+                showJoinCelebration = false
+            }
+            onComplete()
+        }
     }
 
     private func decimalValue(from text: String) -> Double? {

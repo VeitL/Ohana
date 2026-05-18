@@ -7,18 +7,29 @@
 
 import SwiftUI
 
+struct FoodCardMetricLine: Identifiable {
+    var id: String { title }
+    let title: String
+    let value: String
+    let tint: Color
+    var isCurrent: Bool = false
+}
+
 struct CoreFoodCard: View {
     let title: String
     let value: String
     let subtitle: String
     let icon: String
     let tint: Color
+    let metricLines: [FoodCardMetricLine]
     let primaryTitle: String
     let primaryIcon: String
     let secondaryTitle: String
     let secondaryIcon: String
     let cardAction: (() -> Void)?
     let primaryLongPressAction: (() -> Void)?
+    let feedbackToken: CheckInFeedbackToken?
+    let highlightMetricId: String?
     let primaryAction: () -> Void
     let secondaryAction: () -> Void
 
@@ -28,12 +39,15 @@ struct CoreFoodCard: View {
         subtitle: String,
         icon: String,
         tint: Color,
+        metricLines: [FoodCardMetricLine] = [],
         primaryTitle: String,
         primaryIcon: String,
         secondaryTitle: String,
         secondaryIcon: String,
         cardAction: (() -> Void)? = nil,
         primaryLongPressAction: (() -> Void)? = nil,
+        feedbackToken: CheckInFeedbackToken? = nil,
+        highlightMetricId: String? = nil,
         primaryAction: @escaping () -> Void,
         secondaryAction: @escaping () -> Void
     ) {
@@ -42,59 +56,70 @@ struct CoreFoodCard: View {
         self.subtitle = subtitle
         self.icon = icon
         self.tint = tint
+        self.metricLines = metricLines
         self.primaryTitle = primaryTitle
         self.primaryIcon = primaryIcon
         self.secondaryTitle = secondaryTitle
         self.secondaryIcon = secondaryIcon
         self.cardAction = cardAction
         self.primaryLongPressAction = primaryLongPressAction
+        self.feedbackToken = feedbackToken
+        self.highlightMetricId = highlightMetricId
         self.primaryAction = primaryAction
         self.secondaryAction = secondaryAction
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            if let cardAction {
-                Button(action: cardAction) {
+        ZStack(alignment: .topLeading) {
+            HStack(spacing: 12) {
+                if let cardAction {
+                    Button(action: cardAction) {
+                        infoContent
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                } else {
                     infoContent
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .buttonStyle(ScaleButtonStyle())
-            } else {
-                infoContent
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
 
-            VStack(spacing: 8) {
-                Label(primaryTitle, systemImage: primaryIcon)
-                    .font(.system(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
-                    .labelStyle(.titleAndIcon)
-                    .frame(width: 84)
-                    .frame(minHeight: 44)
-                    .background(tint, in: Capsule())
-                    .contentShape(Capsule())
-                    .onTapGesture(perform: primaryAction)
-                    .onLongPressGesture(minimumDuration: 0.48, maximumDistance: 18) {
-                        primaryLongPressAction?()
-                    }
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityAction(named: Text(primaryTitle), primaryAction)
-
-                Button(action: secondaryAction) {
-                    Label(secondaryTitle, systemImage: secondaryIcon)
-                        .font(.system(size: 11, weight: .black, design: .rounded))
-                        .foregroundStyle(tint)
+                VStack(spacing: 8) {
+                    Label(primaryTitle, systemImage: primaryIcon)
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.arkInk)
                         .labelStyle(.titleAndIcon)
                         .frame(width: 84)
                         .frame(minHeight: 44)
-                        .background(tint.opacity(0.12), in: Capsule())
+                        .background(tint, in: Capsule())
+                        .contentShape(Capsule())
+                        .onTapGesture(perform: primaryAction)
+                        .onLongPressGesture(minimumDuration: 0.48, maximumDistance: 18) {
+                            primaryLongPressAction?()
+                        }
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAction(named: Text(primaryTitle), primaryAction)
+
+                    Button(action: secondaryAction) {
+                        Label(secondaryTitle, systemImage: secondaryIcon)
+                            .font(.system(size: 11, weight: .black, design: .rounded))
+                            .foregroundStyle(tint)
+                            .labelStyle(.titleAndIcon)
+                            .frame(width: 84)
+                            .frame(minHeight: 44)
+                            .background(tint.opacity(0.12), in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
                 }
-                .buttonStyle(ScaleButtonStyle())
+            }
+
+            if let feedbackToken {
+                CheckInFeedbackBadge(token: feedbackToken)
+                    .offset(x: 62, y: 2)
             }
         }
         .padding(14)
         .feedFlatBlockSurface(cornerRadius: 22)
+        .checkInPulse(feedbackToken)
     }
 
     private var infoContent: some View {
@@ -109,11 +134,40 @@ struct CoreFoodCard: View {
                 Text(title)
                     .font(.system(size: 16, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(value)
-                    .font(.system(size: 22, weight: .black, design: .rounded))
-                    .foregroundStyle(tint)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                if metricLines.isEmpty {
+                        Text(value)
+                            .font(.system(size: 22, weight: .black, design: .rounded))
+                            .foregroundStyle(tint)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+                            .contentTransition(.numericText())
+                } else {
+                    VStack(alignment: .leading, spacing: 5) {
+                        ForEach(metricLines) { line in
+                            let isFeedbackHighlighted = line.id == highlightMetricId
+                            let isHighlighted = line.isCurrent || isFeedbackHighlighted
+                            HStack(spacing: 6) {
+                                Text(line.title)
+                                    .font(.system(size: 11, weight: .black, design: .rounded))
+                                    .foregroundStyle(isHighlighted ? Color.arkInk.opacity(0.78) : Color.ohanaSecondaryText)
+                                Spacer(minLength: 6)
+                                Text(line.value)
+                                    .font(.system(size: 12, weight: .black, design: .rounded))
+                                    .foregroundStyle(isHighlighted ? Color.arkInk : line.tint)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.72)
+                                    .contentTransition(.numericText())
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(isHighlighted ? line.tint : line.tint.opacity(0.08), in: Capsule())
+                            .opacity(line.isCurrent ? 1 : 0.82)
+                            .scaleEffect(isFeedbackHighlighted ? 1.025 : 1)
+                            .animation(GoMotion.feedback, value: highlightMetricId)
+                            .animation(GoMotion.feedback, value: line.isCurrent)
+                        }
+                    }
+                }
                 Text(subtitle)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -137,6 +191,8 @@ struct StockFoodCard: View {
     let secondaryTitle: String
     let secondaryIcon: String
     let cardAction: (() -> Void)?
+    let stockPulseKind: FeedFoodKind?
+    let stockFeedbackToken: CheckInFeedbackToken?
     let primaryAction: () -> Void
     let secondaryAction: () -> Void
 
@@ -152,6 +208,8 @@ struct StockFoodCard: View {
         secondaryTitle: String,
         secondaryIcon: String,
         cardAction: (() -> Void)? = nil,
+        stockPulseKind: FeedFoodKind? = nil,
+        stockFeedbackToken: CheckInFeedbackToken? = nil,
         primaryAction: @escaping () -> Void,
         secondaryAction: @escaping () -> Void
     ) {
@@ -166,49 +224,59 @@ struct StockFoodCard: View {
         self.secondaryTitle = secondaryTitle
         self.secondaryIcon = secondaryIcon
         self.cardAction = cardAction
+        self.stockPulseKind = stockPulseKind
+        self.stockFeedbackToken = stockFeedbackToken
         self.primaryAction = primaryAction
         self.secondaryAction = secondaryAction
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            if let cardAction {
-                Button(action: cardAction) {
+        ZStack(alignment: .topLeading) {
+            HStack(spacing: 12) {
+                if let cardAction {
+                    Button(action: cardAction) {
+                        infoContent
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                } else {
                     infoContent
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .buttonStyle(ScaleButtonStyle())
-            } else {
-                infoContent
-                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(spacing: 8) {
+                    Button(action: primaryAction) {
+                        Label(primaryTitle, systemImage: primaryIcon)
+                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.arkInk)
+                            .labelStyle(.titleAndIcon)
+                            .frame(width: 84)
+                            .frame(minHeight: 44)
+                            .background(Color.goPrimary, in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+
+                    Button(action: secondaryAction) {
+                        Label(secondaryTitle, systemImage: secondaryIcon)
+                            .font(.system(size: 11, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.goPrimary)
+                            .labelStyle(.titleAndIcon)
+                            .frame(width: 84)
+                            .frame(minHeight: 44)
+                            .background(Color.goPrimary.opacity(0.12), in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
             }
 
-            VStack(spacing: 8) {
-                Button(action: primaryAction) {
-                    Label(primaryTitle, systemImage: primaryIcon)
-                        .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.arkInk)
-                        .labelStyle(.titleAndIcon)
-                        .frame(width: 84)
-                        .frame(minHeight: 44)
-                        .background(Color.goPrimary, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
-
-                Button(action: secondaryAction) {
-                    Label(secondaryTitle, systemImage: secondaryIcon)
-                        .font(.system(size: 11, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.goPrimary)
-                        .labelStyle(.titleAndIcon)
-                        .frame(width: 84)
-                        .frame(minHeight: 44)
-                        .background(Color.goPrimary.opacity(0.12), in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
+            if let stockFeedbackToken {
+                CheckInFeedbackBadge(token: stockFeedbackToken)
+                    .offset(x: 62, y: 2)
             }
         }
         .padding(14)
         .feedFlatBlockSurface(cornerRadius: 22)
+        .checkInPulse(stockFeedbackToken)
     }
 
     private var infoContent: some View {
@@ -229,15 +297,15 @@ struct StockFoodCard: View {
                         .font(.system(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 } else {
-                    stockLine(title: dryTitle, snapshot: drySnapshot, tint: Color.foodDry)
-                    stockLine(title: wetTitle, snapshot: wetSnapshot, tint: Color.foodWet)
+                    stockLine(title: dryTitle, snapshot: drySnapshot, tint: Color.goPrimary, isHighlighted: stockPulseKind == .dry)
+                    stockLine(title: wetTitle, snapshot: wetSnapshot, tint: Color.goPrimary, isHighlighted: stockPulseKind == .wet)
                 }
             }
         }
         .contentShape(Rectangle())
     }
 
-    private func stockLine(title: String, snapshot: FeedStockSnapshot, tint: Color) -> some View {
+    private func stockLine(title: String, snapshot: FeedStockSnapshot, tint: Color, isHighlighted: Bool) -> some View {
         let progress = snapshot.totalGrams > 0 ? max(0, min(1, snapshot.remainingGrams / snapshot.totalGrams)) : 0
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
@@ -250,7 +318,11 @@ struct StockFoodCard: View {
                     .foregroundStyle(tint)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+                    .contentTransition(.numericText())
             }
+            .padding(.horizontal, isHighlighted ? 7 : 0)
+            .padding(.vertical, isHighlighted ? 3 : 0)
+            .background(isHighlighted ? tint.opacity(0.10) : Color.clear, in: Capsule())
             GeometryReader { proxy in
                 Capsule()
                     .fill(tint.opacity(0.14))
@@ -258,6 +330,7 @@ struct StockFoodCard: View {
                         Capsule()
                             .fill(tint)
                             .frame(width: proxy.size.width * progress)
+                            .animation(GoMotion.feedback, value: progress)
                     }
             }
             .frame(height: 6)

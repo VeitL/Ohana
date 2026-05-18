@@ -641,6 +641,14 @@ struct HumanPasscodeManagementSheet: View {
         case remove
     }
 
+    private enum PinInputTarget: Hashable {
+        case current
+        case new
+        case confirm
+    }
+
+    @State private var activePinTarget: PinInputTarget?
+
     init(human: Human) {
         self.human = human
         self._mode = State(initialValue: HumanPasscodeService.hasPasscode(human) ? .overview : .set)
@@ -723,7 +731,7 @@ struct HumanPasscodeManagementSheet: View {
         case .remove:
             VStack(spacing: 14) {
                 statusCard(title: "关闭后可直接切换", subtitle: "请输入当前密码确认关闭", icon: "exclamationmark.lock.fill", tint: Color.goRed)
-                pinField("当前密码", text: $currentPin)
+                pinField("当前密码", text: $currentPin, target: .current)
                 messageView
                 HStack(spacing: 10) {
                     secondaryButton("返回") { resetInputs(); mode = .overview }
@@ -739,10 +747,10 @@ struct HumanPasscodeManagementSheet: View {
                 .font(OhanaFont.callout(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
             if needsCurrent {
-                pinField("当前密码", text: $currentPin)
+                pinField("当前密码", text: $currentPin, target: .current)
             }
-            pinField("新密码", text: $newPin)
-            pinField("确认新密码", text: $confirmPin)
+            pinField("新密码", text: $newPin, target: .new)
+            pinField("确认新密码", text: $confirmPin, target: .confirm)
             messageView
             HStack(spacing: 10) {
                 if HumanPasscodeService.hasPasscode(human) {
@@ -794,19 +802,46 @@ struct HumanPasscodeManagementSheet: View {
         .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
-    private func pinField(_ title: String, text: Binding<String>) -> some View {
-        SecureField(title, text: text)
-            .keyboardType(.numberPad)
-            .textContentType(.oneTimeCode)
-            .font(.system(size: 18, weight: .black, design: .rounded))
-            .multilineTextAlignment(.center)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 13)
-            .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
+    private func pinField(_ title: String, text: Binding<String>, target: PinInputTarget) -> some View {
+        VStack(spacing: 8) {
+            Button {
+                GoKeyboard.dismiss()
+                withAnimation(GoMotion.feedback) {
+                    activePinTarget = activePinTarget == target ? nil : target
+                }
+            } label: {
+                HStack {
+                    Text(title)
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                    Spacer()
+                    HStack(spacing: 7) {
+                        ForEach(0..<4, id: \.self) { index in
+                            Circle()
+                                .fill(index < text.wrappedValue.count ? Color.goPrimary : Color.ohanaControlFill)
+                                .frame(width: 10, height: 10)
+                        }
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 13)
+                .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                        .strokeBorder(activePinTarget == target ? Color.goPrimary.opacity(0.42) : Color.primary.opacity(0.10), lineWidth: 1)
+                }
             }
+            .buttonStyle(ScaleButtonStyle())
+
+            if activePinTarget == target {
+                HumanPasscodePad(pin: text, accent: Color.goPrimary) {
+                    withAnimation(GoMotion.feedback) {
+                        activePinTarget = nil
+                    }
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+            }
+        }
     }
 
     @ViewBuilder
@@ -922,6 +957,7 @@ struct HumanPasscodeManagementSheet: View {
         confirmPin = ""
         message = ""
         isError = false
+        activePinTarget = nil
     }
 
     private func sanitized(_ value: String) -> String {

@@ -27,6 +27,8 @@ struct QuickWaterDetailSheet: View {
     @State private var waterReminderOn = false
     @State private var filterReminderOn = false
     @State private var activeSheet: ActiveSheet?
+    @State private var nestedInlineSheet: ActiveSheet?
+    @State private var waterSheetReturnStack: [ActiveSheet] = []
     @State private var showSaveToast = false
     @State private var saveToastMessage = ""
     @State private var saveToastTask: Task<Void, Never>?
@@ -38,6 +40,10 @@ struct QuickWaterDetailSheet: View {
     @State private var inlineSheetDragOffset: CGFloat = 0
     @State private var adaptiveSheetHeight: CGFloat = 430
     @State private var waterModeStorageTick = 0
+    @State private var waterFeedbackToken: CheckInFeedbackToken?
+    @State private var waterChangeFeedbackToken: CheckInFeedbackToken?
+    @State private var filterFeedbackToken: CheckInFeedbackToken?
+    @State private var feedbackClearTask: Task<Void, Never>?
 
     private enum ActiveSheet: String, Identifiable {
         case waterSettings
@@ -65,7 +71,7 @@ struct QuickWaterDetailSheet: View {
             case .waterAmount:
                 return 430
             case .waterPlan:
-                return 620
+                return 486
             case .waterSettings:
                 return 420
             case .filterSettings:
@@ -95,16 +101,22 @@ struct QuickWaterDetailSheet: View {
             get: { activeSheet?.usesInlineOverlay == true ? nil : activeSheet },
             set: { newValue in
                 if let newValue {
-                    activeSheet = newValue
+                    openRootWaterSheet(newValue)
                 } else if activeSheet?.usesInlineOverlay != true {
+                    nestedInlineSheet = nil
+                    waterSheetReturnStack.removeAll()
                     activeSheet = nil
                 }
             }
         )
     }
 
+    private var activeInlineSheet: ActiveSheet? {
+        nestedInlineSheet ?? (activeSheet?.usesInlineOverlay == true ? activeSheet : nil)
+    }
+
     private var inlineOverlayBlocksBackground: Bool {
-        activeSheet?.usesInlineOverlay == true
+        activeInlineSheet != nil
     }
 
     private var todayWaterLogs: [PetCareLog] {
@@ -191,22 +203,39 @@ struct QuickWaterDetailSheet: View {
             .toolbar(.hidden, for: .navigationBar)
             .sheet(item: systemSheetBinding) { sheet in
                 NavigationStack {
-                    sheetContent(sheet)
-                        .petMemorialTone(isActive: pet.hasPassedAway)
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                OhanaPopupCloseButton(tint: Color.ohanaPrimaryText) {
-                                    activeSheet = nil
-                                }
-                            }
+                    ZStack {
+                        VStack(spacing: 0) {
+                            waterSheetTopChrome(sheet)
+                                .padding(.horizontal, 20)
+                                .padding(.top, 12)
+                                .padding(.bottom, 4)
+
+                            sheetContent(sheet)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                                .allowsHitTesting(nestedInlineSheet == nil)
+                                .petMemorialTone(isActive: pet.hasPassedAway)
                         }
+
+                        if nestedInlineSheet != nil {
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .ignoresSafeArea()
+                                .zIndex(35)
+                        }
+
+                        if let nestedInlineSheet {
+                            inlineWaterSheetOverlay(nestedInlineSheet)
+                                .zIndex(40)
+                                .ignoresSafeArea(.container, edges: .bottom)
+                        }
+                    }
+                    .toolbar(.hidden, for: .navigationBar)
                 }
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-                    .presentationBackground(Color.ohanaCardSurface)
-                    .presentationCornerRadius(30)
-                    .presentationContentInteraction(.scrolls)
+                .presentationDetents([.large]) // ui-v4: allow long overview/history uses system sheet
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color.ohanaCardSurface)
+                .presentationCornerRadius(30)
+                .presentationContentInteraction(.scrolls)
             }
             .ignoresSafeArea(.keyboard, edges: .bottom)
             .petMemorialTone(isActive: pet.hasPassedAway)
@@ -241,7 +270,14 @@ struct QuickWaterDetailSheet: View {
                 }
             }
         }
-        .interactiveDismissDisabled(activeSheet?.usesInlineOverlay == true)
+        .onChange(of: nestedInlineSheet?.id) { _, _ in
+            adaptiveSheetHeight = nestedInlineSheet?.inlineHeight ?? activeSheet?.inlineHeight ?? 430
+            inlineSheetDragOffset = 0
+            if nestedInlineSheet == nil && activeSheet?.usesInlineOverlay != true {
+                inlineSheetVisible = false
+            }
+        }
+        .interactiveDismissDisabled(activeInlineSheet != nil)
     }
 
     // MARK: - Main UI
@@ -284,8 +320,8 @@ struct QuickWaterDetailSheet: View {
                 }
                 .clipShape(shape)
                 .frame(width: panelWidth)
-                .shadow(color: Color.black.opacity(inlineSheetVisible ? 0.56 : 0), radius: 48, x: 0, y: -18)
-                .shadow(color: Color(hex: "0B102C").opacity(inlineSheetVisible ? 0.46 : 0), radius: 28, x: 0, y: 12)
+                .shadow(color: Color.black.opacity(inlineSheetVisible ? 0.56 : 0), radius: 48, x: 0, y: -18) // ui-v4: allow popup liftedAlert shadow
+                .shadow(color: Color(hex: "0B102C").opacity(inlineSheetVisible ? 0.46 : 0), radius: 28, x: 0, y: 12) // ui-v4: allow popup liftedAlert shadow
                 .offset(y: inlineSheetVisible ? inlineSheetDragOffset : hiddenOffset)
                 .opacity(inlineSheetVisible ? 1 : 0.94)
                 .scaleEffect(inlineSheetVisible ? 1 : 0.982, anchor: .bottom)
@@ -306,9 +342,9 @@ struct QuickWaterDetailSheet: View {
 
     private var inlineSheetBackdrop: some View {
         ZStack {
-            Color.black.opacity(inlineSheetVisible ? 0.16 : 0)
+            Color.black.opacity(inlineSheetVisible ? 0.16 : 0) // ui-v4: allow modal scrim
             LinearGradient(
-                colors: [Color.clear, Color.black.opacity(inlineSheetVisible ? 0.26 : 0)],
+                colors: [Color.clear, Color.black.opacity(inlineSheetVisible ? 0.26 : 0)], // ui-v4: allow modal scrim
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -335,16 +371,54 @@ struct QuickWaterDetailSheet: View {
     }
 
     private func dismissInlineWaterSheet() {
-        let dismissingSheetID = activeSheet?.id
+        let dismissingSheetID = activeInlineSheet?.id
         withAnimation(GoMotion.page) {
             inlineSheetVisible = false
             inlineSheetDragOffset = 0
         }
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 260_000_000)
-            if activeSheet?.id == dismissingSheetID {
-                activeSheet = nil
+            if nestedInlineSheet?.id == dismissingSheetID {
+                nestedInlineSheet = nil
+            } else if activeSheet?.id == dismissingSheetID {
+                closeActiveWaterSheet()
             }
+        }
+    }
+
+    private func openRootWaterSheet(_ sheet: ActiveSheet) {
+        nestedInlineSheet = nil
+        waterSheetReturnStack.removeAll()
+        activeSheet = sheet
+    }
+
+    private func openWaterSheet(_ sheet: ActiveSheet) {
+        if activeSheet?.usesInlineOverlay == false, sheet.usesInlineOverlay {
+            nestedInlineSheet = sheet
+            return
+        }
+        if activeSheet?.usesInlineOverlay == true, sheet.usesInlineOverlay {
+            activeSheet = sheet
+            return
+        }
+
+        if let current = activeSheet, current.id != sheet.id {
+            waterSheetReturnStack.append(current)
+        } else if activeSheet == nil {
+            waterSheetReturnStack.removeAll()
+        }
+        activeSheet = sheet
+    }
+
+    private func closeActiveWaterSheet() {
+        if nestedInlineSheet != nil {
+            nestedInlineSheet = nil
+            return
+        }
+        if let returnSheet = waterSheetReturnStack.popLast() {
+            activeSheet = returnSheet
+        } else {
+            activeSheet = nil
         }
     }
 
@@ -505,11 +579,11 @@ struct QuickWaterDetailSheet: View {
             primaryIcon: waterPrimaryIcon,
             primaryAction: {
                 guard !pet.hasPassedAway else {
-                    activeSheet = .waterOverview
+                    openRootWaterSheet(.waterOverview)
                     return
                 }
                 if isAquatic {
-                    activeSheet = .waterOverview
+                    openRootWaterSheet(.waterOverview)
                 } else if waterMode == .reminder {
                     completeNextPlannedWaterOrOpenOverview()
                 } else {
@@ -519,12 +593,13 @@ struct QuickWaterDetailSheet: View {
             secondaryTitle: isAquatic ? nil : "设置",
             secondaryAction: isAquatic ? nil : {
                 guard !pet.hasPassedAway else {
-                    activeSheet = .waterOverview
+                    openRootWaterSheet(.waterOverview)
                     return
                 }
                 handleWaterSettingsTap()
             },
-            tapAction: { activeSheet = .waterOverview }
+            tapAction: { openRootWaterSheet(.waterOverview) },
+            feedbackToken: waterFeedbackToken
         )
     }
 
@@ -540,14 +615,21 @@ struct QuickWaterDetailSheet: View {
             primaryIcon: "checkmark",
             primaryAction: {
                 guard !pet.hasPassedAway else {
-                    activeSheet = .waterChangeOverview
+                    openRootWaterSheet(.waterChangeOverview)
                     return
                 }
                 doWaterChange()
             },
             secondaryTitle: "管理",
-            secondaryAction: { activeSheet = pet.hasPassedAway ? .waterChangeOverview : .waterSettings },
-            tapAction: { activeSheet = .waterChangeOverview }
+            secondaryAction: {
+                if pet.hasPassedAway {
+                    openRootWaterSheet(.waterChangeOverview)
+                } else {
+                    openWaterSheet(.waterSettings)
+                }
+            },
+            tapAction: { openRootWaterSheet(.waterChangeOverview) },
+            feedbackToken: waterChangeFeedbackToken
         )
     }
 
@@ -563,14 +645,21 @@ struct QuickWaterDetailSheet: View {
             primaryIcon: "checkmark",
             primaryAction: {
                 guard !pet.hasPassedAway else {
-                    activeSheet = .filterOverview
+                    openRootWaterSheet(.filterOverview)
                     return
                 }
                 doFilterClean()
             },
             secondaryTitle: "管理",
-            secondaryAction: { activeSheet = pet.hasPassedAway ? .filterOverview : .filterSettings },
-            tapAction: { activeSheet = .filterOverview }
+            secondaryAction: {
+                if pet.hasPassedAway {
+                    openRootWaterSheet(.filterOverview)
+                } else {
+                    openWaterSheet(.filterSettings)
+                }
+            },
+            tapAction: { openRootWaterSheet(.filterOverview) },
+            feedbackToken: filterFeedbackToken
         )
     }
 
@@ -582,7 +671,7 @@ struct QuickWaterDetailSheet: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 Button {
-                    activeSheet = .history
+                    openWaterSheet(.history)
                 } label: {
                     Text("管理")
                         .font(.system(size: 12, weight: .black, design: .rounded))
@@ -616,7 +705,7 @@ struct QuickWaterDetailSheet: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
             .background(chromeTint, in: Capsule())
-            .shadow(color: chromeTint.opacity(0.32), radius: 12, y: 6)
+            .shadow(color: chromeTint.opacity(0.32), radius: 12, y: 6) // ui-v4: allow toast elevation
             .padding(.top, 8)
             .transition(.move(edge: .top).combined(with: .opacity))
     }
@@ -755,9 +844,9 @@ struct QuickWaterDetailSheet: View {
             )
             .ohanaAdaptiveSheetContentHeight(
                 $adaptiveSheetHeight,
-                minHeight: 520,
-                maxHeight: 820,
-                chromePadding: 70
+                minHeight: 430,
+                maxHeight: 520,
+                chromePadding: 0
             )
         case .filterSettings:
             FilterSettingsSheet(
@@ -801,7 +890,6 @@ struct QuickWaterDetailSheet: View {
     private var waterOverviewSheet: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                overviewHero(icon: "drop.fill", title: "喂水总览", subtitle: waterMode == .reminder ? "计划 \(waterRuleState.completionText)" : waterSubtitle, tint: waterMode == .reminder ? Color.goTeal : chromeTint)
                 overviewRangePicker(tint: waterMode == .reminder ? Color.goTeal : chromeTint)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                     overviewMetric(title: "今日次数", value: "\(todayWaterLogs.count)", icon: "number.circle.fill", tint: chromeTint)
@@ -819,7 +907,7 @@ struct QuickWaterDetailSheet: View {
                         handleWaterSettingsTap()
                     }
                     Button {
-                        activeSheet = .history
+                        openWaterSheet(.history)
                     } label: {
                         Label("全部记录", systemImage: "clock.arrow.circlepath")
                             .font(.system(size: 14, weight: .black, design: .rounded))
@@ -842,13 +930,12 @@ struct QuickWaterDetailSheet: View {
             }
             .padding(20)
         }
-        .navigationTitle("喂水")
+        .navigationTitle("")
     }
 
     private var waterChangeOverviewSheet: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                overviewHero(icon: "arrow.2.circlepath", title: "换水总览", subtitle: waterChangeSubtitle, tint: waterChangeTint)
                 overviewRangePicker(tint: waterChangeTint)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                     overviewMetric(title: "周期", value: "\(waterIntervalDays)天", icon: "repeat", tint: waterChangeTint)
@@ -865,7 +952,7 @@ struct QuickWaterDetailSheet: View {
                 HStack(spacing: 10) {
                     WaterPrimaryButton(title: "记录换水", icon: "checkmark", tint: waterChangeTint) { doWaterChange() }
                     Button {
-                        activeSheet = .waterSettings
+                        openWaterSheet(.waterSettings)
                     } label: {
                         Label("管理", systemImage: "slider.horizontal.3")
                             .font(.system(size: 14, weight: .black, design: .rounded))
@@ -888,13 +975,12 @@ struct QuickWaterDetailSheet: View {
             }
             .padding(20)
         }
-        .navigationTitle("换水")
+        .navigationTitle("")
     }
 
     private var filterOverviewSheet: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                overviewHero(icon: "sparkles", title: "滤芯总览", subtitle: filterSubtitle, tint: filterTint)
                 overviewRangePicker(tint: filterTint)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                     overviewMetric(title: "清洗", value: filterNextCleanText, icon: "sparkles", tint: filterTint)
@@ -911,7 +997,7 @@ struct QuickWaterDetailSheet: View {
                 HStack(spacing: 10) {
                     WaterPrimaryButton(title: "记录清洗", icon: "checkmark", tint: filterTint) { doFilterClean() }
                     Button {
-                        activeSheet = .filterSettings
+                        openWaterSheet(.filterSettings)
                     } label: {
                         Label("管理", systemImage: "slider.horizontal.3")
                             .font(.system(size: 14, weight: .black, design: .rounded))
@@ -934,7 +1020,7 @@ struct QuickWaterDetailSheet: View {
             }
             .padding(20)
         }
-        .navigationTitle("滤芯")
+        .navigationTitle("")
     }
 
     private func overviewHero(icon: String, title: String, subtitle: String, tint: Color) -> some View {
@@ -983,6 +1069,51 @@ struct QuickWaterDetailSheet: View {
         }
     }
 
+    @ViewBuilder
+    private func waterSheetTopChrome(_ sheet: ActiveSheet) -> some View {
+        HStack(spacing: 12) {
+            waterSheetChromeTitle(sheet)
+            Spacer(minLength: 12)
+            OhanaPopupCloseButton(tint: Color.ohanaPrimaryText) {
+                closeActiveWaterSheet()
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
+    }
+
+    @ViewBuilder
+    private func waterSheetChromeTitle(_ sheet: ActiveSheet) -> some View {
+        switch sheet {
+        case .waterOverview:
+            waterSheetChromeTitleContent(
+                icon: "drop.fill",
+                title: "喂水总览",
+                tint: waterMode == .reminder ? Color.goTeal : chromeTint
+            )
+        case .waterChangeOverview:
+            waterSheetChromeTitleContent(icon: "arrow.2.circlepath", title: "换水总览", tint: waterChangeTint)
+        case .filterOverview:
+            waterSheetChromeTitleContent(icon: "sparkles", title: "滤芯总览", tint: filterTint)
+        default:
+            EmptyView()
+        }
+    }
+
+    private func waterSheetChromeTitleContent(icon: String, title: String, tint: Color) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .black))
+                .foregroundStyle(tint)
+                .frame(width: 30, height: 34)
+            Text(title)
+                .font(.system(size: 18, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
     private func overviewMetric(title: String, value: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
@@ -1024,29 +1155,31 @@ struct QuickWaterDetailSheet: View {
                 emptyInlineState(icon: "chart.line.uptrend.xyaxis", text: emptyText)
                     .frame(height: 160)
             } else {
-                Chart(points) { point in
+                let yDomain = OhanaChartStyle.yDomain(values: points.map(\.value), includeZero: true)
+                let renderedPoints = points.map {
+                    WaterChartPoint(date: $0.date, value: $0.value * overviewChartProgress)
+                }
+                Chart(renderedPoints) { point in
                     AreaMark(
                         x: .value("Day", point.date),
-                        y: .value("Value", point.value * overviewChartProgress)
+                        y: .value("Value", point.value)
                     )
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [tint.opacity(0.32), tint.opacity(0.04)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
+                    .foregroundStyle(OhanaChartStyle.areaGradient(for: tint, topOpacity: 0.26))
+                    .interpolationMethod(OhanaChartStyle.trendInterpolation)
+
                     LineMark(
                         x: .value("Day", point.date),
-                        y: .value("Value", point.value * overviewChartProgress)
+                        y: .value("Value", point.value)
                     )
-                    .interpolationMethod(.catmullRom)
+                    .interpolationMethod(OhanaChartStyle.trendInterpolation)
                     .foregroundStyle(tint)
-                    .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                    .lineStyle(OhanaChartStyle.trendLineStyle)
                 }
+                .chartYScale(domain: yDomain)
                 .chartXAxis(.hidden)
                 .chartYAxis(.hidden)
                 .frame(height: 160)
+                .animation(GoMotion.page, value: overviewChartProgress)
             }
         }
         .padding(.vertical, 8)
@@ -1274,7 +1407,7 @@ struct QuickWaterDetailSheet: View {
     // MARK: - Actions
     private func handleWaterModeTap(_ mode: WaterOperatingMode) {
         guard !isAquatic else {
-            activeSheet = .waterOverview
+            openRootWaterSheet(.waterOverview)
             return
         }
         guard mode != waterMode else {
@@ -1298,7 +1431,7 @@ struct QuickWaterDetailSheet: View {
         if waterMode == .reminder {
             openWaterPlanSettings()
         } else {
-            activeSheet = .waterAmount
+            openWaterSheet(.waterAmount)
         }
     }
 
@@ -1311,7 +1444,7 @@ struct QuickWaterDetailSheet: View {
             waterPlanCount = min(max(events.count, 1), 6)
             waterPlanTimes = WaterPlanWriter.normalizedTimes(events.map(\.startDate), count: waterPlanCount)
         }
-        activeSheet = .waterPlan
+        openWaterSheet(.waterPlan)
     }
 
     private func syncWaterPlanTimesCount(_ count: Int) {
@@ -1405,7 +1538,7 @@ struct QuickWaterDetailSheet: View {
 
     private func completeNextPlannedWaterOrOpenOverview() {
         guard let reminder = waterRuleState.nextPendingReminder else {
-            activeSheet = .waterOverview
+            openRootWaterSheet(.waterOverview)
             return
         }
         let reward = CareEventService.completePlannedWater(
@@ -1417,6 +1550,7 @@ struct QuickWaterDetailSheet: View {
         )
         let delta = (reward?.humanGot ?? 0) + (reward?.petGot ?? 0)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+        triggerWaterFeedback()
         showSaveConfirmation(delta > 0 ? "喂水计划 +\(delta)🥥" : "已完成喂水")
         ensureUpcomingWaterPlanReminders()
     }
@@ -1433,6 +1567,7 @@ struct QuickWaterDetailSheet: View {
         )
         let delta = reward.humanGot + reward.petGot
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+        triggerWaterFeedback()
         showSaveConfirmation(delta > 0 ? "喂水 +\(delta)🥥" : "已记录喂水")
     }
 
@@ -1459,6 +1594,8 @@ struct QuickWaterDetailSheet: View {
             cycleAnchor: waterChangeAnchorDate
         )
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+        waterChangeFeedbackToken = CheckInFeedbackToken(kind: .done, deltaText: "✓", tint: waterChangeTint)
+        scheduleFeedbackClear()
         showSaveConfirmation("已记录换水")
     }
 
@@ -1478,7 +1615,28 @@ struct QuickWaterDetailSheet: View {
         )
         syncFilterPlan(showToast: false)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+        filterFeedbackToken = CheckInFeedbackToken(kind: .done, deltaText: "✓", tint: filterTint)
+        scheduleFeedbackClear()
         showSaveConfirmation("滤芯已清洗")
+    }
+
+    private func triggerWaterFeedback() {
+        let text = defaultWaterAmountMl.map { "+\(Int($0.rounded()))ml" } ?? "+1"
+        waterFeedbackToken = CheckInFeedbackToken(kind: .gain, deltaText: text, tint: waterMode == .reminder ? Color.goTeal : chromeTint)
+        scheduleFeedbackClear()
+    }
+
+    private func scheduleFeedbackClear() {
+        feedbackClearTask?.cancel()
+        feedbackClearTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_250_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(GoMotion.quick) {
+                waterFeedbackToken = nil
+                waterChangeFeedbackToken = nil
+                filterFeedbackToken = nil
+            }
+        }
     }
 
     private func deleteLog(_ log: PetCareLog) {

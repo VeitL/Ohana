@@ -110,6 +110,7 @@ struct WaterCoreCard: View {
     var secondaryTitle: String?
     var secondaryAction: (() -> Void)?
     var tapAction: (() -> Void)?
+    var feedbackToken: CheckInFeedbackToken? = nil
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -118,37 +119,44 @@ struct WaterCoreCard: View {
     }
 
     var body: some View {
-        HStack(spacing: 14) {
-            tappableInfo
+        ZStack(alignment: .topLeading) {
+            HStack(spacing: 14) {
+                tappableInfo
 
-            VStack(spacing: 8) {
-                Button(action: primaryAction) {
-                    HStack(spacing: 5) {
-                        Image(systemName: primaryIcon)
-                            .font(.system(size: 11, weight: .black))
-                        Text(primaryTitle)
-                            .font(.system(size: 13, weight: .black, design: .rounded))
-                    }
-                    .foregroundStyle(Color.arkInk)
-                    .frame(minWidth: 72)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                    .background(tint, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
-
-                if let secondaryTitle, let secondaryAction {
-                    Button(action: secondaryAction) {
-                        Text(secondaryTitle)
-                            .font(.system(size: 12, weight: .black, design: .rounded))
-                            .foregroundStyle(tint)
-                            .frame(minWidth: 72)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 7)
-                            .background(Color.ohanaCardSurfaceElevated, in: Capsule())
+                VStack(spacing: 8) {
+                    Button(action: primaryAction) {
+                        HStack(spacing: 5) {
+                            Image(systemName: primaryIcon)
+                                .font(.system(size: 11, weight: .black))
+                            Text(primaryTitle)
+                                .font(.system(size: 13, weight: .black, design: .rounded))
+                        }
+                        .foregroundStyle(Color.arkInk)
+                        .frame(minWidth: 72)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
+                        .background(tint, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
+
+                    if let secondaryTitle, let secondaryAction {
+                        Button(action: secondaryAction) {
+                            Text(secondaryTitle)
+                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .foregroundStyle(tint)
+                                .frame(minWidth: 72)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .background(Color.ohanaCardSurfaceElevated, in: Capsule())
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                    }
                 }
+            }
+
+            if let feedbackToken {
+                CheckInFeedbackBadge(token: feedbackToken)
+                    .offset(x: 58, y: 4)
             }
         }
         .padding(16)
@@ -157,6 +165,7 @@ struct WaterCoreCard: View {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         )
+        .checkInPulse(feedbackToken)
     }
 
     @ViewBuilder
@@ -196,6 +205,7 @@ struct WaterCoreCard: View {
                     .foregroundStyle(tint)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
+                    .contentTransition(.numericText())
                 Text(subtitle)
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -383,7 +393,7 @@ struct WaterAmountSettingsSheet: View {
     @Binding var amountText: String
     let onSave: () -> Void
 
-    @FocusState private var amountFocused: Bool
+    @State private var showsAmountKeypad = false
 
     var body: some View {
         VStack(spacing: 18) {
@@ -413,21 +423,51 @@ struct WaterAmountSettingsSheet: View {
                     Text("默认水量")
                         .font(.system(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        TextField("250", text: $amountText)
-                            .keyboardType(.decimalPad)
-                            .focused($amountFocused)
-                            .font(.system(size: 36, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .submitLabel(.done)
-                            .onSubmit { amountFocused = false }
-                        Text("ml")
-                            .font(.system(size: 18, weight: .black, design: .rounded))
-                            .foregroundStyle(tint)
+                    HStack(spacing: 10) {
+                        amountStepButton(systemName: "minus") {
+                            adjustAmount(by: -50)
+                        }
+                        Button {
+                            GoKeyboard.dismiss()
+                            withAnimation(GoMotion.feedback) {
+                                showsAmountKeypad.toggle()
+                            }
+                            UISelectionFeedbackGenerator().selectionChanged()
+                        } label: {
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Text(amountText.isEmpty ? "250" : amountText)
+                                    .font(.system(size: 36, weight: .black, design: .rounded))
+                                    .foregroundStyle(amountText.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
+                                    .monospacedDigit()
+                                Text("ml")
+                                    .font(.system(size: 18, weight: .black, design: .rounded))
+                                    .foregroundStyle(tint)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                        amountStepButton(systemName: "plus") {
+                            adjustAmount(by: 50)
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                     .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+                    if showsAmountKeypad {
+                        EmbeddedDecimalKeypad(
+                            text: $amountText,
+                            countryCode: AppCountry.code,
+                            maxFractionDigits: 0,
+                            accent: tint,
+                            isMini: true
+                        ) {
+                            withAnimation(GoMotion.feedback) {
+                                showsAmountKeypad = false
+                            }
+                        }
+                        .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+                    }
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
@@ -435,7 +475,7 @@ struct WaterAmountSettingsSheet: View {
                                 Button {
                                     withAnimation(GoMotion.feedback) {
                                         amountText = "\(amount)"
-                                        amountFocused = false
+                                        showsAmountKeypad = false
                                     }
                                 } label: {
                                     Text("\(amount)ml")
@@ -454,7 +494,7 @@ struct WaterAmountSettingsSheet: View {
             }
 
             Button {
-                amountFocused = false
+                showsAmountKeypad = false
                 onSave()
             } label: {
                 Text("保存")
@@ -467,18 +507,29 @@ struct WaterAmountSettingsSheet: View {
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(20)
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("完成") { amountFocused = false }
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(tint)
-            }
-        }
     }
 
     private var displayAmount: Int {
-        Int((Double(amountText.replacingOccurrences(of: ",", with: ".")) ?? 250).rounded())
+        Int((CountryDecimalInput.parse(amountText, countryCode: AppCountry.code) ?? 250).rounded())
+    }
+
+    private func adjustAmount(by delta: Int) {
+        let current = displayAmount
+        let next = max(0, current + delta)
+        amountText = next > 0 ? "\(next)" : ""
+        showsAmountKeypad = false
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    private func amountStepButton(systemName: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 13, weight: .black))
+                .foregroundStyle(Color.arkInk)
+                .frame(width: 36, height: 36)
+                .background(tint, in: Circle())
+        }
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func settingsRow(_ title: String, value: String) -> some View {
@@ -677,18 +728,18 @@ struct WaterPlanSettingsSheet: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 18) {
-                HStack(spacing: 14) {
+            VStack(spacing: 14) {
+                HStack(spacing: 12) {
                     Image(systemName: "bell.badge.fill")
-                        .font(.system(size: 24, weight: .bold))
+                        .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(tint)
-                        .frame(width: 54, height: 54)
+                        .frame(width: 46, height: 46)
                         .background(tint.opacity(0.15), in: Circle())
                     VStack(alignment: .leading, spacing: 3) {
                         Text("喂水计划")
-                            .font(.system(size: 24, weight: .black, design: .rounded))
+                            .font(.system(size: 21, weight: .black, design: .rounded))
                         Text("今日 \(completionText) · 每天 \(count) 次")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
@@ -715,7 +766,7 @@ struct WaterPlanSettingsSheet: View {
                         .font(.system(size: 15, weight: .bold, design: .rounded))
                         .tint(tint)
                         .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 6)
                         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
                 }
@@ -728,7 +779,7 @@ struct WaterPlanSettingsSheet: View {
                             .font(.system(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.goRed)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 15)
+                            .padding(.vertical, 13)
                             .background(Color.ohanaCardSurface, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
@@ -740,13 +791,15 @@ struct WaterPlanSettingsSheet: View {
                             .font(.system(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 15)
+                            .padding(.vertical, 13)
                             .background(tint, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
             }
-            .padding(20)
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, 16)
         }
     }
 

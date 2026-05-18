@@ -62,12 +62,12 @@ struct ArkCrewIDCardView: View {
         .frame(width: ScreenCompat.width - 48, height: (ScreenCompat.width - 48) / 1.586)
         .compositingGroup()
         .rotation3DEffect(.degrees(cardRotation), axis: (x: 0, y: 1, z: 0), perspective: 0.16)
-        .shadow(color: glowFlash ? Color.goPrimary.opacity(0.8) : Color.black.opacity(0.15),
+        .shadow(color: glowFlash ? Color.goPrimary.opacity(0.8) : Color.arkInk.opacity(0.15), // ui-v4: allow ID card hero elevation
                 radius: glowFlash ? 20 : 24, x: 0, y: glowFlash ? 0 : 12)
         .scaleEffect(cardScale)
-        .animation(.easeInOut(duration: 0.8), value: glowFlash)
+        .animation(GoMotion.stateChange, value: glowFlash)
         .onChange(of: flipped) { _, newFlipped in
-            withAnimation(.easeInOut(duration: 0.42)) {
+            withAnimation(GoMotion.page) {
                 cardRotation = newFlipped ? 180 : 0
             }
         }
@@ -90,7 +90,7 @@ struct ArkCrewIDCardView: View {
     private var cardTextColor: Color {
         // light colors need dark text
         let bright = ["C8FF00","E8FFB0","B8FFD0","FFF44F","FFEB3B","FFFFFF"]
-        return bright.contains(pet.themeColorHex.uppercased()) ? Color.arkInk : .white
+        return bright.contains(pet.themeColorHex.uppercased()) ? Color.arkInk : Color.ohanaPrimaryText
     }
 
     // MARK: - Card Front (Dynamic Visual Strategy)
@@ -117,10 +117,10 @@ struct ArkCrewIDCardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
         .simultaneousGesture(TapGesture().onEnded { toggleFlip() })
-        .shadow(color: pet.hasPassedAway ? Color.purple.opacity(0.35) : cardThemeColor.opacity(0.45),
+        .shadow(color: pet.hasPassedAway ? Color.purple.opacity(0.35) : cardThemeColor.opacity(0.45), // ui-v4: allow ID card artwork elevation
                 radius: 24, x: 0, y: 8)
-        .shadow(color: .black.opacity(0.28), radius: 40, x: 0, y: 16)
-        .shadow(color: .black.opacity(0.10), radius: 80, x: 0, y: 32)
+        .shadow(color: Color.arkInk.opacity(0.28), radius: 40, x: 0, y: 16) // ui-v4: allow ID card artwork elevation
+        .shadow(color: Color.arkInk.opacity(0.10), radius: 80, x: 0, y: 32) // ui-v4: allow ID card artwork elevation
     }
 
     private func posterFront(geo: GeometryProxy, avatarImage: UIImage?, isTransparent: Bool) -> some View {
@@ -142,7 +142,7 @@ struct ArkCrewIDCardView: View {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
                 .fill(
                     LinearGradient(
-                        colors: [.clear, .black.opacity(0.22)],
+                        colors: [.clear, Color.arkInk.opacity(0.22)], // ui-v4: allow hero readability scrim
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -170,7 +170,7 @@ struct ArkCrewIDCardView: View {
                 if pet.currentStreak > 1 {
                     Text(l.petCardStreak(pet.currentStreak))
                         .font(.system(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 4)
                         .background(Color.goPrimary, in: Capsule())
@@ -180,17 +180,17 @@ struct ArkCrewIDCardView: View {
 
                 Text("\(pet.daysTogether)")
                     .font(.system(size: 34, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(cardTextColor)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
 
                 Text(l.petCardDaysTogetherCaption)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.92))
+                    .foregroundStyle(cardTextColor.opacity(0.92))
 
                 Text(posterFootnote)
                     .font(.system(size: 9, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(cardTextColor.opacity(0.7))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
 
@@ -222,16 +222,16 @@ struct ArkCrewIDCardView: View {
                         .resizable()
                         .scaledToFit()
                         .scaleEffect(0.88)
-                        .colorMultiply(.white)
-                        .shadow(color: .white, radius: 0, x: 2, y: 0)
-                        .shadow(color: .white, radius: 0, x: -2, y: 0)
-                        .shadow(color: .white, radius: 0, x: 0, y: -2)
+                        .colorMultiply(Color.ohanaCardSurface) // ui-v4: allow avatar sticker cutout highlight
+                        .shadow(color: Color.ohanaCardSurface, radius: 0, x: 2, y: 0) // ui-v4: allow avatar sticker cutout highlight
+                        .shadow(color: Color.ohanaCardSurface, radius: 0, x: -2, y: 0) // ui-v4: allow avatar sticker cutout highlight
+                        .shadow(color: Color.ohanaCardSurface, radius: 0, x: 0, y: -2) // ui-v4: allow avatar sticker cutout highlight
                     Image(uiImage: avatarImage)
                         .resizable()
                         .scaledToFit()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .shadow(color: .black.opacity(0.28), radius: 18, x: 0, y: 12)
+                .shadow(color: Color.arkInk.opacity(0.28), radius: 18, x: 0, y: 12) // ui-v4: allow avatar grounding
             } else {
                 // 普通照片：填满左半区域，右侧羽化
                 Image(uiImage: avatarImage)
@@ -244,8 +244,8 @@ struct ArkCrewIDCardView: View {
                     .mask(
                         LinearGradient(
                             stops: [
-                                .init(color: .black, location: 0.0),
-                                .init(color: .black, location: 0.65),
+                                .init(color: Color.arkInk, location: 0.0), // ui-v4: allow image alpha mask
+                                .init(color: Color.arkInk, location: 0.65), // ui-v4: allow image alpha mask
                                 .init(color: .clear, location: 1.0)
                             ],
                             startPoint: .leading,
@@ -255,7 +255,7 @@ struct ArkCrewIDCardView: View {
                     .overlay {
                         LinearGradient(
                             colors: [
-                                .white.opacity(0.08),
+                                Color.ohanaCardSurface.opacity(0.08), // ui-v4: allow image highlight wash
                                 .clear,
                                 cardThemeColor.opacity(0.18)
                             ],
@@ -269,7 +269,7 @@ struct ArkCrewIDCardView: View {
             // 无头像：剪影居中
             ZStack {
                 Ellipse()
-                    .fill(Color.black.opacity(0.16))
+                    .fill(Color.arkInk.opacity(0.16))
                     .frame(width: w * 0.28, height: 24)
                     .blur(radius: 10)
                     .offset(y: h * 0.14)
@@ -316,13 +316,13 @@ struct ArkCrewIDCardView: View {
                 Image(systemName: "arrow.up.right")
                     .font(.system(size: 9, weight: .bold))
             }
-            .foregroundStyle(.white.opacity(0.95))
+            .foregroundStyle(cardTextColor.opacity(0.95))
             .padding(.horizontal, 11)
             .padding(.vertical, 6)
-            .background(.white.opacity(0.12), in: Capsule())
+            .background(cardTextColor.opacity(0.12), in: Capsule())
             .overlay(
                 Capsule()
-                    .strokeBorder(.white.opacity(0.2), lineWidth: 0.8)
+                    .strokeBorder(cardTextColor.opacity(0.2), lineWidth: 0.8)
             )
         }
         .padding(.top, 18)
@@ -335,13 +335,13 @@ struct ArkCrewIDCardView: View {
             HStack(alignment: .bottom, spacing: 2) {
                 ForEach(Array(pattern.enumerated()), id: \.offset) { _, height in
                     RoundedRectangle(cornerRadius: 1.2, style: .continuous)
-                        .fill(.white.opacity(0.95))
+                        .fill(cardTextColor.opacity(0.95))
                         .frame(width: 2, height: height)
                 }
             }
             Text("O H A N A   P E T")
                 .font(.system(size: 9, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.82))
+                .foregroundStyle(cardTextColor.opacity(0.82))
                 .tracking(1.2)
         }
     }
@@ -353,7 +353,7 @@ struct ArkCrewIDCardView: View {
             // 底层：纯主题色渐变
             RoundedRectangle(cornerRadius: 32, style: .continuous)
                 .fill(LinearGradient(
-                    colors: [cardThemeColor, cardThemeColor.mix(with: .black, by: 0.35)],
+                    colors: [cardThemeColor, cardThemeColor.mix(with: Color.arkInk, by: 0.35)],
                     startPoint: .topLeading, endPoint: .bottomTrailing
                 ))
 
@@ -383,7 +383,7 @@ struct ArkCrewIDCardView: View {
                         .frame(width: geo.size.height * 0.52, height: geo.size.height * 0.52)
                         .clipShape(Circle())
                         .overlay(Circle().strokeBorder(tc.opacity(0.25), lineWidth: 2))
-                        .shadow(color: .black.opacity(0.2), radius: 12, x: 0, y: 6)
+                        .shadow(color: Color.arkInk.opacity(0.2), radius: 12, x: 0, y: 6) // ui-v4: allow avatar grounding
                 } else {
                     Text(pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji)
                         .font(.system(size: geo.size.height * 0.30))
@@ -418,9 +418,9 @@ struct ArkCrewIDCardView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 14)
-                .background(.black.opacity(0.20), in: RoundedRectangle(cornerRadius: 0))
+                .background(Color.arkInk.opacity(0.20), in: RoundedRectangle(cornerRadius: 0))
                 .background(
-                    LinearGradient(colors: [.clear, .black.opacity(0.30)],
+                    LinearGradient(colors: [.clear, Color.arkInk.opacity(0.30)],
                                    startPoint: .top, endPoint: .bottom)
                 )
             }
@@ -445,13 +445,13 @@ struct ArkCrewIDCardView: View {
         ZStack(alignment: .bottomLeading) {
             // ── 层1：主色深底 + 渐变
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(cardThemeColor.mix(with: .black, by: 0.30))
+                .fill(cardThemeColor.mix(with: Color.arkInk, by: 0.30))
             RoundedRectangle(cornerRadius: 32, style: .continuous)
                 .fill(
                     LinearGradient(
                         colors: [
                             cardThemeColor.opacity(0.85),
-                            cardThemeColor.mix(with: Color(hex: "000000"), by: 0.45).opacity(0.95)
+                            cardThemeColor.mix(with: Color.arkInk, by: 0.45).opacity(0.95)
                         ],
                         startPoint: .topTrailing,
                         endPoint: .bottomLeading
@@ -510,18 +510,18 @@ struct ArkCrewIDCardView: View {
                     Image(uiImage: uiImage)
                         .resizable().scaledToFit()
                         .scaleEffect(1.06)
-                        .colorMultiply(.white)
-                        .shadow(color: .white, radius: 0, x: 2,  y: 0)
-                        .shadow(color: .white, radius: 0, x: -2, y: 0)
-                        .shadow(color: .white, radius: 0, x: 0,  y: 2)
-                        .shadow(color: .white, radius: 0, x: 0,  y: -2)
-                        .shadow(color: .white, radius: 1, x: 2,  y: 2)
-                        .shadow(color: .white, radius: 1, x: -2, y: -2)
+                        .colorMultiply(Color.ohanaCardSurface) // ui-v4: allow avatar sticker cutout highlight
+                        .shadow(color: Color.ohanaCardSurface, radius: 0, x: 2,  y: 0) // ui-v4: allow avatar sticker cutout highlight
+                        .shadow(color: Color.ohanaCardSurface, radius: 0, x: -2, y: 0) // ui-v4: allow avatar sticker cutout highlight
+                        .shadow(color: Color.ohanaCardSurface, radius: 0, x: 0,  y: 2) // ui-v4: allow avatar sticker cutout highlight
+                        .shadow(color: Color.ohanaCardSurface, radius: 0, x: 0,  y: -2) // ui-v4: allow avatar sticker cutout highlight
+                        .shadow(color: Color.ohanaCardSurface, radius: 1, x: 2,  y: 2) // ui-v4: allow avatar sticker cutout highlight
+                        .shadow(color: Color.ohanaCardSurface, radius: 1, x: -2, y: -2) // ui-v4: allow avatar sticker cutout highlight
                     Image(uiImage: uiImage)
                         .resizable().scaledToFit()
                 }
                 .frame(width: geo.size.width * 0.52, height: geo.size.height * 1.05)
-                .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
+                .shadow(color: Color.arkInk.opacity(0.15), radius: 10, x: 0, y: 5) // ui-v4: allow avatar grounding
                 .offset(y: -20)   // 破框向上溢出
             }
             .frame(width: geo.size.width * 0.52, alignment: .bottom)
@@ -546,8 +546,8 @@ struct ArkCrewIDCardView: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color.black.opacity(0.28),
-                            Color.black.opacity(0.55)
+                            Color.arkInk.opacity(0.28),
+                            Color.arkInk.opacity(0.55)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -561,7 +561,7 @@ struct ArkCrewIDCardView: View {
             // ── 层4：品牌水印
             Text("OHANA")
                 .font(.system(size: 64, weight: .black, design: .rounded))
-                .foregroundStyle(.white.opacity(0.04))
+                .foregroundStyle(Color.ohanaCardSurface.opacity(0.04)) // ui-v4: allow poster watermark
                 .rotationEffect(.degrees(-12))
                 .offset(x: geo.size.width * 0.08, y: -geo.size.height * 0.05)
                 .allowsHitTesting(false)
@@ -578,8 +578,8 @@ struct ArkCrewIDCardView: View {
                         stops: [
                             .init(color: .clear, location: 0.0),
                             .init(color: .clear, location: 0.45),
-                            .init(color: .black.opacity(0.5), location: 0.70),
-                            .init(color: .black, location: 1.0)
+                            .init(color: Color.arkInk.opacity(0.5), location: 0.70), // ui-v4: allow image alpha mask
+                            .init(color: Color.arkInk, location: 1.0) // ui-v4: allow image alpha mask
                         ],
                         startPoint: .leading,
                         endPoint: .trailing
@@ -592,7 +592,7 @@ struct ArkCrewIDCardView: View {
             // ── 层6：右侧信息
             HStack(alignment: .bottom, spacing: 0) {
                 Spacer().frame(width: geo.size.width * 0.46)
-                infoColumn(geo: geo, textColor: .white)
+                infoColumn(geo: geo, textColor: Color.ohanaPrimaryText)
             }
 
             // ── 翻转提示
@@ -612,14 +612,14 @@ struct ArkCrewIDCardView: View {
         ZStack(alignment: .bottomLeading) {
             // 层 1: 主色深底
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(cardThemeColor.mix(with: .black, by: 0.30))
+                .fill(cardThemeColor.mix(with: Color.arkInk, by: 0.30))
 
             // 层 2: 对角渐变 - 左上亮、右下深
             RoundedRectangle(cornerRadius: 32, style: .continuous)
                 .fill(LinearGradient(
                     colors: [
                         cardThemeColor.opacity(0.9),
-                        cardThemeColor.mix(with: .black, by: 0.55).opacity(0.95)
+                        cardThemeColor.mix(with: Color.arkInk, by: 0.55).opacity(0.95)
                     ],
                     startPoint: .topLeading, endPoint: .bottomTrailing))
 
@@ -635,7 +635,7 @@ struct ArkCrewIDCardView: View {
             // 层 4: 左下角暗角光斑
             Ellipse()
                 .fill(RadialGradient(
-                    colors: [.black.opacity(0.35), .clear],
+                    colors: [Color.arkInk.opacity(0.35), .clear],
                     center: .center, startRadius: 0, endRadius: 100))
                 .frame(width: 200, height: 150)
                 .offset(x: -geo.size.width * 0.20, y: geo.size.height * 0.25)
@@ -666,7 +666,7 @@ struct ArkCrewIDCardView: View {
             Text(pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji)
                 .font(.system(size: geo.size.height * 0.60))
                 .minimumScaleFactor(0.4)
-                .shadow(color: .black.opacity(0.25), radius: 16, x: 4, y: 8)
+                .shadow(color: Color.arkInk.opacity(0.25), radius: 16, x: 4, y: 8) // ui-v4: allow emoji avatar grounding
                 .frame(width: geo.size.width * 0.52, height: geo.size.height * 0.92, alignment: .center)
                 .allowsHitTesting(false)
 
@@ -777,7 +777,7 @@ struct ArkCrewIDCardView: View {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
                 .fill(
                     LinearGradient(
-                        colors: [Color.black.opacity(0.65), Color(hex: pet.themeColorHex).opacity(0.35)],
+                        colors: [Color.arkInk.opacity(0.65), Color(hex: pet.themeColorHex).opacity(0.35)],
                         startPoint: .top, endPoint: .bottom
                     )
                 )
@@ -786,18 +786,18 @@ struct ArkCrewIDCardView: View {
             VStack(spacing: 8) {
                 Text("✨")
                     .font(.system(size: 36))
-                    .shadow(color: .white.opacity(0.8), radius: 10, x: 0, y: 0)
+                    .shadow(color: Color.ohanaCardSurface.opacity(0.8), radius: 10, x: 0, y: 0) // ui-v4: allow memorial star glow
                 Text(l.petCardRainbowTitle)
                     .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.95))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.95))
                 if let d = pet.passedAwayDate {
                     let years = Calendar.current.dateComponents([.year], from: d, to: Date()).year ?? 0
                     Text(d.formatted(.dateTime.year().month().day()))
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.55))
+                        .foregroundStyle(Color.ohanaSecondaryText)
                     Text(l.petCardRainbowTogether(days: pet.daysTogetherAtPassing, yearsApart: years))
                         .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                 }
             }
             .allowsHitTesting(false)
@@ -840,16 +840,16 @@ struct ArkCrewIDCardView: View {
         VStack(spacing: 2) {
             Text(value)
                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Text(label)
                 .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(.white.opacity(0.1), in: Capsule())
+        .background(Color.ohanaControlFill, in: Capsule())
     }
     
     // MARK: - Walk Live Panel (背面遛狗中替换内容)
@@ -878,7 +878,7 @@ struct ArkCrewIDCardView: View {
                     Text(l.petCardWalkPatrolling)
                         .font(.system(size: 11, weight: .black, design: .rounded))
                         .tracking(1)
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 // 实时计时器
@@ -916,7 +916,7 @@ struct ArkCrewIDCardView: View {
                     } label: {
                         Label(l.petCardPause, systemImage: "pause.fill")
                             .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity).padding(.vertical, 12)
                             .background(Color.goYellow, in: RoundedRectangle(cornerRadius: 14))
                     }
@@ -927,7 +927,7 @@ struct ArkCrewIDCardView: View {
                     } label: {
                         Label(l.petCardResume, systemImage: "play.fill")
                             .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity).padding(.vertical, 12)
                             .background(Color.goTeal, in: RoundedRectangle(cornerRadius: 14))
                     }
@@ -942,7 +942,7 @@ struct ArkCrewIDCardView: View {
                 } label: {
                     Label(l.petCardEndWalk, systemImage: "stop.fill")
                         .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(maxWidth: .infinity).padding(.vertical, 12)
                         .background(Color.goRed, in: RoundedRectangle(cornerRadius: 14))
                 }
@@ -955,7 +955,7 @@ struct ArkCrewIDCardView: View {
                     Text("💩")
                         .font(.system(size: 20))
                         .frame(width: 46, height: 46)
-                        .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
+                        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14))
                 }
             }
             .buttonStyle(ScaleButtonStyle())
@@ -975,14 +975,14 @@ struct ArkCrewIDCardView: View {
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(value)
                     .font(.system(size: 28, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Text(unit)
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(accent)
             }
             Text(label)
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(Color.ohanaTertiaryText)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
@@ -1018,7 +1018,7 @@ struct ArkCrewIDCardView: View {
                             .foregroundStyle(Color.goPrimary)
                         Text("\(pet.name) 到家啦")
                             .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                     }
 
@@ -1027,7 +1027,7 @@ struct ArkCrewIDCardView: View {
                     Button { closeWalkSummaryPanel() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 26, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.72))
+                            .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .accessibilityLabel("关闭遛狗总结")
@@ -1052,17 +1052,17 @@ struct ArkCrewIDCardView: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text("本次记录已保存")
                             .font(.system(size: 12, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text(coconuts > 0 ? "奖励 +\(coconuts)🥥 已入账" : "距离不足 20m，保留记录不发奖励")
                             .font(.system(size: 10, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.48))
+                            .foregroundStyle(Color.ohanaTertiaryText)
                             .lineLimit(1)
                     }
                     Spacer()
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
-                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
 
@@ -1077,7 +1077,7 @@ struct ArkCrewIDCardView: View {
         VStack(spacing: 4) {
             Text(value)
                 .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.68)
             Text(label)
@@ -1086,7 +1086,7 @@ struct ArkCrewIDCardView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 9)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var latestWalkSummaryLog: PetWalkLog? {
@@ -1245,17 +1245,17 @@ struct ArkCrewIDCardView: View {
         // sheet 路由（由长按手势触发，非单击）
         .sheet(isPresented: $showWeightSheet) {
             WeightHistoryView(pet: pet)
-                .presentationDetents([.large])
+                .presentationDetents([.large]) // ui-v4: allow long history sheet
                 .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showWalkSheet) {
             WalkSummarySheet(pet: pet)
-                .presentationDetents([.medium, .large])
+                .presentationDetents([.medium, .large]) // ui-v4: allow long walk summary sheet
                 .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showHealthSheet) {
             NavigationStack { PetHealthDetailView(pet: pet, isModal: true) }
-                .presentationDetents([.large])
+                .presentationDetents([.large]) // ui-v4: allow long health detail sheet
                 .presentationDragIndicator(.visible)
         }
         .onChange(of: showHealthSheet) { _, newVal in
@@ -1267,12 +1267,12 @@ struct ArkCrewIDCardView: View {
         }
         .sheet(isPresented: $showCareSheet) {
             CareTrackingDetailSheet(pet: pet)
-                .presentationDetents([.large])
+                .presentationDetents([.large]) // ui-v4: allow long care detail sheet
                 .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showFoodSheet) {
             NavigationStack { PetFoodManagementView(pet: pet) }
-                .presentationDetents([.large])
+                .presentationDetents([.large]) // ui-v4: allow long food management sheet
                 .presentationDragIndicator(.visible)
         }
     }
@@ -1396,7 +1396,7 @@ struct ArkCrewIDCardView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("体重走势")
                     .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(Color.ohanaTertiaryText)
                     .textCase(.uppercase)
 
                 let wData = weightSparklineData
@@ -1405,7 +1405,7 @@ struct ArkCrewIDCardView: View {
                         Spacer()
                         Text("暂无数据")
                             .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.15))
+                            .foregroundStyle(Color.ohanaTertiaryText.opacity(0.7))
                         Spacer()
                     }
                     .frame(height: 36)
@@ -1415,7 +1415,7 @@ struct ArkCrewIDCardView: View {
                             x: .value("i", pt.index),
                             y: .value("kg", pt.weight)
                         )
-                        .interpolationMethod(.catmullRom)
+                        .interpolationMethod(OhanaChartStyle.trendInterpolation)
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [cardThemeColor.opacity(0.25), .clear],
@@ -1426,7 +1426,7 @@ struct ArkCrewIDCardView: View {
                             x: .value("i", pt.index),
                             y: .value("kg", pt.weight)
                         )
-                        .interpolationMethod(.catmullRom)
+                        .interpolationMethod(OhanaChartStyle.trendInterpolation)
                         .foregroundStyle(cardThemeColor.opacity(0.9))
                         .lineStyle(StrokeStyle(lineWidth: 2))
                     }
@@ -1437,7 +1437,7 @@ struct ArkCrewIDCardView: View {
                                 if let v = val.as(Double.self) {
                                     Text(String(format: "%.1f", v))
                                         .font(.system(size: 7, weight: .medium, design: .rounded))
-                                        .foregroundStyle(.white.opacity(0.3))
+                                        .foregroundStyle(Color.ohanaTertiaryText)
                                 }
                             }
                         }
@@ -1452,7 +1452,7 @@ struct ArkCrewIDCardView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("本周活跃")
                     .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(Color.ohanaTertiaryText)
                     .textCase(.uppercase)
 
                 let aData = activitySparklineData
@@ -1461,7 +1461,7 @@ struct ArkCrewIDCardView: View {
                         Spacer()
                         Text("暂无数据")
                             .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.15))
+                            .foregroundStyle(Color.ohanaTertiaryText.opacity(0.7))
                         Spacer()
                     }
                     .frame(height: 36)
@@ -1473,7 +1473,7 @@ struct ArkCrewIDCardView: View {
                             y: .value("n", pt.count),
                             width: .fixed(4)
                         )
-                        .foregroundStyle(pt.isToday ? Color.goPrimary : Color.white.opacity(0.2))
+                        .foregroundStyle(pt.isToday ? Color.goPrimary : Color.ohanaTertiaryText.opacity(0.55))
                         .cornerRadius(2)
                     }
                     .chartXAxis {
@@ -1482,7 +1482,7 @@ struct ArkCrewIDCardView: View {
                                 if let d = val.as(Int.self) {
                                     Text(d == 0 ? "7天前" : "今")
                                         .font(.system(size: 7, weight: .medium, design: .rounded))
-                                        .foregroundStyle(.white.opacity(0.25))
+                                        .foregroundStyle(Color.ohanaTertiaryText)
                                 }
                             }
                         }
@@ -1493,10 +1493,10 @@ struct ArkCrewIDCardView: View {
                                 if let v = val.as(Int.self), v > 0 {
                                     Text("\(v)")
                                         .font(.system(size: 7, weight: .medium, design: .rounded))
-                                        .foregroundStyle(.white.opacity(0.22))
+                                        .foregroundStyle(Color.ohanaTertiaryText)
                                 }
                             }
-                            AxisGridLine().foregroundStyle(.white.opacity(0.04))
+                            AxisGridLine().foregroundStyle(Color.ohanaDivider.opacity(0.5))
                         }
                     }
                     .chartPlotStyle { $0.background(.clear) }
@@ -1579,17 +1579,17 @@ struct ArkCrewIDCardView: View {
                 Text("岛屿纪念品")
                     .font(.system(size: 10, weight: .black, design: .rounded))
                     .tracking(1)
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 Text("\(unlocked.count)/\(allAchievements.count)")
                     .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundStyle(unlocked.count == allAchievements.count ? Color.goPrimary : .white.opacity(0.3))
+                    .foregroundStyle(unlocked.count == allAchievements.count ? Color.goPrimary : Color.ohanaTertiaryText)
             }
 
             if unlocked.isEmpty {
                 Text("完成挑战后解锁纪念品 ✨")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.2))
+                    .foregroundStyle(Color.ohanaTertiaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 6)
             } else {
@@ -1598,7 +1598,7 @@ struct ArkCrewIDCardView: View {
                         ForEach(unlocked) { badge in
                             ZStack {
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(.white.opacity(0.05))
+                                    .fill(Color.ohanaControlFill)
                                 Text(badge.emoji)
                                     .font(.system(size: 20))
                             }
@@ -1657,12 +1657,12 @@ struct ArkCrewIDCardView: View {
                 if data.count < 2 {
                     // 空数据占位符
                     Rectangle()
-                        .fill(.white.opacity(0.06))
+                        .fill(Color.ohanaControlFill)
                         .frame(height: 44)
                         .overlay(
                             Text("暂无数据")
                                 .font(.system(size: 9))
-                                .foregroundStyle(.white.opacity(0.2))
+                                .foregroundStyle(Color.ohanaTertiaryText)
                         )
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                 } else {
@@ -1671,7 +1671,7 @@ struct ArkCrewIDCardView: View {
                             x: .value("idx", pt.index),
                             y: .value("kg", pt.weight)
                         )
-                        .interpolationMethod(.catmullRom)
+                        .interpolationMethod(OhanaChartStyle.trendInterpolation)
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [cardThemeColor.opacity(0.3), .clear],
@@ -1682,7 +1682,7 @@ struct ArkCrewIDCardView: View {
                             x: .value("idx", pt.index),
                             y: .value("kg", pt.weight)
                         )
-                        .interpolationMethod(.catmullRom)
+                        .interpolationMethod(OhanaChartStyle.trendInterpolation)
                         .foregroundStyle(cardThemeColor)
                         .lineStyle(StrokeStyle(lineWidth: 2))
                     }
@@ -1703,12 +1703,12 @@ struct ArkCrewIDCardView: View {
                 let allZero = data.allSatisfy { $0.count == 0 }
                 if allZero {
                     Rectangle()
-                        .fill(.white.opacity(0.06))
+                        .fill(Color.ohanaControlFill)
                         .frame(height: 44)
                         .overlay(
                             Text("暂无数据")
                                 .font(.system(size: 9))
-                                .foregroundStyle(.white.opacity(0.2))
+                                .foregroundStyle(Color.ohanaTertiaryText)
                         )
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                 } else {
@@ -1718,7 +1718,7 @@ struct ArkCrewIDCardView: View {
                             y: .value("次", pt.count),
                             width: .fixed(4)
                         )
-                        .foregroundStyle(pt.isToday ? Color.goPrimary : Color.white.opacity(0.25))
+                        .foregroundStyle(pt.isToday ? Color.goPrimary : Color.ohanaTertiaryText.opacity(0.65))
                         .cornerRadius(2)
                     }
                     .chartXAxis(.hidden)
@@ -1746,7 +1746,7 @@ struct ArkCrewIDCardView: View {
             .filter { $0.type == HealthLogType.vaccine.rawValue }
             .sorted(by: { $0.date > $1.date }).first
         guard let last = lastVaccine,
-              let due = Calendar.current.date(byAdding: .year, value: 1, to: last.date) else { return .white.opacity(0.4) }
+              let due = Calendar.current.date(byAdding: .year, value: 1, to: last.date) else { return Color.ohanaTertiaryText }
         let days = Calendar.current.dateComponents([.day], from: Date(), to: due).day ?? 0
         if days < 0 { return Color.goRed }
         if days <= 30 { return Color.goYellow }
@@ -1758,7 +1758,7 @@ struct ArkCrewIDCardView: View {
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value)
                     .font(.system(size: 22, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 if !unit.isEmpty {
                     Text(unit)
                         .font(.system(size: 11, weight: .bold))
@@ -1767,7 +1767,7 @@ struct ArkCrewIDCardView: View {
             }
             Text(label)
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(Color.ohanaTertiaryText)
         }
         .frame(maxWidth: .infinity)
     }
@@ -1780,18 +1780,18 @@ struct ArkCrewIDCardView: View {
                     .foregroundStyle(accent)
                 Text(title)
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             Text(value)
                 .font(.system(size: 20, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.ohanaPrimaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(.white.opacity(0.1), lineWidth: 1)
+                .strokeBorder(Color.ohanaGlassStroke.opacity(0.8), lineWidth: 1)
         }
     }
 }

@@ -11,7 +11,7 @@ import SwiftData
 
 // MARK: - 顶层备份结构
 struct OhanaBackup: Codable {
-    var schemaVersion: Int = 20
+    var schemaVersion: Int = 21
     var exportedAt: String
     // 核心实体
     var pets: [PetBackup]
@@ -47,6 +47,11 @@ struct OhanaBackup: Codable {
     var careLedgerEvents: [CareLedgerEventBackup]?
     var familyCollaborationTasks: [FamilyCollaborationTaskBackup]?
     var coconutExchangeRequests: [CoconutExchangeRequestBackup]?
+    var oasisUpgradeCoconuts: [OasisUpgradeCoconutBackup]?
+    var oasisElectronicPets: [OasisElectronicPetBackup]?
+    var oasisCritterFragments: [OasisCritterFragmentBackup]?
+    var oasisUnlocks: [OasisUnlockBackup]?
+    var oasisCritterActionLogs: [OasisCritterActionLogBackup]?
     // App 状态
     var appState: AppStateBackup
 }
@@ -134,6 +139,8 @@ struct PetCareLogBackup: Codable {
 struct PetPottyLogBackup: Codable {
     var id: String; var date: String; var type: String
     var executorId: String?; var petId: String?
+    var latitude: Double?; var longitude: Double?
+    var locationAccuracyMeters: Double?; var walkLogId: String?
 }
 
 struct PetWalkLogBackup: Codable {
@@ -333,6 +340,88 @@ struct CoconutExchangeRequestBackup: Codable {
     var note: String
 }
 
+struct OasisUpgradeCoconutBackup: Codable {
+    var id: String
+    var level: Int
+    var createdAt: String
+    var openedAt: String?
+    var rewardKindRaw: String
+    var rewardCatalogId: String
+    var guaranteedCritterId: String?
+    var coconutAmount: Int
+    var treeEnergyAmount: Int
+    var fragmentAmount: Int
+    var decorUnlockId: String?
+    var storyStyleUnlockId: String?
+    var temporaryEffectId: String?
+    var titleZh: String
+    var titleEn: String
+    var titleDe: String
+    var descriptionZh: String
+    var descriptionEn: String
+    var descriptionDe: String
+}
+
+struct OasisElectronicPetBackup: Codable {
+    var id: String
+    var catalogId: String
+    var nameZh: String
+    var nameEn: String
+    var nameDe: String
+    var emoji: String
+    var rarityRaw: String
+    var nickname: String
+    var level: Int
+    var starLevel: Int
+    var xp: Int
+    var hunger: Int
+    var mood: Int
+    var bond: Int
+    var appearanceStage: Int
+    var isFeaturedOnOasis: Bool?
+    var habitatSlot: Int?
+    var equippedDecorId: String?
+    var favoriteItemId: String?
+    var personalityRaw: String?
+    var featuredPoseRaw: String?
+    var sourceLevel: Int
+    var obtainedAt: String
+    var lastInteractionAt: String
+    var lastStateRefreshAt: String?
+    var isArchived: Bool
+}
+
+struct OasisCritterFragmentBackup: Codable {
+    var id: String
+    var catalogId: String
+    var amount: Int
+    var updatedAt: String
+}
+
+struct OasisUnlockBackup: Codable {
+    var id: String
+    var unlockId: String
+    var unlockKindRaw: String
+    var sourceLevel: Int
+    var createdAt: String
+    var metadataJSON: String
+}
+
+struct OasisCritterActionLogBackup: Codable {
+    var id: String
+    var critterId: String?
+    var critterCatalogId: String
+    var actionRaw: String
+    var createdAt: String
+    var coconutDelta: Int
+    var fragmentDelta: Int
+    var xpDelta: Int
+    var sourceLevel: Int
+    var noteZh: String
+    var noteEn: String
+    var noteDe: String
+}
+
 // MARK: - DataBackupManager
 @MainActor
 final class DataBackupManager {
@@ -364,7 +453,7 @@ final class DataBackupManager {
         let decoder = JSONDecoder()
         let backup = try decoder.decode(OhanaBackup.self, from: data)
 
-        guard backup.schemaVersion <= 19 else {
+        guard backup.schemaVersion <= 21 else {
             throw BackupError.unsupportedVersion(backup.schemaVersion)
         }
 
@@ -405,6 +494,11 @@ final class DataBackupManager {
         let ledger      = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         let familyTasks = try context.fetch(FetchDescriptor<FamilyCollaborationTask>())
         let exchanges   = try context.fetch(FetchDescriptor<CoconutExchangeRequest>())
+        let oasisUpgradeCoconuts = try context.fetch(FetchDescriptor<OasisUpgradeCoconut>())
+        let oasisElectronicPets = try context.fetch(FetchDescriptor<OasisElectronicPet>())
+        let oasisFragments = try context.fetch(FetchDescriptor<OasisCritterFragmentBalance>())
+        let oasisUnlocks = try context.fetch(FetchDescriptor<OasisUnlock>())
+        let oasisCritterActionLogs = try context.fetch(FetchDescriptor<OasisCritterActionLog>())
 
         let ud = UserDefaults.standard
         let coconutLogsJSON: String = {
@@ -458,6 +552,11 @@ final class DataBackupManager {
             careLedgerEvents: ledger.map(encodeCareLedgerEvent),
             familyCollaborationTasks: familyTasks.map(encodeFamilyCollaborationTask),
             coconutExchangeRequests: exchanges.map(encodeCoconutExchangeRequest),
+            oasisUpgradeCoconuts: oasisUpgradeCoconuts.map(encodeOasisUpgradeCoconut),
+            oasisElectronicPets: oasisElectronicPets.map(encodeOasisElectronicPet),
+            oasisCritterFragments: oasisFragments.map(encodeOasisCritterFragment),
+            oasisUnlocks: oasisUnlocks.map(encodeOasisUnlock),
+            oasisCritterActionLogs: oasisCritterActionLogs.map(encodeOasisCritterActionLog),
             appState:         appState
         )
     }
@@ -475,6 +574,11 @@ final class DataBackupManager {
         let existingLedgerIds = Set((try? context.fetch(FetchDescriptor<CareLedgerEvent>()))?.map { $0.id.uuidString } ?? [])
         let existingFamilyTaskIds = Set((try? context.fetch(FetchDescriptor<FamilyCollaborationTask>()))?.map { $0.id.uuidString } ?? [])
         let existingExchangeIds = Set((try? context.fetch(FetchDescriptor<CoconutExchangeRequest>()))?.map { $0.id.uuidString } ?? [])
+        let existingOasisCoconutIds = Set((try? context.fetch(FetchDescriptor<OasisUpgradeCoconut>()))?.map { $0.id.uuidString } ?? [])
+        let existingOasisCritterIds = Set((try? context.fetch(FetchDescriptor<OasisElectronicPet>()))?.map { $0.id.uuidString } ?? [])
+        let existingOasisFragmentIds = Set((try? context.fetch(FetchDescriptor<OasisCritterFragmentBalance>()))?.map { $0.id.uuidString } ?? [])
+        let existingOasisUnlockIds = Set((try? context.fetch(FetchDescriptor<OasisUnlock>()))?.map { $0.id.uuidString } ?? [])
+        let existingOasisActionLogIds = Set((try? context.fetch(FetchDescriptor<OasisCritterActionLog>()))?.map { $0.id.uuidString } ?? [])
         let existingDocumentAttachmentIds = Set((try? context.fetch(FetchDescriptor<PetDocumentAttachment>()))?.map { $0.id.uuidString } ?? [])
         let existingPhotoIds = Set((try? context.fetch(FetchDescriptor<PetPhotoLog>()))?.map { $0.id.uuidString } ?? [])
         let existingInsuranceIds = Set((try? context.fetch(FetchDescriptor<PetInsurance>()))?.map { $0.id.uuidString } ?? [])
@@ -578,6 +682,21 @@ final class DataBackupManager {
         }
         for dto in backup.coconutExchangeRequests ?? [] where !existingExchangeIds.contains(dto.id) {
             context.insert(decodeCoconutExchangeRequest(dto))
+        }
+        for dto in backup.oasisUpgradeCoconuts ?? [] where !existingOasisCoconutIds.contains(dto.id) {
+            context.insert(decodeOasisUpgradeCoconut(dto))
+        }
+        for dto in backup.oasisElectronicPets ?? [] where !existingOasisCritterIds.contains(dto.id) {
+            context.insert(decodeOasisElectronicPet(dto))
+        }
+        for dto in backup.oasisCritterFragments ?? [] where !existingOasisFragmentIds.contains(dto.id) {
+            context.insert(decodeOasisCritterFragment(dto))
+        }
+        for dto in backup.oasisUnlocks ?? [] where !existingOasisUnlockIds.contains(dto.id) {
+            context.insert(decodeOasisUnlock(dto))
+        }
+        for dto in backup.oasisCritterActionLogs ?? [] where !existingOasisActionLogIds.contains(dto.id) {
+            context.insert(decodeOasisCritterActionLog(dto))
         }
 
         try context.save()
@@ -711,7 +830,9 @@ final class DataBackupManager {
 
     private func encodePottyLog(_ l: PetPottyLog) -> PetPottyLogBackup {
         PetPottyLogBackup(id: l.id.uuidString, date: d(l.date), type: l.type,
-            executorId: l.executorId, petId: l.pet?.id.uuidString)
+            executorId: l.executorId, petId: l.pet?.id.uuidString,
+            latitude: l.latitude, longitude: l.longitude,
+            locationAccuracyMeters: l.locationAccuracyMeters, walkLogId: l.walkLogId)
     }
 
     private func encodeWalkLog(_ l: PetWalkLog) -> PetWalkLogBackup {
@@ -1007,6 +1128,98 @@ final class DataBackupManager {
         )
     }
 
+    private func encodeOasisUpgradeCoconut(_ coconut: OasisUpgradeCoconut) -> OasisUpgradeCoconutBackup {
+        OasisUpgradeCoconutBackup(
+            id: coconut.id.uuidString,
+            level: coconut.level,
+            createdAt: d(coconut.createdAt),
+            openedAt: d(coconut.openedAt),
+            rewardKindRaw: coconut.rewardKindRaw,
+            rewardCatalogId: coconut.rewardCatalogId,
+            guaranteedCritterId: coconut.guaranteedCritterId,
+            coconutAmount: coconut.coconutAmount,
+            treeEnergyAmount: coconut.treeEnergyAmount,
+            fragmentAmount: coconut.fragmentAmount,
+            decorUnlockId: coconut.decorUnlockId,
+            storyStyleUnlockId: coconut.storyStyleUnlockId,
+            temporaryEffectId: coconut.temporaryEffectId,
+            titleZh: coconut.titleZh,
+            titleEn: coconut.titleEn,
+            titleDe: coconut.titleDe,
+            descriptionZh: coconut.descriptionZh,
+            descriptionEn: coconut.descriptionEn,
+            descriptionDe: coconut.descriptionDe
+        )
+    }
+
+    private func encodeOasisElectronicPet(_ critter: OasisElectronicPet) -> OasisElectronicPetBackup {
+        OasisElectronicPetBackup(
+            id: critter.id.uuidString,
+            catalogId: critter.catalogId,
+            nameZh: critter.nameZh,
+            nameEn: critter.nameEn,
+            nameDe: critter.nameDe,
+            emoji: critter.emoji,
+            rarityRaw: critter.rarityRaw,
+            nickname: critter.nickname,
+            level: critter.level,
+            starLevel: critter.starLevel,
+            xp: critter.xp,
+            hunger: critter.hunger,
+            mood: critter.mood,
+            bond: critter.bond,
+            appearanceStage: critter.appearanceStage,
+            isFeaturedOnOasis: critter.isFeaturedOnOasis,
+            habitatSlot: critter.habitatSlot,
+            equippedDecorId: critter.equippedDecorId,
+            favoriteItemId: critter.favoriteItemId,
+            personalityRaw: critter.personalityRaw,
+            featuredPoseRaw: critter.featuredPoseRaw,
+            sourceLevel: critter.sourceLevel,
+            obtainedAt: d(critter.obtainedAt),
+            lastInteractionAt: d(critter.lastInteractionAt),
+            lastStateRefreshAt: d(critter.lastStateRefreshAt),
+            isArchived: critter.isArchived
+        )
+    }
+
+    private func encodeOasisCritterFragment(_ fragment: OasisCritterFragmentBalance) -> OasisCritterFragmentBackup {
+        OasisCritterFragmentBackup(
+            id: fragment.id.uuidString,
+            catalogId: fragment.catalogId,
+            amount: fragment.amount,
+            updatedAt: d(fragment.updatedAt)
+        )
+    }
+
+    private func encodeOasisUnlock(_ unlock: OasisUnlock) -> OasisUnlockBackup {
+        OasisUnlockBackup(
+            id: unlock.id.uuidString,
+            unlockId: unlock.unlockId,
+            unlockKindRaw: unlock.unlockKindRaw,
+            sourceLevel: unlock.sourceLevel,
+            createdAt: d(unlock.createdAt),
+            metadataJSON: unlock.metadataJSON
+        )
+    }
+
+    private func encodeOasisCritterActionLog(_ log: OasisCritterActionLog) -> OasisCritterActionLogBackup {
+        OasisCritterActionLogBackup(
+            id: log.id.uuidString,
+            critterId: log.critterId?.uuidString,
+            critterCatalogId: log.critterCatalogId,
+            actionRaw: log.actionRaw,
+            createdAt: d(log.createdAt),
+            coconutDelta: log.coconutDelta,
+            fragmentDelta: log.fragmentDelta,
+            xpDelta: log.xpDelta,
+            sourceLevel: log.sourceLevel,
+            noteZh: log.noteZh,
+            noteEn: log.noteEn,
+            noteDe: log.noteDe
+        )
+    }
+
     // MARK: - Decode helpers
 
     private func parseDate(_ s: String?) -> Date? {
@@ -1128,7 +1341,11 @@ final class DataBackupManager {
         let l = PetPottyLog(date: parseDate(dto.date) ?? Date(),
                             type: PottyType(rawValue: dto.type) ?? .perfectPoop,
                             pet: dto.petId.flatMap { pets[$0] },
-                            executorId: dto.executorId)
+                            executorId: dto.executorId,
+                            latitude: dto.latitude,
+                            longitude: dto.longitude,
+                            locationAccuracyMeters: dto.locationAccuracyMeters,
+                            walkLogId: dto.walkLogId)
         if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
         return l
     }
@@ -1472,6 +1689,103 @@ final class DataBackupManager {
         )
         if let uuid = UUID(uuidString: dto.id) { request.id = uuid }
         return request
+    }
+
+    private func decodeOasisUpgradeCoconut(_ dto: OasisUpgradeCoconutBackup) -> OasisUpgradeCoconut {
+        let coconut = OasisUpgradeCoconut(
+            level: dto.level,
+            createdAt: parseDate(dto.createdAt) ?? Date(),
+            openedAt: parseDate(dto.openedAt),
+            rewardKind: OasisUpgradeRewardKind(rawValue: dto.rewardKindRaw) ?? .coconuts,
+            rewardCatalogId: dto.rewardCatalogId,
+            guaranteedCritterId: dto.guaranteedCritterId,
+            coconutAmount: dto.coconutAmount,
+            treeEnergyAmount: dto.treeEnergyAmount,
+            fragmentAmount: dto.fragmentAmount,
+            decorUnlockId: dto.decorUnlockId,
+            storyStyleUnlockId: dto.storyStyleUnlockId,
+            temporaryEffectId: dto.temporaryEffectId,
+            titleZh: dto.titleZh,
+            titleEn: dto.titleEn,
+            titleDe: dto.titleDe,
+            descriptionZh: dto.descriptionZh,
+            descriptionEn: dto.descriptionEn,
+            descriptionDe: dto.descriptionDe
+        )
+        if let uuid = UUID(uuidString: dto.id) { coconut.id = uuid }
+        return coconut
+    }
+
+    private func decodeOasisElectronicPet(_ dto: OasisElectronicPetBackup) -> OasisElectronicPet {
+        let critter = OasisElectronicPet(
+            catalogId: dto.catalogId,
+            nameZh: dto.nameZh,
+            nameEn: dto.nameEn,
+            nameDe: dto.nameDe,
+            emoji: dto.emoji,
+            rarity: OasisElectronicPetRarity(rawValue: dto.rarityRaw) ?? .common,
+            nickname: dto.nickname,
+            level: dto.level,
+            starLevel: dto.starLevel,
+            xp: dto.xp,
+            hunger: dto.hunger,
+            mood: dto.mood,
+            bond: dto.bond,
+            appearanceStage: dto.appearanceStage,
+            isFeaturedOnOasis: dto.isFeaturedOnOasis ?? false,
+            habitatSlot: dto.habitatSlot ?? 0,
+            equippedDecorId: dto.equippedDecorId ?? "",
+            favoriteItemId: dto.favoriteItemId ?? "",
+            personalityRaw: dto.personalityRaw ?? "gentle",
+            featuredPoseRaw: dto.featuredPoseRaw ?? "idle",
+            sourceLevel: dto.sourceLevel,
+            obtainedAt: parseDate(dto.obtainedAt) ?? Date(),
+            lastInteractionAt: parseDate(dto.lastInteractionAt) ?? Date(),
+            lastStateRefreshAt: parseDate(dto.lastStateRefreshAt) ?? parseDate(dto.lastInteractionAt) ?? Date(),
+            isArchived: dto.isArchived
+        )
+        if let uuid = UUID(uuidString: dto.id) { critter.id = uuid }
+        return critter
+    }
+
+    private func decodeOasisCritterFragment(_ dto: OasisCritterFragmentBackup) -> OasisCritterFragmentBalance {
+        let fragment = OasisCritterFragmentBalance(
+            catalogId: dto.catalogId,
+            amount: dto.amount,
+            updatedAt: parseDate(dto.updatedAt) ?? Date()
+        )
+        if let uuid = UUID(uuidString: dto.id) { fragment.id = uuid }
+        return fragment
+    }
+
+    private func decodeOasisUnlock(_ dto: OasisUnlockBackup) -> OasisUnlock {
+        let unlock = OasisUnlock(
+            unlockId: dto.unlockId,
+            unlockKind: OasisUpgradeRewardKind(rawValue: dto.unlockKindRaw) ?? .decoration,
+            sourceLevel: dto.sourceLevel,
+            createdAt: parseDate(dto.createdAt) ?? Date(),
+            metadataJSON: dto.metadataJSON
+        )
+        if let uuid = UUID(uuidString: dto.id) { unlock.id = uuid }
+        return unlock
+    }
+
+    private func decodeOasisCritterActionLog(_ dto: OasisCritterActionLogBackup) -> OasisCritterActionLog {
+        let log = OasisCritterActionLog(
+            critterId: dto.critterId.flatMap(UUID.init(uuidString:)),
+            critterCatalogId: dto.critterCatalogId,
+            action: OasisCritterAction(rawValue: dto.actionRaw) ?? .rest,
+            createdAt: parseDate(dto.createdAt) ?? Date(),
+            coconutDelta: dto.coconutDelta,
+            fragmentDelta: dto.fragmentDelta,
+            xpDelta: dto.xpDelta,
+            sourceLevel: dto.sourceLevel,
+            noteZh: dto.noteZh,
+            noteEn: dto.noteEn,
+            noteDe: dto.noteDe
+        )
+        if let uuid = UUID(uuidString: dto.id) { log.id = uuid }
+        return log
     }
 }
 

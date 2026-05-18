@@ -10,6 +10,7 @@ struct DesignSpecPreviewCanvasV4: View {
     let mode: DesignPreviewModeV4
     @Binding var toast: String?
 
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var tapPulse = false
     @State private var fabOpen = false
     @State private var fieldText = "50"
@@ -18,7 +19,8 @@ struct DesignSpecPreviewCanvasV4: View {
     @State private var selectedRange = "7D"
     @State private var showSheetLayer = false
     @State private var rewardActive = false
-    @FocusState private var fieldFocused: Bool
+    @State private var fieldFocused = false
+    @State private var isVisible = false
 
     private var palette: DesignSpecPaletteV4 {
         DesignSpecPaletteV4(selection: selection, mode: mode)
@@ -54,6 +56,12 @@ struct DesignSpecPreviewCanvasV4: View {
         .contentShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .onTapGesture {
             play("画布点击 / Canvas tap")
+        }
+        .onAppear {
+            isVisible = true
+        }
+        .onDisappear {
+            isVisible = false
         }
     }
 
@@ -471,12 +479,18 @@ struct DesignSpecPreviewCanvasV4: View {
                 Image(systemName: "scalemass.fill")
                     .font(.system(size: 12, weight: iconWeight))
                     .foregroundStyle(stroke)
-                TextField("50", text: $fieldText)
-                    .focused($fieldFocused)
-                    .keyboardType(.decimalPad)
-                    .font(font(14, .bold))
-                    .foregroundStyle(palette.primaryText)
-                    .onTapGesture { play("输入框聚焦 / Field focus") }
+                Button {
+                    withAnimation(GoMotion.feedback) {
+                        fieldFocused.toggle()
+                    }
+                    play("输入框聚焦 / Field focus")
+                } label: {
+                    Text(fieldText)
+                        .font(font(14, .bold))
+                        .foregroundStyle(palette.primaryText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(ScaleButtonStyle())
                 Text("g")
                     .font(font(12, .black))
                     .foregroundStyle(palette.secondaryText)
@@ -1082,9 +1096,15 @@ struct DesignSpecPreviewCanvasV4: View {
     }
 
     private var vividGlassBackdrop: some View {
-        TimelineView(.animation) { timeline in
-            let phase = timeline.date.timeIntervalSinceReferenceDate
-            vividGlassBackdropFrame(phase: phase)
+        Group {
+            if workloadPolicy.shouldRunRepeatingAnimation(isVisible: isVisible) {
+                TimelineView(.animation) { timeline in
+                    let phase = timeline.date.timeIntervalSinceReferenceDate
+                    vividGlassBackdropFrame(phase: phase)
+                }
+            } else {
+                vividGlassBackdropFrame(phase: 0)
+            }
         }
     }
 
@@ -1584,7 +1604,7 @@ struct DesignSpecPreviewCanvasV4: View {
         case "overview": return "喂食 Overview"
         case "minimal": return "快速打卡"
         case "confirm": return "确认操作"
-        default: return "记录主粮"
+        default: return "记录喂食"
         }
     }
 

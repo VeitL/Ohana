@@ -27,6 +27,8 @@ struct RootView: View {
                 OnboardingView()
             }
         }
+        .buttonStyle(ScaleButtonStyle())
+        .toggleStyle(OhanaPillToggleStyle())
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .onAppear {
             queueStartupMaintenance()

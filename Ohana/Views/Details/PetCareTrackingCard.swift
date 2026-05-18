@@ -63,7 +63,7 @@ struct PetCareTrackingCard: View {
                             undoLabel = type.rawValue
                             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                                 if undoLog?.id == log.id {
-                                    withAnimation(.spring(response: 0.3)) { undoLog = nil }
+                                    withAnimation(GoMotion.feedback) { undoLog = nil }
                                 }
                             }
                         })
@@ -90,7 +90,7 @@ struct PetCareTrackingCard: View {
                             modelContext.delete(log)
                             modelContext.safeSave()
                         }
-                        withAnimation(.spring(response: 0.3)) { undoLog = nil }
+                        withAnimation(GoMotion.feedback) { undoLog = nil }
                     } label: {
                         Text("撤回")
                             .font(.system(size: 13, weight: .black, design: .rounded))
@@ -98,12 +98,12 @@ struct PetCareTrackingCard: View {
                     }
                 }
                 .padding(.horizontal, 14).padding(.vertical, 10)
-                .background(Color.black.opacity(0.8), in: Capsule())
+                .background(Color.arkInk.opacity(0.8), in: Capsule())
                 .padding(.horizontal, 8).padding(.bottom, 4)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .animation(.spring(response: 0.3), value: undoLog != nil)
+        .animation(GoMotion.feedback, value: undoLog != nil)
         .sheet(isPresented: $showingDetail) {
             CareTrackingDetailSheet(pet: pet)
                 .presentationDetents([.medium, .large])
@@ -197,7 +197,7 @@ struct CareTrackingDetailSheet: View {
 
                     VStack(spacing: 0) {
                         Capsule()
-                            .fill(Color.black.opacity(0.1))
+                            .fill(Color.arkInk.opacity(0.1))
                             .frame(width: 36, height: 4)
                             .padding(.top, 10).padding(.bottom, 12)
 
@@ -214,21 +214,79 @@ struct CareTrackingDetailSheet: View {
                 }
                 .frame(maxHeight: .infinity)
             }
-        }
-        .alert("添加喂食记录", isPresented: $showAddFeed) {
-            TextField("克数 (g)", text: $addGrams).keyboardType(.decimalPad)
-            Button("添加") {
-                if let g = Double(addGrams), g > 0 {
-                    let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-                        .flatMap { $0.isEmpty ? nil : $0 }
-                    let log = PetCareLog(date: Date(), type: .feeding, amountGrams: g, pet: pet, executorId: executorId)
-                    modelContext.insert(log); modelContext.safeSave()
+
+            if showAddFeed {
+                Color.arkInk.opacity(0.22) // ui-v4: allow modal scrim behind inline numeric popup
+                    .ignoresSafeArea()
+                    .onTapGesture { closeAddFeedOverlay() }
+                    .transition(.opacity)
+
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Label("添加喂食", systemImage: "fork.knife")
+                            .font(OhanaFont.title3(.black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                        Spacer()
+                        Button(action: closeAddFeedOverlay) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 13, weight: .black))
+                                .foregroundStyle(Color.ohanaPrimaryText)
+                                .frame(width: 34, height: 34)
+                                .background(Color.ohanaControlFill, in: Circle())
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                    }
+                    InlineNumericInput(
+                        text: $addGrams,
+                        placeholder: "50",
+                        unit: "g",
+                        maxFractionDigits: 0,
+                        accent: Color.goOrange,
+                        step: 5,
+                        valueFont: OhanaFont.title(.black),
+                        fill: Color.ohanaControlFill,
+                        cornerRadius: 18
+                    )
+                    Button {
+                        saveAddFeed()
+                    } label: {
+                        Text("添加")
+                            .font(OhanaFont.callout(.black))
+                            .foregroundStyle(Color.arkInk)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
+                            .background(Color.goOrange, in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
                 }
-                addGrams = ""
+                .padding(18)
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .padding(.horizontal, 12)
+                .padding(.bottom, 20)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(2)
             }
-            Button("取消", role: .cancel) { addGrams = "" }
-        } message: { Text("输入喂食克数") }
+        }
+        .animation(GoMotion.page, value: showAddFeed)
         .sheet(isPresented: $showingCoconutLog) { CoconutLogView() }
+    }
+
+    private func closeAddFeedOverlay() {
+        withAnimation(GoMotion.page) {
+            showAddFeed = false
+            addGrams = ""
+        }
+    }
+
+    private func saveAddFeed() {
+        if let g = CountryDecimalInput.parse(addGrams, countryCode: AppCountry.code), g > 0 {
+            let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+                .flatMap { $0.isEmpty ? nil : $0 }
+            let log = PetCareLog(date: Date(), type: .feeding, amountGrams: g, pet: pet, executorId: executorId)
+            modelContext.insert(log)
+            modelContext.safeSave()
+        }
+        closeAddFeedOverlay()
     }
 
     private func careSectionCard(_ type: CareType) -> some View {
@@ -244,7 +302,7 @@ struct CareTrackingDetailSheet: View {
                     .foregroundStyle(accent)
                 Text(type.rawValue)
                     .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Color.arkInk)
                 Spacer()
                 Text("今日 \(todayCount(type)) 次")
                     .font(.system(size: 11, weight: .bold))
@@ -258,7 +316,7 @@ struct CareTrackingDetailSheet: View {
                 ForEach(Array(bars.enumerated()), id: \.offset) { _, v in
                     let h = max(4, CGFloat(v) / CGFloat(maxBar) * 32)
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(v > 0 ? accent : Color.black.opacity(0.06))
+                        .fill(v > 0 ? accent : Color.arkInk.opacity(0.06))
                         .frame(maxWidth: .infinity, minHeight: 4, maxHeight: h)
                 }
             }
@@ -274,7 +332,7 @@ struct CareTrackingDetailSheet: View {
                         HStack {
                             Text(log.date, format: .dateTime.month().day().hour().minute())
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(.black.opacity(0.7))
+                                .foregroundStyle(Color.arkInk.opacity(0.7))
                             Spacer()
                             if log.amountGrams > 0 {
                                 Text("\(Int(log.amountGrams))g")
@@ -294,7 +352,7 @@ struct CareTrackingDetailSheet: View {
                             }
                         }
                         .padding(.horizontal, 10).padding(.vertical, 7)
-                        .background(Color.white, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .background(Color.goCardWhite, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                 }
             }
@@ -412,7 +470,7 @@ private struct CareTypeRow: View {
         if let pottyLog {
             CareLedgerService.recordPetPotty(log: pottyLog, pet: pet, source: .detail, context: modelContext)
         }
-        withAnimation(.spring(response: 0.3)) { justChecked = type }
+        withAnimation(GoMotion.feedback) { justChecked = type }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             withAnimation { if justChecked == type { justChecked = nil } }
         }

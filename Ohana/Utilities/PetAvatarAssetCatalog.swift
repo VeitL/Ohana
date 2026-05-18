@@ -304,6 +304,24 @@ enum PetAvatarAssetCatalog {
         "poodle"
     ]
 
+    private static let shihTzuBreedNames: Set<String> = [
+        "西施犬",
+        "西施",
+        "Shih Tzu",
+        "shih tzu"
+    ]
+
+    private static let chineseRuralDogBreedNames: Set<String> = [
+        "中华田园犬",
+        "中华田园",
+        "田园犬",
+        "土狗",
+        "Chinese Rural Dog",
+        "chinese rural dog",
+        "Chinese Native Dog",
+        "chinese native dog"
+    ]
+
     private static let miniatureSchnauzerBreedNames: Set<String> = [
         "迷你雪纳瑞",
         "雪纳瑞",
@@ -316,6 +334,38 @@ enum PetAvatarAssetCatalog {
         "阿拉斯加",
         "Alaskan Malamute",
         "alaskan malamute"
+    ]
+
+    private static let australianShepherdBreedNames: Set<String> = [
+        "澳大利亚牧羊犬",
+        "澳牧",
+        "Australian Shepherd",
+        "australian shepherd",
+        "Aussie",
+        "aussie"
+    ]
+
+    private static let borderCollieBreedNames: Set<String> = [
+        "边境牧羊犬",
+        "边牧",
+        "Border Collie",
+        "border collie"
+    ]
+
+    private static let dachshundBreedNames: Set<String> = [
+        "腊肠犬",
+        "腊肠",
+        "Dachshund",
+        "dachshund"
+    ]
+
+    private static let westHighlandWhiteTerrierBreedNames: Set<String> = [
+        "西高地白梗",
+        "西高地",
+        "West Highland White Terrier",
+        "west highland white terrier",
+        "Westie",
+        "westie"
     ]
 
     private static let speciesStandardSlugs: Set<String> = [
@@ -583,6 +633,21 @@ enum PetAvatarAssetCatalog {
         .init(coatName: "蓝灰色", coatSlug: "blue_gray", coatHex: "7A9AAF")
     ]
 
+    static let shihTzuAppearances: [Appearance] = [
+        .init(coatName: "金白色", coatSlug: "golden_white", coatHex: "D4A017", coatAliases: ["金白"]),
+        .init(coatName: "白色", coatSlug: "white", coatHex: "F5F5F0"),
+        .init(coatName: "黑白", coatSlug: "black_white", coatHex: "2A2A2A"),
+        .init(coatName: "红白", coatSlug: "red_white", coatHex: "B5451B"),
+        .init(coatName: "多色", coatSlug: "multicolor", coatHex: "C8B4A0")
+    ]
+
+    static let chineseRuralDogAppearances: [Appearance] = [
+        .init(coatName: "黄色", coatSlug: "yellow", coatHex: "D4A017", coatAliases: ["黄犬", "黄狗"]),
+        .init(coatName: "黑色", coatSlug: "black", coatHex: "1A1A1A"),
+        .init(coatName: "白色", coatSlug: "white", coatHex: "F5F5F0"),
+        .init(coatName: "花斑", coatSlug: "pied", coatHex: "C8B4A0", coatAliases: ["花色", "花狗"])
+    ]
+
     static let miniatureSchnauzerAppearances: [Appearance] = [
         .init(coatName: "椒盐色", coatSlug: "salt_pepper", coatHex: "9E9E9E"),
         .init(coatName: "黑色", coatSlug: "black", coatHex: "1A1A1A"),
@@ -595,6 +660,33 @@ enum PetAvatarAssetCatalog {
         .init(coatName: "灰白", coatSlug: "gray_white", coatHex: "9E9E9E"),
         .init(coatName: "红白", coatSlug: "red_white", coatHex: "8B3A1A"),
         .init(coatName: "纯白", coatSlug: "pure_white", coatHex: "F5F5F0")
+    ]
+
+    static let australianShepherdAppearances: [Appearance] = [
+        .init(coatName: "蓝灰色", coatSlug: "blue_gray", coatHex: "7A9AAF", coatAliases: ["蓝陨石", "蓝陨色"]),
+        .init(coatName: "红色", coatSlug: "red", coatHex: "B5451B"),
+        .init(coatName: "黑色", coatSlug: "black", coatHex: "1A1A1A"),
+        .init(coatName: "花斑色", coatSlug: "dapple", coatHex: "C8B4A0", coatAliases: ["花斑", "陨石色"])
+    ]
+
+    static let borderCollieAppearances: [Appearance] = [
+        .init(coatName: "黑白", coatSlug: "black_white", coatHex: "2A2A2A"),
+        .init(coatName: "蓝白", coatSlug: "blue_white", coatHex: "7A9AAF"),
+        .init(coatName: "红白", coatSlug: "red_white", coatHex: "8B3A1A"),
+        .init(coatName: "三色", coatSlug: "tricolor", coatHex: "4A2A10")
+    ]
+
+    static let dachshundAppearances: [Appearance] = [
+        .init(coatName: "红色", coatSlug: "red", coatHex: "B5451B"),
+        .init(coatName: "巧克力棕", coatSlug: "chocolate_brown", coatHex: "4A2C1A"),
+        .init(coatName: "黑棕", coatSlug: "black_tan", coatHex: "1A1A0A"),
+        .init(coatName: "奶油色", coatSlug: "cream", coatHex: "F5E6C8"),
+        .init(coatName: "花斑", coatSlug: "dapple", coatHex: "C8B4A0")
+    ]
+
+    static let westHighlandWhiteTerrierAppearances: [Appearance] = [
+        .init(coatName: "白色", coatSlug: "white", coatHex: "F5F5F0"),
+        .init(coatName: "黑色", coatSlug: "black", coatHex: "1A1A1A")
     ]
 
     private static var catBreedAppearances: [String: [Appearance]] {
@@ -638,8 +730,14 @@ enum PetAvatarAssetCatalog {
             "yorkshire_terrier": yorkshireTerrierAppearances,
             "samoyed": samoyedAppearances,
             "poodle": poodleAppearances,
+            "shih_tzu": shihTzuAppearances,
+            "chinese_rural_dog": chineseRuralDogAppearances,
             "miniature_schnauzer": miniatureSchnauzerAppearances,
-            "alaskan_malamute": alaskanMalamuteAppearances
+            "alaskan_malamute": alaskanMalamuteAppearances,
+            "australian_shepherd": australianShepherdAppearances,
+            "border_collie": borderCollieAppearances,
+            "dachshund": dachshundAppearances,
+            "west_highland_white_terrier": westHighlandWhiteTerrierAppearances
         ]
     }
 
@@ -706,12 +804,21 @@ enum PetAvatarAssetCatalog {
         return avatarData(filename: filename)
     }
 
-    static func avatarData(filename: String, bundle: Bundle = .main) -> Data? {
-        let name = (filename as NSString).deletingPathExtension
-        let ext = (filename as NSString).pathExtension
-        guard let url = bundle.url(forResource: name, withExtension: ext, subdirectory: assetDirectory) else {
+    static func avatarURL(species: String, breed: String, gender: String, coatColor: String, eyeColor: String, bundle: Bundle = .main) -> URL? {
+        guard let filename = avatarFilename(species: species, breed: breed, gender: gender, coatColor: coatColor, eyeColor: eyeColor) else {
             return nil
         }
+        return avatarURL(filename: filename, bundle: bundle)
+    }
+
+    static func avatarURL(filename: String, bundle: Bundle = .main) -> URL? {
+        let name = (filename as NSString).deletingPathExtension
+        let ext = (filename as NSString).pathExtension
+        return bundle.url(forResource: name, withExtension: ext, subdirectory: assetDirectory)
+    }
+
+    static func avatarData(filename: String, bundle: Bundle = .main) -> Data? {
+        guard let url = avatarURL(filename: filename, bundle: bundle) else { return nil }
         return try? Data(contentsOf: url)
     }
 
@@ -833,11 +940,29 @@ enum PetAvatarAssetCatalog {
         if poodleBreedNames.contains(trimmed) {
             return "poodle"
         }
+        if shihTzuBreedNames.contains(trimmed) {
+            return "shih_tzu"
+        }
+        if chineseRuralDogBreedNames.contains(trimmed) {
+            return "chinese_rural_dog"
+        }
         if miniatureSchnauzerBreedNames.contains(trimmed) {
             return "miniature_schnauzer"
         }
         if alaskanMalamuteBreedNames.contains(trimmed) {
             return "alaskan_malamute"
+        }
+        if australianShepherdBreedNames.contains(trimmed) {
+            return "australian_shepherd"
+        }
+        if borderCollieBreedNames.contains(trimmed) {
+            return "border_collie"
+        }
+        if dachshundBreedNames.contains(trimmed) {
+            return "dachshund"
+        }
+        if westHighlandWhiteTerrierBreedNames.contains(trimmed) {
+            return "west_highland_white_terrier"
         }
         return trimmed
             .lowercased()

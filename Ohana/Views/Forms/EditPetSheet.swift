@@ -108,10 +108,21 @@ struct EditPetSheet: View {
                                 .font(OhanaFont.footnote(.medium))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                             Spacer()
-                            TextField("0", value: $dailyPortionGrams, format: .number)
-                                .keyboardType(.decimalPad)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 100)
+                            InlineNumericInput(
+                                text: dailyPortionTextBinding,
+                                placeholder: "0",
+                                unit: "g",
+                                maxFractionDigits: 0,
+                                accent: Color.goPrimary,
+                                step: 5,
+                                valueFont: OhanaFont.callout(.bold),
+                                valueAlignment: .trailing,
+                                fill: Color.ohanaControlFill,
+                                cornerRadius: 12,
+                                horizontalPadding: 8,
+                                verticalPadding: 6
+                            )
+                            .frame(width: 124)
                         }
                     }
                     .padding(16)
@@ -195,6 +206,17 @@ struct EditPetSheet: View {
                 .padding(12)
                 .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
         }
+    }
+
+    private var dailyPortionTextBinding: Binding<String> {
+        Binding(
+            get: {
+                dailyPortionGrams > 0 ? String(format: "%.0f", dailyPortionGrams) : ""
+            },
+            set: { value in
+                dailyPortionGrams = CountryDecimalInput.parse(value, countryCode: AppCountry.code) ?? 0
+            }
+        )
     }
     
     private func loadData() {

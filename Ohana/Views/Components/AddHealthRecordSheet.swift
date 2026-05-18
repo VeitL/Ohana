@@ -221,10 +221,19 @@ struct AddHealthRecordSheet: View {
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(Color.goYellow)
                                     .frame(width: 22)
-                                TextField("费用（\(AppCurrency.symbol)，可选）", text: $cost)
-                                    .keyboardType(.decimalPad)
-                                    .font(.system(size: 15, weight: .medium, design: .rounded))
-                                    .foregroundStyle(Color.ohanaPrimaryText)
+                                InlineNumericInput(
+                                    text: $cost,
+                                    placeholder: "0",
+                                    maxFractionDigits: 2,
+                                    accent: Color.goYellow,
+                                    step: 10,
+                                    valueFont: .system(size: 15, weight: .medium, design: .rounded),
+                                    valueAlignment: .leading,
+                                    fill: Color.clear,
+                                    cornerRadius: 12,
+                                    horizontalPadding: 4,
+                                    verticalPadding: 0
+                                )
                             }
                         }
 
@@ -359,13 +368,13 @@ struct AddHealthRecordSheet: View {
             .flatMap { $0.isEmpty ? nil : $0 }
         let log = PetHealthLog(date: date, type: selectedType, note: finalNote, pet: pet, executorId: executorId)
         log.vetName = vetName
-        log.cost = Double(cost) ?? 0
+        log.cost = CountryDecimalInput.parse(cost, countryCode: AppCountry.code) ?? 0
         log.expirationDate = (showsExpiration && hasExpiration) ? expirationDate : nil
         log.nextCheckupDate = (showsNextCheckup && hasNextCheckup) ? nextCheckupDate : nil
         modelContext.insert(log)
 
         // 同步费用记录
-        if let amount = Double(cost), amount > 0 {
+        if let amount = CountryDecimalInput.parse(cost, countryCode: AppCountry.code), amount > 0 {
             let expense = PetExpenseLog(date: date, amount: amount, category: .medical, note: typeLabel, pet: pet, executorId: executorId)
             modelContext.insert(expense)
         }

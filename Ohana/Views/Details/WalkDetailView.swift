@@ -12,10 +12,13 @@ struct WalkDetailView: View {
     let pet: Pet
 
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("shop_equip_fx_rainbow") private var equipFxRainbow: Bool = false
+    @AppStorage(RainbowWalkEffectKeys.route) private var equipFxRainbow: Bool = false
+    @AppStorage(RainbowWalkEffectKeys.poop) private var equipFxRainbowPoop: Bool = false
+    @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var shareImage: UIImage? = nil
     @State private var isSharing = false
     @State private var isRendering = false
+    @State private var rainbowRoutePhase: CGFloat = 0
 
     // 解码路径坐标
     private var routeCoordinates: [CLLocationCoordinate2D] {
@@ -29,7 +32,7 @@ struct WalkDetailView: View {
     }
 
     private var routeRegion: MKCoordinateRegion? {
-        let coords = routeCoordinates
+        let coords = routeCoordinates + walkPoopMarkers.compactMap(\.coordinate)
         guard !coords.isEmpty else { return nil }
         let lats = coords.map(\.latitude)
         let lons = coords.map(\.longitude)
@@ -42,6 +45,26 @@ struct WalkDetailView: View {
             longitudeDelta: max(0.008, (lons.max()! - lons.min()!) * 1.6)
         )
         return MKCoordinateRegion(center: center, span: span)
+    }
+
+    private var walkPoopMarkers: [WalkPoopMarker] {
+        pet.pottyLogs
+            .filter { $0.walkLogId == walk.id.uuidString }
+            .sorted { $0.date < $1.date }
+            .map {
+                WalkPoopMarker(
+                    id: $0.id,
+                    date: $0.date,
+                    latitude: $0.latitude,
+                    longitude: $0.longitude,
+                    accuracyMeters: $0.locationAccuracyMeters,
+                    type: $0.pottyType
+                )
+            }
+    }
+
+    private var shouldAnimateRainbowWalkEffects: Bool {
+        (equipFxRainbow || equipFxRainbowPoop) && workloadPolicy.shouldAnimate(isVisible: true)
     }
 
     var body: some View {
@@ -93,6 +116,8 @@ struct WalkDetailView: View {
                 }
             }
         }
+        .onAppear { updateRainbowRouteFlow() }
+        .onChange(of: shouldAnimateRainbowWalkEffects) { _, _ in updateRainbowRouteFlow() }
     }
 
     private var detailHeader: some View {
@@ -137,13 +162,14 @@ struct WalkDetailView: View {
                 // 交互式地图
                 Map(initialPosition: .region(region)) {
                     // 路径折线
-                    if equipFxRainbow {
-                        MapPolyline(coordinates: coords)
-                            .stroke(LinearGradient(colors: [.red, .orange, .yellow, .green, .blue, .purple], startPoint: .leading, endPoint: .trailing), lineWidth: 4)
-                    } else {
-                        MapPolyline(coordinates: coords)
-                            .stroke(Color.goPrimary, lineWidth: 4)
-                    }
+                    RainbowRoutePolyline(
+                        coordinates: coords,
+                        normalColor: .goPrimary,
+                        lineWidth: 4,
+                        isRainbow: equipFxRainbow,
+                        isFlowing: shouldAnimateRainbowWalkEffects,
+                        flowPhase: rainbowRoutePhase
+                    )
 
                     // 起点标注
                     if let first = coords.first {
@@ -159,8 +185,20 @@ struct WalkDetailView: View {
                         Annotation("到家", coordinate: last) {
                             ZStack {
                                 Circle().fill(Color.goRed).frame(width: 20, height: 20)
-                                    .shadow(color: Color.goRed.opacity(0.4), radius: 6)
-                                Circle().fill(.white).frame(width: 8, height: 8)
+                                    .shadow(color: Color.goRed.opacity(0.4), radius: 6) // ui-v4: allow map endpoint glow.
+                                Circle().fill(Color.goCardWhite).frame(width: 8, height: 8)
+                            }
+                        }
+                    }
+
+                    ForEach(walkPoopMarkers) { marker in
+                        if let coordinate = marker.coordinate {
+                            Annotation("便便", coordinate: coordinate) {
+                                RainbowPoopPin(
+                                    isRainbow: equipFxRainbowPoop,
+                                    isFlowing: shouldAnimateRainbowWalkEffects,
+                                    size: 28
+                                )
                             }
                         }
                     }
@@ -228,6 +266,17 @@ struct WalkDetailView: View {
         }
         .padding(16)
         .goTranslucentCard(cornerRadius: 24)
+    }
+
+    private func updateRainbowRouteFlow() {
+        guard shouldAnimateRainbowWalkEffects else {
+            withAnimation(GoMotion.feedback) { rainbowRoutePhase = 0 }
+            return
+        }
+        rainbowRoutePhase = 0
+        withAnimation(.linear(duration: 1.35).repeatForever(autoreverses: false)) { // ui-v4: allow route cosmetic loop; runtime-guardrail: allow gated by AppWorkloadPolicy and only used for visible equipped walk detail maps.
+            rainbowRoutePhase = -68
+        }
     }
 
     private var divider: some View {

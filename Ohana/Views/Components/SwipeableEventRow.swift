@@ -73,7 +73,7 @@ struct SwipeableEventRow: View {
                     .rotationEffect(.degrees(p.rotation))
                     .transition(.asymmetric(insertion: .scale(scale: 0.1).combined(with: .opacity), removal: .opacity))
             }
-            .animation(.spring(response: 0.5, dampingFraction: 0.6), value: celebrationParticles.count)
+            .animation(GoMotion.feedback, value: celebrationParticles.count)
 
             // 椰子浮字
             ForEach(coconutFloats) { f in
@@ -144,10 +144,10 @@ struct SwipeableEventRow: View {
                         let dx = val.translation.width
                         // 信息性事件不可左滑完成
                         if dx < -triggerThreshold && event.isActionableTask { triggerComplete() }
-                        else if dx < -triggerThreshold { withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) { offsetX = 0 } }
+                        else if dx < -triggerThreshold { withAnimation(GoMotion.feedback) { offsetX = 0 } }
                         else if dx > triggerThreshold { pendingDelete() }
                         else {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) { offsetX = 0 }
+                            withAnimation(GoMotion.feedback) { offsetX = 0 }
                         }
                     }
                 )
@@ -182,10 +182,10 @@ struct SwipeableEventRow: View {
                 overdueFloat = 0
                 return
             }
-            withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) {
+            withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) { // ui-v4: allow overdue warning breath, gated by reduce-work policy.
                 overdueBreath = true
             }
-            withAnimation(.easeInOut(duration: 0.83).repeatForever(autoreverses: true)) {
+            withAnimation(.easeInOut(duration: 0.83).repeatForever(autoreverses: true)) { // ui-v4: allow overdue warning float, gated by reduce-work policy.
                 overdueFloat = 2.0
             }
         }
@@ -193,7 +193,7 @@ struct SwipeableEventRow: View {
             if showSkipReason {
                 Text("今日已打卡，不重复奖励 🥥")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 14).padding(.vertical, 8)
                     .background(Color.goYellow, in: Capsule())
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -205,9 +205,9 @@ struct SwipeableEventRow: View {
     // MARK: - Event Card
 
     private var eventCard: some View {
-        let titlePrimary: Color = colorScheme == .light ? Color.black.opacity(0.88) : Color.white
-        let titleMuted: Color = colorScheme == .light ? Color.black.opacity(0.38) : Color.white.opacity(0.35)
-        let timeSecondary: Color = colorScheme == .light ? Color.black.opacity(0.45) : Color.white.opacity(0.35)
+        let titlePrimary: Color = Color.ohanaPrimaryText
+        let titleMuted: Color = Color.ohanaTertiaryText
+        let timeSecondary: Color = Color.ohanaSecondaryText.opacity(0.72)
         // Squish scale: card compresses as left-swipe deepens
         let squishX = 1.0 - leftProgress * 0.04
         let squishY = 1.0 + leftProgress * 0.02
@@ -230,14 +230,14 @@ struct SwipeableEventRow: View {
                     if leftProgress > 0.3 {
                         Image(systemName: "checkmark")
                             .font(.system(size: 16, weight: .black))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.goCardWhite)
                             .opacity(Double((leftProgress - 0.3) / 0.7))
                             .scaleEffect(0.5 + leftProgress * 0.5)
                     } else {
                         Image(systemName: event.silhouetteListSymbol)
                             .font(.system(size: 17, weight: .bold))
                             .symbolRenderingMode(.monochrome)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.goCardWhite)
                             .opacity(1 - Double(leftProgress / 0.3))
                     }
                 }
@@ -261,7 +261,7 @@ struct SwipeableEventRow: View {
                     if leftProgress > 0.4 {
                         Image(systemName: "checkmark")
                             .font(.system(size: 16, weight: .black))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.goCardWhite)
                             .opacity(Double((leftProgress - 0.4) / 0.6))
                             .scaleEffect(0.5 + leftProgress * 0.5)
                     } else {
@@ -333,7 +333,7 @@ struct SwipeableEventRow: View {
         .opacity(rowState == .completed ? 0.5 : 1.0)
         // Squish: card compresses horizontally, slightly taller on deep swipe
         .scaleEffect(x: squishX, y: squishY, anchor: .trailing)
-        .animation(.spring(response: 0.2, dampingFraction: 0.7), value: leftProgress)
+        .animation(GoMotion.feedback, value: leftProgress)
     }
 
     // MARK: - Color Coding
@@ -364,17 +364,17 @@ struct SwipeableEventRow: View {
             spawnCoconutFloat()
         } else {
             // 提示用户已打卡
-            withAnimation(.spring(response: 0.3)) { showSkipReason = true }
+            withAnimation(GoMotion.feedback) { showSkipReason = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                withAnimation { showSkipReason = false }
+                withAnimation(GoMotion.feedback) { showSkipReason = false }
             }
         }
         launchCelebrationParticles()
-        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) { offsetX = -800 }
+        withAnimation(GoMotion.page) { offsetX = -800 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
             onComplete()
             self.isTriggerred = false
-            withAnimation(.spring(response: 0.35)) { self.offsetX = 0 }
+            withAnimation(GoMotion.feedback) { self.offsetX = 0 }
         }
     }
 
@@ -422,19 +422,19 @@ struct SwipeableEventRow: View {
     // E1: 右滑只弹确认 alert，回弹到原位
     private func pendingDelete() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) { offsetX = 0 }
+        withAnimation(GoMotion.feedback) { offsetX = 0 }
         showDeleteConfirmAlert = true
     }
 
     private func triggerDelete() {
         isTriggerred = true
-        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) { offsetX = 800 }
+        withAnimation(GoMotion.page) { offsetX = 800 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
             modelContext.delete(event)
             modelContext.safeSave()
             onDelete()
             isTriggerred = false
-            withAnimation(.spring(response: 0.35)) { offsetX = 0 }
+            withAnimation(GoMotion.feedback) { offsetX = 0 }
         }
     }
 
@@ -527,7 +527,7 @@ struct SwipeableEventRow: View {
         let f = CoconutFloat()
         coconutFloats.append(f)
         let id = f.id
-        withAnimation(.easeOut(duration: 0.9)) {
+        withAnimation(GoMotion.page) {
             if let idx = coconutFloats.firstIndex(where: { $0.id == id }) {
                 coconutFloats[idx].offsetY = -60
                 coconutFloats[idx].opacity = 0
@@ -554,7 +554,7 @@ private struct EventDetailSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             Capsule()
-                .fill(Color.white.opacity(0.2))
+                .fill(Color.goCardWhite.opacity(0.2))
                 .frame(width: 40, height: 4)
                 .padding(.top, 12).padding(.bottom, 20)
 

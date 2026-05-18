@@ -106,6 +106,7 @@ struct CalendarView: View {
     @State private var coconutCount: Int = QuestManager.shared.coconutCount
     @State private var listVisibleTopDate = Calendar.current.startOfDay(for: Date())
     @State private var didScrollListToToday = false
+    @State private var monthSlideDirection = 1
 
     private var isMaterial: Bool { false }
     private var matBg:      Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
@@ -573,7 +574,7 @@ struct CalendarView: View {
             // Month header — Go 风格
             HStack {
                 Button {
-                    withAnimation { selectedDate = Calendar.current.date(byAdding: .month, value: -1, to: selectedDate) ?? selectedDate }
+                    shiftMonth(by: -1)
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 14, weight: .bold))
@@ -592,7 +593,7 @@ struct CalendarView: View {
                 Spacer()
                 
                 Button {
-                    withAnimation { selectedDate = Calendar.current.date(byAdding: .month, value: 1, to: selectedDate) ?? selectedDate }
+                    shiftMonth(by: 1)
                 } label: {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 14, weight: .bold))
@@ -651,6 +652,11 @@ struct CalendarView: View {
                 }
             }
             .padding(.horizontal, 12)
+            .id(calendarMonthKey)
+            .transition(.asymmetric(
+                insertion: .move(edge: monthSlideDirection > 0 ? .trailing : .leading).combined(with: .opacity),
+                removal: .move(edge: monthSlideDirection > 0 ? .leading : .trailing).combined(with: .opacity)
+            ))
             
             GoDashedDivider()
                 .padding(.horizontal, 20)
@@ -679,6 +685,8 @@ struct CalendarView: View {
                 .padding(.horizontal, 16)
             }
         }
+        .contentShape(Rectangle())
+        .simultaneousGesture(monthSwipeGesture)
     }
     
     // MARK: - Go List View（时间轴版）
@@ -986,6 +994,37 @@ struct CalendarView: View {
         }
         
         return days
+    }
+
+    private var calendarMonthKey: String {
+        let components = Calendar.current.dateComponents([.year, .month], from: selectedDate)
+        return "\(components.year ?? 0)-\(components.month ?? 0)"
+    }
+
+    private var monthSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 36, coordinateSpace: .local)
+            .onEnded { value in
+                let width = value.translation.width
+                let height = value.translation.height
+                guard abs(width) > 44, abs(width) > abs(height) * 1.25 else { return }
+                shiftMonth(by: width < 0 ? 1 : -1)
+            }
+    }
+
+    private func shiftMonth(by delta: Int) {
+        let cal = Calendar.current
+        guard let targetMonth = cal.date(byAdding: .month, value: delta, to: selectedDate),
+              let interval = cal.dateInterval(of: .month, for: targetMonth) else { return }
+
+        let today = Date()
+        let targetDate = cal.isDate(interval.start, equalTo: today, toGranularity: .month)
+            ? today
+            : interval.start
+
+        monthSlideDirection = delta >= 0 ? 1 : -1
+        withAnimation(GoMotion.page) {
+            selectedDate = targetDate
+        }
     }
 }
 

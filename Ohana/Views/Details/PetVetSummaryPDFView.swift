@@ -298,7 +298,7 @@ struct PetVetSummaryPDFView: View {
                     y: .value("体重", log.weight)
                 )
                 .foregroundStyle(themeColor)
-                .interpolationMethod(.catmullRom)
+                .interpolationMethod(OhanaChartStyle.trendInterpolation)
 
                 PointMark(
                     x: .value("日期", log.date),

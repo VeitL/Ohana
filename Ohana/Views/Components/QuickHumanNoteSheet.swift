@@ -2,11 +2,14 @@
 //  QuickHumanNoteSheet.swift
 //  Ohana
 //
-//  V4 quick human note popup.
+//  V4 quick human record popup.
 //
 
 import SwiftUI
 import SwiftData
+import PhotosUI
+import UniformTypeIdentifiers
+import UIKit
 
 private struct QuickHumanNoteContentHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
@@ -16,8 +19,17 @@ private struct QuickHumanNoteContentHeightKey: PreferenceKey {
     }
 }
 
+private struct QuickHumanFileAttachmentDraft: Identifiable {
+    let id = UUID()
+    let fileName: String
+    let data: Data
+    let isImage: Bool
+}
+
 struct QuickHumanNoteSheet: View {
     let human: Human
+    var onSaved: (() -> Void)? = nil
+    var onDismiss: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -25,7 +37,16 @@ struct QuickHumanNoteSheet: View {
 
     @State private var noteText = ""
     @State private var date = Date()
-    @State private var adaptiveSheetHeight: CGFloat = 430
+    @State private var selectedItems: [PhotosPickerItem] = []
+    @State private var selectedImages: [UIImage] = []
+    @State private var capturedImage: UIImage? = nil
+    @State private var showCamera = false
+    @State private var showCameraPermissionAlert = false
+    @State private var showFileImporter = false
+    @State private var attachedFiles: [QuickHumanFileAttachmentDraft] = []
+    @State private var reminderEnabled = false
+    @State private var reminderDate = Calendar.current.date(byAdding: .hour, value: 3, to: Date()) ?? Date()
+    @State private var adaptiveSheetHeight: CGFloat = 560
     @State private var contentHeight: CGFloat = 0
     @State private var popupVisible = false
     @State private var isClosing = false
@@ -33,17 +54,18 @@ struct QuickHumanNoteSheet: View {
 
     private var l: L10n { L10n(appLanguage) }
     private var trimmedNote: String { noteText.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var canSave: Bool { !trimmedNote.isEmpty }
+    private var hasAttachment: Bool { !selectedImages.isEmpty || !attachedFiles.isEmpty }
+    private var canSave: Bool { !trimmedNote.isEmpty || hasAttachment || reminderEnabled }
     private var popupAnimation: Animation {
         .interactiveSpring(response: 0.30, dampingFraction: 0.88, blendDuration: 0.12)
     }
 
     var body: some View {
         GeometryReader { proxy in
-            let minPanelHeight: CGFloat = 340
-            let maxPanelHeight = max(minPanelHeight, proxy.size.height * 0.88)
-            let scrollMaxHeight = max(190, maxPanelHeight - 142)
-            let measuredHeight = contentHeight > 1 ? contentHeight : 260
+            let minPanelHeight: CGFloat = 430
+            let maxPanelHeight = max(minPanelHeight, proxy.size.height * 0.90)
+            let scrollMaxHeight = max(260, maxPanelHeight - 142)
+            let measuredHeight = contentHeight > 1 ? contentHeight : 360
             let scrollHeight = min(measuredHeight, scrollMaxHeight)
             let panelHeightEstimate = min(maxPanelHeight, max(adaptiveSheetHeight, minPanelHeight))
             let hiddenOffset = panelHeightEstimate + 72
@@ -60,16 +82,15 @@ struct QuickHumanNoteSheet: View {
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 14) {
                             noteBlock
+                            attachmentBlock
+                            reminderBlock
                             dateBlock
                         }
                         .padding(.bottom, 10)
                         .background {
                             GeometryReader { contentProxy in
                                 Color.clear
-                                    .preference(
-                                        key: QuickHumanNoteContentHeightKey.self,
-                                        value: contentProxy.size.height
-                                    )
+                                    .preference(key: QuickHumanNoteContentHeightKey.self, value: contentProxy.size.height)
                             }
                         }
                     }
@@ -110,6 +131,26 @@ struct QuickHumanNoteSheet: View {
                 }
             }
         }
+        .onChange(of: selectedItems) { _, newItems in
+            Task {
+                var loaded: [UIImage] = []
+                for item in newItems {
+                    if let data = try? await item.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        loaded.append(image)
+                    }
+                }
+                await MainActor.run {
+                    selectedImages.append(contentsOf: loaded)
+                    selectedItems = []
+                }
+            }
+        }
+        .onChange(of: capturedImage) { _, image in
+            guard let image else { return }
+            selectedImages.append(image)
+            capturedImage = nil
+        }
         .onPreferenceChange(QuickHumanNoteContentHeightKey.self) { height in
             guard height.isFinite, height > 0 else { return }
             var transaction = Transaction()
@@ -117,6 +158,28 @@ struct QuickHumanNoteSheet: View {
             withTransaction(transaction) {
                 contentHeight = height
             }
+        }
+        .fullScreenCover(isPresented: $showCamera) {
+            PetCameraPickerView { image in
+                capturedImage = image
+                showCamera = false
+            } onCancel: {
+                showCamera = false
+            }
+        }
+        .fileImporter(
+            isPresented: $showFileImporter,
+            allowedContentTypes: [UTType.pdf, UTType.image, UTType.data],
+            allowsMultipleSelection: true
+        ) { result in
+            if case .success(let urls) = result {
+                attachedFiles.append(contentsOf: loadFileDrafts(from: urls))
+            }
+        }
+        .alert(l.tr(zh: "无法打开相机", en: "Camera unavailable", de: "Kamera nicht verfügbar"), isPresented: $showCameraPermissionAlert) {
+            Button(l.tr(zh: "知道了", en: "OK", de: "OK"), role: .cancel) {}
+        } message: {
+            Text(l.tr(zh: "请在系统设置中允许 Ohana 访问相机。", en: "Allow Ohana to access the camera in system settings.", de: "Erlaube Ohana den Kamerazugriff in den Systemeinstellungen."))
         }
     }
 
@@ -163,7 +226,7 @@ struct QuickHumanNoteSheet: View {
             .frame(width: 58, height: 58)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(l.tr(zh: "快速备注", en: "Quick Note", de: "Schnelle Notiz"))
+                Text(l.tr(zh: "添加记录", en: "Add Record", de: "Eintrag hinzufügen"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(human.name)
@@ -187,16 +250,12 @@ struct QuickHumanNoteSheet: View {
                 .font(OhanaFont.body(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .scrollContentBackground(.hidden)
-                .frame(minHeight: 118)
+                .frame(minHeight: 110)
                 .padding(12)
                 .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
-                }
                 .overlay(alignment: .topLeading) {
                     if noteText.isEmpty {
-                        Text(l.tr(zh: "今天发生了什么？", en: "What happened today?", de: "Was ist heute passiert?"))
+                        Text(l.tr(zh: "记录此刻、想法或要跟进的事……", en: "Write a thought, moment, or follow-up…", de: "Gedanke, Moment oder To-do notieren…"))
                             .font(OhanaFont.body(.semibold))
                             .foregroundStyle(Color.ohanaTertiaryText)
                             .padding(.horizontal, 18)
@@ -208,12 +267,138 @@ struct QuickHumanNoteSheet: View {
         .padding(.horizontal, 22)
     }
 
+    private var attachmentBlock: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                PhotosPicker(selection: $selectedItems, maxSelectionCount: 6, matching: .images) {
+                    attachmentButton(icon: "photo.on.rectangle.angled", title: l.tr(zh: "相册", en: "Album", de: "Album"), color: Color.goPrimary)
+                }
+                .buttonStyle(ScaleButtonStyle())
+
+                Button { presentCamera() } label: {
+                    attachmentButton(icon: "camera.fill", title: l.tr(zh: "拍照", en: "Camera", de: "Kamera"), color: Color.goTeal)
+                }
+                .buttonStyle(ScaleButtonStyle())
+
+                Button { showFileImporter = true } label: {
+                    attachmentButton(icon: "paperclip", title: l.tr(zh: "文件", en: "File", de: "Datei"), color: Color.goPurple)
+                }
+                .buttonStyle(ScaleButtonStyle())
+            }
+
+            if hasAttachment {
+                attachmentPreview
+            }
+        }
+        .padding(14)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .padding(.horizontal, 22)
+    }
+
+    private func attachmentButton(icon: String, title: String, color: Color) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .black))
+            Text(title)
+                .font(OhanaFont.caption(.black))
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+        }
+        .foregroundStyle(Color.arkInk)
+        .frame(maxWidth: .infinity)
+        .frame(height: 40)
+        .background(color, in: Capsule())
+    }
+
+    private var attachmentPreview: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if !selectedImages.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(selectedImages.enumerated()), id: \.offset) { index, image in
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 54, height: 54)
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .overlay(alignment: .topTrailing) {
+                                    Button {
+                                        selectedImages.remove(at: index)
+                                    } label: {
+                                        Image(systemName: "xmark")
+                                            .font(.system(size: 8, weight: .black))
+                                            .foregroundStyle(Color.arkInk)
+                                            .frame(width: 18, height: 18)
+                                            .background(Color.goRed, in: Circle())
+                                    }
+                                    .offset(x: 5, y: -5)
+                                }
+                        }
+                    }
+                    .padding(.top, 4)
+                }
+            }
+
+            ForEach(attachedFiles) { file in
+                HStack(spacing: 8) {
+                    Image(systemName: file.isImage ? "photo.fill" : "doc.fill")
+                        .font(.system(size: 12, weight: .black))
+                        .foregroundStyle(Color.goPurple)
+                    Text(file.fileName)
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .lineLimit(1)
+                    Spacer()
+                    Button {
+                        attachedFiles.removeAll { $0.id == file.id }
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10, weight: .black))
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
+                .padding(.horizontal, 10)
+                .frame(height: 34)
+                .background(Color.ohanaControlFill, in: Capsule())
+            }
+        }
+    }
+
+    private var reminderBlock: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle(isOn: $reminderEnabled.animation(GoMotion.feedback)) {
+                Label(l.tr(zh: "添加提醒", en: "Add Reminder", de: "Erinnerung hinzufügen"), systemImage: "bell.badge.fill")
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+            }
+            .tint(Color.goPrimary)
+
+            if reminderEnabled {
+                HStack {
+                    Text(l.tr(zh: "提醒时间", en: "Reminder time", de: "Erinnerungszeit"))
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                    Spacer()
+                    DatePicker("", selection: $reminderDate, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                        .labelsHidden()
+                        .tint(Color.goPrimary)
+                }
+                .padding(14)
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            }
+        }
+        .padding(16)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .padding(.horizontal, 22)
+    }
+
     private var dateBlock: some View {
         HStack(spacing: 12) {
             Image(systemName: "calendar")
                 .font(.system(size: 14, weight: .black))
                 .foregroundStyle(Color.goPrimary)
-            Text(l.tr(zh: "日期", en: "Date", de: "Datum"))
+            Text(l.tr(zh: "记录日期", en: "Record date", de: "Eintragsdatum"))
                 .font(OhanaFont.callout(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
@@ -223,10 +408,6 @@ struct QuickHumanNoteSheet: View {
         }
         .padding(14)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
-        }
         .padding(.horizontal, 22)
     }
 
@@ -235,7 +416,7 @@ struct QuickHumanNoteSheet: View {
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 16, weight: .black))
-                Text(l.tr(zh: "保存备注", en: "Save Note", de: "Notiz speichern"))
+                Text(l.tr(zh: "保存记录", en: "Save Record", de: "Eintrag speichern"))
                     .font(OhanaFont.callout(.black))
             }
             .foregroundStyle(Color.arkInk)
@@ -250,6 +431,30 @@ struct QuickHumanNoteSheet: View {
         .padding(.bottom, 16)
     }
 
+    private func presentCamera() {
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            showCameraPermissionAlert = true
+            return
+        }
+        showCamera = true
+    }
+
+    private func loadFileDrafts(from urls: [URL]) -> [QuickHumanFileAttachmentDraft] {
+        urls.compactMap { url in
+            let didAccess = url.startAccessingSecurityScopedResource()
+            defer {
+                if didAccess { url.stopAccessingSecurityScopedResource() }
+            }
+            guard let data = try? Data(contentsOf: url) else { return nil }
+            let isImage = (try? url.resourceValues(forKeys: [.contentTypeKey]).contentType?.conforms(to: .image)) ?? false
+            return QuickHumanFileAttachmentDraft(
+                fileName: url.lastPathComponent.isEmpty ? "attachment" : url.lastPathComponent,
+                data: data,
+                isImage: isImage
+            )
+        }
+    }
+
     private func close() {
         guard !isClosing else { return }
         isClosing = true
@@ -258,18 +463,89 @@ struct QuickHumanNoteSheet: View {
             popupDragOffset = 0
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-            dismiss()
+            if let onDismiss {
+                onDismiss()
+            } else {
+                dismiss()
+            }
         }
     }
 
     private func save() {
         guard canSave else { return }
+        let attachments = persistAttachments()
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd"
-        let entry = "[\(fmt.string(from: date))] \(trimmedNote)"
+        let entry = "[\(fmt.string(from: date))] \(recordBody(attachments: attachments))\(HumanNoteAttachmentStore.marker(for: attachments))"
         human.notes = human.notes.isEmpty ? entry : human.notes + "\n\n" + entry
+
+        if reminderEnabled {
+            createReminder()
+        }
+
         modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+        onSaved?()
         close()
+    }
+
+    private func persistAttachments() -> [HumanNoteAttachmentReference] {
+        var references: [HumanNoteAttachmentReference] = []
+        for (index, image) in selectedImages.enumerated() {
+            if let ref = HumanNoteAttachmentStore.saveImage(image, humanId: human.id, index: index + 1) {
+                references.append(ref)
+            }
+        }
+        for file in attachedFiles {
+            if let ref = HumanNoteAttachmentStore.saveFile(
+                data: file.data,
+                originalFileName: file.fileName,
+                isImage: file.isImage,
+                humanId: human.id
+            ) {
+                references.append(ref)
+            }
+        }
+        return references
+    }
+
+    private func recordBody(attachments: [HumanNoteAttachmentReference]) -> String {
+        var parts: [String] = []
+        if !trimmedNote.isEmpty {
+            parts.append(trimmedNote)
+        }
+        let imageCount = attachments.filter(\.isImage).count
+        let fileNames = attachments.filter { !$0.isImage }.map(\.fileName)
+        if imageCount > 0 {
+            parts.append(l.tr(zh: "照片 \(imageCount) 张", en: "\(imageCount) photo(s)", de: "\(imageCount) Foto(s)"))
+        }
+        if !fileNames.isEmpty {
+            parts.append(l.tr(zh: "文件：\(fileNames.joined(separator: ", "))", en: "Files: \(fileNames.joined(separator: ", "))", de: "Dateien: \(fileNames.joined(separator: ", "))"))
+        }
+        if reminderEnabled {
+            parts.append(l.tr(zh: "提醒：\(reminderDate.formatted(date: .abbreviated, time: .shortened))", en: "Reminder: \(reminderDate.formatted(date: .abbreviated, time: .shortened))", de: "Erinnerung: \(reminderDate.formatted(date: .abbreviated, time: .shortened))"))
+        }
+        return parts.isEmpty ? l.tr(zh: "记录", en: "Record", de: "Eintrag") : parts.joined(separator: " · ")
+    }
+
+    private func createReminder() {
+        let title = trimmedNote.isEmpty
+            ? l.tr(zh: "\(human.name) 的记录提醒", en: "\(human.name)'s note reminder", de: "Notizerinnerung für \(human.name)")
+            : trimmedNote
+        let event = Event(
+            title: title,
+            startDate: reminderDate,
+            eventType: EventType.task.rawValue,
+            relatedEntityType: "human_note",
+            relatedEntityId: human.id.uuidString
+        )
+        event.assigneeId = human.id.uuidString
+        let reminder = Reminder(event: event, scheduledAt: reminderDate)
+        event.reminders.append(reminder)
+        modelContext.insert(event)
+        modelContext.insert(reminder)
+        Task {
+            await ReminderSchedulingService.scheduleIfNeeded(reminder: reminder, context: modelContext, source: .quickAction)
+        }
     }
 }

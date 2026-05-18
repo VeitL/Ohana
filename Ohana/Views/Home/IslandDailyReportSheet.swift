@@ -48,7 +48,7 @@ struct IslandDailyReportSheet: View {
     var body: some View {
         ZStack {
             // 背景
-            Color.black.opacity(0.6).ignoresSafeArea()
+            Color.black.opacity(0.6).ignoresSafeArea() // ui-v4: allow launch report modal scrim
                 .background(Color.ohanaCardSurface)
                 .ignoresSafeArea()
 
@@ -57,7 +57,7 @@ struct IslandDailyReportSheet: View {
 
                 VStack(spacing: 24) {
                     // 顶部 emoji + 标题
-                    VStack(spacing: 12) {
+                    VStack(spacing: 10) {
                         Text("🏝️")
                             .font(.system(size: 64))
                             .scaleEffect(islandBounce ? 1.15 : 1.0)
@@ -67,7 +67,7 @@ struct IslandDailyReportSheet: View {
                                 value: islandBounce
                             )
 
-                        Text("岛屿日报")
+                        Text("今日任务盘")
                             .font(.system(size: 28, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
 
@@ -81,7 +81,7 @@ struct IslandDailyReportSheet: View {
                         Rectangle()
                             .fill(Color.primary.opacity(0.1))
                             .frame(height: 1)
-                        Text("今天岛上需要你")
+                        Text("今日")
                             .font(.system(size: 12, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .fixedSize()
@@ -93,8 +93,8 @@ struct IslandDailyReportSheet: View {
 
                     // 任务列表（staggered 入场）
                     if quests.isEmpty {
-                        Text("🌴 今天岛上很平静，好好休息吧")
-                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                        Text("🌴 已清空")
+                            .font(.system(size: 16, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .multilineTextAlignment(.center)
                             .padding(.vertical, 8)
@@ -112,8 +112,8 @@ struct IslandDailyReportSheet: View {
                         HStack(spacing: 6) {
                             Text("🎁")
                                 .font(.system(size: 14))
-                            Text("完成全部可额外获得 +5 🥥")
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                            Text("+5 🥥")
+                                .font(.system(size: 12, weight: .black, design: .rounded))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                         }
                         .padding(.horizontal, 16).padding(.vertical, 8)
@@ -132,7 +132,7 @@ struct IslandDailyReportSheet: View {
                             onStartTasks?()
                         } label: {
                             HStack(spacing: 8) {
-                                Text("开始今日任务")
+                                Text("开始")
                                     .font(.system(size: 16, weight: .bold, design: .rounded))
                                 Text("⚔️")
                                     .font(.system(size: 16))
@@ -141,14 +141,13 @@ struct IslandDailyReportSheet: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                             .background(Color.goPrimary, in: Capsule())
-                            .shadow(color: Color.goPrimary.opacity(0.4), radius: 12, y: 4)
                         }
                         .buttonStyle(ScaleButtonStyle())
 
                         Button {
                             isPresented = false
                         } label: {
-                            Text("跳过，直接进入")
+                            Text("跳过")
                                 .font(.system(size: 13, weight: .medium, design: .rounded))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                         }
@@ -160,7 +159,6 @@ struct IslandDailyReportSheet: View {
                 .background(
                     RoundedRectangle(cornerRadius: 32, style: .continuous)
                         .fill(Color.ohanaCardSurface)
-                        .shadow(color: .black.opacity(0.2), radius: 30, y: -10)
                 )
                 .padding(.horizontal, 16)
 
@@ -176,7 +174,7 @@ struct IslandDailyReportSheet: View {
             // Staggered task rows
             for i in 0..<quests.count {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.15 + Double(i) * 0.08) {
-                    withAnimation(.easeOut(duration: 0.4)) {
+                    withAnimation(GoMotion.quick) {
                         if i < itemsAppeared.count {
                             itemsAppeared[i] = true
                         }
@@ -204,9 +202,6 @@ struct IslandDailyReportSheet: View {
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(quest.isCompleted ? .secondary : .primary)
                     .strikethrough(quest.isCompleted)
-                Text(quest.subtitle)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
             }
 
             Spacer()

@@ -154,7 +154,7 @@ struct IslandHealthDashboard: View {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.goCardWhite)
                     .frame(width: 36, height: 36)
                     .goGlassBackground(Circle())
             }
@@ -163,7 +163,7 @@ struct IslandHealthDashboard: View {
             Spacer()
             Text("健康总览")
                 .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.goCardWhite)
             Spacer()
             Color.clear.frame(width: 36, height: 36)
         }
@@ -213,19 +213,19 @@ struct IslandHealthDashboard: View {
             VStack(alignment: .leading, spacing: 7) {
                 Text("健康信号")
                     .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.56))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.56))
                 Text(dueSoonCount > 0 ? "\(dueSoonCount) 项需要关注" : "状态稳定")
                     .font(.system(size: 24, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.goCardWhite)
                 Text("12 个月 \(yearLogs.count) 条记录 · \(typeBreakdown.first?.type.rawValue ?? "暂无类型")")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.52))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.52))
             }
             Spacer()
         }
         .padding(18)
         .background(
-            LinearGradient(colors: [Color.goLime.opacity(0.2), Color.white.opacity(0.07)], startPoint: .topLeading, endPoint: .bottomTrailing),
+            LinearGradient(colors: [Color.goLime.opacity(0.2), Color.goCardWhite.opacity(0.07)], startPoint: .topLeading, endPoint: .bottomTrailing),
             in: RoundedRectangle(cornerRadius: 26, style: .continuous)
         )
     }
@@ -235,11 +235,11 @@ struct IslandHealthDashboard: View {
             HStack {
                 Label("12 个月健康记录", systemImage: "chart.bar.fill")
                     .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.82))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.82))
                 Spacer()
                 Text("记录数")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.45))
             }
 
             if monthPoints.allSatisfy({ $0.count == 0 }) {
@@ -259,14 +259,14 @@ struct IslandHealthDashboard: View {
             }
         }
         .padding(16)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     private var typeBreakdownSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("记录类型")
                 .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.goCardWhite)
 
             if typeBreakdown.isEmpty {
                 emptyState("暂无类型分布")
@@ -278,26 +278,26 @@ struct IslandHealthDashboard: View {
                             .font(.system(size: 18))
                         Text(item.type.rawValue)
                             .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.goCardWhite)
                         Spacer()
                         Text("\(item.count)")
                             .font(.system(size: 14, weight: .black, design: .rounded))
                             .foregroundStyle(Color.goLime)
                     }
                     .padding(12)
-                    .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .background(Color.goCardWhite.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
             }
         }
         .padding(16)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     private var healthRows: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("成员健康状态")
                 .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.goCardWhite)
 
             ForEach(petSummaries) { summary in
                 Button {
@@ -318,14 +318,14 @@ struct IslandHealthDashboard: View {
                 HStack(spacing: 6) {
                     Text(summary.pet.name)
                         .font(.system(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.goCardWhite)
                     Text(summary.pet.species)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(Color.goCardWhite.opacity(0.5))
                 }
                 Text(summary.latestTitle)
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.58))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.58))
                     .lineLimit(1)
                 HStack(spacing: 8) {
                     pill("总计 \(summary.recordCount)", color: Color.goLime)
@@ -339,14 +339,14 @@ struct IslandHealthDashboard: View {
             if let date = summary.latestDate {
                 Text(relativeDayText(date))
                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.5))
             }
             Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(.white.opacity(0.32))
+                .foregroundStyle(Color.goCardWhite.opacity(0.32))
         }
         .padding(14)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private func metricCard(title: String, value: String, subtitle: String, icon: String, tint: Color) -> some View {
@@ -360,19 +360,19 @@ struct IslandHealthDashboard: View {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
                     .font(.system(size: 30, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.goCardWhite)
                     .monospacedDigit()
                 Text(subtitle)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.48))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.48))
             }
             Text(title)
                 .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.58))
+                .foregroundStyle(Color.goCardWhite.opacity(0.58))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     @ViewBuilder
@@ -383,10 +383,10 @@ struct IslandHealthDashboard: View {
                 Text(title)
                     .font(.system(size: 13, weight: .bold, design: .rounded))
             }
-            .foregroundStyle(isSelected ? .black : .white)
+            .foregroundStyle(isSelected ? Color.arkInk : Color.goCardWhite)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(isSelected ? Color.goLime : Color.white.opacity(0.12), in: Capsule())
+            .background(isSelected ? Color.goLime : Color.ohanaControlFill, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -411,7 +411,7 @@ struct IslandHealthDashboard: View {
         Text(text)
             .multilineTextAlignment(.center)
             .font(.system(size: 13, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white.opacity(0.42))
+            .foregroundStyle(Color.goCardWhite.opacity(0.42))
             .frame(maxWidth: .infinity, minHeight: 130)
     }
 
@@ -462,7 +462,7 @@ struct IslandHealthDashboard: View {
 
     private func playChartReveal() {
         chartRevealProgress = 0
-        withAnimation(.spring(response: 0.62, dampingFraction: 0.84)) {
+        withAnimation(GoMotion.page) {
             chartRevealProgress = 1
         }
     }

@@ -115,14 +115,22 @@ struct PetChartDashboard: View {
                 Text("kg").font(.system(size: 14, weight: .bold)).foregroundStyle(Color.goTeal)
             }
             if showingAddWeight {
-                HStack(spacing: 6) {
-                    TextField("0.0", text: $quickWeightInput)
-                        .keyboardType(.decimalPad)
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .padding(.horizontal, 8).padding(.vertical, 5)
+                VStack(spacing: 6) {
+                    InlineNumericInput(
+                        text: $quickWeightInput,
+                        placeholder: CountryDecimalInput.placeholder(countryCode: AppCountry.code),
+                        unit: "kg",
+                        maxFractionDigits: 1,
+                        accent: Color.goTeal,
+                        step: 0.1,
+                        valueFont: .system(size: 14, weight: .bold, design: .rounded),
+                        unitFont: .system(size: 11, weight: .black, design: .rounded),
+                        cornerRadius: 12,
+                        horizontalPadding: 8,
+                        verticalPadding: 5
+                    )
                     Button {
-                        if let w = Double(quickWeightInput.replacingOccurrences(of: ",", with: ".")) {
+                        if let w = CountryDecimalInput.parse(quickWeightInput, countryCode: AppCountry.code) {
                             let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
                                 .flatMap { $0.isEmpty ? nil : $0 }
                             let log = PetWeightLog(date: Date(), weight: w, pet: pet, executorId: executorId)
@@ -147,7 +155,7 @@ struct PetChartDashboard: View {
                         }
                         quickWeightInput = ""; showingAddWeight = false
                     } label: {
-                        Text("存").font(.system(size: 12, weight: .black)).foregroundStyle(.black)
+                        Text("存").font(.system(size: 12, weight: .black)).foregroundStyle(Color.arkInk)
                             .padding(.horizontal, 10).padding(.vertical, 5).background(Color.goPrimary, in: Capsule())
                     }
                 }

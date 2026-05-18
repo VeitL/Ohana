@@ -30,8 +30,7 @@ enum FocusWalletAvatarCache {
             return cached
         }
 
-        let preview = quickPreviewImage(from: data)
-        let entry = Entry(image: preview, isTransparent: false, signature: signature, isFinal: false)
+        let entry = Entry(image: nil, isTransparent: false, signature: signature, isFinal: false)
         entries[cardId] = entry
         return entry
     }
@@ -93,10 +92,6 @@ enum FocusWalletAvatarCache {
         let isTransparent = image.map { ImageCutoutService.imageHasTransparentPixels($0) } ?? false
         let displayImage = isTransparent ? image.flatMap { ImageCutoutService.trimmedTransparentSubjectImage(from: $0) } ?? image : image
         return Entry(image: displayImage, isTransparent: isTransparent, signature: signature, isFinal: true)
-    }
-
-    nonisolated private static func quickPreviewImage(from data: Data) -> UIImage? {
-        decodedImage(from: data, maxPixel: 320)
     }
 
     nonisolated private static func decodedImage(from data: Data, maxPixel: CGFloat = 700) -> UIImage? {

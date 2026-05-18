@@ -67,9 +67,9 @@ enum ActiveFeedSheet: Identifiable, Equatable {
 
     var usesInlineOverlay: Bool {
         switch self {
-        case .manual, .treat, .plan, .stock, .manage, .editLog:
+        case .manual, .treat, .plan, .stock, .stockManage, .manage, .editLog:
             return true
-        case .stockManage, .history, .stockRecords, .feedingOverview, .feedModeHistory, .stockOverview, .treatOverview:
+        case .history, .stockRecords, .feedingOverview, .feedModeHistory, .stockOverview, .treatOverview:
             return false
         }
     }
@@ -80,11 +80,11 @@ enum ActiveFeedSheet: Identifiable, Equatable {
             return 300
         case .treat:
             return 330
-        case .stock:
+        case .stock, .stockManage:
             return 430
         case .plan:
             return 500
-        case .stockManage, .history, .stockRecords, .feedingOverview, .feedModeHistory, .stockOverview, .treatOverview:
+        case .history, .stockRecords, .feedingOverview, .feedModeHistory, .stockOverview, .treatOverview:
             return defaultAdaptiveHeight
         }
     }
@@ -95,22 +95,22 @@ enum ActiveFeedSheet: Identifiable, Equatable {
             return 580
         case .manage:
             return 520
-        case .stock:
+        case .stock, .stockManage:
             return 820
         case .plan:
             return 860
-        case .stockManage, .history, .stockRecords, .feedingOverview, .feedModeHistory, .stockOverview, .treatOverview:
+        case .history, .stockRecords, .feedingOverview, .feedModeHistory, .stockOverview, .treatOverview:
             return 780
         }
     }
 
     var inlineOverlayChromeReduction: CGFloat {
         switch self {
-        case .stock, .plan:
+        case .stock, .stockManage, .plan:
             return 58
         case .manual, .treat, .manage, .editLog:
             return 50
-        case .stockManage, .history, .stockRecords, .feedingOverview, .feedModeHistory, .stockOverview, .treatOverview:
+        case .history, .stockRecords, .feedingOverview, .feedModeHistory, .stockOverview, .treatOverview:
             return 0
         }
     }
@@ -120,9 +120,9 @@ enum ActiveFeedSheet: Identifiable, Equatable {
         switch self {
         case .manual, .treat, .manage, .editLog:
             return [.height(height)]
-        case .stock, .plan:
+        case .stock, .stockManage, .plan:
             return [.height(height), .large]
-        case .stockManage, .history, .stockRecords:
+        case .history, .stockRecords:
             return [.large]
         case .feedingOverview, .feedModeHistory, .stockOverview, .treatOverview:
             return [.large]
@@ -260,7 +260,7 @@ struct FeedPlanMonthlyCalendarView: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 38)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.plain) // ui-v4: allow calendar day cells use custom press surface
             } else {
                 Color.clear
                     .frame(maxWidth: .infinity, minHeight: 38)
@@ -297,7 +297,7 @@ struct FeedPlanMonthlyCalendarView: View {
 }
 
 struct FeedStockTrendPoint: Identifiable {
-    let id = UUID()
+    var id: String { "\(foodKind.rawValue)-\(Int(date.timeIntervalSinceReferenceDate / 86_400))" }
     let date: Date
     let value: Double
     let foodKind: FeedFoodKind
@@ -310,6 +310,7 @@ struct FeedTreatKindSummary: Identifiable {
     let icon: String
     let count: Int
     let grams: Double
+    let latestDate: Date?
 }
 
 enum FeedInputField: Hashable {

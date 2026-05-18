@@ -21,16 +21,35 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
     case forestGlade = "forest_glade"
     case paperCream  = "paper_cream"
     case neonGrid    = "neon_grid"
+    case coastalFresh = "coastal_fresh"
+    case lavenderDawn = "lavender_dawn"
+    case mintFrost   = "mint_frost"
+    case peachCloud  = "peach_cloud"
+    case graphitePulse = "graphite_pulse"
     case customPhoto = "custom_photo"
 
     var id: String { rawValue }
 
     static var settingsOptions: [AppBackgroundStyle] {
-        [.goIsland, .cleanBlueGray, .paperCream, .forestGlade, .deepAmbient, .customPhoto]
+        officialPairOptions + [.customPhoto]
     }
 
     static var officialPairOptions: [AppBackgroundStyle] {
-        [.goIsland, .cleanBlueGray, .paperCream, .forestGlade, .deepAmbient]
+        [
+            .goIsland,
+            .cleanBlueGray,
+            .paperCream,
+            .forestGlade,
+            .deepAmbient,
+            .aurora,
+            .sakuraMist,
+            .sunsetGlow,
+            .coastalFresh,
+            .lavenderDawn,
+            .mintFrost,
+            .peachCloud,
+            .graphitePulse
+        ]
     }
 
     var displayName: String {
@@ -46,6 +65,11 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
         case .forestGlade: return "森谷"
         case .paperCream:  return "暖纸"
         case .neonGrid:    return "霓虹格"
+        case .coastalFresh: return "海岸清风"
+        case .lavenderDawn: return "薰衣草晨光"
+        case .mintFrost: return "薄荷霜"
+        case .peachCloud: return "桃云"
+        case .graphitePulse: return "石墨微光"
         case .customPhoto: return "自定义照片"
         }
     }
@@ -62,6 +86,22 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
             return L10n(lang).tr(zh: "森林浅雾", en: "Forest Mist", de: "Waldnebel")
         case .deepAmbient:
             return L10n(lang).tr(zh: "星云光感", en: "Nebula Glow", de: "Nebelglanz")
+        case .aurora:
+            return L10n(lang).tr(zh: "极光柔幕", en: "Soft Aurora", de: "Sanfte Aurora")
+        case .sakuraMist:
+            return L10n(lang).tr(zh: "樱雾紫", en: "Sakura Mist", de: "Sakura-Nebel")
+        case .sunsetGlow:
+            return L10n(lang).tr(zh: "落日暖光", en: "Sunset Glow", de: "Abendrot")
+        case .coastalFresh:
+            return L10n(lang).tr(zh: "海岸清风", en: "Coastal Fresh", de: "Küstenfrische")
+        case .lavenderDawn:
+            return L10n(lang).tr(zh: "薰衣草晨光", en: "Lavender Dawn", de: "Lavendel-Morgen")
+        case .mintFrost:
+            return L10n(lang).tr(zh: "薄荷霜", en: "Mint Frost", de: "Minzfrost")
+        case .peachCloud:
+            return L10n(lang).tr(zh: "桃云", en: "Peach Cloud", de: "Pfirsichwolke")
+        case .graphitePulse:
+            return L10n(lang).tr(zh: "石墨微光", en: "Graphite Pulse", de: "Graphitglanz")
         case .customPhoto:
             return L10n(lang).tr(zh: "自定义照片", en: "Custom photo", de: "Eigenes Foto")
         default:
@@ -81,6 +121,22 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
             return L10n(lang).tr(zh: "自然、有氧、低压力", en: "Natural, airy, low-pressure", de: "Natürlich, luftig, entspannt")
         case .deepAmbient:
             return L10n(lang).tr(zh: "更酷的光感背景", en: "Cooler ambient light style", de: "Kühler Lichtstil")
+        case .aurora:
+            return L10n(lang).tr(zh: "清透青绿，适合轻松页面", en: "Clear teal tones for calm screens", de: "Klare Türkistöne für ruhige Seiten")
+        case .sakuraMist:
+            return L10n(lang).tr(zh: "柔粉与紫雾，温柔但不甜腻", en: "Soft pink and violet without feeling sugary", de: "Sanftes Rosa und Violett ohne Kitsch")
+        case .sunsetGlow:
+            return L10n(lang).tr(zh: "暖橙层次，适合奖励感", en: "Warm orange layers for reward moments", de: "Warme Orangetöne für Belohnungen")
+        case .coastalFresh:
+            return L10n(lang).tr(zh: "海风蓝绿，浅色更清爽", en: "Blue-green sea air, crisp in light mode", de: "Blaugrüne Meeresluft, frisch im Hellmodus")
+        case .lavenderDawn:
+            return L10n(lang).tr(zh: "低饱和紫蓝，安静高级", en: "Muted violet-blue, quiet and polished", de: "Gedämpftes Violettblau, ruhig und edel")
+        case .mintFrost:
+            return L10n(lang).tr(zh: "低压力薄荷色，适合健康页", en: "Low-pressure mint tones for care pages", de: "Ruhige Minztöne für Pflegeseiten")
+        case .peachCloud:
+            return L10n(lang).tr(zh: "温暖柔亮，适合家庭和奖励感", en: "Warm and bright for family and rewards", de: "Warm und hell für Familie und Belohnungen")
+        case .graphitePulse:
+            return L10n(lang).tr(zh: "中性灰蓝，最克制耐看", en: "Neutral blue-gray, the most restrained option", de: "Neutrales Blaugrau, sehr zurückhaltend")
         case .customPhoto:
             return L10n(lang).tr(zh: "上传一张全局背景", en: "Use your own app background", de: "Eigenes App-Hintergrundbild")
         default:
@@ -115,15 +171,45 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
                 ? [Color(hex: "030712"), Color(hex: "1D4ED8"), Color(hex: "6D28D9")]
                 : [Color(hex: "E6EAFB"), Color(hex: "D8DDF4"), Color(hex: "C8D0EA")]
         case .aurora:
-            return [Color(hex: "0A0A0C"), Color(hex: "00C9A7"), Color(hex: "845EC2")]
+            return colorScheme == .dark
+                ? [Color(hex: "020617"), Color(hex: "0F766E"), Color(hex: "312E81")]
+                : [Color(hex: "DDFCF6"), Color(hex: "C8F1EA"), Color(hex: "D8D7FA")]
         case .midnight:
-            return [Color(hex: "0D1117"), Color(hex: "161B22"), Color(hex: "21262D")]
+            return colorScheme == .dark
+                ? [Color(hex: "0D1117"), Color(hex: "161B22"), Color(hex: "21262D")]
+                : [Color(hex: "E3E8F1"), Color(hex: "D1D9E6"), Color(hex: "B9C4D3")]
         case .sunsetGlow:
-            return [Color(hex: "1A0A12"), Color(hex: "FF6B35"), Color(hex: "FF8E9E")]
+            return colorScheme == .dark
+                ? [Color(hex: "1A0A12"), Color(hex: "7C2D12"), Color(hex: "581C1C")]
+                : [Color(hex: "FDE8D6"), Color(hex: "F8C7B5"), Color(hex: "E9A5A5")]
         case .sakuraMist:
-            return [Color(hex: "120810"), Color(hex: "EC4899"), Color(hex: "A78BFA")]
+            return colorScheme == .dark
+                ? [Color(hex: "1A0B17"), Color(hex: "831843"), Color(hex: "4C1D95")]
+                : [Color(hex: "F7E3EF"), Color(hex: "E9D5FF"), Color(hex: "FBCFE8")]
         case .neonGrid:
-            return [Color(hex: "050510"), Color(hex: "22D3EE"), Color(hex: "A855F7")]
+            return colorScheme == .dark
+                ? [Color(hex: "050510"), Color(hex: "0E7490"), Color(hex: "6D28D9")]
+                : [Color(hex: "DBF6FF"), Color(hex: "C7D2FE"), Color(hex: "E9D5FF")]
+        case .coastalFresh:
+            return colorScheme == .dark
+                ? [Color(hex: "082F49"), Color(hex: "0E7490"), Color(hex: "0F172A")]
+                : [Color(hex: "D7F3FA"), Color(hex: "C5E3EF"), Color(hex: "B6D5E4")]
+        case .lavenderDawn:
+            return colorScheme == .dark
+                ? [Color(hex: "1E1B4B"), Color(hex: "4C1D95"), Color(hex: "111827")]
+                : [Color(hex: "ECE7FF"), Color(hex: "DDD6FE"), Color(hex: "C7D2FE")]
+        case .mintFrost:
+            return colorScheme == .dark
+                ? [Color(hex: "052E2B"), Color(hex: "115E59"), Color(hex: "0F172A")]
+                : [Color(hex: "DDF7EF"), Color(hex: "CBEFDE"), Color(hex: "B9E3CF")]
+        case .peachCloud:
+            return colorScheme == .dark
+                ? [Color(hex: "3B1D16"), Color(hex: "7C2D12"), Color(hex: "111827")]
+                : [Color(hex: "F9E2D2"), Color(hex: "F3C8B5"), Color(hex: "E8B4A2")]
+        case .graphitePulse:
+            return colorScheme == .dark
+                ? [Color(hex: "111827"), Color(hex: "374151"), Color(hex: "020617")]
+                : [Color(hex: "D8DEE8"), Color(hex: "C8D1DD"), Color(hex: "B7C1CF")]
         case .customPhoto:
             return colorScheme == .dark
                 ? [Color(hex: "0F172A"), Color.goPrimary, Color(hex: "94A3B8")]
@@ -208,13 +294,14 @@ struct ArkBackgroundView: View {
         case .goIsland:    GoIslandBackground()
         case .cleanBlueGray: CleanBlueGrayBackground()
         case .deepAmbient: shouldReduceWork ? AnyView(StaticGradientBackground(colors: style.gradientColors(for: colorScheme))) : AnyView(DeepAmbientBackground())
-        case .aurora:      shouldReduceWork ? AnyView(StaticGradientBackground(colors: style.previewColors)) : AnyView(AuroraBackground())
-        case .midnight:    MidnightBackground()
-        case .sunsetGlow:  shouldReduceWork ? AnyView(StaticGradientBackground(colors: style.previewColors)) : AnyView(SunsetGlowBackground())
-        case .sakuraMist:  shouldReduceWork ? AnyView(StaticGradientBackground(colors: style.previewColors)) : AnyView(SakuraMistBackground())
+        case .aurora, .midnight, .sunsetGlow, .sakuraMist:
+            StaticGradientBackground(colors: style.gradientColors(for: colorScheme))
         case .forestGlade: shouldReduceWork ? AnyView(StaticGradientBackground(colors: style.gradientColors(for: colorScheme))) : AnyView(ForestGladeBackground())
         case .paperCream:  PaperCreamBackground()
-        case .neonGrid:    shouldReduceWork ? AnyView(StaticGradientBackground(colors: style.previewColors)) : AnyView(NeonGridBackground())
+        case .neonGrid:
+            StaticGradientBackground(colors: style.gradientColors(for: colorScheme))
+        case .coastalFresh, .lavenderDawn, .mintFrost, .peachCloud, .graphitePulse:
+            StaticGradientBackground(colors: style.gradientColors(for: colorScheme))
         case .customPhoto: CustomPhotoBackground(version: customBackgroundVersion)
         }
     }
@@ -239,7 +326,7 @@ private struct StaticGradientBackground: View {
 /// Settings > Background Style applies consistently across the app.
 struct OhanaAppBackground: View {
     var body: some View {
-        ArkBackgroundView()
+        ArkBackgroundView() // ui-v4: allow app-wide background wrapper
             .ignoresSafeArea()
     }
 }
@@ -285,13 +372,13 @@ private struct GoDefaultBackground: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            withAnimation(.easeInOut(duration: 8).repeatForever(autoreverses: true)) {
+            withAnimation(.easeInOut(duration: 8).repeatForever(autoreverses: true)) { // ui-v4: allow workload-gated ambient background drift
                 blob1Offset = CGSize(width: 40, height: -30)
             }
-            withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) {
+            withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) { // ui-v4: allow workload-gated ambient background drift
                 blob2Offset = CGSize(width: -50, height: 35)
             }
-            withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) {
+            withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) { // ui-v4: allow workload-gated ambient background drift
                 blob3Offset = CGSize(width: 30, height: -40)
             }
         }
@@ -391,13 +478,13 @@ private struct CustomPhotoBackground: View {
         ZStack {
             LinearGradient(
                 colors: colorScheme == .dark
-                    ? [Color(hex: "020617").opacity(0.76), Color(hex: "0F172A").opacity(0.70), Color.black.opacity(0.78)]
+                    ? [Color(hex: "020617").opacity(0.76), Color(hex: "0F172A").opacity(0.70), Color.arkInk.opacity(0.78)]
                     : [Color(hex: "DDE8F6").opacity(0.68), Color(hex: "C7D4E7").opacity(0.62), Color(hex: "AEBFD4").opacity(0.58)],
                 startPoint: .top,
                 endPoint: .bottom
             )
 
-            (colorScheme == .dark ? Color.black : Color.white)
+            (colorScheme == .dark ? Color.arkInk : Color.goCardWhite)
                 .opacity(colorScheme == .dark ? 0.10 : 0.12)
 
             NoiseTextureView()
@@ -479,7 +566,7 @@ private struct DeepAmbientBackground: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            withAnimation(.linear(duration: 18).repeatForever(autoreverses: true)) {
+            withAnimation(.linear(duration: 18).repeatForever(autoreverses: true)) { // ui-v4: allow workload-gated aurora background drift
                 isAnimating = true
             }
         }
@@ -533,7 +620,7 @@ private struct AuroraBackground: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            withAnimation(.easeInOut(duration: 12).repeatForever(autoreverses: true)) {
+            withAnimation(.easeInOut(duration: 12).repeatForever(autoreverses: true)) { // ui-v4: allow workload-gated ambient background drift
                 phase = 1
             }
         }
@@ -599,7 +686,7 @@ private struct SunsetGlowBackground: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) { pulse = true }
+            withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) { pulse = true } // ui-v4: allow workload-gated ambient background pulse
         }
     }
 }
@@ -637,7 +724,7 @@ private struct SakuraMistBackground: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            withAnimation(.easeInOut(duration: 14).repeatForever(autoreverses: true)) { drift = 1 }
+            withAnimation(.easeInOut(duration: 14).repeatForever(autoreverses: true)) { drift = 1 } // ui-v4: allow workload-gated ambient background drift
         }
     }
 }
@@ -677,7 +764,7 @@ private struct ForestGladeBackground: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            withAnimation(.easeInOut(duration: 11).repeatForever(autoreverses: true)) { sway = true }
+            withAnimation(.easeInOut(duration: 11).repeatForever(autoreverses: true)) { sway = true } // ui-v4: allow workload-gated ambient background sway
         }
     }
 }
@@ -754,7 +841,7 @@ private struct NeonGridBackground: View {
                     path.addLine(to: CGPoint(x: size.width, y: y))
                     y += step
                 }
-                context.stroke(path, with: .color(Color.white.opacity(0.04)), lineWidth: 0.5)
+                context.stroke(path, with: .color(Color.goCardWhite.opacity(0.04)), lineWidth: 0.5)
             }
             .ignoresSafeArea()
 
@@ -777,7 +864,7 @@ private struct NeonGridBackground: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) { phase = 1 }
+            withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) { phase = 1 } // ui-v4: allow workload-gated ambient background phase
         }
     }
 }
@@ -840,7 +927,7 @@ struct GoIslandWizardBackdrop: View {
         .ignoresSafeArea()
         .onAppear {
             guard !shouldReduceWork else { return }
-            withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) {
+            withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) { // ui-v4: allow workload-gated onboarding background pulse
                 blobPulse = true
             }
         }
@@ -848,5 +935,5 @@ struct GoIslandWizardBackdrop: View {
 }
 
 #Preview {
-    ArkBackgroundView()
+    ArkBackgroundView() // ui-v4: allow background component preview
 }

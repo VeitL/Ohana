@@ -247,26 +247,14 @@ struct FamilyCollaborationDashboardView: View {
                     Text(l.tr(zh: "宠物地图", en: "Pet map", de: "Tierkarte"))
                         .font(OhanaFont.title2(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(
-                        zh: "点宠物看待办，点任务分配给家人。",
-                        en: "Tap a pet for tasks, then assign them.",
-                        de: "Tier antippen, Aufgaben zuweisen."
-                    ))
-                    .font(OhanaFont.caption(.bold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
                 }
                 Spacer()
-                Text("\(Int(boardProgress * 100))%")
-                    .font(OhanaFont.metric(size: 28, .black))
-                    .foregroundStyle(Color.goPrimary)
-                    .contentTransition(.numericText())
             }
 
             HStack(spacing: 8) {
                 mapScopeButton(.mine, title: l.tr(zh: "待我", en: "Mine", de: "Meine"), count: assignedFamilyTasks.count, icon: "person.crop.circle.badge.clock", tint: Color.goPurple)
                 mapScopeButton(.bounty, title: l.tr(zh: "悬赏", en: "Bounty", de: "Prämie"), count: bountyFamilyTasks.count, icon: "target", tint: Color.goTeal)
-                mapScopeButton(.pet, title: l.tr(zh: "宠物", en: "Pets", de: "Tiere"), count: petTaskCount(selectedPet), icon: "pawprint.fill", tint: Color.goYellow)
+                progressScopePill
             }
         }
     }
@@ -295,12 +283,27 @@ struct FamilyCollaborationDashboardView: View {
         .buttonStyle(ScaleButtonStyle())
     }
 
+    private var progressScopePill: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "chart.line.uptrend.xyaxis")
+                .font(.system(size: 11, weight: .black))
+            Text(l.tr(zh: "完成", en: "Done", de: "Fertig"))
+                .font(OhanaFont.caption2(.black))
+                .lineLimit(1)
+            Text("\(Int(boardProgress * 100))%")
+                .font(OhanaFont.caption2(.black))
+                .monospacedDigit()
+                .contentTransition(.numericText())
+        }
+        .foregroundStyle(Color.ohanaPrimaryActionText)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 9)
+        .background(Color.goPrimary, in: Capsule())
+        .animation(GoMotion.feedback, value: boardProgress)
+    }
+
     private var petMapSurface: some View {
         ZStack {
-            Circle()
-                .stroke(Color.ohanaCardStroke.opacity(0.68), lineWidth: 1)
-                .frame(height: 222)
-
             ForEach(Array(activeMapPets.enumerated()), id: \.element.id) { index, pet in
                 let offset = petMapOffset(index: index, count: activeMapPets.count)
                 petMapNode(pet)
@@ -644,7 +647,7 @@ struct FamilyCollaborationDashboardView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "ellipsis.circle.fill")
-                    Text(l.tr(zh: "更多协作", en: "More collaboration", de: "Mehr Zusammenarbeit"))
+                    Text(l.tr(zh: "更多", en: "More", de: "Mehr"))
                     Spacer()
                     Image(systemName: "chevron.right")
                 }
@@ -687,11 +690,11 @@ struct FamilyCollaborationDashboardView: View {
     private var emptyDrawerText: String {
         switch selectedTaskScope {
         case .mine:
-            return l.tr(zh: "现在没有发给你的任务。", en: "Nothing assigned to you right now.", de: "Dir ist gerade nichts zugewiesen.")
+            return l.tr(zh: "已清空", en: "All clear", de: "Alles klar")
         case .pet:
-            return l.tr(zh: "这只宠物当前没有待办。", en: "This pet is covered right now.", de: "Für dieses Tier ist alles erledigt.")
+            return l.tr(zh: "已照顾", en: "Covered", de: "Versorgt")
         case .bounty:
-            return l.tr(zh: "还没有悬赏任务。", en: "No bounty tasks yet.", de: "Noch keine Prämien.")
+            return l.tr(zh: "暂无悬赏", en: "No bounty", de: "Keine Prämie")
         }
     }
 
@@ -747,10 +750,6 @@ struct FamilyCollaborationDashboardView: View {
                 Text(reminder.event?.title ?? l.tr(zh: "照护任务", en: "Care task", de: "Pflegeaufgabe"))
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                Text(l.tr(zh: "未分配 · 选择家人接手", en: "Unassigned · choose a person", de: "Nicht zugewiesen · Person wählen"))
-                    .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
             }
             Spacer(minLength: 8)

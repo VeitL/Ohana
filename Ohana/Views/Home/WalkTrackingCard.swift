@@ -17,15 +17,19 @@ struct WalkTrackingCard: View {
     private var mgr: PetWalkingManager { PetWalkingManager.shared }
     private var locationMgr: LocationManager { LocationManager.shared }
     @AppStorage("appLanguage") private var appLanguage: String = "zh"
+    @AppStorage(RainbowWalkEffectKeys.route) private var equipFxRainbowRoute = false
+    @AppStorage(RainbowWalkEffectKeys.poop) private var equipFxRainbowPoop = false
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     @State private var showFloatingPoop = false
     @State private var showWalkDetail: PetWalkLog? = nil
     @State private var showSummaryBack = false
+    @State private var isClosingSummaryBack = false
     @State private var summaryRotation: Double = 0
     @State private var showingGoalSetter = false
     @State private var goalDraft: Double = 0
     @State private var cameraPosition: MapCameraPosition = .userLocation(fallback: .automatic)
+    @State private var rainbowRoutePhase: CGFloat = 0
 
     private var isActivePet: Bool {
         mgr.currentPet?.id == pet.id || mgr.phase == .idle
@@ -48,6 +52,12 @@ struct WalkTrackingCard: View {
     private var liveRouteCoordinates: [CLLocationCoordinate2D] {
         routeCoordinates(from: locationMgr.collectedLocations, maxCount: 320)
     }
+    private var livePoopMarkers: [WalkPoopMarker] {
+        isActivePet ? mgr.activePoopMarkers : []
+    }
+    private var shouldAnimateRainbowWalkEffects: Bool {
+        (equipFxRainbowRoute || equipFxRainbowPoop) && workloadPolicy.shouldAnimate(isVisible: true)
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -55,18 +65,20 @@ struct WalkTrackingCard: View {
                 trackingFrontFace
                     .frame(width: proxy.size.width, height: proxy.size.height)
                     .opacity(summaryRotation < 90 ? 1 : 0)
+                    .allowsHitTesting(!showSummaryBack)
 
                 walkSummaryBackFace
                     .frame(width: proxy.size.width, height: proxy.size.height)
                     .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
                     .opacity(summaryRotation >= 90 ? 1 : 0)
+                    .allowsHitTesting(showSummaryBack)
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
             .rotation3DEffect(.degrees(summaryRotation), axis: (x: 0, y: 1, z: 0), perspective: 0.75)
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+                    .strokeBorder(Color.goCardWhite.opacity(0.12), lineWidth: 1)
             )
             .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
@@ -93,7 +105,9 @@ struct WalkTrackingCard: View {
             if case .finished = mgr.phase, mgr.currentPet?.id == pet.id {
                 presentSummaryBack(animated: false)
             }
+            updateRainbowRouteFlow()
         }
+        .onChange(of: shouldAnimateRainbowWalkEffects) { _, _ in updateRainbowRouteFlow() }
     }
 
     private var trackingFrontFace: some View {
@@ -122,8 +136,21 @@ struct WalkTrackingCard: View {
             // 活跃遛狗中：实时位置地图
             Map(position: $cameraPosition) {
                 UserAnnotation()
-                MapPolyline(coordinates: liveRouteCoordinates)
-                    .stroke(Color.goPrimary, style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round))
+                RainbowRoutePolyline(
+                    coordinates: liveRouteCoordinates,
+                    normalColor: .goPrimary,
+                    lineWidth: 6,
+                    isRainbow: equipFxRainbowRoute,
+                    isFlowing: shouldAnimateRainbowWalkEffects,
+                    flowPhase: rainbowRoutePhase
+                )
+                ForEach(livePoopMarkers) { marker in
+                    if let coordinate = marker.coordinate {
+                        Annotation("便便", coordinate: coordinate) {
+                            poopMapPin
+                        }
+                    }
+                }
             }
             .mapStyle(.standard)
             .mapControls {
@@ -132,25 +159,38 @@ struct WalkTrackingCard: View {
             .overlay(alignment: .topTrailing) {
                 Text(distanceText)
                     .font(OhanaFont.footnote(.bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.goCardWhite)
                     .padding(.horizontal, 10).padding(.vertical, 4)
-                    .background(Color.black.opacity(0.6), in: Capsule())
+                    .background(Color.arkInk.opacity(0.6), in: Capsule())
                     .padding(8)
             }
         } else if isWalking {
             let coords = liveRouteCoordinates
             if coords.count >= 2, let region = routeRegion(for: coords) {
                 Map(initialPosition: .region(region)) {
-                    MapPolyline(coordinates: coords)
-                        .stroke(Color.goYellow, style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round))
+                    RainbowRoutePolyline(
+                        coordinates: coords,
+                        normalColor: .goYellow,
+                        lineWidth: 6,
+                        isRainbow: equipFxRainbowRoute,
+                        isFlowing: shouldAnimateRainbowWalkEffects,
+                        flowPhase: rainbowRoutePhase
+                    )
+                    ForEach(livePoopMarkers) { marker in
+                        if let coordinate = marker.coordinate {
+                            Annotation("便便", coordinate: coordinate) {
+                                poopMapPin
+                            }
+                        }
+                    }
                 }
                 .mapStyle(.standard)
                 .overlay(alignment: .topTrailing) {
                     Text(distanceText)
                         .font(OhanaFont.footnote(.bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.goCardWhite)
                         .padding(.horizontal, 10).padding(.vertical, 4)
-                        .background(Color.black.opacity(0.6), in: Capsule())
+                        .background(Color.arkInk.opacity(0.6), in: Capsule())
                         .padding(8)
                 }
             } else {
@@ -178,10 +218,10 @@ struct WalkTrackingCard: View {
                     VStack(spacing: 6) {
                         Image(systemName: "map")
                             .font(.system(size: 24))
-                            .foregroundStyle(.white.opacity(0.2))
+                            .foregroundStyle(Color.goCardWhite.opacity(0.2))
                         Text("暂无路线记录")
                             .font(OhanaFont.caption())
-                            .foregroundStyle(.white.opacity(0.2))
+                            .foregroundStyle(Color.goCardWhite.opacity(0.2))
                     }
                 )
             }
@@ -201,8 +241,16 @@ struct WalkTrackingCard: View {
                     .foregroundStyle(Color.goYellow.opacity(0.7))
                 Text(L10n(appLanguage).tr(zh: "遛狗已暂停", en: "Walk paused", de: "Gassi pausiert"))
                     .font(OhanaFont.caption(.bold))
-                    .foregroundStyle(.white.opacity(0.62))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.62))
             }
+        )
+    }
+
+    private var poopMapPin: some View {
+        RainbowPoopPin(
+            isRainbow: equipFxRainbowPoop,
+            isFlowing: shouldAnimateRainbowWalkEffects,
+            size: 28
         )
     }
 
@@ -305,9 +353,9 @@ struct WalkTrackingCard: View {
     }
 
     private var statusColor: Color {
-        guard isActivePet else { return .white.opacity(0.3) }
+        guard isActivePet else { return Color.ohanaTertiaryText.opacity(0.3) }
         switch mgr.phase {
-        case .idle:     return .white.opacity(0.3)
+        case .idle:     return Color.ohanaTertiaryText.opacity(0.3)
         case .running:  return Color.goPrimary
         case .paused:   return Color.goYellow
         case .finished: return Color.goTeal
@@ -372,10 +420,11 @@ struct WalkTrackingCard: View {
         ZStack {
             summaryRouteMap(walk: walk)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .allowsHitTesting(false)
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .strokeBorder(.white.opacity(0.16), lineWidth: 1)
+                        .strokeBorder(Color.goCardWhite.opacity(0.16), lineWidth: 1)
                 }
                 .clipped()
 
@@ -389,22 +438,11 @@ struct WalkTrackingCard: View {
                             .tracking(1.2)
                         Text("\(pet.name) 到家啦")
                             .font(OhanaFont.callout(.black))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.goCardWhite)
                             .lineLimit(1)
                     }
                     Spacer()
-                    Button { closeSummaryBack() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .black))
-                            .foregroundStyle(.white)
-                            .frame(width: 40, height: 40)
-                            .background(Color.black.opacity(0.42), in: Circle())
-                            .overlay {
-                                Circle().strokeBorder(.white.opacity(0.18), lineWidth: 1)
-                            }
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .accessibilityLabel("关闭遛狗摘要")
+                    summaryMapToolbar
                 }
 
                 Spacer(minLength: 14)
@@ -415,10 +453,54 @@ struct WalkTrackingCard: View {
         }
     }
 
+    private var summaryMapToolbar: some View {
+        HStack(spacing: 8) {
+            summaryEditGoalIconButton
+            summaryCloseButton
+        }
+        .zIndex(40)
+    }
+
+    private var summaryCloseButton: some View {
+        Button { closeSummaryBack() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .black))
+                    .foregroundStyle(Color.goCardWhite)
+                    .frame(width: 40, height: 40)
+                    .background(Color.arkInk.opacity(0.42), in: Circle())
+                    .overlay {
+                        Circle().strokeBorder(Color.goCardWhite.opacity(0.18), lineWidth: 1)
+                    }
+        }
+        .frame(width: 44, height: 44)
+        .contentShape(Circle())
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel("关闭遛狗摘要")
+    }
+
+    private var summaryEditGoalIconButton: some View {
+        Button {
+            goalDraft = max(3, pet.weeklyWalkGoalKm)
+            showingGoalSetter = true
+        } label: {
+            Image(systemName: "slider.horizontal.3")
+                .font(.system(size: 14, weight: .black))
+                .foregroundStyle(Color.arkInk)
+                .frame(width: 40, height: 40)
+                .background(Color.goPrimary, in: Circle())
+        }
+        .frame(width: 44, height: 44)
+        .contentShape(Circle())
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel("编辑遛狗目标")
+    }
+
     @ViewBuilder
     private func summaryRouteMap(walk: PetWalkLog?) -> some View {
         let coords = routeCoordinates(for: walk)
-        if let walk, let data = walk.mapSnapshotData, let ui = UIImage(data: data) {
+        let poopMarkers = summaryPoopMarkers(for: walk)
+        let visibleCoords = coords + poopMarkers.compactMap(\.coordinate)
+        if let walk, let data = walk.mapSnapshotData, let ui = UIImage(data: data), !(equipFxRainbowRoute || equipFxRainbowPoop) {
             GeometryReader { geo in
                 Image(uiImage: ui)
                     .resizable()
@@ -428,18 +510,24 @@ struct WalkTrackingCard: View {
                     .overlay(alignment: .bottomLeading) {
                         Label("本次轨迹", systemImage: "map.fill")
                             .font(OhanaFont.caption2(.bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.goCardWhite)
                             .padding(.horizontal, 9)
                             .padding(.vertical, 5)
-                            .background(.black.opacity(0.46), in: Capsule())
+                            .background(Color.arkInk.opacity(0.46), in: Capsule())
                             .padding(10)
                     }
             }
-        } else if !coords.isEmpty, let region = routeRegion(for: coords) {
+        } else if !visibleCoords.isEmpty, let region = routeRegion(for: visibleCoords) {
             Map(initialPosition: .region(region)) {
                 if coords.count >= 2 {
-                    MapPolyline(coordinates: coords)
-                        .stroke(Color.goPrimary, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+                    RainbowRoutePolyline(
+                        coordinates: coords,
+                        normalColor: .goPrimary,
+                        lineWidth: 5,
+                        isRainbow: equipFxRainbowRoute,
+                        isFlowing: shouldAnimateRainbowWalkEffects,
+                        flowPhase: rainbowRoutePhase
+                    )
                 }
                 if let first = coords.first {
                     Annotation(coords.count >= 2 ? "出发" : "位置", coordinate: first) {
@@ -454,7 +542,14 @@ struct WalkTrackingCard: View {
                         Circle()
                             .fill(Color.goRed)
                             .frame(width: 18, height: 18)
-                            .overlay(Circle().fill(.white).frame(width: 7, height: 7))
+                            .overlay(Circle().fill(Color.goCardWhite).frame(width: 7, height: 7))
+                    }
+                }
+                ForEach(poopMarkers) { marker in
+                    if let coordinate = marker.coordinate {
+                        Annotation("便便", coordinate: coordinate) {
+                            poopMapPin
+                        }
                     }
                 }
             }
@@ -464,23 +559,23 @@ struct WalkTrackingCard: View {
             .overlay(alignment: .bottomLeading) {
                 Label(coords.count >= 2 ? "本次轨迹" : "本次定位", systemImage: "map.fill")
                     .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.goCardWhite)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 5)
-                    .background(.black.opacity(0.46), in: Capsule())
+                    .background(Color.arkInk.opacity(0.46), in: Capsule())
                     .padding(10)
             }
         } else {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.white.opacity(0.08))
+                .fill(Color.goCardWhite.opacity(0.08))
                 .overlay {
                     VStack(spacing: 5) {
                         Image(systemName: "map")
                             .font(.system(size: 22, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.28))
+                            .foregroundStyle(Color.goCardWhite.opacity(0.28))
                         Text("本次轨迹生成中")
                             .font(OhanaFont.caption(.bold))
-                            .foregroundStyle(.white.opacity(0.38))
+                            .foregroundStyle(Color.goCardWhite.opacity(0.38))
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -492,28 +587,13 @@ struct WalkTrackingCard: View {
         if pet.weeklyWalkGoalKm > 0 {
             let progress = weeklyProgress
             goalOverlayContainer {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 10) {
-                        goalProgressRing(progress: progress)
-                        goalTextBlock(
-                            title: "本周目标完成率",
-                            subtitle: String(format: "%.1f / %.0f km", thisWeekDistanceKm, pet.weeklyWalkGoalKm)
-                        )
-                        Spacer(minLength: 8)
-                        editGoalButton
-                    }
-
-                    VStack(alignment: .leading, spacing: 9) {
-                        HStack(spacing: 10) {
-                            goalProgressRing(progress: progress)
-                            goalTextBlock(
-                                title: "本周目标完成率",
-                                subtitle: String(format: "%.1f / %.0f km", thisWeekDistanceKm, pet.weeklyWalkGoalKm)
-                            )
-                            Spacer(minLength: 0)
-                        }
-                        editGoalButton
-                    }
+                HStack(spacing: 10) {
+                    goalProgressRing(progress: progress)
+                    goalTextBlock(
+                        title: "本周目标",
+                        subtitle: String(format: "%.1f / %.0f km", thisWeekDistanceKm, pet.weeklyWalkGoalKm)
+                    )
+                    Spacer(minLength: 0)
                 }
             }
         } else {
@@ -549,10 +629,10 @@ struct WalkTrackingCard: View {
         content()
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(Color.black.opacity(0.48), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.arkInk.opacity(0.48), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(.white.opacity(0.16), lineWidth: 1)
+                    .strokeBorder(Color.goCardWhite.opacity(0.16), lineWidth: 1)
             }
     }
 
@@ -560,12 +640,12 @@ struct WalkTrackingCard: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
                 .font(OhanaFont.caption2(.bold))
-                .foregroundStyle(.white.opacity(0.58))
+                .foregroundStyle(Color.goCardWhite.opacity(0.58))
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
             Text(subtitle)
                 .font(OhanaFont.footnote(.black))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.goCardWhite)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
         }
@@ -574,15 +654,15 @@ struct WalkTrackingCard: View {
     private func goalProgressRing(progress: Double) -> some View {
         ZStack {
             Circle()
-                .stroke(.white.opacity(0.14), lineWidth: 6)
+                .stroke(Color.goCardWhite.opacity(0.14), lineWidth: 6)
             Circle()
                 .trim(from: 0, to: progress)
                 .stroke(Color.goPrimary, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .animation(.spring(response: 0.55, dampingFraction: 0.82), value: progress)
+                .animation(GoMotion.feedback, value: progress)
             Text("\(Int(progress * 100))%")
                 .font(OhanaFont.caption2(.black))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.goCardWhite)
         }
         .frame(width: 42, height: 42)
     }
@@ -592,7 +672,7 @@ struct WalkTrackingCard: View {
             .font(.system(size: 18, weight: .bold))
             .foregroundStyle(Color.goPrimary)
             .frame(width: 42, height: 42)
-            .background(Color.black.opacity(0.34), in: Circle())
+            .background(Color.arkInk.opacity(0.34), in: Circle())
     }
 
     private var editGoalButton: some View {
@@ -622,7 +702,7 @@ struct WalkTrackingCard: View {
                     .font(.system(size: 52, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .contentTransition(.numericText())
-                    .animation(.spring(duration: 0.2), value: goalDraft)
+                    .animation(GoMotion.feedback, value: goalDraft)
                 Text("km / 周")
                     .font(OhanaFont.title3(.bold))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -633,7 +713,7 @@ struct WalkTrackingCard: View {
                     Image(systemName: "minus.circle.fill")
                         .font(.system(size: 40, weight: .medium))
                         .symbolRenderingMode(.palette)
-                        .foregroundStyle(goalDraft <= 0 ? Color.secondary.opacity(0.35) : Color.goPrimary, Color.primary.opacity(0.12))
+                        .foregroundStyle(goalDraft <= 0 ? Color.ohanaTertiaryText.opacity(0.35) : Color.goPrimary, Color.ohanaControlFill.opacity(0.42))
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .disabled(goalDraft <= 0)
@@ -646,7 +726,7 @@ struct WalkTrackingCard: View {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 40, weight: .medium))
                         .symbolRenderingMode(.palette)
-                        .foregroundStyle(goalDraft >= 100 ? Color.secondary.opacity(0.35) : Color.goPrimary, Color.primary.opacity(0.12))
+                        .foregroundStyle(goalDraft >= 100 ? Color.ohanaTertiaryText.opacity(0.35) : Color.goPrimary, Color.ohanaControlFill.opacity(0.42))
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .disabled(goalDraft >= 100)
@@ -658,9 +738,9 @@ struct WalkTrackingCard: View {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 showingGoalSetter = false
             } label: {
-                Text(goalDraft == 0 ? "清除目标" : "保存目标")
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(.black)
+                    Text(goalDraft == 0 ? "清除目标" : "保存目标")
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14))
@@ -676,7 +756,7 @@ struct WalkTrackingCard: View {
         VStack(spacing: 5) {
             Text(value)
                 .font(OhanaFont.callout(.black))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.goCardWhite)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Text(label)
@@ -685,7 +765,7 @@ struct WalkTrackingCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 9)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var latestWalk: PetWalkLog? {
@@ -746,6 +826,18 @@ struct WalkTrackingCard: View {
             guard let lat = dict["lat"], let lon = dict["lon"] else { return nil }
             return CLLocationCoordinate2D(latitude: lat, longitude: lon)
         }
+    }
+
+    @MainActor
+    private func summaryPoopMarkers(for walk: PetWalkLog?) -> [WalkPoopMarker] {
+        if mgr.lastCompletedPetId == pet.id, !mgr.lastCompletedPoopMarkers.isEmpty {
+            return mgr.lastCompletedPoopMarkers
+        }
+        guard let walkId = walk?.id.uuidString else { return [] }
+        return pet.pottyLogs
+            .filter { $0.walkLogId == walkId }
+            .sorted { $0.date < $1.date }
+            .map(WalkPoopMarker.init(log:))
     }
 
     private func routeCoordinates(from locations: [CLLocation], maxCount: Int) -> [CLLocationCoordinate2D] {
@@ -889,7 +981,7 @@ struct WalkTrackingCard: View {
         } label: {
             Image(systemName: icon)
                 .font(OhanaFont.caption(.bold))
-                .foregroundStyle(.black)
+                .foregroundStyle(Color.arkInk)
                 .frame(width: 34, height: 34)
                 .background(color, in: Circle())
         }
@@ -912,7 +1004,7 @@ struct WalkTrackingCard: View {
             if mgr.poopCount > 0 {
                 Text("\(mgr.poopCount)")
                     .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.goCardWhite)
                     .frame(width: 15, height: 15)
                     .background(Color.goOrange, in: Circle())
                     .offset(x: 3, y: -3)
@@ -928,6 +1020,7 @@ struct WalkTrackingCard: View {
 
     private func presentSummaryBack(animated: Bool = true) {
         guard !showSummaryBack else { return }
+        isClosingSummaryBack = false
         showSummaryBack = true
         summaryRotation = 0
         let updates = { summaryRotation = 180.0 }
@@ -938,12 +1031,27 @@ struct WalkTrackingCard: View {
         }
     }
 
+    private func updateRainbowRouteFlow() {
+        guard shouldAnimateRainbowWalkEffects else {
+            withAnimation(GoMotion.feedback) { rainbowRoutePhase = 0 }
+            return
+        }
+        rainbowRoutePhase = 0
+        withAnimation(.linear(duration: 1.35).repeatForever(autoreverses: false)) { // ui-v4: allow route cosmetic loop; runtime-guardrail: allow gated by AppWorkloadPolicy and only used for visible equipped walk maps.
+            rainbowRoutePhase = -68
+        }
+    }
+
     private func closeSummaryBack() {
+        guard showSummaryBack, !isClosingSummaryBack else { return }
+        isClosingSummaryBack = true
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         withAnimation(GoMotion.page) {
             summaryRotation = 0
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.34) {
             showSummaryBack = false
+            isClosingSummaryBack = false
             mgr.reset()
         }
     }

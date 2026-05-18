@@ -89,7 +89,7 @@ struct CoHealthDashboardView: View {
 
     private func playWeightChartReveal() {
         chartRevealProgress = 0
-        withAnimation(.easeOut(duration: 0.42)) {
+        withAnimation(GoMotion.page) {
             chartRevealProgress = 1.0
         }
     }
@@ -233,7 +233,7 @@ struct CoHealthDashboardView: View {
                                 x: .value("日期", pt.index),
                                 y: .value("体重", pt.value)
                             )
-                            .interpolationMethod(.catmullRom)
+                            .interpolationMethod(OhanaChartStyle.trendInterpolation)
                             .foregroundStyle(
                                 LinearGradient(
                                     colors: [Color.goTeal.opacity(0.18), .clear],
@@ -245,7 +245,7 @@ struct CoHealthDashboardView: View {
                                 x: .value("日期", pt.index),
                                 y: .value("体重", pt.value)
                             )
-                            .interpolationMethod(.catmullRom)
+                            .interpolationMethod(OhanaChartStyle.trendInterpolation)
                             .foregroundStyle(Color.goTeal.opacity(0.9))
                             .lineStyle(StrokeStyle(lineWidth: 2))
                             .symbol(by: .value("who", pt.label))
@@ -257,7 +257,7 @@ struct CoHealthDashboardView: View {
                                 x: .value("日期", pt.index),
                                 y: .value("体重", pt.value)
                             )
-                            .interpolationMethod(.catmullRom)
+                            .interpolationMethod(OhanaChartStyle.trendInterpolation)
                             .foregroundStyle(
                                 LinearGradient(
                                     colors: [(associatedPets.first?.themeColor.color ?? Color.goPrimary).opacity(0.18), .clear],
@@ -269,7 +269,7 @@ struct CoHealthDashboardView: View {
                                 x: .value("日期", pt.index),
                                 y: .value("体重", pt.value)
                             )
-                            .interpolationMethod(.catmullRom)
+                            .interpolationMethod(OhanaChartStyle.trendInterpolation)
                             .foregroundStyle(associatedPets.first?.themeColor.color ?? Color.goPrimary)
                             .lineStyle(StrokeStyle(lineWidth: 2))
                             .symbol(by: .value("who", pt.label))

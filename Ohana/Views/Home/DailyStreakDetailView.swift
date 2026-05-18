@@ -23,6 +23,7 @@ struct DailyStreakDetailView: View {
     @State private var showCoconutShop = false
     @State private var showingCoconutLog = false
     @State private var lastClaimedMilestone = 0
+    @State private var monthSlideDirection = 1
 
     private let cal = Calendar.current
     private var activeHuman: Human? {
@@ -293,9 +294,7 @@ struct DailyStreakDetailView: View {
 
             HStack {
                 Button {
-                    withAnimation(GoMotion.selection) {
-                        selectedMonth = cal.date(byAdding: .month, value: -1, to: selectedMonth) ?? selectedMonth
-                    }
+                    shiftCheckInMonth(by: -1)
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 14, weight: .bold))
@@ -313,12 +312,7 @@ struct DailyStreakDetailView: View {
                 Spacer()
 
                 Button {
-                    let next = cal.date(byAdding: .month, value: 1, to: selectedMonth) ?? selectedMonth
-                    if next <= Date() {
-                        withAnimation(GoMotion.selection) {
-                            selectedMonth = next
-                        }
-                    }
+                    shiftCheckInMonth(by: 1)
                 } label: {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 14, weight: .bold))
@@ -348,6 +342,11 @@ struct DailyStreakDetailView: View {
                     calendarDayCell(cell)
                 }
             }
+            .id(checkInMonthKey)
+            .transition(.asymmetric(
+                insertion: .move(edge: monthSlideDirection > 0 ? .trailing : .leading).combined(with: .opacity),
+                removal: .move(edge: monthSlideDirection > 0 ? .leading : .trailing).combined(with: .opacity)
+            ))
 
             OhanaDashedDivider(color: Color.ohanaPrimaryText.opacity(0.08))
 
@@ -386,6 +385,8 @@ struct DailyStreakDetailView: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
         }
+        .contentShape(Rectangle())
+        .simultaneousGesture(monthSwipeGesture)
     }
 
     private var checkInStatsRow: some View {
@@ -496,6 +497,32 @@ struct DailyStreakDetailView: View {
             cells.append(CalendarCell(dateStr: dateStr, day: day, isToday: isToday, isChecked: isChecked, isMakeup: isMakeup, isFuture: isFuture))
         }
         return cells
+    }
+
+    private var checkInMonthKey: String {
+        let comps = cal.dateComponents([.year, .month], from: selectedMonth)
+        return "\(comps.year ?? 0)-\(comps.month ?? 0)"
+    }
+
+    private var monthSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 36, coordinateSpace: .local)
+            .onEnded { value in
+                let width = value.translation.width
+                let height = value.translation.height
+                guard abs(width) > 44, abs(width) > abs(height) * 1.25 else { return }
+                shiftCheckInMonth(by: width < 0 ? 1 : -1)
+            }
+    }
+
+    private func shiftCheckInMonth(by delta: Int) {
+        guard let next = cal.date(byAdding: .month, value: delta, to: selectedMonth) else { return }
+        if next > Date(), !cal.isDate(next, equalTo: Date(), toGranularity: .month) {
+            return
+        }
+        monthSlideDirection = delta >= 0 ? 1 : -1
+        withAnimation(GoMotion.selection) {
+            selectedMonth = next
+        }
     }
 
     @ViewBuilder

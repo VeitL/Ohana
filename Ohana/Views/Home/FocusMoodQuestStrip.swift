@@ -172,11 +172,6 @@ struct FocusMoodQuestStrip: View {
                             Text("今日任务全部完成")
                                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                                 .foregroundStyle(primaryInk.opacity(0.7))
-                            if let pet = activePet ?? pets.first(where: { !$0.hasPassedAway }) {
-                                Text("去看看 \(pet.name) 今天的状态 →")
-                                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                                    .foregroundStyle(Color(hex: "1A2E8A").opacity(0.6))
-                            }
                         }
                         Spacer()
                     }
@@ -219,12 +214,6 @@ struct FocusMoodQuestStrip: View {
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(primaryInk)
                     .lineLimit(1)
-                if !q.subtitle.isEmpty {
-                    Text(q.subtitle)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(secondaryInk)
-                        .lineLimit(1)
-                }
             }
             Spacer()
 

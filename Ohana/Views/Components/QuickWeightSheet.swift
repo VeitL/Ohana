@@ -16,11 +16,10 @@ struct QuickWeightSheet: View {
     @State private var weightText: String = ""
     @State private var recordDate: Date = Date()
     @State private var didSave = false
-    @FocusState private var focused: Bool
 
-    private var safeWeightText: String { weightText.replacingOccurrences(of: ",", with: ".") }
+    private var parsedWeight: Double? { CountryDecimalInput.parse(weightText, countryCode: AppCountry.code) }
     private var isValid: Bool {
-        guard let v = Double(safeWeightText), v > 0, v < 200 else { return false }
+        guard let v = parsedWeight, v > 0, v < 200 else { return false }
         return true
     }
 
@@ -67,22 +66,20 @@ struct QuickWeightSheet: View {
                 .padding(.bottom, 24)
 
                 // ── 体重大数字输入卡
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    TextField("0.0", text: $weightText)
-                        .keyboardType(.decimalPad)
-                        .font(.system(size: 64, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .minimumScaleFactor(0.4)
-                        .focused($focused)
-                        .multilineTextAlignment(.center)
-                    Text("kg")
-                        .font(.system(size: 26, weight: .black, design: .rounded))
-                        .foregroundStyle(themeColor)
-                }
-                .padding(.horizontal, 32)
-                .padding(.vertical, 28)
-                .frame(maxWidth: .infinity)
-                .goGlassBackground(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                InlineNumericInput(
+                    text: $weightText,
+                    placeholder: CountryDecimalInput.placeholder(countryCode: AppCountry.code),
+                    unit: "kg",
+                    maxFractionDigits: 1,
+                    accent: themeColor,
+                    step: 0.1,
+                    valueFont: .system(size: 58, weight: .black, design: .rounded),
+                    unitFont: .system(size: 24, weight: .black, design: .rounded),
+                    fill: Color.ohanaCardSurfaceElevated,
+                    cornerRadius: 28,
+                    horizontalPadding: 18,
+                    verticalPadding: 18
+                )
                 .padding(.horizontal, 20)
 
                 // ── 上次体重提示
@@ -141,11 +138,10 @@ struct QuickWeightSheet: View {
         }
         .background(Color.ohanaCardSurface)
         .presentationBackground(.clear)
-        .onAppear { focused = true }
     }
 
     private func saveWeight() {
-        guard let v = Double(safeWeightText), v > 0 else { return }
+        guard let v = parsedWeight, v > 0 else { return }
         let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
             .flatMap { $0.isEmpty ? nil : $0 }
         let log = PetWeightLog(date: recordDate, weight: v, pet: pet, executorId: executorId)

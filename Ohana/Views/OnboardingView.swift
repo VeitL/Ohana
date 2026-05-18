@@ -12,13 +12,13 @@ import UIKit
 private enum OnboardingPalette {
     static let backgroundTop = Color(hex: "06140F")
     static let backgroundBottom = Color(hex: "101827")
-    static let primaryText = Color.white.opacity(0.94)
-    static let secondaryText = Color.white.opacity(0.64)
-    static let tertiaryText = Color.white.opacity(0.42)
-    static let panelFill = Color.white.opacity(0.08)
-    static let panelStroke = Color.white.opacity(0.12)
-    static let mutedFill = Color.white.opacity(0.08)
-    static let cardShadow = Color.black.opacity(0.28)
+    static let primaryText = Color.goCardWhite.opacity(0.94)
+    static let secondaryText = Color.goCardWhite.opacity(0.64)
+    static let tertiaryText = Color.goCardWhite.opacity(0.42)
+    static let panelFill = Color.goCardWhite.opacity(0.08)
+    static let panelStroke = Color.goCardWhite.opacity(0.12)
+    static let mutedFill = Color.goCardWhite.opacity(0.08)
+    static let cardShadow = Color.arkInk.opacity(0.28)
     static let selectedText = Color.arkInk
 }
 
@@ -88,10 +88,10 @@ private struct OnboardingCompanionStage: View {
                         RoundedRectangle(cornerRadius: 34, style: .continuous)
                             .strokeBorder(OnboardingPalette.panelStroke, lineWidth: 1)
                     )
-                    .shadow(color: OnboardingPalette.cardShadow, radius: 18, y: 10)
+                    .shadow(color: OnboardingPalette.cardShadow, radius: 18, y: 10) // ui-v4: allow onboarding hero stage lift
 
                 Capsule()
-                    .fill(Color.black.opacity(0.24))
+                    .fill(Color.arkInk.opacity(0.24))
                     .frame(width: width * 0.66, height: 22)
                     .blur(radius: 10)
                     .offset(y: -18)
@@ -151,12 +151,12 @@ private struct OnboardingCompanionStage: View {
             Circle()
                 .fill(
                     LinearGradient(
-                        colors: [Color.white.opacity(0.14), coat.opacity(0.24)],
+                        colors: [Color.goCardWhite.opacity(0.14), coat.opacity(0.24)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
-                .shadow(color: coat.opacity(0.28), radius: 18, y: 10)
+                .shadow(color: coat.opacity(0.28), radius: 18, y: 10) // ui-v4: allow onboarding companion depth
 
             PetSilhouetteView(
                 species: species,
@@ -181,7 +181,7 @@ private struct OnboardingCompanionStage: View {
         .padding(.horizontal, 9)
         .padding(.vertical, 7)
         .background(Color.goLime.opacity(0.92), in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.black.opacity(0.12), lineWidth: 1))
+        .overlay(Capsule().strokeBorder(Color.arkInk.opacity(0.12), lineWidth: 1))
     }
 }
 
@@ -214,10 +214,10 @@ private struct OnboardingAvatarShowcase: View {
                         RoundedRectangle(cornerRadius: 34, style: .continuous)
                             .strokeBorder(OnboardingPalette.panelStroke, lineWidth: 1)
                     )
-                    .shadow(color: OnboardingPalette.cardShadow, radius: 18, y: 10)
+                    .shadow(color: OnboardingPalette.cardShadow, radius: 18, y: 10) // ui-v4: allow onboarding avatar stage lift
 
                 Capsule()
-                    .fill(Color.black.opacity(0.26))
+                    .fill(Color.arkInk.opacity(0.26))
                     .frame(width: width * 0.72, height: 24)
                     .blur(radius: 10)
                     .offset(y: -16)
@@ -303,7 +303,7 @@ private struct OnboardingAvatarShowcase: View {
                     .frame(width: height * 0.72, height: height)
             }
         }
-        .shadow(color: Color.black.opacity(0.34), radius: 18, x: 0, y: 12)
+        .shadow(color: Color.arkInk.opacity(0.34), radius: 18, x: 0, y: 12) // ui-v4: allow onboarding avatar grounding
     }
 
     private func stageBadge(icon: String, label: String) -> some View {
@@ -317,7 +317,7 @@ private struct OnboardingAvatarShowcase: View {
         .padding(.horizontal, 9)
         .padding(.vertical, 7)
         .background(Color.goLime.opacity(0.92), in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.black.opacity(0.12), lineWidth: 1))
+        .overlay(Capsule().strokeBorder(Color.arkInk.opacity(0.12), lineWidth: 1))
     }
 }
 
@@ -382,7 +382,7 @@ struct OnboardingView: View {
             if shouldReduceWork {
                 iconPulse = false
             } else {
-                withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) { iconPulse = true }
+                withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) { iconPulse = true } // ui-v4: allow gated onboarding icon pulse
             }
             if !isReplay && !currentActiveHumanId.isEmpty && !hasOnboarded {
                 step = .firstPet
@@ -939,7 +939,7 @@ struct OnboardingView: View {
                 }
                 .preferredColorScheme(.dark)
                 .environment(\.colorScheme, .dark)
-                .presentationDetents([.large])
+                .presentationDetents([.large]) // ui-v4: allow first-pet creation wizard
                 .interactiveDismissDisabled(false)
             }
         }
@@ -993,7 +993,7 @@ struct OnboardingView: View {
         }
         firstQuickCheckInCompleted = false
         showFirstSuccessCard = true
-        withAnimation(.easeInOut(duration: 0.28)) {
+        withAnimation(GoMotion.page) {
             hasOnboarded = true
         }
     }

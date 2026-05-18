@@ -145,7 +145,7 @@ struct MultiPetLineChart: View {
 
     private func playAnimation() {
         revealProgress = 0
-        withAnimation(.linear(duration: 0.5)) {
+        withAnimation(GoMotion.page) {
             revealProgress = 1.0
         }
     }
@@ -163,34 +163,14 @@ struct MultiPetLineChart: View {
                     ForEach(Array(series.enumerated()), id: \.offset) { _, s in
                         let (_, values, color) = s
                         if values.count >= 2 {
-                            // 渐变填充
-                            Path { path in
-                                path.move(to: CGPoint(x: xPos(0, count: values.count, w: w), y: h))
-                                path.addLine(to: CGPoint(x: xPos(0, count: values.count, w: w), y: yPos(values[0], h: h)))
-                                for i in 1..<values.count {
-                                    let prev = CGPoint(x: xPos(i-1, count: values.count, w: w), y: yPos(values[i-1], h: h))
-                                    let curr = CGPoint(x: xPos(i,   count: values.count, w: w), y: yPos(values[i],   h: h))
-                                    let cp1 = CGPoint(x: prev.x + (curr.x - prev.x) * 0.5, y: prev.y)
-                                    let cp2 = CGPoint(x: prev.x + (curr.x - prev.x) * 0.5, y: curr.y)
-                                    path.addCurve(to: curr, control1: cp1, control2: cp2)
-                                }
-                                path.addLine(to: CGPoint(x: xPos(values.count-1, count: values.count, w: w), y: h))
-                                path.closeSubpath()
+                            let chartPoints = values.enumerated().map { index, value in
+                                CGPoint(x: xPos(index, count: values.count, w: w), y: yPos(value, h: h))
                             }
-                            .fill(LinearGradient(colors: [color.opacity(0.25), color.opacity(0)], startPoint: .top, endPoint: .bottom))
+                            OhanaChartStyle.softenedAreaPath(points: chartPoints, baselineY: h)
+                                .fill(OhanaChartStyle.areaGradient(for: color, topOpacity: 0.22, bottomOpacity: 0))
 
-                            // 折线
-                            Path { path in
-                                path.move(to: CGPoint(x: xPos(0, count: values.count, w: w), y: yPos(values[0], h: h)))
-                                for i in 1..<values.count {
-                                    let prev = CGPoint(x: xPos(i-1, count: values.count, w: w), y: yPos(values[i-1], h: h))
-                                    let curr = CGPoint(x: xPos(i,   count: values.count, w: w), y: yPos(values[i],   h: h))
-                                    let cp1 = CGPoint(x: prev.x + (curr.x - prev.x) * 0.5, y: prev.y)
-                                    let cp2 = CGPoint(x: prev.x + (curr.x - prev.x) * 0.5, y: curr.y)
-                                    path.addCurve(to: curr, control1: cp1, control2: cp2)
-                                }
-                            }
-                            .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                            OhanaChartStyle.softenedLinePath(points: chartPoints)
+                                .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
 
                             // 最新点
                             if let last = values.last {
@@ -236,7 +216,7 @@ struct MiniLineChart: View {
 
     private func playAnimation() {
         revealProgress = 0
-        withAnimation(.linear(duration: 0.45)) {
+        withAnimation(GoMotion.page) {
             revealProgress = 1.0
         }
     }
@@ -246,37 +226,14 @@ struct MiniLineChart: View {
             let w = geo.size.width, h = geo.size.height
             let chartContent = ZStack {
                 if values.count >= 2 {
-                    // 填充渐变
-                    Path { path in
-                        path.move(to: CGPoint(x: xPos(0, w: w), y: h))
-                        path.addLine(to: CGPoint(x: xPos(0, w: w), y: yPos(values[0], h: h)))
-                        for i in 1..<values.count {
-                            let prev = CGPoint(x: xPos(i-1, w: w), y: yPos(values[i-1], h: h))
-                            let curr = CGPoint(x: xPos(i, w: w), y: yPos(values[i], h: h))
-                            let cp1 = CGPoint(x: prev.x + (curr.x - prev.x) * 0.5, y: prev.y)
-                            let cp2 = CGPoint(x: prev.x + (curr.x - prev.x) * 0.5, y: curr.y)
-                            path.addCurve(to: curr, control1: cp1, control2: cp2)
-                        }
-                        path.addLine(to: CGPoint(x: xPos(values.count - 1, w: w), y: h))
-                        path.closeSubpath()
+                    let chartPoints = values.enumerated().map { index, value in
+                        CGPoint(x: xPos(index, w: w), y: yPos(value, h: h))
                     }
-                    .fill(LinearGradient(
-                        colors: [accentColor.opacity(0.35), accentColor.opacity(0)],
-                        startPoint: .top, endPoint: .bottom
-                    ))
+                    OhanaChartStyle.softenedAreaPath(points: chartPoints, baselineY: h)
+                        .fill(OhanaChartStyle.areaGradient(for: accentColor, topOpacity: 0.28, bottomOpacity: 0))
 
-                    // 折线
-                    Path { path in
-                        path.move(to: CGPoint(x: xPos(0, w: w), y: yPos(values[0], h: h)))
-                        for i in 1..<values.count {
-                            let prev = CGPoint(x: xPos(i-1, w: w), y: yPos(values[i-1], h: h))
-                            let curr = CGPoint(x: xPos(i, w: w), y: yPos(values[i], h: h))
-                            let cp1 = CGPoint(x: prev.x + (curr.x - prev.x) * 0.5, y: prev.y)
-                            let cp2 = CGPoint(x: prev.x + (curr.x - prev.x) * 0.5, y: curr.y)
-                            path.addCurve(to: curr, control1: cp1, control2: cp2)
-                        }
-                    }
-                    .stroke(accentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    OhanaChartStyle.softenedLinePath(points: chartPoints)
+                        .stroke(accentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
 
                     // 最新点
                     if let last = values.last {
@@ -317,7 +274,7 @@ struct MiniBarChart: View {
 
     private func playAnimation() {
         animPhase = 0
-        withAnimation(.linear(duration: 0.35)) {
+        withAnimation(GoMotion.page) {
             animPhase = 1.0
         }
     }
@@ -376,7 +333,7 @@ struct MultiPetExpenseBar: View {
 
     private func playAnimation() {
         animPhase = 0
-        withAnimation(.linear(duration: 0.4)) {
+        withAnimation(GoMotion.page) {
             animPhase = 1.0
         }
     }

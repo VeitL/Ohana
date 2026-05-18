@@ -18,6 +18,7 @@ struct InventoryView: View {
     @AppStorage("shop_equipped_title") private var equippedTitle: String = ""
     @AppStorage("shop_equip_fx_lime_glow") private var equipFxLimeGlow: Bool = false
     @AppStorage("shop_equip_fx_rainbow") private var equipFxRainbow: Bool = false
+    @AppStorage("shop_equip_fx_rainbow_poop") private var equipFxRainbowPoop: Bool = false
     @AppStorage("shop_equip_fx_stars") private var equipFxStars: Bool = false
     @AppStorage("shop_equip_fx_firework") private var equipFxFirework: Bool = false
     @AppStorage(AppIconCatalog.selectedIconKey) private var selectedAppIcon: String = AppIconCatalog.defaultItemId
@@ -246,6 +247,7 @@ struct InventoryView: View {
                 switch item.id {
                 case "fx_lime_glow": return equipFxLimeGlow
                 case "fx_rainbow": return equipFxRainbow
+                case "fx_rainbow_poop": return equipFxRainbowPoop
                 case "fx_stars": return equipFxStars
                 case "fx_firework": return equipFxFirework
                 case "fx_popout_card": return true // Popout card is always considered active if owned, it's bound via shop
@@ -257,6 +259,7 @@ struct InventoryView: View {
                 switch item.id {
                 case "fx_lime_glow": equipFxLimeGlow = val
                 case "fx_rainbow": equipFxRainbow = val
+                case "fx_rainbow_poop": equipFxRainbowPoop = val
                 case "fx_stars": equipFxStars = val
                 case "fx_firework": equipFxFirework = val
                 default: break

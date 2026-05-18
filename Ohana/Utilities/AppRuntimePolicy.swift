@@ -18,6 +18,29 @@ enum AppPerformanceMode {
     }
 }
 
+enum OhanaFrameScheduler {
+    @MainActor
+    @discardableResult
+    static func runAfterNextFrame(
+        milliseconds: UInt64 = 0,
+        _ operation: @escaping @MainActor () -> Void
+    ) -> Task<Void, Never> {
+        Task { @MainActor in
+            await waitAfterNextFrame(milliseconds: milliseconds)
+            guard !Task.isCancelled else { return }
+            operation()
+        }
+    }
+
+    static func waitAfterNextFrame(milliseconds: UInt64 = 0) async {
+        await Task.yield()
+        guard !Task.isCancelled else { return }
+        if milliseconds > 0 {
+            try? await Task.sleep(nanoseconds: milliseconds * 1_000_000)
+        }
+    }
+}
+
 @MainActor
 final class AppWorkloadPolicy: ObservableObject {
     static let shared = AppWorkloadPolicy()

@@ -2,7 +2,7 @@
 //  AddPetWizardView.swift
 //  Ohana
 //
-//  全面重写：品种被动选择、拍照/相册取景框、生日年龄换算、到家天数、出生地、护照/chip、毛色/瞳色
+//  Lightweight RPG-style pet creation wizard.
 //
 
 import SwiftUI
@@ -54,6 +54,8 @@ struct AddPetWizardView: View {
     @State private var showThemeColorSheet = false
     @State private var showSaveFailedAlert = false
     @State private var saveFailedMessage = ""
+    @State private var showJoinCelebration = false
+    @State private var joinedPetName = ""
     // 重名防护
     @State private var showDuplicateNameAlert = false
     // Q4: 椰子奖励动画状态
@@ -86,6 +88,8 @@ struct AddPetWizardView: View {
     /// 顶卡头像异步解码缓存，避免每次按键重复解码 Data / 检测透明
     @State private var walletDecodedAvatar: UIImage? = nil
     @State private var walletDecodedAvatarTransparent: Bool = false
+    @State private var automaticAvatarLoadTask: Task<Void, Never>? = nil
+    @State private var entranceReady = false
 
     private let speciesOptions = ["狗", "猫", "鱼", "鸟", "兔子", "爬宠", "仓鼠", "其他"]
     @AppStorage("appLanguage") private var appLanguage = "zh"
@@ -98,30 +102,32 @@ struct AddPetWizardView: View {
     private var canUseAutomatic2DAvatar: Bool {
         Avatar2DAccess.usesFreeSlot(kind: .pet, existingCount: existingPets.count)
     }
-    private var avatar2DStatusText: String {
-        if Avatar2DAccess.usesFreeSlot(kind: .pet, existingCount: existingPets.count) {
-            return wizardL10n.tr(zh: "推荐使用当前 2.5D 头像，可获得最佳卡片和首页体验。", en: "We recommend the current 2.5D avatar for the best card and Home experience.", de: "Wir empfehlen den aktuellen 2.5D-Avatar für die beste Karten- und Home-Erfahrung.")
-        }
-        return wizardL10n.tr(zh: "2.5D 头像需要后期在椰子商店购买，并指定给这个成员解锁。", en: "2.5D avatars can be unlocked later from the Coconut Shop for this member.", de: "2.5D-Avatare kannst du später im Kokosnuss-Shop für dieses Mitglied freischalten.")
-    }
     private var petMeshBasicAndBio: String {
-        wizardL10n.tr(zh: "基础与生物 · 1/5", en: "BASICS & BIO · 1/5", de: "BASIS & BIO · 1/5")
+        wizardL10n.tr(zh: "认识伙伴 · 1/5", en: "MEET YOUR PAL · 1/5", de: "KENNENLERNEN · 1/5")
     }
     private var petMeshAppearance: String {
         isCreatingFirstPet
-            ? wizardL10n.tr(zh: "外貌与主题色 · 2/5", en: "LOOK & THEME · 2/5", de: "AUSSEHEN & THEMA · 2/5")
-            : wizardL10n.tr(zh: "外貌与主题色 · 3/5", en: "LOOK & THEME · 3/5", de: "AUSSEHEN & THEMA · 3/5")
+            ? wizardL10n.tr(zh: "外貌特征 · 2/5", en: "LOOK TRAITS · 2/5", de: "MERKMALE · 2/5")
+            : wizardL10n.tr(zh: "外貌特征 · 3/5", en: "LOOK TRAITS · 3/5", de: "MERKMALE · 3/5")
     }
     private var petMeshAvatar: String {
         isCreatingFirstPet
-            ? wizardL10n.tr(zh: "头像 · 3/5", en: "AVATAR · 3/5", de: "AVATAR · 3/5")
-            : wizardL10n.tr(zh: "头像 · 2/5", en: "AVATAR · 2/5", de: "AVATAR · 2/5")
+            ? wizardL10n.tr(zh: "形象确认 · 3/5", en: "AVATAR CHECK · 3/5", de: "AVATAR-CHECK · 3/5")
+            : wizardL10n.tr(zh: "形象确认 · 2/5", en: "AVATAR CHECK · 2/5", de: "AVATAR-CHECK · 2/5")
     }
     private var petMeshTags: String {
-        wizardL10n.tr(zh: "性格 · 4/5", en: "VIBE TAGS · 4/5", de: "CHARAKTER · 4/5")
+        wizardL10n.tr(zh: "羁绊徽章 · 4/5", en: "BOND BADGES · 4/5", de: "BINDUNGSABZEICHEN · 4/5")
     }
     private var petMeshConfirm: String {
-        wizardL10n.tr(zh: "确认 · 5/5", en: "FINAL CHECK · 5/5", de: "ABSCHLUSS · 5/5")
+        wizardL10n.tr(zh: "加入 Ohana · 5/5", en: "JOIN OHANA · 5/5", de: "OHANA BEITRETEN · 5/5")
+    }
+    private var wizardStages: [AddWizardStageItem] {
+        let basics = AddWizardStageItem(id: 0, title: wizardL10n.tr(zh: "认识伙伴", en: "Meet", de: "Start"), systemImage: "pawprint.fill")
+        let look = AddWizardStageItem(id: isCreatingFirstPet ? 1 : 2, title: wizardL10n.tr(zh: "外貌", en: "Look", de: "Look"), systemImage: "paintpalette.fill")
+        let avatar = AddWizardStageItem(id: isCreatingFirstPet ? 2 : 1, title: wizardL10n.tr(zh: "形象", en: "Avatar", de: "Avatar"), systemImage: "sparkles")
+        let tags = AddWizardStageItem(id: 3, title: wizardL10n.tr(zh: "性格", en: "Vibe", de: "Charakter"), systemImage: "heart.fill")
+        let join = AddWizardStageItem(id: 4, title: wizardL10n.tr(zh: "加入", en: "Join", de: "Beitritt"), systemImage: "checkmark.seal.fill")
+        return [basics, isCreatingFirstPet ? look : avatar, isCreatingFirstPet ? avatar : look, tags, join]
     }
     private var themeUIColorBinding: Binding<Color> {
         Binding(
@@ -243,14 +249,42 @@ struct AddPetWizardView: View {
     private func refreshAutomaticAvatarAssetData() {
         guard usesAutomaticAvatarAsset else { return }
         guard canUseAutomatic2DAvatar else {
+            automaticAvatarLoadTask?.cancel()
             avatarImageData = nil
             return
         }
-        avatarImageData = automaticPetAvatarData()
+        let requestSpecies = effectiveSpeciesForData
+        let requestBreed = effectiveBreedForAvatar
+        let requestGender = gender
+        let requestCoat = coatColor
+        let requestEye = eyeColor
+        let requestURL = PetAvatarAssetCatalog.avatarURL(
+            species: requestSpecies,
+            breed: requestBreed,
+            gender: requestGender,
+            coatColor: requestCoat,
+            eyeColor: requestEye
+        )
+        automaticAvatarLoadTask?.cancel()
+        automaticAvatarLoadTask = Task {
+            let data = await Task.detached(priority: .utility) { () -> Data? in
+                guard let requestURL else { return nil }
+                return try? Data(contentsOf: requestURL)
+            }.value
+            guard !Task.isCancelled else { return }
+            guard usesAutomaticAvatarAsset,
+                  canUseAutomatic2DAvatar,
+                  effectiveSpeciesForData == requestSpecies,
+                  effectiveBreedForAvatar == requestBreed,
+                  gender == requestGender,
+                  coatColor == requestCoat,
+                  eyeColor == requestEye else { return }
+            avatarImageData = data
+        }
     }
 
     private func automaticPetAvatarData() -> Data? {
-        PetAvatarAssetCatalog.avatarData(
+        avatarImageData ?? PetAvatarAssetCatalog.avatarData(
             species: effectiveSpeciesForData,
             breed: effectiveBreedForAvatar,
             gender: gender,
@@ -378,6 +412,24 @@ struct AddPetWizardView: View {
             cornerRadius: walletCardCorner
         )
         .frame(height: walletDraftCardHeight)
+        .overlay(alignment: .bottomLeading) {
+            HStack(spacing: 8) {
+                AddWizardStatusBadge(
+                    title: wizardL10n.tr(zh: "角色卡", en: "Character card", de: "Charakterkarte"),
+                    systemImage: "sparkles",
+                    tint: Color.goPrimary
+                )
+                AddWizardStatusBadge(
+                    title: canUseAutomatic2DAvatar
+                        ? wizardL10n.tr(zh: "推荐 2.5D", en: "2.5D pick", de: "2.5D Tipp")
+                        : wizardL10n.tr(zh: "商店解锁", en: "Shop unlock", de: "Shop-Freischaltung"),
+                    systemImage: canUseAutomatic2DAvatar ? "wand.and.stars" : "lock.fill",
+                    tint: canUseAutomatic2DAvatar ? Color.goTeal : Color.ohanaCardSurfaceElevated
+                )
+            }
+            .padding(.leading, 16)
+            .padding(.bottom, 14)
+        }
         .padding(.horizontal, 7)   // 与首页卡片堆 K.cardMargin 保持一致
         .padding(.top, 8)
         .padding(.bottom, 6)
@@ -394,75 +446,84 @@ struct AddPetWizardView: View {
         .animation(GoMotion.feedback, value: themeColorHex)
     }
 
-    /// 分页：`TabView` 恢复左右滑动；外貌卡内毛/瞳色块使用 `wrappingGrid`，避免横向 `ScrollView` 与分页手势冲突。
+    /// 只挂载当前阶段，避免进入向导时一次性构建外貌/头像/性格/确认全部重页面。
     private var wizardPagedContent: some View {
-        TabView(selection: $wizardPageIndex) {
-            if isCreatingFirstPet {
-                pagedCard(index: 0, content: { wizardCard1BasicAndBio }).tag(0)
-                pagedCard(index: 1, content: { wizardCard4Appearance }).tag(1)
-                pagedCard(index: 2, content: { wizardCard2Avatar }).tag(2)
-                pagedCard(index: 3, content: { wizardCard5Tags }).tag(3)
-                pagedCard(index: 4, content: { wizardCard6Confirm }).tag(4)
-            } else {
-                pagedCard(index: 0, content: { wizardCard1BasicAndBio }).tag(0)
-                pagedCard(index: 1, content: { wizardCard2Avatar }).tag(1)
-                pagedCard(index: 2, content: { wizardCard4Appearance }).tag(2)
-                pagedCard(index: 3, content: { wizardCard5Tags }).tag(3)
-                pagedCard(index: 4, content: { wizardCard6Confirm }).tag(4)
+        ZStack {
+            pagedCard(index: wizardPageIndex) {
+                activeWizardCard
             }
+            .id("\(isCreatingFirstPet)-\(wizardPageIndex)")
+            .transition(.opacity.combined(with: .scale(scale: 0.985)))
         }
         .id(wizardTabViewRemountID)
-        .tabViewStyle(.page(indexDisplayMode: .never))
+        .animation(GoMotion.page, value: wizardPageIndex)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private var activeWizardCard: some View {
+        if isCreatingFirstPet {
+            switch wizardPageIndex {
+            case 0: wizardCard1BasicAndBio
+            case 1: wizardCard4Appearance
+            case 2: wizardCard2Avatar
+            case 3: wizardCard5Tags
+            default: wizardCard6Confirm
+            }
+        } else {
+            switch wizardPageIndex {
+            case 0: wizardCard1BasicAndBio
+            case 1: wizardCard2Avatar
+            case 2: wizardCard4Appearance
+            case 3: wizardCard5Tags
+            default: wizardCard6Confirm
+            }
+        }
     }
 
     /// 拆出主列以减轻 `body` 类型推断压力（避免编译器超时）
     private var addPetWizardMainColumn: some View {
         VStack(spacing: 0) {
             stickyWalletPreview
+                .opacity(entranceReady ? 1 : 0)
+                .scaleEffect(entranceReady ? 1 : 0.985, anchor: .top)
+                .offset(y: entranceReady ? 0 : 10)
 
             wizardPagedContent
                 .padding(.horizontal, 7) // Match the wallet preview card width above.
                 .frame(maxHeight: .infinity)
                 .background(.clear)
+                .opacity(entranceReady ? 1 : 0)
+                .scaleEffect(entranceReady ? 1 : 0.992, anchor: .top)
+                .offset(y: entranceReady ? 0 : 22)
 
             wizardPageDotRow
+                .opacity(entranceReady ? 1 : 0)
+                .offset(y: entranceReady ? 0 : 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .animation(GoMotion.sheet, value: entranceReady)
         // 阻止键盘弹出时压缩整列布局：TabView 相邻卡片的顶部内容
         // 否则会随键盘一起上移，收起时再滑落。键盘直接覆盖当前卡片下方区域。
         .ignoresSafeArea(.keyboard)
     }
 
     private var wizardPageDotRow: some View {
-        HStack(spacing: 6) {
-            ForEach(0..<totalCards, id: \.self) { i in
-                wizardPageDotButton(index: i)
-            }
-        }
-        .padding(.top, 8).padding(.bottom, 4)
-    }
-
-    private func wizardPageDotButton(index i: Int) -> some View {
-        Button {
+        AddWizardStageProgress(stages: wizardStages, currentIndex: wizardPageIndex) { index in
             GoKeyboard.dismiss()
             withAnimation(GoMotion.feedback) {
-                wizardPageIndex = i
+                wizardPageIndex = index
             }
-        } label: {
-            Capsule()
-                .fill(i == wizardPageIndex ? Color.goPrimary : Color.primary.opacity(0.2))
-                .frame(width: i == wizardPageIndex ? 20 : 6, height: 6)
         }
-        .buttonStyle(ScaleButtonStyle())
-        .animation(GoMotion.feedback, value: wizardPageIndex)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
     }
 
     @ViewBuilder
     private var coconutBurstOverlay: some View {
         if showCoconutBurst {
             ZStack {
-                Color.black.opacity(0.35).ignoresSafeArea()
+                Color.arkInk.opacity(0.35).ignoresSafeArea()
                 VStack(spacing: 16) {
                     Text("🥥").font(.system(size: 72))
                     Text("+50 🥥")
@@ -490,9 +551,27 @@ struct AddPetWizardView: View {
     /// 仅 ZStack 层，避免与一长串 onChange 一起参与单次类型推断
     private var addPetWizardStackCore: some View {
         ZStack {
+            OhanaAppBackground()
             coconutBurstOverlay
             ahaHatchOverlayLayer
             addPetWizardMainColumn
+            if showJoinCelebration {
+                AddWizardJoinCelebrationOverlay(
+                    title: wizardL10n.tr(
+                        zh: "\(joinedPetName) 已加入 Ohana",
+                        en: "\(joinedPetName) joined Ohana",
+                        de: "\(joinedPetName) ist bei Ohana"
+                    ),
+                    subtitle: wizardL10n.tr(
+                        zh: "宠物角色卡已准备好",
+                        en: "The pet card is ready",
+                        de: "Die Haustierkarte ist bereit"
+                    ),
+                    systemImage: "pawprint.circle.fill",
+                    accent: Color.goPrimary
+                )
+                .zIndex(1_000)
+            }
         }
     }
 
@@ -546,13 +625,27 @@ struct AddPetWizardView: View {
     private var addPetWizardLifecyclePartA: some View {
         addPetWizardStackCore
             .onAppear {
+                startEntranceAnimation()
                 refreshAutomaticAvatarAssetData()
                 scheduleWalletAvatarDecode()
+            }
+            .onDisappear {
+                entranceReady = false
+                automaticAvatarLoadTask?.cancel()
             }
             .onChange(of: cropImageItem) { _, new in remountWizardPagerIfCropDismissed(new) }
             .onChange(of: wizardPageIndex) { _, new in clampWizardPageIndex(new) }
             .onChange(of: avatarImageData) { _, _ in scheduleWalletAvatarDecode() }
             .onChange(of: photosPickerItem) { _, item in handlePhotosPickerItemChanged(item) }
+    }
+
+    private func startEntranceAnimation() {
+        entranceReady = false
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 35) {
+            withAnimation(GoMotion.sheet) {
+                entranceReady = true
+            }
+        }
     }
 
     private var addPetWizardLifecycleBase: some View {
@@ -616,7 +709,7 @@ struct AddPetWizardView: View {
                 }
                 .navigationBarTitleDisplayMode(.inline)
             }
-            .presentationDetents([.large])
+            .presentationDetents([.large]) // ui-v4: allow image crop editor needs full-screen working space.
         }
         .sheet(isPresented: $showBreedPickerSheet) { breedPickerSheet }
         .sheet(isPresented: $showThemeColorSheet) {
@@ -684,20 +777,20 @@ struct AddPetWizardView: View {
                     .fill(Color(hex: themeColorHex))
                     .frame(width: size, height: size)
                 Circle()
-                    .strokeBorder(Color.primary.opacity(0.2), lineWidth: 1)
+                    .strokeBorder(Color.ohanaGlassStroke, lineWidth: 1)
                     .frame(width: size, height: size)
                 if isCustom {
                     Circle()
-                        .strokeBorder(.white, lineWidth: 2)
+                        .strokeBorder(Color.goCardWhite, lineWidth: 2)
                         .frame(width: size, height: size)
                     Image(systemName: "checkmark")
                         .font(.system(size: max(10, size * 0.3), weight: .black))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(Color.arkInk)
                 } else {
                     Image(systemName: "paintpalette.fill")
                         .font(.system(size: max(12, size * 0.42), weight: .bold))
-                        .foregroundStyle(.white)
-                        .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+                        .foregroundStyle(Color.goCardWhite)
+                        .shadow(color: Color.arkInk.opacity(0.35), radius: 3, y: 1) // ui-v4: allow swatch icon readability shadow.
                 }
             }
         }
@@ -827,7 +920,16 @@ struct AddPetWizardView: View {
 
         isSaving = false
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        onComplete()
+        joinedPetName = trimmedName
+        withAnimation(GoMotion.sheet) {
+            showJoinCelebration = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
+            withAnimation(GoMotion.quick) {
+                showJoinCelebration = false
+            }
+            onComplete()
+        }
     }
 
     private func restoreAutomaticAvatarAsset() {
@@ -888,7 +990,7 @@ struct AddPetWizardView: View {
         }
     }
 
-    // MARK: - Wizard Pager Helpers
+    // MARK: - W      izard Pager Helpers
 
     private func pagedCard<Content: View>(index: Int, @ViewBuilder content: () -> Content) -> some View {
         content()
@@ -897,122 +999,12 @@ struct AddPetWizardView: View {
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
-    private var wizardCardMesh: some View {
-        MeshGradient(
-            width: 3, height: 3,
-            points: [
-                SIMD2(0.0, 0.0), SIMD2(0.5, 0.0), SIMD2(1.0, 0.0),
-                SIMD2(0.0, 0.5), SIMD2(0.55, 0.40), SIMD2(1.0, 0.5),
-                SIMD2(0.0, 1.0), SIMD2(0.5,  1.0), SIMD2(1.0, 1.0)
-            ],
-            colors: [
-                Color(hex: "C8FF00"), Color(hex: "C2F20A"), Color(hex: "9ADB00"),
-                Color(hex: "DEFF8A"), Color(hex: "C8FF00"), Color(hex: "76B000"),
-                Color(hex: "AADC00"), Color(hex: "7CB800"), Color(hex: "3B5F00")
-            ]
-        )
-    }
-
     private func meshCardLabel(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 11, weight: .black, design: .rounded))
             .foregroundStyle(Color.primary.opacity(0.6))
             .tracking(0.8)
             .textCase(.uppercase)
-    }
-
-    // MARK: - Wizard Card 1
-    private var wizardCard1BasicInfo: some View {
-        let l = wizardL10n
-        return VStack(alignment: .leading, spacing: 14) {
-            meshCardLabel(l.petWizMesh1).padding(.top, 14).padding(.horizontal, 20)
-
-            VStack(alignment: .leading, spacing: 6) {
-                PetWizardNameInputField(
-                    name: $name,
-                    placeholder: l.petWizNamePlaceholder,
-                    duplicateMessage: l.humanWizDupNameInline,
-                    takenNames: normalizedExistingMemberNames,
-                    colorScheme: colorScheme
-                )
-            }
-            .padding(.horizontal, 20)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text(l.petWizSpecies)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .padding(.horizontal, 20)
-
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3),
-                    spacing: 8
-                ) {
-                    ForEach(speciesOptions, id: \.self) { sp in
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            species = sp
-                            if sp != "其他" { customSpeciesText = "" }
-                            breed = ""; isCustomBreed = false; customBreedText = ""; isBreedPickerExpanded = false
-                        } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: Pet.speciesSilhouetteSymbol(forSpecies: sp))
-                                    .font(.system(size: 20, weight: .bold)).symbolRenderingMode(.monochrome)
-                                    .foregroundStyle(species == sp ? Color.arkInk : Color.primary.opacity(0.85))
-                                Text(l.petSpeciesLabel(sp))
-                                    .font(.system(size: 11, weight: species == sp ? .bold : .medium, design: .rounded))
-                                    .foregroundStyle(species == sp ? Color.arkInk : .secondary)
-                            }
-                            .frame(maxWidth: .infinity).padding(.vertical, 10)
-                            .background(
-                                species == sp ? Color.goPrimary : Color.primary.opacity(0.07),
-                                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            )
-                            .scaleEffect(species == sp ? 0.96 : 1.0)
-                            .animation(GoMotion.feedback, value: species)
-                        }.buttonStyle(ScaleButtonStyle())
-                    }
-                }
-                .padding(.horizontal, 20)
-
-                if species == "其他" {
-                    GoDraftTextField(
-                        l.petWizSpeciesOtherPh,
-                        text: $customSpeciesText,
-                        commitDelayNanoseconds: 180_000_000,
-                        submitLabel: .done,
-                        capitalization: .words
-                    )
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .textFieldStyle(.plain)
-                        .padding(.horizontal, 14).padding(.vertical, 12)
-                        .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .strokeBorder(customSpeciesText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.goRed.opacity(0.35) : Color.goPrimary.opacity(0.35), lineWidth: 1)
-                        )
-                        .padding(.horizontal, 20)
-                }
-            }
-
-            Button { showBreedPickerSheet = true } label: {
-                HStack {
-                    Image(systemName: "list.bullet").font(.system(size: 13, weight: .semibold)).symbolRenderingMode(.monochrome).foregroundStyle(Color.ohanaSecondaryText)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(l.petWizBentoBreed).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.primary.opacity(0.55))
-                        Text(breedCollapseSummary).font(.system(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).symbolRenderingMode(.monochrome).foregroundStyle(Color.primary.opacity(0.45))
-                }
-                .padding(.horizontal, 14).padding(.vertical, 12)
-                .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            }
-            .buttonStyle(ScaleButtonStyle()).padding(.horizontal, 20)
-
-            Spacer()
-        }
     }
 
     private var wizardCard1BasicAndBio: some View {
@@ -1188,6 +1180,9 @@ struct AddPetWizardView: View {
         return VStack(alignment: .leading, spacing: 14) {
             meshCardLabel(petMeshAvatar).padding(.top, 14).padding(.horizontal, 20)
 
+            petAvatarPreviewHero
+                .padding(.horizontal, 20)
+
             HStack(spacing: 8) {
                 PhotosPicker(selection: $photosPickerItem, matching: .images) {
                     HStack(spacing: 5) {
@@ -1211,11 +1206,17 @@ struct AddPetWizardView: View {
             }
             .padding(.horizontal, 20)
 
-            Text(avatar2DStatusText)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(canUseAutomatic2DAvatar ? Color.goPrimary.opacity(0.85) : Color.primary.opacity(0.48))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 20)
+            HStack {
+                AddWizardStatusBadge(
+                    title: canUseAutomatic2DAvatar
+                        ? l.tr(zh: "推荐当前 2.5D", en: "Use this 2.5D", de: "Diesen 2.5D nutzen")
+                        : l.tr(zh: "2.5D 商店解锁", en: "2.5D in shop", de: "2.5D im Shop"),
+                    systemImage: canUseAutomatic2DAvatar ? "sparkles" : "lock.fill",
+                    tint: canUseAutomatic2DAvatar ? Color.goPrimary : Color.ohanaCardSurfaceElevated
+                )
+                Spacer()
+            }
+            .padding(.horizontal, 20)
 
             if canUseAutomatic2DAvatar && !usesAutomaticAvatarAsset {
                 Button {
@@ -1241,85 +1242,44 @@ struct AddPetWizardView: View {
         }
     }
 
-    // MARK: - Wizard Card 3
-    private var wizardCard3Bio: some View {
-        let l = wizardL10n
-        return VStack(alignment: .leading, spacing: 14) {
-            meshCardLabel(l.petWizMesh2).padding(.top, 14).padding(.horizontal, 20)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(l.petWizGender).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
-                HStack(spacing: 8) {
-                    ForEach([("male", l.petWizGenderBoy), ("female", l.petWizGenderGirl), ("unknown", l.petWizGenderUnknown)], id: \.0) { val, label in
-                        Button { UIImpactFeedbackGenerator(style: .light).impactOccurred(); gender = val } label: {
-                            Text(label).font(.system(size: 13, weight: gender == val ? .bold : .medium, design: .rounded))
-                                .foregroundStyle(gender == val ? Color.arkInk : Color.primary.opacity(0.85))
-                                .frame(maxWidth: .infinity).padding(.vertical, 10)
-                                .background(gender == val ? Color.goPrimary : Color.primary.opacity(0.07), in: Capsule())
-                        }.buttonStyle(ScaleButtonStyle())
-                    }
-                }
+    private var petAvatarPreviewHero: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color.ohanaCardSurfaceElevated)
+            if let walletDecodedAvatar {
+                Image(uiImage: walletDecodedAvatar)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(walletDecodedAvatarTransparent ? 10 : 24)
+            } else {
+                Image(systemName: Pet.speciesSilhouetteSymbol(forSpecies: effectiveSpeciesForData))
+                    .font(.system(size: 64, weight: .black))
+                    .symbolRenderingMode(.monochrome)
+                    .foregroundStyle(Color(hex: themeColorHex).opacity(0.78))
             }
-            .padding(.horizontal, 20)
-
-            HStack {
-                Text(l.petWizNeuter).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
+            VStack {
+                HStack {
+                    AddWizardStatusBadge(
+                        title: usesAutomaticAvatarAsset
+                            ? wizardL10n.tr(zh: "自动形象", en: "Auto avatar", de: "Auto-Avatar")
+                            : wizardL10n.tr(zh: "手动形象", en: "Custom avatar", de: "Eigenes Bild"),
+                        systemImage: usesAutomaticAvatarAsset ? "wand.and.stars" : "photo.fill",
+                        tint: usesAutomaticAvatarAsset ? Color.goTeal : Color(hex: themeColorHex)
+                    )
+                    Spacer()
+                }
                 Spacer()
-                Toggle("", isOn: $isNeutered).tint(Color.goPrimary).labelsHidden()
             }
-            .padding(.horizontal, 16).padding(.vertical, 10)
-            .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .padding(.horizontal, 20)
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(l.petWizBirthday).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
-                    Spacer()
-                    Toggle("", isOn: $hasBirthday).tint(Color.goPrimary).labelsHidden()
-                }
-                if hasBirthday {
-                    DatePicker("", selection: $birthday, in: ...Date(), displayedComponents: .date)
-                        .labelsHidden()
-                        .tint(Color.goPrimary)
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .simultaneousGesture(TapGesture().onEnded { GoKeyboard.dismiss() })
-                    if !humanAgeText.isEmpty {
-                        Label(humanAgeText, systemImage: "person.fill")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                    }
-                }
-            }
-            .padding(.horizontal, 16).padding(.vertical, 10)
-            .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .padding(.horizontal, 20)
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(l.petWizHomeDate).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
-                    Spacer()
-                    Toggle("", isOn: $hasHomeDate).tint(Color.goPrimary).labelsHidden()
-                }
-                if hasHomeDate {
-                    DatePicker("", selection: $homeDate, in: (hasBirthday ? birthday : .distantPast)...Date(), displayedComponents: .date)
-                        .labelsHidden()
-                        .tint(Color.goPrimary)
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .simultaneousGesture(TapGesture().onEnded { GoKeyboard.dismiss() })
-                        .onChange(of: birthday) { _, newB in if homeDate < newB { homeDate = newB } }
-                    if !daysTogetherText.isEmpty {
-                        Label(daysTogetherText, systemImage: "heart.fill")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                    }
-                }
-            }
-            .padding(.horizontal, 16).padding(.vertical, 10)
-            .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .padding(.horizontal, 20)
-
-            Spacer()
+            .padding(14)
         }
+        .frame(height: 164)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+        )
+        .animation(GoMotion.feedback, value: avatarImageData?.count)
+        .animation(GoMotion.feedback, value: usesAutomaticAvatarAsset)
     }
 
     // MARK: - Wizard Card 4
@@ -1356,10 +1316,10 @@ struct AddPetWizardView: View {
                                     ZStack {
                                         Circle().fill(tc.color.opacity(isUsed ? 0.3 : 1.0)).frame(width: 36, height: 36)
                                         if themeColorHex.uppercased() == tcHex.uppercased() {
-                                            Circle().strokeBorder(.white, lineWidth: 2)
-                                            Image(systemName: "checkmark").font(.system(size: 11, weight: .black)).foregroundStyle(.black)
+                                            Circle().strokeBorder(Color.goCardWhite, lineWidth: 2)
+                                            Image(systemName: "checkmark").font(.system(size: 11, weight: .black)).foregroundStyle(Color.arkInk)
                                         }
-                                        if isUsed { Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(Color.primary.opacity(0.55)) }
+                                        if isUsed { Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(Color.ohanaTertiaryText) }
                                     }
                                 }.disabled(isUsed)
                             }
@@ -1383,7 +1343,7 @@ struct AddPetWizardView: View {
                 meshCardLabel(petMeshTags)
                 Spacer()
                 Text(l.petWizTagPicked(selectedPersonalityTagIds.count))
-                    .font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.primary.opacity(0.55))
+                    .font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaTertiaryText)
             }
             .padding(.top, 14).padding(.horizontal, 20)
 
@@ -1413,8 +1373,8 @@ struct AddPetWizardView: View {
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .padding(.horizontal, 10).padding(.vertical, 10)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.primary.opacity(0.07), in: Capsule())
-                        .overlay(Capsule().strokeBorder(Color.black.opacity(0.15), lineWidth: 1))
+                        .background(Color.ohanaControlFill, in: Capsule())
+                        .overlay(Capsule().strokeBorder(Color.ohanaGlassStroke, lineWidth: 1))
                     }.buttonStyle(ScaleButtonStyle())
                 }
               }
@@ -1428,17 +1388,17 @@ struct AddPetWizardView: View {
                         .focused($customPersonalityTagFieldFocused)
                         .font(.system(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
                         .textFieldStyle(.plain).padding(.horizontal, 12).padding(.vertical, 10)
-                        .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 10))
                         .frame(maxWidth: .infinity)
                     Button { cancelCustomPersonalityTagComposer() } label: {
                         Text(l.cancel).font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
                             .padding(.horizontal, 12).padding(.vertical, 10)
-                            .background(Color.primary.opacity(0.05), in: Capsule())
+                            .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
                     }.buttonStyle(ScaleButtonStyle())
                     Button { commitCustomPersonalityTag() } label: {
-                        Text(l.confirm).font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(Color.white)
+                        Text(l.confirm).font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(Color.arkInk)
                             .padding(.horizontal, 12).padding(.vertical, 10)
-                            .background(.secondary, in: Capsule())
+                            .background(Color.goPrimary, in: Capsule())
                     }.buttonStyle(ScaleButtonStyle()).disabled(newCustomPersonalityTagText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 .padding(.horizontal, 20)
@@ -1451,16 +1411,19 @@ struct AddPetWizardView: View {
 
     private func meshTagChip(symbol: String, title: String, isOn: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 5) {
-                Image(systemName: symbol).font(.system(size: 12, weight: .bold)).symbolRenderingMode(.monochrome)
+            HStack(spacing: 6) {
+                Image(systemName: isOn ? "sparkle" : symbol).font(.system(size: 12, weight: .bold)).symbolRenderingMode(.monochrome)
                 Text(title).font(.system(size: 12, weight: .semibold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.8)
             }
-            .foregroundStyle(isOn ? Color.arkInk : Color.primary.opacity(0.85))
+            .foregroundStyle(isOn ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.85))
             .padding(.horizontal, 10).padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(isOn ? Color.goPrimary : Color.primary.opacity(0.07), in: Capsule())
-            .overlay(Capsule().strokeBorder(Color.black.opacity(isOn ? 0 : 0.12), lineWidth: 1))
-        }.buttonStyle(ScaleButtonStyle())
+            .background(isOn ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+            .overlay(Capsule().strokeBorder(isOn ? Color.goPrimary.opacity(0.55) : Color.ohanaGlassStroke, lineWidth: 1))
+            .scaleEffect(isOn ? 0.97 : 1.0)
+            .animation(GoMotion.feedback, value: isOn)
+        }
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func togglePersonalityTag(_ id: String) {
@@ -1710,63 +1673,6 @@ struct AddPetWizardView: View {
         }
     }
 
-    // MARK: - Wizard Bottom Nav Bar
-    private var wizardBottomNavBar: some View {
-        let l = wizardL10n
-        let trimmed = name.trimmingCharacters(in: .whitespaces)
-        let nameOk = !trimmed.isEmpty && !isNameDuplicate
-        let isLastPage = wizardPageIndex == totalCards - 1
-        return HStack(spacing: 12) {
-            if wizardPageIndex > 0 {
-                Button {
-                    GoKeyboard.dismiss()
-                    withAnimation(GoMotion.feedback) { wizardPageIndex -= 1 }
-                } label: {
-                    Image(systemName: "chevron.left").font(.system(size: 16, weight: .bold)).symbolRenderingMode(.monochrome)
-                        .foregroundStyle(Color.ohanaPrimaryText).frame(width: 48, height: 48)
-                        .background(Color.primary.opacity(0.1), in: Circle())
-                }.buttonStyle(ScaleButtonStyle())
-            } else {
-                Color.clear.frame(width: 48, height: 48)
-            }
-            Spacer()
-            if isLastPage {
-                Button {
-                    guard nameOk, !isSaving else { return }
-                    GoKeyboard.dismiss()
-                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                    savePet()
-                } label: {
-                    HStack(spacing: 8) {
-                        if isSaving { ProgressView().tint(.black) }
-                        Text(trimmed.isEmpty ? l.humanWizNeedName : isNameDuplicate ? l.humanWizNameTakenBtn : isSaving ? l.petWizSaving : l.humanWizJoinIsland)
-                            .font(.system(size: 15, weight: .black, design: .rounded))
-                        if !isSaving { Image(systemName: nameOk ? "checkmark.circle.fill" : "lock.fill").font(.system(size: 16, weight: .bold)).symbolRenderingMode(.monochrome) }
-                    }
-                    .foregroundStyle(nameOk ? Color.black : Color.primary.opacity(0.4))
-                    .padding(.horizontal, 24).padding(.vertical, 13)
-                    .background(nameOk ? Color.goPrimary : Color.primary.opacity(0.1), in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle()).disabled(trimmed.isEmpty || isNameDuplicate || isSaving)
-            } else {
-                Button {
-                    GoKeyboard.dismiss()
-                    withAnimation(GoMotion.feedback) { wizardPageIndex += 1 }
-                } label: {
-                    HStack(spacing: 6) {
-                        Text(l.petWizNext).font(.system(size: 15, weight: .bold, design: .rounded))
-                        Image(systemName: "chevron.right").font(.system(size: 14, weight: .bold)).symbolRenderingMode(.monochrome)
-                    }
-                    .foregroundStyle(Color.black)
-                    .padding(.horizontal, 24).padding(.vertical, 13)
-                    .background(Color.goPrimary, in: Capsule())
-                }.buttonStyle(ScaleButtonStyle())
-            }
-        }
-        .padding(.horizontal, 20).padding(.vertical, 8)
-        .background(Color.ohanaCardSurface)
-    }
-
     // MARK: - Breed Picker Sheet
     private var breedPickerSheet: some View {
         let l = wizardL10n
@@ -1872,7 +1778,7 @@ struct AddPetWizardView: View {
                 }
             }
         }
-        .presentationDetents([.large])
+        .presentationDetents([.large]) // ui-v4: allow breed picker is a long searchable selection sheet.
     }
 
 }
@@ -2126,23 +2032,23 @@ final class OhanaCameraViewController: UIViewController {
     private func configureControls() {
         closeButton.translatesAutoresizingMaskIntoConstraints = false
         closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
-        closeButton.tintColor = .white
-        closeButton.backgroundColor = UIColor.black.withAlphaComponent(0.36)
+        closeButton.tintColor = UIColor(Color.goCardWhite)
+        closeButton.backgroundColor = UIColor(Color.arkInk).withAlphaComponent(0.36)
         closeButton.layer.cornerRadius = 22
         closeButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
         view.addSubview(closeButton)
 
         captureButton.translatesAutoresizingMaskIntoConstraints = false
-        captureButton.backgroundColor = .white
+        captureButton.backgroundColor = UIColor(Color.goCardWhite)
         captureButton.layer.cornerRadius = 34
         captureButton.layer.borderWidth = 5
-        captureButton.layer.borderColor = UIColor.white.withAlphaComponent(0.35).cgColor
+        captureButton.layer.borderColor = UIColor(Color.goCardWhite).withAlphaComponent(0.35).cgColor
         captureButton.addTarget(self, action: #selector(captureTapped), for: .touchUpInside)
         view.addSubview(captureButton)
 
         unavailableLabel.translatesAutoresizingMaskIntoConstraints = false
         unavailableLabel.text = "无法打开相机"
-        unavailableLabel.textColor = .white
+        unavailableLabel.textColor = UIColor(Color.goCardWhite)
         unavailableLabel.font = .systemFont(ofSize: 17, weight: .semibold)
         unavailableLabel.textAlignment = .center
         unavailableLabel.isHidden = true
@@ -2419,7 +2325,7 @@ struct PetImageCropView: View {
         GeometryReader { geo in
             let (cropW, cropH) = cropSize(for: geo.size)
             ZStack {
-                Color.black
+                Color.arkInk
 
                 Image(uiImage: image)
                     .resizable()
@@ -2437,12 +2343,12 @@ struct PetImageCropView: View {
                 HStack(spacing: 0) {
                     ZStack {
                         RoundedRectangle(cornerRadius: max(4, cornerRadius - 4), style: .continuous)
-                            .fill(Color.white.opacity(colorScheme == .dark ? 0.1 : 0.07))
+                            .fill(Color.goCardWhite.opacity(colorScheme == .dark ? 0.1 : 0.07))
                             .frame(width: cropW / 2, height: cropH)
                         Image(systemName: silhouetteSystemName ?? Pet.speciesSilhouetteSymbol(forSpecies: species))
                             .font(.system(size: min(cropH * 0.52, 128), weight: .bold))
                             .symbolRenderingMode(.monochrome)
-                            .foregroundStyle(.white.opacity(colorScheme == .dark ? 0.38 : 0.26))
+                            .foregroundStyle(Color.goCardWhite.opacity(colorScheme == .dark ? 0.38 : 0.26))
                     }
                     .frame(width: cropW / 2, height: cropH)
                     Color.clear.frame(width: cropW / 2, height: cropH)
@@ -2462,10 +2368,10 @@ struct PetImageCropView: View {
                     Spacer()
                     Label("卡片取景", systemImage: "crop")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(Color.goCardWhite.opacity(0.5))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(.black.opacity(0.22), in: Capsule())
+                        .background(Color.arkInk.opacity(0.22), in: Capsule())
                         .padding(.bottom, 104)
                 }
                 .allowsHitTesting(false)
@@ -2517,10 +2423,10 @@ struct PetImageCropView: View {
                 Button { onCrop(nil) } label: {
                     Text("取消")
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.75))
+                        .foregroundStyle(Color.goCardWhite.opacity(0.75))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
+                        .background(Color.goCardWhite.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
                 }
                 .buttonStyle(ScaleButtonStyle())
 
@@ -2536,7 +2442,7 @@ struct PetImageCropView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
-            .background(Color.black.opacity(0.8))
+            .background(Color.arkInk.opacity(0.8))
         }
         .navigationBarHidden(true)
         .ignoresSafeArea(edges: .top)
@@ -2599,7 +2505,7 @@ struct PetImageCropView: View {
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: cropW, height: cropH), format: fmt)
         let cropped = renderer.image { _ in
             if !srcHasAlpha {
-                UIColor.black.setFill()
+                UIColor(Color.arkInk).setFill()
                 UIRectFill(CGRect(x: 0, y: 0, width: cropW, height: cropH))
             }
             src.draw(in: drawRect)
@@ -2624,7 +2530,7 @@ private struct PetCropOverlay: View {
                 )
             }
             .fill(style: FillStyle(eoFill: true))
-            .foregroundStyle(.black.opacity(0.62))
+            .foregroundStyle(Color.arkInk.opacity(0.62))
         }
     }
 }
@@ -2675,7 +2581,7 @@ private struct CardCropOverlay: View {
                 )
             }
             .fill(style: FillStyle(eoFill: true))
-            .foregroundStyle(.black.opacity(0.62))
+            .foregroundStyle(Color.arkInk.opacity(0.62))
         }
     }
 }
@@ -2736,7 +2642,7 @@ struct GoColorPickerSheet: View {
             VStack(spacing: 20) {
                 // 顶部把手
                 Capsule()
-                    .fill(.white.opacity(0.2))
+                    .fill(Color.ohanaGlassStroke)
                     .frame(width: 40, height: 4)
                     .padding(.top, 12)
 
@@ -2750,7 +2656,7 @@ struct GoColorPickerSheet: View {
                     .frame(height: 80)
                     .overlay(
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .strokeBorder(.white.opacity(0.2), lineWidth: 1)
+                            .strokeBorder(Color.ohanaGlassStroke, lineWidth: 1)
                     )
                     .padding(.horizontal, 24)
 
@@ -2769,11 +2675,11 @@ struct GoColorPickerSheet: View {
                                     .fill(color)
                                     .frame(height: 42)
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .strokeBorder(.white.opacity(hex == "FFFFFF" ? 0.55 : 0.2), lineWidth: 1)
+                                    .strokeBorder(Color.ohanaGlassStroke.opacity(hex == "FFFFFF" ? 1 : 0.72), lineWidth: 1)
                                 if isSelected {
                                     Image(systemName: "checkmark")
                                         .font(.system(size: 14, weight: .black))
-                                        .foregroundStyle(hex == "FFFFFF" || hex == "F2F2F7" || hex == "FFCC00" || hex == "C8FF00" ? .black : .white)
+                                        .foregroundStyle(hex == "FFFFFF" || hex == "F2F2F7" || hex == "FFCC00" || hex == "C8FF00" ? Color.arkInk : Color.goCardWhite)
                                 }
                             }
                         }
@@ -2789,7 +2695,7 @@ struct GoColorPickerSheet: View {
                 } label: {
                     Text("确认")
                         .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(Color.arkInk)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 16))
@@ -2826,6 +2732,7 @@ private struct AhaHatchOverlay: View {
     let petName: String
     let petEmoji: String
 
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var crackPhase: CGFloat = 0      // 0 = 整蛋，1 = 完全破壳
     @State private var petScale: CGFloat = 0.4
     @State private var petOpacity: Double = 0
@@ -2833,11 +2740,12 @@ private struct AhaHatchOverlay: View {
     @State private var glowOpacity: Double = 0
     @State private var titleOpacity: Double = 0
     @State private var sparkleRotation: CGFloat = 0
+    @State private var isVisible = false
 
     var body: some View {
         ZStack {
             // 背景渐暗
-            Color.black.opacity(0.55)
+            Color.arkInk.opacity(0.55)
                 .ignoresSafeArea()
 
             // 辐射光晕
@@ -2890,37 +2798,65 @@ private struct AhaHatchOverlay: View {
                 Spacer().frame(height: 180)
                 Text("\(petName) 加入 Ohana")
                     .font(.system(size: 22, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.goCardWhite)
                 Text("一起开启你们的故事")
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.7))
             }
             .opacity(titleOpacity)
         }
         .allowsHitTesting(false)
         .onAppear {
-            // 阶段 1：光晕出现（0 ~ 0.4s）
-            withAnimation(.easeOut(duration: 0.4)) {
-                glowOpacity = 1.0
-                glowScale = 1.0
+            isVisible = true
+            startEntranceAnimation()
+            updateSparkleLoop()
+        }
+        .onDisappear {
+            isVisible = false
+            sparkleRotation = 0
+        }
+        .onChange(of: workloadPolicy.isForeground) { _, _ in
+            updateSparkleLoop()
+        }
+        .onChange(of: workloadPolicy.isLowPowerModeEnabled) { _, _ in
+            updateSparkleLoop()
+        }
+        .onChange(of: workloadPolicy.isReduceMotionEnabled) { _, _ in
+            updateSparkleLoop()
+        }
+    }
+
+    private func startEntranceAnimation() {
+        // 阶段 1：光晕出现（0 ~ 0.4s）
+        withAnimation(GoMotion.quick) {
+            glowOpacity = 1.0
+            glowScale = 1.0
+        }
+        // 阶段 2：破壳（0.6 ~ 1.4s）
+        withAnimation(GoMotion.page.delay(0.6)) {
+            crackPhase = 1.0
+        }
+        // 阶段 3：宠物弹出（1.1 ~ 1.7s）
+        withAnimation(GoMotion.fab.delay(1.1)) {
+            petScale = 1.0
+            petOpacity = 1.0
+        }
+        // 阶段 4：标题显现（1.6 ~ 2.2s）
+        withAnimation(GoMotion.quick.delay(1.6)) {
+            titleOpacity = 1.0
+        }
+    }
+
+    private func updateSparkleLoop() {
+        guard workloadPolicy.shouldRunRepeatingAnimation(isVisible: isVisible) else {
+            withAnimation(GoMotion.quick) {
+                sparkleRotation = 0
             }
-            // 阶段 2：破壳（0.6 ~ 1.4s）
-            withAnimation(.easeInOut(duration: 0.7).delay(0.6)) {
-                crackPhase = 1.0
-            }
-            // 阶段 3：宠物弹出（1.1 ~ 1.7s）
-            withAnimation(GoMotion.fab.delay(1.1)) {
-                petScale = 1.0
-                petOpacity = 1.0
-            }
-            // 阶段 4：标题显现（1.6 ~ 2.2s）
-            withAnimation(.easeOut(duration: 0.45).delay(1.6)) {
-                titleOpacity = 1.0
-            }
-            // 星芒持续旋转
-            withAnimation(.linear(duration: 6).repeatForever(autoreverses: false)) {
-                sparkleRotation = 360
-            }
+            return
+        }
+        sparkleRotation = 0
+        withAnimation(.linear(duration: 6).repeatForever(autoreverses: false)) { // ui-v4: allow workload-gated celebratory sparkle loop.
+            sparkleRotation = 360
         }
     }
 }

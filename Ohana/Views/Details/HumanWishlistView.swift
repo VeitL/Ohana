@@ -10,7 +10,9 @@ import SwiftData
 struct HumanWishlistView: View {
     let human: Human
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @Query(sort: \WishlistItem.createdAt, order: .reverse) private var allItems: [WishlistItem]
     @Query(sort: \Human.createdAt) private var allHumans: [Human]
 
@@ -27,6 +29,7 @@ struct HumanWishlistView: View {
     private var isPrivacyLocked: Bool {
         human.isPrivate(.wishlist, viewedBy: UUID(uuidString: activeHumanIdStr))
     }
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -40,31 +43,29 @@ struct HumanWishlistView: View {
 
             // FAB — iOS 26 Primary CTA
             if !isPrivacyLocked {
-                Button { showAddSheet = true } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "plus")
-                            .font(OhanaFont.callout(.black))
-                        Text("许一个愿")
-                            .font(OhanaFont.callout(.black))
-                    }
-                    .foregroundStyle(Color.arkInk)
-                    .padding(.horizontal, 24).padding(.vertical, 14)
-                    .background(Color.goPrimary, in: Capsule())
+                HumanModuleFloatingActionButton(
+                    title: l.tr(zh: "许愿", en: "Wish", de: "Wunsch"),
+                    icon: "plus"
+                ) {
+                    showAddSheet = true
                 }
-                .buttonStyle(ScaleButtonStyle())
                 .padding(.bottom, 28)
             }
         }
         .confettiOverlay(isShowing: $showConfetti)
-        .navigationTitle("🎁 心愿单")
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showAddSheet) { addWishSheet }
     }
 
     private var wishlistContent: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 20) {
-                balanceCard
+                header
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+
+                metricStrip
+                    .padding(.horizontal, 20)
 
                 HumanPrivateDataNotice(human: human, field: .wishlist)
                     .padding(.horizontal, 20)
@@ -94,57 +95,35 @@ struct HumanWishlistView: View {
         }
     }
 
-    private var balanceCard: some View {
-        wishlistSurface {
-            HStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("我的椰子余额")
-                        .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text("🥥")
-                            .font(OhanaFont.title2())
-                        Text("\(human.coconutBalance)")
-                            .font(OhanaFont.metric(size: 44))
-                            .foregroundStyle(Color.goPrimary)
-                            .contentTransition(.numericText())
-                    }
-                    Text("许愿消耗椰子，需攒够才能兑换")
-                        .font(OhanaFont.caption())
-                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 6) {
-                    Text("\(pendingItems.count)")
-                        .font(OhanaFont.metric(size: 32))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                    Text("个待兑换")
-                        .font(OhanaFont.caption())
-                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                }
-            }
-            .padding(20)
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
+    private var header: some View {
+        HumanModulePageHeader(
+            human: human,
+            title: l.tr(zh: "椰子资产", en: "Coconuts", de: "Kokosnüsse"),
+            subtitle: human.name,
+            onClose: { dismiss() }
+        )
+    }
+
+    private var metricStrip: some View {
+        HumanModuleMetricStrip(metrics: [
+            FeatureHubMetric(
+                id: "balance",
+                title: l.tr(zh: "余额", en: "Balance", de: "Saldo"),
+                value: "\(human.coconutBalance)🥥"
+            ),
+            FeatureHubMetric(
+                id: "pending",
+                title: l.tr(zh: "待兑换", en: "Pending", de: "Offen"),
+                value: "\(pendingItems.count)"
+            )
+        ])
     }
 
     private var privacyLockedView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "lock.fill")
-                .font(.system(size: 34, weight: .bold))
-                .foregroundStyle(Color.goYellow)
-            Text("椰子资产仅本人可见")
-                .font(OhanaFont.title3(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Text("当前家庭成员无权查看余额、心愿和兑换记录。")
-                .font(OhanaFont.callout())
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .multilineTextAlignment(.center)
-        }
-        .padding(24)
-        .ohanaStandardCard(cornerRadius: 24)
-        .padding(.horizontal, 24)
+        HumanModulePrivacyLockedView(
+            title: l.tr(zh: "椰子资产仅本人可见", en: "Coconuts are private", de: "Kokosnüsse sind privat"),
+            message: l.tr(zh: "当前家庭成员无权查看余额、心愿和兑换记录。", en: "This family member cannot view balance, wishes, or redemptions.", de: "Dieses Familienmitglied kann Saldo, Wünsche oder Einlösungen nicht sehen.")
+        )
     }
 
     // MARK: - Balance Card (inner)

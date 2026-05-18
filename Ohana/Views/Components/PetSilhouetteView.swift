@@ -69,12 +69,12 @@ private struct SilhouetteIdleBlinkModifier: ViewModifier {
                 try? await Task.sleep(nanoseconds: ns)
                 guard !Task.isCancelled else { break }
                 await MainActor.run {
-                    withAnimation(.linear(duration: 0.04)) { blinkScale = 0.06 }
+                    withAnimation(.linear(duration: 0.04)) { blinkScale = 0.06 } // ui-v4: allow eye blink micro-animation needs a 40ms linear close.
                 }
                 try? await Task.sleep(nanoseconds: 65_000_000)
                 guard !Task.isCancelled else { break }
                 await MainActor.run {
-                    withAnimation(.linear(duration: 0.09)) { blinkScale = 1.0 }
+                    withAnimation(.linear(duration: 0.09)) { blinkScale = 1.0 } // ui-v4: allow eye blink micro-animation needs a 90ms linear open.
                 }
             }
         }
@@ -90,10 +90,10 @@ private extension View {
 /// 点击眼睛：短 easeOut，避免 spring + 多次主线程调度
 private enum SilhouetteEyeTapFeedback {
     static func play(eyePulse: Binding<CGFloat>) {
-        withAnimation(.easeOut(duration: 0.12)) { eyePulse.wrappedValue = 1.07 }
+        withAnimation(GoMotion.quick) { eyePulse.wrappedValue = 1.07 }
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 110_000_000)
-            withAnimation(.easeOut(duration: 0.14)) { eyePulse.wrappedValue = 1.0 }
+            withAnimation(GoMotion.quick) { eyePulse.wrappedValue = 1.0 }
         }
     }
 }
@@ -167,7 +167,7 @@ private struct CatSilhouette: View {
                         colors: [coatColor.mix(with: .white, by: 0.22), coatColor.mix(with: .black, by: 0.04)],
                         center: UnitPoint(x: 0.38, y: 0.28), startRadius: 0, endRadius: 72))
                     .frame(width: 136)
-                    .shadow(color: coatColor.opacity(0.25), radius: 10, y: 5)
+                    .shadow(color: coatColor.opacity(0.25), radius: 10, y: 5) // ui-v4: allow silhouette illustration depth.
                     .overlay(patternOverlay.clipShape(Circle()))
 
                 // 脸颊腮红
@@ -201,12 +201,12 @@ private struct CatSilhouette: View {
 
                 // 猫须
                 Group {
-                    Capsule().fill(.white.opacity(0.55)).frame(width: 24, height: 1.5).rotationEffect(.degrees(-12)).offset(x: -42, y: 32)
-                    Capsule().fill(.white.opacity(0.45)).frame(width: 22, height: 1.5).offset(x: -42, y: 38)
-                    Capsule().fill(.white.opacity(0.35)).frame(width: 20, height: 1.5).rotationEffect(.degrees(12)).offset(x: -42, y: 44)
-                    Capsule().fill(.white.opacity(0.55)).frame(width: 24, height: 1.5).rotationEffect(.degrees(12)).offset(x: 42, y: 32)
-                    Capsule().fill(.white.opacity(0.45)).frame(width: 22, height: 1.5).offset(x: 42, y: 38)
-                    Capsule().fill(.white.opacity(0.35)).frame(width: 20, height: 1.5).rotationEffect(.degrees(-12)).offset(x: 42, y: 44)
+                    Capsule().fill(Color.goCardWhite.opacity(0.55)).frame(width: 24, height: 1.5).rotationEffect(.degrees(-12)).offset(x: -42, y: 32)
+                    Capsule().fill(Color.goCardWhite.opacity(0.45)).frame(width: 22, height: 1.5).offset(x: -42, y: 38)
+                    Capsule().fill(Color.goCardWhite.opacity(0.35)).frame(width: 20, height: 1.5).rotationEffect(.degrees(12)).offset(x: -42, y: 44)
+                    Capsule().fill(Color.goCardWhite.opacity(0.55)).frame(width: 24, height: 1.5).rotationEffect(.degrees(12)).offset(x: 42, y: 32)
+                    Capsule().fill(Color.goCardWhite.opacity(0.45)).frame(width: 22, height: 1.5).offset(x: 42, y: 38)
+                    Capsule().fill(Color.goCardWhite.opacity(0.35)).frame(width: 20, height: 1.5).rotationEffect(.degrees(-12)).offset(x: 42, y: 44)
                 }
             }
             .offset(y: -20)
@@ -282,7 +282,7 @@ private struct DogSilhouette: View {
                         colors: [coatColor.mix(with: .white, by: 0.25), coatColor.mix(with: .black, by: 0.03)],
                         center: UnitPoint(x: 0.38, y: 0.3), startRadius: 0, endRadius: 74))
                     .frame(width: 140)
-                    .shadow(color: coatColor.opacity(0.22), radius: 10, y: 5)
+                    .shadow(color: coatColor.opacity(0.22), radius: 10, y: 5) // ui-v4: allow silhouette illustration depth.
                     .overlay(patternOverlay.clipShape(Circle()))
 
                 // 斑纹色块（kawaii 小狗特征 — 覆盖左侧脸）
@@ -318,7 +318,7 @@ private struct DogSilhouette: View {
                     .offset(y: 30)
                 // 鼻子高光
                 Ellipse()
-                    .fill(.white.opacity(0.38))
+                    .fill(Color.goCardWhite.opacity(0.38))
                     .frame(width: 8, height: 5)
                     .offset(x: -4, y: 27)
             }
@@ -397,7 +397,7 @@ private struct RabbitSilhouette: View {
                         colors: [coatColor.mix(with: .white, by: 0.28), coatColor.mix(with: .black, by: 0.04)],
                         center: UnitPoint(x: 0.38, y: 0.28), startRadius: 0, endRadius: 68))
                     .frame(width: 130)
-                    .shadow(color: coatColor.opacity(0.22), radius: 10, y: 5)
+                    .shadow(color: coatColor.opacity(0.22), radius: 10, y: 5) // ui-v4: allow silhouette illustration depth.
                     .overlay(patternOverlay.clipShape(Circle()))
 
                 // 脸颊腮红（三点）
@@ -517,7 +517,7 @@ private struct HamsterSilhouette: View {
                         colors: [capColor.mix(with: .white, by: 0.15), capColor.mix(with: .black, by: 0.1)],
                         center: UnitPoint(x: 0.4, y: 0.25), startRadius: 0, endRadius: 72))
                     .frame(width: 144)
-                    .shadow(color: capColor.opacity(0.25), radius: 8, y: 4)
+                    .shadow(color: capColor.opacity(0.25), radius: 8, y: 4) // ui-v4: allow silhouette illustration depth.
                     .overlay(patternOverlay.clipShape(Circle()))
 
                 // 奶白色下半脸（遮盖头部下方）
@@ -622,7 +622,7 @@ private struct BirdSilhouette: View {
                         colors: [coatColor.mix(with: .white, by: 0.22), coatColor.mix(with: .black, by: 0.04)],
                         center: UnitPoint(x: 0.38, y: 0.3), startRadius: 0, endRadius: 60))
                     .frame(width: 118)
-                    .shadow(color: coatColor.opacity(0.22), radius: 8, y: 4)
+                    .shadow(color: coatColor.opacity(0.22), radius: 8, y: 4) // ui-v4: allow silhouette illustration depth.
 
                 // 眼睛
                 HStack(spacing: 24) {
@@ -694,7 +694,7 @@ private struct GenericSilhouette: View {
                         colors: [coatColor.mix(with: .white, by: 0.06), coatColor.mix(with: .black, by: 0.08)],
                         startPoint: .topLeading, endPoint: .bottomTrailing))
                     .frame(width: 124)
-                    .shadow(color: coatColor.opacity(0.18), radius: 6, y: 3)
+                    .shadow(color: coatColor.opacity(0.18), radius: 6, y: 3) // ui-v4: allow silhouette illustration depth.
                     .overlay { if let p = patternName { BodyPatternDots(patternName: p).clipShape(Circle()) } }
 
                 HStack(spacing: 22) {
@@ -761,7 +761,7 @@ private struct BodyPatternDots: View {
                 case "虎斑":
                     VStack(spacing: h * 0.13) {
                         ForEach(0..<3, id: \.self) { i in
-                            Capsule().fill(Color.black.opacity(0.18))
+                            Capsule().fill(Color.arkInk.opacity(0.18))
                                 .frame(width: w * (0.48 - CGFloat(i) * 0.06), height: h * 0.05)
                                 .offset(x: CGFloat(i % 2 == 0 ? -w * 0.03 : w * 0.03))
                         }
@@ -784,7 +784,7 @@ struct PetEyeView: View {
         ZStack {
             // 外层白底
             Circle()
-                .fill(.white)
+                .fill(Color.goCardWhite)
                 .frame(width: size * 1.25, height: size * 1.25)
 
             // 虹膜
@@ -794,18 +794,18 @@ struct PetEyeView: View {
 
             // 瞳孔
             Circle()
-                .fill(.black)
+                .fill(Color.arkInk)
                 .frame(width: size * 0.45, height: size * 0.45)
 
             // 大高光
             Circle()
-                .fill(.white.opacity(0.9))
+                .fill(Color.goCardWhite.opacity(0.9))
                 .frame(width: size * 0.32, height: size * 0.32)
                 .offset(x: -size * 0.15, y: -size * 0.15)
 
             // 小高光
             Circle()
-                .fill(.white.opacity(0.5))
+                .fill(Color.goCardWhite.opacity(0.5))
                 .frame(width: size * 0.18, height: size * 0.18)
                 .offset(x: size * 0.18, y: size * 0.18)
         }
@@ -967,14 +967,14 @@ private struct WhiskerGroup: View {
     var body: some View {
         VStack(spacing: 4) {
             Capsule()
-                .fill(.white.opacity(0.6))
+                .fill(Color.goCardWhite.opacity(0.6))
                 .frame(width: 22, height: 1.2)
                 .rotationEffect(.degrees(flip ? 8 : -8))
             Capsule()
-                .fill(.white.opacity(0.5))
+                .fill(Color.goCardWhite.opacity(0.5))
                 .frame(width: 20, height: 1.2)
             Capsule()
-                .fill(.white.opacity(0.4))
+                .fill(Color.goCardWhite.opacity(0.4))
                 .frame(width: 18, height: 1.2)
                 .rotationEffect(.degrees(flip ? -8 : 8))
         }
@@ -1020,7 +1020,7 @@ private struct DogFaceDetails: View {
                 .frame(width: 28, height: 20)
                 .overlay(
                     Ellipse()
-                        .fill(.white.opacity(0.28))
+                        .fill(Color.goCardWhite.opacity(0.28))
                         .frame(width: 9, height: 6)
                         .offset(x: -4, y: -4)
                 )

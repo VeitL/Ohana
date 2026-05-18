@@ -761,6 +761,13 @@ final class QuestManager {
     private func appendLog(_ entry: CoconutLogEntry) {
         coconutLogs.insert(entry, at: 0)
         if coconutLogs.count > 200 { coconutLogs = Array(coconutLogs.prefix(200)) }
+        if entry.amount > 0 {
+            NotificationCenter.default.post(
+                name: .ohanaCoconutRewardEvent,
+                object: OhanaCoconutRewardEvent(entry: entry)
+            )
+        }
+        NotificationCenter.default.post(name: NSNotification.Name("coconutCountChanged"), object: nil)
         // 日志写入延迟到 flushToDefaults() 中一并执行
     }
 

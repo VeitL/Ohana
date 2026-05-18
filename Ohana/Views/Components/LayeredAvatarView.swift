@@ -124,7 +124,7 @@ struct LayeredAvatarView: View {
                         .contentShape(Circle().scale(0.6).offset(y: -h * 0.15))
                         .onTapGesture {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            withAnimation(.spring(response: 0.3)) { showEyePicker = true }
+                            withAnimation(GoMotion.feedback) { showEyePicker = true }
                         }
                     // Body tap zone: lower two-thirds
                     Color.clear
@@ -132,7 +132,7 @@ struct LayeredAvatarView: View {
                         .position(x: w / 2, y: h * 0.7)
                         .onTapGesture {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            withAnimation(.spring(response: 0.3)) { showFurPicker = true }
+                            withAnimation(GoMotion.feedback) { showFurPicker = true }
                         }
                 }
             }
@@ -155,7 +155,7 @@ struct LayeredAvatarView: View {
 
             // Species silhouette SVG path
             PetSilhouetteIcon(species: species)
-                .foregroundStyle(furColor.isDark ? Color.white.opacity(0.15) : Color.black.opacity(0.1))
+                .foregroundStyle(furColor.isDark ? Color.goCardWhite.opacity(0.15) : Color.arkInk.opacity(0.1))
                 .font(.system(size: 56))
                 .frame(width: 80, height: 80)
 
@@ -169,15 +169,15 @@ struct LayeredAvatarView: View {
                     // Left eye
                     Circle()
                         .fill(eyeColor)
-                        .overlay(Circle().fill(.black.opacity(0.6)).scaleEffect(0.5))
-                        .overlay(Circle().fill(.white.opacity(0.55)).scaleEffect(0.28).offset(x: -eyeSize * 0.15, y: -eyeSize * 0.15))
+                        .overlay(Circle().fill(Color.arkInk.opacity(0.6)).scaleEffect(0.5))
+                        .overlay(Circle().fill(Color.goCardWhite.opacity(0.55)).scaleEffect(0.28).offset(x: -eyeSize * 0.15, y: -eyeSize * 0.15))
                         .frame(width: eyeSize, height: eyeSize)
                         .position(x: w / 2 - spacing, y: eyeY)
                     // Right eye
                     Circle()
                         .fill(eyeColor)
-                        .overlay(Circle().fill(.black.opacity(0.6)).scaleEffect(0.5))
-                        .overlay(Circle().fill(.white.opacity(0.55)).scaleEffect(0.28).offset(x: eyeSize * 0.15, y: -eyeSize * 0.15))
+                        .overlay(Circle().fill(Color.arkInk.opacity(0.6)).scaleEffect(0.5))
+                        .overlay(Circle().fill(Color.goCardWhite.opacity(0.55)).scaleEffect(0.28).offset(x: eyeSize * 0.15, y: -eyeSize * 0.15))
                         .frame(width: eyeSize, height: eyeSize)
                         .position(x: w / 2 + spacing, y: eyeY)
                 }
@@ -194,12 +194,12 @@ struct LayeredAvatarView: View {
                         .position(x: w / 2, y: h * 0.38)
                         .onTapGesture {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            withAnimation(.spring(response: 0.3)) {
+                            withAnimation(GoMotion.feedback) {
                                 eyePressScale = 0.95
                                 showEyePicker = true
                             }
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                                withAnimation { eyePressScale = 1 }
+                                withAnimation(GoMotion.feedback) { eyePressScale = 1 }
                             }
                         }
                     // Body zone
@@ -208,19 +208,19 @@ struct LayeredAvatarView: View {
                         .position(x: w / 2, y: h * 0.7)
                         .onTapGesture {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            withAnimation(.spring(response: 0.3)) {
+                            withAnimation(GoMotion.feedback) {
                                 bodyPressScale = 0.95
                                 showFurPicker = true
                             }
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                                withAnimation { bodyPressScale = 1 }
+                                withAnimation(GoMotion.feedback) { bodyPressScale = 1 }
                             }
                         }
                 }
             }
         }
         .scaleEffect(bodyPressScale)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: bodyPressScale)
+        .animation(GoMotion.feedback, value: bodyPressScale)
     }
 
     // MARK: – Customize hint badge
@@ -231,9 +231,9 @@ struct LayeredAvatarView: View {
             Text("点击捏脸")
                 .font(.system(size: 9, weight: .bold, design: .rounded))
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(Color.goCardWhite)
         .padding(.horizontal, 8).padding(.vertical, 4)
-        .background(.black.opacity(0.5), in: Capsule())
+        .background(Color.arkInk.opacity(0.5), in: Capsule())
         .offset(y: 8)
     }
 }
@@ -306,7 +306,7 @@ struct ColorPickerPopup: View {
         let isSelected = selectedHex.uppercased() == preset.hex.uppercased()
         return Button {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            withAnimation(.spring(response: 0.3)) {
+            withAnimation(GoMotion.feedback) {
                 selectedHex = preset.hex
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { dismiss() }
@@ -316,19 +316,19 @@ struct ColorPickerPopup: View {
                     Circle()
                         .fill(preset.color)
                         .frame(width: 44, height: 44)
-                        .shadow(color: preset.color.opacity(0.4), radius: isSelected ? 8 : 3)
+                        .shadow(color: preset.color.opacity(0.4), radius: isSelected ? 8 : 3) // ui-v4: allow color swatch selection glow.
                     if isSelected {
                         Circle()
                             .strokeBorder(accent, lineWidth: 3)
                             .frame(width: 44, height: 44)
                         Image(systemName: "checkmark")
                             .font(.system(size: 12, weight: .black))
-                            .foregroundStyle(.white)
-                            .shadow(radius: 2)
+                            .foregroundStyle(Color.goCardWhite)
+                            .shadow(color: Color.arkInk.opacity(0.22), radius: 2) // ui-v4: allow checkmark readability on bright swatches.
                     }
                 }
                 .scaleEffect(isSelected ? 1.1 : 1)
-                .animation(.spring(response: 0.3), value: isSelected)
+                .animation(GoMotion.feedback, value: isSelected)
 
                 Text(preset.name)
                     .font(.system(size: 10, weight: isSelected ? .bold : .medium, design: .rounded))

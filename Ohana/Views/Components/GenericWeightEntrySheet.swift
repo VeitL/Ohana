@@ -34,6 +34,7 @@ struct GenericWeightEntrySheet: View {
 
     @State private var weightText = ""
     @State private var selectedDate = Date()
+    @State private var includesRecordTime = false
     @State private var weightUnit: String = "kg"
     @State private var adaptiveSheetHeight: CGFloat = 500
     @State private var scrollContentHeight: CGFloat = 0
@@ -71,6 +72,11 @@ struct GenericWeightEntrySheet: View {
 
     private var isValid: Bool {
         (parsedWeight ?? 0) > 0
+    }
+
+    private var recordDate: Date {
+        let date = includesRecordTime ? selectedDate : Calendar.current.startOfDay(for: selectedDate)
+        return min(date, Date())
     }
 
     private var weightInKgForBcs: Double? {
@@ -159,8 +165,8 @@ struct GenericWeightEntrySheet: View {
                 }
                 .background { OhanaPopupGlassSurface(cornerRadius: 52) }
                 .clipShape(RoundedRectangle(cornerRadius: 52, style: .continuous))
-                .shadow(color: Color.black.opacity(0.56), radius: 48, x: 0, y: -18)
-                .shadow(color: Color(hex: "0B102C").opacity(0.46), radius: 28, x: 0, y: 12)
+                .shadow(color: Color.black.opacity(0.56), radius: 48, x: 0, y: -18) // ui-v4: allow confirmed inline popup lifted shadow
+                .shadow(color: Color(hex: "0B102C").opacity(0.46), radius: 28, x: 0, y: 12) // ui-v4: allow confirmed inline popup lifted shadow
                 .padding(.horizontal, 6)
                 .padding(.bottom, 8)
                 .offset(y: popupVisible ? popupDragOffset : hiddenOffset)
@@ -218,11 +224,11 @@ struct GenericWeightEntrySheet: View {
 
     private var popupBackdrop: some View {
         ZStack {
-            Color.black.opacity(0.14)
+            Color.black.opacity(0.14) // ui-v4: allow inline popup scrim
             LinearGradient(
                 colors: [
                     Color.clear,
-                    Color.black.opacity(0.22)
+                    Color.black.opacity(0.22) // ui-v4: allow inline popup scrim gradient
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -366,6 +372,25 @@ struct GenericWeightEntrySheet: View {
                     .tint(accentColor)
                     .labelsHidden()
                     .environment(\.locale, AppLanguage.effectiveLocale)
+            }
+
+            infoRow(icon: "clock", label: l.tr(zh: "时间", en: "Time", de: "Zeit")) {
+                HStack(spacing: 8) {
+                    if includesRecordTime {
+                        DatePicker("", selection: $selectedDate, displayedComponents: .hourAndMinute)
+                            .datePickerStyle(.compact)
+                            .tint(accentColor)
+                            .labelsHidden()
+                            .environment(\.locale, AppLanguage.effectiveLocale)
+                    } else {
+                        Text(l.tr(zh: "可选", en: "Optional", de: "Optional"))
+                            .font(OhanaFont.caption(.black))
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                    }
+                    Toggle("", isOn: $includesRecordTime.animation(GoMotion.feedback))
+                        .labelsHidden()
+                        .tint(accentColor)
+                }
             }
 
             infoRow(icon: "person.crop.circle.fill", label: l.tr(zh: "对象", en: "For", de: "Für")) {
@@ -558,11 +583,11 @@ struct GenericWeightEntrySheet: View {
         switch target {
         case .pet(let pet):
             let bcs = autoBcsForPet ?? 0
-            let log = PetWeightLog(date: selectedDate, weight: weight, weightUnit: weightUnit, bcsScore: bcs, pet: pet, executorId: executorId)
+            let log = PetWeightLog(date: recordDate, weight: weight, weightUnit: weightUnit, bcsScore: bcs, pet: pet, executorId: executorId)
             modelContext.insert(log)
             QuestManager.shared.awardAction(type: .weight, pet: pet, context: modelContext)
         case .human(let human):
-            let log = HumanWeightLog(date: selectedDate, weight: weight, human: human, executorId: executorId)
+            let log = HumanWeightLog(date: recordDate, weight: weight, human: human, executorId: executorId)
             modelContext.insert(log)
             human.weightLogs.append(log)
         }

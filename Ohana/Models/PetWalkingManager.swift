@@ -18,6 +18,54 @@ enum WalkPhase: Equatable {
     case finished(elapsed: TimeInterval, poopCount: Int)
 }
 
+struct WalkPoopMarker: Identifiable, Equatable {
+    let id: UUID
+    let date: Date
+    let latitude: Double?
+    let longitude: Double?
+    let accuracyMeters: Double?
+    let type: PottyType
+
+    init(id: UUID = UUID(), date: Date = Date(), location: CLLocation?, type: PottyType = .perfectPoop) {
+        self.id = id
+        self.date = date
+        self.latitude = location?.coordinate.latitude
+        self.longitude = location?.coordinate.longitude
+        self.accuracyMeters = location?.horizontalAccuracy
+        self.type = type
+    }
+
+    nonisolated init(
+        id: UUID,
+        date: Date,
+        latitude: Double?,
+        longitude: Double?,
+        accuracyMeters: Double?,
+        type: PottyType
+    ) {
+        self.id = id
+        self.date = date
+        self.latitude = latitude
+        self.longitude = longitude
+        self.accuracyMeters = accuracyMeters
+        self.type = type
+    }
+
+    init(log: PetPottyLog) {
+        self.id = log.id
+        self.date = log.date
+        self.latitude = log.latitude
+        self.longitude = log.longitude
+        self.accuracyMeters = log.locationAccuracyMeters
+        self.type = log.pottyType
+    }
+
+    var coordinate: CLLocationCoordinate2D? {
+        guard let latitude, let longitude else { return nil }
+        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+}
+
 @Observable
 final class PetWalkingManager {
     static let shared = PetWalkingManager()
@@ -32,6 +80,8 @@ final class PetWalkingManager {
     var lastCompletedPetId: UUID?
     var lastCompletedWalk: PetWalkLog?
     var lastCompletedRouteCoordinates: [CLLocationCoordinate2D] = []
+    var activePoopMarkers: [WalkPoopMarker] = []
+    var lastCompletedPoopMarkers: [WalkPoopMarker] = []
 
     private var pausedElapsed: TimeInterval = 0  // 暂停前已累计时间
     private var resumeTime: Date?                // 最近一次 resume/start 时间
@@ -59,6 +109,8 @@ final class PetWalkingManager {
         lastCompletedPetId = nil
         lastCompletedWalk = nil
         lastCompletedRouteCoordinates = []
+        activePoopMarkers = []
+        lastCompletedPoopMarkers = []
         
         locationManager.startWalkSession()
         startTimer()
@@ -94,7 +146,8 @@ final class PetWalkingManager {
         locationManager.stopWalkSession()
         
         let elapsed = elapsedTime
-        let poop = poopCount
+        let poopMarkers = activePoopMarkers
+        let poop = max(poopCount, poopMarkers.count)
         
         guard let pet = currentPet else { return }
 
@@ -119,12 +172,25 @@ final class PetWalkingManager {
         lastCompletedPetId = pet.id
         lastCompletedWalk = walkLog
         lastCompletedRouteCoordinates = routeCoordinates
+        lastCompletedPoopMarkers = poopMarkers
         
-        generateMapSnapshot(for: walkLog, routeLocations: routeLocations, modelContext: modelContext)
+        generateMapSnapshot(for: walkLog, routeLocations: routeLocations, poopMarkers: poopMarkers, modelContext: modelContext)
         
-        // 保存便便记录（对应 poopCount 次）
-        for _ in 0..<poop {
-            let pottyLog = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet, executorId: executorId)
+        // 保存遛狗中的便便路线事件（含真实打卡时间与可选坐标）
+        let persistedMarkers: [WalkPoopMarker] = poopMarkers.isEmpty && poop > 0
+            ? (0..<poop).map { _ in WalkPoopMarker(date: Date(), location: nil) }
+            : poopMarkers
+        for marker in persistedMarkers {
+            let pottyLog = PetPottyLog(
+                date: marker.date,
+                type: marker.type,
+                pet: pet,
+                executorId: executorId,
+                latitude: marker.latitude,
+                longitude: marker.longitude,
+                locationAccuracyMeters: marker.accuracyMeters,
+                walkLogId: walkLog.id.uuidString
+            )
             modelContext.insert(pottyLog)
         }
         
@@ -175,6 +241,8 @@ final class PetWalkingManager {
         lastCompletedPetId = nil
         lastCompletedWalk = nil
         lastCompletedRouteCoordinates = []
+        activePoopMarkers = []
+        lastCompletedPoopMarkers = []
     }
 
     func pauseForAppBackground() {
@@ -235,8 +303,10 @@ final class PetWalkingManager {
         }
     }
     
-    func addPoop() {
+    func addPoop(type: PottyType = .perfectPoop) {
         poopCount += 1
+        let location = locationManager.currentLocation ?? locationManager.collectedLocations.last
+        activePoopMarkers.append(WalkPoopMarker(location: location, type: type))
     }
     
     // MARK: - Timer
@@ -259,15 +329,17 @@ final class PetWalkingManager {
     }
     
     // MARK: - Map Snapshot
-    private func generateMapSnapshot(for walkLog: PetWalkLog, routeLocations: [CLLocation], modelContext: ModelContext) {
+    private func generateMapSnapshot(for walkLog: PetWalkLog, routeLocations: [CLLocation], poopMarkers: [WalkPoopMarker], modelContext: ModelContext) {
         let locations = routeLocations
         guard locations.count >= 2 else { return }
         
         let coordinates = locations.map(\.coordinate)
+        let poopCoordinates = poopMarkers.compactMap(\.coordinate)
+        let regionCoordinates = coordinates + poopCoordinates
         var region = MKCoordinateRegion()
         
-        let lats = coordinates.map(\.latitude)
-        let lons = coordinates.map(\.longitude)
+        let lats = regionCoordinates.map(\.latitude)
+        let lons = regionCoordinates.map(\.longitude)
         let center = CLLocationCoordinate2D(
             latitude: (lats.min()! + lats.max()!) / 2,
             longitude: (lons.min()! + lons.max()!) / 2
@@ -290,19 +362,13 @@ final class PetWalkingManager {
             let image = UIGraphicsImageRenderer(size: snapshot.image.size).image { ctx in
                 snapshot.image.draw(at: .zero)
                 
-                let path = UIBezierPath()
-                for (i, coord) in coordinates.enumerated() {
-                    let point = snapshot.point(for: coord)
-                    if i == 0 {
-                        path.move(to: point)
-                    } else {
-                        path.addLine(to: point)
-                    }
-                }
-                
-                UIColor.systemBlue.setStroke()
-                path.lineWidth = 3
-                path.stroke()
+                MapSnapshotRainbowRenderer.drawRoute(
+                    coordinates: coordinates,
+                    on: snapshot,
+                    in: ctx.cgContext,
+                    isRainbow: UserDefaults.standard.bool(forKey: RainbowWalkEffectKeys.route),
+                    lineWidth: 3
+                )
                 
                 // 起点绿点
                 let startPoint = snapshot.point(for: coordinates.first!)
@@ -313,6 +379,15 @@ final class PetWalkingManager {
                 let endPoint = snapshot.point(for: coordinates.last!)
                 UIColor.blue.setFill()
                 UIBezierPath(arcCenter: endPoint, radius: 6, startAngle: 0, endAngle: .pi * 2, clockwise: true).fill()
+
+                for marker in poopMarkers {
+                    guard let coordinate = marker.coordinate else { continue }
+                    MapSnapshotRainbowRenderer.drawPoopMarker(
+                        at: snapshot.point(for: coordinate),
+                        in: ctx.cgContext,
+                        isRainbow: UserDefaults.standard.bool(forKey: RainbowWalkEffectKeys.poop)
+                    )
+                }
             }
             
             let jpegData = image.jpegData(compressionQuality: 0.7)
@@ -323,7 +398,7 @@ final class PetWalkingManager {
             }
         }
     }
-    
+
     // MARK: - Formatted Time
     var formattedTime: String {
         let total = Int(elapsedTime)

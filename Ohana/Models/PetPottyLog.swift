@@ -40,13 +40,30 @@ final class PetPottyLog {
     var date: Date
     var type: String
     var executorId: String?  // ArkSchemaV11: 执行该动作的 Human.id.uuidString
+    var latitude: Double?
+    var longitude: Double?
+    var locationAccuracyMeters: Double?
+    var walkLogId: String?
     var pet: Pet?
     
-    init(date: Date = Date(), type: PottyType = .perfectPoop, pet: Pet? = nil, executorId: String? = nil) {
+    init(
+        date: Date = Date(),
+        type: PottyType = .perfectPoop,
+        pet: Pet? = nil,
+        executorId: String? = nil,
+        latitude: Double? = nil,
+        longitude: Double? = nil,
+        locationAccuracyMeters: Double? = nil,
+        walkLogId: String? = nil
+    ) {
         self.id = UUID()
         self.date = date
         self.type = type.rawValue
         self.executorId = executorId
+        self.latitude = latitude
+        self.longitude = longitude
+        self.locationAccuracyMeters = locationAccuracyMeters
+        self.walkLogId = walkLogId
         self.pet = pet
     }
     

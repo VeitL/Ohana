@@ -22,7 +22,6 @@ struct PetHygieneDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
-    @State private var showingPottyOverview = false
     @State private var groomingPlanTarget: HygieneType? = nil
 
     /// 用于匹配 `HygieneTodoSheet` 写入的 Event 标题前缀：`\(pet.name) — \(type.rawValue)`
@@ -178,11 +177,6 @@ struct PetHygieneDetailView: View {
         .tint(themeColor)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .navigationBar)
-        .sheet(isPresented: $showingPottyOverview) {
-            PottyOverviewView(pet: pet)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-        }
         // 护理卡片「计划」按钮 → 待办 sheet
         .sheet(item: $groomingPlanTarget) { hygieneType in
             HygieneTodoSheet(pet: pet, type: hygieneType, accent: themeColor) {
@@ -226,15 +220,6 @@ struct PetHygieneDetailView: View {
             }
 
             Spacer()
-
-            Button { showingPottyOverview = true } label: {
-                Image(systemName: "chart.bar.doc.horizontal")
-                    .font(.system(size: 14, weight: .black))
-                    .foregroundStyle(chromeAccent)
-                    .frame(width: 40, height: 40)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(ScaleButtonStyle())
 
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
@@ -398,7 +383,7 @@ struct PetHygieneDetailView: View {
                     } else {
                         Text("打卡")
                             .font(.system(size: 11, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.goCardWhite)
                             .padding(.horizontal, 10).padding(.vertical, 5)
                             .background(themeColor, in: Capsule())
                     }

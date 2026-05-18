@@ -779,6 +779,8 @@ enum CoconutEconomyService {
         context: ModelContext,
         quality: QuestManager.QualityBonus = .none
     ) -> (humanGot: Int, petGot: Int) {
-        QuestManager.shared.awardAction(type: type, pet: pet, context: context, quality: quality)
+        let reward = QuestManager.shared.awardAction(type: type, pet: pet, context: context, quality: quality)
+        OasisUpgradeRewardService.rewardFeaturedCritterFromCare(type: type, context: context)
+        return reward
     }
 }

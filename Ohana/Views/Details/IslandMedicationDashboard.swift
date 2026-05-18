@@ -119,7 +119,7 @@ struct IslandMedicationDashboard: View {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.goCardWhite)
                     .frame(width: 36, height: 36)
                     .goGlassBackground(Circle())
             }
@@ -127,7 +127,7 @@ struct IslandMedicationDashboard: View {
             Spacer()
             Text("今日药盒")
                 .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.goCardWhite)
             Spacer()
             Color.clear.frame(width: 36, height: 36)
         }
@@ -153,7 +153,7 @@ struct IslandMedicationDashboard: View {
         HStack(spacing: 16) {
             ZStack {
                 Circle()
-                    .stroke(Color.white.opacity(0.12), lineWidth: 12)
+                    .stroke(Color.goCardWhite.opacity(0.12), lineWidth: 12)
                     .frame(width: 104, height: 104)
                 Circle()
                     .trim(from: 0, to: completion * revealProgress)
@@ -163,29 +163,29 @@ struct IslandMedicationDashboard: View {
                 VStack(spacing: 1) {
                     Text("\(takenDoses)")
                         .font(.system(size: 31, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.goCardWhite)
                     Text("/ \(dueDoses)")
                         .font(.system(size: 11, weight: .black, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.48))
+                        .foregroundStyle(Color.goCardWhite.opacity(0.48))
                 }
             }
 
             VStack(alignment: .leading, spacing: 7) {
                 Text("今日服药进度")
                     .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.56))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.56))
                 Text(dueDoses == 0 ? "没有固定剂量" : completion >= 1 ? "今日完成" : "还有 \(max(0, dueDoses - takenDoses)) 次")
                     .font(.system(size: 24, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.goCardWhite)
                 Text("\(activeMeds.count) 个当前用药 · \(endingSoonCount) 个 7 天内结束")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.52))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.52))
             }
             Spacer()
         }
         .padding(18)
         .background(
-            LinearGradient(colors: [Color(hex: "FF5A00").opacity(0.26), Color.white.opacity(0.07)], startPoint: .topLeading, endPoint: .bottomTrailing),
+            LinearGradient(colors: [Color(hex: "FF5A00").opacity(0.26), Color.goCardWhite.opacity(0.07)], startPoint: .topLeading, endPoint: .bottomTrailing),
             in: RoundedRectangle(cornerRadius: 26, style: .continuous)
         )
         .overlay {
@@ -198,7 +198,7 @@ struct IslandMedicationDashboard: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("药盒格")
                 .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.white.opacity(0.72))
+                .foregroundStyle(Color.goCardWhite.opacity(0.72))
 
             if activeMeds.isEmpty {
                 emptyState("暂无当前用药\n进入成员页添加药物计划")
@@ -211,7 +211,7 @@ struct IslandMedicationDashboard: View {
             }
         }
         .padding(16)
-        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.07), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private func pillCell(_ med: PetMedication) -> some View {
@@ -238,23 +238,23 @@ struct IslandMedicationDashboard: View {
             }
             Text(med.name.isEmpty ? "未命名" : med.name)
                 .font(.system(size: 10, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.goCardWhite)
                 .lineLimit(1)
             Text(pet?.name ?? med.frequency.rawValue)
                 .font(.system(size: 9, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.42))
+                .foregroundStyle(Color.goCardWhite.opacity(0.42))
                 .lineLimit(1)
         }
         .padding(10)
         .frame(maxWidth: .infinity)
-        .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.07), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private var medicationRows: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("成员药盒")
                 .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.goCardWhite)
             ForEach(summaries) { summary in
                 Button { open(summary.pet) } label: {
                     HStack(spacing: 12) {
@@ -262,10 +262,10 @@ struct IslandMedicationDashboard: View {
                         VStack(alignment: .leading, spacing: 5) {
                             Text(summary.pet.name)
                                 .font(.system(size: 15, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Color.goCardWhite)
                             Text(summary.activeMeds.isEmpty ? "暂无当前用药" : "\(summary.activeMeds.count) 个当前用药")
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.48))
+                                .foregroundStyle(Color.goCardWhite.opacity(0.48))
                         }
                         Spacer()
                         Text(summary.dueDoses == 0 ? "--" : "\(summary.takenDoses)/\(summary.dueDoses)")
@@ -273,10 +273,10 @@ struct IslandMedicationDashboard: View {
                             .foregroundStyle(summary.dueDoses > 0 && summary.takenDoses >= summary.dueDoses ? Color.goLime : medAccent)
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .black))
-                            .foregroundStyle(.white.opacity(0.3))
+                            .foregroundStyle(Color.goCardWhite.opacity(0.3))
                     }
                     .padding(14)
-                    .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .background(Color.goCardWhite.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -291,10 +291,10 @@ struct IslandMedicationDashboard: View {
                 Text(title)
                     .font(.system(size: 13, weight: .bold, design: .rounded))
             }
-            .foregroundStyle(isSelected ? .black : .white)
+            .foregroundStyle(isSelected ? Color.arkInk : Color.goCardWhite)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(isSelected ? Color.goLime : Color.white.opacity(0.12), in: Capsule())
+            .background(isSelected ? Color.goLime : Color.ohanaControlFill, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -309,7 +309,7 @@ struct IslandMedicationDashboard: View {
         Text(text)
             .font(.system(size: 13, weight: .bold, design: .rounded))
             .multilineTextAlignment(.center)
-            .foregroundStyle(.white.opacity(0.42))
+            .foregroundStyle(Color.goCardWhite.opacity(0.42))
             .frame(maxWidth: .infinity, minHeight: 100)
     }
 
@@ -325,7 +325,7 @@ struct IslandMedicationDashboard: View {
 
     private func animateReveal() {
         revealProgress = 0
-        withAnimation(.spring(response: 0.58, dampingFraction: 0.82)) {
+        withAnimation(GoMotion.page) {
             revealProgress = 1
         }
     }

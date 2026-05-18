@@ -169,7 +169,7 @@ struct IslandQuestCarousel: View {
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(coconutClaimed ? .secondary : Color.arkInk)
                         if !coconutClaimed {
-                            Text("完成所有委托的专属奖励 · 全勤额外 +5🥥")
+                            Text("+5🥥")
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundStyle(Color.arkInk.opacity(0.6))
                         }
@@ -199,9 +199,6 @@ struct IslandQuestCarousel: View {
                 .font(.system(size: 40))
             Text("今日委托全部完成！")
                 .font(.headline)
-            Text("岛屿很平静，居民们很满足")
-                .font(.subheadline)
-                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 160)
@@ -286,12 +283,6 @@ private struct IslandQuestCarouselCard: View {
                     .lineLimit(2)
                     .minimumScaleFactor(0.85)
                     .padding(.top, 6)
-
-                Text(quest.subtitle)
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(2)
-                    .padding(.top, 2)
 
                 Spacer(minLength: 4)
 

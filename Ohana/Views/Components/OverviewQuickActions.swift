@@ -457,7 +457,7 @@ struct GoQuickActionCard: View {
     }
 
     private func handlePrimaryTap() {
-        if isGroom {
+        if isGroom && onGroomCheckIn != nil {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             showGroomMenu = true
         } else if isPotty && onPottySelect != nil {
@@ -1051,20 +1051,20 @@ struct QuickFeedSheet: View {
                     Text("输入\(isWater ? "饮水量" : "喂食量")")
                         .font(OhanaFont.footnote(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
-                    HStack(spacing: 8) {
-                        TextField("默认 \(Int(defaultAmount))", text: $amountText)
-                            .keyboardType(.decimalPad)
-                            .font(OhanaFont.metric(size: 32))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
-                        Text(unit)
-                            .font(OhanaFont.title3(.bold))
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
-                            .frame(width: 36)
-                    }
+                    InlineNumericInput(
+                        text: $amountText,
+                        placeholder: "默认 \(Int(defaultAmount))",
+                        unit: unit,
+                        maxFractionDigits: 0,
+                        accent: Color.goPrimary,
+                        step: isWater ? 50 : 5,
+                        valueFont: OhanaFont.metric(size: 32),
+                        unitFont: OhanaFont.title3(.bold),
+                        fill: Color.ohanaControlFill,
+                        cornerRadius: 16,
+                        horizontalPadding: 12,
+                        verticalPadding: 10
+                    )
                     Toggle(isOn: $setAsDefault) {
                         Text("设为默认\(isWater ? "饮水量" : "每日份量")")
                             .font(OhanaFont.footnote(.medium))
@@ -1077,7 +1077,7 @@ struct QuickFeedSheet: View {
             .padding(.horizontal, 20)
 
             Button {
-                let amount = Double(amountText.replacingOccurrences(of: ",", with: ".")) ?? defaultAmount
+                let amount = CountryDecimalInput.parse(amountText, countryCode: AppCountry.code) ?? defaultAmount
                 commitFeed(amount: amount)
             } label: {
                 Text("打卡 +1🥥")

@@ -121,16 +121,21 @@ final class OasisTreeManager {
         set { UserDefaults.standard.set(newValue, forKey: "oasis_lastRewardedLevel") }
     }
 
-    /// 检查是否刚升级并发放奖励，返回新等级（有升级）或 nil
+    /// 检查是否刚升级并生成待开启的升级椰子，返回新等级（有升级）或 nil
     @discardableResult
-    func checkAndRewardLevelUp() -> TreeLevel? {
+    @MainActor
+    func checkAndRewardLevelUp(modelContext: ModelContext) -> TreeLevel? {
         let current = treeLevel.rawValue
         guard current > lastRewardedLevel else { return nil }
-        let reward = treeLevel.levelUpReward
-        lastRewardedLevel = current
-        if reward > 0 {
-            QuestManager.shared.addCoconuts(reward, emoji: "🌴", title: "升级奖励：\(treeLevel.displayName) Lv.\(current)")
+        let firstRewardLevel = max(2, lastRewardedLevel + 1)
+        if firstRewardLevel <= current {
+            OasisUpgradeRewardService.ensureUpgradeCoconuts(
+                from: firstRewardLevel,
+                through: current,
+                context: modelContext
+            )
         }
+        lastRewardedLevel = current
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
         return treeLevel
     }
@@ -186,20 +191,24 @@ final class OasisTreeManager {
         )) ?? 0
         total += plantEventCount
         islandEnergy = total
-        checkAndRewardLevelUp()
+        checkAndRewardLevelUp(modelContext: modelContext)
     }
 
     // MARK: - Inject Energy（消耗椰子，增加树经验）
 
     @discardableResult
-    func injectEnergy(cost: Int = 10) -> Bool {
-        guard QuestManager.shared.coconutCount >= cost else { return false }
-        QuestManager.shared.addCoconuts(-cost, emoji: "✨", title: "注入生命之树能量")
+    @MainActor
+    func injectEnergy(cost: Int = 10, modelContext: ModelContext) -> Bool {
+        guard OasisCritterEconomyService.spendCurrentHumanCoconuts(
+            cost,
+            emoji: "✨",
+            title: "注入生命之树能量",
+            context: modelContext
+        ) else { return false }
         injectedEnergy += cost
         
-        // 检查是否升级，只有升级时才奖励椰子
-        if checkAndRewardLevelUp() != nil {
-            // 升级成功，已在 checkAndRewardLevelUp 中发放椰子奖励
+        // 检查是否升级；升级奖励会以“升级椰子”形式等待用户敲开。
+        if checkAndRewardLevelUp(modelContext: modelContext) != nil {
             UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
         } else {
             // 普通注入，无奖励

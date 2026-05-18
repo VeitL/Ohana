@@ -196,17 +196,7 @@ struct HomeFamilyCollaborationCard: View {
 
             FamilyActivityStripView(pet: pet, style: .compact, onExpand: onOpenActivity)
 
-            if assignedReminders.isEmpty {
-                Text(l.tr(
-                    zh: "没有指派待办时，任何家人完成打卡都会更新上次照护状态。",
-                    en: "When nothing is assigned, any family check-in updates the latest care status.",
-                    de: "Ohne Zuweisung aktualisiert jeder Check-in den letzten Pflegestatus."
-                ))
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
+            if !assignedReminders.isEmpty {
                 VStack(spacing: 8) {
                     ForEach(assignedReminders.prefix(1)) { reminder in
                         assignedReminderRow(reminder)

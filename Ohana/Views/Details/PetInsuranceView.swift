@@ -132,7 +132,7 @@ struct PetInsuranceView: View {
             Text("暂无保险记录").font(.system(size: 17, weight: .black, design: .rounded))
             Text("记录宠物保险保单，轻松追踪续期日期").font(.system(size: 13, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText).multilineTextAlignment(.center)
             Button { showingAdd = true } label: {
-                Text("添加保单").font(.system(size: 15, weight: .black, design: .rounded)).foregroundStyle(.black)
+                Text("添加保单").font(.system(size: 15, weight: .black, design: .rounded)).foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 28).padding(.vertical, 12)
                     .background(Color.goPrimary, in: Capsule())
             }.buttonStyle(ScaleButtonStyle())
@@ -152,7 +152,7 @@ struct PetInsuranceView: View {
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                 Text(ins.renewalStatusLabel)
                                     .font(.system(size: 10, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.black)
+                                    .foregroundStyle(Color.arkInk)
                                     .padding(.horizontal, 8).padding(.vertical, 3)
                                     .background(Color(hex: ins.renewalStatusColor), in: Capsule())
                             }
@@ -267,7 +267,7 @@ struct AddPetInsuranceSheet: View {
 
     /// 用户输入金额 → 始终转为年费存储
     private var annualPremiumDouble: Double {
-        let raw = Double(premiumInput.replacingOccurrences(of: ",", with: ".")) ?? 0
+        let raw = CountryDecimalInput.parse(premiumInput, countryCode: AppCountry.code) ?? 0
         switch premiumMode {
         case .annual:   return raw
         case .monthly:  return raw * 12
@@ -277,7 +277,7 @@ struct AddPetInsuranceSheet: View {
     /// 每期保费（含其他费用）
     private var periodTotal: Double {
         let base = paymentFrequency.periodAmount(fromAnnual: annualPremiumDouble)
-        let other = Double(otherFeeInput.replacingOccurrences(of: ",", with: ".")) ?? 0
+        let other = CountryDecimalInput.parse(otherFeeInput, countryCode: AppCountry.code) ?? 0
         return base + other
     }
 
@@ -333,7 +333,7 @@ struct AddPetInsuranceSheet: View {
                         Button { save() } label: {
                             Text(isEdit ? "保存修改" : "添加保单")
                                 .font(.system(size: 16, weight: .black, design: .rounded))
-                                .foregroundStyle(.black)
+                                .foregroundStyle(Color.arkInk)
                                 .frame(maxWidth: .infinity).padding(.vertical, 16)
                                 .background(productName.isEmpty ? Color.primary.opacity(0.15) : Color.goPrimary,
                                             in: RoundedRectangle(cornerRadius: 16))
@@ -397,10 +397,18 @@ struct AddPetInsuranceSheet: View {
                 Text(AppCurrency.symbol)
                     .font(.system(size: 20, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goPrimary)
-                TextField("0.00", text: $premiumInput)
-                    .keyboardType(.decimalPad)
-                    .font(.system(size: 28, weight: .black, design: .rounded))
-                    .frame(maxWidth: .infinity)
+                InlineNumericInput(
+                    text: $premiumInput,
+                    placeholder: CountryDecimalInput.placeholder(fractionDigits: 2, countryCode: AppCountry.code),
+                    maxFractionDigits: 2,
+                    accent: Color.goPrimary,
+                    step: 10,
+                    valueFont: .system(size: 28, weight: .black, design: .rounded),
+                    fill: Color.ohanaControlFill,
+                    cornerRadius: 16,
+                    horizontalPadding: 10,
+                    verticalPadding: 8
+                )
                 Text(premiumMode == .annual ? "/ 年" : "/ 月")
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -409,7 +417,7 @@ struct AddPetInsuranceSheet: View {
 
             // 等价提示
             if annualPremiumDouble > 0 {
-                let other = Double(otherFeeInput.replacingOccurrences(of: ",", with: ".")) ?? 0
+                let other = CountryDecimalInput.parse(otherFeeInput, countryCode: AppCountry.code) ?? 0
                 let basePerPeriod = paymentFrequency.periodAmount(fromAnnual: annualPremiumDouble)
                 VStack(alignment: .leading, spacing: 3) {
                     if premiumMode == .monthly {
@@ -432,7 +440,7 @@ struct AddPetInsuranceSheet: View {
 
             // 其他费用折叠行
             Button {
-                withAnimation(.spring(response: 0.3)) { showOtherFee.toggle() }
+                withAnimation(GoMotion.feedback) { showOtherFee.toggle() }
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: showOtherFee ? "minus.circle" : "plus.circle")
@@ -451,9 +459,18 @@ struct AddPetInsuranceSheet: View {
                         Text(AppCurrency.symbol)
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
-                        TextField("0.00", text: $otherFeeInput)
-                            .keyboardType(.decimalPad)
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        InlineNumericInput(
+                            text: $otherFeeInput,
+                            placeholder: CountryDecimalInput.placeholder(fractionDigits: 2, countryCode: AppCountry.code),
+                            maxFractionDigits: 2,
+                            accent: Color.goPrimary,
+                            step: 5,
+                            valueFont: .system(size: 15, weight: .semibold, design: .rounded),
+                            fill: Color.clear,
+                            cornerRadius: 10,
+                            horizontalPadding: 4,
+                            verticalPadding: 0
+                        )
                     }
                     .padding(10)
                     .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
@@ -563,7 +580,7 @@ struct AddPetInsuranceSheet: View {
 
     private func frequencyGridCell(_ freq: InsurancePaymentFrequency) -> some View {
         Button {
-            withAnimation(.spring(response: 0.25)) { paymentFrequency = freq }
+            withAnimation(GoMotion.feedback) { paymentFrequency = freq }
         } label: {
             Text(freq.rawValue)
                 .font(.system(size: 13, weight: .bold, design: .rounded))
@@ -590,7 +607,7 @@ struct AddPetInsuranceSheet: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("自动生成全部付款记录")
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    let other = Double(otherFeeInput.replacingOccurrences(of: ",", with: ".")) ?? 0
+                    let other = CountryDecimalInput.parse(otherFeeInput, countryCode: AppCountry.code) ?? 0
                     let perPeriod = paymentFrequency.periodAmount(fromAnnual: annualPremiumDouble) + other
                     Text("每期 \(AppCurrency.format(perPeriod, fractionDigits: 2)) · 按\(paymentFrequency.rawValue)写入花费")
                         .font(.system(size: 12, weight: .regular, design: .rounded))
@@ -637,11 +654,19 @@ struct AddPetInsuranceSheet: View {
 
     @ViewBuilder
     private func fieldNum(_ placeholder: String, text: Binding<String>) -> some View {
-        TextField(placeholder, text: text)
-            .keyboardType(.decimalPad)
-            .font(.system(size: 15, weight: .semibold, design: .rounded))
-            .padding(14)
-            .goTranslucentCard(cornerRadius: 14)
+        InlineNumericInput(
+            text: text,
+            placeholder: placeholder,
+            maxFractionDigits: 2,
+            accent: Color.goPrimary,
+            step: 100,
+            valueFont: .system(size: 15, weight: .semibold, design: .rounded),
+            valueAlignment: .leading,
+            fill: Color.ohanaControlFill,
+            cornerRadius: 14,
+            horizontalPadding: 14,
+            verticalPadding: 10
+        )
     }
 
     // MARK: - Logic
@@ -673,9 +698,9 @@ struct AddPetInsuranceSheet: View {
     private func save() {
         let savedPolicyNumber = enablePolicyNumber ? policyNumber : ""
         let coverageDouble = enableCoverage
-            ? (Double(coverageAmount.replacingOccurrences(of: ",", with: ".")) ?? 0)
+            ? (CountryDecimalInput.parse(coverageAmount, countryCode: AppCountry.code) ?? 0)
             : 0
-        let otherDouble = Double(otherFeeInput.replacingOccurrences(of: ",", with: ".")) ?? 0
+        let otherDouble = CountryDecimalInput.parse(otherFeeInput, countryCode: AppCountry.code) ?? 0
 
         if let ins = existing {
             ins.productName         = productName
@@ -723,7 +748,7 @@ struct AddPetInsuranceSheet: View {
     /// 按频次生成从 startDate 到 renewalDate 的全部付款记录
     private func generatePaymentSchedule(for ins: PetInsurance) {
         let cal = Calendar.current
-        let otherDouble = Double(otherFeeInput.replacingOccurrences(of: ",", with: ".")) ?? 0
+        let otherDouble = CountryDecimalInput.parse(otherFeeInput, countryCode: AppCountry.code) ?? 0
         let perPeriodBase = ins.paymentFrequency.periodAmount(fromAnnual: ins.annualPremium)
         let perPeriod = perPeriodBase + otherDouble
         let name = ins.productName.isEmpty ? ins.companyName : ins.productName

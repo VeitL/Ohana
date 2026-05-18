@@ -12,10 +12,12 @@ import Charts
 struct WeightHistoryView: View {
     let pet: Pet
     var onRemove: (() -> Void)? = nil
+    var showsCloseButton: Bool = true
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
 
+    @State private var showingWeightPopup = false
     @State private var isInlineWeightComposerVisible = false
     @State private var newWeightText = ""
     @State private var newWeightUnit = "kg"
@@ -56,47 +58,33 @@ struct WeightHistoryView: View {
     }
 
     var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .bottom) {
-                OhanaAppBackground()
-
-                VStack(spacing: 0) {
-                    chartSection
-                        .frame(maxHeight: .infinity)
-
-                    if let avg = avgDailyGrams {
-                        feedingInsightBanner(avg: avg)
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 8)
-                    }
-
-                    recordListLayer
-                        .frame(height: geo.size.height * 0.52)
-                }
-                .ignoresSafeArea(edges: .bottom)
-            }
-        }
-        .navigationTitle("体重追踪")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
+        ZStack {
+            PetWeightDashboardContent(
+                pet: pet,
+                showsCloseButton: showsCloseButton,
+                onClose: { dismiss() },
+                onAdd: {
                     withAnimation(GoMotion.feedback) {
-                        isInlineWeightComposerVisible.toggle()
+                        showingWeightPopup = true
                     }
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(OhanaFont.title2(.bold))
-                        .foregroundStyle(Color.goPrimary)
-                }
+                },
+                onRemove: onRemove
+            )
+
+            if showingWeightPopup {
+                GenericWeightEntrySheet(
+                    target: .pet(pet),
+                    onDismiss: {
+                        withAnimation(GoMotion.feedback) {
+                            showingWeightPopup = false
+                        }
+                    }
+                )
+                .zIndex(20)
+                .transition(.opacity)
             }
         }
-        .onChange(of: newWeightText) { _, value in
-            let sanitized = CountryDecimalInput.sanitize(value, countryCode: appCountry, maxFractionDigits: 2)
-            if sanitized != value {
-                newWeightText = sanitized
-            }
-        }
+        .toolbar(.hidden, for: .navigationBar)
     }
 
     // MARK: - Chart Section
@@ -462,7 +450,7 @@ struct WeightHistoryView: View {
                 if log.bcsScore > 0 {
                     Text("BCS \(log.bcsScore)")
                         .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 7).padding(.vertical, 2)
                         .background(bcsColor(log.bcsScore), in: Capsule())
                 }

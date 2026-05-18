@@ -64,7 +64,7 @@ struct AddReminderFromCheckInSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             Capsule()
-                .fill(Color.primary.opacity(0.12))
+                .fill(Color.ohanaSecondaryText.opacity(0.18))
                 .frame(width: 40, height: 4)
                 .padding(.top, 12).padding(.bottom, 20)
 
@@ -97,7 +97,7 @@ struct AddReminderFromCheckInSheet: View {
                     }
                     .padding(.horizontal, 24)
                     .padding(.vertical, 14)
-                    .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 16))
+                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .padding(.horizontal, 24)
 
                     // 开始时间
@@ -142,13 +142,14 @@ struct AddReminderFromCheckInSheet: View {
                                     Button { recurrenceDays = opt.days } label: {
                                         Text(opt.label)
                                             .font(.system(size: 14, weight: .bold, design: .rounded))
-                                            .foregroundStyle(recurrenceDays == opt.days ? .black : Color(.label))
+                                            .foregroundStyle(recurrenceDays == opt.days ? Color.arkInk : Color.ohanaPrimaryText)
                                             .padding(.horizontal, 16).padding(.vertical, 10)
                                             .background(
-                                                recurrenceDays == opt.days ? Color.goPrimary : Color(.systemGray5),
+                                                recurrenceDays == opt.days ? Color.goPrimary : Color.ohanaControlFill,
                                                 in: Capsule()
                                             )
                                     }
+                                    .buttonStyle(ScaleButtonStyle())
                                 }
                             }
                             .padding(.horizontal, 24)
@@ -162,7 +163,7 @@ struct AddReminderFromCheckInSheet: View {
                     } label: {
                         Text("添加到日历")
                             .font(.system(size: 17, weight: .bold, design: .rounded))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 18)
                             .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 18))
@@ -173,7 +174,7 @@ struct AddReminderFromCheckInSheet: View {
             }
         }
         .background(OhanaAppBackground())
-        .presentationDetents([.large])
+        .presentationDetents([.large]) // ui-v4: allow long calendar editor uses system sheet
         .presentationDragIndicator(.hidden)
     }
 
@@ -318,7 +319,7 @@ struct BackBentoDashboard: View {
                                     Text("🍖").font(.system(size: 12))
                                     Text("余粮")
                                         .font(.system(size: 10, weight: .black, design: .rounded))
-                                        .foregroundStyle(.white.opacity(0.6))
+                                        .foregroundStyle(Color.ohanaSecondaryText)
                                 }
                                 Spacer()
                                 if pet.remainingFoodGrams > 0 {
@@ -328,12 +329,12 @@ struct BackBentoDashboard: View {
                                 } else {
                                     Text("未记录余粮")
                                         .font(.system(size: 10, weight: .medium, design: .rounded))
-                                        .foregroundStyle(.white.opacity(0.3))
+                                        .foregroundStyle(Color.ohanaTertiaryText)
                                 }
                             }
                             GeometryReader { geo in
                                 ZStack(alignment: .leading) {
-                                    Capsule().fill(.white.opacity(0.08)).frame(height: 5)
+                                    Capsule().fill(Color.ohanaControlFill).frame(height: 5)
                                     Capsule().fill(foodAccent)
                                         .frame(width: max(6, geo.size.width * foodProgress), height: 5)
                                 }
@@ -341,7 +342,7 @@ struct BackBentoDashboard: View {
                             .frame(height: 5)
                         }
                         .padding(.horizontal, 12).padding(.vertical, 8)
-                        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(Color.ohanaControlFill.opacity(0.72), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .strokeBorder(foodAccent.opacity(0.2), lineWidth: 1))
                     }
@@ -406,15 +407,15 @@ struct BackBentoDashboard: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("彩虹桥彼端 — 永远爱你")
                     .font(.system(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.85))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.86))
                 if let d = pet.passedAwayDate {
                     Text("离世于 \(d.formatted(.dateTime.year().month().day()))")
                         .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.45))
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Text("相伴 \(pet.daysTogetherAtPassing) 天 · \(pet.ageAtPassingText)")
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(Color.ohanaTertiaryText)
             }
             Spacer()
         }
@@ -446,7 +447,7 @@ struct BackBentoDashboard: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(todayWalkCount == 0 ? "今日未出行" : "今日已遛 \(todayWalkCount) 次")
                     .font(.system(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 let distStr = todayWalkDistance >= 1000
                     ? String(format: "%.1f km", todayWalkDistance / 1000)
                     : String(format: "%.0f m", todayWalkDistance)
@@ -459,14 +460,14 @@ struct BackBentoDashboard: View {
                 Text("💩").font(.system(size: 16))
                 Text(lastPottyText)
                     .font(.system(size: 9, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(Color.ohanaTertiaryText)
                     .lineLimit(1)
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
-        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color.ohanaControlFill.opacity(0.72), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(.white.opacity(0.08), lineWidth: 1))
+            .strokeBorder(Color.ohanaGlassStroke.opacity(0.7), lineWidth: 1))
     }
 
     private var careActivityRow: some View {
@@ -494,16 +495,16 @@ struct BackBentoDashboard: View {
                     Text("🕐").font(.system(size: 14))
                     Text(lastPottyText)
                         .font(.system(size: 8, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(Color.ohanaTertiaryText)
                         .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity)
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
-        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color.ohanaControlFill.opacity(0.72), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(.white.opacity(0.08), lineWidth: 1))
+            .strokeBorder(Color.ohanaGlassStroke.opacity(0.7), lineWidth: 1))
     }
 
     private func careCountCell(emoji: String, label: String, count: Int, accent: Color) -> some View {
@@ -512,11 +513,11 @@ struct BackBentoDashboard: View {
                 Text(emoji).font(.system(size: 14))
                 Text("\(count)")
                     .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(count > 0 ? accent : .white.opacity(0.3))
+                    .foregroundStyle(count > 0 ? accent : Color.ohanaTertiaryText)
             }
             Text(label)
                 .font(.system(size: 9, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(Color.ohanaTertiaryText)
         }
         .frame(maxWidth: .infinity)
     }
@@ -527,7 +528,7 @@ struct BackBentoDashboard: View {
         let item = CoconutFloat(amount: amount)
         coconutFloats.append(item)
         let id = item.id
-        withAnimation(.easeOut(duration: 0.9)) {
+        withAnimation(GoMotion.page) {
             if let idx = coconutFloats.firstIndex(where: { $0.id == id }) {
                 coconutFloats[idx].offset  = -60
                 coconutFloats[idx].opacity = 0
@@ -569,7 +570,7 @@ struct SmartHygieneGrid: View {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(reminder.event?.title ?? "待办任务")
                                 .font(.system(size: 11, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                                 .lineLimit(1)
                             Text(reminder.scheduledAt, format: .dateTime.hour().minute())
                                 .font(.system(size: 9, weight: .medium))
@@ -884,7 +885,7 @@ struct SpeciesCheckInGrid: View {
         // 体重 sheet
         .sheet(isPresented: $showWeightSheet) {
             GenericWeightEntrySheet(target: .pet(pet))
-                .presentationDetents([.height(690), .large])
+                .presentationDetents([.height(690), .large]) // ui-v4: allow complex weight editor until inline quick menu migration
                 .presentationDragIndicator(.visible)
                 .presentationBackground(.clear)
         }
@@ -895,7 +896,7 @@ struct SpeciesCheckInGrid: View {
         // 添加面板 sheet
         .sheet(isPresented: $showAddPanel) {
             QAAddPanel(pet: pet, activeCards: $activeCards)
-                .presentationDetents([.medium])
+                .presentationDetents([.medium]) // ui-v4: allow legacy quick-action editor sheet
                 .presentationDragIndicator(.visible)
         }
     }
@@ -906,17 +907,17 @@ struct SpeciesCheckInGrid: View {
             VStack(spacing: 8) {
                 Image(systemName: "plus.circle.dashed")
                     .font(.system(size: 28))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(Color.ohanaTertiaryText)
                 Text("添加快捷操作")
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(Color.ohanaTertiaryText)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 24)
-            .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(Color.ohanaControlFill.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                .foregroundStyle(.white.opacity(0.15)))
+                .foregroundStyle(Color.ohanaGlassStroke))
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -927,17 +928,17 @@ struct SpeciesCheckInGrid: View {
             VStack(spacing: 4) {
                 Image(systemName: "plus")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(Color.ohanaTertiaryText)
                 Text("添加")
                     .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(Color.ohanaTertiaryText)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
-            .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(Color.ohanaControlFill.opacity(0.72), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                .foregroundStyle(.white.opacity(0.12)))
+                .foregroundStyle(Color.ohanaGlassStroke.opacity(0.8)))
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -952,7 +953,7 @@ struct SpeciesCheckInGrid: View {
             Text(card.emoji).font(.system(size: 22))
             Text(card.label)
                 .font(.system(size: 10, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.82))
             if !subtitle.isEmpty {
                 Text(subtitle)
                     .font(.caption2)
@@ -967,9 +968,9 @@ struct SpeciesCheckInGrid: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
-        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color.ohanaControlFill.opacity(0.86), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(count > 0 ? Color.goPrimary.opacity(0.4) : .white.opacity(0.08), lineWidth: 1))
+            .strokeBorder(count > 0 ? Color.goPrimary.opacity(0.4) : Color.ohanaGlassStroke.opacity(0.75), lineWidth: 1))
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .onTapGesture {
             handleTap(card)
@@ -997,12 +998,12 @@ struct SpeciesCheckInGrid: View {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         
         if equipFxLimeGlow {
-            withAnimation(.easeOut(duration: 0.15)) {
+            withAnimation(GoMotion.feedback) {
                 glowFlash = true
                 cardScale = 1.03
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                withAnimation(.easeIn(duration: 0.5)) {
+                withAnimation(GoMotion.page) {
                     glowFlash = false
                     cardScale = 1.0
                 }
@@ -1047,7 +1048,7 @@ struct SpeciesCheckInGrid: View {
 
     // MARK: - 卡片移除
     private func removeCard(_ card: QACardType) {
-        withAnimation(.spring(response: 0.3)) {
+        withAnimation(GoMotion.feedback) {
             activeCards.removeAll { $0 == card }
             QAConfig.exclude(card, for: pet.id)
         }
@@ -1061,7 +1062,7 @@ struct SpeciesCheckInGrid: View {
         let log: PetCareLog
         if type == .feeding {
             log = PetCareLog(date: now, type: .feeding, amountGrams: pet.dailyPortionGrams, pet: pet, executorId: eid)
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) { feedAnimating = true }
+            withAnimation(GoMotion.feedback) { feedAnimating = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { withAnimation { feedAnimating = false } }
         } else {
             log = PetCareLog(date: now, type: .watering, amountMl: 250, pet: pet, executorId: eid)
@@ -1202,10 +1203,10 @@ struct SpeciesCheckInGrid: View {
 
         let ids: [PersistentIdentifier] = [insertedID, event.persistentModelID, reminder.persistentModelID]
         let newUndo = UndoCheckIn(label: label, emoji: emoji, insertedIDs: ids)
-        withAnimation(.spring(response: 0.3)) { undoItem = newUndo }
+        withAnimation(GoMotion.feedback) { undoItem = newUndo }
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
             if undoItem?.id == newUndo.id {
-                withAnimation(.spring(response: 0.3)) { undoItem = nil }
+                withAnimation(GoMotion.feedback) { undoItem = nil }
             }
         }
     }
@@ -1217,7 +1218,7 @@ struct SpeciesCheckInGrid: View {
             HStack(spacing: 8) {
                 Text("\(undo.emoji) \(undo.label) 已打卡")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Button {
                     for pid in undo.insertedIDs {
@@ -1228,7 +1229,7 @@ struct SpeciesCheckInGrid: View {
                         else if let m: Reminder      = modelContext.registeredModel(for: pid) { modelContext.delete(m) }
                     }
                     modelContext.safeSave()
-                    withAnimation(.spring(response: 0.3)) { undoItem = nil }
+                    withAnimation(GoMotion.feedback) { undoItem = nil }
                 } label: {
                     Text("撤回")
                         .font(.system(size: 13, weight: .black, design: .rounded))
@@ -1236,7 +1237,7 @@ struct SpeciesCheckInGrid: View {
                 }
             }
             .padding(.horizontal, 14).padding(.vertical, 10)
-            .background(Color.black.opacity(0.75), in: Capsule())
+            .background(Color.ohanaCardSurfaceElevated.opacity(0.94), in: Capsule())
         }
     }
 
@@ -1385,7 +1386,7 @@ struct QAAddPanel: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("添加快捷操作")
                             .font(.system(size: 18, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                         Text("点击添加到 \(pet.name) 的卡片")
                             .font(.caption)
                             .foregroundStyle(Color.ohanaSecondaryText)
@@ -1417,7 +1418,7 @@ struct QAAddPanel: View {
                     ) {
                         ForEach(availableToAdd, id: \.rawValue) { card in
                             Button {
-                                withAnimation(.spring(response: 0.3)) {
+                                withAnimation(GoMotion.feedback) {
                                     activeCards.append(card)
                                     QAConfig.unexclude(card, for: pet.id)
                                 }
@@ -1427,13 +1428,13 @@ struct QAAddPanel: View {
                                     Text(card.emoji).font(.system(size: 28))
                                     Text(card.label)
                                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(Color.ohanaPrimaryText)
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
-                                .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .strokeBorder(.white.opacity(0.1), lineWidth: 1))
+                                    .strokeBorder(Color.ohanaGlassStroke.opacity(0.8), lineWidth: 1))
                             }
                             .buttonStyle(ScaleButtonStyle())
                         }

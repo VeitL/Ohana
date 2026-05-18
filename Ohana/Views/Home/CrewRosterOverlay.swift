@@ -18,6 +18,7 @@ struct CrewRosterOverlay: View {
 
     let onSelectPet: (Pet) -> Void
     let onSelectHuman: (Human) -> Void
+    var onAddEntity: ((EntityType) -> Void)? = nil
     var hideToolbar: Bool = false
     var searchTrigger: Bool = false
     var addMemberTrigger: Bool = false
@@ -29,8 +30,7 @@ struct CrewRosterOverlay: View {
     @Query(filter: #Predicate<Reminder> { $0.status == "pending" },
            sort: \Reminder.scheduledAt) private var pendingReminders: [Reminder]
 
-    @State private var showingAddEntity = false
-    @State private var addEntityInitialType: EntityType? = nil
+    @State private var activeAddEntityType: EntityType? = nil
     @State private var memberAddMenuExpanded = false
     @State private var memberAddMenuItemsVisible = false
     @State private var showingCoconutLog = false
@@ -39,6 +39,9 @@ struct CrewRosterOverlay: View {
     @State private var selectedRosterMode: RosterMode = .members
     @State private var collaborationCreateTaskTrigger = 0
     @State private var collaborationEditorPresented = false
+    @State private var inlineAddEntityContentReady = false
+    @State private var pendingInlineSavedPet: Pet? = nil
+    @State private var pendingInlineSavedHuman: Human? = nil
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @Environment(\.colorScheme) private var colorScheme
@@ -123,15 +126,10 @@ struct CrewRosterOverlay: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                         .transition(.scale(scale: 0.86, anchor: .center).combined(with: .opacity))
                 }
+
+                inlineAddEntityOverlay
             }
             .toolbar(.hidden, for: .navigationBar)
-            .sheet(isPresented: $showingAddEntity, onDismiss: {
-                addEntityInitialType = nil
-                memberAddMenuItemsVisible = false
-                memberAddMenuExpanded = false
-            }) {
-                AddEntityView(initialType: addEntityInitialType)
-            }
             .fullScreenCover(isPresented: $showingCoconutLog) { IslandWealthDashboardView() }
             .sheet(item: $familyActivityPet) { pet in
                 NavigationStack {
@@ -171,10 +169,10 @@ struct CrewRosterOverlay: View {
                 }
             }
             .onChange(of: addMemberTrigger) { _, _ in
-                addEntityInitialType = nil
                 memberAddMenuItemsVisible = false
                 memberAddMenuExpanded = false
-                showingAddEntity = true
+                selectedRosterMode = .members
+                openMemberAddMenu()
             }
             .onAppear {
                 if showsFamilyCollaboration {
@@ -321,10 +319,116 @@ struct CrewRosterOverlay: View {
     }
 
     private var shouldShowRosterFab: Bool {
+        guard activeAddEntityType == nil else { return false }
         if showsFamilyCollaboration && selectedRosterMode == .collaboration {
             return !collaborationEditorPresented
         }
         return selectedRosterMode == .members || isEmpty
+    }
+
+    @ViewBuilder
+    private var inlineAddEntityOverlay: some View {
+        if let type = activeAddEntityType {
+            ZStack(alignment: .topTrailing) {
+                if inlineAddEntityContentReady {
+                    AddEntityDestinationView(
+                        type: type,
+                        onComplete: { completeInlineAddEntity() },
+                        onPetSaved: { pet in
+                            pendingInlineSavedPet = pet
+                        },
+                        onHumanSaved: { human in
+                            pendingInlineSavedHuman = human
+                        }
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .ignoresSafeArea()
+                    .transition(addEntityContentTransition)
+                } else {
+                    inlineAddEntityLoadingView(type)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+                }
+
+                Button {
+                    dismissInlineAddEntity()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .frame(width: 42, height: 42)
+                        .background(Color.ohanaControlFill, in: Circle())
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .padding(.top, 18)
+                .padding(.trailing, 18)
+                .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+            }
+            .background(Color.clear)
+            .transition(addEntityOverlayTransition)
+            .zIndex(5_000)
+        }
+    }
+
+    private var addEntityOverlayTransition: AnyTransition {
+        .asymmetric(
+            insertion: .opacity,
+            removal: .opacity
+        )
+    }
+
+    private var addEntityContentTransition: AnyTransition {
+        .asymmetric(
+            insertion: .opacity,
+            removal: .opacity
+        )
+    }
+
+    private func inlineAddEntityLoadingView(_ type: EntityType) -> some View {
+        OhanaAppBackground()
+    }
+
+    private func presentInlineAddEntity(_ type: EntityType) {
+        inlineAddEntityContentReady = false
+        withAnimation(GoMotion.sheet) {
+            activeAddEntityType = type
+        }
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 55) {
+            guard activeAddEntityType == type else { return }
+            withAnimation(GoMotion.quick) {
+                inlineAddEntityContentReady = true
+            }
+        }
+    }
+
+    private func dismissInlineAddEntity() {
+        pendingInlineSavedPet = nil
+        pendingInlineSavedHuman = nil
+        withAnimation(GoMotion.sheet) {
+            activeAddEntityType = nil
+            inlineAddEntityContentReady = false
+        }
+    }
+
+    private func completeInlineAddEntity() {
+        let savedPet = pendingInlineSavedPet
+        let savedHuman = pendingInlineSavedHuman
+        pendingInlineSavedPet = nil
+        pendingInlineSavedHuman = nil
+
+        withAnimation(GoMotion.sheet) {
+            activeAddEntityType = nil
+            inlineAddEntityContentReady = false
+        }
+
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
+            if let savedPet {
+                onSelectPet(savedPet)
+            } else if let savedHuman {
+                onSelectHuman(savedHuman)
+            }
+        }
     }
 
     private var rosterFloatingActionOverlay: some View {
@@ -332,23 +436,14 @@ struct CrewRosterOverlay: View {
             if selectedRosterMode == .members && memberAddMenuExpanded {
                 ForEach(Array(memberAddMenuItems.enumerated()), id: \.element) { index, type in
                     memberAddActionRow(type)
-                        .scaleEffect(memberAddMenuItemsVisible ? 1 : 0.6, anchor: .bottomTrailing)
-                        .opacity(memberAddMenuItemsVisible ? 1 : 0)
-                        .offset(y: memberAddMenuItemsVisible ? 0 : 22)
-                        .animation(
-                            GoMotion.fab
-                                .delay(memberAddMenuItemsVisible
-                                       ? Double(memberAddMenuItems.count - 1 - index) * 0.055
-                                       : Double(index) * 0.04),
-                            value: memberAddMenuItemsVisible
-                        )
+                        .ohanaStaggeredMenuItem(isVisible: memberAddMenuItemsVisible, index: index, total: memberAddMenuItems.count)
                         .allowsHitTesting(memberAddMenuItemsVisible)
                         .accessibilityHidden(!memberAddMenuItemsVisible)
                 }
             }
 
             Button {
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                OhanaFeedback.medium()
                 if showsFamilyCollaboration && selectedRosterMode == .collaboration {
                     withAnimation(GoMotion.page) {
                         collaborationCreateTaskTrigger &+= 1
@@ -416,10 +511,14 @@ struct CrewRosterOverlay: View {
 
     private func memberAddActionRow(_ type: EntityType) -> some View {
         Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            closeMemberAddMenu()
-            addEntityInitialType = type
-            showingAddEntity = true
+            OhanaFeedback.light()
+            memberAddMenuItemsVisible = false
+            memberAddMenuExpanded = false
+            if let onAddEntity {
+                onAddEntity(type)
+            } else {
+                presentInlineAddEntity(type)
+            }
         } label: {
             HStack(spacing: 10) {
                 HStack(spacing: 7) {
@@ -639,7 +738,6 @@ private struct PetSquareCard: View {
             Text("确定要删除 \(pet.name) 吗？此操作不可撤销。")
         }
     }
-
     private var cardFace: some View {
         GeometryReader { geo in
             let w = geo.size.width
@@ -691,12 +789,12 @@ private struct PetSquareCard: View {
         }
         .aspectRatio(1.586, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: themeColor.opacity(0.32), radius: 12, x: 0, y: 4)
+        .shadow(color: themeColor.opacity(0.32), radius: 12, x: 0, y: 4) // ui-v4: allow member card lifted preview
     }
 
     private var readableTextColor: Color {
         let bright = ["C8FF00","E8FFB0","B8FFD0","FFF44F","FFEB3B","FFFFFF","FFEAA7","FDCB6E"]
-        return bright.contains(pet.themeColorHex.uppercased()) ? Color.arkInk : .white
+        return bright.contains(pet.themeColorHex.uppercased()) ? Color.arkInk : Color.goCardWhite
     }
 
     private func compactBadge(_ text: String, textColor: Color) -> some View {
@@ -715,7 +813,7 @@ private struct PetSquareCard: View {
         Binding(
             get: { isShownOnHome },
             set: { newValue in
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                OhanaFeedback.light()
                 if newValue,
                    !HomeCardVisibility.canShowPet(pet, pets: allPets, humans: allHumans, raw: hiddenHomePetIDsRaw) {
                     showHomeStackFullAlert = true
@@ -762,10 +860,10 @@ private struct PetSquareCard: View {
     private var deletePreviewBadge: some View {
         Image(systemName: "trash.fill")
             .font(.system(size: 12, weight: .black))
-            .foregroundStyle(.white)
+            .foregroundStyle(Color.goCardWhite)
             .frame(width: 28, height: 28)
             .background(Color.goRed, in: Circle())
-            .shadow(color: Color.goRed.opacity(0.45), radius: 8, y: 3)
+            .shadow(color: Color.goRed.opacity(0.45), radius: 8, y: 3) // ui-v4: allow delete press warning badge lift
     }
 
     private func updateDeletePressFeedback(_ pressing: Bool) {
@@ -779,14 +877,14 @@ private struct PetSquareCard: View {
                 withAnimation(deletePressAnimation) {
                     isDeletePressing = true
                 }
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                OhanaFeedback.light()
             }
         } else {
             deletePressCandidate = false
             deletePressToken = UUID()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
                 guard !showDeleteAlert else { return }
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.84)) {
+                withAnimation(GoMotion.feedback) {
                     isDeletePressing = false
                 }
             }
@@ -797,10 +895,10 @@ private struct PetSquareCard: View {
         suppressTapUntil = Date().addingTimeInterval(1.1)
         deletePressCandidate = false
         deletePressToken = UUID()
-        withAnimation(.spring(response: 0.18, dampingFraction: 0.82)) {
+        withAnimation(GoMotion.feedback) {
             isDeletePressing = false
         }
-        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        OhanaFeedback.strong()
         showDeleteAlert = true
     }
 
@@ -808,22 +906,15 @@ private struct PetSquareCard: View {
     private func miniSubjectLayer(avatarImage: UIImage?, isPopout: Bool, w: CGFloat, h: CGFloat) -> some View {
         if let avatarImage {
             if isPopout {
-                // 透明抠图：居左贴边
-                ZStack(alignment: .bottom) {
-                    Image(uiImage: avatarImage)
-                        .resizable()
-                        .scaledToFit()
-                        .scaleEffect(0.88)
-                        .colorMultiply(.white)
-                        .shadow(color: .white, radius: 0, x: 2, y: 0)
-                        .shadow(color: .white, radius: 0, x: -2, y: 0)
-                        .shadow(color: .white, radius: 0, x: 0, y: -2)
-                    Image(uiImage: avatarImage)
-                        .resizable()
-                        .scaledToFit()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .shadow(color: .black.opacity(0.28), radius: 10, x: 0, y: 6)
+                // 透明 2.5D 主体只渲染一层，避免成员页小卡出现重影。
+                Image(uiImage: avatarImage)
+                    .resizable()
+                    .scaledToFit()
+                    .scaleEffect(0.92)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .padding(.top, 4)
+                    .padding(.bottom, 2)
+                    .shadow(color: Color.arkInk.opacity(0.22), radius: 10, x: 0, y: 6) // ui-v4: allow avatar grounding
             } else {
                 // 普通照片：填满左半区域，右侧羽化
                 Image(uiImage: avatarImage)
@@ -867,7 +958,7 @@ private struct PetSquareCard: View {
             }()
             ZStack {
                 Ellipse()
-                    .fill(Color.black.opacity(0.16))
+                    .fill(Color.arkInk.opacity(0.16))
                     .frame(width: w * 0.28, height: 12)
                     .blur(radius: 6)
                     .offset(y: h * 0.14)
@@ -909,9 +1000,9 @@ private struct PetSquareCard: View {
                     ZStack {
                         Image(uiImage: img).resizable().scaledToFit()
                             .scaleEffect(1.06).colorMultiply(.white)
-                            .shadow(color: .white, radius: 0, x: 2, y: 0)
-                            .shadow(color: .white, radius: 0, x: -2, y: 0)
-                            .shadow(color: .white, radius: 0, x: 0, y: -2)
+                            .shadow(color: Color.goCardWhite, radius: 0, x: 2, y: 0) // ui-v4: allow cutout rim for 2.5D readability
+                            .shadow(color: Color.goCardWhite, radius: 0, x: -2, y: 0) // ui-v4: allow cutout rim for 2.5D readability
+                            .shadow(color: Color.goCardWhite, radius: 0, x: 0, y: -2) // ui-v4: allow cutout rim for 2.5D readability
                         Image(uiImage: img).resizable().scaledToFit()
                     }
                     .frame(width: w * 0.50, height: h * 1.12)
@@ -932,15 +1023,15 @@ private struct PetSquareCard: View {
                     .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .fill(LinearGradient(
-                        colors: [Color.black.opacity(0.25), Color.black.opacity(0.52)],
+                        colors: [Color.arkInk.opacity(0.25), Color.arkInk.opacity(0.52)],
                         startPoint: .topLeading, endPoint: .bottomTrailing))
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .fill(Color.ohanaCardSurface.opacity(0.30))
                 Image(uiImage: img).resizable().scaledToFill()
                     .frame(width: w * 0.60, height: h).clipped()
                     .mask(LinearGradient(
-                        stops: [.init(color: .black, location: 0),
-                                .init(color: .black, location: 0.45),
+                        stops: [.init(color: Color.arkInk, location: 0),
+                                .init(color: Color.arkInk, location: 0.45),
                                 .init(color: .clear, location: 1.0)],
                         startPoint: .leading, endPoint: .trailing))
                     .allowsHitTesting(false)
@@ -1139,7 +1230,8 @@ private struct HumanSquareCard: View {
             let w = geo.size.width
             let h = geo.size.height
             let avatarImage: UIImage? = human.avatarImageData.flatMap { UIImage(data: $0) }
-            let usesFullBleed = avatarImage != nil
+            let hasAvatarImage = avatarImage != nil
+            let isTransparent: Bool = human.avatarImageData.map { ImageCutoutService.isTransparentPNG($0) } ?? false
 
             ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -1155,33 +1247,10 @@ private struct HumanSquareCard: View {
                         )
                     )
                 LinearGradient(
-                    colors: [.clear, .black.opacity(usesFullBleed ? 0.12 : 0.28)],
+                    colors: [.clear, .black.opacity(hasAvatarImage ? 0.16 : 0.28)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
-
-                if let avatarImage {
-                    Image(uiImage: avatarImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: max(w, h), height: h)
-                        .clipped()
-                        .frame(width: w, height: h, alignment: .leading)
-                        .mask(
-                            LinearGradient(
-                                stops: [
-                                    .init(color: .white, location: 0),
-                                    .init(color: .white, location: 0.46),
-                                    .init(color: .white.opacity(0.72), location: 0.60),
-                                    .init(color: .white.opacity(0.18), location: 0.76),
-                                    .init(color: .clear, location: 0.92)
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .allowsHitTesting(false)
-                }
 
                 Text(human.name.uppercased())
                     .font(.system(size: WalletPetCardTheme.headlinePointSize(cardWidth: w, headlineCount: human.name.count), weight: .black, design: .rounded))
@@ -1195,12 +1264,11 @@ private struct HumanSquareCard: View {
                     .opacity(0.78)
                     .allowsHitTesting(false)
 
-                if !usesFullBleed {
-                    humanAvatarContent
-                        .frame(width: w * 0.52, height: h)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                        .allowsHitTesting(false)
-                }
+                humanSubjectLayer(avatarImage: avatarImage, isTransparent: isTransparent, w: w, h: h)
+                    .frame(width: w * 0.52, height: h)
+                    .clipped()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    .allowsHitTesting(false)
 
                 HStack(alignment: .bottom, spacing: 0) {
                     Spacer().frame(width: w * 0.50)
@@ -1213,14 +1281,14 @@ private struct HumanSquareCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
+                .strokeBorder(Color.goCardWhite.opacity(0.15), lineWidth: 0.5)
         )
-        .shadow(color: themeColor.opacity(0.28), radius: 12, x: 0, y: 4)
+        .shadow(color: themeColor.opacity(0.28), radius: 12, x: 0, y: 4) // ui-v4: allow member card lifted preview
     }
 
     private var readableTextColor: Color {
         let bright = ["C8FF00","E8FFB0","B8FFD0","FFF44F","FFEB3B","FFFFFF","FFEAA7","FDCB6E"]
-        return bright.contains(human.themeColor.uppercased()) ? Color.arkInk : .white
+        return bright.contains(human.themeColor.uppercased()) ? Color.arkInk : Color.goCardWhite
     }
 
     private func compactBadge(_ text: String, textColor: Color) -> some View {
@@ -1239,7 +1307,7 @@ private struct HumanSquareCard: View {
         Binding(
             get: { human.shouldShowOnHome },
             set: { newValue in
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                OhanaFeedback.light()
                 if newValue,
                    !HomeCardVisibility.canShowHuman(human, pets: allPets, humans: allHumans, raw: hiddenHomePetIDsRaw) {
                     showHomeStackFullAlert = true
@@ -1287,10 +1355,10 @@ private struct HumanSquareCard: View {
     private var deletePreviewBadge: some View {
         Image(systemName: "trash.fill")
             .font(.system(size: 12, weight: .black))
-            .foregroundStyle(.white)
+            .foregroundStyle(Color.goCardWhite)
             .frame(width: 28, height: 28)
             .background(Color.goRed, in: Circle())
-            .shadow(color: Color.goRed.opacity(0.45), radius: 8, y: 3)
+            .shadow(color: Color.goRed.opacity(0.45), radius: 8, y: 3) // ui-v4: allow delete press warning badge lift
     }
 
     private func updateDeletePressFeedback(_ pressing: Bool) {
@@ -1304,14 +1372,14 @@ private struct HumanSquareCard: View {
                 withAnimation(deletePressAnimation) {
                     isDeletePressing = true
                 }
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                OhanaFeedback.light()
             }
         } else {
             deletePressCandidate = false
             deletePressToken = UUID()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
                 guard !showDeleteAlert else { return }
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.84)) {
+                withAnimation(GoMotion.feedback) {
                     isDeletePressing = false
                 }
             }
@@ -1322,10 +1390,10 @@ private struct HumanSquareCard: View {
         suppressTapUntil = Date().addingTimeInterval(1.1)
         deletePressCandidate = false
         deletePressToken = UUID()
-        withAnimation(.spring(response: 0.18, dampingFraction: 0.82)) {
+        withAnimation(GoMotion.feedback) {
             isDeletePressing = false
         }
-        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        OhanaFeedback.strong()
         showDeleteAlert = true
     }
 
@@ -1343,7 +1411,46 @@ private struct HumanSquareCard: View {
         } else {
             Text(String(human.name.prefix(1)))
                 .font(.system(size: 36, weight: .black, design: .rounded))
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(Color.goCardWhite.opacity(0.6))
+        }
+    }
+
+    @ViewBuilder
+    private func humanSubjectLayer(avatarImage: UIImage?, isTransparent: Bool, w: CGFloat, h: CGFloat) -> some View {
+        if let avatarImage {
+            if isTransparent {
+                Image(uiImage: avatarImage)
+                    .resizable()
+                    .scaledToFit()
+                    .scaleEffect(0.92)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .padding(.top, 4)
+                    .padding(.bottom, 2)
+                    .shadow(color: Color.arkInk.opacity(0.22), radius: 10, x: 0, y: 6) // ui-v4: allow avatar grounding
+            } else {
+                Image(uiImage: avatarImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: w * 0.52, height: h)
+                    .clipped()
+                    .saturation(1.02)
+                    .contrast(1.03)
+                    .mask(
+                        LinearGradient(
+                            stops: [
+                                .init(color: .black, location: 0.0),
+                                .init(color: .black, location: 0.65),
+                                .init(color: .clear, location: 1.0)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            }
+        } else {
+            humanAvatarContent
+                .frame(width: w * 0.42, height: h * 0.72)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         }
     }
 
@@ -1371,9 +1478,9 @@ private struct HumanSquareCard: View {
                     ZStack {
                         Image(uiImage: img).resizable().scaledToFit()
                             .scaleEffect(1.06).colorMultiply(.white)
-                            .shadow(color: .white, radius: 0, x: 2, y: 0)
-                            .shadow(color: .white, radius: 0, x: -2, y: 0)
-                            .shadow(color: .white, radius: 0, x: 0, y: -2)
+                            .shadow(color: Color.goCardWhite, radius: 0, x: 2, y: 0) // ui-v4: allow cutout rim for 2.5D readability
+                            .shadow(color: Color.goCardWhite, radius: 0, x: -2, y: 0) // ui-v4: allow cutout rim for 2.5D readability
+                            .shadow(color: Color.goCardWhite, radius: 0, x: 0, y: -2) // ui-v4: allow cutout rim for 2.5D readability
                         Image(uiImage: img).resizable().scaledToFit()
                             .clipShape(Circle()) // Apply circular clipping for humans if preferring normal avatar look
                     }
@@ -1395,15 +1502,15 @@ private struct HumanSquareCard: View {
                     .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .fill(LinearGradient(
-                        colors: [Color.black.opacity(0.25), Color.black.opacity(0.52)],
+                        colors: [Color.arkInk.opacity(0.25), Color.arkInk.opacity(0.52)],
                         startPoint: .topLeading, endPoint: .bottomTrailing))
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .fill(Color.ohanaCardSurface.opacity(0.30))
                 Image(uiImage: img).resizable().scaledToFill()
                     .frame(width: w * 0.60, height: h).clipped()
                     .mask(LinearGradient(
-                        stops: [.init(color: .black, location: 0),
-                                .init(color: .black, location: 0.45),
+                        stops: [.init(color: Color.arkInk, location: 0),
+                                .init(color: Color.arkInk, location: 0.45),
                                 .init(color: .clear, location: 1.0)],
                         startPoint: .leading, endPoint: .trailing))
                     .allowsHitTesting(false)
@@ -1483,7 +1590,7 @@ private struct PlantTallCard: View {
                 // 植物向上生长的 emoji
                 Text(plant.avatarEmoji)
                     .font(.system(size: 42))
-                    .shadow(color: Color.goTeal.opacity(0.4), radius: 10)
+                    .shadow(color: Color.goTeal.opacity(0.4), radius: 10) // ui-v4: allow plant avatar growth glow
                 Spacer()
             }
             .frame(maxWidth: .infinity)
@@ -1509,7 +1616,7 @@ private struct PlantTallCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 LinearGradient(
-                    colors: [.clear, Color.black.opacity(0.55)],
+                    colors: [.clear, Color.arkInk.opacity(0.55)],
                     startPoint: .top, endPoint: .bottom
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -1519,7 +1626,7 @@ private struct PlantTallCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+                .strokeBorder(Color.goCardWhite.opacity(0.08), lineWidth: 1)
         )
     }
 }

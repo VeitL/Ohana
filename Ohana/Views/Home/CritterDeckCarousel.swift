@@ -92,7 +92,7 @@ struct CritterDeckCarousel: View {
             }
             .frame(height: cardH + 16)
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .animation(.spring(response: 0.42, dampingFraction: 0.82), value: activeIndex)
+            .animation(GoMotion.page, value: activeIndex)
 
             HStack(spacing: 0) {
                 Spacer()
@@ -100,11 +100,11 @@ struct CritterDeckCarousel: View {
                     HStack(spacing: 6) {
                         ForEach(0..<min(cards.count, 5), id: \.self) { idx in
                             Capsule()
-                                .fill(idx == activeIndex ? Color.goPrimary : Color.white.opacity(0.35))
+                                .fill(idx == activeIndex ? Color.goPrimary : Color.ohanaTertiaryText.opacity(0.75))
                                 .frame(width: idx == activeIndex ? 24 : 7, height: 7)
                         }
                     }
-                    .animation(.spring(response: 0.35, dampingFraction: 0.7), value: activeIndex)
+                    .animation(GoMotion.feedback, value: activeIndex)
                 }
                 Spacer()
                 if cards.count > WalletLayout.maxVisible {
@@ -115,13 +115,13 @@ struct CritterDeckCarousel: View {
                         HStack(spacing: 4) {
                             Text("全部 \(cards.count) 张")
                                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.75))
+                                .foregroundStyle(Color.ohanaSecondaryText)
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.4))
+                                .foregroundStyle(Color.ohanaTertiaryText)
                         }
                         .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(.white.opacity(0.1), in: Capsule())
+                        .background(Color.ohanaControlFill, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
@@ -168,13 +168,13 @@ struct CritterDeckCarousel: View {
                     }
                 }
             )
-            .presentationDetents([.large])
+            .presentationDetents([.large]) // ui-v4: allow all cards overview sheet
             .presentationDragIndicator(.visible)
         }
         // C3: 宠物背面健康格 → modal sheet（避免 NavigationStack push 死锁）
         .sheet(item: $quickHealthPet) { pet in
             NavigationStack { PetHealthDetailView(pet: pet, isModal: true) }
-                .presentationDetents([.large])
+                .presentationDetents([.large]) // ui-v4: allow long health detail sheet
                 .presentationDragIndicator(.visible)
         }
     }
@@ -208,13 +208,13 @@ struct CritterDeckCarousel: View {
     /// 上滑：activeIndex 向后移动一张（下一张来到中心）
     private func advanceToNext() {
         guard cards.count > 1, !isBusy else {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { dragOffsetY = 0 }
+            withAnimation(GoMotion.feedback) { dragOffsetY = 0 }
             return
         }
         isBusy = true
         isTopFlipped = false
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        withAnimation(.spring(response: 0.42, dampingFraction: 0.80)) {
+        withAnimation(GoMotion.page) {
             dragOffsetY = 0
             activeIndex = (activeIndex + 1) % cards.count
         }
@@ -225,13 +225,13 @@ struct CritterDeckCarousel: View {
     /// 下滑：activeIndex 向前移动一张（上一张来到中心）
     private func retreatToPrev() {
         guard cards.count > 1, !isBusy else {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { dragOffsetY = 0 }
+            withAnimation(GoMotion.feedback) { dragOffsetY = 0 }
             return
         }
         isBusy = true
         isTopFlipped = false
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        withAnimation(.spring(response: 0.42, dampingFraction: 0.80)) {
+        withAnimation(GoMotion.page) {
             dragOffsetY = 0
             activeIndex = (activeIndex - 1 + cards.count) % cards.count
         }
@@ -245,7 +245,7 @@ struct CritterDeckCarousel: View {
         isBusy = true
         isTopFlipped = false
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        withAnimation(.spring(response: 0.42, dampingFraction: 0.80)) {
+        withAnimation(GoMotion.page) {
             dragOffsetY = 0
             activeIndex = index
         }
@@ -259,7 +259,7 @@ struct CritterDeckCarousel: View {
         isBusy = true
         isTopFlipped = false
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        withAnimation(.spring(response: 0.42, dampingFraction: 0.80)) {
+        withAnimation(GoMotion.page) {
             dragOffsetY = 0
             activeIndex = index
         }
@@ -385,7 +385,7 @@ private struct MiniFlipCard: View {
         }
         .frame(width: cardWidth, height: cardHeight)
         .rotation3DEffect(.degrees(isFlipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
-        .animation(.spring(response: 0.5, dampingFraction: 0.78), value: isFlipped)
+        .animation(GoMotion.page, value: isFlipped)
         .onChange(of: isFlipped) { _, newFlipped in
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
                 var t = Transaction(); t.disablesAnimations = true
@@ -400,7 +400,7 @@ private struct MiniFlipCard: View {
             if isFirst {
                 Text("当前")
                     .font(.system(size: 9, weight: .black, design: .rounded))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(Color.goPrimary, in: Capsule())
                     .padding(8)
@@ -435,8 +435,8 @@ private struct MiniFlipCard: View {
                                 .mask(
                                     RadialGradient(
                                         gradient: Gradient(stops: [
-                                            .init(color: .black, location: 0.35),      // 中心完全显示
-                                            .init(color: .black, location: 0.5),       // 过渡区
+                                            .init(color: Color.arkInk, location: 0.35), // ui-v4: allow image alpha mask
+                                            .init(color: Color.arkInk, location: 0.5), // ui-v4: allow image alpha mask
                                             .init(color: .clear, location: 0.9)        // 边缘完全隐藏
                                         ]),
                                         center: UnitPoint(x: 0.2, y: 1.0),         // 左下角
@@ -466,7 +466,7 @@ private struct MiniFlipCard: View {
                         Spacer()
                         Text(pet.name)
                             .font(.system(size: 18, weight: .heavy, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1).minimumScaleFactor(0.5)
                     }
                     .padding(.trailing, 10).padding(.bottom, 12)
@@ -476,7 +476,7 @@ private struct MiniFlipCard: View {
                     // 翻转提示
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(Color.ohanaTertiaryText)
                         .padding(8)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -490,7 +490,7 @@ private struct MiniFlipCard: View {
                         .frame(width: cardWidth * 0.65, height: cardHeight, alignment: .bottom)
                 }
             }
-            .shadow(color: themeColor.opacity(0.4), radius: 8, x: 0, y: 4)
+            .shadow(color: themeColor.opacity(0.4), radius: 8, x: 0, y: 4) // ui-v4: allow mini card elevation
 
         case .human(let human):
             let themeHex: String = human.themeColor
@@ -541,7 +541,7 @@ private struct MiniFlipCard: View {
                     }()
                     Text(titleDisplay + human.name)
                         .font(.system(size: 18, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1).minimumScaleFactor(0.5)
                 }
                 .padding(.trailing, 10).padding(.bottom, 12)
@@ -550,11 +550,11 @@ private struct MiniFlipCard: View {
 
                 Image(systemName: "arrow.triangle.2.circlepath")
                     .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(Color.ohanaTertiaryText)
                     .padding(8)
             }
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .shadow(color: themeColor.opacity(0.4), radius: 8, x: 0, y: 4)
+            .shadow(color: themeColor.opacity(0.4), radius: 8, x: 0, y: 4) // ui-v4: allow mini card elevation
         }
     }
 
@@ -587,7 +587,7 @@ private struct MiniFlipCard: View {
                         .frame(width: 6, height: 6)
                     Text(name)
                         .font(.system(size: 13, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                 }
 
@@ -604,14 +604,14 @@ private struct MiniFlipCard: View {
                             .foregroundStyle(Color.goOrange.opacity(feedToday > 0 ? 1 : 0.35))
                     }
                     .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(.white.opacity(0.06), in: Capsule())
+                    .background(Color.ohanaControlFill, in: Capsule())
                 }
 
                 // 详情按钮
                 Button(action: onDetail) {
                     Text("进入详情")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(Color.arkInk)
                         .frame(maxWidth: .infinity).padding(.vertical, 7)
                         .background(accentColor, in: Capsule())
                 }
@@ -622,9 +622,9 @@ private struct MiniFlipCard: View {
                     Button(action: promote) {
                         Text("置顶显示")
                             .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(Color.ohanaSecondaryText)
                             .frame(maxWidth: .infinity).padding(.vertical, 5)
-                            .background(Color.white.opacity(0.08), in: Capsule())
+                            .background(Color.ohanaControlFill, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
@@ -632,7 +632,7 @@ private struct MiniFlipCard: View {
             .padding(12)
         }
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
+        .shadow(color: Color.arkInk.opacity(0.3), radius: 8, x: 0, y: 4) // ui-v4: allow mini card back elevation
     }
 }
 
@@ -676,7 +676,7 @@ struct HumanIDCardView: View {
         .compositingGroup()
         .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
         .rotation3DEffect(.degrees(flipped ? 180 : 0), axis: (x: 0, y: 1, z: 0), perspective: 0.4)
-        .animation(.spring(response: 0.6, dampingFraction: 0.78), value: flipped)
+        .animation(GoMotion.page, value: flipped)
         .onChange(of: flipped) { _, newFlipped in
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
                 var t = Transaction(); t.disablesAnimations = true
@@ -706,7 +706,7 @@ struct HumanIDCardView: View {
                 // ── 层2：大号水印背景字
                 Text(human.name.uppercased())
                     .font(.system(size: 110, weight: .black, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.045))
+                    .foregroundStyle(Color.ohanaCardSurface.opacity(0.045)) // ui-v4: allow ID watermark
                     .rotationEffect(.degrees(-12))
                     .offset(x: geo.size.width * 0.05, y: -geo.size.height * 0.05)
                     .allowsHitTesting(false)
@@ -737,13 +737,13 @@ struct HumanIDCardView: View {
                                     Image(uiImage: uiImage)
                                         .resizable().scaledToFit()
                                         .scaleEffect(1.06)
-                                        .colorMultiply(.white)
-                                        .shadow(color: .white, radius: 0, x: 2, y: 0)
-                                        .shadow(color: .white, radius: 0, x: -2, y: 0)
-                                        .shadow(color: .white, radius: 0, x: 0, y: 2)
-                                        .shadow(color: .white, radius: 0, x: 0, y: -2)
-                                        .shadow(color: .white, radius: 1, x: 2, y: 2)
-                                        .shadow(color: .white, radius: 1, x: -2, y: -2)
+                                        .colorMultiply(Color.ohanaCardSurface) // ui-v4: allow avatar sticker cutout highlight
+                                        .shadow(color: Color.ohanaCardSurface, radius: 0, x: 2, y: 0) // ui-v4: allow avatar sticker cutout highlight
+                                        .shadow(color: Color.ohanaCardSurface, radius: 0, x: -2, y: 0) // ui-v4: allow avatar sticker cutout highlight
+                                        .shadow(color: Color.ohanaCardSurface, radius: 0, x: 0, y: 2) // ui-v4: allow avatar sticker cutout highlight
+                                        .shadow(color: Color.ohanaCardSurface, radius: 0, x: 0, y: -2) // ui-v4: allow avatar sticker cutout highlight
+                                        .shadow(color: Color.ohanaCardSurface, radius: 1, x: 2, y: 2) // ui-v4: allow avatar sticker cutout highlight
+                                        .shadow(color: Color.ohanaCardSurface, radius: 1, x: -2, y: -2) // ui-v4: allow avatar sticker cutout highlight
                                     Image(uiImage: uiImage)
                                         .resizable().scaledToFit()
                                 }
@@ -754,7 +754,7 @@ struct HumanIDCardView: View {
                             }
                         }
                         .frame(width: geo.size.width * 0.52, height: geo.size.height * 0.90)
-                        .shadow(color: .black.opacity(0.4), radius: 18, x: 12, y: 14)
+                        .shadow(color: Color.arkInk.opacity(0.4), radius: 18, x: 12, y: 14) // ui-v4: allow avatar grounding
                     }
                     .frame(width: geo.size.width * 0.52, alignment: .bottom)
                     .clipped()
@@ -769,14 +769,14 @@ struct HumanIDCardView: View {
                             HStack(alignment: .firstTextBaseline, spacing: 3) {
                                 Text("✨ 相识")
                                     .font(.system(size: 10, weight: .black, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.65))
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                                 Text("\(daysKnown)")
                                     .font(.system(size: 28, weight: .black, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Color.ohanaPrimaryText)
                                     .lineLimit(1).minimumScaleFactor(0.5)
                                 Text("天")
                                     .font(.system(size: 10, weight: .black, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.65))
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                             }
                             .padding(.bottom, 6)
                         } else {
@@ -785,7 +785,7 @@ struct HumanIDCardView: View {
                                     .font(.system(size: 11))
                                 Text(human.roleText)
                                     .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.65))
+                                    .foregroundStyle(Color.ohanaSecondaryText)
                             }
                             .padding(.bottom, 10)
                         }
@@ -803,7 +803,7 @@ struct HumanIDCardView: View {
                         }()
                         Text(titleDisplay + human.name)
                             .font(.system(size: 28, weight: .heavy, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1).minimumScaleFactor(0.45)
                             .padding(.bottom, 6)
 
@@ -855,7 +855,7 @@ struct HumanIDCardView: View {
                     HStack {
                         Image(systemName: "arrow.triangle.2.circlepath")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.35))
+                            .foregroundStyle(Color.ohanaTertiaryText)
                             .padding(.leading, 18).padding(.bottom, 14)
                             .allowsHitTesting(false)
                         Spacer()
@@ -863,7 +863,7 @@ struct HumanIDCardView: View {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-            .shadow(color: humanThemeColor.opacity(0.5), radius: 24, x: 0, y: 10)
+            .shadow(color: humanThemeColor.opacity(0.5), radius: 24, x: 0, y: 10) // ui-v4: allow human ID card elevation
             .contentShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
         }
     }
@@ -871,21 +871,21 @@ struct HumanIDCardView: View {
     private func humanFrontPill(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 10, weight: .bold, design: .rounded))
-            .foregroundStyle(.white.opacity(0.85))
+            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.86))
             .lineLimit(1)
             .padding(.horizontal, 9).padding(.vertical, 4)
-            .background(.white.opacity(0.12), in: Capsule())
-            .overlay(Capsule().strokeBorder(.white.opacity(0.15), lineWidth: 0.5))
+            .background(Color.ohanaControlFill, in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.ohanaGlassStroke.opacity(0.8), lineWidth: 0.5))
     }
 
     private func humanFrontPillScalable(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 10, weight: .bold, design: .rounded))
-            .foregroundStyle(.white.opacity(0.85))
+            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.86))
             .lineLimit(1).minimumScaleFactor(0.5)
             .padding(.horizontal, 9).padding(.vertical, 4)
-            .background(.white.opacity(0.12), in: Capsule())
-            .overlay(Capsule().strokeBorder(.white.opacity(0.15), lineWidth: 0.5))
+            .background(Color.ohanaControlFill, in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.ohanaGlassStroke.opacity(0.8), lineWidth: 0.5))
     }
     
     private var humanBackView: some View {
@@ -906,10 +906,10 @@ struct HumanIDCardView: View {
                         Text("QUICK ACCESS")
                             .font(.system(size: 10, weight: .black, design: .rounded))
                             .tracking(3)
-                            .foregroundStyle(.white.opacity(0.45))
+                            .foregroundStyle(Color.ohanaSecondaryText)
                         Text(human.name)
                             .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.ohanaPrimaryText)
                     }
                     Spacer()
                     Button(action: onDetail) {
@@ -970,7 +970,7 @@ struct HumanIDCardView: View {
                 .frame(width: 48, alignment: .leading)
             Text(value)
                 .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
         }
     }
@@ -1014,7 +1014,7 @@ struct HumanQuickAccessGrid: View {
         }
         .sheet(isPresented: $showWishSheet) {
             HumanWishlistView(human: human)
-                .presentationDetents([.large])
+                .presentationDetents([.large]) // ui-v4: allow long wishlist detail sheet
                 .presentationDragIndicator(.visible)
         }
         .alert("仅本人可见", isPresented: $showPrivacyAlert) {
@@ -1036,11 +1036,11 @@ struct HumanQuickAccessGrid: View {
                 Text(action.emoji).font(.system(size: 20))
                 Text(action.label)
                     .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .foregroundStyle(isWaterDone ? Color.goPrimary : .white.opacity(0.85))
+                    .foregroundStyle(isWaterDone ? Color.goPrimary : Color.ohanaPrimaryText.opacity(0.86))
                     .lineLimit(1)
                 Text(isWaterDone ? "已打卡" : action.sublabel)
                     .font(.system(size: 8, weight: .medium, design: .rounded))
-                    .foregroundStyle(isWaterDone ? Color.goPrimary.opacity(0.7) : .white.opacity(0.4))
+                    .foregroundStyle(isWaterDone ? Color.goPrimary.opacity(0.7) : Color.ohanaTertiaryText)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
@@ -1069,7 +1069,7 @@ struct HumanQuickAccessGrid: View {
                 pet: nil, context: modelContext
             )
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            withAnimation(.spring(response: 0.3)) { waterCheckedIn = true }
+            withAnimation(GoMotion.feedback) { waterCheckedIn = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                 withAnimation { waterCheckedIn = false }
             }

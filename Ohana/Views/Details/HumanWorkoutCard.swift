@@ -430,7 +430,8 @@ struct AddWorkoutSheet: View {
     }
 
     private func workoutField(icon: String, label: String, placeholder: String, text: Binding<String>, color: Color) -> some View {
-        HStack(spacing: 10) {
+        let allowsDecimal = placeholder.contains(".")
+        return HStack(spacing: 10) {
             Image(systemName: icon)
                 .font(OhanaFont.callout())
                 .foregroundStyle(color)
@@ -439,12 +440,20 @@ struct AddWorkoutSheet: View {
                 .font(OhanaFont.callout(.medium))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
             Spacer()
-            TextField(placeholder, text: text)
-                .keyboardType(.decimalPad)
-                .font(OhanaFont.callout(.bold))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .multilineTextAlignment(.trailing)
-                .frame(width: 80)
+            InlineNumericInput(
+                text: text,
+                placeholder: placeholder,
+                maxFractionDigits: allowsDecimal ? 1 : 0,
+                accent: color,
+                step: label.contains("分钟") || label.contains("卡路里") ? 5 : 0.5,
+                valueFont: OhanaFont.callout(.bold),
+                valueAlignment: .trailing,
+                fill: Color.ohanaControlFill,
+                cornerRadius: 14,
+                horizontalPadding: 10,
+                verticalPadding: 6
+            )
+            .frame(width: 102)
         }
     }
 

@@ -17,8 +17,10 @@ struct HumanWeightHistoryView: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var isInlineWeightComposerVisible = false
+    @State private var showingWeightPopup = false
     @State private var newWeightText = ""
     @State private var newWeightDate = Date()
+    @State private var includesWeightTime = false
 
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isViewingOwnProfile: Bool { activeHumanId == human.id }
@@ -40,6 +42,11 @@ struct HumanWeightHistoryView: View {
         (parsedInlineWeight ?? 0) > 0
     }
 
+    private var inlineWeightRecordDate: Date {
+        let date = includesWeightTime ? newWeightDate : Calendar.current.startOfDay(for: newWeightDate)
+        return min(date, Date())
+    }
+
     private var inlineQuickWeights: [Double] {
         let latest = sortedLogs.first?.weight ?? 60
         return [latest - 1, latest, latest + 1]
@@ -48,53 +55,31 @@ struct HumanWeightHistoryView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            OhanaAppBackground().ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                pageHeader
-                    .padding(.horizontal, 20)
-                    .padding(.top, 14)
-
-                if isPrivacyLocked {
-                    Spacer(minLength: 24)
-                    privacyLockedView
-                    Spacer()
-                } else {
-                    chartSection.frame(maxHeight: .infinity)
-                    recordListLayer.frame(height: 320)
-                }
-            }
-            .ignoresSafeArea(edges: .bottom)
-
-            if !isPrivacyLocked {
-                Button {
+        ZStack {
+            HumanWeightDashboardContent(
+                human: human,
+                onClose: { dismiss() },
+                onAdd: {
                     withAnimation(GoMotion.feedback) {
-                        isInlineWeightComposerVisible.toggle()
+                        showingWeightPopup = true
                     }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .black))
-                        Text(l.tr(zh: "添加体重", en: "Add weight", de: "Gewicht hinzufügen"))
-                            .font(.system(size: 16, weight: .black, design: .rounded))
-                    }
-                    .foregroundStyle(Color.arkInk)
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 14)
-                    .background(Color.goPrimary, in: Capsule())
                 }
-                .buttonStyle(ScaleButtonStyle())
-                .padding(.bottom, 28)
+            )
+
+            if showingWeightPopup {
+                GenericWeightEntrySheet(
+                    target: .human(human),
+                    onDismiss: {
+                        withAnimation(GoMotion.feedback) {
+                            showingWeightPopup = false
+                        }
+                    }
+                )
+                .zIndex(20)
+                .transition(.opacity)
             }
         }
         .toolbar(.hidden, for: .navigationBar)
-        .onChange(of: newWeightText) { _, value in
-            let sanitized = CountryDecimalInput.sanitize(value, countryCode: appCountry, maxFractionDigits: 2)
-            if sanitized != value {
-                newWeightText = sanitized
-            }
-        }
     }
 
     private var pageHeader: some View {
@@ -368,6 +353,33 @@ struct HumanWeightHistoryView: View {
             .padding(12)
             .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
+            HStack(spacing: 10) {
+                Image(systemName: "clock")
+                    .font(.system(size: 13, weight: .black))
+                    .foregroundStyle(Color.goPrimary)
+                    .frame(width: 24)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(l.tr(zh: "时间", en: "Time", de: "Zeit"))
+                        .font(OhanaFont.subheadline(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(l.tr(zh: "可选", en: "Optional", de: "Optional"))
+                        .font(OhanaFont.caption2(.black))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
+                Spacer()
+                if includesWeightTime {
+                    DatePicker("", selection: $newWeightDate, displayedComponents: .hourAndMinute)
+                        .datePickerStyle(.compact)
+                        .tint(Color.goPrimary)
+                        .labelsHidden()
+                }
+                Toggle("", isOn: $includesWeightTime.animation(GoMotion.feedback))
+                    .labelsHidden()
+                    .tint(Color.goPrimary)
+            }
+            .padding(12)
+            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
             Button(action: saveInlineWeight) {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
@@ -393,7 +405,7 @@ struct HumanWeightHistoryView: View {
                 Text(log.date, format: .dateTime.year().month().day())
                     .font(OhanaFont.subheadline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(log.date, format: .dateTime.weekday(.wide))
+                Text(weightRowSubtitle(for: log.date))
                     .font(OhanaFont.caption())
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -422,7 +434,7 @@ struct HumanWeightHistoryView: View {
     private func saveInlineWeight() {
         guard let value = parsedInlineWeight, value > 0 else { return }
         let executorId = activeHumanIdStr.isEmpty ? nil : activeHumanIdStr
-        let log = HumanWeightLog(date: newWeightDate, weight: value, human: human, executorId: executorId)
+        let log = HumanWeightLog(date: inlineWeightRecordDate, weight: value, human: human, executorId: executorId)
         modelContext.insert(log)
         human.weightLogs.append(log)
         modelContext.safeSave()
@@ -430,8 +442,19 @@ struct HumanWeightHistoryView: View {
         withAnimation(GoMotion.feedback) {
             newWeightText = ""
             newWeightDate = Date()
+            includesWeightTime = false
             isInlineWeightComposerVisible = false
         }
+    }
+
+    private func weightRowSubtitle(for date: Date) -> String {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.hour, .minute], from: date)
+        let weekday = date.formatted(.dateTime.weekday(.wide).locale(AppLanguage.effectiveLocale))
+        guard (components.hour ?? 0) != 0 || (components.minute ?? 0) != 0 else {
+            return weekday
+        }
+        return "\(weekday) · \(date.formatted(date: .omitted, time: .shortened))"
     }
 }
 
