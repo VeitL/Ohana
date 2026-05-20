@@ -935,7 +935,7 @@ struct OhanaPopupCloseButton: View {
     }
 }
 
-/// Icon Button Style B — subtle gradient bg, colored icon, no border
+/// Icon Button Style B — plain monochrome glyph, no colored tile
 public struct OhanaIconButton: View {
     let icon: String
     let color: Color
@@ -951,10 +951,10 @@ public struct OhanaIconButton: View {
         Button(action: action) {
             Image(systemName: icon)
                 .font(OhanaFont.headline(.bold))
-                .foregroundStyle(color)
+                .foregroundStyle(Color.ohanaFunctionalIcon)
                 .frame(width: 44, height: 44)
                 .background(
-                    LinearGradient(colors: [color.opacity(0.2), color.opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing),
+                    Color.ohanaControlFill,
                     in: RoundedRectangle(cornerRadius: 14)
                 )
         }
@@ -1042,7 +1042,7 @@ public struct OhanaQACard: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Image(systemName: icon).font(OhanaFont.title(.bold)).foregroundStyle(color)
+            Image(systemName: icon).font(OhanaFont.title(.bold)).foregroundStyle(Color.ohanaFunctionalIcon)
             VStack(alignment: .leading, spacing: 2) {
                 Text(value).font(OhanaFont.title2(.black)).foregroundStyle(Color.ohanaPrimaryText)
                 Text(title).font(OhanaFont.caption2(.bold)).foregroundStyle(Color.ohanaSecondaryText)

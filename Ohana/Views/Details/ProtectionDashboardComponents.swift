@@ -9,7 +9,6 @@ import SwiftUI
 
 enum ProtectionSection: String, CaseIterable, Identifiable {
     case documents
-    case vaccines
     case insurance
 
     var id: String { rawValue }
@@ -17,7 +16,6 @@ enum ProtectionSection: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .documents: return "doc.text.fill"
-        case .vaccines: return "syringe.fill"
         case .insurance: return "shield.lefthalf.filled"
         }
     }
@@ -25,7 +23,6 @@ enum ProtectionSection: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .documents: return "证件"
-        case .vaccines: return "疫苗本"
         case .insurance: return "保险"
         }
     }
@@ -33,7 +30,6 @@ enum ProtectionSection: String, CaseIterable, Identifiable {
     var tint: Color {
         switch self {
         case .documents: return Color(hex: "94A3B8")
-        case .vaccines: return Color.goTeal
         case .insurance: return Color.goPurple
         }
     }
@@ -66,35 +62,29 @@ enum ProtectionRiskLevel: Equatable {
 
 struct PetProtectionDashboardState {
     let documentCount: Int
-    let vaccineCount: Int
     let insuranceCount: Int
     let documentsRisk: ProtectionRiskLevel
-    let vaccineRisk: ProtectionRiskLevel
     let insuranceRisk: ProtectionRiskLevel
     let nextDocumentDate: Date?
-    let nextVaccineDate: Date?
     let nextInsuranceDate: Date?
 
     init(pet: Pet, calendar: Calendar = .current, now: Date = Date()) {
-        let documents = pet.documents
-        let vaccines = pet.healthLogs.filter { $0.healthLogType == .vaccine }
+        let documents = pet.documents.filter { doc in
+            doc.documentCategory != .vaccine && doc.documentCategory != .insurance
+        }
         let insurances = pet.insurances
 
         documentCount = documents.count
-        vaccineCount = vaccines.count
         insuranceCount = insurances.count
         documentsRisk = Self.risk(for: documents.compactMap(\.expiryDate), now: now, calendar: calendar, empty: documents.isEmpty)
-        vaccineRisk = Self.risk(for: vaccines.compactMap(\.expirationDate), now: now, calendar: calendar, empty: vaccines.isEmpty)
         insuranceRisk = Self.risk(for: insurances.map(\.renewalDate), now: now, calendar: calendar, empty: insurances.isEmpty)
         nextDocumentDate = Self.nextDate(from: documents.compactMap(\.expiryDate), now: now)
-        nextVaccineDate = Self.nextDate(from: vaccines.compactMap(\.expirationDate), now: now)
         nextInsuranceDate = Self.nextDate(from: insurances.map(\.renewalDate), now: now)
     }
 
     func count(for section: ProtectionSection) -> Int {
         switch section {
         case .documents: return documentCount
-        case .vaccines: return vaccineCount
         case .insurance: return insuranceCount
         }
     }
@@ -102,7 +92,6 @@ struct PetProtectionDashboardState {
     func risk(for section: ProtectionSection) -> ProtectionRiskLevel {
         switch section {
         case .documents: return documentsRisk
-        case .vaccines: return vaccineRisk
         case .insurance: return insuranceRisk
         }
     }
@@ -110,7 +99,6 @@ struct PetProtectionDashboardState {
     func nextDate(for section: ProtectionSection) -> Date? {
         switch section {
         case .documents: return nextDocumentDate
-        case .vaccines: return nextVaccineDate
         case .insurance: return nextInsuranceDate
         }
     }
@@ -164,7 +152,7 @@ struct ProtectionCoreCard: View {
                 Text("\(count)")
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .contentTransition(.numericText())
+                    .ohanaNumericMotion(count)
             }
 
             HStack(spacing: 5) {
@@ -236,21 +224,13 @@ struct ProtectionPetAvatar: View {
     let size: CGFloat
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(Color(hex: pet.safeThemeColorHex).opacity(0.18))
-                .frame(width: size, height: size)
-            if let data = pet.avatarImageData, let ui = UIImage(data: data) {
-                Image(uiImage: ui)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: size, height: size)
-                    .clipShape(Circle())
-            } else {
-                Text(pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji)
-                    .font(.system(size: size * 0.48))
-            }
-        }
+        PetAvatarPortraitView(
+            imageData: pet.avatarImageData,
+            fallbackText: pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji,
+            themeColor: Color(hex: pet.safeThemeColorHex),
+            size: size,
+            backgroundOpacity: 0.18
+        )
     }
 }
 
@@ -361,64 +341,6 @@ struct DocumentDetailRow: View {
         if let data = doc.attachmentData, let ui = UIImage(data: data) { return ui }
         if let first = doc.attachments.first(where: { $0.isImage }), let ui = UIImage(data: first.data) { return ui }
         return nil
-    }
-}
-
-struct ProtectionVaccineRow: View {
-    let log: PetHealthLog
-    let onDelete: () -> Void
-
-    private var expiryColor: Color {
-        guard let date = log.expirationDate else { return Color.ohanaSecondaryText }
-        let days = Calendar.current.dateComponents([.day], from: Date(), to: date).day ?? 0
-        if days < 0 { return Color.goRed }
-        if days <= 30 { return Color.goYellow }
-        return Color.goTeal
-    }
-
-    private var statusText: String {
-        guard let date = log.expirationDate else { return "未设有效期" }
-        let days = Calendar.current.dateComponents([.day], from: Date(), to: date).day ?? 0
-        if days < 0 { return "已过期" }
-        if days == 0 { return "今日到期" }
-        if days <= 30 { return "\(days)天" }
-        return date.formatted(.dateTime.month().day())
-    }
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "syringe.fill")
-                .font(.system(size: 16, weight: .black))
-                .foregroundStyle(Color.goTeal)
-                .frame(width: 42, height: 42)
-            VStack(alignment: .leading, spacing: 5) {
-                Text(log.note.isEmpty ? "疫苗接种" : log.note)
-                    .font(OhanaFont.subheadline(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                HStack(spacing: 8) {
-                    Text(log.date.formatted(.dateTime.month().day()))
-                    if !log.vetName.isEmpty { Text(log.vetName) }
-                    if log.cost > 0 { Text(AppCurrency.format(log.cost, fractionDigits: 0)) }
-                }
-                .font(OhanaFont.caption2(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .lineLimit(1)
-            }
-            Spacer()
-            Text(statusText)
-                .font(OhanaFont.caption2(.black))
-                .foregroundStyle(expiryColor)
-                .padding(.horizontal, 9)
-                .frame(height: 26)
-                .background(expiryColor.opacity(0.14), in: Capsule())
-        }
-        .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .contextMenu {
-            Button(role: .destructive) { onDelete() } label: {
-                Label("删除疫苗", systemImage: "trash")
-            }
-        }
     }
 }
 

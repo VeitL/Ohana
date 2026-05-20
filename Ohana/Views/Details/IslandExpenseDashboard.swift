@@ -2,58 +2,57 @@
 //  IslandExpenseDashboard.swift
 //  Ohana
 //
-//  全岛花费详情页 — Bento Box 深色毛玻璃主题
-//  吞金兽 + 消费大头 + 横向 BarMark + SectorMark 环形饼图
+//  Global expense dashboard, aligned with the V4 "planet" dashboard language.
 //
 
 import SwiftUI
 import SwiftData
-import Charts
 
-// MARK: - Time Filter
-enum ExpenseTimeRange: String, CaseIterable, Identifiable {
-    case day   = "日"
-    case month = "月"
-    case year  = "年"
-    case all   = "全部"
-    var id: String { rawValue }
+private struct CategorySpendBreakdown: Identifiable {
+    var id: String { category.rawValue }
+    let category: ExpenseCategory
+    let total: Double
+    let pct: Double
 }
 
-// MARK: - Internal Data Models
 private struct PetExpenseSummary: Identifiable {
     let id: UUID
     let name: String
     let emoji: String
     let total: Double
     let color: Color
+    let categories: [CategorySpendBreakdown]
 }
 
 private struct CategorySummary: Identifiable {
-    let id = UUID()
+    var id: String { category.rawValue }
     let category: ExpenseCategory
     let total: Double
     let pct: Double
 }
 
 private struct PayerSummary: Identifiable {
-    let id = UUID()
+    let id: String
     let name: String
     let emoji: String
     let total: Double
     let color: Color
     let pct: Double
+    let categories: [CategorySpendBreakdown]
 }
 
-// MARK: - Main View
 struct IslandExpenseDashboard: View {
     var standalone: Bool = true
 
-    @Environment(\.dismiss)           private var dismiss
-    @Query(sort: \Pet.name)           private var pets: [Pet]
-    @Query(sort: \Human.createdAt)    private var humans: [Human]
+    @Environment(\.dismiss) private var dismiss
+    @Query(sort: \Pet.name) private var pets: [Pet]
+    @Query(sort: \Human.createdAt) private var humans: [Human]
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
-    @State private var timeRange: ExpenseTimeRange = .month
-    @State private var chartAnimationProgress: Double = 0.0
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+
+    @State private var selectedRange: ExpenseDashboardRange = .month
+
+    private var l: L10n { L10n(appLanguage) }
 
     private var activeHumanId: UUID? {
         UUID(uuidString: activeHumanIdStr)
@@ -63,114 +62,148 @@ struct IslandExpenseDashboard: View {
         PrivacyService.unlockedHumans(for: .expense, from: humans, viewedBy: activeHumanId)
     }
 
-    // 时间过滤后的所有花费
+    private var allExpenseLogs: [PetExpenseLog] {
+        pets.flatMap(\.expenseLogs)
+    }
+
     private var filteredLogs: [PetExpenseLog] {
-        let now = Date()
-        let cal = Calendar.current
-        let cutoff: Date? = {
-            switch timeRange {
-            case .day:   return cal.startOfDay(for: now)
-            case .month: return cal.dateInterval(of: .month, for: now)?.start
-            case .year:  return cal.dateInterval(of: .year, for: now)?.start
-            case .all:   return nil
-            }
-        }()
-        return pets.flatMap { $0.expenseLogs }.filter {
-            guard let c = cutoff else { return true }
-            return $0.date >= c
-        }
+        guard let cutoff = selectedRange.startDate() else { return allExpenseLogs }
+        return allExpenseLogs.filter { $0.date >= cutoff }
     }
 
     private var visibleExpenseLogs: [PetExpenseLog] {
-        filteredLogs.filter {
-            !PrivacyService.isLocked(.expense, humanId: $0.executorId, in: humans, viewedBy: activeHumanId)
-        }
+        visibleLogs(from: filteredLogs)
     }
 
-    /// 实际总支出（正值，不含报销负值）
-    private var totalAmount: Double { visibleExpenseLogs.filter { $0.amount > 0 }.reduce(0) { $0 + $1.amount } }
-    /// 报销合计（绝对值）
-    private var totalReimbursed: Double { visibleExpenseLogs.filter { $0.amount < 0 }.reduce(0) { $0 + abs($1.amount) } }
-
-    // 每宠物汇总
-    private var petSummaries: [PetExpenseSummary] {
-        pets.compactMap { pet -> PetExpenseSummary? in
-            let logs = visibleExpenseLogs.filter { $0.pet?.id == pet.id && $0.amount > 0 }
-            let total = logs.reduce(0) { $0 + $1.amount }
-            guard total > 0 else { return nil }
-            return PetExpenseSummary(id: pet.id, name: pet.name,
-                                     emoji: pet.avatarEmoji, total: total,
-                                     color: Color(hex: pet.themeColorHex))
-        }.sorted { $0.total > $1.total }
+    private var positiveExpenseLogs: [PetExpenseLog] {
+        visibleExpenseLogs.filter { $0.amount > 0 }
     }
 
-    // 类目汇总（饼图，仅正值）
+    private var totalAmount: Double {
+        positiveExpenseLogs.reduce(0) { $0 + $1.amount }
+    }
+
+    private var totalReimbursed: Double {
+        visibleExpenseLogs
+            .filter { $0.amount < 0 }
+            .reduce(0) { $0 + abs($1.amount) }
+    }
+
+    private var periodDelta: Double? {
+        guard let currentStart = selectedRange.startDate() else { return nil }
+        let now = Date()
+        let span = now.timeIntervalSince(currentStart)
+        guard span > 0 else { return nil }
+        let previousStart = currentStart.addingTimeInterval(-span)
+        let previousLogs = allExpenseLogs.filter { $0.date >= previousStart && $0.date < currentStart }
+        let previousTotal = visibleLogs(from: previousLogs)
+            .filter { $0.amount > 0 }
+            .reduce(0) { $0 + $1.amount }
+        return totalAmount - previousTotal
+    }
+
     private var categorySummaries: [CategorySummary] {
         let total = max(1, totalAmount)
         var dict: [String: Double] = [:]
-        for log in visibleExpenseLogs where log.amount > 0 {
+        for log in positiveExpenseLogs {
             dict[log.category, default: 0] += log.amount
         }
-        return dict.compactMap { key, val -> CategorySummary? in
-            guard let cat = ExpenseCategory(rawValue: key) else { return nil }
-            return CategorySummary(category: cat, total: val, pct: val / total)
-        }.sorted { $0.total > $1.total }
+        return dict.compactMap { key, value in
+            guard let category = ExpenseCategory(rawValue: key) else { return nil }
+            return CategorySummary(category: category, total: value, pct: value / total)
+        }
+        .sorted { $0.total > $1.total }
     }
 
-    // 吞金兽
-    private var topPet: PetExpenseSummary? { petSummaries.first }
-    // 消费大头类目
-    private var topCategory: CategorySummary? { categorySummaries.first }
+    private var topCategory: CategorySummary? {
+        categorySummaries.first
+    }
 
-    // 按支付人汇总（谁在买单）
+    private var petSummaries: [PetExpenseSummary] {
+        pets.compactMap { pet in
+            let logs = positiveExpenseLogs.filter { $0.pet?.id == pet.id }
+            let total = logs.reduce(0) { $0 + $1.amount }
+            guard total > 0 else { return nil }
+            return PetExpenseSummary(
+                id: pet.id,
+                name: pet.name,
+                emoji: pet.avatarEmoji,
+                total: total,
+                color: Color(hex: pet.safeThemeColorHex),
+                categories: categoryBreakdown(for: logs)
+            )
+        }
+        .sorted { $0.total > $1.total }
+    }
+
+    private var topPet: PetExpenseSummary? {
+        petSummaries.first
+    }
+
     private var humanSummaries: [PayerSummary] {
         let total = max(1, totalAmount)
-        var dict: [String: Double] = [:]
-        for log in visibleExpenseLogs {
-            let raw = log.executorId
-            let key: String
-            if raw == nil || (raw?.isEmpty ?? true) {
-                key = "__unknown__"
-            } else if let r = raw, !r.isEmpty, visibleExpenseHumans.contains(where: { $0.id.uuidString == r }) {
-                key = r
-            } else {
-                // 已删除成员或无效 id：并入未指定，避免支付人统计漏额
-                key = "__unknown__"
-            }
-            dict[key, default: 0] += log.amount
+        var totals: [String: Double] = [:]
+        var logsByKey: [String: [PetExpenseLog]] = [:]
+        for log in positiveExpenseLogs {
+            let key = payerKey(for: log.executorId)
+            totals[key, default: 0] += log.amount
+            logsByKey[key, default: []].append(log)
         }
-        return dict.compactMap { key, val -> PayerSummary? in
+
+        return totals.compactMap { key, value in
             if key == "__unknown__" {
-                return PayerSummary(name: "未指定", emoji: "❓", total: val,
-                                   color: .white.opacity(0.4), pct: val / total)
+                return PayerSummary(
+                    id: key,
+                    name: l.tr(zh: "未指定", en: "Unassigned", de: "Nicht zugeordnet"),
+                    emoji: "❓",
+                    total: value,
+                    color: Color.ohanaSecondaryText,
+                    pct: value / total,
+                    categories: categoryBreakdown(for: logsByKey[key] ?? [])
+                )
             }
-            guard let human = visibleExpenseHumans.first(where: { $0.id.uuidString == key }) else { return nil }
-            return PayerSummary(name: human.name, emoji: human.avatarEmoji, total: val,
-                               color: humanThemeColor(human), pct: val / total)
-        }.sorted { $0.total > $1.total }
+
+            guard let human = visibleExpenseHumans.first(where: { $0.id.uuidString == key }) else {
+                return nil
+            }
+            return PayerSummary(
+                id: key,
+                name: human.name,
+                emoji: human.avatarEmoji,
+                total: value,
+                color: humanThemeColor(human),
+                pct: value / total,
+                categories: categoryBreakdown(for: logsByKey[key] ?? [])
+            )
+        }
+        .sorted { $0.total > $1.total }
     }
 
-    private func humanThemeColor(_ human: Human) -> Color {
-        let hex = human.themeColor
-        if hex.count == 6 { return Color(hex: hex) }
-        return Color.goPrimary
+    private var topPayer: PayerSummary? {
+        humanSummaries.first
+    }
+
+    private var trendBuckets: [ExpenseTimeBucket] {
+        let calendar = Calendar.current
+        let now = Date()
+        let start = selectedRange.startDate() ?? allExpenseStartDate(calendar: calendar, now: now)
+
+        guard let start else { return [] }
+        let dayCount = max(0, calendar.dateComponents([.day], from: calendar.startOfDay(for: start), to: calendar.startOfDay(for: now)).day ?? 0)
+
+        return (0...dayCount).compactMap { offset in
+            guard let day = calendar.date(byAdding: .day, value: offset, to: calendar.startOfDay(for: start)) else {
+                return nil
+            }
+            let amount = positiveExpenseLogs.reduce(0) { partial, log in
+                calendar.isDate(log.date, inSameDayAs: day) ? partial + log.amount : partial
+            }
+            return ExpenseTimeBucket(date: day, label: compactDayLabel(day), amount: amount)
+        }
     }
 
     var body: some View {
         dashboardBody
-            .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8, blendDuration: 0)) {
-                        chartAnimationProgress = 1.0
-                    }
-                }
-            }
-            .onChange(of: timeRange) { _, _ in
-                chartAnimationProgress = 0.0
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.8, blendDuration: 0)) {
-                    chartAnimationProgress = 1.0
-                }
-            }
     }
 
     @ViewBuilder
@@ -188,20 +221,23 @@ struct IslandExpenseDashboard: View {
 
     private var scrollContent: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 20) {
+            VStack(spacing: 18) {
                 if standalone { navBar }
-                expenseFloatingHeader
-                funBentoRow
-                petBarChartCard
-                payerBreakdownCard
-                ExpenseSplitterCard(filteredLogs: visibleExpenseLogs, humans: visibleExpenseHumans)
+                expensePlanetHero
+                expenseTrendCard
+                expenseBadgeStrip
+                humanSpendSection
+                petSpendSection
+                if totalReimbursed > 0 {
+                    reimbursementStrip
+                }
                 Color.clear.frame(height: 40)
             }
             .padding(.horizontal, 16)
+            .padding(.top, standalone ? 0 : 14)
         }
     }
 
-    // MARK: - Nav Bar
     private var navBar: some View {
         HStack {
             Button { dismiss() } label: {
@@ -209,392 +245,393 @@ struct IslandExpenseDashboard: View {
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 36, height: 36)
-                    .background(.white.opacity(0.12), in: Circle())
+                    .background(Color.ohanaControlFill, in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())
+
             Spacer()
-            Text("全岛花费")
+            Text(l.tr(zh: "花费星球", en: "Expense Planet", de: "Ausgabenplanet"))
                 .font(.system(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Color.clear.frame(width: 36, height: 36)
         }
-        .padding(.top, 64)
+        .padding(.top, 50)
     }
 
-    // MARK: - E7: 悬浮首部（时间filter + 大数字 + pie chart）
-    private var expenseFloatingHeader: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // 时间 filter
-            Picker("", selection: $timeRange) {
-                ForEach(ExpenseTimeRange.allCases) { r in
-                    Text(r.rawValue).tag(r)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 4)
-
-            // 悬浮 Pie Chart（独立色系，无卡片背景）
-            HStack(alignment: .center, spacing: 20) {
+    private var expensePlanetHero: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 12) {
                 ZStack {
-                    if categorySummaries.isEmpty {
-                        // 无数据：灰色空心环
-                        Circle()
-                            .strokeBorder(.primary.opacity(0.1), lineWidth: 18)
-                            .frame(width: 150, height: 150)
-                    } else {
-                        Chart(categorySummaries) { item in
-                            SectorMark(
-                                angle: .value("金额", item.total * chartAnimationProgress),
-                                innerRadius: .ratio(0.5),
-                                angularInset: 2
-                            )
-                            .foregroundStyle(expensePieColor(item.category))
-                            .cornerRadius(4)
-                        }
-                        .frame(width: 150, height: 150)
-                    }
+                    Circle()
+                        .fill(Color.goPrimary.opacity(0.16))
+                        .frame(width: 56, height: 56)
+                    Image(systemName: "creditcard.fill")
+                        .font(.system(size: 24, weight: .black))
+                        .foregroundStyle(Color.goPrimary)
+                }
 
-                    VStack(spacing: 2) {
-                        if categorySummaries.isEmpty {
-                            Text("暂无数据")
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
-                        } else {
-                            Text(AppCurrency.format(totalAmount, fractionDigits: 0))
-                                .font(.system(size: 16, weight: .black, design: .rounded))
-                                .foregroundStyle(Color.ohanaPrimaryText)
-                            Text(timeRange.rawValue == "全部" ? "累计" : "本\(timeRange.rawValue)")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(Color.ohanaSecondaryText)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(l.tr(zh: "本期花费", en: "Spent", de: "Ausgaben"))
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                    HStack(alignment: .lastTextBaseline, spacing: 8) {
+                        Text(AppCurrency.format(totalAmount, fractionDigits: 0))
+                            .font(.system(size: 38, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .ohanaNumericMotion(totalAmount)
+                        if let periodDelta {
+                            trendDeltaPill(periodDelta)
                         }
                     }
                 }
+                Spacer(minLength: 0)
+            }
 
-                if !categorySummaries.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(categorySummaries.prefix(4)) { item in
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(expensePieColor(item.category))
-                                    .frame(width: 7, height: 7)
-                                Text(item.category.rawValue)
-                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.75))
-                                Spacer()
-                                Text("\(Int(item.pct * 100))%")
-                                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
-                            }
-                        }
-                        // 报销行
-                        if totalReimbursed > 0 {
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(Color(hex: "4ECDC4"))
-                                    .frame(width: 7, height: 7)
-                                Text("保险报销")
-                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(Color(hex: "4ECDC4"))
-                                Spacer()
-                                Text(AppCurrency.format(-totalReimbursed, fractionDigits: 0))
-                                    .font(.system(size: 10, weight: .black, design: .rounded))
-                                    .foregroundStyle(Color(hex: "4ECDC4"))
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                } else {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("记录第一笔花费")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                        Text("在宠物详情页添加花费记录后，这里会显示消费分布")
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 10) {
+                if let topCategory {
+                    miniMetric(
+                        title: l.tr(zh: "最多", en: "Top", de: "Top"),
+                        value: topCategory.category.rawValue,
+                        icon: topCategory.category.systemIconName,
+                        tint: expenseTint(topCategory.category)
+                    )
+                }
+                if let topPayer {
+                    miniMetric(
+                        title: l.tr(zh: "成员", en: "Member", de: "Mitglied"),
+                        value: topPayer.name,
+                        icon: "person.fill",
+                        tint: topPayer.color
+                    )
+                }
+                if let topPet {
+                    miniMetric(
+                        title: l.tr(zh: "宠物", en: "Pet", de: "Tier"),
+                        value: topPet.name,
+                        icon: "pawprint.fill",
+                        tint: topPet.color
+                    )
                 }
             }
-            .padding(.horizontal, 4)
+        }
+    }
+
+    private var expenseTrendCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center) {
+                Label(l.tr(zh: "花费节奏", en: "Spend rhythm", de: "Ausgabenrhythmus"), systemImage: "chart.bar.xaxis")
+                    .font(OhanaFont.subheadline(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Spacer()
+                DashboardRangePicker(ranges: ExpenseDashboardRange.allCases, selection: $selectedRange) {
+                    $0.title(l)
+                }
+            }
+
+            if trendBuckets.allSatisfy({ $0.amount == 0 }) {
+                emptyState(
+                    icon: "creditcard",
+                    text: l.tr(zh: "记录花费后会显示趋势", en: "Log spending to see the trend", de: "Ausgaben erfassen, um den Trend zu sehen")
+                )
+            } else {
+                ExpenseBarDashboardChart(buckets: trendBuckets, accent: .goPrimary)
+                    .frame(height: 150)
+            }
+        }
+        .padding(16)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    private var expenseBadgeStrip: some View {
+        HStack(spacing: 10) {
+            statBadge(
+                title: l.tr(zh: "成员", en: "Members", de: "Mitglieder"),
+                value: "\(humanSummaries.count)",
+                icon: "person.2.fill",
+                tint: Color.goPrimary
+            )
+            statBadge(
+                title: l.tr(zh: "宠物", en: "Pets", de: "Tiere"),
+                value: "\(petSummaries.count)",
+                icon: "pawprint.fill",
+                tint: Color(hex: "8B5CF6")
+            )
+            statBadge(
+                title: l.tr(zh: "报销", en: "Refund", de: "Erstattung"),
+                value: totalReimbursed > 0 ? AppCurrency.format(totalReimbursed, fractionDigits: 0) : "0",
+                icon: "arrow.uturn.backward.circle.fill",
+                tint: Color(hex: "06B6D4")
+            )
+        }
+    }
+
+    private var humanSpendSection: some View {
+        dashboardSection(
+            title: l.tr(zh: "成员花费", en: "Member spending", de: "Mitgliederausgaben"),
+            icon: "person.2.fill"
+        ) {
+            if humanSummaries.isEmpty {
+                emptyState(
+                    icon: "person.crop.circle.badge.questionmark",
+                    text: l.tr(zh: "记录支付人后会显示成员花费", en: "Add payers to see member spending", de: "Zahlende erfassen, um Ausgaben je Mitglied zu sehen")
+                )
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(humanSummaries) { summary in
+                        spendRow(
+                            avatar: summary.emoji,
+                            name: summary.name,
+                            amount: summary.total,
+                            tint: summary.color,
+                            categories: summary.categories,
+                            detailPrefix: l.tr(zh: "花到", en: "For", de: "Für")
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private var petSpendSection: some View {
+        dashboardSection(
+            title: l.tr(zh: "宠物花费", en: "Pet spending", de: "Tierausgaben"),
+            icon: "pawprint.fill"
+        ) {
+            if petSummaries.isEmpty {
+                emptyState(
+                    icon: "pawprint",
+                    text: l.tr(zh: "关联宠物后会显示每只宠物花了什么", en: "Link pets to see what each one cost", de: "Haustiere zuordnen, um Kosten je Tier zu sehen")
+                )
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(petSummaries) { summary in
+                        spendRow(
+                            avatar: summary.emoji,
+                            name: summary.name,
+                            amount: summary.total,
+                            tint: summary.color,
+                            categories: summary.categories,
+                            detailPrefix: l.tr(zh: "用于", en: "Used for", de: "Verwendet für")
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private var reimbursementStrip: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "arrow.uturn.backward.circle.fill")
+                .font(.system(size: 15, weight: .black))
+                .foregroundStyle(Color(hex: "06B6D4"))
+            Text(l.tr(zh: "已记录报销", en: "Refunds logged", de: "Erstattungen erfasst"))
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(Color.ohanaSecondaryText)
+            Spacer()
+            Text(AppCurrency.format(totalReimbursed, fractionDigits: 0))
+                .font(OhanaFont.subheadline(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
         }
         .padding(.horizontal, 4)
     }
 
-    /// E7: 独立色系，和宠物主题色区分
-    private func expensePieColor(_ cat: ExpenseCategory) -> Color {
-        switch cat {
-        case .food:             return Color.foodDry
-        case .treats:           return Color(hex: "10B981")  // 緑
-        case .medical:          return Color(hex: "F59E0B")  // 橙黄
-        case .grooming:         return Color(hex: "8B5CF6")  // 紫
-        case .toys:             return Color(hex: "EC4899")  // 粉
-        case .insurancePremium: return Color(hex: "06B6D4")  // 青（保险费）
-        case .other:            return Color(hex: "6B7280")  // 灰
+    private func dashboardSection<Content: View>(
+        title: String,
+        icon: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(title, systemImage: icon)
+                .font(OhanaFont.subheadline(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+            content()
         }
     }
 
-    // MARK: - 趣味 Bento（吞金兽 + 消费大头）
-    private var funBentoRow: some View {
-        HStack(spacing: 12) {
-            topPetCard
-            topCategoryCard
-        }
-    }
+    private func spendRow(
+        avatar: String,
+        name: String,
+        amount: Double,
+        tint: Color,
+        categories: [CategorySpendBreakdown],
+        detailPrefix: String
+    ) -> some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 12) {
+                Text(avatar)
+                    .font(.system(size: 24))
+                    .frame(width: 42, height: 42)
+                    .background(tint.opacity(0.16), in: Circle())
 
-    private var topPetCard: some View {
-        VStack(alignment: .center, spacing: 6) {
-            HStack(spacing: 5) {
-                Text("💰")
-                Text("吞金兽")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(name)
+                        .font(OhanaFont.body(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .lineLimit(1)
+                    Text(categorySummaryText(categories, prefix: detailPrefix))
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                Text(AppCurrency.format(amount, fractionDigits: 0))
+                    .font(OhanaFont.subheadline(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .ohanaNumericMotion(amount)
             }
-            Spacer(minLength: 0)
-            if let top = topPet {
-                Text(top.emoji).font(.system(size: 34))
-                Text(top.name)
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+
+            if !categories.isEmpty {
+                categoryStackedBar(categories)
+            }
+        }
+        .padding(.vertical, 12)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.ohanaTertiaryText.opacity(0.18))
+                .frame(height: 1)
+        }
+    }
+
+    private func categoryStackedBar(_ categories: [CategorySpendBreakdown]) -> some View {
+        GeometryReader { proxy in
+            HStack(spacing: 3) {
+                ForEach(categories.prefix(5)) { item in
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(expenseTint(item.category))
+                        .frame(width: max(6, proxy.size.width * item.pct))
+                }
+            }
+        }
+        .frame(height: 7)
+    }
+
+    private func trendDeltaPill(_ delta: Double) -> some View {
+        let isUp = delta > 0
+        let tint = isUp ? Color.goRed : Color.goTeal
+        return HStack(spacing: 4) {
+            Image(systemName: isUp ? "arrow.up.right" : "arrow.down.right")
+                .font(.system(size: 9, weight: .black))
+            Text(AppCurrency.format(abs(delta), fractionDigits: 0))
+                .ohanaNumericMotion(delta)
+        }
+        .font(.system(size: 11, weight: .black, design: .rounded))
+        .foregroundStyle(tint)
+        .padding(.horizontal, 8)
+        .frame(height: 24)
+        .background(tint.opacity(0.14), in: Capsule())
+    }
+
+    private func miniMetric(title: String, value: String, icon: String, tint: Color) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .black))
+                .foregroundStyle(tint)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 9, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaTertiaryText)
+                Text(value)
+                    .font(.system(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
-                Text(AppCurrency.format(top.total, fractionDigits: 0))
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.85))
-            } else {
-                Text("暂无数据").font(.system(size: 12)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 110)
-        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.white.opacity(0.1), lineWidth: 1))
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var topCategoryCard: some View {
-        VStack(alignment: .center, spacing: 6) {
-            HStack(spacing: 5) {
-                Text("🏷️")
-                Text("消费大头")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
-            }
-            Spacer(minLength: 0)
-            if let top = topCategory {
-                Text(top.category.emoji).font(.system(size: 34))
-                Text(top.category.rawValue)
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+    private func statBadge(title: String, value: String, icon: String, tint: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .black))
+                .foregroundStyle(tint)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(value)
+                    .font(.system(size: 16, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("\(Int(top.pct * 100))%")
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.85))
-            } else {
-                Text("暂无数据").font(.system(size: 12)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
+                    .ohanaNumericMotion(value)
+                Text(title)
+                    .font(.system(size: 9, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaTertiaryText)
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 110)
-        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.white.opacity(0.1), lineWidth: 1))
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: - 成员花费横向条形图
-    private var petBarChartCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 6) {
-                Text("🐾").font(.system(size: 14))
-                Text("成员花费对比")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-            }
-
-            if petSummaries.isEmpty {
-                emptyState("暂无花费记录")
-            } else {
-                petBarChart
-            }
+    private func emptyState(icon: String, text: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 20, weight: .black))
+                .foregroundStyle(Color.ohanaTertiaryText)
+            Text(text)
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .multilineTextAlignment(.center)
         }
-        .padding(16)
-        .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(.white.opacity(0.1), lineWidth: 1))
+        .frame(maxWidth: .infinity, minHeight: 120)
     }
 
-    private var petBarChart: some View {
-        VStack(spacing: 10) {
-            let maxVal = petSummaries.first?.total ?? 1
-            ForEach(petSummaries) { summary in
-                HStack(spacing: 10) {
-                    Text(summary.emoji).font(.system(size: 16))
-                    Text(summary.name)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 50, alignment: .leading)
-                        .lineLimit(1)
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(.white.opacity(0.06))
-                                .frame(height: 10)
-                            Capsule()
-                                .fill(summary.color)
-                                .frame(
-                                    width: max(8, geo.size.width * (summary.total / maxVal) * chartAnimationProgress),
-                                    height: 10
-                                )
-                        }
-                    }
-                    .frame(height: 10)
-                    Text(AppCurrency.format(summary.total, fractionDigits: 0))
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(summary.color)
-                        .frame(width: 48, alignment: .trailing)
-                }
-            }
+    private func visibleLogs(from logs: [PetExpenseLog]) -> [PetExpenseLog] {
+        logs.filter {
+            !PrivacyService.isLocked(.expense, humanId: $0.executorId, in: humans, viewedBy: activeHumanId)
         }
     }
 
-    // MARK: - 💳 谁在买单卡片
-    private var payerBreakdownCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 6) {
-                Text("💳").font(.system(size: 14))
-                Text("谁在买单")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-            }
-
-            if humanSummaries.isEmpty {
-                emptyState("暂无支付人数据")
-            } else {
-                let maxVal = humanSummaries.first?.total ?? 1
-                VStack(spacing: 10) {
-                    ForEach(humanSummaries) { summary in
-                        HStack(spacing: 10) {
-                            Text(summary.emoji).font(.system(size: 16))
-                            Text(summary.name)
-                                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                .foregroundStyle(Color.ohanaPrimaryText)
-                                .frame(width: 50, alignment: .leading)
-                                .lineLimit(1)
-                            GeometryReader { geo in
-                                ZStack(alignment: .leading) {
-                                    Capsule()
-                                        .fill(.white.opacity(0.06))
-                                        .frame(height: 10)
-                                    Capsule()
-                                        .fill(summary.color)
-                                        .frame(
-                                            width: max(8, geo.size.width * (summary.total / maxVal) * chartAnimationProgress),
-                                            height: 10
-                                        )
-                                }
-                            }
-                            .frame(height: 10)
-                            Text(AppCurrency.format(summary.total, fractionDigits: 0))
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
-                                .foregroundStyle(summary.color)
-                                .frame(width: 48, alignment: .trailing)
-                        }
-                    }
-                }
-            }
-        }
-        .padding(16)
-        .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(.white.opacity(0.1), lineWidth: 1))
+    private func payerKey(for executorId: String?) -> String {
+        guard let raw = executorId, !raw.isEmpty else { return "__unknown__" }
+        guard visibleExpenseHumans.contains(where: { $0.id.uuidString == raw }) else { return "__unknown__" }
+        return raw
     }
 
-    // MARK: - 类目环形饼图 (SectorMark)
-    private var categoryDonutCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 6) {
-                Text("🍩").font(.system(size: 14))
-                Text("消费类目分布")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-            }
-
-            if categorySummaries.isEmpty {
-                emptyState("暂无类目数据")
-            } else {
-                HStack(alignment: .center, spacing: 20) {
-                    donutChart
-                    categoryLegend
-                }
-            }
-        }
-        .padding(16)
-        .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(.white.opacity(0.1), lineWidth: 1))
+    private func humanThemeColor(_ human: Human) -> Color {
+        human.themeColor.count == 6 ? Color(hex: human.themeColor) : Color.goPrimary
     }
 
-    private var donutChart: some View {
-        ZStack {
-            Chart(categorySummaries) { item in
-                SectorMark(
-                    angle: .value("金额", item.total * chartAnimationProgress),
-                    innerRadius: .ratio(0.55),
-                    angularInset: 2
-                )
-                .foregroundStyle(categoryColor(item.category))
-                .cornerRadius(4)
-            }
-            .frame(width: 130, height: 130)
-
-            VStack(spacing: 2) {
-                Text(AppCurrency.format(totalAmount, fractionDigits: 0))
-                    .font(.title3.bold())
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text("总计")
-                    .font(.caption)
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
+    private func categoryBreakdown(for logs: [PetExpenseLog]) -> [CategorySpendBreakdown] {
+        let total = max(1, logs.filter { $0.amount > 0 }.reduce(0) { $0 + $1.amount })
+        var dict: [String: Double] = [:]
+        for log in logs where log.amount > 0 {
+            dict[log.category, default: 0] += log.amount
         }
+        return dict.compactMap { key, value in
+            guard let category = ExpenseCategory(rawValue: key) else { return nil }
+            return CategorySpendBreakdown(category: category, total: value, pct: value / total)
+        }
+        .sorted { $0.total > $1.total }
     }
 
-    private var categoryLegend: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(categorySummaries) { item in
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(categoryColor(item.category))
-                        .frame(width: 8, height: 8)
-                    Text(item.category.rawValue)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.75))
-                    Spacer()
-                    Text("\(Int(item.pct * 100))%")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
-                }
-            }
+    private func categorySummaryText(_ categories: [CategorySpendBreakdown], prefix: String) -> String {
+        guard !categories.isEmpty else {
+            return l.tr(zh: "暂无分类", en: "No category", de: "Keine Kategorie")
         }
-        .frame(maxWidth: .infinity)
+        let names = categories.prefix(2).map { $0.category.rawValue }.joined(separator: " · ")
+        return "\(prefix) \(names)"
     }
 
-    // MARK: - Helpers
-    private func categoryColor(_ cat: ExpenseCategory) -> Color {
-        switch cat {
-        case .food:             return Color(hex: "FF8C42")
-        case .treats:           return Color(hex: "FFF44F")
-        case .medical:          return Color(hex: "FF4757")
-        case .grooming:         return Color(hex: "C084FC")
-        case .toys:             return Color(hex: "80FFEA")
+    private func expenseTint(_ category: ExpenseCategory) -> Color {
+        switch category {
+        case .food: return Color.foodDry
+        case .treats: return Color(hex: "10B981")
+        case .medical: return Color(hex: "F59E0B")
+        case .grooming: return Color(hex: "8B5CF6")
+        case .toys: return Color(hex: "EC4899")
         case .insurancePremium: return Color(hex: "06B6D4")
-        case .other:            return Color(hex: "95ADBE")
+        case .other: return Color(hex: "6B7280")
         }
     }
 
-    private func emptyState(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 13, weight: .medium, design: .rounded))
-            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 28)
+    private func allExpenseStartDate(calendar: Calendar, now: Date) -> Date? {
+        let first = positiveExpenseLogs.map(\.date).min()
+        return first.map { calendar.startOfDay(for: $0) } ?? calendar.startOfDay(for: now)
     }
-}
 
-#Preview {
-    IslandExpenseDashboard()
-        .modelContainer(SharedModelContainer.make())
+    private func compactDayLabel(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = AppLanguage.effectiveLocale
+        formatter.setLocalizedDateFormatFromTemplate("Md")
+        return formatter.string(from: date)
+    }
+
 }

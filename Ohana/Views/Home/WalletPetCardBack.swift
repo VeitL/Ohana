@@ -191,9 +191,14 @@ struct WalletPetCardBack: View {
     // MARK: - Top bar
     private var topBar: some View {
         HStack(spacing: 6) {
-            if let data = pet.avatarImageData, let img = UIImage(data: data) {
-                Image(uiImage: img).resizable().scaledToFill()
-                    .frame(width: 24, height: 24).clipShape(Circle())
+            if pet.avatarImageData != nil {
+                PetAvatarPortraitView(
+                    imageData: pet.avatarImageData,
+                    fallbackText: pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji,
+                    themeColor: Color.goCardWhite,
+                    size: 24,
+                    backgroundOpacity: 0.15
+                )
             } else {
                 Image(systemName: Pet.speciesSilhouetteSymbol(forSpecies: pet.species))
                     .font(.system(size: 13, weight: .semibold))

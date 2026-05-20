@@ -29,7 +29,8 @@
 - **卡片与输入**：卡片使用 `flat`，输入框使用 `flat`，即纯色块、无描边、无阴影；整体密度使用 `compact`。
 - **控件**：按钮 `pill`，chip `pill`，segment `capsule`，toggle `pill`，进度条 `bar`，列表行 `filled`，角标 `solid`。
 - **实色控件**：高频按钮、chip、快捷金额/克数、内嵌数字键盘优先使用实色填充，减少低透明度和磨砂表面。选中态使用实色 `goPrimary` / 业务 tint + `Color.arkInk` 文本；未选态使用实色 elevated surface，不使用低透明度 tint。
-- **导航与设置行**：设置项左 icon 使用 `tintedTile`；非弹窗页面返回使用 `floatingCircle`；非弹窗页面关闭使用 `iconOnly`；弹窗关闭继续使用独立 `sheetChrome=iconOnly`。
+- **功能 Icon**：全局功能 icon 使用 `monochromePrimary`。导航、按钮、设置行、快捷操作、列表和状态入口里的 icon 必须是 SF Symbol 或 template vector，统一使用 `goPrimary`，不使用彩色仿真 icon、emoji、多色插画或拟物图标。
+- **导航与设置行**：设置项左 icon 使用 `plainGlyph`，不加彩色底块；非弹窗页面返回使用 `floatingCircle`；非弹窗页面关闭使用 `iconOnly`；弹窗关闭继续使用独立 `sheetChrome=iconOnly`。
 - **弹窗**：sheet 使用独立 token，当前为 `compact` 布局、`nativeRegular` 背景、`flat` 卡片、`flat` 输入框、`pill` 按钮、`iconOnly` 关闭。短记录/确认弹窗使用 `inlineOverlay`，底部贴近安全区、左右 `6pt`、连续圆角 `52pt`、自适应内容高度、`liftedAlert` 阴影、`scrimGradient` 背后遮罩、`bottomSpringScaleFade` 出入场；长表单底部 CTA 固定可见；下滑关闭只允许从顶部 drag handle 触发。弹窗 token 不跟随普通卡片/输入/按钮选择变化。
 - **图表与日历**：图表使用 `area` 趋势 + `quiet` 坐标；日历使用 `agendaHybrid`、`minimalNumber` 日期格、`dots` 事件标记、`timeRail` 日程列表。
 - **反馈与动效**：toast 使用 `icon`，banner 使用 `inline`，触感 `soft`，主运动 `spring`，FAB `rotate`，转场 `scale`，奖励 `bouncy`。
@@ -39,7 +40,7 @@
 
 - **信息密度优先**：Ohana 是家庭宠物管理工具，优先清晰、可扫描、可重复操作，不做营销式大 hero。
 - **圆润但克制**：使用圆体、胶囊按钮和柔和卡片，但不要卡片套卡片，不要堆过多装饰。
-- **状态可读**：任何状态都必须靠文字、icon、颜色共同表达，不能只靠颜色。
+- **状态可读**：任何状态都必须靠文字、icon、颜色共同表达，不能只靠颜色；状态背景、badge、文字可以使用语义色，但功能 icon glyph 本身保持全局 `goPrimary` 单色。
 - **状态优先于说明**：高频页面只展示当前状态和下一步动作，避免常驻“点击/长按/拖动/如何使用”式教程文案。
 - **卡片只给可操作表面**：卡片 UI 只用于可点击、可进入、可展开或可操作的区域；纯信息总览、静态指标和标题说明使用无框布局、行内数字或轻量分隔，不为了分组而套卡片背景。
 - **深浅色同步**：页面切换浅色/深色时，背景、卡片、描边、文字、图表和控件都必须同步变化。
@@ -136,7 +137,7 @@
 - Secondary：`primaryText.opacity(0.08)` 背景，适合取消、稍后、查看详情。
 - Destructive：红色文字、浅红背景、红色描边，必须配二次确认。
 - Ghost：无背景或轻背景，只用于卡片内轻量动作。
-- Quick Action Circle：40x40 圆形 icon 按钮，按功能使用 tint。
+- Quick Action Circle：40x40 圆形 icon 按钮，功能 icon 统一使用 `goPrimary` 单色；通过按钮背景、badge 或文字表达业务状态。
 - 高频选择按钮：选中态必须是实色主色/业务色，未选态必须是实色 surface；避免 `tint.opacity(0.10-0.20)` 作为可点击按钮主体。
 - 内嵌数字键盘：数字、删除、小数点键统一使用实色 elevated surface；不要用半透明磨砂键帽。
 
@@ -157,13 +158,20 @@
 - 彩色 hero 上使用实色返回圆按钮。
 - 多级详情可使用“返回”文字胶囊，但背景和文字必须有足够对比。
 
+### 全局功能 Icon
+
+- 功能 icon 由 `icon` 控制，当前为 `monochromePrimary`。
+- 适用范围：导航、按钮、设置行、快捷操作、列表行、状态入口、toast/banner 中的功能符号。
+- 默认结构：SF Symbol 或 template-rendered vector，20-22pt 视觉尺寸，`goPrimary` 前景，保留至少 44pt 触控区。
+- 禁止：彩色仿真 icon、拟物 icon、emoji 作为 UI 功能 icon、多色图标、照片/插画裁成按钮图标。
+- 例外：宠物/人类头像、2.5D 角色、商品预览、照片、电子宠物形象、App Icon、业务插画不是功能 icon，可继续使用彩色视觉资产。
+- 状态表达不要靠 icon 变色完成；使用 badge、背景、文字、进度条或状态行补充。
+
 ### 设置行左侧 Icon
 
-- 设置项左侧 icon 由 `settingIcon` 控制，当前为 `tintedTile`。
-- 默认结构：SF Symbol + 32pt 圆角方块，背景为功能 tint 的低透明度填充，icon 使用功能 tint。
-- `plainGlyph` 只用于极简列表，不适合复杂设置页。
-- `circleDisc` 可用于设备身份、权限、账户等更接近系统设置的模块。
-- `flatBlock` 可用于 compact 工具页，与 `flat` 卡片/输入保持一致。
+- 设置项左侧 icon 由 `settingIcon` 控制，当前为 `plainGlyph`。
+- 默认结构：纯 SF Symbol / template glyph，无彩色 tile 背景，20-22pt 视觉尺寸，`goPrimary` 前景，44pt 实际触控区。
+- 设置行可以使用文字、副标题、右侧 toggle/chevron 和状态 badge 建立层级，不再依赖彩色 icon 底块区分功能。
 - 设置行 icon 必须和标题、右侧 chevron/toggle 对齐，行高稳定，不能因为 icon 样式切换造成布局跳动。
 
 ### Toggle

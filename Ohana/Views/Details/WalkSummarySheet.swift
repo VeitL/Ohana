@@ -104,18 +104,13 @@ struct WalkSummarySheet: View {
 
     private var petHeader: some View {
         HStack(spacing: 14) {
-            if let data = pet.avatarImageData, let image = UIImage(data: data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 54, height: 54)
-                    .clipShape(Circle())
-            } else {
-                Text(pet.avatarEmoji)
-                    .font(.system(size: 34))
-                    .frame(width: 54, height: 54)
-                    .background(Color(hex: pet.themeColorHex).opacity(0.16), in: Circle())
-            }
+            PetAvatarPortraitView(
+                imageData: pet.avatarImageData,
+                fallbackText: pet.avatarEmoji,
+                themeColor: Color(hex: pet.safeThemeColorHex),
+                size: 54,
+                backgroundOpacity: 0.16
+            )
 
             VStack(alignment: .leading, spacing: 3) {
                 Text("遛狗详情")

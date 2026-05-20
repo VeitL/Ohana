@@ -1,8 +1,154 @@
 # Ohana iOS App 项目文档
 
-> 最后更新: 2026-05-08（喂食管理页 Go Focus Refine / 首页喂食状态统一）| Build: ✅ | Tests: ⚠️ 喂食状态新增用例通过；完整 OhanaTests 仍有既有隐私用例待修 | Schema: ArkSchemaV38
+> 最后更新: 2026-05-18（V4 UI / 任务协作 / Oasis 电子宠物 / 能耗治理 / 添加成员体验 / 毛绒 Icon 样张规范）| Build: ✅ `xcodebuild -scheme Ohana -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.4' build` | Schema: ArkSchemaV51
 >
-> **当前默认首页**：GO UI（`FocusStackHomeTestView`）。普通用户固定进入 GO Focus；经典 `OverviewView` 仅保留 `debugEnableClassicHome` 内部兼容入口。首页是唯一核心工作台，只回答“今天谁需要照顾 / 现在最该做什么 / 点一下怎么完成”；卡片展开页放快捷操作，FAB 放二级功能，详情页放深数据。首页卡片堆固定只取前 7 张可显示卡片；宠物/人类“在首页显示”开关位于卡片展开页，切换后同步影响首页卡片堆，满 7 张时会提示先隐藏一张。
+> **当前事实优先级**：本文件顶部“当前快照”代表 2026-05-18 的实现状态；下方早期长章节保留为历史实现记录，若与当前快照、`AGENTS.md`、`ui规范.selection.json` 或 `docs/app-architecture-governance.md` 冲突，以后四者为准。
+>
+> **当前默认首页**：GO Focus V4（`FocusStackHomeTestView`）。普通用户固定进入 GO Focus；经典 `OverviewView` 仅作内部兼容/回归路径。首页是唯一高频工作台，只回答“今天谁需要照顾 / 现在最该做什么 / 点一下怎么完成”；卡片展开页放当前成员/宠物的快捷操作与轻量详情，FAB 放低频功能入口，深数据进入详情页。
+
+---
+
+## 当前快照（2026-05-18）
+
+### 1. 设计系统与 UI 源头
+
+- **唯一机器可读 UI 源头**：根目录 `ui规范.selection.json`。
+- **人类可读 companion**：`ui规范.md`。若 Markdown 与 JSON 冲突，JSON token 胜出。
+- **毛绒 Icon 样张源头**：`docs/plush-icon-sample-care-prompts.md` 记录 Feed / Water / Walk 三个照护快捷入口的 3D 毛绒 icon 生成规范、统一负面 prompt、命名与导入建议；`docs/plush-icon-samples/` 保存对应 SVG 构图预览稿。
+- **开发者 UI 控制台**：设置 > 开发者工具 > UI/UX 规范查看，只是编辑、预览、导出界面；只有导出的 V4 JSON 写回 `ui规范.selection.json` 后才成为正式规范。
+- **全局主色**：`goPrimary` 自适应，深色 = `goLime`，浅色 = `goBlue`。成员主题色、宠物主题色、领域专有色不得复用 `goLime/goBlue` 或 primary alias。
+- **卡片规则**：只有可点击、可编辑、可展开、可导航的 grouped surface 才使用 flat card；纯信息摘要使用 unframed metrics / inline summary。
+- **短弹窗规范**：短记录、确认、补粮、轻管理弹窗必须是当前页面内 `inlineOverlay`，底部靠近安全区、6pt 水平边距、52pt 连续圆角、单层 `nativeRegular` glass、`liftedAlert` 阴影、内容自适应高度、顶部 handle 才能下滑关闭。
+- **普通 sheet/page 规范**：总览、历史、长列表、复杂编辑可使用普通页面或系统 sheet，但页面 chrome、关闭按钮、背景、chart、按钮仍遵守 V4。
+- **数字输入**：高频数字输入优先使用页面内迷你数字键盘、Stepper 或快捷 chip，避免弹系统键盘。
+- **动效**：全局使用克制高级动效：短按 spring、selection soft glide、数字 `contentTransition(.numericText())`、FAB/menu stagger、popup bottomSpringScaleFade、奖励/成功反馈短粒子。常驻循环必须接入 `AppWorkloadPolicy`。
+
+### 2. 架构、能耗与合规边界
+
+- **工程治理源头**：`docs/app-architecture-governance.md`。
+- **运行时策略唯一入口**：`Ohana/Utilities/AppRuntimePolicy.swift` 中的 `AppWorkloadPolicy`。不要在单个 View 里新建平行低功耗、Reduce Motion、scene phase 或后台策略。
+- **定位合规**：只有 running 遛狗可以持续定位和后台定位；paused、finished、无遛狗进程、普通浏览、首页、记录、喂食、协作、商店都必须停止持续定位。
+- **后台/锁屏**：running 遛狗继续记录路线，但 UI timer、地图重绘、装饰动画停止或降频；时长用 elapsed-time 计算，不依赖后台每秒 timer。
+- **重复动画/Timer**：新增 `Timer.publish`、`TimelineView(.animation)`、`repeatForever`、Canvas/粒子循环、Map live update 必须通过 `scripts/audit-runtime-guardrails.sh`。
+- **构建快速入口**：`scripts/build-debug-fast.sh` 固定 iPhone 17 / iOS 26.4.1 simulator destination，作为日常 Debug build 验证。
+
+### 3. 当前 SwiftData Schema
+
+当前 schema 链到 **ArkSchemaV51**，`SharedModelContainer` 使用 `Schema(ArkSchemaV51.models)`。
+
+近期关键迁移：
+
+| Schema | 当前用途 |
+|---|---|
+| V39 | 喂食干/湿粮、零食类型、喂食计划结构化字段 |
+| V40 | Human PIN：`pinHash/pinSalt/failedAttempts/lockedUntil` |
+| V41 | 宠物当前主粮类型，用于打卡和计划默认值 |
+| V42 | 余粮 purchase/open date、手动修正余量 |
+| V43 | 人类纪念模式生命周期字段 |
+| V44 | 人类离世/纪念只读边界扩展 |
+| V45 | `FamilyCollaborationTask` 统一家庭任务/事项模型 |
+| V46 | `CoconutExchangeRequest` 家庭内部线下兑换记录 |
+| V47 | Oasis 升级椰子、电子宠物、碎片、解锁模型 |
+| V48 | `OasisCritterActionLog` 电子宠物互动/升星日志 |
+| V49 | 电子宠物展示/状态扩展字段 |
+| V50 | 遛狗便便地图标记：`PetPottyLog` 坐标 + `walkLogId` |
+| V51 | 宠物 3D 破框卡片专用主体图：`cardPopoutImageData/cardPopoutSourceRaw` |
+
+备份/恢复已覆盖家庭协作任务、兑换请求、Oasis 电子宠物、喂食结构化字段、余粮字段、破框图等新数据；PIN hash/salt 不应进入备份。
+
+### 4. 首页与快捷操作
+
+- **首页主文件**：`FocusStackHomeTestView`，并持续拆分到 `FocusWalletCardView`、`ExpandedQuickActionsSection` 等文件以降低编译热区。
+- **卡片堆**：首页首帧优先渲染背景、顶部按钮、卡片堆；头像预热、快捷状态、FAB 复杂状态延后，避免首次点击卡顿。
+- **顶部按钮**：首页显示当前用户椰子数和全局日历；进入具体人类/宠物卡片放大页后，顶部椰子数/日历应切到该实体语义。
+- **快捷操作**：不再依赖隐藏长按。点击快捷操作时，在按钮下方出现类似 FAB 的两个极简图标按钮：`checkmark` 快速打卡/快记/完成，`chart/list` 详情/管理/历史；无快速动作的入口只显示打开/管理按钮。
+- **默认快捷操作**：按物种区分。狗：喂食/喂水/遛狗/陪玩/体重/记录/花费；猫：喂食/喂水/铲屎/陪玩/体重/记录/花费。其它低频操作进入 FAB/全部功能。
+- **局部打卡反馈**：打卡成功后当前卡片/快捷 icon 必须播放轻量反馈，数字跳变；椰子正向增加由全局 `CoconutRewardFeedbackCenter` 播放 `+x🥥`。
+
+### 5. Today Focus
+
+- Today Focus 是“今日任务盘”，展示当前最值得处理的任务/警告/协作/兑换确认/Oasis 建设任务。
+- 顶部 `x/x` 状态跟随当前卡片类型和滑动位置，不再固定显示全局总数。
+- 点击任务卡进入相关任务页或总览页；添加记录应使用弹窗，不直接跳系统 sheet。
+- 警告卡用户看过一次后应可关闭，不应每天重复打扰。
+- 分配给当前人类的 `FamilyCollaborationTask` 立即进入 Today Focus；照护快捷打卡完成后，相关 reminder/task 同步消失。
+- 首个人类建档填写初始体重后会写入体重记录，并抑制当天“记录体重”任务。
+- Oasis 建设/生命树升级任务也可进入 Today Focus，以 token/槽位呈现。
+
+### 6. 喂食、水、便便/铲屎
+
+- **喂食**：三模式互斥：手动、提醒计划、自动猫粮机。顶部模式切换直接决定喂食卡 UI；计划/自动若已有 active plan，点击直接切换，否则进入设置。
+- **喂食卡**：显示当前主粮类型（干粮/湿粮）并在两个粮食显示区域直接 highlight；手动模式的设置按钮改为历史/设置管理语义，记录喂食弹窗确认参数时不应误触发打卡。
+- **喂食总览**：聚合三种模式的数据；单一模式详情进入对应历史/日历页。Chart 极简，数据语义正确，有加载/切换动画。
+- **余粮**：补粮区分购买日期与开袋日期；只有开袋日起的同类型主粮记录扣减。余粮管理支持查看、修改、删除、提醒、手动修正。余粮色默认 `goPrimary`，低余粮只在局部状态用警告色。
+- **零食**：Chart 主语义是频率，按每日记录次数统计，未填写克数也计入；支持零食类型 filter，并能看到某类型上次喂食时间。
+- **喂水**：参考喂食，保留手动/提醒计划；已有计划时切换不再反复弹新建计划。水量可选，不填则只记录次数。
+- **便便/铲屎/猫砂**：猫显示便便/铲屎/猫砂；非猫物种需要调整为更通用便便管理，不显示猫砂/铲屎误导入口。点击卡片进 overview，按钮做记录/管理。
+
+### 7. 健康、人类、体重、花费、记录
+
+- **宠物健康**：三核心卡：预防护理、用药、异常/就诊。用药任务可在 Today Focus 直接打卡，不强制跳转用药页。
+- **人类模块**：默认快捷操作为体重、花费、用药、运动、备注、全部功能；本人可见私密数据并提示“仅自己可见”，非本人显示锁定占位。
+- **人类 PIN**：设置 > 设备身份 > 切换人类账户 > 人类卡片锁按钮设置/公开/隐私；切换到有 PIN 成员时必须验证。
+- **体重/花费统一页**：宠物/人类从全部功能和快捷操作进入同一套页面。快记使用 V4 inline popup + 内嵌数字键盘；详情页有 chart + 历史，避免重复相似页面。
+- **记录中心**：短按“记录”打开快速记录弹窗，支持文字、拍照、相册、文件、提醒等；长路径进入记录中心。时光页显示用户主动记录和重要成长事件，不混入大量工具流水账。
+- **证件保障**：三入口：证件、疫苗本、保险。新增/编辑走 inline popup；添加证件类型不含保险，保险有独立弹窗与结构。
+
+### 8. 家庭协作与任务/事项
+
+- **入口**：首页顶部 Ohana 成员按钮默认进入家庭协作；协作页右上“成员”按钮进入成员页。
+- **任务统一模型**：`FamilyCollaborationTask` 是协作、普通家庭任务、悬赏、宠物照护待办、Today Focus 展示的统一任务层。
+- **服务**：`FamilyTaskService` 负责创建、分配、接手、提交完成、发布人确认、拒绝、取消、删除，并同步 `Reminder` 与椰子账本。
+- **宠物地图**：协作默认是宠物地图。点击宠物节点，底部抽屉显示该宠物待办；每条待办有明显分配按钮，可指定除自己外的家庭成员并可选悬赏。
+- **悬赏**：可发布任意家庭任务，设置椰子奖励。接受者完成后先进入待确认，发布人确认后才从发布人扣椰子并转给完成人；发布人也可拒绝并重新发布/编辑。
+- **Today Focus**：发给当前人的任务立即出现；快捷打卡成功后，同宠物同类型最近 pending/failed reminder/task 同步完成。
+
+### 9. Oasis、商店、椰子经济
+
+- **人类椰子**：可消费钱包，用于商店、悬赏、货币兑换、电子宠物升星/互动等。
+- **宠物椰子**：宠物成长资产，用于宠物专属装饰、名字铭牌、相册故事样式、Oasis 小窝装饰、纪念相框；不能换钱、不能付悬赏、不能买 App Icon。
+- **Oasis 第一屏**：生命椰子树舞台 + 注入能量按钮 + 升级椰子 + Lv5/Lv10 电子宠物目标。注入能量后树形、进度、椰子/叶片/光效应即时变化。
+- **升级椰子**：每次生命树升级生成可敲开的升级椰子；普通等级给资源/碎片/装饰，Lv5 保底 `芽芽 / Sprout Mochi`，Lv10 保底 `极光灵 / Aurora Luma`。
+- **电子宠物**：轻养成 + 收藏，图鉴/详情/互动/升星/碎片/日志/备份均已建模。真实照护行为应给生命树能量并给当前展示电子宠物轻量 bond/xp/mood 反馈。
+- **商店**：分类包含 App Icon、2.5D 头像、货币兑换、外观特效、称号、加成道具。购买装饰必须提供实际应用预览；无法直接预览的商品用动画预览。
+- **外观特效**：彩虹轨迹、彩虹便便购买后有开关；实时遛狗、总结地图、历史快照都要一致展示。星辰落雨等效果购买后也应在实际页面可见。
+- **3D 破框卡片**：购买后选择宠物，可用相册抠图或 2.5D 头像作为破框主体；主要在卡片放大页实现主体跳出卡片边界的 3D 效果，普通头像不被覆盖。
+- **椰子入口**：点击椰子数默认进入椰子历史记录；历史页右上 pie chart 进入 Ohana 财富页。财富页只做分析，不重复展示流水历史。
+
+### 10. 创建流程
+
+- **首次安装本人档案**：语言/国家后直接进入 `AddHumanWizardView`，不再有“添加家人”二次选择页。首次流程保持深色模式和全局背景。
+- **添加人类**：5 步轻 RPG 角色创建：身份卡、形象、权限、身体档案、加入 Ohana。第 1 步合并姓名/性别/生日/血型/MBTI；性别无“不透露”；性别选择使用一排 2.5D 头像按钮。
+- **添加宠物**：5 步：认识伙伴、外貌、形象、性格、加入 Ohana。首个宠物默认免费 2.5D；后续成员提示商店解锁。
+- **顶部预览卡**：人类/宠物创建时始终显示实时角色卡，字段变化用克制动画，不硬切。
+- **主题色**：成员主题色使用专属 palette，不包含 goLime/goBlue；最后一步色盘应极简、高级、顺滑。
+
+### 11. 离世/纪念模式
+
+- 宠物/人类标记离世后进入黑白纪念只读模式；日常照护、未来提醒、Today Focus 任务、日历未来事项不应继续出现。
+- 当前产品决策：离世不可撤回。
+- 离世宠物仍可保留在首页卡片堆，是否显示由“首页显示”按钮决定；成员页历史宠物卡片也应黑白化。
+- 允许查看历史、档案、照片、记录中心、证件/保障、纪念相关内容。
+
+### 12. 常用验证命令
+
+```bash
+scripts/build-debug-fast.sh
+scripts/audit-ui-v4.sh --changed
+scripts/audit-runtime-guardrails.sh --changed
+```
+
+触碰定位、后台、Timer、常驻动画、Map live update 时必须跑：
+
+```bash
+scripts/audit-runtime-guardrails.sh
+```
+
+触碰新页面/大 UI 重构时至少跑路径级：
+
+```bash
+scripts/audit-ui-v4.sh <changed paths>
+```
 
 ---
 
@@ -13,14 +159,15 @@
 - **理念**："Ohana means family. Nobody gets left behind or forgotten."
 - **技术栈**：SwiftUI + SwiftData + Swift Charts, iOS 26+, Swift 6
 - **本地优先**：无账号，SwiftData（App Group `group.com.guanchen.li.Ohana`）
-- **全局主色**：`Color.goPrimary` — 浅色 `#FF7600` / 深色 `#C8FF00`，`OhanaApp` 根视图 `.tint(Color.goPrimary)`
-- **UI 规范**：见 `UIRules.md`，所有新页面必须符合规范
+- **全局主色**：`Color.goPrimary` — 深色模式解析为 `goLime`，浅色模式解析为 `goBlue`，仅用于全局品牌/系统主操作
+- **UI 规范**：`ui规范.selection.json` 是唯一机器可读源头；`ui规范.md` 是人类可读 companion；所有新页面必须符合 V4 规范
 
 ### 本地化（简体中文 / English / Deutsch）
 
-- **策略**：Swift 源码中的用户可见**中文整句**作为 `LocalizedStringKey`；`Ohana/en.lproj/Localizable.strings` 以相同中文为 key、英文为 value。系统语言为 **English** 时使用英文，为 **简体中文** 时显示源码中文（无需 `zh-Hans` 副本）。
+- **策略**：用户可见动态文案、插值文案、按钮、弹窗、formatter 标签优先通过 `L10n(appLanguage).tr(zh:en:de:)`、`L10n.current` 或 `AppLocalizedText(zh:en:de:)`。
 - **语言入口**：`AppLanguage.supported` 是设置页、SwiftUI `Locale`、`DateFormatter` / `NumberFormatter` 的唯一语言清单；新增语言时追加 `Option` 并创建对应 `<lang>.lproj/Localizable.strings`。
-- **当前语言**：设置页支持中文 / English / Deutsch；新增 Go Focus 功能的可见文案应通过 `L10n` / `AppLocalizedText` 提供三语 fallback，并按 `AppLanguage.supported` 扩展更多语言。
+- **当前语言**：设置页支持中文 / English / Deutsch；新增 Go Focus 功能的可见文案必须同时提供中文、英文、德文，德文未完成时用清晰英文 fallback，不能泄露中文。
+- **禁止模式**：不要新增 `appLanguage == "zh" ? ... : ...` 或 `AppLanguage.isEnglish ? ... : ...` 这类视图内语言三元判断。
 - **隐私文案**：`Ohana/en.lproj/InfoPlist.strings` 覆盖相机/定位说明；`Info.plist` 内保留中文作开发默认值。
 - **工程**：`CFBundleLocalizations` = `en` + `zh-Hans`；Xcode `knownRegions` 含 `zh-Hans`。
 - **批量生成**：`scripts/generate_en_localizable.py --target en --lproj en`（依赖 `deep-translator`，建议使用仓库内 `.venv-l10n`）扫描含汉字的字符串字面量并机翻；新增语言可改 `--target ja --lproj ja` 等参数；进度缓存在 `scripts/.l10n_<target>_cache.json`（已 `.gitignore`），中断后可续跑。
@@ -36,18 +183,19 @@ Ohana/
 │   ├── Localizable.strings   # 英文 UI（key = 源码中的中文）
 │   └── InfoPlist.strings     # 英文隐私描述
 ├── Models/
-│   ├── Pet.swift / PetWeightLog.swift / PetCareLog.swift # 含 FeedTodayState：喂食今日状态统一计算
+│   ├── Pet.swift / PetWeightLog.swift / PetCareLog.swift # 宠物资料、体重、照护记录；含喂食结构化字段
 │   ├── PetMedication.swift / PetInsurance.swift / InsuranceClaim.swift
 │   ├── PetPhotoLog.swift / SymptomLog.swift / HeatCycleLog.swift
 │   ├── Human.swift / HumanWeightLog.swift / Plant.swift / PlantCareLog.swift
 │   ├── Event.swift / Reminder.swift / PetExpenseLog.swift
-│   ├── SharedModelContainer.swift   # Schema 迁移链，当前 ArkSchemaV38
+│   ├── SharedModelContainer.swift   # Schema 迁移链，当前 ArkSchemaV51
 │   ├── CareLedgerEvent.swift        # 统一照护事件账本
 │   ├── CareLedgerService.swift / CareLedgerBackfillService.swift
 │   ├── ReminderSchedulingService.swift # 提醒调度、去重、补偿
 │   ├── PrivacyService.swift         # 人类隐私权限统一入口
 │   ├── QuestManager.swift           # 椰子奖励系统
-│   └── OasisTreeManager.swift       # 生命之树等级
+│   ├── FamilyTaskService.swift      # 家庭协作任务/悬赏/Today Focus 同步
+│   └── OasisUpgradeRewards.swift    # 生命树升级椰子、电子宠物、碎片、互动
 ├── Views/
 │   ├── OverviewView.swift           # 首页主视图（经典 UI）
 │   ├── CalendarView.swift
@@ -55,7 +203,7 @@ Ohana/
 │   ├── OhanaDesignSystem.swift      # CoconutBalanceCapsule + OhanaFont + goTranslucentCard 等
 │   ├── ArkBackgroundView.swift      # AppBackgroundStyle / OhanaAppBackground 全局背景
 │   ├── Home/
-│   │   ├── FocusStackHomeTestView.swift # GO UI 默认首页：Wallet 卡片堆（前 7 张可显示卡）+ Today Focus 一键任务 + 展开态快捷模块 + FAB
+│   │   ├── FocusStackHomeTestView.swift # GO Focus V4 默认首页：卡片堆 + Today Focus + 快捷操作 + FAB
 │   │   ├── FocusMoodQuestStrip.swift    # 旧 GO UI 心情 + 任务白卡组件，部分路径仍可复用
 │   │   ├── EmptyStateWelcomeCard.swift  # GO UI 空态欢迎卡
 │   │   ├── FunctionMenuSheet.swift      # GO UI 功能分类 sheet + FMDest / FeatureGroup / PetFeature
@@ -78,7 +226,7 @@ Ohana/
 │   ├── Components/
 │   │   ├── FamilyActivityStripView.swift # 今日谁做了什么
 │   │   ├── DutyNudgeComponents.swift     # 指派成员 chip + 催办按钮
-│   │   ├── QuickFeedDetailSheet.swift    # Go Focus 喂食管理：今日 / 计划 / 粮仓 / 历史
+│   │   ├── QuickFeedDetailSheet.swift    # Go Focus 喂食管理：三模式、余粮、零食、overview/history
 │   │   ├── QuickWaterDetailSheet.swift   # 喂水/换水
 │   │   ├── QuickLitterDetailSheet.swift  # 铲屎/换砂
 │   │   ├── QuickPottyDetailSheet.swift   # 便便记录
@@ -88,7 +236,7 @@ Ohana/
 │   │   ├── GenericWeightEntrySheet.swift # 统一体重输入
 │   │   └── OverviewQuickActions.swift    # 首页快捷操作网格
 │   └── Forms/
-│       ├── AddEntityView.swift
+│       ├── AddEntityRoute.swift
 │       ├── AddPetWizardView.swift
 │       └── AddHumanWizardView.swift
 ├── ViewModels/
@@ -103,6 +251,8 @@ Ohana/
 ## 三、数据模型（SwiftData）
 
 ### Schema 版本历史
+> 说明：完整当前版本为 ArkSchemaV51；V39 之后的关键迁移见下表。早期 V1-V38 保留历史记录。
+
 | Schema | 新增内容 |
 |--------|---------|
 | V23 | `PetWeightLog.weightUnit` / `Pet.weeklyWalkGoalKm` |
@@ -121,6 +271,19 @@ Ohana/
 | V36 | `Pet.foodReminderEnabled` / `Pet.foodReminderAdvanceDays`（粮仓断粮提醒偏好） |
 | V37 | `CareLedgerEvent`（统一照护事件账本，additive schema） |
 | V38 | `PetWeightLog.executorId` / `PetHealthLog.executorId` / `PetHygieneLog.executorId` / `HumanWeightLog.executorId`（快捷记录执行者绑定） |
+| V39 | 喂食结构化：`foodKindRaw` / `treatKindRaw` / `feedRuleKindRaw` / `feedAmountGrams` 等 |
+| V40 | 人类本地 PIN：`pinHash` / `pinSalt` / 失败次数 / 冷却时间 |
+| V41 | `Pet.currentFoodKindRaw`（当前主粮类型） |
+| V42 | 余粮购买日期、开袋日期语义、手动修正余量/时间 |
+| V43 | 人类生命周期/纪念模式字段 |
+| V44 | 人类离世只读与纪念状态扩展 |
+| V45 | `FamilyCollaborationTask`（统一家庭任务/事项/悬赏） |
+| V46 | `CoconutExchangeRequest`（家庭内部线下货币兑换确认） |
+| V47 | Oasis 升级椰子、电子宠物、碎片、解锁模型 |
+| V48 | `OasisCritterActionLog`（电子宠物互动/升星日志） |
+| V49 | 电子宠物展示与状态扩展字段 |
+| V50 | 遛狗便便地图标记：`PetPottyLog` 坐标与 `walkLogId` |
+| V51 | 宠物 3D 破框卡片专用图：`cardPopoutImageData` / `cardPopoutSourceRaw` |
 
 ### 关键模型字段
 **Pet**：`species`、`themeColorHex`、`personalityTagsRaw`、`currentStreak`、`foodTrackingMode`

@@ -273,7 +273,7 @@ struct PlantGardenCard: View {
             VStack(spacing: 8) {
                 ZStack {
                     Circle()
-                        .fill(plant.needsWatering ? Color.goPrimary.opacity(0.2) : .white.opacity(0.15))
+                        .fill(plant.needsWatering ? Color.goPrimary.opacity(0.2) : Color.ohanaControlFill)
                         .frame(width: 60, height: 60)
                     Text(plant.avatarEmoji)
                         .font(.system(size: 32))
@@ -283,7 +283,7 @@ struct PlantGardenCard: View {
 
                 Text(plant.name)
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
 
                 if plant.needsWatering {
@@ -304,11 +304,11 @@ struct PlantGardenCard: View {
                 } else if let days = plant.daysSinceWatered {
                     Text("\(days)d ago")
                         .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 } else {
                     Text("No record")
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(Color.ohanaTertiaryText)
                 }
             }
             .frame(width: 92)
@@ -508,7 +508,7 @@ struct BentoStatCard: View {
                 Text(value)
                     .font(OhanaFont.metric(size: 32))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .contentTransition(.numericText())
+                    .ohanaNumericMotion(value)
                 if !unit.isEmpty {
                     Text(unit)
                         .font(OhanaFont.caption(.bold))
@@ -599,17 +599,13 @@ struct AllPetsFoodOverviewSheet: View {
 
         Button { selectedPet = pet } label: {
             HStack(spacing: 14) {
-                Group {
-                    if let data = pet.avatarImageData, let ui = UIImage(data: data) {
-                        Image(uiImage: ui)
-                            .resizable().scaledToFill()
-                    } else {
-                        Text(pet.species == "cat" ? "🐱" : pet.species == "dog" ? "🐶" : "🐾")
-                            .font(.system(size: 26))
-                    }
-                }
-                .frame(width: 48, height: 48)
-                .clipShape(Circle())
+                PetAvatarPortraitView(
+                    imageData: pet.avatarImageData,
+                    fallbackText: pet.species == "cat" ? "🐱" : pet.species == "dog" ? "🐶" : "🐾",
+                    themeColor: Color(hex: pet.safeThemeColorHex),
+                    size: 48,
+                    backgroundOpacity: 0.18
+                )
                 .overlay(Circle().stroke(accent.opacity(0.5), lineWidth: 1.5))
 
                 VStack(alignment: .leading, spacing: 4) {

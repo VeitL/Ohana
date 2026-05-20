@@ -7,7 +7,6 @@
 
 import SwiftUI
 import SwiftData
-import Charts
 
 struct QuickWaterDetailSheet: View {
     let pet: Pet
@@ -17,6 +16,7 @@ struct QuickWaterDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Query(sort: \Event.startDate) private var allEvents: [Event]
+    @Query(sort: \Pet.createdAt) private var allPets: [Pet]
 
     @State private var waterIntervalDays: Int = 3
     @State private var waterChangeAnchorDate: Date = Date()
@@ -44,6 +44,7 @@ struct QuickWaterDetailSheet: View {
     @State private var waterChangeFeedbackToken: CheckInFeedbackToken?
     @State private var filterFeedbackToken: CheckInFeedbackToken?
     @State private var feedbackClearTask: Task<Void, Never>?
+    @State private var selectedSharedWaterPetIds: Set<UUID> = []
 
     private enum ActiveSheet: String, Identifiable {
         case waterSettings
@@ -87,6 +88,20 @@ struct QuickWaterDetailSheet: View {
     private var chromeTint: Color { Color.goPrimary }
     private var petKey: String { pet.id.uuidString }
     private var isAquatic: Bool { WaterQuickActionPolicy.isAquatic(species: pet.species) }
+    private var sameSpeciesWaterPets: [Pet] {
+        let species = normalizedSpecies(pet.species)
+        return allPets
+            .filter { !$0.hasPassedAway && normalizedSpecies($0.species) == species }
+            .sorted { lhs, rhs in
+                if lhs.id == pet.id { return true }
+                if rhs.id == pet.id { return false }
+                return lhs.createdAt < rhs.createdAt
+            }
+    }
+    private var selectedWaterTargets: [Pet] {
+        let targets = sameSpeciesWaterPets.filter { selectedSharedWaterPetIds.contains($0.id) }
+        return targets.isEmpty ? [pet] : targets
+    }
     private var waterChangeTint: Color { Color(hex: CareType.waterChange.accentColorHex) }
     private var filterTint: Color { Color(hex: CareType.filterClean.accentColorHex) }
     private var waterRuleState: WaterRuleState {
@@ -177,7 +192,6 @@ struct QuickWaterDetailSheet: View {
                         waterDashboard
                         coreCards
                         recentStrip
-                        removeQuickActionFooter
                     }
                     .padding(.horizontal, 18)
                     .padding(.top, 14)
@@ -242,6 +256,7 @@ struct QuickWaterDetailSheet: View {
         }
         .onAppear {
             loadSettings()
+            selectedSharedWaterPetIds = Set(sameSpeciesWaterPets.map(\.id))
             if !pet.hasPassedAway {
                 ensureUpcomingWaterPlanReminders()
             }
@@ -424,21 +439,13 @@ struct QuickWaterDetailSheet: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(themeColor.opacity(0.16))
-                    .frame(width: 48, height: 48)
-                if let data = pet.avatarImageData, let image = UIImage(data: data) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 48, height: 48)
-                        .clipShape(Circle())
-                } else {
-                    Text(pet.avatarEmoji)
-                        .font(.system(size: 24))
-                }
-            }
+            PetAvatarPortraitView(
+                imageData: pet.avatarImageData,
+                fallbackText: pet.avatarEmoji,
+                themeColor: themeColor,
+                size: 48,
+                backgroundOpacity: 0.16
+            )
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(pet.name)
@@ -710,24 +717,6 @@ struct QuickWaterDetailSheet: View {
             .transition(.move(edge: .top).combined(with: .opacity))
     }
 
-    private var removeQuickActionFooter: some View {
-        VStack(spacing: 14) {
-            Divider().opacity(0.35)
-            Button(role: .destructive) {
-                onRemove()
-                dismiss()
-            } label: {
-                Text("移除此快捷入口")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.goRed)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-            }
-            .buttonStyle(ScaleButtonStyle())
-        }
-        .padding(.top, 4)
-    }
-
     private var sheetSurface: some ShapeStyle {
         Color.ohanaCardSurface
     }
@@ -810,42 +799,68 @@ struct QuickWaterDetailSheet: View {
                 chromePadding: 70
             )
         case .waterAmount:
-            WaterAmountSettingsSheet(
-                tint: chromeTint,
-                amountEnabled: $waterAmountEnabled,
-                amountText: $waterAmountMlText,
-                onSave: {
-                    persistWaterAmountSettings()
-                    showSaveConfirmation(waterAmountEnabled ? "已保存默认水量" : "已关闭默认水量")
-                    dismissInlineWaterSheet()
+            VStack(spacing: 12) {
+                if sameSpeciesWaterPets.count > 1 {
+                    SharedCareTargetPicker(
+                        title: "共同喂水",
+                        subtitle: "\(selectedWaterTargets.count)只\(pet.species)",
+                        pets: sameSpeciesWaterPets,
+                        selectedPetIds: $selectedSharedWaterPetIds,
+                        tint: chromeTint
+                    )
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
                 }
-            )
+                WaterAmountSettingsSheet(
+                    tint: chromeTint,
+                    amountEnabled: $waterAmountEnabled,
+                    amountText: $waterAmountMlText,
+                    onSave: {
+                        persistWaterAmountSettings()
+                        showSaveConfirmation(waterAmountEnabled ? "已保存默认水量" : "已关闭默认水量")
+                        dismissInlineWaterSheet()
+                    }
+                )
+            }
             .ohanaAdaptiveSheetContentHeight(
                 $adaptiveSheetHeight,
-                minHeight: 320,
-                maxHeight: 560,
+                minHeight: sameSpeciesWaterPets.count > 1 ? 420 : 320,
+                maxHeight: 620,
                 chromePadding: 70
             )
         case .waterPlan:
-            WaterPlanSettingsSheet(
-                tint: Color.goTeal,
-                count: $waterPlanCount,
-                times: $waterPlanTimes,
-                completionText: waterRuleState.completionText,
-                onCountChange: syncWaterPlanTimesCount,
-                onSave: {
-                    saveWaterPlan()
-                    dismissInlineWaterSheet()
-                },
-                onDelete: {
-                    deleteWaterPlanAndSwitchToManual()
-                    dismissInlineWaterSheet()
+            VStack(spacing: 12) {
+                if sameSpeciesWaterPets.count > 1 {
+                    SharedCareTargetPicker(
+                        title: "目标宠物",
+                        subtitle: "\(selectedWaterTargets.count)只\(pet.species)",
+                        pets: sameSpeciesWaterPets,
+                        selectedPetIds: $selectedSharedWaterPetIds,
+                        tint: Color.goTeal
+                    )
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
                 }
-            )
+                WaterPlanSettingsSheet(
+                    tint: Color.goTeal,
+                    count: $waterPlanCount,
+                    times: $waterPlanTimes,
+                    completionText: waterRuleState.completionText,
+                    onCountChange: syncWaterPlanTimesCount,
+                    onSave: {
+                        saveWaterPlan()
+                        dismissInlineWaterSheet()
+                    },
+                    onDelete: {
+                        deleteWaterPlanAndSwitchToManual()
+                        dismissInlineWaterSheet()
+                    }
+                )
+            }
             .ohanaAdaptiveSheetContentHeight(
                 $adaptiveSheetHeight,
-                minHeight: 430,
-                maxHeight: 520,
+                minHeight: sameSpeciesWaterPets.count > 1 ? 520 : 430,
+                maxHeight: 620,
                 chromePadding: 0
             )
         case .filterSettings:
@@ -1156,29 +1171,13 @@ struct QuickWaterDetailSheet: View {
                     .frame(height: 160)
             } else {
                 let yDomain = OhanaChartStyle.yDomain(values: points.map(\.value), includeZero: true)
-                let renderedPoints = points.map {
-                    WaterChartPoint(date: $0.date, value: $0.value * overviewChartProgress)
-                }
-                Chart(renderedPoints) { point in
-                    AreaMark(
-                        x: .value("Day", point.date),
-                        y: .value("Value", point.value)
-                    )
-                    .foregroundStyle(OhanaChartStyle.areaGradient(for: tint, topOpacity: 0.26))
-                    .interpolationMethod(OhanaChartStyle.trendInterpolation)
-
-                    LineMark(
-                        x: .value("Day", point.date),
-                        y: .value("Value", point.value)
-                    )
-                    .interpolationMethod(OhanaChartStyle.trendInterpolation)
-                    .foregroundStyle(tint)
-                    .lineStyle(OhanaChartStyle.trendLineStyle)
-                }
-                .chartYScale(domain: yDomain)
-                .chartXAxis(.hidden)
-                .chartYAxis(.hidden)
-                .frame(height: 160)
+                OhanaMinimalTrendChart(
+                    points: points.map { OhanaMinimalChartPoint(date: $0.date, value: $0.value) },
+                    yDomain: yDomain,
+                    tint: tint,
+                    progress: overviewChartProgress
+                )
+                .frame(height: 128)
                 .animation(GoMotion.page, value: overviewChartProgress)
             }
         }
@@ -1456,16 +1455,26 @@ struct QuickWaterDetailSheet: View {
     private func saveWaterPlan() {
         let normalized = WaterPlanWriter.normalizedTimes(waterPlanTimes, count: waterPlanCount)
         waterPlanTimes = normalized
-        let reminders = WaterPlanWriter.replacePlan(
-            pet: pet,
-            times: normalized,
-            allEvents: latestAllEvents(),
-            context: modelContext
-        )
+        var latestEvents = latestAllEvents()
+        var reminders: [Reminder] = []
+        let targets = selectedWaterTargets
+        for target in targets {
+            let created = WaterPlanWriter.replacePlan(
+                pet: target,
+                times: normalized,
+                allEvents: latestEvents,
+                context: modelContext
+            )
+            reminders.append(contentsOf: created)
+            let replacedEventIds = Set(WaterPlanWriter.planEvents(pet: target, allEvents: latestEvents).map(\.id))
+            latestEvents = latestEvents
+                .filter { !replacedEventIds.contains($0.id) } + created.compactMap(\.event)
+            WaterOperatingMode.set(target.id, mode: .reminder)
+        }
         scheduleWaterReminders(reminders)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         setActiveWaterMode(.reminder)
-        showSaveConfirmation("已保存喂水计划")
+        showSaveConfirmation(targets.count > 1 ? "共同喂水计划已保存 · \(targets.count)只" : "已保存喂水计划")
     }
 
     private func activateManualWaterMode() {
@@ -1557,18 +1566,28 @@ struct QuickWaterDetailSheet: View {
 
     private func commitWater() {
         let executorId = activeExecutorId()
-        let reward = CareEventService.recordCare(
-            pet: pet,
-            type: .watering,
-            amountMl: defaultWaterAmountMl ?? 0,
-            context: modelContext,
-            executorId: executorId,
-            reward: .water
-        )
+        let targets = selectedWaterTargets
+        let reward = targets.count > 1
+            ? CareEventService.recordSharedWatering(
+                sourcePet: pet,
+                targets: targets,
+                totalMl: defaultWaterAmountMl ?? 0,
+                context: modelContext,
+                executorId: executorId
+            )
+            : CareEventService.recordCare(
+                pet: pet,
+                type: .watering,
+                amountMl: defaultWaterAmountMl ?? 0,
+                context: modelContext,
+                executorId: executorId,
+                reward: .water
+            )
         let delta = reward.humanGot + reward.petGot
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         triggerWaterFeedback()
-        showSaveConfirmation(delta > 0 ? "喂水 +\(delta)🥥" : "已记录喂水")
+        let actionText = targets.count > 1 ? "共同喂水 · \(targets.count)只" : "已记录喂水"
+        showSaveConfirmation(delta > 0 ? "\(actionText) +\(delta)🥥" : actionText)
     }
 
     private func doWaterChange() {
@@ -1652,6 +1671,10 @@ struct QuickWaterDetailSheet: View {
     private func activeExecutorId() -> String? {
         UserDefaults.standard.string(forKey: "currentActiveHumanId")
             .flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    private func normalizedSpecies(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
     // MARK: - Formatting

@@ -35,6 +35,81 @@ enum PetMedicationFrequency: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum PetMedicationSchedulePlan {
+    private static let doseMinutesPrefix = "doseMinutes="
+
+    static func dosesPerDay(for frequency: PetMedicationFrequency) -> Int {
+        switch frequency {
+        case .daily, .everyOtherDay, .weekly:
+            return 1
+        case .twiceDaily:
+            return 2
+        case .threeTimesDaily:
+            return 3
+        case .asNeeded, .custom:
+            return 0
+        }
+    }
+
+    static func defaultDoseMinutes(for frequency: PetMedicationFrequency) -> [Int] {
+        switch frequency {
+        case .daily, .everyOtherDay, .weekly:
+            return [8 * 60]
+        case .twiceDaily:
+            return [8 * 60, 20 * 60]
+        case .threeTimesDaily:
+            return [8 * 60, 14 * 60, 20 * 60]
+        case .asNeeded, .custom:
+            return []
+        }
+    }
+
+    static func encodeDoseMinutes(_ minutes: [Int]) -> String {
+        let normalized = minutes
+            .map { min(max($0, 0), 23 * 60 + 59) }
+            .sorted()
+        guard !normalized.isEmpty else { return "" }
+        return doseMinutesPrefix + normalized.map(String.init).joined(separator: ",")
+    }
+
+    static func decodeDoseMinutes(from note: String) -> [Int] {
+        guard let range = note.range(of: doseMinutesPrefix) else { return [] }
+        let raw = note[range.upperBound...]
+            .split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
+            .first ?? ""
+        return raw
+            .split(separator: ",")
+            .compactMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+            .map { min(max($0, 0), 23 * 60 + 59) }
+            .sorted()
+    }
+
+    static func doseMinutes(for medication: PetMedication, required: Int? = nil) -> [Int] {
+        let targetCount = required ?? dosesPerDay(for: medication.frequency)
+        guard targetCount > 0 else { return [] }
+
+        let saved = decodeDoseMinutes(from: medication.customFrequencyNote)
+        let base = saved.isEmpty ? defaultDoseMinutes(for: medication.frequency) : saved
+        return normalizedDoseMinutes(base, count: targetCount, frequency: medication.frequency)
+    }
+
+    static func normalizedDoseMinutes(_ minutes: [Int], count: Int, frequency: PetMedicationFrequency) -> [Int] {
+        guard count > 0 else { return [] }
+        var result = minutes
+            .map { min(max($0, 0), 23 * 60 + 59) }
+            .sorted()
+        let defaults = defaultDoseMinutes(for: frequency)
+        while result.count < count {
+            let fallback = defaults.indices.contains(result.count) ? defaults[result.count] : (8 * 60 + result.count * 360)
+            result.append(min(fallback, 23 * 60 + 59))
+        }
+        if result.count > count {
+            result = Array(result.prefix(count))
+        }
+        return result.sorted()
+    }
+}
+
 @Model
 final class PetMedication {
     var id: UUID

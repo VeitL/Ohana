@@ -30,6 +30,12 @@ struct WealthBalancePoint: Identifiable {
     let balance: Int
 }
 
+struct WealthTrendPoint: Identifiable {
+    let id = UUID()
+    let bucket: Date
+    let amount: Int
+}
+
 // MARK: - Leaderboard Row（直接用实体余额）
 struct WealthLeaderRow: Identifiable {
     let id = UUID()
@@ -37,6 +43,9 @@ struct WealthLeaderRow: Identifiable {
     let name: String
     let entityId: String
     let amount: Int        // 直接读 coconutBalance
+    let periodIncome: Int
+    let periodSpending: Int
+    let periodNet: Int
     let percentage: Double
 }
 
@@ -75,41 +84,58 @@ final class IslandWealthViewModel {
         var all: [WealthLeaderRow] = []
         let total = max(1, totalAssets)
         all += pets.map { pet in
-            WealthLeaderRow(emoji: pet.avatarEmoji, name: pet.name,
-                            entityId: pet.id.uuidString, amount: pet.coconutBalance,
-                            percentage: Double(pet.coconutBalance) / Double(total))
+            let stats = periodStats(for: pet.id.uuidString)
+            return WealthLeaderRow(emoji: pet.avatarEmoji, name: pet.name,
+                                   entityId: pet.id.uuidString, amount: pet.coconutBalance,
+                                   periodIncome: stats.income, periodSpending: stats.spending, periodNet: stats.net,
+                                   percentage: Double(pet.coconutBalance) / Double(total))
         }
         all += humans.map { h in
-            WealthLeaderRow(emoji: h.avatarEmoji, name: h.name,
-                            entityId: h.id.uuidString, amount: h.coconutBalance,
-                            percentage: Double(h.coconutBalance) / Double(total))
+            let stats = periodStats(for: h.id.uuidString)
+            return WealthLeaderRow(emoji: h.avatarEmoji, name: h.name,
+                                   entityId: h.id.uuidString, amount: h.coconutBalance,
+                                   periodIncome: stats.income, periodSpending: stats.spending, periodNet: stats.net,
+                                   percentage: Double(h.coconutBalance) / Double(total))
         }
-        return all.filter { $0.amount > 0 }.sorted { $0.amount > $1.amount }
+        return all
+            .filter { $0.amount > 0 || $0.periodIncome > 0 || $0.periodSpending > 0 }
+            .sorted { $0.amount > $1.amount }
     }
 
     // MARK: - 图表数据（按时间桶聚合 log，仅用于趋势图）
+    private var visibleLogs: [CoconutLogEntry] {
+        QuestManager.shared.coconutLogs.filter { !hiddenHumanIds.contains($0.actorId ?? "") }
+    }
+
     private var logs: [CoconutLogEntry] {
-        let visibleLogs = QuestManager.shared.coconutLogs.filter { !hiddenHumanIds.contains($0.actorId ?? "") }
         guard let selectedActorId else { return visibleLogs }
         return visibleLogs.filter { $0.actorId == selectedActorId }
     }
 
     // 按时间范围过滤（不区分正负）
     private var filteredByTimeRange: [CoconutLogEntry] {
+        timeFiltered(logs)
+    }
+
+    private var visibleFilteredByTimeRange: [CoconutLogEntry] {
+        timeFiltered(visibleLogs)
+    }
+
+    private func timeFiltered(_ entries: [CoconutLogEntry]) -> [CoconutLogEntry] {
         let cal = Calendar.current
         let now = Date()
         switch timeRange {
         case .day:
             let start = cal.startOfDay(for: now)
-            return logs.filter { $0.date >= start }
+            return entries.filter { $0.date >= start }
         case .week:
-            guard let start = cal.dateInterval(of: .weekOfYear, for: now)?.start else { return logs }
-            return logs.filter { $0.date >= start }
+            guard let start = cal.dateInterval(of: .weekOfYear, for: now)?.start else { return entries }
+            return entries.filter { $0.date >= start }
         case .month:
-            guard let start = cal.dateInterval(of: .month, for: now)?.start else { return logs }
-            return logs.filter { $0.date >= start }
+            guard let start = cal.dateInterval(of: .month, for: now)?.start else { return entries }
+            return entries.filter { $0.date >= start }
         case .all:
-            return logs
+            return entries
         }
     }
 
@@ -127,6 +153,13 @@ final class IslandWealthViewModel {
     var periodIncome:   Int { filteredIncome.reduce(0)   { $0 + $1.amount } }
     var periodSpending: Int { filteredSpending.reduce(0) { $0 + abs($1.amount) } }
     var periodNet: Int { periodIncome - periodSpending }
+
+    private func periodStats(for actorId: String) -> (income: Int, spending: Int, net: Int) {
+        let entries = visibleFilteredByTimeRange.filter { $0.actorId == actorId }
+        let income = entries.filter { $0.amount > 0 }.reduce(0) { $0 + $1.amount }
+        let spending = entries.filter { $0.amount < 0 }.reduce(0) { $0 + abs($1.amount) }
+        return (income, spending, income - spending)
+    }
 
     // 时间段内活跃实体名集合（用于图例）
     var activeEntityNames: [String] {
@@ -162,6 +195,21 @@ final class IslandWealthViewModel {
         }
     }
 
+    private var chartBuckets: [Date] {
+        let cal = Calendar.current
+        let component = bucketComponent
+        let start = cal.dateInterval(of: component, for: rangeStartDate)?.start ?? rangeStartDate
+        let end = cal.dateInterval(of: component, for: Date())?.start ?? Date()
+        var buckets: [Date] = []
+        var cursor = start
+        while cursor <= end {
+            buckets.append(cursor)
+            guard let next = cal.date(byAdding: component, value: 1, to: cursor), next > cursor else { break }
+            cursor = next
+        }
+        return buckets.isEmpty ? [start] : buckets
+    }
+
     var wealthTrendPoints: [WealthBalancePoint] {
         let cal = Calendar.current
         let component = bucketComponent
@@ -190,6 +238,30 @@ final class IslandWealthViewModel {
             }
         }
         return points
+    }
+
+    var incomeTrendPoints: [WealthTrendPoint] {
+        trendPoints(from: filteredIncome) { $0.amount }
+    }
+
+    var spendingTrendPoints: [WealthTrendPoint] {
+        trendPoints(from: filteredSpending) { abs($0.amount) }
+    }
+
+    private func trendPoints(
+        from entries: [CoconutLogEntry],
+        value: (CoconutLogEntry) -> Int
+    ) -> [WealthTrendPoint] {
+        let cal = Calendar.current
+        let component = bucketComponent
+        var bucketTotals: [Date: Int] = [:]
+        for entry in entries {
+            let bucket = cal.dateInterval(of: component, for: entry.date)?.start ?? entry.date
+            bucketTotals[bucket, default: 0] += value(entry)
+        }
+        return chartBuckets.map { bucket in
+            WealthTrendPoint(bucket: bucket, amount: bucketTotals[bucket] ?? 0)
+        }
     }
 
     var chartBars: [WealthBarData] {

@@ -7,22 +7,70 @@
 
 import SwiftUI
 import SwiftData
-import Charts
 
 struct WeightTrendPoint: Identifiable, Hashable {
-    let id = UUID()
     let date: Date
     let kilograms: Double
+    var isSynthetic: Bool = false
+
+    var id: String {
+        let timestamp = Int(date.timeIntervalSinceReferenceDate.rounded())
+        let grams = Int((kilograms * 1000).rounded())
+        return "\(timestamp)-\(grams)-\(isSynthetic ? "synthetic" : "actual")"
+    }
+}
+
+enum WeightTrendDataBuilder {
+    static func points(
+        from entries: [(date: Date, kilograms: Double)],
+        rangeStart: Date?,
+        rangeEnd: Date = Date()
+    ) -> [WeightTrendPoint] {
+        let sorted = entries
+            .filter { $0.kilograms > 0 && $0.date <= rangeEnd }
+            .sorted { $0.date < $1.date }
+        guard !sorted.isEmpty else { return [] }
+
+        guard let rangeStart else {
+            return sorted.map { WeightTrendPoint(date: $0.date, kilograms: $0.kilograms) }
+        }
+
+        var points: [WeightTrendPoint] = []
+        if let previous = sorted.last(where: { $0.date < rangeStart }) {
+            points.append(WeightTrendPoint(date: rangeStart, kilograms: previous.kilograms, isSynthetic: true))
+        }
+
+        points.append(contentsOf: sorted
+            .filter { $0.date >= rangeStart && $0.date <= rangeEnd }
+            .map { WeightTrendPoint(date: $0.date, kilograms: $0.kilograms) }
+        )
+
+        if points.isEmpty, let previous = sorted.last(where: { $0.date < rangeStart }) {
+            points = [
+                WeightTrendPoint(date: rangeStart, kilograms: previous.kilograms, isSynthetic: true),
+                WeightTrendPoint(date: rangeEnd, kilograms: previous.kilograms, isSynthetic: true)
+            ]
+        } else if let last = points.last, last.date < rangeEnd {
+            points.append(WeightTrendPoint(date: rangeEnd, kilograms: last.kilograms, isSynthetic: true))
+        }
+
+        return points
+    }
 }
 
 struct UnifiedWeightTrendChart: View {
     let points: [WeightTrendPoint]
+    var xDomain: ClosedRange<Date>?
     var accent: Color = .goPrimary
 
     @State private var chartProgress: Double = 0
 
     private var sortedPoints: [WeightTrendPoint] {
         points.sorted { $0.date < $1.date }
+    }
+
+    private var actualPoints: [WeightTrendPoint] {
+        sortedPoints.filter { !$0.isSynthetic }
     }
 
     private var yDomain: ClosedRange<Double> {
@@ -34,65 +82,27 @@ struct UnifiedWeightTrendChart: View {
     }
 
     var body: some View {
-        Chart {
-            ForEach(sortedPoints) { point in
-                AreaMark(
-                    x: .value("Date", point.date),
-                    yStart: .value("Baseline", yDomain.lowerBound),
-                    yEnd: .value("Weight", animatedValue(point.kilograms))
-                )
-                .interpolationMethod(.catmullRom)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [accent.opacity(0.28), accent.opacity(0.03)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-
-                LineMark(
-                    x: .value("Date", point.date),
-                    y: .value("Weight", animatedValue(point.kilograms))
-                )
-                .interpolationMethod(.catmullRom)
-                .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                .foregroundStyle(accent)
-            }
-
-            if let latest = sortedPoints.last {
-                PointMark(
-                    x: .value("Date", latest.date),
-                    y: .value("Weight", animatedValue(latest.kilograms))
-                )
-                .symbolSize(70)
-                .foregroundStyle(accent)
-            }
-        }
-        .chartLegend(.hidden)
-        .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 3)) { _ in
-                AxisValueLabel()
-                    .font(OhanaFont.caption2(.semibold))
-                    .foregroundStyle(Color.ohanaTertiaryText)
-            }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { _ in
-                AxisGridLine(stroke: StrokeStyle(lineWidth: 1, dash: [3, 6]))
-                    .foregroundStyle(Color.ohanaDivider)
-                AxisValueLabel()
-                    .font(OhanaFont.caption2(.semibold))
-                    .foregroundStyle(Color.ohanaTertiaryText)
-            }
-        }
-        .chartYScale(domain: yDomain)
-        .opacity(sortedPoints.count >= 2 ? 1 : 0.35)
+        OhanaMinimalTrendChart(
+            points: sortedPoints.map {
+                OhanaMinimalChartPoint(date: $0.date, value: $0.kilograms, id: $0.id)
+            },
+            xDomain: xDomain,
+            yDomain: yDomain,
+            tint: accent,
+            progress: chartProgress,
+            showsLatestPoint: !actualPoints.isEmpty || !sortedPoints.isEmpty,
+            yReferenceLineCount: 3,
+            yReferenceFormatter: { OhanaChartStyle.weightReferenceLabel(kilograms: $0, domain: $1) }
+        )
+        .opacity(sortedPoints.isEmpty ? 0.35 : 1)
         .onAppear { playEntrance() }
-        .onChange(of: points) { _, _ in playEntrance() }
+        .onChange(of: chartSignature) { _, _ in playEntrance() }
     }
 
-    private func animatedValue(_ value: Double) -> Double {
-        yDomain.lowerBound + (value - yDomain.lowerBound) * chartProgress
+    private var chartSignature: String {
+        sortedPoints.map(\.id).joined(separator: "|")
+            + "|\(xDomain?.lowerBound.timeIntervalSinceReferenceDate ?? 0)"
+            + "|\(xDomain?.upperBound.timeIntervalSinceReferenceDate ?? 0)"
     }
 
     private func playEntrance() {
@@ -150,33 +160,15 @@ struct ExpenseBarDashboardChart: View {
     @State private var chartProgress: Double = 0
 
     var body: some View {
-        Chart {
-            ForEach(buckets) { bucket in
-                BarMark(
-                    x: .value("Date", bucket.label),
-                    y: .value("Amount", max(0, bucket.amount) * chartProgress)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                .foregroundStyle(accent.gradient)
-            }
-        }
-        .chartLegend(.hidden)
-        .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) { _ in
-                AxisValueLabel()
-                    .font(OhanaFont.caption2(.semibold))
-                    .foregroundStyle(Color.ohanaTertiaryText)
-            }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { _ in
-                AxisGridLine(stroke: StrokeStyle(lineWidth: 1, dash: [3, 6]))
-                    .foregroundStyle(Color.ohanaDivider)
-                AxisValueLabel()
-                    .font(OhanaFont.caption2(.semibold))
-                    .foregroundStyle(Color.ohanaTertiaryText)
-            }
-        }
+        OhanaMinimalBarChart(
+            points: buckets.map {
+                OhanaMinimalChartPoint(date: $0.date, value: max(0, $0.amount), label: $0.label)
+            },
+            tint: accent,
+            progress: chartProgress,
+            showsLabels: buckets.count <= 10,
+            maxBarHeight: 124
+        )
         .onAppear { playEntrance() }
         .onChange(of: buckets) { _, _ in playEntrance() }
     }
@@ -249,18 +241,21 @@ struct PetWeightDashboardContent: View {
             case .all: return nil
             }
         }
+
+        func xDomain(now: Date = Date(), calendar: Calendar = .current) -> ClosedRange<Date>? {
+            guard let start = startDate(now: now, calendar: calendar) else { return nil }
+            return start...now
+        }
     }
 
     private var l: L10n { L10n(appLanguage) }
     private var logs: [PetWeightLog] { pet.weightLogs.sorted { $0.date > $1.date } }
-    private var filteredLogs: [PetWeightLog] {
-        guard let start = selectedRange.startDate() else { return logs }
-        return logs.filter { $0.date >= start }
-    }
-    private var trendPoints: [WeightTrendPoint] {
-        filteredLogs
-            .sorted { $0.date < $1.date }
-            .map { WeightTrendPoint(date: $0.date, kilograms: $0.weightInKg) }
+    private func trendPoints(now: Date = Date()) -> [WeightTrendPoint] {
+        WeightTrendDataBuilder.points(
+            from: logs.map { (date: $0.date, kilograms: $0.weightInKg) },
+            rangeStart: selectedRange.startDate(now: now),
+            rangeEnd: now
+        )
     }
 
     var body: some View {
@@ -273,9 +268,6 @@ struct PetWeightDashboardContent: View {
                     metrics
                     chartBlock
                     historyBlock
-                    if let onRemove {
-                        removeButton(onRemove)
-                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 18)
@@ -351,8 +343,10 @@ struct PetWeightDashboardContent: View {
                 }
             }
 
-            if trendPoints.count >= 2 {
-                UnifiedWeightTrendChart(points: trendPoints, accent: .goPrimary)
+            let now = Date()
+            let points = trendPoints(now: now)
+            if !points.isEmpty {
+                UnifiedWeightTrendChart(points: points, xDomain: selectedRange.xDomain(now: now), accent: .goPrimary)
                     .frame(height: 190)
             } else {
                 emptyState(
@@ -460,20 +454,6 @@ struct PetWeightDashboardContent: View {
         .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
-    private func removeButton(_ onRemove: @escaping () -> Void) -> some View {
-        Button(role: .destructive) {
-            onRemove()
-            onClose()
-        } label: {
-            Text(l.tr(zh: "移除此快捷入口", en: "Remove from quick actions", de: "Aus Schnellaktionen entfernen"))
-                .font(OhanaFont.callout(.black))
-                .foregroundStyle(Color.goRed)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.ohanaControlFill, in: Capsule())
-        }
-        .buttonStyle(ScaleButtonStyle())
-    }
 }
 
 struct HumanWeightDashboardContent: View {
@@ -492,12 +472,12 @@ struct HumanWeightDashboardContent: View {
     private var isViewingOwnProfile: Bool { activeHumanId == human.id }
     private var isPrivacyLocked: Bool { human.isPrivate(.weight, viewedBy: activeHumanId) }
     private var logs: [HumanWeightLog] { human.weightLogs.sorted { $0.date > $1.date } }
-    private var filteredLogs: [HumanWeightLog] {
-        guard let start = selectedRange.startDate() else { return logs }
-        return logs.filter { $0.date >= start }
-    }
-    private var trendPoints: [WeightTrendPoint] {
-        filteredLogs.sorted { $0.date < $1.date }.map { WeightTrendPoint(date: $0.date, kilograms: $0.weight) }
+    private func trendPoints(now: Date = Date()) -> [WeightTrendPoint] {
+        WeightTrendDataBuilder.points(
+            from: logs.map { (date: $0.date, kilograms: $0.weight) },
+            rangeStart: selectedRange.startDate(now: now),
+            rangeEnd: now
+        )
     }
 
     var body: some View {
@@ -563,8 +543,10 @@ struct HumanWeightDashboardContent: View {
                     $0.title(l)
                 }
             }
-            if trendPoints.count >= 2 {
-                UnifiedWeightTrendChart(points: trendPoints, accent: .goPrimary)
+            let now = Date()
+            let points = trendPoints(now: now)
+            if !points.isEmpty {
+                UnifiedWeightTrendChart(points: points, xDomain: selectedRange.xDomain(now: now), accent: .goPrimary)
                     .frame(height: 190)
             } else {
                 emptyState(icon: "chart.xyaxis.line", text: l.tr(zh: "记录 2 次后显示趋势", en: "Add 2 logs to show a trend", de: "2 Einträge zeigen einen Trend"))
@@ -696,9 +678,6 @@ struct PetExpenseDashboardContent: View {
                     chartBlock
                     categoryStrip
                     historyBlock
-                    if let onRemove {
-                        removeButton(onRemove)
-                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 18)
@@ -881,20 +860,6 @@ struct PetExpenseDashboardContent: View {
         .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
-    private func removeButton(_ onRemove: @escaping () -> Void) -> some View {
-        Button(role: .destructive) {
-            onRemove()
-            onClose()
-        } label: {
-            Text(l.tr(zh: "移除此快捷入口", en: "Remove from quick actions", de: "Aus Schnellaktionen entfernen"))
-                .font(OhanaFont.callout(.black))
-                .foregroundStyle(Color.goRed)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.ohanaControlFill, in: Capsule())
-        }
-        .buttonStyle(ScaleButtonStyle())
-    }
 }
 
 struct HumanExpenseDashboardContent: View {

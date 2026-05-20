@@ -94,16 +94,13 @@ struct AddHealthRecordSheet: View {
                     VStack(spacing: 20) {
                         // 宠物信息行
                         HStack(spacing: 12) {
-                            ZStack {
-                                Circle().fill(Color(hex: pet.themeColorHex).opacity(0.25))
-                                    .frame(width: 48, height: 48)
-                                if let data = pet.avatarImageData, let ui = UIImage(data: data) {
-                                    Image(uiImage: ui).resizable().scaledToFill()
-                                        .frame(width: 48, height: 48).clipShape(Circle())
-                                } else {
-                                    Text(pet.avatarEmoji).font(.system(size: 26))
-                                }
-                            }
+                            PetAvatarPortraitView(
+                                imageData: pet.avatarImageData,
+                                fallbackText: pet.avatarEmoji,
+                                themeColor: Color(hex: pet.safeThemeColorHex),
+                                size: 48,
+                                backgroundOpacity: 0.25
+                            )
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(pet.name)
                                     .font(OhanaFont.body(.black))

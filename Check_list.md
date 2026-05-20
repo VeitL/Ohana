@@ -1,6 +1,6 @@
 # Ohana 功能完成清单
 
-> 最后更新: 2026-04-26（GO UI 宠物/人类卡展开态快捷操作与粮仓管理更新）| Build: ✅ | Schema: ArkSchemaV36
+> 最后更新: 2026-05-18（毛绒 Icon 照护快捷三件套样张规范）| Build: ✅ | Schema: ArkSchemaV51
 >
 > **规则**：仅在完成新的功能模块或重大 UI 重构时更新本文档，小 bug 修复不记录。
 
@@ -17,6 +17,7 @@
 - [x] 数据备份/恢复（`DataBackupManager`）
 
 ### 首页（GO UI / OverviewView）
+- [x] **毛绒 Icon 照护快捷三件套样张**（2026-05-18）：新增 `docs/plush-icon-sample-care-prompts.md`，定义 Feed / Water / Walk 三个 3D 毛绒 icon 的统一 prompt、负面 prompt、命名与导入规范；新增 `docs/plush-icon-samples/` 下 3 个 SVG 构图预览稿，用于快速评估喂食、喂水、遛狗快捷入口的毛绒视觉方向
 - [x] **GO UI 展开态快捷模块**（2026-04-26）：`FocusStackHomeTestView` 的宠物卡展开后复用经典 UI `GoQuickActionCard` 网格样式，读取同一份 `quickActionItems_v2`，短按/长按/Popover 行为与经典快捷操作保持一致
 - [x] **GO UI 展开态快捷编辑**（2026-04-26）：宠物卡展开后的快捷操作支持铅笔编辑、删除、拖拽排序和添加入口，编辑态保持最多 4 个，保存回 `quickActionItems_v2`
 - [x] **GO UI 人类卡快捷操作同步**（2026-04-26）：人类卡展开后使用同款 `GoQuickActionCard` 网格，支持体重 / 运动 / 用药 / 备注和编辑保存

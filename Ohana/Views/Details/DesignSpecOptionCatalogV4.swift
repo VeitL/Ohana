@@ -107,15 +107,11 @@ enum DesignSpecOptionCatalogV4 {
     ]
 
     static let icons = [
-        DesignSpecOptionV4("filled", "填充", "Filled", "识别快。", "Fast recognition.", "square.grid.2x2.fill", Color.goPrimary, recommended: true),
-        DesignSpecOptionV4("line", "线性", "Line", "更轻。", "Lighter look.", "circle", Color.goBlue)
+        DesignSpecOptionV4("monochromePrimary", "全局单色", "Monochrome Primary", "所有功能 icon 统一 goPrimary，禁止彩色仿真/emoji。", "All functional icons use goPrimary only; no multicolor, skeuomorphic, or emoji glyphs.", "circle.grid.2x2.fill", Color.goPrimary, recommended: true, goodFor: ["导航", "快捷操作", "列表", "状态入口"])
     ]
 
     static let settingIcons = [
-        DesignSpecOptionV4("tintedTile", "染色方块", "Tinted Tile", "设置页默认：彩色 icon + 轻 tint 圆角方块。", "Default Settings row icon: colored glyph on a light tinted rounded tile.", "square.grid.2x2.fill", Color.goPrimary, recommended: true, goodFor: ["设置页", "表单行"]),
-        DesignSpecOptionV4("plainGlyph", "纯图标", "Plain Glyph", "最轻，适合极简列表。", "Lightest style for minimal lists.", "circle", Color.goBlue, goodFor: ["极简设置"], avoidFor: ["复杂分组"]),
-        DesignSpecOptionV4("circleDisc", "圆形底", "Circle Disc", "更像 iOS 系统设置图标。", "Closer to iOS system Settings icons.", "circle.fill", Color.goTeal, goodFor: ["设备身份", "权限"]),
-        DesignSpecOptionV4("flatBlock", "纯色块", "Flat Block", "无描边纯色块，匹配 flat 卡片。", "Borderless solid block matching flat cards.", "rectangle.inset.filled", Color.goOrange, goodFor: ["compact 工具页"])
+        DesignSpecOptionV4("plainGlyph", "纯符号", "Plain Glyph", "设置行无底块，只显示 goPrimary 单色符号。", "Settings rows use a goPrimary monochrome glyph without a tile background.", "circle", Color.goPrimary, recommended: true, goodFor: ["设置页", "表单行", "极简列表"])
     ]
 
     static let navigation = [

@@ -28,6 +28,7 @@ struct SwipeableEventRow: View {
     @State private var coconutFloats: [CoconutFloat] = []
     @State private var showDetail = false
     @State private var showSkipReason = false
+    @State private var activeDragAxis: DragAxis? = nil
 
     // Overdue gravitational pull — driven by native SwiftUI animation (no TimelineView polling)
     @State private var overdueBreath: Bool = false
@@ -35,6 +36,10 @@ struct SwipeableEventRow: View {
 
     private let triggerThreshold: CGFloat = 100
     private let dampFactor: CGFloat = 0.4
+    private enum DragAxis {
+        case horizontal
+        case vertical
+    }
     private var shouldReduceWork: Bool {
         powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
     }
@@ -128,29 +133,7 @@ struct SwipeableEventRow: View {
             // 主卡片
             eventCard
                 .offset(x: offsetX)
-                .gesture(DragGesture(minimumDistance: 12)
-                    .onChanged { val in
-                        guard !isTriggerred else { return }
-                        let dx = val.translation.width
-                        if abs(dx) <= triggerThreshold {
-                            offsetX = dx
-                        } else {
-                            let extra = abs(dx) - triggerThreshold
-                            offsetX = (dx > 0 ? 1 : -1) * (triggerThreshold + extra * dampFactor)
-                        }
-                    }
-                    .onEnded { val in
-                        guard !isTriggerred else { return }
-                        let dx = val.translation.width
-                        // 信息性事件不可左滑完成
-                        if dx < -triggerThreshold && event.isActionableTask { triggerComplete() }
-                        else if dx < -triggerThreshold { withAnimation(GoMotion.feedback) { offsetX = 0 } }
-                        else if dx > triggerThreshold { pendingDelete() }
-                        else {
-                            withAnimation(GoMotion.feedback) { offsetX = 0 }
-                        }
-                    }
-                )
+                .simultaneousGesture(rowSwipeGesture)
                 .onTapGesture { showDetail = true }
         }
         .sheet(isPresented: $showDetail) {
@@ -350,6 +333,64 @@ struct SwipeableEventRow: View {
     }
 
     // MARK: - Gesture Actions
+
+    private var rowSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 12, coordinateSpace: .local)
+            .onChanged { value in
+                guard !isTriggerred else { return }
+                let dx = value.translation.width
+                let dy = value.translation.height
+
+                if activeDragAxis == nil {
+                    let absX = abs(dx)
+                    let absY = abs(dy)
+                    guard max(absX, absY) > 10 else { return }
+
+                    if absY > absX * 1.12 {
+                        activeDragAxis = .vertical
+                        if offsetX != 0 {
+                            withAnimation(GoMotion.feedback) { offsetX = 0 }
+                        }
+                        return
+                    }
+
+                    guard absX > absY * 1.45 else { return }
+                    activeDragAxis = .horizontal
+                }
+
+                guard activeDragAxis == .horizontal else { return }
+                if abs(dx) <= triggerThreshold {
+                    offsetX = dx
+                } else {
+                    let extra = abs(dx) - triggerThreshold
+                    offsetX = (dx > 0 ? 1 : -1) * (triggerThreshold + extra * dampFactor)
+                }
+            }
+            .onEnded { value in
+                defer { activeDragAxis = nil }
+                guard !isTriggerred else { return }
+                guard activeDragAxis == .horizontal else {
+                    if offsetX != 0 {
+                        withAnimation(GoMotion.feedback) { offsetX = 0 }
+                    }
+                    return
+                }
+
+                let dx = value.translation.width
+                let dy = value.translation.height
+                guard abs(dx) > abs(dy) * 1.35 else {
+                    withAnimation(GoMotion.feedback) { offsetX = 0 }
+                    return
+                }
+
+                if dx < -triggerThreshold && event.isActionableTask { triggerComplete() }
+                else if dx < -triggerThreshold { withAnimation(GoMotion.feedback) { offsetX = 0 } }
+                else if dx > triggerThreshold { pendingDelete() }
+                else {
+                    withAnimation(GoMotion.feedback) { offsetX = 0 }
+                }
+            }
+    }
 
     private func triggerComplete() {
         isTriggerred = true

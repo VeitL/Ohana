@@ -354,14 +354,31 @@ struct L10n {
 
     func humanThemeSwatchLabel(_ zh: String) -> String {
         switch zh {
-        case "青柠": return isEn ? "Lime" : "青柠"
-        case "橙色": return isEn ? "Orange" : "橙色"
-        case "靛蓝": return isEn ? "Indigo" : "靛蓝"
-        case "粉色": return isEn ? "Pink" : "粉色"
-        case "青色": return isEn ? "Teal" : "青色"
-        case "紫色": return isEn ? "Purple" : "紫色"
-        case "红色": return isEn ? "Red" : "红色"
-        case "金色": return isEn ? "Gold" : "金色"
+        case "青柠": return tr(zh: "青柠", en: "Lime", de: "Limette")
+        case "橙色": return tr(zh: "橙色", en: "Orange", de: "Orange")
+        case "珊瑚": return tr(zh: "珊瑚", en: "Coral", de: "Koralle")
+        case "玫红": return tr(zh: "玫红", en: "Rose", de: "Rosé")
+        case "莓果": return tr(zh: "莓果", en: "Berry", de: "Beere")
+        case "靛蓝": return tr(zh: "靛蓝", en: "Indigo", de: "Indigo")
+        case "深靛": return tr(zh: "深靛", en: "Deep indigo", de: "Tiefes Indigo")
+        case "粉色": return tr(zh: "粉色", en: "Pink", de: "Pink")
+        case "青色": return tr(zh: "青色", en: "Teal", de: "Türkis")
+        case "深青": return tr(zh: "深青", en: "Deep teal", de: "Tiefes Türkis")
+        case "海青": return tr(zh: "海青", en: "Sea cyan", de: "Meerescyan")
+        case "湖蓝": return tr(zh: "湖蓝", en: "Lake blue", de: "Seeblau")
+        case "孔雀": return tr(zh: "孔雀", en: "Peacock", de: "Pfau")
+        case "森林": return tr(zh: "森林", en: "Forest", de: "Wald")
+        case "橄榄": return tr(zh: "橄榄", en: "Olive", de: "Olive")
+        case "叶绿": return tr(zh: "叶绿", en: "Leaf", de: "Blattgrün")
+        case "紫色": return tr(zh: "紫色", en: "Purple", de: "Violett")
+        case "紫罗兰": return tr(zh: "紫罗兰", en: "Violet", de: "Violett")
+        case "红色": return tr(zh: "红色", en: "Red", de: "Rot")
+        case "金色": return tr(zh: "金色", en: "Gold", de: "Gold")
+        case "琥珀": return tr(zh: "琥珀", en: "Amber", de: "Bernstein")
+        case "栗色": return tr(zh: "栗色", en: "Chestnut", de: "Kastanie")
+        case "酒红": return tr(zh: "酒红", en: "Wine", de: "Weinrot")
+        case "咖啡": return tr(zh: "咖啡", en: "Coffee", de: "Kaffee")
+        case "灰色": return tr(zh: "灰色", en: "Slate", de: "Schiefer")
         default: return zh
         }
     }

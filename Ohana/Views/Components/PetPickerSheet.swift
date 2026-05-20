@@ -67,22 +67,13 @@ struct PetPickerSheet: View {
                         } label: {
                             HStack(spacing: 14) {
                                 // 头像
-                                ZStack {
-                                    Circle()
-                                        .fill(Color(hex: pet.themeColorHex).opacity(0.2))
-                                        .frame(width: 52, height: 52)
-                                    if let data = pet.avatarImageData,
-                                       let img = UIImage(data: data) {
-                                        Image(uiImage: img)
-                                            .resizable()
-                                            .scaledToFill()
-                                            .frame(width: 52, height: 52)
-                                            .clipShape(Circle())
-                                    } else {
-                                        Text(pet.species == "狗" ? "🐶" : pet.species == "猫" ? "🐱" : "🐾")
-                                            .font(.system(size: 26))
-                                    }
-                                }
+                                PetAvatarPortraitView(
+                                    imageData: pet.avatarImageData,
+                                    fallbackText: pet.species == "狗" ? "🐶" : pet.species == "猫" ? "🐱" : "🐾",
+                                    themeColor: Color(hex: pet.safeThemeColorHex),
+                                    size: 52,
+                                    backgroundOpacity: 0.2
+                                )
 
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(pet.name)

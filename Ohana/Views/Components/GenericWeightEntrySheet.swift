@@ -548,17 +548,13 @@ struct GenericWeightEntrySheet: View {
     private var avatarView: some View {
         switch target {
         case .pet(let pet):
-            Group {
-                if let data = pet.avatarImageData, let image = UIImage(data: data) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .clipShape(Circle())
-                } else {
-                    Text(pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji)
-                        .font(.system(size: 28))
-                }
-            }
+            PetAvatarPortraitView(
+                imageData: pet.avatarImageData,
+                fallbackText: pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji,
+                themeColor: Color(hex: pet.safeThemeColorHex),
+                size: 42,
+                showsBackground: false
+            )
         case .human(let human):
             Group {
                 if let data = human.avatarImageData, let image = UIImage(data: data) {

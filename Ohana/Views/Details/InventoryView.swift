@@ -10,7 +10,9 @@ import SwiftData
 
 struct InventoryView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
+    @Query(sort: \Human.createdAt) private var humans: [Human]
     @AppStorage("appLanguage") private var appLanguage = "zh"
     @AppStorage("purchasedShopItems") private var purchasedRaw: String = ""
     
@@ -19,6 +21,7 @@ struct InventoryView: View {
     @AppStorage("shop_equip_fx_lime_glow") private var equipFxLimeGlow: Bool = false
     @AppStorage("shop_equip_fx_rainbow") private var equipFxRainbow: Bool = false
     @AppStorage("shop_equip_fx_rainbow_poop") private var equipFxRainbowPoop: Bool = false
+    @AppStorage("shop_equip_fx_popout_card") private var equipFxPopoutCard: Bool = true
     @AppStorage("shop_equip_fx_stars") private var equipFxStars: Bool = false
     @AppStorage("shop_equip_fx_firework") private var equipFxFirework: Bool = false
     @AppStorage(AppIconCatalog.selectedIconKey) private var selectedAppIcon: String = AppIconCatalog.defaultItemId
@@ -28,6 +31,7 @@ struct InventoryView: View {
     @AppStorage("shop_boostDoubleActive") private var doubleBoostActive: Bool = false
     @State private var streakShieldExpiry: Date? = nil
     @State private var showPetPickerForPopout = false
+    @State private var showAvatarTargetPicker = false
     @State private var equipPopoutPet: Pet? = nil
     
     // All items reference (shared with CoconutShopView)
@@ -68,6 +72,12 @@ struct InventoryView: View {
                             }
                         }
 
+                        if Avatar2DAccess.extraPassCount > 0 {
+                            inventorySection(title: l.tr(zh: "2.5D 头像", en: "2.5D Avatar", de: "2,5D-Avatar"), icon: "person.crop.square.fill") {
+                                avatarPassRow
+                            }
+                        }
+
                         // 1. 称号区
                         if !myTitles.isEmpty {
                             inventorySection(title: "我的称号", icon: "rosette") {
@@ -102,7 +112,7 @@ struct InventoryView: View {
                             }
                         }
                         
-                        if myAppIcons.isEmpty && myTitles.isEmpty && myEffects.isEmpty && backdatePacks == 0 && !isShieldActive && !doubleBoostActive {
+                        if myAppIcons.isEmpty && myTitles.isEmpty && myEffects.isEmpty && Avatar2DAccess.extraPassCount == 0 && backdatePacks == 0 && !isShieldActive && !doubleBoostActive {
                             VStack(spacing: 12) {
                                 Image(systemName: "shippingbox")
                                     .font(.system(size: 40))
@@ -133,12 +143,50 @@ struct InventoryView: View {
             ForEach(pets) { pet in
                 Button(pet.name) { equipPopoutPet = pet }
             }
-            Button("取消", role: .cancel) {}
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
+        }
+        .confirmationDialog(l.tr(zh: "选择要升级 2.5D 头像的成员", en: "Choose who gets the 2.5D avatar", de: "Wähle das 2,5D-Avatar-Ziel"), isPresented: $showAvatarTargetPicker, titleVisibility: .visible) {
+            ForEach(humans) { human in
+                Button(human.name) { upgradeHumanTo2DAvatar(human) }
+            }
+            ForEach(pets) { pet in
+                Button(pet.name) { upgradePetTo2DAvatar(pet) }
+            }
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
         }
         .sheet(item: $equipPopoutPet) { pet in
             EquipPopoutCardSheet(pet: pet)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+        }
+    }
+
+    private var avatarPassRow: some View {
+        HStack(spacing: 14) {
+            Text("🖼️")
+                .font(.system(size: 28))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(l.tr(zh: "2.5D 头像券", en: "2.5D Avatar Pass", de: "2,5D-Avatarpass"))
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text(l.tr(zh: "库存 x\(Avatar2DAccess.extraPassCount) · 开关后指定成员", en: "x\(Avatar2DAccess.extraPassCount) available · toggle to assign", de: "x\(Avatar2DAccess.extraPassCount) verfügbar · Schalter zum Zuweisen"))
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
+            }
+            Spacer()
+
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                showAvatarTargetPicker = true
+            } label: {
+                inventorySwitch(isOn: Avatar2DAccess.extraPassCount > 0)
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .disabled(Avatar2DAccess.extraPassCount <= 0)
+        }
+        .padding(16)
+        .overlay(alignment: .bottom) {
+            Divider().background(Color.ohanaPrimaryText.opacity(0.1)).padding(.leading, 60)
         }
     }
 
@@ -218,21 +266,15 @@ struct InventoryView: View {
             }
             Spacer()
             
-            Button {
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                if isEquipped {
-                    equippedTitle = ""
-                } else {
-                    equippedTitle = item.id
+            Toggle("", isOn: Binding(
+                get: { isEquipped },
+                set: { val in
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    equippedTitle = val ? item.id : ""
                 }
-            } label: {
-                Text(isEquipped ? "卸下" : "装备")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(isEquipped ? Color.goDarkBlue : Color.goPrimary)
-                    .padding(.horizontal, 14).padding(.vertical, 6)
-                    .background(isEquipped ? Color.goPrimary : Color.goPrimary.opacity(0.15), in: Capsule())
-            }
-            .buttonStyle(ScaleButtonStyle())
+            ))
+            .toggleStyle(OhanaPillToggleStyle())
+            .labelsHidden()
         }
         .padding(16)
         .overlay(alignment: .bottom) {
@@ -248,9 +290,9 @@ struct InventoryView: View {
                 case "fx_lime_glow": return equipFxLimeGlow
                 case "fx_rainbow": return equipFxRainbow
                 case "fx_rainbow_poop": return equipFxRainbowPoop
+                case "fx_popout_card": return equipFxPopoutCard
                 case "fx_stars": return equipFxStars
                 case "fx_firework": return equipFxFirework
-                case "fx_popout_card": return true // Popout card is always considered active if owned, it's bound via shop
                 default: return false
                 }
             },
@@ -260,6 +302,15 @@ struct InventoryView: View {
                 case "fx_lime_glow": equipFxLimeGlow = val
                 case "fx_rainbow": equipFxRainbow = val
                 case "fx_rainbow_poop": equipFxRainbowPoop = val
+                case "fx_popout_card":
+                    equipFxPopoutCard = val
+                    if val && !pets.contains(where: { $0.cardStyleRaw == "popout" }) {
+                        if pets.count == 1 {
+                            equipPopoutPet = pets.first
+                        } else if pets.count > 1 {
+                            showPetPickerForPopout = true
+                        }
+                    }
                 case "fx_stars": equipFxStars = val
                 case "fx_firework": equipFxFirework = val
                 default: break
@@ -281,25 +332,27 @@ struct InventoryView: View {
             }
             Spacer()
             
-            if item.id == "fx_popout_card" {
-                Button {
-                    if pets.count == 1 {
-                        equipPopoutPet = pets.first
-                    } else if pets.count > 1 {
-                        showPetPickerForPopout = true
+            HStack(spacing: 10) {
+                if item.id == "fx_popout_card" {
+                    Button {
+                        if pets.count == 1 {
+                            equipPopoutPet = pets.first
+                        } else if pets.count > 1 {
+                            showPetPickerForPopout = true
+                        }
+                    } label: {
+                        Text(l.tr(zh: "素材", en: "Asset", de: "Motiv"))
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.goDarkBlue)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(Color.goPrimary, in: Capsule())
                     }
-                } label: {
-                    Text("绑定")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.goDarkBlue)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 6)
-                        .background(Color.goPrimary, in: Capsule())
+                    .buttonStyle(ScaleButtonStyle())
                 }
-                .buttonStyle(ScaleButtonStyle())
-            } else {
+
                 Toggle("", isOn: isActive)
-                    .tint(Color.goPrimary)
+                    .toggleStyle(OhanaPillToggleStyle())
                     .labelsHidden()
             }
         }
@@ -336,6 +389,53 @@ struct InventoryView: View {
 
     private func loadStreakShieldExpiry() {
         streakShieldExpiry = UserDefaults.standard.object(forKey: "shop_streakShieldExpiry") as? Date
+    }
+
+    private func inventorySwitch(isOn: Bool) -> some View {
+        Capsule()
+            .fill(isOn ? Color.goPrimary : Color.ohanaControlFill)
+            .frame(width: 50, height: 28)
+            .overlay(alignment: isOn ? .trailing : .leading) {
+                Circle()
+                    .fill(Color.ohanaPrimaryText)
+                    .frame(width: 22, height: 22)
+                    .padding(3)
+            }
+            .overlay {
+                Capsule()
+                    .strokeBorder(isOn ? Color.goPrimary.opacity(0.55) : Color.ohanaGlassStroke.opacity(0.9), lineWidth: 1)
+            }
+            .animation(GoMotion.selection, value: isOn)
+    }
+
+    private func upgradeHumanTo2DAvatar(_ human: Human) {
+        let rawGender = HumanProfileOptions.normalizedGender(human.genderRaw)
+        let avatarGender: String
+        switch rawGender {
+        case "男", "女", "非二元":
+            avatarGender = rawGender
+        default:
+            avatarGender = "非二元"
+        }
+        guard let data = HumanAvatarAssetCatalog.avatarData(gender: avatarGender, birthday: human.birthday),
+              Avatar2DAccess.consumeExtraPass() else { return }
+        human.avatarImageData = data
+        human.avatarEmoji = HumanGenderIdentity.fallbackAvatarEmoji(for: avatarGender)
+        modelContext.safeSave()
+        showAvatarTargetPicker = false
+    }
+
+    private func upgradePetTo2DAvatar(_ pet: Pet) {
+        guard let data = PetAvatarAssetCatalog.avatarData(
+            species: pet.species,
+            breed: pet.breed,
+            gender: pet.gender,
+            coatColor: pet.coatColor,
+            eyeColor: pet.eyeColor
+        ), Avatar2DAccess.consumeExtraPass() else { return }
+        pet.avatarImageData = data
+        modelContext.safeSave()
+        showAvatarTargetPicker = false
     }
 }
 

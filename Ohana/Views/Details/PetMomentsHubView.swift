@@ -31,6 +31,12 @@ private struct PetDiaryEntry: Identifiable {
     var hasPhotos: Bool { !photos.isEmpty }
 }
 
+private enum PetGeneratedMomentCategory {
+    case birthday
+    case together
+    case remembrance
+}
+
 struct PetMomentsHubView: View {
     let pet: Pet
 
@@ -94,15 +100,23 @@ struct PetMomentsHubView: View {
                     photosPickerItems = []
                 }
 
-                if tab == .timeline {
-                    addMomentButton
-                        .padding(.trailing, 18)
-                        .padding(.bottom, 24)
-                }
+                activeAddButton
+                    .padding(.trailing, 18)
+                    .padding(.bottom, 24)
             }
             .toolbar(.hidden, for: .navigationBar)
-            .sheet(isPresented: $showingQuickMoment) {
-                QuickMomentSheet(pet: pet, onRemove: nil)
+            .overlay {
+                if showingQuickMoment {
+                    QuickMomentSheet(
+                        pet: pet,
+                        onRemove: nil,
+                        onClose: {
+                            showingQuickMoment = false
+                        }
+                    )
+                    .ignoresSafeArea()
+                    .zIndex(100)
+                }
             }
         }
     }
@@ -125,16 +139,6 @@ struct PetMomentsHubView: View {
                     .lineLimit(1)
             }
             Spacer()
-            if tab == .photos {
-                PhotosPicker(selection: $photosPickerItems, maxSelectionCount: 12, matching: .images) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 15, weight: .black))
-                        .foregroundStyle(Color.arkInk)
-                        .frame(width: 38, height: 38)
-                        .background(Color.goPrimary, in: Circle())
-                }
-                .buttonStyle(ScaleButtonStyle())
-            }
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 15, weight: .black))
@@ -263,6 +267,34 @@ struct PetMomentsHubView: View {
         .buttonStyle(ScaleButtonStyle())
     }
 
+    @ViewBuilder
+    private var activeAddButton: some View {
+        if tab == .photos {
+            PhotosPicker(selection: $photosPickerItems, maxSelectionCount: 12, matching: .images) {
+                addButtonLabel(
+                    icon: "plus",
+                    title: l.tr(zh: "添加", en: "Add", de: "Hinzufügen")
+                )
+            }
+            .buttonStyle(ScaleButtonStyle())
+        } else {
+            addMomentButton
+        }
+    }
+
+    private func addButtonLabel(icon: String, title: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .black))
+            Text(title)
+                .font(OhanaFont.callout(.black))
+        }
+        .foregroundStyle(Color.arkInk)
+        .padding(.horizontal, 22)
+        .frame(height: 54)
+        .background(Color.goPrimary, in: Capsule())
+    }
+
     private var groupedEntries: [(day: Date, title: String, entries: [PetDiaryEntry])] {
         let cal = Calendar.current
         let groups = Dictionary(grouping: diaryEntries) { cal.startOfDay(for: $0.date) }
@@ -368,7 +400,8 @@ struct PetMomentsHubView: View {
             )
         }
 
-        let milestoneEntries = pet.milestones.map { milestone in
+        let pastMilestones = pet.milestones.filter { isMomentVisibleDate($0.date) }
+        let milestoneEntries = pastMilestones.map { milestone in
             PetDiaryEntry(
                 id: "milestone-\(milestone.id.uuidString)",
                 kind: .milestone,
@@ -380,11 +413,14 @@ struct PetMomentsHubView: View {
             )
         }
 
-        return (photoEntries + milestoneEntries).sorted { $0.date > $1.date }
+        return (photoEntries + milestoneEntries + generatedMeaningfulMoments(existingMilestones: pastMilestones))
+            .sorted { $0.date > $1.date }
     }
 
     private func groupedMomentLogs() -> [[PetPhotoLog]] {
-        let sorted = pet.photoLogs.sorted { $0.date < $1.date }
+        let sorted = pet.photoLogs
+            .filter { $0.date <= Date() }
+            .sorted { $0.date < $1.date }
         var groups: [[PetPhotoLog]] = []
 
         for log in sorted {
@@ -400,6 +436,175 @@ struct PetMomentsHubView: View {
         }
 
         return groups.sorted { ($0.first?.date ?? .distantPast) > ($1.first?.date ?? .distantPast) }
+    }
+
+    private func generatedMeaningfulMoments(existingMilestones: [PetMilestone]) -> [PetDiaryEntry] {
+        var entries: [PetDiaryEntry] = []
+        let cal = Calendar.current
+        let now = Date()
+        let today = cal.startOfDay(for: now)
+        let lifeEnd = pet.passedAwayDate.map { min($0, now) } ?? now
+
+        if let birthday = pet.birthday,
+           let birthYear = cal.dateComponents([.year], from: birthday).year,
+           let currentYear = cal.dateComponents([.year], from: today).year {
+            let birthdayComponents = cal.dateComponents([.month, .day], from: birthday)
+            for year in birthYear...currentYear {
+                let age = year - birthYear
+                guard age > 0 else { continue }
+                var components = DateComponents()
+                components.year = year
+                components.month = birthdayComponents.month
+                components.day = birthdayComponents.day
+                guard let date = cal.date(from: components),
+                      isMomentVisibleDate(date),
+                      date <= lifeEnd,
+                      !hasExistingMilestone(on: date, category: .birthday, in: existingMilestones)
+                else { continue }
+                entries.append(generatedEntry(
+                    id: "birthday-\(year)",
+                    date: date,
+                    title: birthdayTitle(age: age),
+                    subtitle: l.tr(
+                        zh: "\(pet.name) 的生日",
+                        en: "\(pet.name)'s birthday",
+                        de: "\(pet.name)s Geburtstag"
+                    ),
+                    emoji: "🎂"
+                ))
+            }
+        }
+
+        if let homeDate = pet.homeDate {
+            for days in togetherMilestoneDays {
+                guard let date = cal.date(byAdding: .day, value: days, to: homeDate),
+                      isMomentVisibleDate(date),
+                      date <= lifeEnd,
+                      !hasExistingMilestone(on: date, category: .together, in: existingMilestones)
+                else { continue }
+                entries.append(generatedEntry(
+                    id: "together-\(days)",
+                    date: date,
+                    title: togetherTitle(days),
+                    subtitle: l.tr(
+                        zh: "从到家那天开始计算",
+                        en: "Counted from the day \(pet.name) came home",
+                        de: "Gezählt seit \(pet.name)s Einzug"
+                    ),
+                    emoji: days >= 1000 ? "🏆" : "🎉"
+                ))
+            }
+        }
+
+        if let passedAwayDate = pet.passedAwayDate, passedAwayDate <= now {
+            for days in remembranceMilestoneDays {
+                guard let date = cal.date(byAdding: .day, value: days, to: passedAwayDate),
+                      isMomentVisibleDate(date),
+                      !hasExistingMilestone(on: date, category: .remembrance, in: existingMilestones)
+                else { continue }
+                entries.append(generatedEntry(
+                    id: "remembrance-\(days)",
+                    date: date,
+                    title: remembranceTitle(days),
+                    subtitle: l.tr(
+                        zh: "彩虹桥后的思念",
+                        en: "Remembering after the rainbow bridge",
+                        de: "Erinnerung nach der Regenbogenbrücke"
+                    ),
+                    emoji: "🌈"
+                ))
+            }
+        }
+
+        return entries
+    }
+
+    private var togetherMilestoneDays: [Int] {
+        [100, 365, 500, 730, 1000, 1095, 1500, 1825, 2000, 2190, 2500, 3000]
+    }
+
+    private var remembranceMilestoneDays: [Int] {
+        [30, 100, 365, 500, 730, 1000, 1095, 1500, 1825]
+    }
+
+    private func generatedEntry(id: String, date: Date, title: String, subtitle: String, emoji: String) -> PetDiaryEntry {
+        PetDiaryEntry(
+            id: "generated-\(id)",
+            kind: .milestone,
+            date: date,
+            title: "\(emoji) \(title)",
+            subtitle: subtitle,
+            photos: [],
+            milestone: nil
+        )
+    }
+
+    private func isMomentVisibleDate(_ date: Date) -> Bool {
+        Calendar.current.startOfDay(for: date) <= Calendar.current.startOfDay(for: Date())
+    }
+
+    private func hasExistingMilestone(
+        on date: Date,
+        category: PetGeneratedMomentCategory,
+        in milestones: [PetMilestone]
+    ) -> Bool {
+        let cal = Calendar.current
+        return milestones.contains { milestone in
+            cal.isDate(milestone.date, inSameDayAs: date) &&
+            milestoneCategory(for: milestone) == category
+        }
+    }
+
+    private func milestoneCategory(for milestone: PetMilestone) -> PetGeneratedMomentCategory? {
+        let text = "\(milestone.title) \(milestone.notes)".lowercased()
+        if text.contains("生日") || text.contains("birthday") || text.contains("geburtstag") {
+            return .birthday
+        }
+        if text.contains("思念") || text.contains("remember") || text.contains("erinner") || text.contains("rainbow") || text.contains("彩虹桥") {
+            return .remembrance
+        }
+        if text.contains("共度") || text.contains("相伴") || text.contains("together") || text.contains("days") || text.contains("tage") || text.contains("纪念") {
+            return .together
+        }
+        return nil
+    }
+
+    private func birthdayTitle(age: Int) -> String {
+        l.tr(
+            zh: age == 1 ? "一岁生日" : "\(age) 岁生日",
+            en: age == 1 ? "First Birthday" : "\(age)th Birthday",
+            de: age == 1 ? "Erster Geburtstag" : "\(age). Geburtstag"
+        )
+    }
+
+    private func togetherTitle(_ days: Int) -> String {
+        switch days {
+        case 365:
+            return l.tr(zh: "相伴一年", en: "One Year Together", de: "Ein Jahr zusammen")
+        case 730:
+            return l.tr(zh: "相伴两年", en: "Two Years Together", de: "Zwei Jahre zusammen")
+        case 1095:
+            return l.tr(zh: "相伴三年", en: "Three Years Together", de: "Drei Jahre zusammen")
+        case 1825:
+            return l.tr(zh: "相伴五年", en: "Five Years Together", de: "Fünf Jahre zusammen")
+        default:
+            return l.tr(zh: "共度 \(days) 天", en: "\(days) Days Together", de: "\(days) Tage zusammen")
+        }
+    }
+
+    private func remembranceTitle(_ days: Int) -> String {
+        switch days {
+        case 365:
+            return l.tr(zh: "思念一年", en: "One Year Remembered", de: "Ein Jahr Erinnerung")
+        case 730:
+            return l.tr(zh: "思念两年", en: "Two Years Remembered", de: "Zwei Jahre Erinnerung")
+        case 1095:
+            return l.tr(zh: "思念三年", en: "Three Years Remembered", de: "Drei Jahre Erinnerung")
+        case 1825:
+            return l.tr(zh: "思念五年", en: "Five Years Remembered", de: "Fünf Jahre Erinnerung")
+        default:
+            return l.tr(zh: "思念 \(days) 天", en: "\(days) Days Remembered", de: "\(days) Tage Erinnerung")
+        }
     }
 
     private func normalizedMomentKey(_ log: PetPhotoLog) -> String {

@@ -31,20 +31,13 @@ struct QuickWeightSheet: View {
                 HStack {
                     // 宠物头像 + 名字
                     HStack(spacing: 10) {
-                        ZStack {
-                            Circle()
-                                .fill(themeColor.opacity(0.22))
-                                .frame(width: 40, height: 40)
-                            if let data = pet.avatarImageData, let img = UIImage(data: data) {
-                                Image(uiImage: img)
-                                    .resizable().scaledToFill()
-                                    .frame(width: 40, height: 40)
-                                    .clipShape(Circle())
-                            } else {
-                                Text(pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji)
-                                    .font(.system(size: 20))
-                            }
-                        }
+                        PetAvatarPortraitView(
+                            imageData: pet.avatarImageData,
+                            fallbackText: pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji,
+                            themeColor: themeColor,
+                            size: 40,
+                            backgroundOpacity: 0.22
+                        )
                         VStack(alignment: .leading, spacing: 2) {
                             Text(pet.name)
                                 .font(.system(size: 16, weight: .black, design: .rounded))

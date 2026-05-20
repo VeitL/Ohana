@@ -56,7 +56,6 @@ struct QuickWaterChangeDetailSheet: View {
                         waterChangeSection
                         filterSection
                         historySection
-                        removeButton
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 16)
@@ -79,15 +78,13 @@ struct QuickWaterChangeDetailSheet: View {
 
     private var petHeader: some View {
         HStack(spacing: 12) {
-            ZStack {
-                Circle().fill(themeColor.opacity(0.15)).frame(width: 48, height: 48)
-                if let data = pet.avatarImageData, let img = UIImage(data: data) {
-                    Image(uiImage: img).resizable().scaledToFill()
-                        .frame(width: 48, height: 48).clipShape(Circle())
-                } else {
-                    Text(pet.avatarEmoji).font(.system(size: 24))
-                }
-            }
+            PetAvatarPortraitView(
+                imageData: pet.avatarImageData,
+                fallbackText: pet.avatarEmoji,
+                themeColor: themeColor,
+                size: 48,
+                backgroundOpacity: 0.15
+            )
             VStack(alignment: .leading, spacing: 2) {
                 Text(pet.name)
                     .font(.system(size: 17, weight: .black, design: .rounded))
@@ -260,15 +257,6 @@ struct QuickWaterChangeDetailSheet: View {
                 }
             }
         }
-    }
-
-    private var removeButton: some View {
-        Button(role: .destructive) { onRemove(); dismiss() } label: {
-            Text("移除此快捷入口")
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.goRed)
-        }
-        .buttonStyle(ScaleButtonStyle())
     }
 
     // MARK: - Helpers

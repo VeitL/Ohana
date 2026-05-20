@@ -2,7 +2,7 @@
 //  DocumentDetailSheet.swift
 //  Ohana
 //
-//  证件详情页：显示证件完整信息 + 所有附件（支持多附件 + 兼容旧单附件）
+//  V4 document detail page.
 //
 
 import SwiftUI
@@ -12,12 +12,19 @@ struct DocumentDetailSheet: View {
     let doc: PetDocument
     let pet: Pet
     let onEdit: () -> Void
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
-    @State private var previewImageData: Data? = nil
-    @State private var showingEdit = false
+    @State private var previewImageData: Data?
     @State private var showingDeleteAlert = false
+
+    private var l: L10n { L10n(appLanguage) }
+
+    private var title: String {
+        doc.title.isEmpty ? doc.category : doc.title
+    }
 
     private var expiryColor: Color {
         if doc.isExpired { return Color.goRed }
@@ -25,10 +32,15 @@ struct DocumentDetailSheet: View {
         return Color.goTeal
     }
 
-    // Combined attachments: new multi-attach + old single-attach legacy
+    private var statusText: String {
+        if doc.isExpired { return l.tr(zh: "已过期", en: "Expired", de: "Abgelaufen") }
+        if doc.isExpiringSoon { return l.tr(zh: "即将到期", en: "Expiring", de: "Läuft bald ab") }
+        if doc.expiryDate != nil { return l.tr(zh: "保障中", en: "Protected", de: "Geschützt") }
+        return l.tr(zh: "长期", en: "Long-term", de: "Langfristig")
+    }
+
     private var imageAttachments: [Data] {
-        var result: [Data] = doc.attachments.filter { $0.isImage }.map { $0.data }
-        // Fall-back to legacy single attachment
+        var result = doc.attachments.filter { $0.isImage }.map(\.data)
         if result.isEmpty, let legacy = doc.attachmentData {
             result.append(legacy)
         }
@@ -44,217 +56,230 @@ struct DocumentDetailSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color(hex: "0D0638").ignoresSafeArea()
+        ZStack {
+            OhanaAppBackground().ignoresSafeArea()
 
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 16) {
-
-                        // ── 标题区
-                        VStack(spacing: 10) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.goCardCyan.opacity(0.12))
-                                    .frame(width: 72, height: 72)
-                                Text(doc.documentCategory.emoji)
-                                    .font(.system(size: 40))
-                            }
-                            Text(doc.title.isEmpty ? doc.category : doc.title)
-                                .font(.system(size: 22, weight: .black, design: .rounded))
-                                .foregroundStyle(Color.ohanaPrimaryText)
-                                .multilineTextAlignment(.center)
-                            Text(doc.category)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                                .padding(.horizontal, 12).padding(.vertical, 4)
-                                .goGlassBackground(Capsule())
-                        }
-                        .padding(.top, 8)
-
-                        // ── 状态胶囊
-                        if doc.isExpired {
-                            Label("已过期", systemImage: "exclamationmark.triangle.fill")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(Color.goRed)
-                                .padding(.horizontal, 14).padding(.vertical, 7)
-                                .background(Color.goRed.opacity(0.15), in: Capsule())
-                        } else if doc.isExpiringSoon {
-                            Label("即将到期", systemImage: "clock.badge.exclamationmark")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(Color.goYellow)
-                                .padding(.horizontal, 14).padding(.vertical, 7)
-                                .background(Color.goYellow.opacity(0.15), in: Capsule())
-                        }
-
-                        // ── 信息卡片
-                        VStack(spacing: 0) {
-                            if let issue = doc.issueDate {
-                                infoRow(icon: "calendar", label: "签发日期", value: issue.formatted(.dateTime.year().month().day()))
-                                Divider()
-                            }
-                            if let expiry = doc.expiryDate {
-                                infoRow(icon: "clock", label: "到期日期", value: expiry.formatted(.dateTime.year().month().day()), valueColor: expiryColor)
-                                Divider()
-                            }
-                            if !doc.issuingAuthority.isEmpty {
-                                infoRow(icon: "building.2", label: "签发机构", value: doc.issuingAuthority)
-                                Divider()
-                            }
-                            if doc.cost > 0 {
-                                infoRow(icon: AppCurrency.systemIconName, label: "花费", value: AppCurrency.format(doc.cost, fractionDigits: 2))
-                                if !visibleNotes.isEmpty {
-                                    Divider()
-                                }
-                            }
-                            if !visibleNotes.isEmpty {
-                                infoRow(icon: "note.text", label: "备注", value: visibleNotes)
-                            }
-                        }
-                        .goGlassBackground(RoundedRectangle(cornerRadius: 16, style: .continuous))
-
-                        // ── 图片附件（支持多附件）
-                        if !imageAttachments.isEmpty {
-                            VStack(alignment: .leading, spacing: 10) {
-                                sectionHeader("附件图片", systemImage: "photo.stack.fill")
-                                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                                    ForEach(Array(imageAttachments.enumerated()), id: \.offset) { _, data in
-                                        if let ui = UIImage(data: data) {
-                                            Button { previewImageData = data } label: {
-                                                Image(uiImage: ui)
-                                                    .resizable().scaledToFill()
-                                                    .frame(maxWidth: .infinity).frame(height: 140)
-                                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                            }
-                                            .buttonStyle(ScaleButtonStyle())
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // ── 文件附件
-                        if !fileAttachments.isEmpty {
-                            VStack(alignment: .leading, spacing: 10) {
-                                sectionHeader("文件附件", systemImage: "doc.fill")
-                                ForEach(Array(fileAttachments.enumerated()), id: \.offset) { _, att in
-                                    HStack(spacing: 12) {
-                                        Image(systemName: "doc.fill")
-                                            .font(.system(size: 20))
-                                            .foregroundStyle(Color.goCardCyan)
-                                        Text(att.name)
-                                            .font(.system(size: 14, weight: .medium))
-                                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
-                                            .lineLimit(1)
-                                        Spacer()
-                                    }
-                                    .padding(12)
-                                    .goGlassBackground(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                }
-                            }
-                        }
-
-                        Spacer(minLength: 40)
-                    }
-                    .padding(.horizontal, 16)
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    header
+                    statusStrip
+                    infoRows
+                    attachmentSection
+                    actionRow
+                    Spacer(minLength: 36)
                 }
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+            }
 
-                // ── 全屏图片预览
-                if let data = previewImageData, let ui = UIImage(data: data) {
-                    ZStack {
-                        Color.black.opacity(0.9).ignoresSafeArea()
-                            .onTapGesture { previewImageData = nil }
-                        Image(uiImage: ui)
-                            .resizable().scaledToFit()
-                            .ignoresSafeArea(edges: .all)
-                        VStack {
-                            HStack {
-                                Spacer()
-                                Button { previewImageData = nil } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.system(size: 30))
-                                        .symbolRenderingMode(.hierarchical)
-                                        .foregroundStyle(Color.ohanaPrimaryText).padding(16)
-                                }
-                            }
-                            Spacer()
-                        }
-                    }
+            if let previewImageData, let ui = UIImage(data: previewImageData) {
+                imagePreview(ui)
                     .transition(.opacity)
-                }
+                    .zIndex(20)
             }
-            .navigationTitle("证件详情")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 14) {
-                        Button {
-                            showingDeleteAlert = true
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.goRed)
-                        }
-                        Button {
-                            dismiss()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { onEdit() }
-                        } label: {
-                            Image(systemName: "pencil.circle.fill")
-                                .font(.system(size: 20))
-                                .symbolRenderingMode(.hierarchical)
-                                .foregroundStyle(Color.goCardCyan)
-                        }
-                    }
-                }
+        }
+        .alert(l.tr(zh: "删除证件？", en: "Delete document?", de: "Dokument löschen?"), isPresented: $showingDeleteAlert) {
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
+            Button(l.tr(zh: "删除", en: "Delete", de: "Löschen"), role: .destructive) {
+                modelContext.delete(doc)
+                modelContext.safeSave()
+                dismiss()
             }
-            .alert("删除证件？", isPresented: $showingDeleteAlert) {
-                Button("取消", role: .cancel) {}
-                Button("删除", role: .destructive) {
-                    modelContext.delete(doc)
-                    modelContext.safeSave()
-                    dismiss()
-                }
-            } message: { Text("「\(doc.title.isEmpty ? doc.category : doc.title)」将被永久删除。") }
+        } message: {
+            Text(l.tr(
+                zh: "「\(title)」将被永久删除。",
+                en: "\"\(title)\" will be deleted permanently.",
+                de: "\"\(title)\" wird dauerhaft gelöscht."
+            ))
         }
     }
 
-    // MARK: - Helpers
+    private var header: some View {
+        HStack(spacing: 12) {
+            Text(doc.documentCategory.emoji)
+                .font(.system(size: 26))
+                .frame(width: 48, height: 48)
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(OhanaFont.title3(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                Text(doc.category)
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+            Spacer()
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+        }
+    }
 
-    @ViewBuilder
-    private func infoRow(icon: String, label: String, value: String, valueColor: Color = .white) -> some View {
+    private var statusStrip: some View {
+        HStack(spacing: 12) {
+            metric(title: l.tr(zh: "状态", en: "Status", de: "Status"), value: statusText, tint: expiryColor)
+            metric(title: l.tr(zh: "附件", en: "Files", de: "Anhänge"), value: "\(imageAttachments.count + fileAttachments.count)", tint: Color.goPrimary)
+            metric(title: l.tr(zh: "花费", en: "Cost", de: "Kosten"), value: doc.cost > 0 ? AppCurrency.format(doc.cost, fractionDigits: 0) : "—", tint: Color.goTeal)
+        }
+    }
+
+    private func metric(title: String, value: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(value)
+                .font(OhanaFont.headline(.black))
+                .foregroundStyle(tint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(title)
+                .font(OhanaFont.caption2(.semibold))
+                .foregroundStyle(Color.ohanaSecondaryText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var infoRows: some View {
+        VStack(spacing: 8) {
+            if let issue = doc.issueDate {
+                detailRow(icon: "calendar", label: l.tr(zh: "签发日期", en: "Issue", de: "Ausgestellt"), value: issue.formatted(.dateTime.year().month().day()))
+            }
+            if let expiry = doc.expiryDate {
+                detailRow(icon: "clock", label: l.tr(zh: "到期日期", en: "Expiry", de: "Ablauf"), value: expiry.formatted(.dateTime.year().month().day()), tint: expiryColor)
+            }
+            if !doc.issuingAuthority.isEmpty {
+                detailRow(icon: "building.2.fill", label: l.tr(zh: "机构", en: "Authority", de: "Behörde"), value: doc.issuingAuthority)
+            }
+            if !visibleNotes.isEmpty {
+                detailRow(icon: "note.text", label: l.tr(zh: "备注", en: "Notes", de: "Notizen"), value: visibleNotes)
+            }
+        }
+    }
+
+    private func detailRow(icon: String, label: String, value: String, tint: Color = Color.ohanaPrimaryText) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.goCardCyan.opacity(0.7))
-                .frame(width: 22)
+                .font(.system(size: 13, weight: .black))
+                .foregroundStyle(Color.goPrimary)
+                .frame(width: 24)
             Text(label)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-            Spacer()
+                .font(OhanaFont.caption(.bold))
+                .foregroundStyle(Color.ohanaSecondaryText)
+            Spacer(minLength: 12)
             Text(value)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundStyle(valueColor)
+                .font(OhanaFont.subheadline(.black))
+                .foregroundStyle(tint)
                 .multilineTextAlignment(.trailing)
         }
-        .padding(.horizontal, 16).padding(.vertical, 12)
+        .padding(14)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     @ViewBuilder
-    private func sectionHeader(_ title: String, systemImage: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: systemImage)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(Color.goCardCyan)
-            Text(title)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
+    private var attachmentSection: some View {
+        if !imageAttachments.isEmpty || !fileAttachments.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(l.tr(zh: "附件", en: "Attachments", de: "Anhänge"))
+                    .font(OhanaFont.headline(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+
+                if !imageAttachments.isEmpty {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                        ForEach(Array(imageAttachments.enumerated()), id: \.offset) { _, data in
+                            if let ui = UIImage(data: data) {
+                                Button { previewImageData = data } label: {
+                                    Image(uiImage: ui)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(height: 128)
+                                        .frame(maxWidth: .infinity)
+                                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                                }
+                                .buttonStyle(ScaleButtonStyle())
+                            }
+                        }
+                    }
+                }
+
+                ForEach(Array(fileAttachments.enumerated()), id: \.offset) { _, attachment in
+                    HStack(spacing: 12) {
+                        Image(systemName: "doc.fill")
+                            .font(.system(size: 14, weight: .black))
+                            .foregroundStyle(Color.goPrimary)
+                        Text(attachment.name)
+                            .font(OhanaFont.caption(.bold))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .lineLimit(1)
+                        Spacer()
+                    }
+                    .padding(14)
+                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
+            }
+        }
+    }
+
+    private var actionRow: some View {
+        HStack(spacing: 10) {
+            Button {
+                dismiss()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
+                    onEdit()
+                }
+            } label: {
+                Label(l.tr(zh: "编辑", en: "Edit", de: "Bearbeiten"), systemImage: "pencil")
+                    .font(OhanaFont.subheadline(.black))
+                    .foregroundStyle(Color.arkInk)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(Color.goPrimary, in: Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+
+            Button(role: .destructive) {
+                showingDeleteAlert = true
+            } label: {
+                Image(systemName: "trash.fill")
+                    .font(.system(size: 14, weight: .black))
+                    .foregroundStyle(Color.goRed)
+                    .frame(width: 52, height: 48)
+                    .background(Color.ohanaCardSurface, in: Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(l.tr(zh: "删除", en: "Delete", de: "Löschen"))
+        }
+        .padding(.top, 4)
+    }
+
+    private func imagePreview(_ ui: UIImage) -> some View {
+        ZStack {
+            Color.arkInk.opacity(0.94)
+                .ignoresSafeArea()
+                .onTapGesture { withAnimation(GoMotion.page) { previewImageData = nil } }
+            Image(uiImage: ui)
+                .resizable()
+                .scaledToFit()
+                .padding(18)
+            VStack {
+                HStack {
+                    Spacer()
+                    Button { withAnimation(GoMotion.page) { previewImageData = nil } } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .padding(16)
+                }
+                Spacer()
+            }
         }
     }
 }

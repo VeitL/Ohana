@@ -23,13 +23,9 @@ struct PetInsuranceView: View {
     }
 
     var body: some View {
-        Group {
+        ZStack {
             if embedded {
                 embeddedContent
-                    .sheet(isPresented: $showingAdd) { AddPetInsuranceSheet(pet: pet) }
-                    .sheet(item: $insuranceToEdit) { ins in
-                        AddPetInsuranceSheet(pet: pet, existing: ins)
-                    }
                     .sheet(item: $selectedInsurance) { ins in
                         InsurancePolicyDetailSheet(insurance: ins, pet: pet)
                     }
@@ -53,14 +49,21 @@ struct PetInsuranceView: View {
                             }
                         }
                     }
-                    .sheet(isPresented: $showingAdd) { AddPetInsuranceSheet(pet: pet) }
-                    .sheet(item: $insuranceToEdit) { ins in
-                        AddPetInsuranceSheet(pet: pet, existing: ins)
-                    }
                     .sheet(item: $selectedInsurance) { ins in
                         InsurancePolicyDetailSheet(insurance: ins, pet: pet)
                     }
                 }
+            }
+
+            if showingAdd || insuranceToEdit != nil {
+                ProtectionInsurancePopup(pet: pet, existing: insuranceToEdit) {
+                    withAnimation(GoMotion.page) {
+                        showingAdd = false
+                        insuranceToEdit = nil
+                    }
+                }
+                .transition(.opacity)
+                .zIndex(40)
             }
         }
     }

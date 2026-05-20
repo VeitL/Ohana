@@ -162,11 +162,11 @@ struct CheckInFeedbackBadge: View {
     var body: some View {
         Text(token.deltaText)
             .font(.system(size: 12, weight: .black, design: .rounded))
-            .foregroundStyle(token.kind == .loss ? token.tint : Color.arkInk)
+            .foregroundStyle(Color.arkInk)
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
             .background(
-                token.kind == .loss ? token.tint.opacity(0.15) : token.tint,
+                token.tint,
                 in: Capsule()
             )
             .contentTransition(.numericText())

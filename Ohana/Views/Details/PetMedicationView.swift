@@ -96,6 +96,10 @@ struct PetMedicationView: View {
 
                         summaryStrip
 
+                        if !pet.medications.isEmpty {
+                            medicationRhythmStrip
+                        }
+
                         if pet.medications.isEmpty {
                             emptyState
                         } else {
@@ -136,15 +140,90 @@ struct PetMedicationView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
-            .sheet(isPresented: $showingAddSheet) {
-                AddPetMedicationSheet(pet: pet)
+            .overlay {
+                if showingAddSheet {
+                    addMedicationOverlay
+                }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if !pet.hasPassedAway && !showingAddSheet {
+                    addMedicationFab
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 24)
+                        .transition(
+                            .scale(scale: 0.86, anchor: .bottomTrailing)
+                                .combined(with: .opacity)
+                        )
+                }
             }
             .sheet(item: $selectedMedication) { med in
                 PetMedicationDetailSheet(pet: pet, medication: med)
             }
             .animation(GoMotion.stateChange, value: doseRefreshToken)
             .animation(GoMotion.feedback, value: toastMessage)
+            .animation(GoMotion.sheet, value: showingAddSheet)
         }
+    }
+
+    private var addMedicationOverlay: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .bottom) {
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(colorScheme == .dark ? 0.16 : 0.08), // ui-v4: allow modal scrim
+                        Color.black.opacity(colorScheme == .dark ? 0.42 : 0.22) // ui-v4: allow modal scrim
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                .onTapGesture {
+                    closeAddMedicationPopup()
+                }
+
+                AddPetMedicationSheet(
+                    pet: pet,
+                    isInlinePopup: true,
+                    onClose: closeAddMedicationPopup,
+                    onSaved: {
+                        MedicationReminderService.shared.scheduleMedicationReminders(for: pet, context: modelContext)
+                        doseRefreshToken = UUID()
+                        closeAddMedicationPopup()
+                    }
+                )
+                .frame(maxHeight: min(proxy.size.height * 0.88, 690))
+                .padding(.horizontal, 6)
+                .padding(.bottom, max(proxy.safeAreaInsets.bottom, 8) + 6)
+                .transition(
+                    .asymmetric(
+                        insertion: .move(edge: .bottom)
+                            .combined(with: .opacity)
+                            .combined(with: .scale(scale: 0.985, anchor: .bottom)),
+                        removal: .move(edge: .bottom)
+                            .combined(with: .opacity)
+                            .combined(with: .scale(scale: 0.985, anchor: .bottom))
+                    )
+                )
+            }
+            .animation(GoMotion.sheet, value: showingAddSheet)
+        }
+        .ignoresSafeArea()
+        .zIndex(40)
+    }
+
+    private var addMedicationFab: some View {
+        Button {
+            openAddMedicationPopup()
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 22, weight: .black))
+                .foregroundStyle(Color.ohanaPrimaryActionText)
+                .frame(width: 60, height: 60)
+                .background(chromeAccent, in: Circle())
+                .shadow(color: chromeAccent.opacity(0.26), radius: 18, x: 0, y: 10) // ui-v4: allow floating FAB lift
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(l.tr(zh: "添加药物", en: "Add medication", de: "Medikament hinzufügen"))
     }
 
     private var header: some View {
@@ -170,19 +249,6 @@ struct PetMedicationView: View {
                     .lineLimit(1)
             }
             Spacer()
-            if !pet.hasPassedAway {
-                Button {
-                    showingAddSheet = true
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 16, weight: .black))
-                        .foregroundStyle(Color.ohanaPrimaryActionText)
-                        .frame(width: 42, height: 42)
-                        .background(chromeAccent, in: Circle())
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(l.tr(zh: "添加药物", en: "Add medication", de: "Medikament hinzufügen"))
-            }
             Button {
                 dismiss()
             } label: {
@@ -211,6 +277,97 @@ struct PetMedicationView: View {
                 value: "\(max(0, todayRequired - todayDone))"
             )
         }
+    }
+
+    private var rhythmDays: [Date] {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        return (-13...0).compactMap { cal.date(byAdding: .day, value: $0, to: today) }
+    }
+
+    private var medicationRhythmStrip: some View {
+        let days = rhythmDays
+        let completedDays = days.filter { day in
+            let stats = medicationDayStats(for: day)
+            return stats.required > 0 && stats.done >= stats.required
+        }.count
+        let plannedDays = days.filter { medicationDayStats(for: $0).required > 0 }.count
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .lastTextBaseline, spacing: 8) {
+                Label {
+                    Text(l.tr(zh: "用药节奏", en: "Medication rhythm", de: "Medikamentenrhythmus"))
+                } icon: {
+                    Image(systemName: "calendar.badge.checkmark")
+                }
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                Spacer()
+                Text(plannedDays == 0 ? "—" : "\(completedDays)/\(plannedDays)")
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(chromeAccent)
+                    .contentTransition(.numericText())
+            }
+
+            HStack(alignment: .bottom, spacing: 6) {
+                ForEach(days, id: \.self) { day in
+                    medicationRhythmDay(day)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func medicationRhythmDay(_ day: Date) -> some View {
+        let stats = medicationDayStats(for: day)
+        let progress = stats.required == 0 ? 0 : min(1, Double(stats.done) / Double(stats.required))
+        let cal = Calendar.current
+        let isToday = cal.isDateInToday(day)
+        let tint: Color = {
+            if stats.required == 0 { return Color.ohanaTertiaryText.opacity(0.42) }
+            if stats.done >= stats.required { return Color.goTeal }
+            if stats.done > 0 { return Color.goOrange }
+            return isToday ? chromeAccent : Color.goRed.opacity(0.82)
+        }()
+
+        return VStack(spacing: 5) {
+            ZStack(alignment: .bottom) {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.ohanaControlFill)
+                    .frame(width: 14, height: 34)
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(tint)
+                    .frame(width: 14, height: max(stats.required == 0 ? 4 : 6, 34 * progress))
+                    .animation(GoMotion.stateChange, value: progress)
+            }
+            Text(isToday ? l.tr(zh: "今", en: "T", de: "H") : "\(cal.component(.day, from: day))")
+                .font(OhanaFont.caption2(.black))
+                .foregroundStyle(isToday ? chromeAccent : Color.ohanaTertiaryText)
+                .frame(width: 20)
+        }
+        .accessibilityLabel(medicationRhythmAccessibility(for: day, stats: stats))
+    }
+
+    private func medicationDayStats(for day: Date) -> (required: Int, done: Int) {
+        let required = pet.medications.reduce(0) { total, medication in
+            total + PetMedicationDoseLogging.requiredDoses(on: day, for: medication)
+        }
+        let done = pet.medications.reduce(0) { total, medication in
+            let count = medicationEvents.filter { event in
+                event.relatedEntityId == medication.id.uuidString &&
+                    Calendar.current.isDate(event.startDate, inSameDayAs: day)
+            }.count
+            return total + min(count, max(0, PetMedicationDoseLogging.requiredDoses(on: day, for: medication)))
+        }
+        return (required, done)
+    }
+
+    private func medicationRhythmAccessibility(for day: Date, stats: (required: Int, done: Int)) -> String {
+        let dateText = day.formatted(.dateTime.month().day())
+        if stats.required == 0 {
+            return "\(dateText) \(l.tr(zh: "无固定用药", en: "No scheduled medication", de: "Keine geplante Medikation"))"
+        }
+        return "\(dateText) \(stats.done)/\(stats.required)"
     }
 
     private func metricCell(title: String, value: String) -> some View {
@@ -411,19 +568,6 @@ struct PetMedicationView: View {
                 .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
-            if !pet.hasPassedAway {
-                Button {
-                    showingAddSheet = true
-                } label: {
-                    Text(l.tr(zh: "添加药物", en: "Add medication", de: "Medikament hinzufügen"))
-                        .font(OhanaFont.callout(.black))
-                        .foregroundStyle(Color.ohanaPrimaryActionText)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 13)
-                        .background(chromeAccent, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
-            }
         }
         .padding(18)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -431,7 +575,8 @@ struct PetMedicationView: View {
 
     private func medicationSubtitle(for med: PetMedication) -> String {
         let dose = med.dosage.isEmpty ? l.tr(zh: "按医嘱", en: "As directed", de: "Nach Anweisung") : med.dosage
-        return "\(localizedFrequency(med.frequency)) · \(dose)"
+        let times = medicationTimeSummary(for: med)
+        return times.isEmpty ? "\(localizedFrequency(med.frequency)) · \(dose)" : "\(localizedFrequency(med.frequency)) · \(times) · \(dose)"
     }
 
     private func localizedFrequency(_ frequency: PetMedicationFrequency) -> String {
@@ -462,6 +607,31 @@ struct PetMedicationView: View {
         guard required > 0 else { return 0 }
         let done = PetMedicationDoseLogging.todayDoseCount(events: medicationEvents, medicationId: med.id)
         return max(0, required - done)
+    }
+
+    private func openAddMedicationPopup() {
+        withAnimation(GoMotion.sheet) {
+            showingAddSheet = true
+        }
+    }
+
+    private func closeAddMedicationPopup() {
+        withAnimation(GoMotion.sheet) {
+            showingAddSheet = false
+        }
+    }
+
+    private func medicationTimeSummary(for med: PetMedication) -> String {
+        let required = PetMedicationSchedulePlan.dosesPerDay(for: med.frequency)
+        guard required > 0 else { return "" }
+        let minutes = PetMedicationSchedulePlan.doseMinutes(for: med, required: required)
+        return minutes
+            .map { minute in
+                let hour = minute / 60
+                let min = minute % 60
+                return String(format: "%02d:%02d", hour, min)
+            }
+            .joined(separator: "/")
     }
 
     @MainActor

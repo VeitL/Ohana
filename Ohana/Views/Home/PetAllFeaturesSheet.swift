@@ -60,6 +60,11 @@ struct PetAllFeaturesSheet: View {
         pet.species.localizedCaseInsensitiveContains("dog")
     }
     private var archiveSnapshot: ArchiveMemorySnapshot { ArchiveMemorySnapshot(pet: pet) }
+    private var protectionDocumentCount: Int {
+        pet.documents.filter { doc in
+            doc.documentCategory != .vaccine && doc.documentCategory != .insurance
+        }.count
+    }
 
     var body: some View {
         NavigationStack {
@@ -114,7 +119,7 @@ struct PetAllFeaturesSheet: View {
         case .food:          PetFoodManagementView(pet: pet)
         case .hygiene:       PetHygieneDetailView(pet: pet)
         case .walks:         WalkSummarySheet(pet: pet)
-        case .potty:         PottyOverviewView(pet: pet)
+        case .potty:         QuickPottyDetailSheet(pet: pet) {}
         case .basicInfo:     PetBasicInfoDetailView(pet: pet)
         case .documents:     DocumentsListView(pet: pet, showsCloseButton: true)
         case .moments:       PetMomentsHubView(pet: pet)
@@ -147,7 +152,7 @@ struct PetAllFeaturesSheet: View {
             FeatureHubSectionData(
                 id: "health",
                 title: l.tr(zh: "健康身体", en: "Health", de: "Gesundheit"),
-                subtitle: l.tr(zh: "状态、用药、趋势", en: "Status, meds, trends", de: "Status, Medikamente, Trends"),
+                subtitle: l.tr(zh: "状态与趋势", en: "Status and trends", de: "Status und Trends"),
                 items: healthItems
             ),
             FeatureHubSectionData(
@@ -224,15 +229,6 @@ struct PetAllFeaturesSheet: View {
                 destination: .health
             ),
             item(
-                id: "meds",
-                title: l.tr(zh: "用药", en: "Meds", de: "Medikamente"),
-                value: "\(pet.medications.filter { $0.isActiveToday }.count)",
-                subtitle: medSub,
-                icon: "pills.fill",
-                tint: Color.goPurple,
-                destination: .medications
-            ),
-            item(
                 id: "weight",
                 title: l.tr(zh: "体重", en: "Weight", de: "Gewicht"),
                 value: latestWeightText,
@@ -267,7 +263,7 @@ struct PetAllFeaturesSheet: View {
             item(
                 id: "documents",
                 title: l.tr(zh: "证件保障", en: "Documents", de: "Dokumente"),
-                value: "\(pet.documents.count + pet.insurances.count)",
+                value: "\(protectionDocumentCount + pet.insurances.count)",
                 subtitle: documentsSub,
                 icon: "doc.fill",
                 tint: Color(hex: "94A3B8"),
@@ -391,7 +387,7 @@ struct PetAllFeaturesSheet: View {
         return l.tr(zh: "完善基本信息", en: "Complete profile", de: "Profil ergänzen")
     }
     private var documentsSub: String {
-        let documentCount = pet.documents.count
+        let documentCount = protectionDocumentCount
         let insuranceCount = pet.insurances.count
         if documentCount > 0 || insuranceCount > 0 {
             return l.tr(zh: "\(documentCount)份证件 · \(insuranceCount)份保险", en: "\(documentCount) docs · \(insuranceCount) policies", de: "\(documentCount) Dokumente · \(insuranceCount) Policen")
@@ -475,7 +471,10 @@ struct ArchiveMemorySnapshot {
         let hasBasicProfile = Self.hasBasicProfile(pet)
         let hasHealthOrWeight = !pet.healthLogs.isEmpty || !pet.weightLogs.isEmpty
         let hasMemory = !pet.photoLogs.isEmpty || !pet.milestones.isEmpty
-        let hasProtection = !pet.documents.isEmpty || !pet.insurances.isEmpty || !pet.medications.isEmpty
+        let hasProtectionDocument = pet.documents.contains { doc in
+            doc.documentCategory != .vaccine && doc.documentCategory != .insurance
+        }
+        let hasProtection = hasProtectionDocument || !pet.insurances.isEmpty || !pet.medications.isEmpty
         let hasContinuity = pet.currentStreak > 0 || !pet.milestones.isEmpty
         let checks = [hasBasicProfile, hasHealthOrWeight, hasMemory, hasProtection, hasContinuity]
 
@@ -483,7 +482,7 @@ struct ArchiveMemorySnapshot {
         self.total = checks.count
         self.nextStep = Self.nextStep(
             hasBasicProfile: hasBasicProfile,
-            hasDocumentsOrInsurance: !pet.documents.isEmpty || !pet.insurances.isEmpty,
+            hasDocumentsOrInsurance: hasProtectionDocument || !pet.insurances.isEmpty,
             hasMemory: hasMemory,
             hasHealthOrWeight: hasHealthOrWeight
         )
@@ -516,7 +515,7 @@ struct ArchiveMemorySnapshot {
             return ArchiveMemoryNextStep(
                 kind: .documents,
                 title: l.tr(zh: "添加证件/保障", en: "Add documents", de: "Dokumente hinzufügen"),
-                subtitle: l.tr(zh: "上传疫苗、证件或保险资料", en: "Add vaccine, ID, or insurance files", de: "Impfung, Ausweis oder Versicherung hinzufügen"),
+                subtitle: l.tr(zh: "上传证件或保险资料", en: "Add ID or insurance files", de: "Ausweis oder Versicherung hinzufügen"),
                 icon: "doc.badge.plus"
             )
         }

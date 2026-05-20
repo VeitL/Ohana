@@ -30,6 +30,9 @@ enum FocusWalletAvatarCache {
             return cached
         }
 
+        // Keep SwiftUI body evaluation strictly memory-only. Loading preview files
+        // from disk here can land on the first card-expansion frame and make taps
+        // feel sticky; background `preload` fills the cache instead.
         let entry = Entry(image: nil, isTransparent: false, signature: signature, isFinal: false)
         entries[cardId] = entry
         return entry
@@ -62,20 +65,25 @@ enum FocusWalletAvatarCache {
         let decoded = await Task.detached(priority: .userInitiated) {
             decodePayloads.map { id, data, signature, inFlightKey in
                 let entry = decodedEntry(from: data, signature: signature)
+                let previewData = entry.image.flatMap { previewPNGData(from: $0) }
                 return (
                     id,
                     entry.image,
                     entry.isTransparent,
                     entry.signature,
                     entry.isFinal,
+                    previewData,
                     inFlightKey
                 )
             }
         }.value
 
-        for (id, image, isTransparent, signature, isFinal, inFlightKey) in decoded {
+        for (id, image, isTransparent, signature, isFinal, previewData, inFlightKey) in decoded {
             inFlightKeys.remove(inFlightKey)
             entries[id] = Entry(image: image, isTransparent: isTransparent, signature: signature, isFinal: isFinal)
+            if let previewData {
+                writePreviewData(previewData, cardId: id, signature: signature)
+            }
         }
         AppPerformanceMonitor.shared.record("首页头像解码", startedAt: decodeStartedAt, note: "\(decoded.count) 张")
         return true
@@ -87,11 +95,51 @@ enum FocusWalletAvatarCache {
         return "\(data.count)-\(head)-\(tail)"
     }
 
+    nonisolated private static func previewEntry(for cardId: UUID, signature: String) -> Entry? {
+        let url = previewURL(cardId: cardId, signature: signature)
+        guard let data = try? Data(contentsOf: url),
+              let image = UIImage(data: data) else { return nil }
+        let isTransparent = ImageCutoutService.imageHasTransparentPixels(image)
+        return Entry(image: image, isTransparent: isTransparent, signature: signature, isFinal: false)
+    }
+
+    nonisolated private static func writePreviewData(_ data: Data, cardId: UUID, signature: String) {
+        let directory = previewDirectory()
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? data.write(to: previewURL(cardId: cardId, signature: signature), options: [.atomic])
+    }
+
+    nonisolated private static func previewURL(cardId: UUID, signature: String) -> URL {
+        previewDirectory()
+            .appendingPathComponent("\(cardId.uuidString)-\(signature).png", isDirectory: false)
+    }
+
+    nonisolated private static func previewDirectory() -> URL {
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        return base.appendingPathComponent("Ohana/HomeAvatarPreviews", isDirectory: true)
+    }
+
     nonisolated private static func decodedEntry(from data: Data, signature: String) -> Entry {
         let image = decodedImage(from: data)
         let isTransparent = image.map { ImageCutoutService.imageHasTransparentPixels($0) } ?? false
         let displayImage = isTransparent ? image.flatMap { ImageCutoutService.trimmedTransparentSubjectImage(from: $0) } ?? image : image
         return Entry(image: displayImage, isTransparent: isTransparent, signature: signature, isFinal: true)
+    }
+
+    nonisolated private static func previewPNGData(from image: UIImage, maxPixel: CGFloat = 220) -> Data? {
+        let longest = max(image.size.width, image.size.height)
+        guard longest > 0 else { return image.pngData() }
+        let scale = min(1, maxPixel / longest)
+        let targetSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        let renderer = UIGraphicsImageRenderer(size: targetSize, format: format)
+        let preview = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+        return preview.pngData()
     }
 
     nonisolated private static func decodedImage(from data: Data, maxPixel: CGFloat = 700) -> UIImage? {

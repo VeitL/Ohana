@@ -8,9 +8,24 @@
 import SwiftUI
 import UIKit
 
+private final class GoKeyboardResponderBox {
+    weak var responder: UIResponder?
+}
+
 enum GoKeyboard {
+    private static let responderBox = GoKeyboardResponderBox()
+
+    @MainActor
     static func dismiss() {
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        responderBox.responder = nil
+        UIApplication.shared.sendAction(#selector(UIResponder.ohanaCaptureFirstResponder(_:)), to: nil, from: responderBox, for: nil)
+        responderBox.responder?.resignFirstResponder()
+    }
+}
+
+private extension UIResponder {
+    @objc func ohanaCaptureFirstResponder(_ sender: Any) {
+        (sender as? GoKeyboardResponderBox)?.responder = self
     }
 }
 

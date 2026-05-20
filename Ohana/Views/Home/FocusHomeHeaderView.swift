@@ -1,0 +1,142 @@
+//
+//  FocusHomeHeaderView.swift
+//  Ohana
+//
+//  Top chrome for the wallet home screen.
+//
+
+import SwiftUI
+
+struct FocusHomeHeaderView: View {
+    let safeTop: CGFloat
+    let streak: Int
+    let coconutBalance: Int
+    let activeHumanDisplayName: String
+    let activeHumanAvatarImage: UIImage?
+    let activeHumanAvatarEmoji: String?
+
+    let onStreak: () -> Void
+    let onCoconut: () -> Void
+    let onCrew: () -> Void
+    let onAccountSwitcher: () -> Void
+    let onCalendar: () -> Void
+    let onSettings: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 0) {
+            HStack(spacing: 8) {
+                Button(action: onStreak) {
+                    limePill {
+                        Text("🔥")
+                            .font(OhanaFont.metric(size: 9, .medium))
+                        Text("\(streak)")
+                            .font(OhanaFont.caption2(.black))
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                            .animation(GoMotion.feedback, value: streak)
+                    }
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel("连续打卡 \(streak) 天")
+
+                CoconutBalanceCapsule(balance: coconutBalance, onTap: onCoconut)
+            }
+
+            Spacer()
+
+            HStack(spacing: 8) {
+                limePill {
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 12, weight: .black))
+                        .frame(width: 18)
+                }
+                .contentShape(Capsule())
+                .onTapGesture(perform: onCrew)
+                .onLongPressGesture(minimumDuration: 0.45) {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    onAccountSwitcher()
+                }
+                .accessibilityLabel("家庭协作")
+                .accessibilityHint("点击打开家庭协作，长按切换人类账户")
+
+                Button(action: onCalendar) {
+                    limePill {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 12, weight: .black))
+                            .frame(width: 18)
+                    }
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel("日历")
+
+                Button(action: onSettings) {
+                    settingsPill
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel("设置，当前用户 \(activeHumanDisplayName)")
+            }
+        }
+        .padding(.horizontal, K.hPad)
+        .padding(.top, safeTop + 12)
+        .frame(height: safeTop + 56)
+    }
+
+    private var settingsPill: some View {
+        HStack(spacing: 5) {
+            miniAvatar
+            Text(activeHumanDisplayName)
+                .font(OhanaFont.caption2(.black))
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 9, weight: .black))
+        }
+        .foregroundStyle(Color.ohanaPrimaryActionText)
+        .padding(.leading, 4)
+        .padding(.trailing, 7)
+        .padding(.vertical, 3)
+        .frame(height: 26)
+        .frame(maxWidth: 104)
+        .background(Color.goPrimary, in: Capsule())
+    }
+
+    @ViewBuilder
+    private var miniAvatar: some View {
+        if let image = activeHumanAvatarImage {
+            ZStack {
+                Circle()
+                    .fill(Color.arkInk.opacity(0.12))
+                    .frame(width: 20, height: 20)
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 18, height: 18)
+                    .clipShape(Circle())
+            }
+        } else if let emoji = activeHumanAvatarEmoji, !emoji.isEmpty {
+            ZStack {
+                Circle()
+                    .fill(Color.arkInk.opacity(0.12))
+                    .frame(width: 20, height: 20)
+                Text(emoji)
+                    .font(.system(size: 11))
+            }
+        } else {
+            Image(systemName: "person.crop.circle.badge.exclamationmark")
+                .font(.system(size: 14, weight: .black))
+                .frame(width: 20, height: 20)
+        }
+    }
+
+    private func limePill<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: 3) {
+            content()
+        }
+        .foregroundStyle(Color.ohanaPrimaryActionText)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .frame(height: 26)
+        .fixedSize(horizontal: true, vertical: false)
+        .background(Color.goPrimary, in: Capsule())
+    }
+}

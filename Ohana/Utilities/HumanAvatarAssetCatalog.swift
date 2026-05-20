@@ -16,21 +16,21 @@ enum HumanAvatarAssetCatalog {
         case senior
     }
 
-    static let assetDirectory = "HumanAvatarAssets"
+    nonisolated static let assetDirectory = "HumanAvatarAssets"
 
-    static func avatarFilename(gender: String, birthday: Date?, now: Date = Date()) -> String? {
+    nonisolated static func avatarFilename(gender: String, birthday: Date?, now: Date = Date()) -> String? {
         guard let genderSlug = normalizedGenderSlug(gender) else { return nil }
         return "human_\(genderSlug)_\(ageGroup(for: birthday, now: now).rawValue).png"
     }
 
-    static func avatarData(gender: String, birthday: Date?, now: Date = Date(), bundle: Bundle = .main) -> Data? {
+    nonisolated static func avatarData(gender: String, birthday: Date?, now: Date = Date(), bundle: Bundle = .main) -> Data? {
         guard let filename = avatarFilename(gender: gender, birthday: birthday, now: now) else {
             return nil
         }
         return avatarData(filename: filename, bundle: bundle)
     }
 
-    static func avatarData(filename: String, bundle: Bundle = .main) -> Data? {
+    nonisolated static func avatarData(filename: String, bundle: Bundle = .main) -> Data? {
         let name = (filename as NSString).deletingPathExtension
         let ext = (filename as NSString).pathExtension
         guard let url = bundle.url(forResource: name, withExtension: ext, subdirectory: assetDirectory) else {
@@ -39,7 +39,7 @@ enum HumanAvatarAssetCatalog {
         return try? Data(contentsOf: url)
     }
 
-    static func ageGroup(for birthday: Date?, now: Date = Date(), calendar: Calendar = .current) -> AgeGroup {
+    nonisolated static func ageGroup(for birthday: Date?, now: Date = Date(), calendar: Calendar = .current) -> AgeGroup {
         guard let birthday,
               let years = calendar.dateComponents([.year], from: birthday, to: now).year,
               years >= 0 else {
@@ -60,7 +60,7 @@ enum HumanAvatarAssetCatalog {
         }
     }
 
-    private static func normalizedGenderSlug(_ value: String) -> String? {
+    nonisolated private static func normalizedGenderSlug(_ value: String) -> String? {
         switch HumanProfileOptions.normalizedGender(value) {
         case "男":
             return "male"

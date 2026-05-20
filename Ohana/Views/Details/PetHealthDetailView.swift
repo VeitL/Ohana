@@ -8,7 +8,6 @@
 
 import SwiftUI
 import SwiftData
-import Charts
 
 // MARK: - 健康添加 Sheet 路由
 private enum HealthPlusDestination: Identifiable {
@@ -74,6 +73,55 @@ private enum ActiveHealthSheet: Identifiable {
     }
 }
 
+private enum HealthFabActionKind: String, Identifiable {
+    case preventive
+    case visit
+    case medication
+    case vaccinePassport
+    case archive
+    case pdf
+    case symptom
+    case heatCycle
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .preventive: return "shield.checkered"
+        case .visit: return "cross.case.fill"
+        case .medication: return "pill.fill"
+        case .vaccinePassport: return "syringe.fill"
+        case .archive: return "folder.fill"
+        case .pdf: return "doc.richtext"
+        case .symptom: return "exclamationmark.triangle.fill"
+        case .heatCycle: return "heart.text.square.fill"
+        }
+    }
+
+    func label(_ l: L10n, isRenderingPDF: Bool = false) -> String {
+        switch self {
+        case .preventive:
+            return l.tr(zh: "预防护理", en: "Preventive care", de: "Vorsorge")
+        case .visit:
+            return l.tr(zh: "就诊记录", en: "Visit record", de: "Besuchseintrag")
+        case .medication:
+            return l.tr(zh: "添加药物", en: "Add medication", de: "Medikament")
+        case .vaccinePassport:
+            return l.tr(zh: "疫苗本", en: "Vaccine passport", de: "Impfpass")
+        case .archive:
+            return l.tr(zh: "完整档案", en: "Full archive", de: "Vollständige Akte")
+        case .pdf:
+            return isRenderingPDF
+                ? l.tr(zh: "PDF 生成中", en: "Rendering PDF", de: "PDF wird erstellt")
+                : l.tr(zh: "导出 PDF", en: "Export PDF", de: "PDF exportieren")
+        case .symptom:
+            return l.tr(zh: "记录异常", en: "Log symptom", de: "Symptom")
+        case .heatCycle:
+            return l.tr(zh: "生理期", en: "Heat cycle", de: "Läufigkeit")
+        }
+    }
+}
+
 enum PetHealthInitialSection {
     case preventive
     case medication
@@ -124,6 +172,9 @@ struct PetHealthDetailView: View {
     @State private var scatterRevealProgress: CGFloat = 0.0
     @State private var showingHistory = false
     @State private var showingPassport = false
+    @State private var isHealthFabExpanded = false
+    @State private var healthFabItemsVisible = false
+    @State private var showingMedicationPopup = false
     @State private var medicationDoseRefreshToken = UUID()
     @State private var didOpenInitialSection = false
 
@@ -150,9 +201,17 @@ struct PetHealthDetailView: View {
 
     private func dueDate(for type: HealthLogType) -> Date? {
         guard let last = latestLog(type: type) else { return nil }
+        if let expirationDate = last.expirationDate {
+            return expirationDate
+        }
+        if type == .checkup, let nextCheckupDate = last.nextCheckupDate {
+            return nextCheckupDate
+        }
         switch type {
         case .vaccine:    return Calendar.current.date(byAdding: .year,  value: 1, to: last.date)
-        case .medication, .dewormingInternal, .dewormingExternal:
+        case .medication, .dewormingExternal:
+                          return Calendar.current.date(byAdding: .month, value: 1, to: last.date)
+        case .dewormingInternal:
                           return Calendar.current.date(byAdding: .month, value: 3, to: last.date)
         case .checkup:    return Calendar.current.date(byAdding: .year,  value: 1, to: last.date)
         default:          return nil
@@ -175,6 +234,75 @@ struct PetHealthDetailView: View {
             return isDark ? Color.goPrimary.opacity(0.85) : Color.goRed
         default:
             return isDark ? Color.goPrimary.opacity(0.78) : Color.goCardCyan
+        }
+    }
+
+    private func healthIcon(for type: HealthLogType) -> String {
+        switch type {
+        case .general: return "clipboard.fill"
+        case .vaccine: return "syringe.fill"
+        case .medication: return "pill.fill"
+        case .dewormingInternal: return "pills.fill"
+        case .dewormingExternal: return "shield.lefthalf.filled"
+        case .surgery: return "cross.case.fill"
+        case .dental: return "mouth.fill"
+        case .checkup: return "stethoscope"
+        case .emergency: return "cross.circle.fill"
+        case .other: return "doc.text.fill"
+        }
+    }
+
+    private func healthTypeTitle(_ type: HealthLogType) -> String {
+        switch type {
+        case .general: return l.tr(zh: "常规记录", en: "General", de: "Allgemein")
+        case .vaccine: return l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung")
+        case .medication: return l.tr(zh: "用药", en: "Medication", de: "Medikament")
+        case .dewormingInternal: return l.tr(zh: "体内驱虫", en: "Internal deworming", de: "Innere Entwurmung")
+        case .dewormingExternal: return l.tr(zh: "体外驱虫", en: "External deworming", de: "Äußere Entwurmung")
+        case .surgery: return l.tr(zh: "手术", en: "Surgery", de: "Operation")
+        case .dental: return l.tr(zh: "牙科", en: "Dental", de: "Zahnmedizin")
+        case .checkup: return l.tr(zh: "体检", en: "Checkup", de: "Check-up")
+        case .emergency: return l.tr(zh: "急诊", en: "Emergency", de: "Notfall")
+        case .other: return l.tr(zh: "其他", en: "Other", de: "Andere")
+        }
+    }
+
+    private func symptomCategoryIcon(_ category: SymptomCategory) -> String {
+        switch category {
+        case .digestive: return "stomach.fill"
+        case .respiratory: return "lungs.fill"
+        case .mobility: return "figure.walk"
+        case .appetite: return "fork.knife"
+        case .skin: return "bandage.fill"
+        case .behavior: return "moon.zzz.fill"
+        case .other: return "magnifyingglass"
+        }
+    }
+
+    private func localizedSeverityLabel(_ severity: SymptomSeverity) -> String {
+        switch severity {
+        case .mild: return l.tr(zh: "轻微", en: "Mild", de: "Leicht")
+        case .moderate: return l.tr(zh: "中度", en: "Moderate", de: "Mittel")
+        case .severe: return l.tr(zh: "严重", en: "Severe", de: "Schwer")
+        case .critical: return l.tr(zh: "紧急", en: "Critical", de: "Kritisch")
+        }
+    }
+
+    private func alertIcon(for type: HealthAlert.AlertType) -> String {
+        switch type {
+        case .vaccineExpired, .vaccineExpiringSoon: return "syringe.fill"
+        case .dewormingDue: return "pills.fill"
+        case .weightGainAlert, .weightLossAlert: return "scalemass.fill"
+        case .noCheckIn: return "calendar.badge.exclamationmark"
+        case .noPotty: return "toilet.fill"
+        case .noWalk: return "figure.walk"
+        case .checkupOverdue: return "stethoscope"
+        case .documentExpiringSoon: return "doc.text.fill"
+        case .activeSymptom: return "waveform.path.ecg"
+        case .heatCycleAlert: return "heart.text.square.fill"
+        case .pregnancyCountdown: return "cross.case.fill"
+        case .drinkingWeightAlert: return "drop.fill"
+        case .lowActivityAlert: return "chart.line.downtrend.xyaxis"
         }
     }
 
@@ -455,8 +583,8 @@ struct PetHealthDetailView: View {
             HealthActivityItem(
                 id: "health-\(log.id.uuidString)",
                 date: log.date,
-                icon: log.healthLogType.emoji,
-                title: log.type,
+                icon: healthIcon(for: log.healthLogType),
+                title: log.note.isEmpty ? healthTypeTitle(log.healthLogType) : log.note,
                 detail: log.note.isEmpty ? log.date.formatted(.dateTime.month().day()) : log.note,
                 tint: colorForType(log.healthLogType)
             )
@@ -465,9 +593,9 @@ struct PetHealthDetailView: View {
             HealthActivityItem(
                 id: "symptom-\(log.id.uuidString)",
                 date: log.date,
-                icon: log.category.emoji,
+                icon: symptomCategoryIcon(log.category),
                 title: log.symptomName.isEmpty ? l.tr(zh: "异常症状", en: "Symptom", de: "Symptom") : log.symptomName,
-                detail: log.severity.label,
+                detail: localizedSeverityLabel(log.severity),
                 tint: log.severity == .severe || log.severity == .critical ? Color.goRed : Color.goOrange
             )
         }
@@ -475,7 +603,7 @@ struct PetHealthDetailView: View {
             HealthActivityItem(
                 id: "heat-\(log.id.uuidString)",
                 date: log.startDate,
-                icon: "💗",
+                icon: "heart.text.square.fill",
                 title: log.status.rawValue,
                 detail: log.isMated ? l.tr(zh: "已交配", en: "Mated", de: "Gedeckt") : log.startDate.formatted(.dateTime.month().day()),
                 tint: Color(hex: log.status.colorHex)
@@ -489,11 +617,11 @@ struct PetHealthDetailView: View {
 
     private func handleMedicationPrimaryAction() {
         guard !activeMedications.isEmpty else {
-            healthPlusDestination = .medications
+            openMedicationPopup()
             return
         }
         guard let item = actionableMedicationDose else {
-            activeHealthSheet = .medicationOverview
+            openHealthOverview(.medicationOverview)
             return
         }
         recordMedicationDose(item)
@@ -508,7 +636,7 @@ struct PetHealthDetailView: View {
             awardCoconut: true
         )
         MedicationReminderService.shared.scheduleMedicationReminders(for: pet, context: modelContext)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        OhanaFeedback.success()
         medicationDoseRefreshToken = UUID()
     }
 
@@ -525,7 +653,7 @@ struct PetHealthDetailView: View {
                 let required = PetMedicationDoseLogging.requiredDoses(on: day, for: medication)
                 guard required > 0 else { continue }
                 let completedCount = medicationDoseCount(on: day, for: medication)
-                let minutes = medicationDoseMinutes(for: medication.frequency, required: required)
+                let minutes = PetMedicationSchedulePlan.doseMinutes(for: medication, required: required)
                 for index in 0..<required {
                     let minute = minutes.indices.contains(index) ? minutes[index] : 8 * 60
                     guard let scheduled = calendar.date(byAdding: .minute, value: minute, to: day) else { continue }
@@ -541,19 +669,6 @@ struct PetHealthDetailView: View {
             }
         }
         return items.filter { $0.scheduledAt <= end && $0.scheduledAt >= startDay }
-    }
-
-    private func medicationDoseMinutes(for frequency: PetMedicationFrequency, required: Int) -> [Int] {
-        switch frequency {
-        case .daily, .everyOtherDay, .weekly, .custom:
-            return [8 * 60]
-        case .twiceDaily:
-            return [8 * 60, 20 * 60]
-        case .threeTimesDaily:
-            return [8 * 60, 14 * 60, 20 * 60]
-        case .asNeeded:
-            return []
-        }
     }
 
     private func medicationDoseCount(on day: Date, for medication: PetMedication) -> Int {
@@ -587,7 +702,7 @@ struct PetHealthDetailView: View {
                     }
                     healthDashboardCards
                     recentActivityCard
-                    Spacer(minLength: 40)
+                    Spacer(minLength: 108)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
@@ -596,6 +711,19 @@ struct PetHealthDetailView: View {
                 healthAlerts = PetHealthAlertEngine.shared.scanAlerts(pets: [pet])
                 openInitialSectionIfNeeded()
             }
+
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    if healthPlusDestination == nil && !showingMedicationPopup {
+                        healthAddMenu
+                            .padding(.trailing, 18)
+                            .padding(.bottom, 24)
+                    }
+                }
+            }
+            .zIndex(12)
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -604,6 +732,11 @@ struct PetHealthDetailView: View {
         .overlay {
             if let dest = healthPlusDestination, dest.usesInlineRecordPopup {
                 healthRecordInlineOverlay(dest)
+                    .transition(.opacity)
+            }
+            if showingMedicationPopup {
+                medicationInlineOverlay
+                    .transition(.opacity)
             }
         }
         .sheet(item: sheetHealthPlusDestination) { dest in
@@ -685,9 +818,7 @@ struct PetHealthDetailView: View {
                 )
                 .ignoresSafeArea()
                 .onTapGesture {
-                    withAnimation(GoMotion.sheet) {
-                        healthPlusDestination = nil
-                    }
+                    closeHealthRecordPopup()
                 }
 
                 PetHealthRecordInlinePopup(
@@ -695,21 +826,18 @@ struct PetHealthDetailView: View {
                     initialType: healthRecordInitialType(for: destination),
                     entryMode: healthRecordEntryMode(for: destination),
                     onClose: {
-                        withAnimation(GoMotion.sheet) {
-                            healthPlusDestination = nil
-                        }
+                        closeHealthRecordPopup()
                     },
                     onSaved: {
                         healthAlerts = PetHealthAlertEngine.shared.scanAlerts(pets: [pet])
-                        withAnimation(GoMotion.sheet) {
-                            healthPlusDestination = nil
-                        }
+                        OhanaFeedback.success()
+                        closeHealthRecordPopup(feedback: false)
                     }
                 )
                 .frame(maxHeight: min(proxy.size.height * 0.86, 680))
                 .padding(.horizontal, 6)
                 .padding(.bottom, max(proxy.safeAreaInsets.bottom, 8) + 6)
-                .transition(.move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.985, anchor: .bottom)))
+                .transition(healthInlinePopupTransition)
             }
             .animation(GoMotion.sheet, value: healthPlusDestination?.id)
         }
@@ -733,24 +861,56 @@ struct PetHealthDetailView: View {
         return nil
     }
 
+    private var medicationInlineOverlay: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .bottom) {
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(isDark ? 0.16 : 0.08), // ui-v4: allow modal scrim
+                        Color.black.opacity(isDark ? 0.42 : 0.22) // ui-v4: allow modal scrim
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                .onTapGesture {
+                    closeMedicationPopup()
+                }
+
+                AddPetMedicationSheet(
+                    pet: pet,
+                    isInlinePopup: true,
+                    onClose: {
+                        closeMedicationPopup()
+                    },
+                    onSaved: {
+                        medicationDoseRefreshToken = UUID()
+                        MedicationReminderService.shared.scheduleMedicationReminders(for: pet, context: modelContext)
+                        OhanaFeedback.success()
+                        closeMedicationPopup(feedback: false)
+                    }
+                )
+                .frame(maxHeight: min(proxy.size.height * 0.88, 690))
+                .padding(.horizontal, 6)
+                .padding(.bottom, max(proxy.safeAreaInsets.bottom, 8) + 6)
+                .transition(healthInlinePopupTransition)
+            }
+            .animation(GoMotion.sheet, value: showingMedicationPopup)
+        }
+        .ignoresSafeArea()
+        .zIndex(42)
+    }
+
     // MARK: - Guided Health Home
     private var healthHeader: some View {
         HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(chromeAccent.opacity(isDark ? 0.18 : 0.12))
-                    .frame(width: 46, height: 46)
-                if let data = pet.avatarImageData, let image = UIImage(data: data) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 46, height: 46)
-                        .clipShape(Circle())
-                } else {
-                    Text(pet.avatarEmoji)
-                        .font(.system(size: 24))
-                }
-            }
+            PetAvatarPortraitView(
+                imageData: pet.avatarImageData,
+                fallbackText: pet.avatarEmoji,
+                themeColor: chromeAccent,
+                size: 46,
+                backgroundOpacity: isDark ? 0.18 : 0.12
+            )
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(pet.name)
@@ -763,9 +923,8 @@ struct PetHealthDetailView: View {
 
             Spacer()
 
-            healthAddMenu
-
             Button {
+                OhanaFeedback.light()
                 dismiss()
                 onFullDismiss?()
             } label: {
@@ -781,58 +940,167 @@ struct PetHealthDetailView: View {
     }
 
     private var healthAddMenu: some View {
-        Menu {
-            Button {
-                healthPlusDestination = .guided(.preventive)
-            } label: {
-                Label(l.tr(zh: "预防护理", en: "Preventive care", de: "Vorsorge"), systemImage: "shield.checkered")
-            }
-            Button {
-                healthPlusDestination = .guided(.visit)
-            } label: {
-                Label(l.tr(zh: "就诊记录", en: "Visit record", de: "Besuchseintrag"), systemImage: "cross.case.fill")
-            }
-            Button {
-                healthPlusDestination = .medications
-            } label: {
-                Label(l.tr(zh: "用药记录", en: "Medication", de: "Medikamente"), systemImage: "pill.fill")
-            }
-            Button {
-                showingPassport = true
-            } label: {
-                Label(l.tr(zh: "疫苗本", en: "Vaccine passport", de: "Impfpass"), systemImage: "syringe.fill")
-            }
-            Button {
-                showingHistory = true
-            } label: {
-                Label(l.tr(zh: "完整档案", en: "Full archive", de: "Vollständige Akte"), systemImage: "folder.fill")
-            }
-            Button {
-                renderHealthPDF()
-            } label: {
-                Label(isRenderingPDF ? l.tr(zh: "PDF 生成中", en: "Rendering PDF", de: "PDF wird erstellt") : l.tr(zh: "导出 PDF", en: "Export PDF", de: "PDF exportieren"), systemImage: "doc.richtext")
-            }
-            Divider()
-            Button {
-                healthPlusDestination = .symptom
-            } label: {
-                Label(l.tr(zh: "记录异常症状", en: "Log symptom", de: "Symptom eintragen"), systemImage: "exclamationmark.triangle.fill")
-            }
-            if !pet.isNeutered {
-                Button {
-                    healthPlusDestination = .heatCycle
-                } label: {
-                    Label(l.tr(zh: "记录生理期", en: "Log heat cycle", de: "Läufigkeit eintragen"), systemImage: "heart.text.square.fill")
+        VStack(alignment: .trailing, spacing: 14) {
+            if isHealthFabExpanded {
+                ForEach(Array(healthFabActionKinds.enumerated()), id: \.element.id) { index, action in
+                    HomeFabActionRow(
+                        item: HomeFabFunctionShortcut(
+                            label: action.label(l, isRenderingPDF: isRenderingPDF),
+                            icon: action.icon,
+                            isAvailable: action != .pdf || !isRenderingPDF
+                        ),
+                        rowHeight: 48
+                    )
+                    .ohanaStaggeredMenuItem(isVisible: healthFabItemsVisible, index: index, total: healthFabActionKinds.count)
+                    .onTapGesture {
+                        performHealthFabAction(action)
+                    }
+                    .allowsHitTesting(healthFabItemsVisible && (action != .pdf || !isRenderingPDF))
+                    .accessibilityHidden(!healthFabItemsVisible)
                 }
             }
-        } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 15, weight: .black))
-                .foregroundStyle(Color.ohanaPrimaryActionText)
-                .frame(width: 40, height: 40)
-                .background(chromeAccent, in: Circle())
+
+            HomeFabMainButton(
+                isExpanded: isHealthFabExpanded,
+                accessibilityLabel: isHealthFabExpanded
+                    ? l.tr(zh: "收起健康菜单", en: "Collapse health menu", de: "Gesundheitsmenü schließen")
+                    : l.tr(zh: "展开健康菜单", en: "Open health menu", de: "Gesundheitsmenü öffnen"),
+                action: toggleHealthFabMenu
+            )
         }
-        .buttonStyle(ScaleButtonStyle())
+    }
+
+    private var healthFabActionKinds: [HealthFabActionKind] {
+        var actions: [HealthFabActionKind] = [
+            .preventive,
+            .visit,
+            .medication,
+            .vaccinePassport,
+            .archive,
+            .pdf,
+            .symptom
+        ]
+        if !pet.isNeutered {
+            actions.append(.heatCycle)
+        }
+        return actions
+    }
+
+    private func openHealthFabMenu() {
+        guard !isHealthFabExpanded else { return }
+        healthFabItemsVisible = false
+        withAnimation(GoMotion.fab) {
+            isHealthFabExpanded = true
+        }
+        DispatchQueue.main.async {
+            withAnimation(GoMotion.fab) {
+                healthFabItemsVisible = true
+            }
+        }
+    }
+
+    private func closeHealthFabMenu() {
+        guard isHealthFabExpanded else { return }
+        withAnimation(GoMotion.fab) {
+            healthFabItemsVisible = false
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            if isHealthFabExpanded && !healthFabItemsVisible {
+                withAnimation(GoMotion.fab) {
+                    isHealthFabExpanded = false
+                }
+            }
+        }
+    }
+
+    private func toggleHealthFabMenu() {
+        OhanaFeedback.medium()
+        isHealthFabExpanded ? closeHealthFabMenu() : openHealthFabMenu()
+    }
+
+    private func performHealthFabAction(_ action: HealthFabActionKind) {
+        guard action != .pdf || !isRenderingPDF else { return }
+        OhanaFeedback.light()
+        healthFabItemsVisible = false
+        withAnimation(GoMotion.fab) {
+            isHealthFabExpanded = false
+        }
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 90) {
+            switch action {
+            case .preventive:
+                openHealthRecord(.guided(.preventive), feedback: false)
+            case .visit:
+                openHealthRecord(.guided(.visit), feedback: false)
+            case .medication:
+                openMedicationPopup(feedback: false)
+            case .vaccinePassport:
+                showingPassport = true
+            case .archive:
+                showingHistory = true
+            case .pdf:
+                renderHealthPDF()
+            case .symptom:
+                openHealthRecord(.symptom, feedback: false)
+            case .heatCycle:
+                openHealthRecord(.heatCycle, feedback: false)
+            }
+        }
+    }
+
+    private var healthInlinePopupTransition: AnyTransition {
+        .asymmetric(
+            insertion: .move(edge: .bottom)
+                .combined(with: .opacity)
+                .combined(with: .scale(scale: 0.965, anchor: .bottom)),
+            removal: .move(edge: .bottom)
+                .combined(with: .opacity)
+                .combined(with: .scale(scale: 0.985, anchor: .bottom))
+        )
+    }
+
+    private func openHealthRecord(_ destination: HealthPlusDestination, feedback: Bool = true) {
+        if feedback { OhanaFeedback.light() }
+        activeHealthSheet = nil
+        withAnimation(GoMotion.sheet) {
+            healthPlusDestination = destination
+        }
+    }
+
+    private func closeHealthRecordPopup(feedback: Bool = true) {
+        if feedback { OhanaFeedback.light() }
+        withAnimation(GoMotion.sheet) {
+            healthPlusDestination = nil
+        }
+    }
+
+    private func openHealthOverview(_ sheet: ActiveHealthSheet, feedback: Bool = true) {
+        if feedback { OhanaFeedback.light() }
+        withAnimation(GoMotion.page) {
+            activeHealthSheet = sheet
+        }
+    }
+
+    private func closeHealthOverview() {
+        OhanaFeedback.light()
+        withAnimation(GoMotion.page) {
+            activeHealthSheet = nil
+        }
+    }
+
+    private func openMedicationPopup(feedback: Bool = true) {
+        if feedback { OhanaFeedback.light() }
+        activeHealthSheet = nil
+        healthPlusDestination = nil
+        withAnimation(GoMotion.sheet) {
+            showingMedicationPopup = true
+        }
+    }
+
+    private func closeMedicationPopup(feedback: Bool = true) {
+        if feedback { OhanaFeedback.light() }
+        withAnimation(GoMotion.sheet) {
+            showingMedicationPopup = false
+        }
     }
 
     private func renderHealthPDF() {
@@ -887,8 +1155,9 @@ struct PetHealthDetailView: View {
         VStack(spacing: 10) {
             ForEach(healthAlerts.prefix(2)) { alert in
                 HStack(spacing: 10) {
-                    Text(alert.emoji)
-                        .font(.system(size: 20))
+                    Image(systemName: alertIcon(for: alert.type))
+                        .font(.system(size: 15, weight: .black))
+                        .foregroundStyle(alertColor(alert))
                         .frame(width: 30, height: 30)
                         .background(alertColor(alert).opacity(0.16), in: Circle())
                     VStack(alignment: .leading, spacing: 2) {
@@ -919,10 +1188,13 @@ struct PetHealthDetailView: View {
                 icon: "shield.checkered",
                 tint: preventionTint,
                 primaryTitle: l.tr(zh: "记录", en: "Log", de: "Eintragen"),
-                secondaryTitle: l.tr(zh: "总览", en: "Overview", de: "Übersicht"),
-                primaryAction: { healthPlusDestination = .guided(.preventive) },
-                secondaryAction: { activeHealthSheet = .preventiveOverview },
-                cardAction: { activeHealthSheet = .preventiveOverview }
+                secondaryTitle: l.tr(zh: "疫苗本", en: "Passport", de: "Impfpass"),
+                primaryAction: { openHealthRecord(.guided(.preventive)) },
+                secondaryAction: {
+                    OhanaFeedback.light()
+                    showingPassport = true
+                },
+                cardAction: { openHealthOverview(.preventiveOverview) }
             )
             healthDashboardCard(
                 title: l.tr(zh: "用药", en: "Medication", de: "Medikamente"),
@@ -933,8 +1205,11 @@ struct PetHealthDetailView: View {
                 primaryTitle: medicationPrimaryButtonTitle,
                 secondaryTitle: l.tr(zh: "管理", en: "Manage", de: "Verwalten"),
                 primaryAction: handleMedicationPrimaryAction,
-                secondaryAction: { healthPlusDestination = .medications },
-                cardAction: { activeHealthSheet = .medicationOverview }
+                secondaryAction: {
+                    OhanaFeedback.light()
+                    healthPlusDestination = .medications
+                },
+                cardAction: { openHealthOverview(.medicationOverview) }
             )
             healthDashboardCard(
                 title: l.tr(zh: "异常/就诊", en: "Symptoms & visits", de: "Auffälligkeiten & Besuche"),
@@ -944,9 +1219,9 @@ struct PetHealthDetailView: View {
                 tint: symptomVisitTint,
                 primaryTitle: l.tr(zh: "症状", en: "Symptom", de: "Symptom"),
                 secondaryTitle: l.tr(zh: "就诊", en: "Visit", de: "Besuch"),
-                primaryAction: { healthPlusDestination = .symptom },
-                secondaryAction: { healthPlusDestination = .guided(.visit) },
-                cardAction: { activeHealthSheet = .symptomVisitOverview }
+                primaryAction: { openHealthRecord(.symptom) },
+                secondaryAction: { openHealthRecord(.guided(.visit)) },
+                cardAction: { openHealthOverview(.symptomVisitOverview) }
             )
         }
     }
@@ -991,7 +1266,9 @@ struct PetHealthDetailView: View {
             Spacer(minLength: 8)
 
             VStack(spacing: 8) {
-                Button(action: primaryAction) {
+                Button {
+                    primaryAction()
+                } label: {
                     Text(primaryTitle)
                         .font(.system(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryActionText)
@@ -1000,7 +1277,9 @@ struct PetHealthDetailView: View {
                 }
                 .buttonStyle(ScaleButtonStyle())
 
-                Button(action: secondaryAction) {
+                Button {
+                    secondaryAction()
+                } label: {
                     Text(secondaryTitle)
                         .font(.system(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
@@ -1041,7 +1320,7 @@ struct PetHealthDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        activeHealthSheet = nil
+                        closeHealthOverview()
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 14, weight: .black))
@@ -1070,7 +1349,7 @@ struct PetHealthDetailView: View {
             HStack(spacing: 10) {
                 overviewActionButton(l.tr(zh: "添加预防", en: "Add preventive", de: "Vorsorge hinzufügen"), icon: "plus") {
                     activeHealthSheet = nil
-                    healthPlusDestination = .guided(.preventive)
+                    openHealthRecord(.guided(.preventive), feedback: false)
                 }
                 overviewActionButton(l.tr(zh: "疫苗本", en: "Passport", de: "Impfpass"), icon: "syringe.fill") {
                     activeHealthSheet = nil
@@ -1089,8 +1368,8 @@ struct PetHealthDetailView: View {
                 VStack(spacing: 8) {
                     ForEach(Array(preventiveLogs)) { log in
                         overviewHistoryRow(
-                            icon: log.healthLogType.emoji,
-                            title: log.type,
+                            icon: healthIcon(for: log.healthLogType),
+                            title: log.note.isEmpty ? healthTypeTitle(log.healthLogType) : log.note,
                             detail: log.date.formatted(.dateTime.year().month().day()),
                             tint: colorForType(log.healthLogType)
                         )
@@ -1145,7 +1424,7 @@ struct PetHealthDetailView: View {
                 VStack(spacing: 8) {
                     ForEach(Array(recentEvents)) { event in
                         overviewHistoryRow(
-                            icon: "💊",
+                            icon: "pill.fill",
                             title: medicationName(for: event),
                             detail: event.startDate.formatted(.dateTime.month().day().hour().minute()),
                             tint: medicationTint
@@ -1156,7 +1435,9 @@ struct PetHealthDetailView: View {
 
             overviewActionButton(l.tr(zh: "管理用药", en: "Manage medication", de: "Medikamente verwalten"), icon: "slider.horizontal.3") {
                 activeHealthSheet = nil
-                healthPlusDestination = .medications
+                withAnimation(GoMotion.sheet) {
+                    healthPlusDestination = .medications
+                }
             }
         }
     }
@@ -1178,11 +1459,11 @@ struct PetHealthDetailView: View {
             HStack(spacing: 10) {
                 overviewActionButton(l.tr(zh: "记录症状", en: "Log symptom", de: "Symptom eintragen"), icon: "exclamationmark.triangle.fill") {
                     activeHealthSheet = nil
-                    healthPlusDestination = .symptom
+                    openHealthRecord(.symptom, feedback: false)
                 }
                 overviewActionButton(l.tr(zh: "记录就诊", en: "Log visit", de: "Besuch eintragen"), icon: "cross.case.fill") {
                     activeHealthSheet = nil
-                    healthPlusDestination = .guided(.visit)
+                    openHealthRecord(.guided(.visit), feedback: false)
                 }
             }
 
@@ -1194,9 +1475,9 @@ struct PetHealthDetailView: View {
                 VStack(spacing: 8) {
                     ForEach(Array(symptoms)) { log in
                         overviewHistoryRow(
-                            icon: log.category.emoji,
+                            icon: symptomCategoryIcon(log.category),
                             title: log.symptomName.isEmpty ? l.tr(zh: "异常症状", en: "Symptom", de: "Symptom") : log.symptomName,
-                            detail: "\(log.severity.label) · \(log.date.formatted(.dateTime.month().day()))",
+                            detail: "\(localizedSeverityLabel(log.severity)) · \(log.date.formatted(.dateTime.month().day()))",
                             tint: log.severity == .severe || log.severity == .critical ? Color.goRed : Color.goOrange
                         )
                     }
@@ -1214,8 +1495,8 @@ struct PetHealthDetailView: View {
                 VStack(spacing: 8) {
                     ForEach(Array(visits)) { log in
                         overviewHistoryRow(
-                            icon: log.healthLogType.emoji,
-                            title: log.type,
+                            icon: healthIcon(for: log.healthLogType),
+                            title: log.note.isEmpty ? healthTypeTitle(log.healthLogType) : log.note,
                             detail: log.date.formatted(.dateTime.year().month().day()),
                             tint: colorForType(log.healthLogType)
                         )
@@ -1370,8 +1651,9 @@ struct PetHealthDetailView: View {
 
     private func overviewHistoryRow(icon: String, title: String, detail: String, tint: Color) -> some View {
         HStack(spacing: 12) {
-            Text(icon)
-                .font(.system(size: 16))
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .black))
+                .foregroundStyle(tint)
                 .frame(width: 34, height: 34)
                 .background(tint.opacity(isDark ? 0.16 : 0.10), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
@@ -1456,7 +1738,7 @@ struct PetHealthDetailView: View {
                 icon: "shield.checkered",
                 tint: isDark ? Color.goPrimary : Color.goTeal
             ) {
-                healthPlusDestination = .guided(.preventive)
+                openHealthRecord(.guided(.preventive))
             }
             healthCoreCard(
                 title: "用药",
@@ -1464,6 +1746,7 @@ struct PetHealthDetailView: View {
                 icon: "pill.fill",
                 tint: Color(hex: "FF8A3D")
             ) {
+                OhanaFeedback.light()
                 healthPlusDestination = .medications
             }
             healthCoreCard(
@@ -1472,7 +1755,7 @@ struct PetHealthDetailView: View {
                 icon: "waveform.path.ecg",
                 tint: latestSymptomLog == nil ? (isDark ? Color.goPrimary : Color.goTeal) : Color.goRed
             ) {
-                healthPlusDestination = .symptom
+                openHealthRecord(.symptom)
             }
             healthCoreCard(
                 title: "档案",
@@ -1480,6 +1763,7 @@ struct PetHealthDetailView: View {
                 icon: "folder.fill",
                 tint: Color.goPurple
             ) {
+                OhanaFeedback.light()
                 showingHistory = true
             }
         }
@@ -1492,7 +1776,10 @@ struct PetHealthDetailView: View {
         tint: Color,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
+        Button {
+            OhanaFeedback.light()
+            action()
+        } label: {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Image(systemName: icon)
@@ -1530,6 +1817,7 @@ struct PetHealthDetailView: View {
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Button {
+                    OhanaFeedback.light()
                     showingPassport = true
                 } label: {
                     Image(systemName: "syringe.fill")
@@ -1571,7 +1859,10 @@ struct PetHealthDetailView: View {
     }
 
     private func healthToolButton(title: String, icon: String, tint: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button {
+            OhanaFeedback.light()
+            action()
+        } label: {
             VStack(spacing: 7) {
                 Image(systemName: icon)
                     .font(.system(size: 15, weight: .black))
@@ -1598,6 +1889,7 @@ struct PetHealthDetailView: View {
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Button {
+                    OhanaFeedback.light()
                     showingHistory = true
                 } label: {
                     Text(l.tr(zh: "全部", en: "All", de: "Alle"))
@@ -1616,23 +1908,14 @@ struct PetHealthDetailView: View {
                         .font(.system(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Spacer()
-                    Button {
-                        healthPlusDestination = .guided(.preventive)
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 12, weight: .black))
-                            .foregroundStyle(Color.arkInk)
-                            .frame(width: 30, height: 30)
-                            .background(Color.goPrimary, in: Circle())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
                 }
                 .padding(.vertical, 8)
             } else {
                 ForEach(recentHealthActivities) { item in
                     HStack(spacing: 12) {
-                        Text(item.icon)
-                            .font(.system(size: 17))
+                        Image(systemName: item.icon)
+                            .font(.system(size: 15, weight: .black))
+                            .foregroundStyle(item.tint)
                             .frame(width: 34, height: 34)
                             .background(item.tint.opacity(isDark ? 0.20 : 0.12), in: Circle())
                         VStack(alignment: .leading, spacing: 2) {
@@ -1661,13 +1944,13 @@ struct PetHealthDetailView: View {
     // MARK: - 免疫状态总览条
     private var immunityOverviewRow: some View {
         let items: [(HealthLogType, String, String, Int)] = [
-            (.vaccine,           "💉", "疫苗",  365),
-            (.dewormingInternal, "🪱", "体内驱虫", 90),
-            (.dewormingExternal, "🛡️", "体外驱虫", 90),
-            (.checkup,           "🩺", "体检",  365),
+            (.vaccine,           "syringe.fill", l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung"),  365),
+            (.dewormingInternal, "pills.fill", l.tr(zh: "体内", en: "Internal", de: "Innen"), 90),
+            (.dewormingExternal, "shield.lefthalf.filled", l.tr(zh: "体外", en: "External", de: "Außen"), 90),
+            (.checkup,           "stethoscope", l.tr(zh: "体检", en: "Checkup", de: "Check-up"),  365),
         ]
         return HStack(spacing: 0) {
-            ForEach(items, id: \.0) { type, emoji, label, cycle in
+            ForEach(items, id: \.0) { type, icon, label, cycle in
                 let last = latestLog(type: type)
                 let due  = dueDate(for: type)
                 let days = daysUntil(due)
@@ -1689,7 +1972,9 @@ struct PetHealthDetailView: View {
                                 .frame(width: 44, height: 44)
                                 .rotationEffect(.degrees(-90))
                         }
-                        Text(emoji).font(.system(size: 18))
+                        Image(systemName: icon)
+                            .font(.system(size: 16, weight: .black))
+                            .foregroundStyle(color)
                     }
                     Text(label)
                         .font(.system(size: 9, weight: .bold, design: .rounded))
@@ -1703,53 +1988,52 @@ struct PetHealthDetailView: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .onTapGesture { healthPlusDestination = .direct(type) }
+                .onTapGesture {
+                    openHealthRecord(.direct(type))
+                }
             }
         }
     }
 
     // MARK: - 散点图主体
     private var scatterChart: some View {
-        Chart {
-            // 每种类型一条极细引导线
-            ForEach(HealthLogType.allCases, id: \.rawValue) { type in
-                RuleMark(y: .value("类型", type.rawValue))
-                    .lineStyle(StrokeStyle(lineWidth: 0.5, dash: [3, 4]))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.08))
-            }
-            // 每条记录一个散点，直接映射颜色
-            ForEach(scatterPoints) { pt in
-                PointMark(
-                    x: .value("日期", pt.date),
-                    y: .value("类型", pt.typeName)
-                )
-                .foregroundStyle(colorForType(pt.typeEnum))
-                .symbolSize(110)
-            }
-        }
-        .chartXScale(domain: chartXDomain)
-        .chartXAxis {
-            AxisMarks(values: .stride(by: .month, count: 2)) { _ in
-                AxisValueLabel(format: .dateTime.month())
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-            }
-        }
-        .chartYAxis {
-            AxisMarks { _ in
-                AxisValueLabel()
-                    .font(.system(size: 9, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
-            }
-        }
-        .mask(alignment: .leading) {
-            GeometryReader { geo in
-                Rectangle()
-                    .frame(width: max(1, geo.size.width * scatterRevealProgress))
+        GeometryReader { proxy in
+            let rows = HealthLogType.allCases
+            let start = chartXDomain.lowerBound.timeIntervalSinceReferenceDate
+            let span = max(chartXDomain.upperBound.timeIntervalSinceReferenceDate - start, 1)
+            ZStack {
+                ForEach(Array(rows.enumerated()), id: \.element.rawValue) { index, _ in
+                    let y = rowY(index: index, count: rows.count, height: proxy.size.height)
+                    Path { path in
+                        path.move(to: CGPoint(x: 0, y: y))
+                        path.addLine(to: CGPoint(x: proxy.size.width, y: y))
+                    }
+                    .stroke(Color.ohanaPrimaryText.opacity(0.08), style: StrokeStyle(lineWidth: 0.5, dash: [3, 4]))
+                }
+
+                ForEach(scatterPoints) { pt in
+                    let xRatio = (pt.date.timeIntervalSinceReferenceDate - start) / span
+                    let rowIndex = rows.firstIndex(of: pt.typeEnum) ?? 0
+                    Circle()
+                        .fill(colorForType(pt.typeEnum))
+                        .frame(width: 11, height: 11)
+                        .position(
+                            x: min(max(CGFloat(xRatio) * proxy.size.width * scatterRevealProgress, 0), proxy.size.width),
+                            y: rowY(index: rowIndex, count: rows.count, height: proxy.size.height)
+                        )
+                }
             }
         }
         .frame(height: 160)
         .onAppear { playScatterReveal() }
+    }
+
+    private func rowY(index: Int, count: Int, height: CGFloat) -> CGFloat {
+        guard count > 1 else { return height / 2 }
+        let topInset: CGFloat = 12
+        let bottomInset: CGFloat = 12
+        let usable = max(1, height - topInset - bottomInset)
+        return topInset + usable * CGFloat(index) / CGFloat(count - 1)
     }
 
     // MARK: - 图例视图
@@ -1804,8 +2088,10 @@ struct PetHealthDetailView: View {
 
             if sortedLogs.isEmpty {
                 VStack(spacing: 10) {
-                    Text("💉").font(.system(size: 36))
-                    Text("暂无健康记录\n点击右上角 + 开始记录")
+                    Image(systemName: "heart.text.square")
+                        .font(.system(size: 34, weight: .black))
+                        .foregroundStyle(chromeAccent)
+                    Text(l.tr(zh: "暂无健康记录", en: "No health records yet", de: "Noch keine Gesundheitseinträge"))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         .multilineTextAlignment(.center)
@@ -1817,7 +2103,9 @@ struct PetHealthDetailView: View {
                     HStack(spacing: 12) {
                         ZStack {
                             Circle().fill(colorForType(log.healthLogType).opacity(0.15)).frame(width: 38, height: 38)
-                            Text(log.healthLogType.emoji).font(.system(size: 18))
+                            Image(systemName: healthIcon(for: log.healthLogType))
+                                .font(.system(size: 15, weight: .black))
+                                .foregroundStyle(colorForType(log.healthLogType))
                         }
                         VStack(alignment: .leading, spacing: 3) {
                             Text(log.type)
@@ -1878,7 +2166,9 @@ struct PetHealthDetailView: View {
                 HStack(spacing: 12) {
                     ZStack {
                         Circle().fill(Color.red.opacity(0.15)).frame(width: 38, height: 38)
-                        Text(log.category.emoji).font(.system(size: 18))
+                        Image(systemName: symptomCategoryIcon(log.category))
+                            .font(.system(size: 15, weight: .black))
+                            .foregroundStyle(Color.goRed)
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         Text(log.symptomName)
@@ -1936,7 +2226,9 @@ struct PetHealthDetailView: View {
                 HStack(spacing: 12) {
                     ZStack {
                         Circle().fill(Color(hex: log.status.colorHex).opacity(0.15)).frame(width: 38, height: 38)
-                        Text("💖").font(.system(size: 18))
+                        Image(systemName: "heart.text.square.fill")
+                            .font(.system(size: 15, weight: .black))
+                            .foregroundStyle(Color(hex: log.status.colorHex))
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         Text(log.status.rawValue)
@@ -1993,8 +2285,9 @@ struct PetHealthDetailView: View {
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .fill(alertColor(alert).opacity(0.15))
                             .frame(width: 32, height: 32)
-                        Text(alert.emoji)
-                            .font(.system(size: 15))
+                        Image(systemName: alertIcon(for: alert.type))
+                            .font(.system(size: 13, weight: .black))
+                            .foregroundStyle(alertColor(alert))
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         Text(alert.title)
@@ -2096,6 +2389,21 @@ private struct PetHealthRecordInlinePopup: View {
         }
     }
 
+    private func healthIcon(for type: HealthLogType) -> String {
+        switch type {
+        case .general: return "clipboard.fill"
+        case .vaccine: return "syringe.fill"
+        case .medication: return "pill.fill"
+        case .dewormingInternal: return "pills.fill"
+        case .dewormingExternal: return "shield.lefthalf.filled"
+        case .surgery: return "cross.case.fill"
+        case .dental: return "mouth.fill"
+        case .checkup: return "stethoscope"
+        case .emergency: return "cross.circle.fill"
+        case .other: return "doc.text.fill"
+        }
+    }
+
     var body: some View {
         VStack(spacing: 12) {
             Capsule()
@@ -2104,8 +2412,9 @@ private struct PetHealthRecordInlinePopup: View {
                 .padding(.top, 8)
 
             HStack(spacing: 12) {
-                Text(selectedType.emoji)
-                    .font(.system(size: 24))
+                Image(systemName: healthIcon(for: selectedType))
+                    .font(.system(size: 20, weight: .black))
+                    .foregroundStyle(accent)
                     .frame(width: 46, height: 46)
                     .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
@@ -2236,12 +2545,16 @@ private struct PetHealthRecordInlinePopup: View {
                 Button {
                     withAnimation(GoMotion.selection) { selectedType = type }
                 } label: {
-                    Text("\(type.emoji) \(title)")
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(selectedType == type ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(selectedType == type ? accent : Color.ohanaControlFill, in: Capsule())
+                    HStack(spacing: 5) {
+                        Image(systemName: healthIcon(for: type))
+                            .font(.system(size: 11, weight: .black))
+                        Text(title)
+                            .font(OhanaFont.caption(.black))
+                    }
+                    .foregroundStyle(selectedType == type ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(selectedType == type ? accent : Color.ohanaControlFill, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -2354,23 +2667,19 @@ private struct PetHealthRecordInlinePopup: View {
 
     private func autoCreateReminderEvent(on dueDate: Date) {
         let eventType: EventType
-        let emoji: String
         switch selectedType {
         case .vaccine:
             eventType = .vaccine
-            emoji = "💉"
         case .dewormingInternal:
             eventType = .internalDeworming
-            emoji = "🪱"
         case .dewormingExternal:
             eventType = .externalDeworming
-            emoji = "🛡️"
         default:
             return
         }
         let recordName = name.isEmpty ? typeLabel : name
         modelContext.insert(Event(
-            title: "\(emoji) \(pet.name) · \(recordName)到期提醒",
+            title: "\(pet.name) · \(recordName)到期提醒",
             startDate: dueDate,
             isAllDay: true,
             eventType: eventType.rawValue,
@@ -2408,18 +2717,20 @@ private struct PetHealthArchiveView: View {
     let pet: Pet
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var filter: PetHealthArchiveFilter = .all
 
     private var isDark: Bool { colorScheme == .dark }
     private var accent: Color { isDark ? Color.goPrimary : Color(hex: pet.themeColorHex) }
+    private var l: L10n { L10n(appLanguage) }
 
     private var items: [PetHealthArchiveItem] {
         let healthItems = pet.healthLogs.map { log in
             PetHealthArchiveItem(
                 id: "health-\(log.id.uuidString)",
                 date: log.date,
-                icon: log.healthLogType.emoji,
-                title: log.type,
+                icon: healthIcon(for: log.healthLogType),
+                title: log.note.isEmpty ? healthTitle(for: log.healthLogType) : log.note,
                 detail: archiveDetail(for: log),
                 tint: color(for: log.healthLogType),
                 filter: .health,
@@ -2430,9 +2741,9 @@ private struct PetHealthArchiveView: View {
             PetHealthArchiveItem(
                 id: "symptom-\(log.id.uuidString)",
                 date: log.date,
-                icon: log.category.emoji,
-                title: log.symptomName.isEmpty ? "异常症状" : log.symptomName,
-                detail: log.severity.label,
+                icon: symptomIcon(for: log.category),
+                title: log.symptomName.isEmpty ? l.tr(zh: "异常症状", en: "Symptom", de: "Symptom") : log.symptomName,
+                detail: severityTitle(log.severity),
                 tint: log.severity == .severe || log.severity == .critical ? Color.goRed : Color.goOrange,
                 filter: .symptom,
                 source: .symptom(log)
@@ -2442,9 +2753,9 @@ private struct PetHealthArchiveView: View {
             PetHealthArchiveItem(
                 id: "heat-\(log.id.uuidString)",
                 date: log.startDate,
-                icon: "💗",
+                icon: "heart.text.square.fill",
                 title: log.status.rawValue,
-                detail: log.isMated ? "已交配" : log.startDate.formatted(.dateTime.month().day()),
+                detail: log.isMated ? l.tr(zh: "已交配", en: "Mated", de: "Gedeckt") : log.startDate.formatted(.dateTime.month().day()),
                 tint: Color(hex: log.status.colorHex),
                 filter: .heat,
                 source: .heat(log)
@@ -2474,7 +2785,7 @@ private struct PetHealthArchiveView: View {
                 .padding(.top, 12)
             }
         }
-        .navigationTitle("健康档案")
+        .navigationTitle(l.tr(zh: "健康档案", en: "Health archive", de: "Gesundheitsakte"))
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -2484,7 +2795,7 @@ private struct PetHealthArchiveView: View {
                 Button {
                     filter = option
                 } label: {
-                    Text(option.rawValue)
+                    Text(filterTitle(option))
                         .font(.system(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(filter == option ? Color.arkInk : .primary.opacity(0.68))
                         .frame(maxWidth: .infinity)
@@ -2501,7 +2812,7 @@ private struct PetHealthArchiveView: View {
             Image(systemName: "folder")
                 .font(.system(size: 34, weight: .bold))
                 .foregroundStyle(accent)
-            Text("暂无记录")
+            Text(l.tr(zh: "暂无记录", en: "No records", de: "Keine Einträge"))
                 .font(.system(size: 15, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
@@ -2512,8 +2823,9 @@ private struct PetHealthArchiveView: View {
 
     private func archiveRow(_ item: PetHealthArchiveItem) -> some View {
         HStack(spacing: 12) {
-            Text(item.icon)
-                .font(.system(size: 20))
+            Image(systemName: item.icon)
+                .font(.system(size: 17, weight: .black))
+                .foregroundStyle(item.tint)
                 .frame(width: 42, height: 42)
                 .background(item.tint.opacity(isDark ? 0.20 : 0.12), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
@@ -2549,11 +2861,73 @@ private struct PetHealthArchiveView: View {
         if !log.note.isEmpty { return log.note }
         if let expiration = log.expirationDate {
             let days = Calendar.current.dateComponents([.day], from: Date(), to: expiration).day ?? 0
-            if days < 0 { return "已过期" }
-            return days == 0 ? "今天到期" : "\(days) 天后到期"
+            if days < 0 { return l.tr(zh: "已过期", en: "Expired", de: "Abgelaufen") }
+            return days == 0
+                ? l.tr(zh: "今天到期", en: "Due today", de: "Heute fällig")
+                : l.tr(zh: "\(days) 天后到期", en: "Due in \(days)d", de: "In \(days)T fällig")
         }
         if log.cost > 0 { return AppCurrency.format(log.cost, fractionDigits: 0) }
         return log.date.formatted(.dateTime.year().month().day())
+    }
+
+    private func filterTitle(_ filter: PetHealthArchiveFilter) -> String {
+        switch filter {
+        case .all: return l.tr(zh: "全部", en: "All", de: "Alle")
+        case .health: return l.tr(zh: "记录", en: "Records", de: "Einträge")
+        case .symptom: return l.tr(zh: "异常", en: "Symptoms", de: "Symptome")
+        case .heat: return l.tr(zh: "生理", en: "Heat", de: "Läufigkeit")
+        }
+    }
+
+    private func healthIcon(for type: HealthLogType) -> String {
+        switch type {
+        case .general: return "clipboard.fill"
+        case .vaccine: return "syringe.fill"
+        case .medication: return "pill.fill"
+        case .dewormingInternal: return "pills.fill"
+        case .dewormingExternal: return "shield.lefthalf.filled"
+        case .surgery: return "cross.case.fill"
+        case .dental: return "mouth.fill"
+        case .checkup: return "stethoscope"
+        case .emergency: return "cross.circle.fill"
+        case .other: return "doc.text.fill"
+        }
+    }
+
+    private func healthTitle(for type: HealthLogType) -> String {
+        switch type {
+        case .general: return l.tr(zh: "常规记录", en: "General", de: "Allgemein")
+        case .vaccine: return l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung")
+        case .medication: return l.tr(zh: "用药", en: "Medication", de: "Medikament")
+        case .dewormingInternal: return l.tr(zh: "体内驱虫", en: "Internal deworming", de: "Innere Entwurmung")
+        case .dewormingExternal: return l.tr(zh: "体外驱虫", en: "External deworming", de: "Äußere Entwurmung")
+        case .surgery: return l.tr(zh: "手术", en: "Surgery", de: "Operation")
+        case .dental: return l.tr(zh: "牙科", en: "Dental", de: "Zahnmedizin")
+        case .checkup: return l.tr(zh: "体检", en: "Checkup", de: "Check-up")
+        case .emergency: return l.tr(zh: "急诊", en: "Emergency", de: "Notfall")
+        case .other: return l.tr(zh: "其他", en: "Other", de: "Andere")
+        }
+    }
+
+    private func symptomIcon(for category: SymptomCategory) -> String {
+        switch category {
+        case .digestive: return "stomach.fill"
+        case .respiratory: return "lungs.fill"
+        case .mobility: return "figure.walk"
+        case .appetite: return "fork.knife"
+        case .skin: return "bandage.fill"
+        case .behavior: return "moon.zzz.fill"
+        case .other: return "magnifyingglass"
+        }
+    }
+
+    private func severityTitle(_ severity: SymptomSeverity) -> String {
+        switch severity {
+        case .mild: return l.tr(zh: "轻微", en: "Mild", de: "Leicht")
+        case .moderate: return l.tr(zh: "中度", en: "Moderate", de: "Mittel")
+        case .severe: return l.tr(zh: "严重", en: "Severe", de: "Schwer")
+        case .critical: return l.tr(zh: "紧急", en: "Critical", de: "Kritisch")
+        }
     }
 
     private func color(for type: HealthLogType) -> Color {

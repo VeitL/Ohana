@@ -44,6 +44,7 @@ final class PetPottyLog {
     var longitude: Double?
     var locationAccuracyMeters: Double?
     var walkLogId: String?
+    var sharedSessionId: String = ""
     var pet: Pet?
     
     init(
@@ -54,7 +55,8 @@ final class PetPottyLog {
         latitude: Double? = nil,
         longitude: Double? = nil,
         locationAccuracyMeters: Double? = nil,
-        walkLogId: String? = nil
+        walkLogId: String? = nil,
+        sharedSessionId: String = ""
     ) {
         self.id = UUID()
         self.date = date
@@ -64,6 +66,7 @@ final class PetPottyLog {
         self.longitude = longitude
         self.locationAccuracyMeters = locationAccuracyMeters
         self.walkLogId = walkLogId
+        self.sharedSessionId = sharedSessionId
         self.pet = pet
     }
     

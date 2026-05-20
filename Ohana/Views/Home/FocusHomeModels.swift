@@ -25,6 +25,9 @@ struct FocusCard: Identifiable {
     var genderText: String?
     var personalityHint: String?
     var avatarImageData: Data?
+    var cardStyleRaw: String = "classic"
+    var cardPopoutImageData: Data? = nil
+    var cardPopoutSourceRaw: String = ""
     var humanGender: String? = nil
     var petSpecies: String?
     var coatColor: Color = Color(hex: "E8C49A")
@@ -147,6 +150,9 @@ extension FocusCard {
             genderText: pet.genderSymbol + (pet.isNeutered ? l.tr(zh: " 已绝育", en: " neutered", de: " kastriert") : ""),
             personalityHint: PetTagGreeting.homeSubtitleHint(pet: pet, hour: hour, l: L10n(language)),
             avatarImageData: includeAvatarData ? pet.avatarImageData : nil,
+            cardStyleRaw: pet.cardStyleRaw,
+            cardPopoutImageData: pet.cardStyleRaw == "popout" ? pet.cardPopoutImageData : nil,
+            cardPopoutSourceRaw: pet.cardPopoutSourceRaw ?? "",
             petSpecies: pet.species,
             coatColor: WalletPetCardTheme.silhouetteCoatColor(for: pet),
             eyeColor: WalletPetCardTheme.silhouetteEyeColor(for: pet),

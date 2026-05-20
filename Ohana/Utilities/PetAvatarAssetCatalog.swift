@@ -36,6 +36,45 @@ enum PetAvatarAssetCatalog {
         "devon rex"
     ]
 
+    private static let exoticShorthairBreedNames: Set<String> = [
+        "异国短毛猫",
+        "异国短毛",
+        "异短",
+        "加菲猫",
+        "Exotic Shorthair",
+        "exotic shorthair",
+        "Exotic",
+        "exotic"
+    ]
+
+    private static let munchkinBreedNames: Set<String> = [
+        "曼基康猫",
+        "曼基康",
+        "短腿猫",
+        "Munchkin",
+        "munchkin",
+        "Munchkin Cat",
+        "munchkin cat"
+    ]
+
+    private static let birmanBreedNames: Set<String> = [
+        "伯曼猫",
+        "伯曼",
+        "Birman",
+        "birman",
+        "Birman Cat",
+        "birman cat"
+    ]
+
+    private static let siberianCatBreedNames: Set<String> = [
+        "西伯利亚猫",
+        "西伯利亚",
+        "Siberian",
+        "siberian",
+        "Siberian Cat",
+        "siberian cat"
+    ]
+
     private static let britishShorthairBreedNames: Set<String> = [
         "英国短毛猫",
         "英国短毛",
@@ -200,6 +239,88 @@ enum PetAvatarAssetCatalog {
         "shiba inu"
     ]
 
+    private static let pugBreedNames: Set<String> = [
+        "巴哥犬",
+        "八哥犬",
+        "巴哥",
+        "八哥",
+        "Pug",
+        "pug"
+    ]
+
+    private static let bostonTerrierBreedNames: Set<String> = [
+        "波士顿梗",
+        "波士顿",
+        "Boston Terrier",
+        "boston terrier"
+    ]
+
+    private static let chihuahuaBreedNames: Set<String> = [
+        "吉娃娃",
+        "奇瓦瓦",
+        "Chihuahua",
+        "chihuahua"
+    ]
+
+    private static let akitaBreedNames: Set<String> = [
+        "秋田犬",
+        "秋田",
+        "Akita",
+        "akita",
+        "Akita Inu",
+        "akita inu"
+    ]
+
+    private static let jackRussellTerrierBreedNames: Set<String> = [
+        "杰克罗素梗",
+        "杰克罗素",
+        "Jack Russell Terrier",
+        "jack russell terrier",
+        "Jack Russell",
+        "jack russell"
+    ]
+
+    private static let rottweilerBreedNames: Set<String> = [
+        "罗威纳犬",
+        "罗威纳",
+        "Rottweiler",
+        "rottweiler"
+    ]
+
+    private static let sharPeiBreedNames: Set<String> = [
+        "沙皮犬",
+        "沙皮",
+        "Shar Pei",
+        "shar pei",
+        "Chinese Shar Pei",
+        "chinese shar pei"
+    ]
+
+    private static let chowChowBreedNames: Set<String> = [
+        "松狮犬",
+        "松狮",
+        "Chow Chow",
+        "chow chow"
+    ]
+
+    private static let shetlandSheepdogBreedNames: Set<String> = [
+        "喜乐蒂牧羊犬",
+        "喜乐蒂",
+        "Shetland Sheepdog",
+        "shetland sheepdog",
+        "Sheltie",
+        "sheltie"
+    ]
+
+    private static let englishBulldogBreedNames: Set<String> = [
+        "英国斗牛犬",
+        "英斗",
+        "English Bulldog",
+        "english bulldog",
+        "Bulldog",
+        "bulldog"
+    ]
+
     private static let goldenRetrieverBreedNames: Set<String> = [
         "金毛",
         "金毛寻回犬",
@@ -352,6 +473,47 @@ enum PetAvatarAssetCatalog {
         "border collie"
     ]
 
+    private static let pomeranianBreedNames: Set<String> = [
+        "博美犬",
+        "博美",
+        "Pomeranian",
+        "pomeranian"
+    ]
+
+    private static let cavalierKingCharlesSpanielBreedNames: Set<String> = [
+        "查理王骑士犬",
+        "查理王",
+        "Cavalier King Charles Spaniel",
+        "cavalier king charles spaniel",
+        "Cavalier",
+        "cavalier"
+    ]
+
+    private static let cockerSpanielBreedNames: Set<String> = [
+        "可卡犬",
+        "可卡",
+        "Cocker Spaniel",
+        "cocker spaniel",
+        "Cocker",
+        "cocker"
+    ]
+
+    private static let siberianHuskyBreedNames: Set<String> = [
+        "西伯利亚哈士奇",
+        "哈士奇",
+        "Siberian Husky",
+        "siberian husky",
+        "Husky",
+        "husky"
+    ]
+
+    private static let germanShepherdBreedNames: Set<String> = [
+        "德国牧羊犬",
+        "德牧",
+        "German Shepherd",
+        "german shepherd"
+    ]
+
     private static let dachshundBreedNames: Set<String> = [
         "腊肠犬",
         "腊肠",
@@ -381,25 +543,39 @@ enum PetAvatarAssetCatalog {
 
     static let devonRexAppearances: [Appearance] = [
         .init(coatName: "黑色", coatSlug: "black", coatHex: "1A1A1A"),
-        .init(coatName: "蓝灰色", coatSlug: "blue_gray", coatHex: "7A9AAF", coatAliases: ["蓝色（灰蓝）"]),
         .init(coatName: "白色", coatSlug: "white", coatHex: "F5F5F0"),
-        .init(coatName: "红虎斑", coatSlug: "red_tabby", coatHex: "B5451B", coatAliases: ["红色"]),
+        .init(coatName: "蓝灰色", coatSlug: "blue_gray", coatHex: "7A9AAF", coatAliases: ["蓝色（灰蓝）"]),
         .init(coatName: "奶油色", coatSlug: "cream", coatHex: "F5E6C8"),
         .init(coatName: "棕虎斑", coatSlug: "brown_tabby", coatHex: "7A5C3A", coatAliases: ["虎斑色"]),
-        .init(coatName: "银虎斑", coatSlug: "silver_tabby", coatHex: "C0C0C0", coatAliases: ["银色"]),
-        .init(coatName: "黑烟色", coatSlug: "black_smoke", coatHex: "4B4B4B"),
-        .init(coatName: "玳瑁", coatSlug: "tortoiseshell", coatHex: "6E2C00"),
-        .init(coatName: "三花", coatSlug: "calico", coatHex: "D4B896"),
         .init(coatName: "黑白", coatSlug: "black_white", coatHex: "2C2C2C"),
-        .init(coatName: "蓝白", coatSlug: "blue_white", coatHex: "8FA8BE"),
+        .init(coatName: "海豹重点色", coatSlug: "seal_point", coatHex: "4A2A10", coatAliases: ["重点色"]),
+        .init(coatName: "蓝重点色", coatSlug: "blue_point", coatHex: "7A9AAF"),
+        .init(coatName: "巧克力重点色", coatSlug: "chocolate_point", coatHex: "4A2C1A", coatAliases: ["巧克力色"]),
+        .init(coatName: "火焰重点色", coatSlug: "flame_point", coatHex: "E36A2E", coatAliases: ["红色"])
+    ]
+
+    static let exoticShorthairAppearances: [Appearance] = [
+        .init(coatName: "白色", coatSlug: "white", coatHex: "F5F5F0"),
+        .init(coatName: "蓝灰色", coatSlug: "blue_gray", coatHex: "7A9AAF", coatAliases: ["蓝色"]),
+        .init(coatName: "橘白", coatSlug: "orange_white", coatHex: "C8622A", coatAliases: ["橘白色", "红白"])
+    ]
+
+    static let munchkinAppearances: [Appearance] = [
+        .init(coatName: "银虎斑", coatSlug: "silver_tabby", coatHex: "C0C0C0"),
+        .init(coatName: "橘虎斑", coatSlug: "orange_tabby", coatHex: "C8622A", coatAliases: ["红虎斑"]),
+        .init(coatName: "黑白", coatSlug: "black_white", coatHex: "2C2C2C", coatAliases: ["奶牛色"])
+    ]
+
+    static let birmanAppearances: [Appearance] = [
         .init(coatName: "海豹重点色", coatSlug: "seal_point", coatHex: "4A2A10"),
         .init(coatName: "蓝重点色", coatSlug: "blue_point", coatHex: "7A9AAF"),
-        .init(coatName: "巧克力重点色", coatSlug: "chocolate_point", coatHex: "4A2C1A"),
-        .init(coatName: "丁香重点色", coatSlug: "lilac_point", coatHex: "B0A0B0"),
-        .init(coatName: "火焰重点色", coatSlug: "flame_point", coatHex: "E36A2E"),
-        .init(coatName: "奶油重点色", coatSlug: "cream_point", coatHex: "F5E6C8"),
-        .init(coatName: "海豹山猫重点色", coatSlug: "seal_lynx_point", coatHex: "6B4F32"),
-        .init(coatName: "蓝山猫重点色", coatSlug: "blue_lynx_point", coatHex: "8FA8BE")
+        .init(coatName: "巧克力重点色", coatSlug: "chocolate_point", coatHex: "4A2C1A")
+    ]
+
+    static let siberianCatAppearances: [Appearance] = [
+        .init(coatName: "棕虎斑", coatSlug: "brown_tabby", coatHex: "7A5C3A"),
+        .init(coatName: "银虎斑", coatSlug: "silver_tabby", coatHex: "C0C0C0"),
+        .init(coatName: "重点色", coatSlug: "colorpoint", coatHex: "4A2A10", coatAliases: ["海豹重点色"])
     ]
 
     static let britishShorthairAppearances: [Appearance] = [
@@ -553,10 +729,69 @@ enum PetAvatarAssetCatalog {
         .init(coatName: "胡麻色", coatSlug: "sesame", coatHex: "7A6A4A")
     ]
 
+    static let pugAppearances: [Appearance] = [
+        .init(coatName: "黄褐色", coatSlug: "fawn", coatHex: "C8A060", coatAliases: ["米色", "浅黄褐色", "fawn"]),
+        .init(coatName: "黑色", coatSlug: "black", coatHex: "1A1A1A", coatAliases: ["black"]),
+        .init(coatName: "杏色", coatSlug: "apricot_fawn", coatHex: "E8C49A", coatAliases: ["杏黄", "杏黄褐色", "apricot", "apricot fawn"]),
+        .init(coatName: "银米色", coatSlug: "silver_fawn", coatHex: "C8B8A0", coatAliases: ["银色黄褐", "银黄褐色", "silver fawn"])
+    ]
+
+    static let bostonTerrierAppearances: [Appearance] = [
+        .init(coatName: "黑白", coatSlug: "black_white", coatHex: "2A2A2A"),
+        .init(coatName: "虎斑白", coatSlug: "brindle_white", coatHex: "4A3A1A", coatAliases: ["虎斑配白"]),
+        .init(coatName: "海豹色白", coatSlug: "seal_white", coatHex: "3A2418", coatAliases: ["海豹白", "海豹色配白"])
+    ]
+
+    static let chihuahuaAppearances: [Appearance] = [
+        .init(coatName: "黄褐色", coatSlug: "fawn", coatHex: "C8A060", coatAliases: ["浅黄褐色", "米色"]),
+        .init(coatName: "奶油色", coatSlug: "cream", coatHex: "F5E6C8"),
+        .init(coatName: "黑棕色", coatSlug: "black_tan", coatHex: "2A1A0A", coatAliases: ["黑棕"]),
+        .init(coatName: "巧克力色", coatSlug: "chocolate", coatHex: "4A2C1A")
+    ]
+
+    static let akitaAppearances: [Appearance] = [
+        .init(coatName: "赤色", coatSlug: "red", coatHex: "C8622A"),
+        .init(coatName: "白色", coatSlug: "white", coatHex: "F5F5F0"),
+        .init(coatName: "虎斑", coatSlug: "brindle", coatHex: "4A3A1A"),
+        .init(coatName: "芝麻色", coatSlug: "sesame", coatHex: "7A5C3A")
+    ]
+
+    static let jackRussellTerrierAppearances: [Appearance] = [
+        .init(coatName: "白棕", coatSlug: "brown_white", coatHex: "C8622A", coatAliases: ["白棕色", "棕白"]),
+        .init(coatName: "白黑", coatSlug: "black_white", coatHex: "2A2A2A", coatAliases: ["黑白"]),
+        .init(coatName: "三色", coatSlug: "tricolor", coatHex: "4A2A10")
+    ]
+
+    static let rottweilerAppearances: [Appearance] = [
+        .init(coatName: "standard", coatSlug: "standard", coatHex: "2A1A0A", coatAliases: ["标准", "黑棕", "黑棕色"])
+    ]
+
+    static let sharPeiAppearances: [Appearance] = [
+        .init(coatName: "黄褐色", coatSlug: "fawn", coatHex: "C8A060", coatAliases: ["黄褐", "浅黄褐色"]),
+        .init(coatName: "奶油色", coatSlug: "cream", coatHex: "F5E6C8"),
+        .init(coatName: "黑色", coatSlug: "black", coatHex: "1A1A1A")
+    ]
+
+    static let chowChowAppearances: [Appearance] = [
+        .init(coatName: "红色", coatSlug: "red", coatHex: "B5451B"),
+        .init(coatName: "黑色", coatSlug: "black", coatHex: "1A1A1A"),
+        .init(coatName: "奶油色", coatSlug: "cream", coatHex: "F5E6C8")
+    ]
+
+    static let shetlandSheepdogAppearances: [Appearance] = [
+        .init(coatName: "貂色白", coatSlug: "sable_white", coatHex: "A05A1A", coatAliases: ["貂白", "貂色配白"]),
+        .init(coatName: "三色", coatSlug: "tricolor", coatHex: "4A2A10"),
+        .init(coatName: "蓝陨色", coatSlug: "blue_merle", coatHex: "7A9AAF", coatAliases: ["蓝陨", "蓝色陨石"])
+    ]
+
+    static let englishBulldogAppearances: [Appearance] = [
+        .init(coatName: "黄褐白", coatSlug: "fawn_white", coatHex: "C8A060", coatAliases: ["黄褐色白", "黄褐配白"]),
+        .init(coatName: "虎斑白", coatSlug: "brindle_white", coatHex: "4A3A1A", coatAliases: ["虎斑配白"]),
+        .init(coatName: "红白", coatSlug: "red_white", coatHex: "B5451B", coatAliases: ["红色白", "红色配白"])
+    ]
+
     static let goldenRetrieverAppearances: [Appearance] = [
-        .init(coatName: "浅金色", coatSlug: "light_golden", coatHex: "F2D38A", coatAliases: ["浅奶油金"]),
-        .init(coatName: "金色", coatSlug: "golden", coatHex: "D4A017", coatAliases: ["金黄色"]),
-        .init(coatName: "深金色", coatSlug: "dark_golden", coatHex: "B66A1F")
+        .init(coatName: "浅金色", coatSlug: "light_golden", coatHex: "F2D38A", coatAliases: ["浅奶油金", "金色", "金黄色", "深金色"])
     ]
 
     static let frenchBulldogAppearances: [Appearance] = [
@@ -635,10 +870,8 @@ enum PetAvatarAssetCatalog {
 
     static let shihTzuAppearances: [Appearance] = [
         .init(coatName: "金白色", coatSlug: "golden_white", coatHex: "D4A017", coatAliases: ["金白"]),
-        .init(coatName: "白色", coatSlug: "white", coatHex: "F5F5F0"),
         .init(coatName: "黑白", coatSlug: "black_white", coatHex: "2A2A2A"),
-        .init(coatName: "红白", coatSlug: "red_white", coatHex: "B5451B"),
-        .init(coatName: "多色", coatSlug: "multicolor", coatHex: "C8B4A0")
+        .init(coatName: "红白", coatSlug: "red_white", coatHex: "B5451B")
     ]
 
     static let chineseRuralDogAppearances: [Appearance] = [
@@ -676,6 +909,43 @@ enum PetAvatarAssetCatalog {
         .init(coatName: "三色", coatSlug: "tricolor", coatHex: "4A2A10")
     ]
 
+    static let pomeranianAppearances: [Appearance] = [
+        .init(coatName: "橙色", coatSlug: "orange", coatHex: "C8622A"),
+        .init(coatName: "白色", coatSlug: "white", coatHex: "F5F5F0"),
+        .init(coatName: "黑色", coatSlug: "black", coatHex: "1A1A1A"),
+        .init(coatName: "奶油色", coatSlug: "cream", coatHex: "F5E6C8"),
+        .init(coatName: "棕色", coatSlug: "brown", coatHex: "7B4F2E")
+    ]
+
+    static let cavalierKingCharlesSpanielAppearances: [Appearance] = [
+        .init(coatName: "红宝石色", coatSlug: "ruby", coatHex: "8B1A1A"),
+        .init(coatName: "黑棕色", coatSlug: "black_tan", coatHex: "2A1A0A"),
+        .init(coatName: "三色", coatSlug: "tricolor", coatHex: "4A2A10"),
+        .init(coatName: "布伦海姆色", coatSlug: "blenheim", coatHex: "C8622A")
+    ]
+
+    static let cockerSpanielAppearances: [Appearance] = [
+        .init(coatName: "黑色", coatSlug: "black", coatHex: "1A1A1A"),
+        .init(coatName: "金色", coatSlug: "golden", coatHex: "D4A017"),
+        .init(coatName: "巧克力色", coatSlug: "chocolate", coatHex: "4A2C1A"),
+        .init(coatName: "花斑", coatSlug: "parti", coatHex: "C8B4A0")
+    ]
+
+    static let siberianHuskyAppearances: [Appearance] = [
+        .init(coatName: "黑白", coatSlug: "black_white", coatHex: "2A2A2A"),
+        .init(coatName: "灰白", coatSlug: "gray_white", coatHex: "9E9E9E"),
+        .init(coatName: "红白", coatSlug: "red_white", coatHex: "8B3A1A"),
+        .init(coatName: "纯白", coatSlug: "solid_white", coatHex: "F5F5F0"),
+        .init(coatName: "银白", coatSlug: "silver_white", coatHex: "E0E0E0")
+    ]
+
+    static let germanShepherdAppearances: [Appearance] = [
+        .init(coatName: "黑棕（鞍形）", coatSlug: "black_tan_saddle", coatHex: "1A1A0A"),
+        .init(coatName: "黑红色", coatSlug: "black_red", coatHex: "2A1A0A"),
+        .init(coatName: "纯黑", coatSlug: "solid_black", coatHex: "1A1A1A"),
+        .init(coatName: "纯白", coatSlug: "solid_white", coatHex: "F5F5F0")
+    ]
+
     static let dachshundAppearances: [Appearance] = [
         .init(coatName: "红色", coatSlug: "red", coatHex: "B5451B"),
         .init(coatName: "巧克力棕", coatSlug: "chocolate_brown", coatHex: "4A2C1A"),
@@ -692,6 +962,10 @@ enum PetAvatarAssetCatalog {
     private static var catBreedAppearances: [String: [Appearance]] {
         [
             "devon_rex": devonRexAppearances,
+            "exotic_shorthair": exoticShorthairAppearances,
+            "munchkin": munchkinAppearances,
+            "birman": birmanAppearances,
+            "siberian": siberianCatAppearances,
             "british_shorthair": britishShorthairAppearances,
             "american_shorthair": americanShorthairAppearances,
             "ragdoll": ragdollAppearances,
@@ -717,6 +991,16 @@ enum PetAvatarAssetCatalog {
     private static var dogBreedAppearances: [String: [Appearance]] {
         [
             "shiba_inu": shibaInuAppearances,
+            "pug": pugAppearances,
+            "boston_terrier": bostonTerrierAppearances,
+            "chihuahua": chihuahuaAppearances,
+            "akita": akitaAppearances,
+            "jack_russell_terrier": jackRussellTerrierAppearances,
+            "rottweiler": rottweilerAppearances,
+            "shar_pei": sharPeiAppearances,
+            "chow_chow": chowChowAppearances,
+            "shetland_sheepdog": shetlandSheepdogAppearances,
+            "english_bulldog": englishBulldogAppearances,
             "golden_retriever": goldenRetrieverAppearances,
             "french_bulldog": frenchBulldogAppearances,
             "labrador_retriever": labradorRetrieverAppearances,
@@ -736,6 +1020,11 @@ enum PetAvatarAssetCatalog {
             "alaskan_malamute": alaskanMalamuteAppearances,
             "australian_shepherd": australianShepherdAppearances,
             "border_collie": borderCollieAppearances,
+            "pomeranian": pomeranianAppearances,
+            "cavalier_king_charles_spaniel": cavalierKingCharlesSpanielAppearances,
+            "cocker_spaniel": cockerSpanielAppearances,
+            "siberian_husky": siberianHuskyAppearances,
+            "german_shepherd": germanShepherdAppearances,
             "dachshund": dachshundAppearances,
             "west_highland_white_terrier": westHighlandWhiteTerrierAppearances
         ]
@@ -841,6 +1130,18 @@ enum PetAvatarAssetCatalog {
         if devonRexBreedNames.contains(trimmed) {
             return "devon_rex"
         }
+        if exoticShorthairBreedNames.contains(trimmed) {
+            return "exotic_shorthair"
+        }
+        if munchkinBreedNames.contains(trimmed) {
+            return "munchkin"
+        }
+        if birmanBreedNames.contains(trimmed) {
+            return "birman"
+        }
+        if siberianCatBreedNames.contains(trimmed) {
+            return "siberian"
+        }
         if britishShorthairBreedNames.contains(trimmed) {
             return "british_shorthair"
         }
@@ -901,6 +1202,36 @@ enum PetAvatarAssetCatalog {
         if shibaInuBreedNames.contains(trimmed) {
             return "shiba_inu"
         }
+        if pugBreedNames.contains(trimmed) {
+            return "pug"
+        }
+        if bostonTerrierBreedNames.contains(trimmed) {
+            return "boston_terrier"
+        }
+        if chihuahuaBreedNames.contains(trimmed) {
+            return "chihuahua"
+        }
+        if akitaBreedNames.contains(trimmed) {
+            return "akita"
+        }
+        if jackRussellTerrierBreedNames.contains(trimmed) {
+            return "jack_russell_terrier"
+        }
+        if rottweilerBreedNames.contains(trimmed) {
+            return "rottweiler"
+        }
+        if sharPeiBreedNames.contains(trimmed) {
+            return "shar_pei"
+        }
+        if chowChowBreedNames.contains(trimmed) {
+            return "chow_chow"
+        }
+        if shetlandSheepdogBreedNames.contains(trimmed) {
+            return "shetland_sheepdog"
+        }
+        if englishBulldogBreedNames.contains(trimmed) {
+            return "english_bulldog"
+        }
         if goldenRetrieverBreedNames.contains(trimmed) {
             return "golden_retriever"
         }
@@ -957,6 +1288,21 @@ enum PetAvatarAssetCatalog {
         }
         if borderCollieBreedNames.contains(trimmed) {
             return "border_collie"
+        }
+        if pomeranianBreedNames.contains(trimmed) {
+            return "pomeranian"
+        }
+        if cavalierKingCharlesSpanielBreedNames.contains(trimmed) {
+            return "cavalier_king_charles_spaniel"
+        }
+        if cockerSpanielBreedNames.contains(trimmed) {
+            return "cocker_spaniel"
+        }
+        if siberianHuskyBreedNames.contains(trimmed) {
+            return "siberian_husky"
+        }
+        if germanShepherdBreedNames.contains(trimmed) {
+            return "german_shepherd"
         }
         if dachshundBreedNames.contains(trimmed) {
             return "dachshund"

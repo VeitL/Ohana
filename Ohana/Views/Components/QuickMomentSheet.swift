@@ -25,6 +25,7 @@ struct QuickMomentSheet: View {
     let pet: Pet?
     var onRemove: (() -> Void)? = nil
     var onSaved: (() -> Void)? = nil
+    var onClose: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -233,27 +234,25 @@ struct QuickMomentSheet: View {
             popupDragOffset = 0
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-            dismiss()
+            if let onClose {
+                onClose()
+            } else {
+                dismiss()
+            }
         }
     }
 
     private var header: some View {
         HStack(spacing: 14) {
             if let pet {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(momentAccent.opacity(0.15))
-                    if let data = pet.avatarImageData, let img = UIImage(data: data) {
-                        Image(uiImage: img)
-                            .resizable()
-                            .scaledToFill()
-                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    } else {
-                        Text(pet.avatarEmoji)
-                            .font(.system(size: 24))
-                    }
-                }
-                .frame(width: 58, height: 58)
+                PetAvatarPortraitRoundedView(
+                    imageData: pet.avatarImageData,
+                    fallbackText: pet.avatarEmoji,
+                    themeColor: momentAccent,
+                    size: 58,
+                    cornerRadius: 18,
+                    backgroundOpacity: 0.15
+                )
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "快速记录", en: "Quick Moment", de: "Schneller Moment"))

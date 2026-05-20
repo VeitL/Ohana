@@ -7,7 +7,6 @@
 
 import SwiftUI
 import SwiftData
-import Charts
 
 private struct FoodDayPoint: Identifiable {
     let id = UUID()
@@ -25,12 +24,30 @@ private struct FoodPetSummary: Identifiable {
     let weekGrams: Double
 }
 
+private struct FoodStockOverview {
+    let remainingGrams: Double
+    let totalGrams: Double
+    let estimatedDailyGrams: Double
+
+    var hasStock: Bool { totalGrams > 0 }
+    var remainingDays: Int? {
+        estimatedDailyGrams > 0 ? Int(remainingGrams / estimatedDailyGrams) : nil
+    }
+    var progress: Double {
+        guard totalGrams > 0 else { return 0.04 }
+        return max(0.04, min(1, remainingGrams / totalGrams))
+    }
+}
+
 struct IslandFoodDashboard: View {
     var standalone: Bool = true
     var onOpenPet: ((Pet) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \Pet.name) private var pets: [Pet]
+    @Query(sort: \Event.startDate) private var allEvents: [Event]
+    @Query(sort: \PetCareLog.date) private var allCareLogs: [PetCareLog]
+    @Query(sort: \PetFoodRecord.startDate) private var allFoodRecords: [PetFoodRecord]
 
     @State private var selectedPetId: UUID? = nil
     @State private var sheetPet: Pet? = nil
@@ -46,7 +63,15 @@ struct IslandFoodDashboard: View {
     }
 
     private var filteredFeedLogs: [PetCareLog] {
-        selectedPets
+        let selectedIds = Set(selectedPets.map(\.id))
+        let queried = allCareLogs.filter { log in
+            guard let pet = log.pet else { return false }
+            return selectedIds.contains(pet.id) && log.careType == .feeding
+        }
+        if !queried.isEmpty || !selectedPets.isEmpty {
+            return queried
+        }
+        return selectedPets
             .flatMap(\.careLogs)
             .filter { $0.careType == .feeding }
     }
@@ -75,9 +100,16 @@ struct IslandFoodDashboard: View {
         let selected = selectedPets
         return (0..<7).reversed().map { offset in
             let day = cal.date(byAdding: .day, value: -offset, to: cal.startOfDay(for: Date())) ?? Date()
-            let logs = selected
-                .flatMap(\.careLogs)
-                .filter { $0.careType == .feeding && cal.isDate($0.date, inSameDayAs: day) }
+            let selectedIds = Set(selected.map(\.id))
+            let queried = allCareLogs.filter { log in
+                guard let pet = log.pet else { return false }
+                return selectedIds.contains(pet.id) &&
+                    log.careType == .feeding &&
+                    cal.isDate(log.date, inSameDayAs: day)
+            }
+            let logs = queried.isEmpty
+                ? selected.flatMap(\.careLogs).filter { $0.careType == .feeding && cal.isDate($0.date, inSameDayAs: day) }
+                : queried
             return FoodDayPoint(
                 date: day,
                 grams: logs.reduce(0) { $0 + amountGrams(for: $1) },
@@ -91,8 +123,10 @@ struct IslandFoodDashboard: View {
         let today = cal.startOfDay(for: Date())
         let cutoff = cal.date(byAdding: .day, value: -6, to: today) ?? today
         return selectedPets.map { pet in
-            let todayLogs = pet.careLogs.filter { $0.careType == .feeding && cal.isDateInToday($0.date) }
-            let weekLogs = pet.careLogs.filter { $0.careType == .feeding && $0.date >= cutoff }
+            let petLogs = allCareLogs.filter { $0.pet?.id == pet.id && $0.careType == .feeding }
+            let sourceLogs = petLogs.isEmpty ? pet.careLogs.filter { $0.careType == .feeding } : petLogs
+            let todayLogs = sourceLogs.filter { cal.isDateInToday($0.date) }
+            let weekLogs = sourceLogs.filter { $0.date >= cutoff }
             return FoodPetSummary(
                 id: pet.id,
                 pet: pet,
@@ -105,7 +139,7 @@ struct IslandFoodDashboard: View {
     }
 
     private var lowestFoodDaysPet: Pet? {
-        activePets
+        selectedPets
             .filter { foodRemainingDays(for: $0) != nil }
             .min { (foodRemainingDays(for: $0) ?? Int.max) < (foodRemainingDays(for: $1) ?? Int.max) }
     }
@@ -289,33 +323,16 @@ struct IslandFoodDashboard: View {
                 emptyState("暂无喂食数据\n打卡后即可看到趋势")
                     .frame(height: 150)
             } else {
-                Chart(dailyPoints) { point in
-                    BarMark(
-                        x: .value("日期", point.date, unit: .day),
-                        y: .value("克数", point.grams * Double(chartRevealProgress))
-                    )
-                    .foregroundStyle(Color.foodDry.gradient)
-                    .cornerRadius(6)
-                }
-                .chartXAxis {
-                    AxisMarks(values: dailyPoints.map(\.date)) { _ in
-                        AxisValueLabel(format: .dateTime.weekday(.narrow))
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                    }
-                }
-                .chartYAxis {
-                    AxisMarks(values: .automatic(desiredCount: 3)) { _ in
-                        AxisGridLine().foregroundStyle(Color.ohanaDivider)
-                        AxisValueLabel()
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                    }
-                }
-                .chartPlotStyle { plot in
-                    plot.padding(.top, 10)
-                }
-                .frame(height: 168)
+                OhanaMinimalBarChart(
+                    points: dailyPoints.map {
+                        OhanaMinimalChartPoint(date: $0.date, value: $0.grams)
+                    },
+                    tint: Color.foodDry,
+                    progress: Double(chartRevealProgress),
+                    showsLabels: true,
+                    maxBarHeight: 118
+                )
+                .frame(height: 150)
             }
         }
     }
@@ -460,25 +477,55 @@ struct IslandFoodDashboard: View {
         return Color.goPrimary
     }
 
-    private func foodRemainingDays(for pet: Pet) -> Int? {
+    private func foodStockOverview(for pet: Pet) -> FoodStockOverview? {
+        let dry = FeedStockCalculator.snapshot(
+            for: pet,
+            foodKind: .dry,
+            events: allEvents,
+            careLogs: allCareLogs,
+            foodRecords: allFoodRecords
+        )
+        let wet = FeedStockCalculator.snapshot(
+            for: pet,
+            foodKind: .wet,
+            events: allEvents,
+            careLogs: allCareLogs,
+            foodRecords: allFoodRecords
+        )
+        let modernTotal = dry.totalGrams + wet.totalGrams
+        if modernTotal > 0 {
+            return FoodStockOverview(
+                remainingGrams: dry.remainingGrams + wet.remainingGrams,
+                totalGrams: modernTotal,
+                estimatedDailyGrams: dry.estimatedDailyGrams + wet.estimatedDailyGrams
+            )
+        }
+
         switch pet.foodTrackingMode {
         case .precise:
-            guard pet.restockWeight > 0, pet.dailyPortionGrams > 0 else { return nil }
-            return pet.remainingFoodDays
+            guard pet.restockWeight > 0 else { return nil }
+            return FoodStockOverview(
+                remainingGrams: pet.remainingFoodGrams,
+                totalGrams: pet.restockWeight,
+                estimatedDailyGrams: pet.dailyPortionGrams
+            )
         case .casual:
-            return pet.casualRemainingDays
+            guard let days = pet.casualRemainingDays, pet.casualDurationDays > 0 else { return nil }
+            let progress = max(0.04, min(1, Double(days) / Double(pet.casualDurationDays)))
+            return FoodStockOverview(
+                remainingGrams: Double(days),
+                totalGrams: Double(pet.casualDurationDays),
+                estimatedDailyGrams: progress > 0 ? 1 : 0
+            )
         }
     }
 
+    private func foodRemainingDays(for pet: Pet) -> Int? {
+        foodStockOverview(for: pet)?.remainingDays
+    }
+
     private func foodProgress(for pet: Pet) -> Double {
-        switch pet.foodTrackingMode {
-        case .precise:
-            if pet.restockWeight > 0 { return max(0.04, min(1, pet.remainingFoodPercent)) }
-            return 0.04
-        case .casual:
-            guard pet.casualDurationDays > 0, let days = pet.casualRemainingDays else { return 0.04 }
-            return max(0.04, min(1, Double(days) / Double(pet.casualDurationDays)))
-        }
+        foodStockOverview(for: pet)?.progress ?? 0.04
     }
 
     private func foodAccent(for pet: Pet) -> Color {
@@ -489,18 +536,13 @@ struct IslandFoodDashboard: View {
     }
 
     private func foodStatusText(for pet: Pet) -> String {
-        switch pet.foodTrackingMode {
-        case .precise:
-            guard pet.restockWeight > 0, pet.dailyPortionGrams > 0 else {
-                return "未设置粮仓"
-            }
-            return "余粮 \(compactFoodWeight(pet.remainingFoodGrams)) · 可用 \(pet.remainingFoodDays) 天"
-        case .casual:
-            if let days = pet.casualRemainingDays {
-                return "佛系估算 · 约 \(days) 天"
-            }
-            return "未设置开包估算"
+        guard let stock = foodStockOverview(for: pet), stock.hasStock else {
+            return "未设置粮仓"
         }
+        if let days = stock.remainingDays {
+            return "余粮 \(compactFoodWeight(stock.remainingGrams)) · 可用 \(days) 天"
+        }
+        return "余粮 \(compactFoodWeight(stock.remainingGrams)) · 未估算"
     }
 
     private func playChartReveal() {

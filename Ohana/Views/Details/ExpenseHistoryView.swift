@@ -7,12 +7,11 @@
 
 import SwiftUI
 import SwiftData
-import Charts
 
 struct ExpenseHistoryView: View {
     let pet: Pet
     var onRemove: (() -> Void)? = nil
-    var showsCloseButton: Bool = false
+    var showsCloseButton: Bool = true
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
@@ -170,13 +169,14 @@ struct ExpenseHistoryView: View {
                     }
                 }
                 Spacer()
-                if let data = pet.avatarImageData, let img = UIImage(data: data) {
-                    Image(uiImage: img).resizable().scaledToFill()
-                        .frame(width: 48, height: 48).clipShape(Circle())
-                        .overlay(Circle().strokeBorder(.primary.opacity(0.2), lineWidth: 2))
-                } else {
-                    Text(pet.avatarEmoji).font(.system(size: 36))
-                }
+                PetAvatarPortraitView(
+                    imageData: pet.avatarImageData,
+                    fallbackText: pet.avatarEmoji,
+                    themeColor: Color(hex: pet.safeThemeColorHex),
+                    size: 48,
+                    backgroundOpacity: 0.18
+                )
+                .overlay(Circle().strokeBorder(Color.ohanaSecondaryText.opacity(0.2), lineWidth: 2))
                 if showsCloseButton {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark")
@@ -217,41 +217,33 @@ struct ExpenseHistoryView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 30)
             } else {
-                HStack(spacing: 20) {
-                    // SectorMark 饼图
-                    Chart(categoryBreakdown, id: \.0) { cat, amount in
-                        SectorMark(
-                            angle: .value("金额", amount),
-                            innerRadius: .ratio(0.52),
-                            angularInset: 1.5
-                        )
-                        .foregroundStyle(by: .value("分类", cat.rawValue))
-                        .cornerRadius(4)
-                    }
-                    .chartForegroundStyleScale(
-                        domain: ExpenseCategory.allCases.map { $0.rawValue },
-                        range: [Color.goYellow, Color.goTeal, Color.goOrange,
-                                Color.goPrimary, Color.goCardCyan, Color(hex: "06B6D4"), Color.goRed]
-                    )
-                    .chartLegend(.hidden)
-                    .frame(width: 110, height: 110)
-
-                    // 图例列表
-                    VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 9) {
                         ForEach(categoryBreakdown.prefix(4), id: \.0) { cat, amount in
                             let pct = rangeTotal > 0 ? Int(amount / rangeTotal * 100) : 0
-                            HStack(spacing: 6) {
-                                Text(cat.emoji).font(.system(size: 13))
-                                Text(cat.rawValue)
-                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
-                                Spacer()
-                                Text("\(pct)%")
-                                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                                Text(AppCurrency.format(amount, fractionDigits: 0))
-                                    .font(.system(size: 11, weight: .black, design: .rounded))
-                                    .foregroundStyle(Color.goYellow)
+                            VStack(alignment: .leading, spacing: 5) {
+                                HStack(spacing: 6) {
+                                    Text(cat.emoji).font(.system(size: 13))
+                                    Text(cat.rawValue)
+                                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
+                                    Spacer()
+                                    Text("\(pct)%")
+                                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
+                                    Text(AppCurrency.format(amount, fractionDigits: 0))
+                                        .font(.system(size: 11, weight: .black, design: .rounded))
+                                        .foregroundStyle(Color.goYellow)
+                                }
+                                GeometryReader { proxy in
+                                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                        .fill(Color.ohanaControlFill.opacity(0.55))
+                                        .overlay(alignment: .leading) {
+                                            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                                .fill(Color.goYellow)
+                                                .frame(width: max(5, proxy.size.width * CGFloat(max(0, min(1, amount / max(rangeTotal, 1))))))
+                                        }
+                                }
+                                .frame(height: 6)
                             }
                         }
                         // 报销净节省行
@@ -267,8 +259,6 @@ struct ExpenseHistoryView: View {
                                     .foregroundStyle(Color(hex: "4ECDC4"))
                             }
                         }
-                    }
-                    .frame(maxWidth: .infinity)
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 12)
@@ -321,20 +311,6 @@ struct ExpenseHistoryView: View {
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                                 .multilineTextAlignment(.center)
                                 .padding(.vertical, 40)
-                        }
-                        if let onRemove {
-                            VStack(spacing: 14) {
-                                Divider().opacity(0.35)
-                                Button(role: .destructive) { onRemove(); dismiss() } label: {
-                                    Text("移除此快捷入口")
-                                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                        .foregroundStyle(Color.goRed)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 12)
-                                }
-                                .buttonStyle(ScaleButtonStyle())
-                            }
-                            .padding(.top, 4)
                         }
                     }
                     .padding(.horizontal, 16)

@@ -899,21 +899,13 @@ struct WalkTrackingCard: View {
     }
 
     private func petAvatar(pet: Pet, size: CGFloat) -> some View {
-        ZStack {
-            Circle()
-                .fill(Color(hex: pet.themeColorHex).opacity(0.25))
-                .frame(width: size, height: size)
-            if let data = pet.avatarImageData, let ui = UIImage(data: data) {
-                Image(uiImage: ui)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: size, height: size)
-                    .clipShape(Circle())
-            } else {
-                Text(pet.speciesEmoji)
-                    .font(.system(size: size * 0.5))
-            }
-        }
+        PetAvatarPortraitView(
+            imageData: pet.avatarImageData,
+            fallbackText: pet.speciesEmoji,
+            themeColor: Color(hex: pet.safeThemeColorHex),
+            size: size,
+            backgroundOpacity: 0.25
+        )
     }
 
     private func formatElapsed(_ t: TimeInterval) -> String {

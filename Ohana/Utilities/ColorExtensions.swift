@@ -91,6 +91,8 @@ extension Color {
     static let goPrimary = Color(light: goBlue, dark: goLime)
     static let goPrimaryLight = Color(light: Color(hex: "60A5FA"), dark: Color(hex: "E0FF80"))
     static let goPrimaryDark = Color(light: Color(hex: "2563EB"), dark: Color(hex: "9ECC00"))
+    /// V4 功能图标色：所有导航、设置行、快捷操作和功能入口使用同一套纯色 glyph。
+    static let ohanaFunctionalIcon = Color.goPrimary
 
     // MARK: - Theme Semantic Colors
     static let ohanaCardSurface = Color(light: Color(hex: "EEF1F6"), dark: Color(hex: "1A2030"))

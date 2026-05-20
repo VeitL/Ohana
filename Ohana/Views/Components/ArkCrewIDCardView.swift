@@ -7,7 +7,6 @@
 
 import SwiftUI
 import SwiftData
-import Charts
 
 struct ArkCrewIDCardView: View {
     let pet: Pet
@@ -22,6 +21,7 @@ struct ArkCrewIDCardView: View {
     var onTapHealthStat: (() -> Void)? = nil
     var onTapDocStat: (() -> Void)? = nil
     
+    @AppStorage("shop_equip_fx_popout_card") private var equipFxPopoutCard: Bool = true
     @State private var _isFlipped = false
     @State private var glowFlash = false
     @State private var cardScale: CGFloat = 1.0
@@ -98,12 +98,12 @@ struct ArkCrewIDCardView: View {
         GeometryReader { geo in
             let avatarImage: UIImage? = pet.avatarImageData.flatMap { UIImage(data: $0) }
             let isTransparent: Bool = pet.avatarImageData.map { ImageCutoutService.isTransparentPNG($0) } ?? false
-            let isPopout = pet.cardStyleRaw == "popout" && isTransparent && avatarImage != nil
+            let isPopout = equipFxPopoutCard && pet.cardStyleRaw == "popout" && isTransparent && avatarImage != nil
             let isMinimal = pet.cardStyleRaw == "minimal"
 
             ZStack {
                 if isMinimal {
-                    minimalFront(geo: geo, avatarImage: avatarImage)
+                    minimalFront(geo: geo, avatarImage: avatarImage, isTransparent: isTransparent)
                 } else {
                     posterFront(
                         geo: geo,
@@ -347,7 +347,7 @@ struct ArkCrewIDCardView: View {
     }
 
     // MARK: - 简约风格正面
-    private func minimalFront(geo: GeometryProxy, avatarImage: UIImage?) -> some View {
+    private func minimalFront(geo: GeometryProxy, avatarImage: UIImage?, isTransparent: Bool) -> some View {
         let tc = cardTextColor
         return ZStack {
             // 底层：纯主题色渐变
@@ -378,10 +378,11 @@ struct ArkCrewIDCardView: View {
             VStack(spacing: 0) {
                 Spacer()
                 if let img = avatarImage {
-                    Image(uiImage: img)
-                        .resizable().scaledToFill()
-                        .frame(width: geo.size.height * 0.52, height: geo.size.height * 0.52)
-                        .clipShape(Circle())
+                    PetAvatarPortraitImage(
+                        image: img,
+                        isTransparentAvatar: isTransparent,
+                        size: geo.size.height * 0.52
+                    )
                         .overlay(Circle().strokeBorder(tc.opacity(0.25), lineWidth: 2))
                         .shadow(color: Color.arkInk.opacity(0.2), radius: 12, x: 0, y: 6) // ui-v4: allow avatar grounding
                 } else {
@@ -1410,39 +1411,17 @@ struct ArkCrewIDCardView: View {
                     }
                     .frame(height: 36)
                 } else {
-                    Chart(wData) { pt in
-                        AreaMark(
-                            x: .value("i", pt.index),
-                            y: .value("kg", pt.weight)
-                        )
-                        .interpolationMethod(OhanaChartStyle.trendInterpolation)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [cardThemeColor.opacity(0.25), .clear],
-                                startPoint: .top, endPoint: .bottom
+                    OhanaMinimalTrendChart(
+                        points: wData.map {
+                            OhanaMinimalChartPoint(
+                                date: Date(timeIntervalSinceReferenceDate: Double($0.index) * 86_400),
+                                value: $0.weight,
+                                id: $0.id.uuidString
                             )
-                        )
-                        LineMark(
-                            x: .value("i", pt.index),
-                            y: .value("kg", pt.weight)
-                        )
-                        .interpolationMethod(OhanaChartStyle.trendInterpolation)
-                        .foregroundStyle(cardThemeColor.opacity(0.9))
-                        .lineStyle(StrokeStyle(lineWidth: 2))
-                    }
-                    .chartXAxis(.hidden)
-                    .chartYAxis {
-                        AxisMarks(position: .trailing, values: .automatic(desiredCount: 2)) { val in
-                            AxisValueLabel {
-                                if let v = val.as(Double.self) {
-                                    Text(String(format: "%.1f", v))
-                                        .font(.system(size: 7, weight: .medium, design: .rounded))
-                                        .foregroundStyle(Color.ohanaTertiaryText)
-                                }
-                            }
-                        }
-                    }
-                    .chartPlotStyle { $0.background(.clear) }
+                        },
+                        tint: cardThemeColor.opacity(0.9),
+                        showsLatestPoint: false
+                    )
                     .frame(height: 36)
                 }
             }
@@ -1466,40 +1445,19 @@ struct ArkCrewIDCardView: View {
                     }
                     .frame(height: 36)
                 } else {
-                    let maxCount = aData.map(\.count).max() ?? 1
-                    Chart(aData) { pt in
-                        BarMark(
-                            x: .value("day", pt.dayOffset),
-                            y: .value("n", pt.count),
-                            width: .fixed(4)
-                        )
-                        .foregroundStyle(pt.isToday ? Color.goPrimary : Color.ohanaTertiaryText.opacity(0.55))
-                        .cornerRadius(2)
-                    }
-                    .chartXAxis {
-                        AxisMarks(values: [0, 6]) { val in
-                            AxisValueLabel {
-                                if let d = val.as(Int.self) {
-                                    Text(d == 0 ? "7天前" : "今")
-                                        .font(.system(size: 7, weight: .medium, design: .rounded))
-                                        .foregroundStyle(Color.ohanaTertiaryText)
-                                }
-                            }
-                        }
-                    }
-                    .chartYAxis {
-                        AxisMarks(values: [0, maxCount]) { val in
-                            AxisValueLabel {
-                                if let v = val.as(Int.self), v > 0 {
-                                    Text("\(v)")
-                                        .font(.system(size: 7, weight: .medium, design: .rounded))
-                                        .foregroundStyle(Color.ohanaTertiaryText)
-                                }
-                            }
-                            AxisGridLine().foregroundStyle(Color.ohanaDivider.opacity(0.5))
-                        }
-                    }
-                    .chartPlotStyle { $0.background(.clear) }
+                    OhanaMinimalBarChart(
+                        points: aData.map {
+                            OhanaMinimalChartPoint(
+                                date: Date(timeIntervalSinceReferenceDate: Double($0.dayOffset) * 86_400),
+                                value: Double($0.count),
+                                label: $0.isToday ? "今" : "",
+                                id: $0.id.uuidString
+                            )
+                        },
+                        tint: Color.goPrimary,
+                        showsLabels: false,
+                        maxBarHeight: 30
+                    )
                     .frame(height: 36)
                 }
             }
@@ -1666,28 +1624,17 @@ struct ArkCrewIDCardView: View {
                         )
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                 } else {
-                    Chart(data) { pt in
-                        AreaMark(
-                            x: .value("idx", pt.index),
-                            y: .value("kg", pt.weight)
-                        )
-                        .interpolationMethod(OhanaChartStyle.trendInterpolation)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [cardThemeColor.opacity(0.3), .clear],
-                                startPoint: .top, endPoint: .bottom
+                    OhanaMinimalTrendChart(
+                        points: data.map {
+                            OhanaMinimalChartPoint(
+                                date: Date(timeIntervalSinceReferenceDate: Double($0.index) * 86_400),
+                                value: $0.weight,
+                                id: $0.id.uuidString
                             )
-                        )
-                        LineMark(
-                            x: .value("idx", pt.index),
-                            y: .value("kg", pt.weight)
-                        )
-                        .interpolationMethod(OhanaChartStyle.trendInterpolation)
-                        .foregroundStyle(cardThemeColor)
-                        .lineStyle(StrokeStyle(lineWidth: 2))
-                    }
-                    .chartXAxis(.hidden)
-                    .chartYAxis(.hidden)
+                        },
+                        tint: cardThemeColor,
+                        showsLatestPoint: false
+                    )
                     .frame(height: 44)
                 }
             }
@@ -1712,17 +1659,18 @@ struct ArkCrewIDCardView: View {
                         )
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                 } else {
-                    Chart(data) { pt in
-                        BarMark(
-                            x: .value("day", pt.dayOffset),
-                            y: .value("次", pt.count),
-                            width: .fixed(4)
-                        )
-                        .foregroundStyle(pt.isToday ? Color.goPrimary : Color.ohanaTertiaryText.opacity(0.65))
-                        .cornerRadius(2)
-                    }
-                    .chartXAxis(.hidden)
-                    .chartYAxis(.hidden)
+                    OhanaMinimalBarChart(
+                        points: data.map {
+                            OhanaMinimalChartPoint(
+                                date: Date(timeIntervalSinceReferenceDate: Double($0.dayOffset) * 86_400),
+                                value: Double($0.count),
+                                id: $0.id.uuidString
+                            )
+                        },
+                        tint: Color.goPrimary,
+                        showsLabels: false,
+                        maxBarHeight: 34
+                    )
                     .frame(height: 44)
                 }
             }

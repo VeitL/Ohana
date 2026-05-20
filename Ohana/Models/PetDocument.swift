@@ -15,6 +15,10 @@ enum DocumentCategory: String, Codable, CaseIterable {
     case medical = "病历"
     case registration = "登记证"
     case other = "其他"
+
+    static var protectionDocumentCases: [DocumentCategory] {
+        [.passport, .medical, .registration, .other]
+    }
     
     var emoji: String {
         switch self {

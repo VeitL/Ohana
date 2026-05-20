@@ -7,7 +7,6 @@
 
 import SwiftUI
 import SwiftData
-import Charts
 import UIKit
 import Combine
 
@@ -27,6 +26,7 @@ struct QuickFeedDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \Event.startDate) private var allEvents: [Event]
     @Query(sort: \Human.createdAt) private var allHumans: [Human]
+    @Query(sort: \Pet.createdAt) private var allPets: [Pet]
     @Query(sort: \PetCareLog.date) private var allCareLogs: [PetCareLog]
     @Query(sort: \PetFoodRecord.startDate) private var allFoodRecords: [PetFoodRecord]
     @AppStorage("appLanguage") private var appLanguage = "zh"
@@ -50,6 +50,8 @@ struct QuickFeedDetailSheet: View {
     @State private var manualFoodKindDraft: FeedFoodKind = .dry
     @State private var manualGramsText = ""
     @State private var saveManualAsDefault = true
+    @State private var selectedSharedFeedPetIds: Set<UUID> = []
+    @State private var selectedSharedPlanPetIds: Set<UUID> = []
     @State private var treatGramsText = ""
     @State private var planCount = 3
     @State private var planTimes: [Date] = []
@@ -94,6 +96,7 @@ struct QuickFeedDetailSheet: View {
     @State private var loadedFoodRecords: [PetFoodRecord] = []
     @State private var hasLoadedFeedSnapshots = false
     @State private var didApplyInitialSheet = false
+    @State private var didScheduleBootstrapMaintenance = false
     @State private var overviewChartProgress: Double = 1
     @State private var feedModeStorageTick = 0
     @State private var clockTick = Date()
@@ -106,6 +109,49 @@ struct QuickFeedDetailSheet: View {
     @FocusState private var focusedField: FeedInputField?
 
     private let stockReminderAdvanceOptions = [1, 3, 7, 14]
+
+    init(
+        pet: Pet,
+        onRemove: @escaping () -> Void,
+        showsRemoveQuickActionFooter: Bool = true,
+        showsCloseButton: Bool = true,
+        opensManualSheetOnAppear: Bool = false
+    ) {
+        self.pet = pet
+        self.onRemove = onRemove
+        self.showsRemoveQuickActionFooter = showsRemoveQuickActionFooter
+        self.showsCloseButton = showsCloseButton
+        self.opensManualSheetOnAppear = opensManualSheetOnAppear
+
+        let petID = pet.id
+        let petKey = petID.uuidString
+        let dryStockKey = "\(petKey):\(FeedFoodKind.dry.rawValue)"
+        let wetStockKey = "\(petKey):\(FeedFoodKind.wet.rawValue)"
+        let feedingType = CareType.feeding.rawValue
+
+        _allEvents = Query(
+            filter: #Predicate<Event> { event in
+                event.relatedEntityId == petKey ||
+                event.relatedEntityId == dryStockKey ||
+                event.relatedEntityId == wetStockKey
+            },
+            sort: \.startDate
+        )
+        _allCareLogs = Query(
+            filter: #Predicate<PetCareLog> { log in
+                log.type == feedingType && log.pet?.id == petID
+            },
+            sort: \.date,
+            order: .reverse
+        )
+        _allFoodRecords = Query(
+            filter: #Predicate<PetFoodRecord> { record in
+                record.pet?.id == petID
+            },
+            sort: \.startDate,
+            order: .reverse
+        )
+    }
 
     private var l: L10n { L10n(appLanguage) }
     private var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
@@ -128,6 +174,9 @@ struct QuickFeedDetailSheet: View {
     private var currentUserId: String? {
         UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
     }
+    private func normalizedSpecies(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
     private var savedGoal: Int {
         let value = UserDefaults.standard.integer(forKey: "feedGoal_\(pet.id.uuidString)")
         return value > 0 ? value : 1
@@ -149,6 +198,24 @@ struct QuickFeedDetailSheet: View {
             return loadedFoodRecords
         }
         return allFoodRecords.filter { $0.pet?.id == pet.id }
+    }
+    private var sameSpeciesFeedPets: [Pet] {
+        let species = normalizedSpecies(pet.species)
+        return allPets
+            .filter { !$0.hasPassedAway && normalizedSpecies($0.species) == species }
+            .sorted { lhs, rhs in
+                if lhs.id == pet.id { return true }
+                if rhs.id == pet.id { return false }
+                return lhs.createdAt < rhs.createdAt
+            }
+    }
+    private var selectedFeedTargets: [Pet] {
+        let targets = sameSpeciesFeedPets.filter { selectedSharedFeedPetIds.contains($0.id) }
+        return targets.isEmpty ? [pet] : targets
+    }
+    private var selectedPlanTargets: [Pet] {
+        let targets = sameSpeciesFeedPets.filter { selectedSharedPlanPetIds.contains($0.id) }
+        return targets.isEmpty ? [pet] : targets
     }
     private var systemSheetBinding: Binding<ActiveFeedSheet?> {
         Binding(
@@ -187,12 +254,7 @@ struct QuickFeedDetailSheet: View {
                         if pet.hasPassedAway {
                             PetMemorialBanner(pet: pet)
                         }
-                        feedingHeroCard
-                        coreCards
-                        recentRecordsCard
-                        if showsRemoveQuickActionFooter {
-                            removeQuickActionFooter
-                        }
+                        guidedFeedHome
                     }
                     .padding(.horizontal, 18)
                     .padding(.top, 14)
@@ -665,6 +727,206 @@ struct QuickFeedDetailSheet: View {
         }
     }
 
+    private var guidedFeedHome: some View {
+        GuidedFeedHomeView(
+            task: guidedFeedTask,
+            modeTitle: l.tr(zh: "喂食模式", en: "Feeding mode", de: "Fütterungsmodus"),
+            modeOptions: guidedFeedModeOptions,
+            chart: guidedFeedChart,
+            dockItems: guidedFeedDockItems,
+            primaryAction: handleGuidedFeedPrimaryTap
+        )
+    }
+
+    private var guidedFeedTask: FeedGuidedTaskState {
+        let mode = activeFeedingMode
+        let title: String
+        let metricTitle: String
+        let metricValue: String
+        let detail: String
+        let primaryTitle: String
+        let primaryIcon: String
+        let isPrimaryEnabled: Bool
+
+        if pet.hasPassedAway {
+            title = l.tr(zh: "纪念饮食记录", en: "Memorial food log", de: "Futter im Gedenken")
+            metricTitle = l.tr(zh: "今日", en: "Today", de: "Heute")
+            metricValue = dashboard.todayMainFoodGrams > 0 ? formattedFoodCardWeight(dashboard.todayMainFoodGrams) : "--"
+            detail = l.tr(zh: "只保留历史查看。", en: "History only.", de: "Nur Verlauf.")
+            primaryTitle = l.tr(zh: "查看", en: "View", de: "Ansehen")
+            primaryIcon = "clock.arrow.circlepath"
+            isPrimaryEnabled = true
+        } else {
+            switch mode {
+            case .manual where pet.dailyPortionGrams <= 0:
+                title = l.tr(zh: "先设置喂食量", en: "Set feeding amount", de: "Futtermenge festlegen")
+                metricTitle = FeedFoodKind.dry.title(l) + " / " + FeedFoodKind.wet.title(l)
+                metricValue = "50g"
+                detail = l.tr(zh: "保存一次默认克数后，就能一键打卡。", en: "Save a default amount for one-tap logging.", de: "Standardmenge speichern.")
+                primaryTitle = l.tr(zh: "设置", en: "Set", de: "Festlegen")
+                primaryIcon = "slider.horizontal.3"
+                isPrimaryEnabled = true
+            case .manual:
+                title = l.tr(zh: "现在可以喂食", en: "Ready to feed", de: "Bereit zum Füttern")
+                metricTitle = l.tr(zh: "默认", en: "Default", de: "Standard")
+                metricValue = formattedFoodCardWeight(pet.dailyPortionGrams)
+                detail = l.tr(
+                    zh: "\(pet.mainFoodKind.title(l)) · 今天 \(formattedFoodCardWeight(dashboard.todayMainFoodGrams))",
+                    en: "\(pet.mainFoodKind.title(l)) · today \(formattedFoodCardWeight(dashboard.todayMainFoodGrams))",
+                    de: "\(pet.mainFoodKind.title(l)) · heute \(formattedFoodCardWeight(dashboard.todayMainFoodGrams))"
+                )
+                primaryTitle = l.tr(zh: "喂食", en: "Feed", de: "Füttern")
+                primaryIcon = "checkmark"
+                isPrimaryEnabled = true
+            case .manualReminder:
+                let hasPending = dashboard.nextManualReminder != nil
+                title = dashboard.hasMissedManualPlan
+                    ? l.tr(zh: "有计划餐待补", en: "Meal missed", de: "Mahlzeit verpasst")
+                    : (hasPending ? l.tr(zh: "有计划餐待打卡", en: "Planned meal ready", de: "Planmahlzeit bereit") : l.tr(zh: "下一餐已安排", en: "Next meal is set", de: "Nächste Mahlzeit steht"))
+                metricTitle = l.tr(zh: "今日计划", en: "Today plan", de: "Heute Plan")
+                metricValue = dashboard.todayManualPlanCompletionText
+                detail = nextFeedDetailText(
+                    events: feedScheduleEvents,
+                    fallback: l.tr(zh: "今天 \(dashboard.todayManualPlanCompletionText)", en: "Today \(dashboard.todayManualPlanCompletionText)", de: "Heute \(dashboard.todayManualPlanCompletionText)")
+                )
+                primaryTitle = hasPending ? l.tr(zh: "完成", en: "Complete", de: "Erledigen") : l.tr(zh: "查看", en: "View", de: "Ansehen")
+                primaryIcon = hasPending ? "checkmark" : "calendar"
+                isPrimaryEnabled = true
+            case .autoFeeder:
+                title = l.tr(zh: "自动记录中", en: "Auto logging", de: "Auto-Aufzeichnung")
+                metricTitle = l.tr(zh: "今日自动", en: "Auto today", de: "Heute Auto")
+                metricValue = "\(dashboard.todayAutoFeedCount)x"
+                detail = nextFeedDetailText(events: autoFeederEvents, fallback: autoFeederStatusText)
+                primaryTitle = l.tr(zh: "历史", en: "History", de: "Verlauf")
+                primaryIcon = "chart.line.uptrend.xyaxis"
+                isPrimaryEnabled = true
+            }
+        }
+
+        return FeedGuidedTaskState(
+            modeTitle: feedModeShortTitle(mode),
+            modeIcon: feedModeIcon(mode),
+            modeTint: feedModeTint(mode),
+            title: title,
+            metricTitle: metricTitle,
+            metricValue: metricValue,
+            detail: detail,
+            primaryTitle: primaryTitle,
+            primaryIcon: primaryIcon,
+            isPrimaryEnabled: isPrimaryEnabled,
+            metrics: guidedFeedMetrics,
+            feedbackToken: feedFeedbackToken,
+            stockFeedbackToken: stockFeedbackToken
+        )
+    }
+
+    private var guidedFeedMetrics: [FeedGuidedMetric] {
+        feedingCardMetricLines.map { line in
+            FeedGuidedMetric(
+                id: line.id,
+                title: line.title,
+                value: line.value,
+                tint: line.tint,
+                isHighlighted: line.isCurrent || line.id == feedFeedbackMetricId
+            )
+        }
+    }
+
+    private var guidedFeedModeOptions: [FeedGuidedModeOption] {
+        FeedOperatingMode.allCases.map { mode in
+            FeedGuidedModeOption(
+                id: mode.rawValue,
+                title: feedModeShortTitle(mode),
+                icon: feedModeIcon(mode),
+                tint: feedModeTint(mode),
+                isSelected: activeFeedingMode == mode
+            ) {
+                handleFeedModeChipTap(mode)
+            }
+        }
+    }
+
+    private var guidedFeedChart: FeedGuidedChartState {
+        let points = guidedSevenDayMainFoodPoints
+        let total = points.reduce(0) { $0 + $1.value }
+        return FeedGuidedChartState(
+            title: l.tr(zh: "7日进食", en: "7-day food", de: "7 Tage Futter"),
+            value: total > 0 ? formattedFoodCardWeight(total) : "--",
+            subtitle: l.tr(zh: "只看趋势，详情进总览。", en: "A quiet trend. Details in overview.", de: "Ruhiger Trend. Details im Überblick."),
+            points: points,
+            tint: mainFoodOverviewTint,
+            progress: overviewChartProgress,
+            emptyText: l.tr(zh: "打卡后会出现趋势", en: "Log meals to see the trend", de: "Nach Einträgen erscheint ein Trend"),
+            action: openFeedingOverview
+        )
+    }
+
+    private var guidedSevenDayMainFoodPoints: [OhanaMinimalChartPoint] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let start = calendar.date(byAdding: .day, value: -6, to: today) ?? today
+        return (0..<7).map { offset in
+            let day = calendar.date(byAdding: .day, value: offset, to: start) ?? start
+            let total = mainFoodLogsInRange
+                .filter { calendar.isDate($0.date, inSameDayAs: day) }
+                .reduce(0) { $0 + FeedStockCalculator.effectiveMainFoodAmount(for: $1, pet: pet) }
+            return OhanaMinimalChartPoint(
+                date: day,
+                value: total,
+                label: calendar.isDateInToday(day) ? l.tr(zh: "今", en: "T", de: "H") : day.formatted(.dateTime.weekday(.narrow))
+            )
+        }
+    }
+
+    private var guidedFeedDockItems: [FeedDiscoveryDockItem] {
+        [
+            FeedDiscoveryDockItem(
+                id: "stock",
+                icon: "shippingbox.fill",
+                title: l.tr(zh: "粮仓", en: "Stock", de: "Vorrat"),
+                value: stockCardValue,
+                tint: stockTint
+            ) {
+                openRootFeedSheet(.stockOverview)
+            },
+            FeedDiscoveryDockItem(
+                id: "treat",
+                icon: "birthday.cake.fill",
+                title: l.tr(zh: "零食", en: "Treats", de: "Snacks"),
+                value: todayTreatCount > 0 ? "\(todayTreatCount)x" : "--",
+                tint: treatTint
+            ) {
+                openRootFeedSheet(.treatOverview)
+            },
+            FeedDiscoveryDockItem(
+                id: "history",
+                icon: "clock.arrow.circlepath",
+                title: l.tr(zh: "历史", en: "History", de: "Verlauf"),
+                value: feedModeShortTitle(activeFeedingMode),
+                tint: feedingModeTint
+            ) {
+                if activeFeedingMode == .manual {
+                    openRootFeedSheet(.history)
+                } else {
+                    openRootFeedSheet(.feedModeHistory)
+                }
+            },
+            FeedDiscoveryDockItem(
+                id: "manage",
+                icon: "slider.horizontal.3",
+                title: l.tr(zh: "管理", en: "Manage", de: "Verwalten"),
+                value: feedModeShortTitle(activeFeedingMode),
+                tint: Color.goPrimary
+            ) {
+                openFeedSheet(.manage)
+            }
+        ]
+    }
+
+    private var todayTreatCount: Int {
+        dashboard.recentFeedLogs.filter { FeedLogMetadata.isTreatLog($0) }.count
+    }
+
     private var feedingHeroCard: some View {
         let today = dashboard.today
         return HStack(spacing: 16) {
@@ -829,23 +1091,6 @@ struct QuickFeedDetailSheet: View {
         .feedFlatBlockSurface(cornerRadius: 22)
     }
 
-    private var removeQuickActionFooter: some View {
-        VStack(spacing: 12) {
-            Divider().opacity(0.3)
-            Button(role: .destructive) {
-                onRemove()
-                dismiss()
-            } label: {
-                Text(l.tr(zh: "移除此快捷入口", en: "Remove this quick action", de: "Schnellaktion entfernen"))
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.goRed)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-            }
-            .buttonStyle(ScaleButtonStyle())
-        }
-    }
-
     private var toastView: some View {
         VStack {
             Spacer()
@@ -909,6 +1154,15 @@ struct QuickFeedDetailSheet: View {
                 }
                 if isSettingsOnly || dashboard.nextManualReminder == nil {
                     manualFoodKindSelector
+                }
+                if !isSettingsOnly, dashboard.nextManualReminder == nil, sameSpeciesFeedPets.count > 1 {
+                    SharedCareTargetPicker(
+                        title: l.tr(zh: "共同照护", en: "Shared care", de: "Gemeinsam"),
+                        subtitle: "\(selectedFeedTargets.count)只\(pet.species)",
+                        pets: sameSpeciesFeedPets,
+                        selectedPetIds: $selectedSharedFeedPetIds,
+                        tint: mainFoodTint
+                    )
                 }
                 manualGramInput(
                     title: l.tr(zh: "克数", en: "Grams", de: "Gramm"),
@@ -1011,6 +1265,15 @@ struct QuickFeedDetailSheet: View {
                         : l.tr(zh: "不提醒、不等待确认；App 打开或进入本页时会自动补记并扣余粮。", en: "No reminder or confirmation. The app backfills due meals and deducts stock.", de: "Keine Erinnerung. Fällige Mahlzeiten werden automatisch eingetragen."),
                     tint: tint
                 )
+                if sameSpeciesFeedPets.count > 1 {
+                    SharedCareTargetPicker(
+                        title: l.tr(zh: "目标宠物", en: "Pets", de: "Tiere"),
+                        subtitle: "\(selectedPlanTargets.count)只\(pet.species)",
+                        pets: sameSpeciesFeedPets,
+                        selectedPetIds: $selectedSharedPlanPetIds,
+                        tint: tint
+                    )
+                }
 
                 HStack(spacing: 12) {
                     planStepperCard(
@@ -1067,7 +1330,7 @@ struct QuickFeedDetailSheet: View {
             .padding(.bottom, hasExistingPlan ? 126 : 78)
             .ohanaAdaptiveSheetContentHeight(
                 $adaptiveSheetHeight,
-                minHeight: 620,
+                minHeight: sameSpeciesFeedPets.count > 1 ? 690 : 620,
                 maxHeight: 860,
                 chromePadding: 70
             )
@@ -1314,7 +1577,7 @@ struct QuickFeedDetailSheet: View {
             }
 
             Button {
-                GoKeyboard.dismiss()
+                dismissSystemFeedKeyboardIfNeeded()
                 focusedField = nil
                 withAnimation(GoMotion.feedback) {
                     stockExpenseAmountKeypadVisible.toggle()
@@ -1635,6 +1898,22 @@ struct QuickFeedDetailSheet: View {
     private var manageSheet: some View {
         VStack(alignment: .leading, spacing: 16) {
             sheetHero(icon: "slider.horizontal.3", title: l.tr(zh: "管理", en: "Manage", de: "Verwalten"), tint: Color.goPrimary)
+            VStack(alignment: .leading, spacing: 10) {
+                Text(l.tr(zh: "模式", en: "Mode", de: "Modus"))
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                feedModeSelector
+            }
+            .padding(12)
+            .feedFlatBlockSurface(cornerRadius: 18)
+            manageRow(
+                icon: "fork.knife",
+                title: l.tr(zh: "默认粮种 / 克数", en: "Default food / grams", de: "Standardfutter / Gramm"),
+                value: pet.dailyPortionGrams > 0 ? "\(pet.mainFoodKind.title(l)) · \(formattedFoodWeight(pet.dailyPortionGrams))" : l.tr(zh: "待设置", en: "Not set", de: "Nicht gesetzt"),
+                tint: mainFoodTint
+            ) {
+                openManualFeedSheet(settingsOnly: true)
+            }
             manageRow(
                 icon: FeedRuleKind.manualReminder.iconName,
                 title: l.tr(zh: "喂食计划", en: "Feeding plan", de: "Fütterungsplan"),
@@ -1673,7 +1952,7 @@ struct QuickFeedDetailSheet: View {
         .ohanaAdaptiveSheetContentHeight(
             $adaptiveSheetHeight,
             minHeight: 300,
-            maxHeight: 460,
+            maxHeight: 580,
             chromePadding: 66
         )
         .navigationTitle(l.tr(zh: "管理", en: "Manage", de: "Verwalten"))
@@ -2222,11 +2501,10 @@ struct QuickFeedDetailSheet: View {
 
     private var stockOverviewSheet: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                overviewRangePicker(tint: stockTint)
+            VStack(alignment: .leading, spacing: 14) {
+                stockOverviewStatusStrip
                 stockSnapshotCard(foodKind: .dry, tint: dryFoodTint)
                 stockSnapshotCard(foodKind: .wet, tint: wetFoodTint)
-                overviewStockChart
                 HStack(spacing: 10) {
                     FoodPrimaryButton(title: l.tr(zh: "补粮", en: "Restock", de: "Nachfüllen"), icon: "plus", tint: stockTint) {
                         prepareStockSheet()
@@ -2245,15 +2523,7 @@ struct QuickFeedDetailSheet: View {
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
-                overviewSectionHeader(l.tr(zh: "补粮记录", en: "Restock history", de: "Nachfüllungen"))
-                let records = Array(pet.foodRecords.sorted { $0.startDate > $1.startDate }.prefix(8))
-                if records.isEmpty {
-                    emptyInlineState(icon: "shippingbox", text: l.tr(zh: "补粮后会显示在这里", en: "Restocks appear here", de: "Nachfüllungen erscheinen hier"))
-                } else {
-                    ForEach(records) { record in
-                        foodRecordRow(record)
-                    }
-                }
+                stockOverviewRestockSection
             }
             .padding(20)
         }
@@ -2263,25 +2533,9 @@ struct QuickFeedDetailSheet: View {
 
     private var treatOverviewSheet: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 14) {
                 overviewRangePicker(tint: treatTint)
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    overviewMetric(
-                        title: selectedTreatOverviewKind == nil
-                            ? l.tr(zh: "今日零食", en: "Treats today", de: "Snacks heute")
-                            : l.tr(zh: "今日克数", en: "Grams today", de: "Gramm heute"),
-                        value: filteredTreatGramsToday > 0 ? formattedFoodWeight(filteredTreatGramsToday) : "--",
-                        icon: "scalemass.fill",
-                        tint: treatTint
-                    )
-                    overviewMetric(
-                        title: l.tr(zh: "今日次数", en: "Count today", de: "Anzahl heute"),
-                        value: "\(filteredTreatLogsToday.count)",
-                        icon: "number.circle.fill",
-                        tint: treatTint
-                    )
-                }
-
+                treatOverviewHero
                 treatKindFilterBar
 
                 treatFrequencyPulseChart(
@@ -2290,21 +2544,16 @@ struct QuickFeedDetailSheet: View {
                     tint: treatTint,
                     emptyText: l.tr(zh: "记录零食后会显示频率", en: "Log treats to see frequency", de: "Snack eintragen, dann erscheint die Frequenz")
                 )
-                overviewSectionHeader(l.tr(zh: "类型", en: "Types", de: "Typen"))
-                if treatTypeSummaries.isEmpty {
-                    emptyInlineState(icon: "birthday.cake", text: l.tr(zh: "还没有零食记录", en: "No treat logs yet", de: "Noch keine Snack-Einträge"))
-                } else {
-                    ForEach(treatTypeSummaries) { summary in
-                        treatSummaryRow(summary)
-                    }
-                }
-                overviewSectionHeader(l.tr(zh: "最近零食", en: "Recent treats", de: "Letzte Snacks"))
-                let logs = Array(filteredTreatLogsInRange.sorted { $0.date > $1.date }.prefix(8))
+
+                let logs = Array(filteredTreatLogsInRange.sorted { $0.date > $1.date }.prefix(4))
                 if logs.isEmpty {
                     emptyInlineState(icon: "birthday.cake", text: l.tr(zh: "还没有零食记录", en: "No treat logs yet", de: "Noch keine Snack-Einträge"))
                 } else {
+                    Text(l.tr(zh: "最近", en: "Recent", de: "Zuletzt"))
+                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
                     ForEach(logs) { log in
-                        feedLogRow(log, compact: false)
+                        feedLogRow(log, compact: true)
                     }
                 }
             }
@@ -2836,7 +3085,7 @@ struct QuickFeedDetailSheet: View {
     }
 
     private func openFeedNumberPad(_ field: FeedInputField) {
-        GoKeyboard.dismiss()
+        dismissSystemFeedKeyboardIfNeeded()
         stockExpenseAmountKeypadVisible = false
         withAnimation(GoMotion.feedback) {
             focusedField = focusedField == field ? nil : field
@@ -3268,42 +3517,13 @@ struct QuickFeedDetailSheet: View {
                     .frame(maxWidth: .infinity, minHeight: 150)
             } else {
                 let yDomain = OhanaChartStyle.yDomain(values: points.map(\.value), includeZero: true)
-                let renderedPoints = points.map {
-                    FeedOverviewChartPoint(date: $0.date, value: $0.value * overviewChartProgress)
-                }
-                Chart(renderedPoints) { point in
-                    AreaMark(
-                        x: .value(l.tr(zh: "日期", en: "Date", de: "Datum"), point.date, unit: .day),
-                        y: .value(l.tr(zh: "克数", en: "Grams", de: "Gramm"), point.value)
-                    )
-                    .foregroundStyle(OhanaChartStyle.areaGradient(for: tint, topOpacity: 0.26))
-                    .interpolationMethod(OhanaChartStyle.trendInterpolation)
-
-                    LineMark(
-                        x: .value(l.tr(zh: "日期", en: "Date", de: "Datum"), point.date, unit: .day),
-                        y: .value(l.tr(zh: "克数", en: "Grams", de: "Gramm"), point.value)
-                    )
-                    .foregroundStyle(tint)
-                    .lineStyle(OhanaChartStyle.trendLineStyle)
-                    .interpolationMethod(OhanaChartStyle.trendInterpolation)
-                }
-                .chartYScale(domain: yDomain)
-                .chartYAxis {
-                    AxisMarks(values: .automatic(desiredCount: 3)) { _ in
-                        AxisGridLine().foregroundStyle(Color.ohanaDivider)
-                        AxisValueLabel()
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                    }
-                }
-                .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: overviewRange == .days7 ? 7 : 5)) { _ in
-                        AxisValueLabel()
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                    }
-                }
-                .frame(height: 172)
+                OhanaMinimalTrendChart(
+                    points: points.map { OhanaMinimalChartPoint(date: $0.date, value: $0.value) },
+                    yDomain: yDomain,
+                    tint: tint,
+                    progress: overviewChartProgress
+                )
+                .frame(height: 136)
                 .animation(GoMotion.page, value: overviewChartProgress)
             }
         }
@@ -3348,12 +3568,7 @@ struct QuickFeedDetailSheet: View {
                     .frame(maxWidth: .infinity, minHeight: 118)
             } else {
                 let total = points.reduce(0) { $0 + $1.value }
-                let maxCount = max(1, points.map(\.value).max() ?? 1)
                 let average = total / Double(max(points.count, 1))
-                let yDomain = 0...(maxCount + 1)
-                let renderedPoints = points.map {
-                    FeedOverviewChartPoint(date: $0.date, value: $0.value * overviewChartProgress)
-                }
                 HStack(spacing: 8) {
                     Text(l.tr(
                         zh: "总 \(Int(total)) 次",
@@ -3369,34 +3584,14 @@ struct QuickFeedDetailSheet: View {
                 .font(.system(size: 11, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
 
-                Chart(renderedPoints) { point in
-                    BarMark(
-                        x: .value(l.tr(zh: "日期", en: "Date", de: "Datum"), point.date, unit: .day),
-                        y: .value(l.tr(zh: "次数", en: "Count", de: "Anzahl"), point.value)
-                    )
-                    .foregroundStyle(point.value > 0 ? tint : Color.ohanaControlFill)
-                    .cornerRadius(7)
-                }
-                .chartYScale(domain: yDomain)
-                .chartYAxis {
-                    AxisMarks(values: [0, maxCount]) { value in
-                        AxisValueLabel {
-                            if let count = value.as(Double.self) {
-                                Text("\(max(0, Int(count.rounded())))")
-                                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                                    .foregroundStyle(Color.ohanaSecondaryText)
-                            }
-                        }
-                    }
-                }
-                .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: overviewRange == .days7 ? 7 : 5)) { _ in
-                        AxisValueLabel()
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                    }
-                }
-                .frame(height: 132)
+                OhanaMinimalBarChart(
+                    points: points.map { OhanaMinimalChartPoint(date: $0.date, value: $0.value) },
+                    tint: tint,
+                    progress: overviewChartProgress,
+                    showsLabels: overviewRange == .days7,
+                    maxBarHeight: 86
+                )
+                .frame(height: overviewRange == .days7 ? 116 : 96)
                 .opacity(0.40 + overviewChartProgress * 0.60)
                 .scaleEffect(x: 1, y: 0.96 + overviewChartProgress * 0.04, anchor: .bottom)
                 .animation(GoMotion.page, value: overviewChartProgress)
@@ -3439,20 +3634,14 @@ struct QuickFeedDetailSheet: View {
                 emptyInlineState(icon: "birthday.cake", text: emptyText)
                     .frame(minHeight: 118)
             } else {
-                HStack(spacing: 8) {
-                    treatFrequencyStat(
-                        l.tr(zh: "总次数", en: "Total", de: "Gesamt"),
-                        "\(total)"
-                    )
-                    treatFrequencyStat(
-                        l.tr(zh: "有零食天", en: "Snack days", de: "Snacktage"),
-                        "\(activeDays)"
-                    )
-                    treatFrequencyStat(
-                        l.tr(zh: "最高/天", en: "Peak/day", de: "Max/Tag"),
-                        "\(maxCount)"
-                    )
-                }
+                Text(l.tr(
+                    zh: "\(total) 次 · \(activeDays) 天有零食 · 峰值 \(maxCount)",
+                    en: "\(total)x · \(activeDays) snack days · peak \(maxCount)",
+                    de: "\(total)x · \(activeDays) Snacktage · Spitze \(maxCount)"
+                ))
+                .font(.system(size: 11, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .contentTransition(.numericText())
 
                 GeometryReader { proxy in
                     let spacing: CGFloat = overviewRange == .days7 ? 7 : (overviewRange == .days30 ? 4 : 2)
@@ -3486,24 +3675,6 @@ struct QuickFeedDetailSheet: View {
             }
         }
         .padding(.vertical, 2)
-    }
-
-    private func treatFrequencyStat(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.system(size: 10, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaTertiaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-            Text(value)
-                .font(.system(size: 18, weight: .black, design: .rounded))
-                .foregroundStyle(treatTint)
-                .contentTransition(.numericText())
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .feedFlatBlockSurface(cornerRadius: 16)
     }
 
     private func treatFrequencyAccessibilityText(_ point: FeedOverviewChartPoint) -> String {
@@ -3550,6 +3721,172 @@ struct QuickFeedDetailSheet: View {
         }
         .padding(14)
         .feedFlatBlockSurface(cornerRadius: 20)
+    }
+
+    private var stockOverviewStatusStrip: some View {
+        let dry = dashboard.stock(foodKind: .dry)
+        let wet = dashboard.stock(foodKind: .wet)
+        let activeCount = [
+            FeedStockCalculator.activeStockRecord(for: pet, foodKind: .dry, foodRecords: observedFoodRecords),
+            FeedStockCalculator.activeStockRecord(for: pet, foodKind: .wet, foodRecords: observedFoodRecords)
+        ].compactMap { $0 }.count
+        let pendingCount = stockOverviewRecords.filter { FeedStockCalculator.stockOpenDay(for: $0) > Calendar.current.startOfDay(for: Date()) }.count
+        let days = [dry, wet].filter { $0.totalGrams > 0 && $0.remainingDays > 0 }.map(\.remainingDays).min()
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .lastTextBaseline, spacing: 8) {
+                Text(days.map { "\($0)d" } ?? "--")
+                    .font(.system(size: 34, weight: .black, design: .rounded))
+                    .foregroundStyle(stockOverviewStatusTint(dry: dry, wet: wet))
+                    .contentTransition(.numericText())
+                Text(l.tr(zh: "预计可用", en: "estimated", de: "geschätzt"))
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                Spacer()
+                Text(stockOverviewStatusText(dry: dry, wet: wet))
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(stockOverviewStatusTint(dry: dry, wet: wet))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(stockOverviewStatusTint(dry: dry, wet: wet), in: Capsule())
+                    .foregroundStyle(Color.arkInk)
+            }
+
+            HStack(spacing: 8) {
+                stockOverviewMetric(
+                    title: l.tr(zh: "开袋中", en: "Open", de: "Offen"),
+                    value: "\(activeCount)",
+                    icon: "shippingbox.fill"
+                )
+                stockOverviewMetric(
+                    title: l.tr(zh: "待开袋", en: "Pending", de: "Wartend"),
+                    value: "\(pendingCount)",
+                    icon: "clock.fill"
+                )
+                stockOverviewMetric(
+                    title: l.tr(zh: "提醒", en: "Alert", de: "Alarm"),
+                    value: pet.foodReminderEnabled ? l.tr(zh: "开", en: "On", de: "Ein") : l.tr(zh: "关", en: "Off", de: "Aus"),
+                    icon: pet.foodReminderEnabled ? "bell.badge.fill" : "bell.slash.fill"
+                )
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func stockOverviewMetric(title: String, value: String, icon: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .black))
+                .foregroundStyle(stockTint)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(value)
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
+                Text(title)
+                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var stockOverviewRestockSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                overviewSectionHeader(l.tr(zh: "补粮记录", en: "Restocks", de: "Nachfüllungen"))
+                Spacer()
+                Text("\(stockOverviewRecords.count)")
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(stockTint)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(Color.ohanaControlFill, in: Capsule())
+            }
+
+            if stockOverviewRecords.isEmpty {
+                emptyInlineState(
+                    icon: "shippingbox",
+                    text: l.tr(zh: "补粮后会显示每袋粮的购买、开袋和使用状态", en: "Restocks show purchase, open date, and status.", de: "Nachfüllungen zeigen Kauf, Öffnung und Status.")
+                )
+            } else {
+                ForEach(stockOverviewRecords.prefix(6)) { record in
+                    stockOverviewRecordCard(record)
+                }
+            }
+        }
+    }
+
+    private var stockOverviewRecords: [PetFoodRecord] {
+        observedFoodRecords.sorted { lhs, rhs in
+            if lhs.startDate != rhs.startDate { return lhs.startDate > rhs.startDate }
+            return (lhs.purchaseDate ?? lhs.startDate) > (rhs.purchaseDate ?? rhs.startDate)
+        }
+    }
+
+    private func stockOverviewRecordCard(_ record: PetFoodRecord) -> some View {
+        let total = FeedStockCalculator.activeStockTotalGrams(for: pet, record: record, foodKind: record.foodKind)
+        let activeRecord = FeedStockCalculator.activeStockRecord(for: pet, foodKind: record.foodKind, foodRecords: observedFoodRecords)
+        let isActive = activeRecord?.id == record.id
+        let isPending = FeedStockCalculator.stockOpenDay(for: record) > Calendar.current.startOfDay(for: Date())
+        let statusTint = isActive ? stockTint : (isPending ? Color.goYellow : Color.ohanaSecondaryText)
+        let statusText = isActive
+            ? l.tr(zh: "使用中", en: "Active", de: "Aktiv")
+            : (isPending ? l.tr(zh: "待开袋", en: "Pending", de: "Wartend") : l.tr(zh: "历史", en: "Past", de: "Verlauf"))
+
+        return Button {
+            prepareStockSheet(record: record)
+            openFeedSheet(.stock)
+            UISelectionFeedbackGenerator().selectionChanged()
+        } label: {
+            HStack(spacing: 12) {
+                VStack(spacing: 4) {
+                    Image(systemName: record.foodKind.systemIconName)
+                        .font(.system(size: 15, weight: .black))
+                        .foregroundStyle(Color.arkInk)
+                    Text(record.foodKind == .dry ? "DRY" : "WET")
+                        .font(.system(size: 8, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.arkInk.opacity(0.72))
+                }
+                .frame(width: 44, height: 48)
+                .background(foodKindTint(record.foodKind), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 6) {
+                        Text(record.brand.isEmpty ? l.tr(zh: "未命名主粮", en: "Food", de: "Futter") : record.brand)
+                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .lineLimit(1)
+                        Text(statusText)
+                            .font(.system(size: 10, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.arkInk)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 4)
+                            .background(statusTint, in: Capsule())
+                    }
+                    Text(stockRecordDateSummary(record))
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 8)
+
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(total > 0 ? formattedStockWeight(total) : "--")
+                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .foregroundStyle(foodKindTint(record.foodKind))
+                    Image(systemName: "pencil")
+                        .font(.system(size: 11, weight: .black))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
+            }
+            .padding(12)
+            .feedFlatBlockSurface(cornerRadius: 18)
+        }
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private var autoFeederOverviewCard: some View {
@@ -3639,58 +3976,20 @@ struct QuickFeedDetailSheet: View {
                     .frame(maxWidth: .infinity, minHeight: 150)
             } else {
                 let yDomain = OhanaChartStyle.yDomain(values: points.map(\.value), includeZero: true, paddingRatio: 0.10, minimumSpan: 100)
-                let dateLabel = l.tr(zh: "日期", en: "Date", de: "Datum")
-                let remainingLabel = l.tr(zh: "余量", en: "Remaining", de: "Rest")
-                let kindLabel = l.tr(zh: "种类", en: "Kind", de: "Art")
-                let renderedPoints = points.map {
-                    FeedStockTrendPoint(
-                        date: $0.date,
-                        value: $0.value * overviewChartProgress,
-                        foodKind: $0.foodKind
-                    )
-                }
-                let latestPoints = latestStockTrendPoints(from: renderedPoints)
-                Chart {
-                    ForEach(renderedPoints) { point in
-                        LineMark(
-                            x: .value(dateLabel, point.date, unit: .day),
-                            y: .value(remainingLabel, point.value),
-                            series: .value(kindLabel, point.foodKind.rawValue)
+                OhanaMinimalMultiTrendChart(
+                    series: FeedFoodKind.allCases.map { foodKind in
+                        OhanaMinimalLineSeries(
+                            id: foodKind.rawValue,
+                            points: points
+                                .filter { $0.foodKind == foodKind }
+                                .map { OhanaMinimalChartPoint(date: $0.date, value: $0.value) },
+                            tint: foodKindTint(foodKind)
                         )
-                        .foregroundStyle(foodKindTint(point.foodKind))
-                        .lineStyle(OhanaChartStyle.trendLineStyle)
-                        .interpolationMethod(.linear)
-                    }
-                    ForEach(latestPoints) { point in
-                        PointMark(
-                            x: .value(dateLabel, point.date, unit: .day),
-                            y: .value(remainingLabel, point.value)
-                        )
-                        .foregroundStyle(foodKindTint(point.foodKind))
-                        .symbolSize(34)
-                    }
-                }
-                .chartYScale(domain: yDomain)
-                .chartYAxis {
-                    AxisMarks(values: .automatic(desiredCount: 4)) { value in
-                        AxisGridLine().foregroundStyle(Color.ohanaDivider)
-                        AxisValueLabel {
-                            if let grams = value.as(Double.self) {
-                                Text(formattedStockAxisWeight(grams))
-                                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                                    .foregroundStyle(Color.ohanaSecondaryText)
-                            }
-                        }
-                    }
-                }
-                .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: overviewRange == .days7 ? 7 : 5)) { _ in
-                        AxisValueLabel()
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                    }
-                }
-                .frame(height: 172)
+                    },
+                    yDomain: yDomain,
+                    progress: overviewChartProgress
+                )
+                .frame(height: 132)
                 .opacity(0.35 + overviewChartProgress * 0.65)
                 .scaleEffect(x: 1, y: 0.96 + overviewChartProgress * 0.04, anchor: .bottom)
                 .animation(GoMotion.page, value: overviewChartProgress)
@@ -3735,55 +4034,70 @@ struct QuickFeedDetailSheet: View {
             .padding(.top, 2)
     }
 
-    private var treatKindFilterBar: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    treatFilterChip(
-                        title: l.tr(zh: "全部", en: "All", de: "Alle"),
-                        icon: "square.grid.2x2.fill",
-                        count: treatLogsInRange.count,
-                        isSelected: selectedTreatOverviewKind == nil
-                    ) {
-                        selectedTreatOverviewKind = nil
-                    }
+    private var treatOverviewHero: some View {
+        let selectedTitle = selectedTreatOverviewKind?.title(l) ?? l.tr(zh: "全部零食", en: "All treats", de: "Alle Snacks")
+        let count = filteredTreatLogsToday.count
+        let gramsText = filteredTreatGramsToday > 0 ? formattedFoodWeight(filteredTreatGramsToday) : "--"
 
-                    ForEach(FeedTreatKind.allCases) { kind in
-                        let count = treatLogsInRange.filter { ($0.treatKind ?? .other) == kind }.count
-                        treatFilterChip(
-                            title: kind.title(l),
-                            icon: kind.systemIconName,
-                            count: count,
-                            isSelected: selectedTreatOverviewKind == kind
-                        ) {
-                            selectedTreatOverviewKind = kind
-                        }
-                    }
-                }
-                .padding(.horizontal, 1)
+        return HStack(alignment: .center, spacing: 14) {
+            Image(systemName: selectedTreatOverviewKind?.systemIconName ?? "birthday.cake.fill")
+                .font(.system(size: 22, weight: .black))
+                .foregroundStyle(treatTint)
+                .frame(width: 42, height: 42)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(selectedTitle)
+                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
+                Text(treatLastSeenText(lastTreatDate(for: selectedTreatOverviewKind)))
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(1)
             }
 
-            HStack(spacing: 10) {
-                Image(systemName: selectedTreatOverviewKind?.systemIconName ?? "clock.fill")
-                    .font(.system(size: 13, weight: .black))
-                    .foregroundStyle(Color.arkInk)
-                    .frame(width: 30, height: 30)
-                    .background(treatTint, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(selectedTreatOverviewKind?.title(l) ?? l.tr(zh: "全部零食", en: "All treats", de: "Alle Snacks"))
-                        .font(.system(size: 13, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(treatLastSeenText(lastTreatDate(for: selectedTreatOverviewKind)))
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                }
-                Spacer()
-                Text(l.tr(zh: "上次", en: "Last", de: "Zuletzt"))
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 3) {
+                Text("\(count)")
+                    .font(.system(size: 34, weight: .black, design: .rounded))
                     .foregroundStyle(treatTint)
+                    .contentTransition(.numericText())
+                Text(l.tr(zh: "今日 · \(gramsText)", en: "Today · \(gramsText)", de: "Heute · \(gramsText)"))
+                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
             }
-            .padding(12)
-            .feedFlatBlockSurface(cornerRadius: 18)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var treatKindFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                treatFilterChip(
+                    title: l.tr(zh: "全部", en: "All", de: "Alle"),
+                    icon: "square.grid.2x2.fill",
+                    count: treatLogsInRange.count,
+                    isSelected: selectedTreatOverviewKind == nil
+                ) {
+                    selectedTreatOverviewKind = nil
+                }
+
+                ForEach(FeedTreatKind.allCases) { kind in
+                    let count = treatLogsInRange.filter { ($0.treatKind ?? .other) == kind }.count
+                    treatFilterChip(
+                        title: kind.title(l),
+                        icon: kind.systemIconName,
+                        count: count,
+                        isSelected: selectedTreatOverviewKind == kind
+                    ) {
+                        selectedTreatOverviewKind = kind
+                    }
+                }
+            }
+            .padding(.horizontal, 1)
         }
     }
 
@@ -3818,43 +4132,6 @@ struct QuickFeedDetailSheet: View {
         .buttonStyle(ScaleButtonStyle())
         .disabled(count == 0 && !isSelected)
         .opacity(count == 0 && !isSelected ? 0.42 : 1)
-    }
-
-    private func treatSummaryRow(_ summary: FeedTreatKindSummary) -> some View {
-        Button {
-            withAnimation(GoMotion.feedback) {
-                selectedTreatOverviewKind = summary.kind
-            }
-            UISelectionFeedbackGenerator().selectionChanged()
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: summary.icon)
-                    .font(.system(size: 14, weight: .black))
-                    .foregroundStyle(Color.arkInk)
-                    .frame(width: 36, height: 36)
-                    .background(treatTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(summary.title)
-                        .font(.system(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(treatLastSeenText(summary.latestDate))
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(summary.count)")
-                        .font(.system(size: 16, weight: .black, design: .rounded))
-                        .foregroundStyle(treatTint)
-                    Text(l.tr(zh: "次", en: "logs", de: "Einträge"))
-                        .font(.system(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaTertiaryText)
-                }
-            }
-        }
-        .padding(12)
-        .feedFlatBlockSurface(cornerRadius: 18)
-        .buttonStyle(ScaleButtonStyle())
     }
 
     private func lastTreatDate(for kind: FeedTreatKind?) -> Date? {
@@ -3910,19 +4187,13 @@ struct QuickFeedDetailSheet: View {
     }
 
     private func avatarView(size: CGFloat) -> some View {
-        ZStack {
-            Circle().fill(themeColor.opacity(0.16))
-            if let data = pet.avatarImageData, let image = UIImage(data: data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .clipShape(Circle())
-            } else {
-                Text(pet.avatarEmoji)
-                    .font(.system(size: size * 0.48))
-            }
-        }
-        .frame(width: size, height: size)
+        PetAvatarPortraitView(
+            imageData: pet.avatarImageData,
+            fallbackText: pet.avatarEmoji,
+            themeColor: themeColor,
+            size: size,
+            backgroundOpacity: 0.16
+        )
     }
 
     // MARK: - Actions
@@ -3982,6 +4253,32 @@ struct QuickFeedDetailSheet: View {
         }
     }
 
+    private func handleGuidedFeedPrimaryTap() {
+        guard !pet.hasPassedAway else {
+            openRootFeedSheet(.feedingOverview)
+            return
+        }
+
+        switch activeFeedingMode {
+        case .manual:
+            if pet.dailyPortionGrams > 0 {
+                handleFeedPrimaryTap()
+            } else {
+                openManualFeedSheet(settingsOnly: true)
+            }
+        case .manualReminder:
+            if dashboard.nextManualReminder != nil {
+                completeNextPlannedFeed()
+            } else {
+                openFeedModeHistory()
+            }
+        case .autoFeeder:
+            materializeAutoFeedLogs()
+            reloadFeedSnapshots()
+            openFeedModeHistory()
+        }
+    }
+
     private func handleFeedSettingsTap() {
         guard !pet.hasPassedAway else {
             openRootFeedSheet(.feedingOverview)
@@ -3998,10 +4295,6 @@ struct QuickFeedDetailSheet: View {
     }
 
     private func bootstrap() {
-        if !pet.hasPassedAway {
-            materializeAutoFeedLogs()
-            ensureUpcomingPlanReminders()
-        }
         if manualGramsText.isEmpty, let grams = currentPortionAmount {
             manualGramsText = String(format: "%.0f", grams)
         }
@@ -4015,10 +4308,22 @@ struct QuickFeedDetailSheet: View {
         stockReminderEnabled = pet.foodReminderEnabled
         stockReminderAdvanceDays = pet.foodReminderAdvanceDays
         reloadFeedSnapshots()
+
+        if !didScheduleBootstrapMaintenance {
+            didScheduleBootstrapMaintenance = true
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 220_000_000)
+                guard !pet.hasPassedAway else { return }
+                materializeAutoFeedLogs()
+                ensureUpcomingPlanReminders()
+                reloadFeedSnapshots()
+            }
+        }
+
         if opensManualSheetOnAppear && !didApplyInitialSheet {
             didApplyInitialSheet = true
             Task { @MainActor in
-                prepareManualSheet()
+                prepareManualSheet(settingsOnly: pet.dailyPortionGrams <= 0)
                 openFeedSheet(.manual)
             }
         }
@@ -4028,6 +4333,9 @@ struct QuickFeedDetailSheet: View {
         inputError = nil
         manualFeedSheetMode = settingsOnly ? .settingsOnly : .log
         manualFoodKindDraft = pet.mainFoodKind
+        selectedSharedFeedPetIds = settingsOnly
+            ? Set([pet.id])
+            : Set(sameSpeciesFeedPets.map(\.id))
         if let grams = currentPortionAmount ?? (defaultFeedGrams > 0 ? defaultFeedGrams : nil) {
             manualGramsText = String(format: "%.0f", grams)
         } else {
@@ -4087,6 +4395,7 @@ struct QuickFeedDetailSheet: View {
     private func openPlanEditor(_ kind: FeedRuleKind) {
         inputError = nil
         let events = FeedingPlanWriter.planEvents(pet: pet, kind: kind, allEvents: allEvents)
+        selectedSharedPlanPetIds = Set(sameSpeciesFeedPets.map(\.id))
         if events.isEmpty {
             planCount = 3
             let grams = currentPortionAmount ?? 50
@@ -4148,16 +4457,32 @@ struct QuickFeedDetailSheet: View {
                 pet.dailyPortionGrams = grams
                 defaultFeedGrams = grams
             }
-            _ = CareEventService.recordManualFeed(
-                pet: pet,
-                amountGrams: grams,
-                context: modelContext,
-                executorId: currentUserId,
-                quality: quality,
-                foodKind: foodKind
-            )
+            let targets = selectedFeedTargets
+            if targets.count > 1 {
+                _ = CareEventService.recordSharedManualFeed(
+                    sourcePet: pet,
+                    targets: targets,
+                    totalGrams: grams,
+                    foodKind: foodKind,
+                    context: modelContext,
+                    executorId: currentUserId,
+                    quality: quality
+                )
+            } else {
+                _ = CareEventService.recordManualFeed(
+                    pet: pet,
+                    amountGrams: grams,
+                    context: modelContext,
+                    executorId: currentUserId,
+                    quality: quality,
+                    foodKind: foodKind
+                )
+            }
             triggerFeedCheckInFeedback(foodKind: foodKind, grams: grams, affectsStock: hadStock)
-            afterFoodLogSaved(message: l.tr(zh: "已记录\(foodKind.title(l))", en: "\(foodKind.title(l)) saved", de: "\(foodKind.title(l)) gespeichert"), tint: mainFoodTint)
+            let message = targets.count > 1
+                ? l.tr(zh: "共同喂食 · \(targets.count)只", en: "Shared feeding · \(targets.count)", de: "Gemeinsam gefüttert · \(targets.count)")
+                : l.tr(zh: "已记录\(foodKind.title(l))", en: "\(foodKind.title(l)) saved", de: "\(foodKind.title(l)) gespeichert")
+            afterFoodLogSaved(message: message, tint: mainFoodTint)
         }
         performWithAntiRepeat(action)
     }
@@ -4231,27 +4556,46 @@ struct QuickFeedDetailSheet: View {
             return
         }
         let draft = FeedPlanDraft(kind: kind, meals: normalizedMeals)
-        let result = FeedingPlanWriter.replacePlan(
-            pet: pet,
-            draft: draft,
-            allEvents: allEvents,
-            context: modelContext
-        )
-        let mergedEvents = eventsReplacingFeedRules(kind: kind, with: result.events)
+        let targets = selectedPlanTargets
+        var createdReminders: [Reminder] = []
+        var latestEvents = targets.count > 1 ? latestAllEvents() : allEvents
+
+        for target in targets {
+            let result = FeedingPlanWriter.replacePlan(
+                pet: target,
+                draft: draft,
+                allEvents: latestEvents,
+                context: modelContext
+            )
+            latestEvents = latestEvents
+                .filter { existing in
+                    !(FeedRuleMetadata.isManualReminderEvent(existing, pet: target) ||
+                      FeedRuleMetadata.isAutoFeederEvent(existing, pet: target))
+                } + result.events
+            HomeFeedRecordMode.set(target.id, mode: .planned)
+
+            if kind == .manualReminder {
+                createdReminders.append(contentsOf: result.reminders)
+            } else {
+                _ = FeedAutoLogMaterializer.materializeDueLogs(pet: target, allEvents: latestEvents, context: modelContext)
+            }
+            scheduleStockReminders(FeedingPlanWriter.rebuildFoodStockReminders(pet: target, allEvents: latestEvents, context: modelContext))
+        }
+
         if kind == .manualReminder {
-            scheduleReminders(result.reminders)
-            scheduleStockReminders(FeedingPlanWriter.rebuildFoodStockReminders(pet: pet, allEvents: mergedEvents, context: modelContext))
-        } else {
-            _ = FeedAutoLogMaterializer.materializeDueLogs(pet: pet, allEvents: mergedEvents, context: modelContext)
-            scheduleStockReminders(FeedingPlanWriter.rebuildFoodStockReminders(pet: pet, allEvents: mergedEvents, context: modelContext))
+            scheduleReminders(createdReminders)
         }
         reloadFeedSnapshots()
         closeActiveFeedSheet()
         setActiveFeedMode(kind == .manualReminder ? .manualReminder : .autoFeeder)
         triggerToast(
-            kind == .manualReminder
-                ? l.tr(zh: "喂食计划已保存", en: "Plan saved", de: "Plan gespeichert")
-                : l.tr(zh: "自动记录已保存", en: "Auto feeder saved", de: "Automat gespeichert"),
+            targets.count > 1
+                ? (kind == .manualReminder
+                   ? l.tr(zh: "共同计划已保存 · \(targets.count)只", en: "Shared plan saved · \(targets.count)", de: "Gemeinsamer Plan · \(targets.count)")
+                   : l.tr(zh: "共同自动记录已保存 · \(targets.count)只", en: "Shared auto saved · \(targets.count)", de: "Gemeinsame Auto-Regel · \(targets.count)"))
+                : (kind == .manualReminder
+                   ? l.tr(zh: "喂食计划已保存", en: "Plan saved", de: "Plan gespeichert")
+                   : l.tr(zh: "自动记录已保存", en: "Auto feeder saved", de: "Automat gespeichert")),
             tint: kind == .manualReminder ? Color.goPurple : Color.goTeal
         )
     }
@@ -4584,10 +4928,10 @@ struct QuickFeedDetailSheet: View {
     private func triggerFeedCheckInFeedback(foodKind: FeedFoodKind, grams: Double, affectsStock: Bool) {
         let tint = foodKindTint(foodKind)
         feedFeedbackMetricId = foodKind.title(l)
-        feedFeedbackToken = CheckInFeedbackToken(kind: .gain, deltaText: "+\(formattedFoodWeight(grams))", tint: tint)
+        feedFeedbackToken = CheckInFeedbackToken(kind: .gain, deltaText: "+\(formattedFoodCardWeight(grams))", tint: tint)
         if affectsStock {
             stockFeedbackKind = foodKind
-            stockFeedbackToken = CheckInFeedbackToken(kind: .loss, deltaText: "-\(formattedFoodWeight(grams))", tint: tint)
+            stockFeedbackToken = CheckInFeedbackToken(kind: .loss, deltaText: "-\(formattedFoodCardWeight(grams))", tint: tint)
         }
         scheduleFeedbackClear()
     }
@@ -4728,9 +5072,14 @@ struct QuickFeedDetailSheet: View {
     }
 
     private func dismissFeedKeyboard() {
+        dismissSystemFeedKeyboardIfNeeded()
         focusedField = nil
         stockExpenseAmountKeypadVisible = false
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+
+    private func dismissSystemFeedKeyboardIfNeeded() {
+        guard focusedField == .stockBrand else { return }
+        GoKeyboard.dismiss()
     }
 
     private var isInlineInputActive: Bool {
@@ -4778,8 +5127,8 @@ struct QuickFeedDetailSheet: View {
     private var feedingCardValue: String {
         switch activeFeedingMode {
         case .manual:
-            if dashboard.todayMainFoodGrams > 0 { return formattedFoodWeight(dashboard.todayMainFoodGrams) }
-            if pet.dailyPortionGrams > 0 { return formattedFoodWeight(pet.dailyPortionGrams) }
+            if dashboard.todayMainFoodGrams > 0 { return formattedFoodCardWeight(dashboard.todayMainFoodGrams) }
+            if pet.dailyPortionGrams > 0 { return formattedFoodCardWeight(pet.dailyPortionGrams) }
             return "--"
         case .manualReminder:
             return dashboard.todayManualPlanCompletionText
@@ -4792,13 +5141,13 @@ struct QuickFeedDetailSheet: View {
         [
             FoodCardMetricLine(
                 title: FeedFoodKind.dry.title(l),
-                value: dashboard.todayDryFoodGrams > 0 ? formattedFoodWeight(dashboard.todayDryFoodGrams) : "--",
+                value: dashboard.todayDryFoodGrams > 0 ? formattedFoodCardWeight(dashboard.todayDryFoodGrams) : "--",
                 tint: dryFoodTint,
                 isCurrent: pet.mainFoodKind == .dry
             ),
             FoodCardMetricLine(
                 title: FeedFoodKind.wet.title(l),
-                value: dashboard.todayWetFoodGrams > 0 ? formattedFoodWeight(dashboard.todayWetFoodGrams) : "--",
+                value: dashboard.todayWetFoodGrams > 0 ? formattedFoodCardWeight(dashboard.todayWetFoodGrams) : "--",
                 tint: wetFoodTint,
                 isCurrent: pet.mainFoodKind == .wet
             )
@@ -4810,9 +5159,9 @@ struct QuickFeedDetailSheet: View {
         case .manual:
             if pet.dailyPortionGrams > 0 {
                 return l.tr(
-                    zh: "\(pet.mainFoodKind.title(l)) · 默认 \(formattedFoodWeight(pet.dailyPortionGrams))",
-                    en: "\(pet.mainFoodKind.title(l)) · default \(formattedFoodWeight(pet.dailyPortionGrams))",
-                    de: "\(pet.mainFoodKind.title(l)) · Standard \(formattedFoodWeight(pet.dailyPortionGrams))"
+                    zh: "\(pet.mainFoodKind.title(l)) · 默认 \(formattedFoodCardWeight(pet.dailyPortionGrams))",
+                    en: "\(pet.mainFoodKind.title(l)) · default \(formattedFoodCardWeight(pet.dailyPortionGrams))",
+                    de: "\(pet.mainFoodKind.title(l)) · Standard \(formattedFoodCardWeight(pet.dailyPortionGrams))"
                 )
             }
             return l.tr(
@@ -5094,6 +5443,31 @@ struct QuickFeedDetailSheet: View {
         if snapshot.remainingGrams <= 0 || snapshot.remainingDays <= 3 { return Color.goRed }
         if snapshot.remainingDays <= 7 { return Color.goYellow }
         return stockTint
+    }
+
+    private func stockOverviewStatusTint(dry: FeedStockSnapshot, wet: FeedStockSnapshot) -> Color {
+        let snapshots = [dry, wet].filter { $0.totalGrams > 0 }
+        guard !snapshots.isEmpty else { return Color.ohanaSecondaryText }
+        if snapshots.contains(where: { $0.remainingGrams <= 0 || $0.remainingDays <= 3 }) { return Color.goRed }
+        if snapshots.contains(where: { $0.remainingDays <= 7 }) { return Color.goYellow }
+        return stockTint
+    }
+
+    private func stockOverviewStatusText(dry: FeedStockSnapshot, wet: FeedStockSnapshot) -> String {
+        let snapshots = [dry, wet].filter { $0.totalGrams > 0 }
+        guard !snapshots.isEmpty else {
+            return l.tr(zh: "未建立", en: "Empty", de: "Leer")
+        }
+        if snapshots.contains(where: { $0.remainingGrams <= 0 }) {
+            return l.tr(zh: "已断粮", en: "Out", de: "Leer")
+        }
+        if snapshots.contains(where: { $0.remainingDays > 0 && $0.remainingDays <= 3 }) {
+            return l.tr(zh: "快补粮", en: "Refill", de: "Nachfüllen")
+        }
+        if snapshots.contains(where: { $0.remainingDays > 0 && $0.remainingDays <= 7 }) {
+            return l.tr(zh: "关注", en: "Watch", de: "Achten")
+        }
+        return l.tr(zh: "稳定", en: "Good", de: "Gut")
     }
 
     private var mainFoodTint: Color {
@@ -5442,28 +5816,6 @@ struct QuickFeedDetailSheet: View {
         FeedFoodKind.allCases.flatMap { stockTrendPoints(for: $0) }
     }
 
-    private var treatTypeSummaries: [FeedTreatKindSummary] {
-        let grouped = Dictionary(grouping: treatLogsInRange) { log in
-            log.treatKind ?? .other
-        }
-        return grouped.map { kind, logs in
-            FeedTreatKindSummary(
-                kind: kind,
-                title: kind.title(l),
-                icon: kind.systemIconName,
-                count: logs.count,
-                grams: logs.reduce(0) { $0 + max(0, $1.amountGrams) },
-                latestDate: logs.map(\.date).max()
-            )
-        }
-        .sorted {
-            if $0.count == $1.count {
-                return ($0.latestDate ?? .distantPast) > ($1.latestDate ?? .distantPast)
-            }
-            return $0.count > $1.count
-        }
-    }
-
     private var currentPortionAmount: Double? {
         if pet.dailyPortionGrams > 0 { return pet.dailyPortionGrams }
         return nil
@@ -5567,6 +5919,10 @@ struct QuickFeedDetailSheet: View {
 
     private func formattedFoodWeight(_ grams: Double) -> String {
         AppMeasurementSystem.formatFoodGrams(grams)
+    }
+
+    private func formattedFoodCardWeight(_ grams: Double) -> String {
+        "\(Int(max(0, grams).rounded()))g"
     }
 
     private func formattedStockWeight(_ grams: Double) -> String {

@@ -262,8 +262,8 @@ struct IslandQuestEngine {
             quests.append(IslandQuest(
                 id: oasisPetWizardQuestId,
                 emoji: needsFirstHuman ? "👤" : "🐾",
-                title: needsFirstHuman ? "迎接第一位家人" : "迎接第一只宠物",
-                subtitle: needsFirstHuman ? "先建立照护者身份" : "让第一位伙伴住进岛屿 · +50🥥",
+                title: needsFirstHuman ? "先建立你的本人档案" : "迎接第一只宠物",
+                subtitle: needsFirstHuman ? "创建主人身份卡" : "让第一位伙伴住进岛屿 · +50🥥",
                 isCompleted: false,
                 targetPetId: nil,
                 targetPlantId: nil
@@ -609,14 +609,14 @@ struct CoconutDropSheet: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.85).ignoresSafeArea()
+            Color.arkInk.opacity(0.85).ignoresSafeArea()
 
             VStack(spacing: 32) {
                 Spacer()
 
                 // 椰子
                 Button {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.5)) {
+                    withAnimation(GoMotion.feedback) {
                         revealed = true
                     }
                     UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
@@ -632,14 +632,14 @@ struct CoconutDropSheet: View {
                                 )
                             )
                             .frame(width: 120, height: 120)
-                            .shadow(color: Color(hex: "A8711A").opacity(0.5), radius: 20, y: 8)
+                            .shadow(color: Color(hex: "A8711A").opacity(0.5), radius: 20, y: 8) // ui-v4: allow reward coconut lift in modal prize reveal.
                             .scaleEffect(bounce ? 1.08 : 1.0)
                             .animation(shouldAnimate ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true) : nil, value: bounce)
 
                         Text(revealed ? reward.emoji : "🥥")
                             .font(.system(size: 52))
                             .scaleEffect(revealed ? 1.3 : 1.0)
-                            .animation(.spring(response: 0.5, dampingFraction: 0.6), value: revealed)
+                            .animation(GoMotion.feedback, value: revealed)
                     }
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -741,9 +741,9 @@ struct DailyQuestsCard: View {
             coconutClaimed = true
             toastMessage = "🥥 今日椰子盲盒已领取！"
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { showRewardToast = true }
+            withAnimation(GoMotion.feedback) { showRewardToast = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
-                withAnimation(.easeOut(duration: 0.3)) { showRewardToast = false }
+                withAnimation(GoMotion.quick) { showRewardToast = false }
             }
         }) {
             CoconutDropSheet(isPresented: $showCoconut)
@@ -755,13 +755,13 @@ struct DailyQuestsCard: View {
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 20).padding(.vertical, 11)
                     .background(Color.goPrimary, in: Capsule())
-                    .shadow(color: Color.goPrimary.opacity(0.45), radius: 12, y: 4)
+                    .shadow(color: Color.goPrimary.opacity(0.45), radius: 12, y: 4) // ui-v4: allow transient reward toast lift.
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .padding(.top, 8)
             }
         }
-        .animation(.spring(response: 0.4), value: allDone)
-        .animation(.spring(response: 0.4), value: coconutClaimed)
+        .animation(GoMotion.feedback, value: allDone)
+        .animation(GoMotion.feedback, value: coconutClaimed)
         // 当完成数量提升时触发回调
         .onChange(of: completedCount) { _, newVal in
             if newVal > lastCompletedCount && lastCompletedCount >= 0 {
@@ -838,7 +838,7 @@ struct DailyQuestsCard: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(coconutClaimed ? "今日盲盒已领取" : "领取今日椰子盲盒！")
                                 .font(.system(size: 14, weight: .bold, design: .rounded))
-                                .foregroundStyle(coconutClaimed ? .white.opacity(0.4) : Color.arkInk)
+                                .foregroundStyle(coconutClaimed ? Color.goCardWhite.opacity(0.4) : Color.arkInk)
                             if !coconutClaimed {
                                 Text("+5🥥")
                                     .font(.system(size: 11, weight: .medium))
@@ -854,7 +854,7 @@ struct DailyQuestsCard: View {
                     }
                     .padding(.horizontal, 14).padding(.vertical, 10)
                     .background(
-                        coconutClaimed ? Color.white.opacity(0.05) : Color.goPrimary,
+                        coconutClaimed ? Color.goCardWhite.opacity(0.05) : Color.goPrimary,
                         in: RoundedRectangle(cornerRadius: 14)
                     )
                 }
@@ -909,6 +909,6 @@ struct DailyQuestsCard: View {
         }
         .padding(.vertical, 10)
         .opacity(quest.isCompleted ? 0.4 : 1.0)
-        .animation(.easeOut(duration: 0.3), value: quest.isCompleted)
+        .animation(GoMotion.quick, value: quest.isCompleted)
     }
 }

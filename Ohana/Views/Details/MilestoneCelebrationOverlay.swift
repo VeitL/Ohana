@@ -96,20 +96,14 @@ struct MilestoneCelebrationOverlay: View {
 
                     VStack(spacing: 20) {
                         // 宠物头像
-                        ZStack {
-                            Circle()
-                                .fill(milestone.accentColor.opacity(0.2))
-                                .frame(width: 110, height: 110)
-                            if let data = pet.avatarImageData, let img = UIImage(data: data) {
-                                Image(uiImage: img)
-                                    .resizable().scaledToFill()
-                                    .frame(width: 100, height: 100)
-                                    .clipShape(Circle())
-                            } else {
-                                Text(pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji)
-                                    .font(.system(size: 60))
-                            }
-                        }
+                        PetAvatarPortraitView(
+                            imageData: pet.avatarImageData,
+                            fallbackText: pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji,
+                            themeColor: milestone.accentColor,
+                            size: 110,
+                            backgroundOpacity: 0.2,
+                            transparentScale: 0.78
+                        )
 
                         // 大 emoji
                         Text(milestone.emoji)

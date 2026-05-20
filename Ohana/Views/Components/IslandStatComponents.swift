@@ -20,7 +20,7 @@ struct OverlappingAvatarsView: View {
                 ZStack {
                     Circle()
                         .fill(Color.goPrimary.mix(with: .black, by: 0.3))
-                        .overlay(Circle().strokeBorder(.white.opacity(0.25), lineWidth: 1.5))
+                        .overlay(Circle().strokeBorder(Color.ohanaCardStroke, lineWidth: 1.5))
                         .frame(width: 24, height: 24)
                     Text(emoji)
                         .font(.system(size: 12))
@@ -31,8 +31,8 @@ struct OverlappingAvatarsView: View {
             if emojis.count > maxCount {
                 ZStack {
                     Circle()
-                        .fill(.white.opacity(0.12))
-                        .overlay(Circle().strokeBorder(.white.opacity(0.2), lineWidth: 1.5))
+                        .fill(Color.ohanaControlFill)
+                        .overlay(Circle().strokeBorder(Color.ohanaCardStroke, lineWidth: 1.5))
                         .frame(width: 24, height: 24)
                     Text("+\(emojis.count - maxCount)")
                         .font(.system(size: 8, weight: .black, design: .rounded))
@@ -73,7 +73,7 @@ struct IslandStatCard<Chart: View>: View {
                 Text(value)
                     .font(OhanaFont.metric(size: 34))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .contentTransition(.numericText())
+                    .ohanaNumericMotion(value)
                 if !unit.isEmpty {
                     Text(unit)
                         .font(OhanaFont.callout(.bold))
@@ -604,13 +604,13 @@ struct SynergyFlashCard: View {
                 .frame(width: 280, height: 160)
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    withAnimation(.spring(response: 0.3)) {
+                    withAnimation(GoMotion.feedback) {
                         currentIndex = (currentIndex + 1) % engine.briefs.count
                     }
                 }
                 .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
                 .id(currentIndex)
-                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: currentIndex)
+                .animation(GoMotion.page, value: currentIndex)
             }
         }
         .onAppear {
@@ -633,7 +633,7 @@ struct SynergyFlashCard: View {
         timer = Timer.scheduledTimer(withTimeInterval: 6, repeats: true) { _ in
             Task { @MainActor in
                 guard !engine.briefs.isEmpty else { return }
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                withAnimation(GoMotion.page) {
                     currentIndex = (currentIndex + 1) % engine.briefs.count
                 }
             }
@@ -705,12 +705,12 @@ struct CoconutWealthRankingCard: View {
                     Text("\(computedTotal)")
                         .font(OhanaFont.metric(size: 36))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .contentTransition(.numericText())
+                        .ohanaNumericMotion(computedTotal)
                     Text("🥥")
                         .font(.system(size: 18))
                 }
 
-            OhanaDashedDivider(color: .white.opacity(0.1)).padding(.vertical, 4)
+            OhanaDashedDivider(color: Color.ohanaCardStroke).padding(.vertical, 4)
 
             // 排行榜
             if leaderboard.isEmpty {
@@ -738,10 +738,11 @@ struct CoconutWealthRankingCard: View {
                             Spacer()
                             Text("\(entry.balance) 🥥")
                                 .font(.system(size: 12, weight: .black, design: .rounded))
-                                .foregroundStyle(i == 0 ? Color.goPrimary : .white.opacity(0.6))
+                                .foregroundStyle(i == 0 ? Color.goPrimary : Color.ohanaSecondaryText)
                                 .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(i == 0 ? Color.goPrimary.opacity(0.15) : Color.white.opacity(0.06),
+                                .background(i == 0 ? Color.goPrimary.opacity(0.15) : Color.ohanaControlFill,
                                             in: Capsule())
+                                .ohanaNumericMotion(entry.balance)
                         }
                     }
                 }
@@ -761,7 +762,7 @@ struct MiniRingChart: View {
 
     private func playAnimation() {
         animPhase = 0
-        withAnimation(.easeOut(duration: 0.28)) {
+        withAnimation(GoMotion.quick) {
             animPhase = 1.0
         }
     }
@@ -769,7 +770,7 @@ struct MiniRingChart: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(.white.opacity(0.1), lineWidth: 5)
+                .stroke(Color.ohanaCardStroke, lineWidth: 5)
             Circle()
                 .trim(from: 0, to: CGFloat(progress) * animPhase)
                 .stroke(
@@ -777,11 +778,12 @@ struct MiniRingChart: View {
                     style: StrokeStyle(lineWidth: 5, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
-                .animation(.easeOut(duration: 0.28), value: progress * Double(animPhase))
+                .animation(GoMotion.quick, value: progress * Double(animPhase))
 
             Text("\(Int(progress * 100))%")
                 .font(.system(size: 11, weight: .black, design: .rounded))
                 .foregroundStyle(accentColor)
+                .ohanaNumericMotion(Int(progress * 100))
         }
         .frame(width: 44, height: 44)
         .frame(maxWidth: .infinity, alignment: .center)

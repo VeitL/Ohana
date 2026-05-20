@@ -1270,6 +1270,7 @@ struct WalletHumanCardDraftFront: View {
                         .foregroundStyle(primaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
+                        .contentTransition(.opacity)
                     Text(L10n.current.humanWalletResident)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(primaryText.opacity(useDarkText ? 0.72 : 0.62))
@@ -1297,6 +1298,7 @@ struct WalletHumanCardDraftFront: View {
                         .lineLimit(2)
                         .multilineTextAlignment(.trailing)
                         .minimumScaleFactor(0.75)
+                        .contentTransition(.numericText())
                     HStack(alignment: .bottom, spacing: 2) {
                         ForEach([14, 8, 12, 6, 10, 16, 5, 11, 9, 13], id: \.self) { bh in
                             RoundedRectangle(cornerRadius: 1.2)

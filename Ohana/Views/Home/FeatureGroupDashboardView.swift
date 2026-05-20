@@ -44,23 +44,35 @@ struct FeatureGroupDashboardView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [Color(hex: "1A2E8A"), Color(hex: "0C1640")],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            OhanaAppBackground()
             .ignoresSafeArea()
 
             VStack(spacing: 0) {
+                pageHeader
                 segmentBar
-                Rectangle().fill(.white.opacity(0.08)).frame(height: 1)
+                Rectangle().fill(Color.ohanaDivider).frame(height: 1)
                 pager
             }
         }
-        .navigationTitle(group.title)
-        .navigationBarTitleDisplayMode(.inline)
         .onAppear(perform: ensureSelectedItem)
         .onChange(of: items.map(\.id)) { _, _ in ensureSelectedItem() }
+    }
+
+    private var pageHeader: some View {
+        HStack(spacing: 10) {
+            Image(systemName: group.icon)
+                .font(.system(size: 17, weight: .black))
+                .foregroundStyle(group.color)
+                .frame(width: 34, height: 34)
+            Text(group.title)
+                .font(OhanaFont.title2(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(1)
+            Spacer(minLength: 54)
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 12)
+        .padding(.bottom, 6)
     }
 
     private var segmentBar: some View {
@@ -69,7 +81,7 @@ struct FeatureGroupDashboardView: View {
                 ForEach(items) { item in
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                        withAnimation(GoMotion.feedback) {
                             selectedItemID = item.id
                         }
                     } label: {
@@ -80,10 +92,10 @@ struct FeatureGroupDashboardView: View {
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
                                 .lineLimit(1)
                         }
-                        .foregroundStyle(selectedItem.id == item.id ? .black : .white)
+                        .foregroundStyle(selectedItem.id == item.id ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                         .padding(.horizontal, 13)
                         .padding(.vertical, 8)
-                        .background(selectedItem.id == item.id ? Color.goLime : Color.white.opacity(0.12), in: Capsule())
+                        .background(selectedItem.id == item.id ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
@@ -104,7 +116,7 @@ struct FeatureGroupDashboardView: View {
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
-        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: selectedItem.id)
+        .animation(GoMotion.page, value: selectedItem.id)
     }
 
     @ViewBuilder

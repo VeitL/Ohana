@@ -157,7 +157,7 @@ struct DesignSpecControlsPanelV4: View {
         HStack(spacing: 6) {
             Image(systemName: option.icon)
                 .font(.system(size: 11, weight: .black))
-                .foregroundStyle(selected ? Color.arkInk : option.tint)
+                .foregroundStyle(selected ? Color.arkInk : palette.accent)
             VStack(alignment: .leading, spacing: 0) {
                 Text(option.zh)
                 Text(option.en)

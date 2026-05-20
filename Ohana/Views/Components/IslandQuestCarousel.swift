@@ -317,20 +317,13 @@ private struct IslandQuestCarouselCard: View {
     private var avatarView: some View {
         let size: CGFloat = 36
         if let p = relatedPet {
-            Group {
-                if let data = p.avatarImageData, let ui = UIImage(data: data) {
-                    Image(uiImage: ui)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    Text(p.speciesEmoji)
-                        .font(.system(size: 20))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(stripColor.opacity(0.2))
-                }
-            }
-            .frame(width: size, height: size)
-            .clipShape(Circle())
+            PetAvatarPortraitView(
+                imageData: p.avatarImageData,
+                fallbackText: p.speciesEmoji,
+                themeColor: stripColor,
+                size: size,
+                backgroundOpacity: 0.2
+            )
         } else if let pl = relatedPlant {
             Text(pl.avatarEmoji)
                 .font(.system(size: 20))

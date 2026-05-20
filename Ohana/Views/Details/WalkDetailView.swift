@@ -19,6 +19,7 @@ struct WalkDetailView: View {
     @State private var isSharing = false
     @State private var isRendering = false
     @State private var rainbowRoutePhase: CGFloat = 0
+    private let l = L10n()
 
     // 解码路径坐标
     private var routeCoordinates: [CLLocationCoordinate2D] {
@@ -67,49 +68,46 @@ struct WalkDetailView: View {
         (equipFxRainbow || equipFxRainbowPoop) && workloadPolicy.shouldAnimate(isVisible: true)
     }
 
+    private var walkEndDateText: String {
+        guard let endDate = walk.endDate else {
+            return l.tr(zh: "未结束", en: "Open", de: "Offen")
+        }
+        return endDate.formatted(.dateTime.hour().minute())
+    }
+
+    private var averagePaceText: String {
+        guard walk.distanceMeters > 5, walk.durationSeconds > 10 else { return "--" }
+        let secondsPerKilometer = walk.durationSeconds / max(walk.distanceMeters / 1000, 0.001)
+        let minutes = Int(secondsPerKilometer) / 60
+        let seconds = Int(secondsPerKilometer) % 60
+        return String(format: "%d:%02d/km", minutes, seconds)
+    }
+
+    private var poopCountText: String {
+        "\(walkPoopMarkers.count)"
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
-                OhanaAppBackground()
+                OhanaAppBackground().ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: 20) {
-                        detailHeader
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 18) {
+                        pageChrome
+                        heroSummary
                         mapSection
-                        statsSection
-                        Spacer(minLength: 40)
+                        metricStrip
+                        detailTimeline
+                        Color.clear.frame(height: 28)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
                 }
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        Task { await renderShareImage() }
-                    } label: {
-                        if isRendering {
-                            ProgressView()
-                                .tint(Color.goPrimary)
-                                .scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(Color.goPrimary)
-                        }
-                    }
-                    .disabled(isRendering)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                    }
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $isSharing) {
                 if let img = shareImage {
                     ShareSheet(image: img)
@@ -120,37 +118,85 @@ struct WalkDetailView: View {
         .onChange(of: shouldAnimateRainbowWalkEffects) { _, _ in updateRainbowRouteFlow() }
     }
 
-    private var detailHeader: some View {
-        HStack(spacing: 14) {
-            if let data = pet.avatarImageData, let image = UIImage(data: data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 54, height: 54)
-                    .clipShape(Circle())
-            } else {
-                Text(pet.avatarEmoji)
-                    .font(.system(size: 34))
-                    .frame(width: 54, height: 54)
-                    .background(Color(hex: pet.themeColorHex).opacity(0.16), in: Circle())
+    private var pageChrome: some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "figure.walk")
+                    .font(.system(size: 17, weight: .black))
+                    .foregroundStyle(Color.goPrimary)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(l.tr(zh: "遛狗回放", en: "Walk replay", de: "Spaziergang"))
+                        .font(.system(size: 19, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(pet.name)
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
             }
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text("单次记录")
-                    .font(.system(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.goPrimary)
-                    .tracking(1.2)
-                Text(walk.startDate, format: .dateTime.month().day().weekday(.wide))
-                    .font(.system(size: 24, weight: .black, design: .rounded))
+            Spacer(minLength: 0)
+
+            Button {
+                Task { await renderShareImage() }
+            } label: {
+                if isRendering {
+                    ProgressView()
+                        .tint(Color.ohanaPrimaryText)
+                        .scaleEffect(0.78)
+                        .frame(width: 42, height: 42)
+                } else {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 15, weight: .black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .frame(width: 42, height: 42)
+                }
+            }
+            .background(Color.ohanaControlFill, in: Circle())
+            .disabled(isRendering)
+            .buttonStyle(ScaleButtonStyle())
+
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(walk.startDate, format: .dateTime.hour().minute())
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .frame(width: 42, height: 42)
+            }
+            .background(Color.ohanaControlFill, in: Circle())
+            .buttonStyle(ScaleButtonStyle())
+        }
+    }
+
+    private var heroSummary: some View {
+        HStack(spacing: 14) {
+            PetAvatarPortraitView(
+                imageData: pet.avatarImageData,
+                fallbackText: pet.avatarEmoji,
+                themeColor: Color(hex: pet.safeThemeColorHex),
+                size: 58,
+                backgroundOpacity: 0.10
+            )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(walk.startDate, format: .dateTime.month().day().weekday(.wide))
+                    .font(.system(size: 26, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text("\(walk.startDate.formatted(.dateTime.hour().minute())) - \(walkEndDateText)")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer(minLength: 0)
+
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(walk.distanceText)
+                    .font(.system(size: 24, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.goPrimary)
+                    .ohanaNumericMotion(walk.distanceMeters)
+                Text(l.tr(zh: "距离", en: "Distance", de: "Distanz"))
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
         }
-        .padding(18)
-        .goTranslucentCard(cornerRadius: 24)
     }
 
     // MARK: - Map Section
@@ -158,114 +204,146 @@ struct WalkDetailView: View {
     private var mapSection: some View {
         let coords = routeCoordinates
         if coords.count >= 2, let region = routeRegion {
-            VStack(spacing: 0) {
-                // 交互式地图
+            VStack(spacing: 10) {
                 Map(initialPosition: .region(region)) {
-                    // 路径折线
                     RainbowRoutePolyline(
                         coordinates: coords,
                         normalColor: .goPrimary,
-                        lineWidth: 4,
+                        lineWidth: 5,
                         isRainbow: equipFxRainbow,
                         isFlowing: shouldAnimateRainbowWalkEffects,
                         flowPhase: rainbowRoutePhase
                     )
 
-                    // 起点标注
                     if let first = coords.first {
-                        Annotation("出发", coordinate: first) {
-                            ZStack {
-                                Circle().fill(Color.goPrimary).frame(width: 20, height: 20)
-                                Circle().fill(Color.arkInk).frame(width: 8, height: 8)
-                            }
+                        Annotation(l.tr(zh: "出发", en: "Start", de: "Start"), coordinate: first) {
+                            routeEndpoint(color: .goPrimary, icon: "figure.walk")
                         }
                     }
-                    // 终点标注
                     if let last = coords.last {
-                        Annotation("到家", coordinate: last) {
-                            ZStack {
-                                Circle().fill(Color.goRed).frame(width: 20, height: 20)
-                                    .shadow(color: Color.goRed.opacity(0.4), radius: 6) // ui-v4: allow map endpoint glow.
-                                Circle().fill(Color.goCardWhite).frame(width: 8, height: 8)
-                            }
+                        Annotation(l.tr(zh: "到家", en: "Finish", de: "Ziel"), coordinate: last) {
+                            routeEndpoint(color: .goRed, icon: "house.fill")
                         }
                     }
 
                     ForEach(walkPoopMarkers) { marker in
                         if let coordinate = marker.coordinate {
-                            Annotation("便便", coordinate: coordinate) {
+                            Annotation(l.tr(zh: "便便", en: "Poop", de: "Haufen"), coordinate: coordinate) {
                                 RainbowPoopPin(
                                     isRainbow: equipFxRainbowPoop,
                                     isFlowing: shouldAnimateRainbowWalkEffects,
-                                    size: 28
+                                    size: 30
                                 )
                             }
                         }
                     }
                 }
-                .frame(height: 280)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .frame(height: 334)
+                .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+                .overlay(alignment: .topLeading) {
+                    mapBadge(icon: "point.topleft.down.curvedto.point.bottomright.up", text: "\(coords.count)")
+                        .padding(12)
+                }
+                .overlay(alignment: .topTrailing) {
+                    mapBadge(icon: "sparkles", text: equipFxRainbow ? l.tr(zh: "彩虹", en: "Rainbow", de: "Regenbogen") : l.tr(zh: "路线", en: "Route", de: "Route"))
+                        .padding(12)
+                }
 
-                // Apple Maps 跳转按钮
                 Button { openInAppleMaps(coords: coords) } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: "arrow.up.forward")
-                            .font(.system(size: 14, weight: .bold))
-                        Text("在 Apple Maps 中查看")
+                        Image(systemName: "map.fill")
+                            .font(.system(size: 13, weight: .black))
+                        Text(l.tr(zh: "Apple Maps", en: "Apple Maps", de: "Apple Maps"))
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                     }
-                    .foregroundStyle(Color.goPrimary)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.goPrimary.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
-                    .padding(.top, 10)
+                    .frame(height: 46)
+                    .background(Color.goPrimary, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
-            .padding(12)
-            .goTranslucentCard(cornerRadius: 24)
         } else if let snapshotData = walk.mapSnapshotData, let img = UIImage(data: snapshotData) {
-            // fallback：静态截图（无坐标时）
             Image(uiImage: img)
                 .resizable()
                 .scaledToFill()
-                .frame(height: 220)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .goTranslucentCard(cornerRadius: 24)
+                .frame(height: 300)
+                .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
         } else {
             ZStack {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.ohanaCardSurface)
-                    .frame(height: 160)
+                RoundedRectangle(cornerRadius: 32, style: .continuous)
+                    .fill(Color.ohanaControlFill)
+                    .frame(height: 240)
                 VStack(spacing: 8) {
                     Image(systemName: "map")
-                        .font(.system(size: 32))
-                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
-                    Text("没有路径数据")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                    Text(l.tr(zh: "没有路径数据", en: "No route data", de: "Keine Routendaten"))
                         .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
-            .goTranslucentCard(cornerRadius: 24)
         }
     }
 
-    // MARK: - Stats Section
-    private var statsSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Overview")
-                .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
+    private var metricStrip: some View {
+        HStack(spacing: 10) {
+            metricPill(icon: "clock.fill", value: walk.durationText, label: l.tr(zh: "时长", en: "Time", de: "Zeit"))
+            metricPill(icon: "speedometer", value: averagePaceText, label: l.tr(zh: "配速", en: "Pace", de: "Tempo"))
+            metricPill(icon: "pawprint.fill", value: poopCountText, label: l.tr(zh: "便便", en: "Poop", de: "Haufen"))
+        }
+    }
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 2), spacing: 10) {
-                statCell(icon: "arrow.left.and.right", value: walk.distanceText, label: "距离")
-                statCell(icon: "clock", value: walk.durationText, label: "时长")
-                statCell(icon: "calendar", value: walk.startDate.formatted(.dateTime.month().day()), label: "日期")
-                statCell(icon: "circle", value: walk.startDate.formatted(.dateTime.hour().minute()), label: "出发")
+    @ViewBuilder
+    private var detailTimeline: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(l.tr(zh: "这一趟", en: "This walk", de: "Dieser Spaziergang"))
+                    .font(.system(size: 17, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Spacer()
+                if walk.coconutsEarned > 0 {
+                    Text("+\(walk.coconutsEarned)🥥")
+                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.arkInk)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Color.goPrimary, in: Capsule())
+                        .ohanaNumericMotion(walk.coconutsEarned)
+                }
+            }
+
+            VStack(spacing: 8) {
+                timelineRow(
+                    icon: "play.fill",
+                    title: l.tr(zh: "出发", en: "Started", de: "Gestartet"),
+                    value: walk.startDate.formatted(.dateTime.month().day().hour().minute()),
+                    tint: .goPrimary
+                )
+                timelineRow(
+                    icon: "flag.checkered",
+                    title: l.tr(zh: "结束", en: "Finished", de: "Beendet"),
+                    value: walk.endDate?.formatted(.dateTime.month().day().hour().minute()) ?? l.tr(zh: "未结束", en: "Open", de: "Offen"),
+                    tint: .goTeal
+                )
+                if walkPoopMarkers.isEmpty == false {
+                    timelineRow(
+                        icon: "pawprint.fill",
+                        title: l.tr(zh: "路线事件", en: "Route events", de: "Routenereignisse"),
+                        value: l.tr(zh: "\(walkPoopMarkers.count) 次便便", en: "\(walkPoopMarkers.count) poop stop\(walkPoopMarkers.count == 1 ? "" : "s")", de: "\(walkPoopMarkers.count) Haufen"),
+                        tint: .goYellow
+                    )
+                }
+                if let notes = walk.behaviorNotes, notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+                    timelineRow(
+                        icon: "quote.bubble.fill",
+                        title: l.tr(zh: "备注", en: "Note", de: "Notiz"),
+                        value: notes,
+                        tint: .goPurple
+                    )
+                }
             }
         }
-        .padding(16)
-        .goTranslucentCard(cornerRadius: 24)
     }
 
     private func updateRainbowRouteFlow() {
@@ -279,30 +357,72 @@ struct WalkDetailView: View {
         }
     }
 
-    private var divider: some View {
-        Rectangle()
-            .fill(.primary.opacity(0.12))
-            .frame(width: 1, height: 40)
+    private func routeEndpoint(color: Color, icon: String) -> some View {
+        Image(systemName: icon)
+            .font(.system(size: 11, weight: .black))
+            .foregroundStyle(Color.ohanaPrimaryActionText)
+            .frame(width: 28, height: 28)
+            .background(color, in: Circle())
+            .shadow(color: color.opacity(0.28), radius: 8, y: 3) // ui-v4: allow semantic map endpoint elevation.
     }
 
-    private func statCell(icon: String, value: String, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private func mapBadge(icon: String, text: String) -> some View {
+        HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .frame(width: 26, height: 26)
-                .background(Color.primary.opacity(0.07), in: Circle())
+                .font(.system(size: 10, weight: .black))
+            Text(text)
+                .font(.system(size: 11, weight: .black, design: .rounded))
+        }
+        .foregroundStyle(Color.ohanaPrimaryText)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(Color.ohanaCardSurface.opacity(0.88), in: Capsule())
+    }
+
+    private func metricPill(icon: String, value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .black))
+                    .foregroundStyle(Color.goPrimary)
+                Text(label)
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
             Text(value)
-                .font(.system(size: 18, weight: .heavy, design: .rounded))
+                .font(.system(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(1).minimumScaleFactor(0.7)
-            Text(label)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+                .ohanaNumericMotion(value)
         }
         .frame(maxWidth: .infinity)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func timelineRow(icon: String, title: String, value: String, tint: Color) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .black))
+                .foregroundStyle(tint)
+                .frame(width: 30, height: 30)
+                .background(tint.opacity(0.14), in: Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                Text(value)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 0)
+        }
         .padding(12)
-        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     // MARK: - Share
@@ -320,7 +440,10 @@ struct WalkDetailView: View {
 
         // 无快照时用 ImageRenderer 渲染 statsSection
         let renderer = ImageRenderer(content:
-            statsSection
+            VStack(spacing: 14) {
+                heroSummary
+                metricStrip
+            }
                 .frame(width: 360)
                 .padding(20)
                 .background(Color(hex: "4338FF"))
@@ -336,15 +459,26 @@ struct WalkDetailView: View {
     private func openInAppleMaps(coords: [CLLocationCoordinate2D]) {
         guard let first = coords.first, let last = coords.last else { return }
 
-        let startItem = MKMapItem(placemark: MKPlacemark(coordinate: first))
+        let startItem = mapItem(coordinate: first)
         startItem.name = "出发点"
-        let endItem = MKMapItem(placemark: MKPlacemark(coordinate: last))
+        let endItem = mapItem(coordinate: last)
         endItem.name = "终点"
 
         MKMapItem.openMaps(
             with: [startItem, endItem],
             launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeWalking]
         )
+    }
+
+    private func mapItem(coordinate: CLLocationCoordinate2D) -> MKMapItem {
+        if #available(iOS 26.0, *) {
+            MKMapItem(
+                location: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude),
+                address: nil
+            )
+        } else {
+            MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
+        }
     }
 }
 

@@ -1,0 +1,76 @@
+//
+//  FocusHomeTodayFocusSection.swift
+//  Ohana
+//
+//  First-screen Today Focus strip extracted from the main home view.
+//
+
+import SwiftUI
+
+struct FocusHomeTodayFocusSection: View {
+    let activePets: [Pet]
+    let plants: [Plant]
+    let reminders: [Reminder]
+    let humans: [Human]
+    let events: [Event]
+    let activePet: Pet?
+    let showFirstSuccessCard: Bool
+    let firstQuickCheckInCompleted: Bool
+    let isExpanded: Bool
+    let cardMargin: CGFloat
+    let animation: Animation
+    let onCompleteQuest: (IslandQuest) -> Void
+    let onTapNegativeSignal: (IslandNegativeSignal) -> Void
+    let onTapOasis: () -> Void
+    let onTapFamilyTask: (FamilyCollaborationTask) -> Void
+    let onFirstSuccessFeed: (Pet) -> Void
+    let onFirstSuccessPlay: (Pet) -> Void
+    let onFirstSuccessMoment: (Pet) -> Void
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Color.clear
+                .frame(height: 216)
+                .padding(.top, 12)
+
+            TodayFocusCarousel(cardMargin: cardMargin, animation: animation) { cardWidth in
+                TodayFocusQuestCardHost(
+                    pets: activePets,
+                    plants: plants,
+                    reminders: reminders,
+                    humans: humans,
+                    events: events,
+                    activePet: activePet,
+                    onCompleteQuest: onCompleteQuest,
+                    onTapNegativeSignal: onTapNegativeSignal,
+                    onTapOasis: onTapOasis,
+                    onTapFamilyTask: onTapFamilyTask
+                )
+                .frame(width: cardWidth)
+
+                if showFirstSuccessCard,
+                   !firstQuickCheckInCompleted,
+                   let activePet {
+                    HomeFirstSuccessCard(
+                        pet: activePet,
+                        onFeed: { onFirstSuccessFeed(activePet) },
+                        onPlay: { onFirstSuccessPlay(activePet) },
+                        onMoment: { onFirstSuccessMoment(activePet) }
+                    )
+                    .frame(width: cardWidth)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+            .opacity(isExpanded ? 0 : 1)
+            .scaleEffect(isExpanded ? 0.965 : 1, anchor: .top)
+            .allowsHitTesting(!isExpanded)
+            .transition(.opacity)
+            .animation(animation, value: isExpanded)
+        }
+        .frame(height: 228, alignment: .top)
+        .clipped()
+        .allowsHitTesting(!isExpanded)
+        .accessibilityHidden(isExpanded)
+        .animation(animation, value: isExpanded)
+    }
+}

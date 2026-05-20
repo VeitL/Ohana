@@ -258,17 +258,12 @@ struct FocusMoodQuestStrip: View {
     @ViewBuilder
     private func petAvatar(_ pet: Pet) -> some View {
         let color = Color(hex: pet.themeColorHex.isEmpty ? "B0C4DE" : pet.themeColorHex)
-        ZStack {
-            Circle().fill(color.opacity(0.25)).frame(width: 34, height: 34)
-            if let data = pet.avatarImageData, let img = UIImage(data: data) {
-                Image(uiImage: img)
-                    .resizable().scaledToFill()
-                    .frame(width: 34, height: 34)
-                    .clipShape(Circle())
-            } else {
-                Text(pet.avatarEmoji.isEmpty ? "🐾" : pet.avatarEmoji)
-                    .font(.system(size: 18))
-            }
-        }
+        PetAvatarPortraitView(
+            imageData: pet.avatarImageData,
+            fallbackText: pet.avatarEmoji.isEmpty ? "🐾" : pet.avatarEmoji,
+            themeColor: color,
+            size: 34,
+            backgroundOpacity: 0.25
+        )
     }
 }

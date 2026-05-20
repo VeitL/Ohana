@@ -16,6 +16,7 @@ struct CoconutShopView: View {
     @AppStorage("shop_equip_fx_lime_glow") private var equipFxLimeGlow = false
     @AppStorage("shop_equip_fx_rainbow") private var equipFxRainbow = false
     @AppStorage("shop_equip_fx_rainbow_poop") private var equipFxRainbowPoop = false
+    @AppStorage("shop_equip_fx_popout_card") private var equipFxPopoutCard = true
     @AppStorage("shop_equip_fx_stars") private var equipFxStars = false
     @AppStorage("shop_equip_fx_firework") private var equipFxFirework = false
     @AppStorage(AppIconCatalog.selectedIconKey) private var selectedAppIcon = AppIconCatalog.defaultItemId
@@ -461,7 +462,7 @@ struct CoconutShopView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                     Spacer()
-                    if item.isPurchased, isToggleableEffect(item) {
+                    if showsShopSwitch(for: item) {
                         shopTogglePill(isOn: state.isEquipped)
                     } else if state.showCost {
                         Text("🥥 \(item.cost)")
@@ -533,6 +534,18 @@ struct CoconutShopView: View {
             }
             let missing = max(0, item.cost - currentHumanBalance)
             return .init(label: canAfford(item) ? l.tr(zh: "买断", en: "Unlock", de: "Freischalten") : l.tr(zh: "还差 \(missing)🥥", en: "Need \(missing)🥥", de: "Noch \(missing)🥥"), tint: canAfford(item) ? Color.goYellow : tertiaryText, showCost: true)
+        }
+
+        if item.id == Avatar2DAccess.shopItemId, Avatar2DAccess.extraPassCount > 0 {
+            return .init(
+                label: l.tr(
+                    zh: "库存 \(Avatar2DAccess.extraPassCount) 张",
+                    en: "\(Avatar2DAccess.extraPassCount) available",
+                    de: "\(Avatar2DAccess.extraPassCount) verfügbar"
+                ),
+                tint: Color.goPrimary,
+                isEquipped: true
+            )
         }
 
         if item.isPurchased {
@@ -1186,6 +1199,8 @@ struct CoconutShopView: View {
             equipFxRainbow = true
         case "fx_rainbow_poop":
             equipFxRainbowPoop = true
+        case "fx_popout_card":
+            equipFxPopoutCard = true
         case "fx_stars":
             equipFxStars = true
         case "fx_firework":
@@ -1206,14 +1221,17 @@ struct CoconutShopView: View {
             equipFxRainbow.toggle()
         case "fx_rainbow_poop":
             equipFxRainbowPoop.toggle()
+        case "fx_popout_card":
+            equipFxPopoutCard.toggle()
+            if equipFxPopoutCard && !pets.contains(where: { $0.cardStyleRaw == "popout" }) {
+                openPopoutPetPicker()
+            }
         case "fx_stars":
             equipFxStars.toggle()
         case "fx_firework":
             equipFxFirework.toggle()
         case "title_guardian", "title_pioneer", "title_chef":
             equippedTitle = equippedTitle == item.id ? "" : item.id
-        case "fx_popout_card":
-            openPopoutPetPicker()
         default:
             break
         }
@@ -1228,14 +1246,19 @@ struct CoconutShopView: View {
             return equipFxRainbow ? l.tr(zh: "已启用", en: "On", de: "Aktiv") : l.tr(zh: "未启用", en: "Off", de: "Aus")
         case "fx_rainbow_poop":
             return equipFxRainbowPoop ? l.tr(zh: "已启用", en: "On", de: "Aktiv") : l.tr(zh: "未启用", en: "Off", de: "Aus")
+        case "fx_popout_card":
+            if !equipFxPopoutCard {
+                return l.tr(zh: "未启用", en: "Off", de: "Aus")
+            }
+            return pets.contains { $0.cardStyleRaw == "popout" }
+                ? l.tr(zh: "已启用 · 可更换", en: "On · Change", de: "Aktiv · Ändern")
+                : l.tr(zh: "选择宠物/素材", en: "Choose pet/asset", de: "Tier/Motiv wählen")
         case "fx_stars":
             return equipFxStars ? l.tr(zh: "已启用", en: "On", de: "Aktiv") : l.tr(zh: "未启用", en: "Off", de: "Aus")
         case "fx_firework":
             return equipFxFirework ? l.tr(zh: "已启用", en: "On", de: "Aktiv") : l.tr(zh: "未启用", en: "Off", de: "Aus")
         case "title_guardian", "title_pioneer", "title_chef":
             return equippedTitle == item.id ? l.tr(zh: "已装备", en: "Equipped", de: "Ausgerüstet") : l.tr(zh: "未装备", en: "Not equipped", de: "Nicht ausgerüstet")
-        case "fx_popout_card":
-            return l.tr(zh: "点按绑定", en: "Tap to bind", de: "Zum Binden tippen")
         default:
             return item.isPurchased ? l.tr(zh: "已拥有", en: "Owned", de: "Besitzt") : ""
         }
@@ -1246,6 +1269,7 @@ struct CoconutShopView: View {
         case "fx_lime_glow": return equipFxLimeGlow
         case "fx_rainbow": return equipFxRainbow
         case "fx_rainbow_poop": return equipFxRainbowPoop
+        case "fx_popout_card": return equipFxPopoutCard && pets.contains { $0.cardStyleRaw == "popout" }
         case "fx_stars": return equipFxStars
         case "fx_firework": return equipFxFirework
         case "title_guardian", "title_pioneer", "title_chef": return equippedTitle == item.id
@@ -1253,9 +1277,19 @@ struct CoconutShopView: View {
         }
     }
 
+    private func showsShopSwitch(for item: ShopItem) -> Bool {
+        if item.id == Avatar2DAccess.shopItemId {
+            return Avatar2DAccess.extraPassCount > 0
+        }
+        if item.category == .title_ {
+            return item.isPurchased
+        }
+        return item.isPurchased && isToggleableEffect(item)
+    }
+
     private func isToggleableEffect(_ item: ShopItem) -> Bool {
         switch item.id {
-        case "fx_lime_glow", "fx_rainbow", "fx_rainbow_poop", "fx_stars", "fx_firework":
+        case "fx_lime_glow", "fx_rainbow", "fx_rainbow_poop", "fx_popout_card", "fx_stars", "fx_firework":
             return true
         default:
             return false
@@ -1476,8 +1510,10 @@ private struct ShopAppliedPreview: View {
                 .frame(height: 58)
                 .padding(.horizontal, 14)
                 .padding(.bottom, 10)
-            petAvatar(size: 78)
-                .offset(x: 22, y: animate ? -13 : -4)
+            popoutSubject(size: 92)
+                .rotation3DEffect(.degrees(-4), axis: (x: 0, y: 1, z: 0), anchor: .bottomLeading, perspective: 0.55)
+                .shadow(color: Color.arkInk.opacity(0.28), radius: 14, x: 0, y: 9) // ui-v4: allow popout preview depth
+                .offset(x: 16, y: animate ? -18 : -7)
             VStack(alignment: .leading, spacing: 2) {
                 Text(pet?.name ?? l.tr(zh: "宠物", en: "Pet", de: "Tier"))
                     .font(OhanaFont.caption(.black))
@@ -1798,6 +1834,20 @@ private struct ShopAppliedPreview: View {
                 .font(.system(size: size * 0.42, weight: .black))
                 .foregroundStyle(accent)
                 .frame(width: size, height: size)
+        }
+    }
+
+    @ViewBuilder
+    private func popoutSubject(size: CGFloat) -> some View {
+        if let pet,
+           let data = pet.cardPopoutImageData ?? pet.avatarImageData,
+           let image = UIImage(data: data) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .frame(width: size, height: size * 1.12, alignment: .bottom)
+        } else {
+            petAvatar(size: size)
         }
     }
 }

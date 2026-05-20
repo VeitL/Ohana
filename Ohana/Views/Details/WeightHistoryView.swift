@@ -7,7 +7,6 @@
 
 import SwiftUI
 import SwiftData
-import Charts
 
 struct WeightHistoryView: View {
     let pet: Pet
@@ -109,15 +108,14 @@ struct WeightHistoryView: View {
                 }
                 Spacer()
                 // 宠物头像
-                if let data = pet.avatarImageData, let img = UIImage(data: data) {
-                    Image(uiImage: img)
-                        .resizable().scaledToFill()
-                        .frame(width: 56, height: 56)
-                        .clipShape(Circle())
-                        .overlay(Circle().strokeBorder(.primary.opacity(0.2), lineWidth: 2))
-                } else {
-                    Text(pet.avatarEmoji).font(.system(size: 40))
-                }
+                PetAvatarPortraitView(
+                    imageData: pet.avatarImageData,
+                    fallbackText: pet.avatarEmoji,
+                    themeColor: Color(hex: pet.safeThemeColorHex),
+                    size: 56,
+                    backgroundOpacity: 0.18
+                )
+                .overlay(Circle().strokeBorder(Color.ohanaSecondaryText.opacity(0.2), lineWidth: 2))
             }
             .padding(.horizontal, 24)
             .padding(.top, 16)
@@ -261,20 +259,6 @@ struct WeightHistoryView: View {
                                 .foregroundStyle(Color.ohanaSecondaryText)
                                 .multilineTextAlignment(.center)
                                 .padding(.vertical, 40)
-                        }
-                        if let onRemove {
-                            VStack(spacing: 14) {
-                                Divider().opacity(0.35)
-                                Button(role: .destructive) { onRemove(); dismiss() } label: {
-                                    Text("移除此快捷入口")
-                                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                        .foregroundStyle(Color.goRed)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 12)
-                                }
-                                .buttonStyle(ScaleButtonStyle())
-                            }
-                            .padding(.top, 4)
                         }
                     }
                     .padding(.horizontal, 16)
@@ -501,72 +485,23 @@ struct WeightHistoryView: View {
 struct WeightDetailLineChart: View {
     let logs: [PetWeightLog]
 
-    // 统一用 kg 作图（避免 kg/g 混合导致图表失真）
-    private var weights: [Double] { logs.map { $0.weightInKg } }
-    private var minW: Double { (weights.min() ?? 0) - 0.3 }
-    private var maxW: Double { (weights.max() ?? 1) + 0.3 }
-    private var range: Double { max(maxW - minW, 0.1) }
-
-    private func xPos(_ i: Int, w: CGFloat) -> CGFloat {
-        logs.count <= 1 ? w / 2 : CGFloat(i) / CGFloat(logs.count - 1) * w
+    private var sortedLogs: [PetWeightLog] {
+        logs.sorted { $0.date < $1.date }
     }
-    private func yPos(_ v: Double, h: CGFloat) -> CGFloat {
-        h - CGFloat((v - minW) / range) * h
+
+    private var yDomain: ClosedRange<Double> {
+        OhanaChartStyle.yDomain(values: sortedLogs.map(\.weightInKg), includeZero: false, paddingRatio: 0.16, minimumSpan: 0.5)
     }
 
     var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width, h = geo.size.height
-            ZStack {
-                // 横向参考线
-                ForEach(0..<3) { i in
-                    let y = h / 2 * CGFloat(i)
-                    Path { p in
-                        p.move(to: CGPoint(x: 0, y: y))
-                        p.addLine(to: CGPoint(x: w, y: y))
-                    }
-                    .stroke(Color.primary.opacity(0.06), style: StrokeStyle(lineWidth: 1, dash: [4, 6]))
-                }
-
-                if logs.count >= 2 {
-                    // 填充
-                    Path { path in
-                        path.move(to: CGPoint(x: xPos(0, w: w), y: h))
-                        path.addLine(to: CGPoint(x: xPos(0, w: w), y: yPos(weights[0], h: h)))
-                        for i in 1..<logs.count {
-                            let prev = CGPoint(x: xPos(i-1, w: w), y: yPos(weights[i-1], h: h))
-                            let curr = CGPoint(x: xPos(i, w: w), y: yPos(weights[i], h: h))
-                            let cp1 = CGPoint(x: prev.x + (curr.x - prev.x)*0.5, y: prev.y)
-                            let cp2 = CGPoint(x: prev.x + (curr.x - prev.x)*0.5, y: curr.y)
-                            path.addCurve(to: curr, control1: cp1, control2: cp2)
-                        }
-                        path.addLine(to: CGPoint(x: xPos(logs.count-1, w: w), y: h))
-                        path.closeSubpath()
-                    }
-                    .fill(Color.ohanaCardSurface.opacity(0.3))
-
-                    // 折线
-                    Path { path in
-                        path.move(to: CGPoint(x: xPos(0, w: w), y: yPos(weights[0], h: h)))
-                        for i in 1..<logs.count {
-                            let prev = CGPoint(x: xPos(i-1, w: w), y: yPos(weights[i-1], h: h))
-                            let curr = CGPoint(x: xPos(i, w: w), y: yPos(weights[i], h: h))
-                            let cp1 = CGPoint(x: prev.x + (curr.x - prev.x)*0.5, y: prev.y)
-                            let cp2 = CGPoint(x: prev.x + (curr.x - prev.x)*0.5, y: curr.y)
-                            path.addCurve(to: curr, control1: cp1, control2: cp2)
-                        }
-                    }
-                    .stroke(.primary.opacity(0.4), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-
-                    // 数据点
-                    ForEach(Array(logs.enumerated()), id: \.offset) { i, log in
-                        Circle()
-                            .fill(i == logs.count - 1 ? Color.primary : Color.primary.opacity(0.5))
-                            .frame(width: i == logs.count - 1 ? 8 : 5, height: i == logs.count - 1 ? 8 : 5)
-                            .position(x: xPos(i, w: w), y: yPos(log.weight, h: h))
-                    }
-                }
-            }
-        }
+        OhanaMinimalTrendChart(
+            points: sortedLogs.map {
+                OhanaMinimalChartPoint(date: $0.date, value: $0.weightInKg, id: $0.id.uuidString)
+            },
+            yDomain: yDomain,
+            tint: .goPrimary,
+            yReferenceLineCount: 3,
+            yReferenceFormatter: { OhanaChartStyle.weightReferenceLabel(kilograms: $0, domain: $1) }
+        )
     }
 }

@@ -742,17 +742,13 @@ private struct DeckQuestCard: View {
     private var avatarView: some View {
         let sz: CGFloat = 30
         if let p = relatedPet {
-            Group {
-                if let data = p.avatarImageData, let ui = UIImage(data: data) {
-                    Image(uiImage: ui).resizable().scaledToFill()
-                } else {
-                    Text(p.speciesEmoji)
-                        .font(.system(size: 16))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(stripColor.opacity(0.2))
-                }
-            }
-            .frame(width: sz, height: sz).clipShape(Circle())
+            PetAvatarPortraitView(
+                imageData: p.avatarImageData,
+                fallbackText: p.speciesEmoji,
+                themeColor: stripColor,
+                size: sz,
+                backgroundOpacity: 0.2
+            )
         } else if let pl = relatedPlant {
             Text(pl.avatarEmoji)
                 .font(.system(size: 16))
@@ -981,16 +977,14 @@ private struct QuestConfirmationSheet: View {
                 // Quest preview
                 VStack(spacing: 12) {
                     ZStack {
-                        Circle()
-                            .fill(Color.goPrimary.opacity(0.12))
-                            .frame(width: 72, height: 72)
-                        if let pet = relatedPet,
-                           let data = pet.avatarImageData,
-                           let ui = UIImage(data: data) {
-                            Image(uiImage: ui)
-                                .resizable().scaledToFill()
-                                .frame(width: 72, height: 72)
-                                .clipShape(Circle())
+                        if let pet = relatedPet {
+                            PetAvatarPortraitView(
+                                imageData: pet.avatarImageData,
+                                fallbackText: pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji,
+                                themeColor: Color(hex: pet.safeThemeColorHex),
+                                size: 72,
+                                backgroundOpacity: 0.12
+                            )
                         } else {
                             Text(quest.emoji)
                                 .font(.system(size: 36))

@@ -8,6 +8,21 @@
 import Foundation
 
 enum ExpandedQuickActionDefaults {
+    static func humanItems(for human: Human, localization l: L10n) -> [QuickActionItem] {
+        [
+            QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA",
+                            actionType: "humanWeight", entityId: human.id, entityKind: .human),
+            QuickActionItem(label: l.expense, icon: "creditcard.fill", colorHex: "F59E0B",
+                            actionType: "humanExpense", entityId: human.id, entityKind: .human),
+            QuickActionItem(label: l.homeQAMeds, icon: "pill.fill", colorHex: "FF6B8A",
+                            actionType: "humanMedication", entityId: human.id, entityKind: .human),
+            QuickActionItem(label: l.homeQASport, icon: "figure.run", colorHex: "F97316",
+                            actionType: "humanWorkout", entityId: human.id, entityKind: .human),
+            QuickActionItem(label: l.homeQANote, icon: "note.text", colorHex: "A78BFA",
+                            actionType: "humanNote", entityId: human.id, entityKind: .human)
+        ]
+    }
+
     static func items(for pet: Pet, localization l: L10n, waterManagementLabel: String) -> [QuickActionItem] {
         let species = pet.species.lowercased()
         let isDog = pet.species.contains("狗") || species.contains("dog")

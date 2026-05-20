@@ -367,12 +367,8 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [OnboardingPalette.backgroundTop, OnboardingPalette.backgroundBottom],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            OhanaAppBackground()
+                .ignoresSafeArea()
 
             content
         }
@@ -431,7 +427,8 @@ struct OnboardingView: View {
     private var humanOnboardingWizard: some View {
         NavigationStack {
             ZStack {
-                GoIslandWizardBackdrop()
+                OhanaAppBackground()
+                    .ignoresSafeArea()
                 AddHumanWizardView(
                     onComplete: {
                         withAnimation(GoMotion.page) {
@@ -444,7 +441,7 @@ struct OnboardingView: View {
                 )
                 .id(humanWizardSessionId)
             }
-            .navigationTitle(localized(zh: "家庭成员", en: "Family Member", de: "Familienmitglied"))
+            .navigationTitle(localized(zh: "本人档案", en: "Your Profile", de: "Dein Profil"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
@@ -452,10 +449,13 @@ struct OnboardingView: View {
                     Button {
                         withAnimation(GoMotion.page) { step = .intro }
                     } label: {
-                        Text(localized(zh: "返回", en: "Back", de: "Zuruck"))
-                            .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color.goLime)
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.goPrimary)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Circle())
                     }
+                    .accessibilityLabel(localized(zh: "返回", en: "Back", de: "Zurück"))
                 }
             }
         }

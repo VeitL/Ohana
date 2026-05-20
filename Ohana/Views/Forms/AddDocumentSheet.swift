@@ -61,20 +61,13 @@ struct AddDocumentSheet: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 14) {
                         HStack(spacing: 12) {
-                            ZStack {
-                                Circle()
-                                    .fill(petThemeColor.opacity(0.28))
-                                    .frame(width: 48, height: 48)
-                                if let data = pet.avatarImageData, let ui = UIImage(data: data) {
-                                    Image(uiImage: ui)
-                                        .resizable().scaledToFill()
-                                        .frame(width: 48, height: 48)
-                                        .clipShape(Circle())
-                                } else {
-                                    Text(pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji)
-                                        .font(.system(size: 24))
-                                }
-                            }
+                            PetAvatarPortraitView(
+                                imageData: pet.avatarImageData,
+                                fallbackText: pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji,
+                                themeColor: petThemeColor,
+                                size: 48,
+                                backgroundOpacity: 0.28
+                            )
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(pet.name)
                                     .font(.system(size: 17, weight: .black, design: .rounded))
@@ -101,7 +94,7 @@ struct AddDocumentSheet: View {
                             }
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 8) {
-                                    ForEach(DocumentCategory.allCases, id: \.rawValue) { cat in
+                                    ForEach(DocumentCategory.protectionDocumentCases, id: \.rawValue) { cat in
                                         Button { selectedCategory = cat } label: {
                                             HStack(spacing: 5) {
                                                 Text(cat.emoji)
@@ -611,20 +604,13 @@ struct EditDocumentSheet: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 14) {
                         HStack(spacing: 12) {
-                            ZStack {
-                                Circle()
-                                    .fill(petThemeColor.opacity(0.28))
-                                    .frame(width: 48, height: 48)
-                                if let data = pet.avatarImageData, let ui = UIImage(data: data) {
-                                    Image(uiImage: ui)
-                                        .resizable().scaledToFill()
-                                        .frame(width: 48, height: 48)
-                                        .clipShape(Circle())
-                                } else {
-                                    Text(pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji)
-                                        .font(.system(size: 24))
-                                }
-                            }
+                            PetAvatarPortraitView(
+                                imageData: pet.avatarImageData,
+                                fallbackText: pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji,
+                                themeColor: petThemeColor,
+                                size: 48,
+                                backgroundOpacity: 0.28
+                            )
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(pet.name)
                                     .font(.system(size: 17, weight: .black, design: .rounded))
@@ -651,7 +637,7 @@ struct EditDocumentSheet: View {
                             }
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 8) {
-                                    ForEach(DocumentCategory.allCases, id: \.rawValue) { cat in
+                                    ForEach(DocumentCategory.protectionDocumentCases, id: \.rawValue) { cat in
                                         Button { selectedCategory = cat } label: {
                                             HStack(spacing: 5) {
                                                 Text(cat.emoji)

@@ -2,28 +2,60 @@
 //  IslandHealthDashboard.swift
 //  Ohana
 //
-//  Cross-pet health overview used by the GO home FAB and feature groups.
+//  Cross-pet health archive dashboard.
 //
 
 import SwiftUI
 import SwiftData
-import Charts
 
-private struct HealthMonthPoint: Identifiable {
-    let id = UUID()
-    let month: Date
+private enum HealthDashboardRange: Hashable, CaseIterable {
+    case days7
+    case days30
+    case days90
+    case all
+
+    func title(_ l: L10n) -> String {
+        switch self {
+        case .days7: return l.tr(zh: "7天", en: "7D", de: "7T")
+        case .days30: return l.tr(zh: "30天", en: "30D", de: "30T")
+        case .days90: return l.tr(zh: "90天", en: "90D", de: "90T")
+        case .all: return l.tr(zh: "全部", en: "All", de: "Alle")
+        }
+    }
+
+    func startDate(now: Date = Date(), calendar: Calendar = .current) -> Date? {
+        switch self {
+        case .days7:
+            return calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now))
+        case .days30:
+            return calendar.date(byAdding: .day, value: -29, to: calendar.startOfDay(for: now))
+        case .days90:
+            return calendar.date(byAdding: .day, value: -89, to: calendar.startOfDay(for: now))
+        case .all:
+            return nil
+        }
+    }
+}
+
+private struct HealthDayPoint: Identifiable, Hashable {
+    let date: Date
     let count: Int
+
+    var id: String {
+        "\(Int(date.timeIntervalSinceReferenceDate))-\(count)"
+    }
 }
 
 private struct HealthPetSummary: Identifiable {
     let id: UUID
     let pet: Pet
-    let recordCount: Int
-    let yearCount: Int
+    let totalCount: Int
+    let periodCount: Int
     let latestTitle: String
     let latestDate: Date?
     let riskText: String
     let riskColor: Color
+    let riskRank: Int
 }
 
 struct IslandHealthDashboard: View {
@@ -32,10 +64,14 @@ struct IslandHealthDashboard: View {
 
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \Pet.name) private var pets: [Pet]
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
 
     @State private var selectedPetId: UUID? = nil
+    @State private var selectedRange: HealthDashboardRange = .days30
     @State private var sheetPet: Pet? = nil
-    @State private var chartRevealProgress: CGFloat = 0
+    @State private var chartProgress: Double = 0
+
+    private var l: L10n { L10n(appLanguage) }
 
     private var activePets: [Pet] {
         pets.filter { !$0.hasPassedAway }
@@ -50,16 +86,25 @@ struct IslandHealthDashboard: View {
         selectedPets.flatMap(\.healthLogs)
     }
 
-    private var yearLogs: [PetHealthLog] {
-        let cutoff = Calendar.current.date(byAdding: .month, value: -12, to: Date()) ?? Date()
+    private var periodLogs: [PetHealthLog] {
+        guard let cutoff = selectedRange.startDate() else { return filteredLogs }
         return filteredLogs.filter { $0.date >= cutoff }
+    }
+
+    private var overdueCount: Int {
+        selectedPets.reduce(0) { total, pet in
+            total + dueItems(for: pet).filter { item in
+                let days = Calendar.current.dateComponents([.day], from: Date(), to: item.date).day ?? 0
+                return days < 0
+            }.count
+        }
     }
 
     private var dueSoonCount: Int {
         selectedPets.reduce(0) { total, pet in
             total + dueItems(for: pet).filter { item in
-                guard let days = Calendar.current.dateComponents([.day], from: Date(), to: item.date).day else { return false }
-                return days <= 30
+                let days = Calendar.current.dateComponents([.day], from: Date(), to: item.date).day ?? 0
+                return days >= 0 && days <= 30
             }.count
         }
     }
@@ -68,41 +113,60 @@ struct IslandHealthDashboard: View {
         selectedPets.filter(\.healthLogs.isEmpty).count
     }
 
-    private var monthPoints: [HealthMonthPoint] {
-        let cal = Calendar.current
-        let thisMonth = cal.dateInterval(of: .month, for: Date())?.start ?? Date()
-        return (0..<12).reversed().map { offset in
-            let month = cal.date(byAdding: .month, value: -offset, to: thisMonth) ?? Date()
-            let count = filteredLogs.filter { log in
-                cal.isDate(log.date, equalTo: month, toGranularity: .month)
-            }.count
-            return HealthMonthPoint(month: month, count: count)
+    private var attentionCount: Int {
+        overdueCount + dueSoonCount + noRecordCount
+    }
+
+    private var chartStartDate: Date {
+        let calendar = Calendar.current
+        let now = Date()
+        if let rangeStart = selectedRange.startDate(now: now, calendar: calendar) {
+            return rangeStart
+        }
+        let earliest = filteredLogs.map(\.date).min()
+        let capped = calendar.date(byAdding: .day, value: -119, to: calendar.startOfDay(for: now)) ?? now
+        return max(calendar.startOfDay(for: earliest ?? now), capped)
+    }
+
+    private var dayPoints: [HealthDayPoint] {
+        let calendar = Calendar.current
+        let nowStart = calendar.startOfDay(for: Date())
+        let start = calendar.startOfDay(for: chartStartDate)
+        let dayCount = max(0, calendar.dateComponents([.day], from: start, to: nowStart).day ?? 0)
+        return (0...dayCount).compactMap { offset in
+            guard let day = calendar.date(byAdding: .day, value: offset, to: start) else { return nil }
+            let count = filteredLogs.filter { calendar.isDate($0.date, inSameDayAs: day) }.count
+            return HealthDayPoint(date: day, count: count)
         }
     }
 
     private var typeBreakdown: [(type: HealthLogType, count: Int)] {
         HealthLogType.allCases
-            .map { type in (type, filteredLogs.filter { $0.type == type.rawValue }.count) }
+            .map { type in (type, periodLogs.filter { $0.type == type.rawValue }.count) }
             .filter { $0.count > 0 }
             .sorted { $0.count > $1.count }
     }
 
     private var petSummaries: [HealthPetSummary] {
-        let cal = Calendar.current
-        let cutoff = cal.date(byAdding: .month, value: -12, to: Date()) ?? Date()
+        let cutoff = selectedRange.startDate() ?? .distantPast
         return selectedPets.map { pet in
             let latest = pet.healthLogs.max { $0.date < $1.date }
             let risk = riskStatus(for: pet)
             return HealthPetSummary(
                 id: pet.id,
                 pet: pet,
-                recordCount: pet.healthLogs.count,
-                yearCount: pet.healthLogs.filter { $0.date >= cutoff }.count,
-                latestTitle: latest.map { $0.healthLogType.rawValue } ?? "暂无健康记录",
+                totalCount: pet.healthLogs.count,
+                periodCount: pet.healthLogs.filter { $0.date >= cutoff }.count,
+                latestTitle: latest.map { $0.healthLogType.rawValue } ?? l.tr(zh: "暂无健康记录", en: "No health logs", de: "Keine Gesundheitsdaten"),
                 latestDate: latest?.date,
                 riskText: risk.text,
-                riskColor: risk.color
+                riskColor: risk.color,
+                riskRank: risk.rank
             )
+        }
+        .sorted {
+            if $0.riskRank != $1.riskRank { return $0.riskRank > $1.riskRank }
+            return $0.pet.name < $1.pet.name
         }
     }
 
@@ -111,9 +175,10 @@ struct IslandHealthDashboard: View {
             .sheet(item: $sheetPet) { pet in
                 PetHealthDetailView(pet: pet, isModal: false)
             }
-            .onAppear { playChartReveal() }
-            .onChange(of: selectedPetId) { _, _ in playChartReveal() }
-            .onChange(of: filteredLogs.count) { _, _ in playChartReveal() }
+            .onAppear { playChartEntrance() }
+            .onChange(of: selectedPetId) { _, _ in playChartEntrance() }
+            .onChange(of: selectedRange) { _, _ in playChartEntrance() }
+            .onChange(of: dayPoints) { _, _ in playChartEntrance() }
     }
 
     @ViewBuilder
@@ -134,15 +199,15 @@ struct IslandHealthDashboard: View {
 
     private var scrollContent: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 16) {
+            VStack(spacing: 18) {
                 if standalone { navBar }
                 memberSelector
-                healthSignalHero
-                overviewCards
-                trendSection
-                typeBreakdownSection
+                healthPlanetHero
+                healthTrendCard
+                healthBadgeStrip
+                typeBreakdownStrip
                 healthRows
-                Color.clear.frame(height: 36)
+                Color.clear.frame(height: 40)
             }
             .padding(.horizontal, 16)
             .padding(.top, standalone ? 0 : 14)
@@ -154,30 +219,39 @@ struct IslandHealthDashboard: View {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color.goCardWhite)
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 36, height: 36)
-                    .goGlassBackground(Circle())
+                    .background(Color.ohanaControlFill, in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())
 
             Spacer()
-            Text("健康总览")
+            Text(l.tr(zh: "健康星球", en: "Health Planet", de: "Gesundheitsplanet"))
                 .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(Color.goCardWhite)
+                .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Color.clear.frame(width: 36, height: 36)
         }
-        .padding(.top, 64)
+        .padding(.top, 50)
     }
 
     private var memberSelector: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                selectorChip(title: "全部", icon: "square.grid.2x2.fill", isSelected: selectedPetId == nil) {
+                selectorChip(
+                    title: l.tr(zh: "全部", en: "All", de: "Alle"),
+                    icon: "square.grid.2x2.fill",
+                    isSelected: selectedPetId == nil
+                ) {
                     selectedPetId = nil
                 }
+
                 ForEach(activePets) { pet in
-                    selectorChip(title: pet.name, avatar: { FMPetAvatar(pet: pet, size: 22) }, isSelected: selectedPetId == pet.id) {
+                    selectorChip(
+                        title: pet.name,
+                        avatar: { FMPetAvatar(pet: pet, size: 22) },
+                        isSelected: selectedPetId == pet.id
+                    ) {
                         selectedPetId = pet.id
                     }
                 }
@@ -186,126 +260,146 @@ struct IslandHealthDashboard: View {
         }
     }
 
-    private var overviewCards: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-            metricCard(title: "总记录", value: "\(filteredLogs.count)", subtitle: "条", icon: "cross.case.fill", tint: Color.goLime)
-            metricCard(title: "12 个月", value: "\(yearLogs.count)", subtitle: "条", icon: "calendar", tint: Color.goTeal)
-            metricCard(title: "近期到期", value: "\(dueSoonCount)", subtitle: "项", icon: "bell.badge.fill", tint: dueSoonCount > 0 ? Color.goOrange : Color.goLime)
-            metricCard(title: "待建立档案", value: "\(noRecordCount)", subtitle: "位", icon: "person.crop.circle.badge.exclamationmark", tint: noRecordCount > 0 ? Color.goRed : Color.goLime)
-        }
-    }
-
-    private var healthSignalHero: some View {
-        HStack(spacing: 16) {
+    private var healthPlanetHero: some View {
+        HStack(alignment: .center, spacing: 14) {
             ZStack {
-                ForEach(0..<3, id: \.self) { index in
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(Color.goLime.opacity(0.16 + Double(index) * 0.07), lineWidth: 5)
-                        .frame(width: 92 - CGFloat(index) * 18, height: 92 - CGFloat(index) * 18)
-                        .rotationEffect(.degrees(Double(index) * 12 + Double(chartRevealProgress) * 20))
-                }
-                Image(systemName: dueSoonCount > 0 ? "bell.badge.fill" : "heart.text.square.fill")
-                    .font(.system(size: 34, weight: .black))
-                    .foregroundStyle(dueSoonCount > 0 ? Color.goOrange : Color.goLime)
+                Circle()
+                    .fill(heroTint.opacity(0.16))
+                    .frame(width: 62, height: 62)
+                Image(systemName: attentionCount > 0 ? "heart.text.square.fill" : "checkmark.seal.fill")
+                    .font(.system(size: 26, weight: .black))
+                    .foregroundStyle(heroTint)
+                    .symbolEffect(.pulse, value: attentionCount)
             }
-            .frame(width: 104, height: 104)
 
-            VStack(alignment: .leading, spacing: 7) {
-                Text("健康信号")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.goCardWhite.opacity(0.56))
-                Text(dueSoonCount > 0 ? "\(dueSoonCount) 项需要关注" : "状态稳定")
-                    .font(.system(size: 24, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.goCardWhite)
-                Text("12 个月 \(yearLogs.count) 条记录 · \(typeBreakdown.first?.type.rawValue ?? "暂无类型")")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.goCardWhite.opacity(0.52))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(attentionCount > 0 ? l.tr(zh: "需要关注", en: "Needs attention", de: "Braucht Aufmerksamkeit") : l.tr(zh: "健康记录", en: "Health logs", de: "Gesundheitsdaten"))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+
+                HStack(alignment: .lastTextBaseline, spacing: 6) {
+                    Text("\(attentionCount > 0 ? attentionCount : periodLogs.count)")
+                        .font(.system(size: 40, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .ohanaNumericMotion(attentionCount > 0 ? attentionCount : periodLogs.count)
+                    Text(attentionCount > 0 ? l.tr(zh: "项", en: "items", de: "Punkte") : l.tr(zh: "条", en: "logs", de: "Einträge"))
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
+
+                Text(heroSubtitle)
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(1)
             }
-            Spacer()
+
+            Spacer(minLength: 0)
         }
-        .padding(18)
-        .background(
-            LinearGradient(colors: [Color.goLime.opacity(0.2), Color.goCardWhite.opacity(0.07)], startPoint: .topLeading, endPoint: .bottomTrailing),
-            in: RoundedRectangle(cornerRadius: 26, style: .continuous)
-        )
     }
 
-    private var trendSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private var healthTrendCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Label("12 个月健康记录", systemImage: "chart.bar.fill")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.goCardWhite.opacity(0.82))
+                Label(l.tr(zh: "健康记录频率", en: "Health rhythm", de: "Gesundheitsrhythmus"), systemImage: "chart.bar.fill")
+                    .font(OhanaFont.subheadline(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
-                Text("记录数")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.goCardWhite.opacity(0.45))
+                DashboardRangePicker(ranges: HealthDashboardRange.allCases, selection: $selectedRange) {
+                    $0.title(l)
+                }
             }
 
-            if monthPoints.allSatisfy({ $0.count == 0 }) {
-                emptyState("暂无健康数据\n添加疫苗、体检或用药后会显示趋势")
+            if dayPoints.allSatisfy({ $0.count == 0 }) {
+                emptyState(
+                    icon: "cross.case",
+                    text: l.tr(zh: "添加疫苗、体检或用药后会显示趋势", en: "Vaccines, checkups, or meds will show here", de: "Impfungen, Checks oder Medikamente erscheinen hier")
+                )
             } else {
-                Chart(monthPoints) { point in
-                    BarMark(
-                        x: .value("月份", point.month, unit: .month),
-                        y: .value("记录", Double(point.count) * Double(chartRevealProgress))
-                    )
-                    .foregroundStyle(Color.goLime.gradient)
-                    .cornerRadius(4)
-                }
+                OhanaMinimalBarChart(
+                    points: dayPoints.map { OhanaMinimalChartPoint(date: $0.date, value: Double($0.count)) },
+                    tint: heroTint,
+                    progress: chartProgress,
+                    showsLabels: dayPoints.count <= 10,
+                    maxBarHeight: 124
+                )
                 .frame(height: 150)
-                .chartXAxis(.hidden)
-                .chartYAxis(.hidden)
             }
         }
         .padding(16)
-        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
-    private var typeBreakdownSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("记录类型")
-                .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(Color.goCardWhite)
+    private var healthBadgeStrip: some View {
+        HStack(spacing: 10) {
+            statBadge(
+                title: l.tr(zh: "本期", en: "Period", de: "Zeitraum"),
+                value: "\(periodLogs.count)",
+                icon: "cross.case.fill",
+                tint: Color.goPrimary
+            )
+            statBadge(
+                title: l.tr(zh: "到期", en: "Due", de: "Fällig"),
+                value: "\(overdueCount + dueSoonCount)",
+                icon: "bell.badge.fill",
+                tint: overdueCount + dueSoonCount > 0 ? Color.goOrange : Color.goTeal
+            )
+            statBadge(
+                title: l.tr(zh: "待建档", en: "Setup", de: "Anlegen"),
+                value: "\(noRecordCount)",
+                icon: "person.crop.circle.badge.exclamationmark",
+                tint: noRecordCount > 0 ? Color.goRed : Color.goTeal
+            )
+        }
+    }
 
-            if typeBreakdown.isEmpty {
-                emptyState("暂无类型分布")
-                    .frame(minHeight: 78)
-            } else {
-                ForEach(typeBreakdown.prefix(5), id: \.type.rawValue) { item in
-                    HStack(spacing: 10) {
-                        Text(item.type.emoji)
-                            .font(.system(size: 18))
-                        Text(item.type.rawValue)
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.goCardWhite)
-                        Spacer()
-                        Text("\(item.count)")
-                            .font(.system(size: 14, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.goLime)
+    @ViewBuilder
+    private var typeBreakdownStrip: some View {
+        if !typeBreakdown.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(typeBreakdown.prefix(6), id: \.type.rawValue) { item in
+                        HStack(spacing: 6) {
+                            Text(item.type.emoji)
+                                .font(.system(size: 15))
+                            Text(item.type.rawValue)
+                                .font(OhanaFont.caption(.black))
+                                .foregroundStyle(Color.ohanaPrimaryText)
+                            Text("\(item.count)")
+                                .font(OhanaFont.caption(.black))
+                                .foregroundStyle(Color.goPrimary)
+                                .ohanaNumericMotion(item.count)
+                        }
+                        .padding(.horizontal, 10)
+                        .frame(height: 34)
+                        .background(Color.ohanaControlFill, in: Capsule())
                     }
-                    .padding(12)
-                    .background(Color.goCardWhite.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
             }
         }
-        .padding(16)
-        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     private var healthRows: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("成员健康状态")
-                .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(Color.goCardWhite)
+        VStack(alignment: .leading, spacing: 12) {
+            Label(l.tr(zh: "成员健康", en: "Health status", de: "Gesundheitsstatus"), systemImage: "pawprint.fill")
+                .font(OhanaFont.subheadline(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
 
-            ForEach(petSummaries) { summary in
-                Button {
-                    open(summary.pet)
-                } label: {
-                    healthRow(summary)
+            if petSummaries.isEmpty {
+                emptyState(
+                    icon: "pawprint",
+                    text: l.tr(zh: "添加宠物后会显示健康档案", en: "Add pets to see health files", de: "Füge Tiere hinzu, um Akten zu sehen")
+                )
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(petSummaries) { summary in
+                        Button {
+                            open(summary.pet)
+                        } label: {
+                            healthRow(summary)
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                    }
                 }
-                .buttonStyle(ScaleButtonStyle())
             }
         }
     }
@@ -317,76 +411,79 @@ struct IslandHealthDashboard: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
                     Text(summary.pet.name)
-                        .font(.system(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.goCardWhite)
-                    Text(summary.pet.species)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.goCardWhite.opacity(0.5))
-                }
-                Text(summary.latestTitle)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.goCardWhite.opacity(0.58))
-                    .lineLimit(1)
-                HStack(spacing: 8) {
-                    pill("总计 \(summary.recordCount)", color: Color.goLime)
-                    pill("年内 \(summary.yearCount)", color: Color.goTeal)
+                        .font(OhanaFont.body(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .lineLimit(1)
                     pill(summary.riskText, color: summary.riskColor)
+                }
+
+                Text(summary.latestTitle)
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(1)
+
+                HStack(spacing: 8) {
+                    pill(l.tr(zh: "本期 \(summary.periodCount)", en: "Now \(summary.periodCount)", de: "Jetzt \(summary.periodCount)"), color: Color.goPrimary)
+                    pill(l.tr(zh: "总计 \(summary.totalCount)", en: "Total \(summary.totalCount)", de: "Gesamt \(summary.totalCount)"), color: Color.goTeal)
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 0)
 
             if let date = summary.latestDate {
                 Text(relativeDayText(date))
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.goCardWhite.opacity(0.5))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaTertiaryText)
             }
+
             Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Color.goCardWhite.opacity(0.32))
+                .font(.system(size: 11, weight: .black))
+                .foregroundStyle(Color.ohanaTertiaryText)
         }
-        .padding(14)
-        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(.vertical, 13)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.ohanaTertiaryText.opacity(0.18))
+                .frame(height: 1)
+        }
     }
 
-    private func metricCard(title: String, value: String, subtitle: String, icon: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.system(size: 13, weight: .black))
-                    .foregroundStyle(tint)
-                Spacer()
-            }
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(value)
-                    .font(.system(size: 30, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.goCardWhite)
-                    .monospacedDigit()
-                Text(subtitle)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.goCardWhite.opacity(0.48))
-            }
-            Text(title)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.goCardWhite.opacity(0.58))
+    private var heroTint: Color {
+        if overdueCount > 0 || noRecordCount > 0 { return Color.goRed }
+        if dueSoonCount > 0 { return Color.goOrange }
+        return Color.goPrimary
+    }
+
+    private var heroSubtitle: String {
+        if overdueCount > 0 {
+            return l.tr(zh: "\(overdueCount) 项已过期", en: "\(overdueCount) overdue", de: "\(overdueCount) überfällig")
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        if dueSoonCount > 0 {
+            return l.tr(zh: "\(dueSoonCount) 项 30 天内到期", en: "\(dueSoonCount) due in 30 days", de: "\(dueSoonCount) in 30 Tagen fällig")
+        }
+        if noRecordCount > 0 {
+            return l.tr(zh: "\(noRecordCount) 位还没有健康档案", en: "\(noRecordCount) without health files", de: "\(noRecordCount) ohne Gesundheitsakte")
+        }
+        return l.tr(zh: "健康档案节奏稳定", en: "Health files look steady", de: "Gesundheitsakten wirken stabil")
     }
 
     @ViewBuilder
-    private func selectorChip<A: View>(title: String, avatar: () -> A, isSelected: Bool, action: @escaping () -> Void) -> some View {
+    private func selectorChip<A: View>(
+        title: String,
+        avatar: () -> A,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 avatar()
                 Text(title)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.caption(.black))
             }
-            .foregroundStyle(isSelected ? Color.arkInk : Color.goCardWhite)
+            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
             .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(isSelected ? Color.goLime : Color.ohanaControlFill, in: Capsule())
+            .frame(height: 36)
+            .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -394,8 +491,26 @@ struct IslandHealthDashboard: View {
     private func selectorChip(title: String, icon: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         selectorChip(title: title, avatar: {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: 11, weight: .black))
         }, isSelected: isSelected, action: action)
+    }
+
+    private func statBadge(title: String, value: String, icon: String, tint: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .black))
+                .foregroundStyle(tint)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(value)
+                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .ohanaNumericMotion(value)
+                Text(title)
+                    .font(.system(size: 9, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaTertiaryText)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func pill(_ text: String, color: Color) -> some View {
@@ -407,12 +522,17 @@ struct IslandHealthDashboard: View {
             .background(color.opacity(0.14), in: Capsule())
     }
 
-    private func emptyState(_ text: String) -> some View {
-        Text(text)
-            .multilineTextAlignment(.center)
-            .font(.system(size: 13, weight: .semibold, design: .rounded))
-            .foregroundStyle(Color.goCardWhite.opacity(0.42))
-            .frame(maxWidth: .infinity, minHeight: 130)
+    private func emptyState(icon: String, text: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 20, weight: .black))
+                .foregroundStyle(Color.ohanaTertiaryText)
+            Text(text)
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, minHeight: 120)
     }
 
     private func open(_ pet: Pet) {
@@ -424,8 +544,18 @@ struct IslandHealthDashboard: View {
     }
 
     private func dueItems(for pet: Pet) -> [(type: HealthLogType, date: Date)] {
-        let trackedTypes: [HealthLogType] = [.vaccine, .medication, .dewormingInternal, .dewormingExternal, .checkup]
-        return trackedTypes.compactMap { type in
+        let fallbackTypes: [HealthLogType] = [.vaccine, .medication, .dewormingInternal, .dewormingExternal, .checkup]
+        let explicitDates = pet.healthLogs.compactMap { log -> (HealthLogType, Date)? in
+            if let expiration = log.expirationDate {
+                return (log.healthLogType, expiration)
+            }
+            if let nextCheckup = log.nextCheckupDate {
+                return (log.healthLogType, nextCheckup)
+            }
+            return nil
+        }
+
+        let fallbackDates = fallbackTypes.compactMap { type -> (HealthLogType, Date)? in
             guard let last = pet.healthLogs.filter({ $0.type == type.rawValue }).max(by: { $0.date < $1.date }) else {
                 return nil
             }
@@ -441,29 +571,42 @@ struct IslandHealthDashboard: View {
             guard let next else { return nil }
             return (type, next)
         }
+
+        return explicitDates + fallbackDates
     }
 
-    private func riskStatus(for pet: Pet) -> (text: String, color: Color) {
-        let items = dueItems(for: pet)
-        guard !items.isEmpty else {
-            return pet.healthLogs.isEmpty ? ("待建立", Color.goRed) : ("正常", Color.goLime)
+    private func riskStatus(for pet: Pet) -> (text: String, color: Color, rank: Int) {
+        if pet.healthLogs.isEmpty {
+            return (l.tr(zh: "待建档", en: "Setup", de: "Anlegen"), Color.goRed, 3)
         }
+
+        let items = dueItems(for: pet)
         let days = items.compactMap { Calendar.current.dateComponents([.day], from: Date(), to: $0.date).day }
-        if days.contains(where: { $0 < 0 }) { return ("已过期", Color.goRed) }
-        if days.contains(where: { $0 <= 30 }) { return ("即将到期", Color.goOrange) }
-        return ("正常", Color.goLime)
+        if days.contains(where: { $0 < 0 }) {
+            return (l.tr(zh: "已过期", en: "Overdue", de: "Überfällig"), Color.goRed, 4)
+        }
+        if days.contains(where: { $0 <= 30 }) {
+            return (l.tr(zh: "即将到期", en: "Due soon", de: "Bald fällig"), Color.goOrange, 2)
+        }
+        return (l.tr(zh: "稳定", en: "Steady", de: "Stabil"), Color.goTeal, 0)
     }
 
     private func relativeDayText(_ date: Date) -> String {
-        if Calendar.current.isDateInToday(date) { return "今天" }
-        let days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: date), to: Calendar.current.startOfDay(for: Date())).day ?? 0
-        return "\(max(days, 0))天前"
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) {
+            return l.tr(zh: "今天", en: "Today", de: "Heute")
+        }
+        if calendar.isDateInYesterday(date) {
+            return l.tr(zh: "昨天", en: "Yesterday", de: "Gestern")
+        }
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: Date())).day ?? 0
+        return l.tr(zh: "\(max(days, 0))天前", en: "\(max(days, 0))d ago", de: "vor \(max(days, 0))T")
     }
 
-    private func playChartReveal() {
-        chartRevealProgress = 0
-        withAnimation(GoMotion.page) {
-            chartRevealProgress = 1
+    private func playChartEntrance() {
+        chartProgress = 0
+        withAnimation(GoMotion.page.delay(0.04)) {
+            chartProgress = 1
         }
     }
 }

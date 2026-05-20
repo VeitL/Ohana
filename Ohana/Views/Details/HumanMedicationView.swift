@@ -5,7 +5,6 @@
 
 import SwiftUI
 import SwiftData
-import Charts
 
 struct DailyDoseItem: Identifiable, Hashable {
     let medication: HumanMedication
@@ -525,38 +524,20 @@ struct HumanMedicationView: View {
                     }
                 }
 
-                Chart {
-                    ForEach(adherenceDays) { item in
-                        BarMark(
-                            x: .value(l.tr(zh: "日期", en: "Date", de: "Datum"), item.dayLabel),
-                            y: .value(l.tr(zh: "剂量", en: "Dose", de: "Dosis"), item.planned)
+                OhanaMinimalBarChart(
+                    points: adherenceDays.map { item in
+                        OhanaMinimalChartPoint(
+                            date: item.date,
+                            value: Double(item.taken),
+                            label: item.dayLabel,
+                            id: item.id.uuidString
                         )
-                        .foregroundStyle(controlFill)
-                        .position(by: .value(l.tr(zh: "类型", en: "Type", de: "Typ"), l.tr(zh: "计划", en: "Planned", de: "Geplant")))
-                        .cornerRadius(5)
-
-                        BarMark(
-                            x: .value(l.tr(zh: "日期", en: "Date", de: "Datum"), item.dayLabel),
-                            y: .value(l.tr(zh: "剂量", en: "Dose", de: "Dosis"), item.taken)
-                        )
-                        .foregroundStyle(Color.goPrimary.gradient)
-                        .position(by: .value(l.tr(zh: "类型", en: "Type", de: "Typ"), l.tr(zh: "已服", en: "Taken", de: "Genommen")))
-                        .cornerRadius(5)
-                    }
-                }
+                    },
+                    tint: Color.goPrimary,
+                    showsLabels: true,
+                    maxBarHeight: 104
+                )
                 .frame(height: 150)
-                .chartLegend(.hidden)
-                .chartYAxis {
-                    AxisMarks(position: .leading) { _ in
-                        AxisGridLine().foregroundStyle(dividerColor)
-                        AxisValueLabel().foregroundStyle(secondaryText)
-                    }
-                }
-                .chartXAxis {
-                    AxisMarks { _ in
-                        AxisValueLabel().foregroundStyle(secondaryText)
-                    }
-                }
 
                 HStack(spacing: 14) {
                     chartLegendDot(color: secondaryText.opacity(0.55), label: l.tr(zh: "计划", en: "Planned", de: "Geplant"))

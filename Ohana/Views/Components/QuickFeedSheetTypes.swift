@@ -303,16 +303,6 @@ struct FeedStockTrendPoint: Identifiable {
     let foodKind: FeedFoodKind
 }
 
-struct FeedTreatKindSummary: Identifiable {
-    var id: String { kind.rawValue }
-    let kind: FeedTreatKind
-    let title: String
-    let icon: String
-    let count: Int
-    let grams: Double
-    let latestDate: Date?
-}
-
 enum FeedInputField: Hashable {
     case manualGrams
     case treatGrams

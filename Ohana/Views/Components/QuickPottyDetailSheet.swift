@@ -7,7 +7,6 @@
 
 import SwiftUI
 import SwiftData
-import Charts
 
 struct QuickPottyDetailSheet: View {
     let pet: Pet
@@ -17,6 +16,7 @@ struct QuickPottyDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Query(sort: \Event.startDate) private var allEvents: [Event]
+    @Query(sort: \Pet.createdAt) private var allPets: [Pet]
 
     @State private var activeSheet: ActiveSheet?
     @State private var nestedInlineSheet: ActiveSheet?
@@ -42,6 +42,7 @@ struct QuickPottyDetailSheet: View {
     @State private var scoopFeedbackToken: CheckInFeedbackToken?
     @State private var litterFeedbackToken: CheckInFeedbackToken?
     @State private var feedbackClearTask: Task<Void, Never>?
+    @State private var selectedSharedPottyPetIds: Set<UUID> = []
 
     private enum PottyFocus: String, CaseIterable, Identifiable {
         case potty
@@ -114,6 +115,20 @@ struct QuickPottyDetailSheet: View {
     private var isCatPet: Bool {
         let text = "\(pet.species) \(pet.breed)".lowercased()
         return text.contains("猫") || text.contains("cat")
+    }
+    private var sameSpeciesPottyPets: [Pet] {
+        let species = normalizedSpecies(pet.species)
+        return allPets
+            .filter { !$0.hasPassedAway && normalizedSpecies($0.species) == species }
+            .sorted { lhs, rhs in
+                if lhs.id == pet.id { return true }
+                if rhs.id == pet.id { return false }
+                return lhs.createdAt < rhs.createdAt
+            }
+    }
+    private var selectedPottyTargets: [Pet] {
+        let targets = sameSpeciesPottyPets.filter { selectedSharedPottyPetIds.contains($0.id) }
+        return targets.isEmpty ? [pet] : targets
     }
     private var availableFocuses: [PottyFocus] {
         isCatPet ? [.potty, .scoop, .litter] : [.potty]
@@ -219,7 +234,6 @@ struct QuickPottyDetailSheet: View {
                         pottyDashboard
                         coreCards
                         recentStrip
-                        removeQuickActionFooter
                     }
                     .padding(.horizontal, 18)
                     .padding(.top, 14)
@@ -288,6 +302,7 @@ struct QuickPottyDetailSheet: View {
         }
         .onAppear {
             loadSettings()
+            selectedSharedPottyPetIds = Set(sameSpeciesPottyPets.map(\.id))
             guard !pet.hasPassedAway else { return }
             if !isCatPet {
                 selectedFocus = .potty
@@ -481,27 +496,19 @@ struct QuickPottyDetailSheet: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(themeColor.opacity(0.16))
-                    .frame(width: 48, height: 48)
-                if let data = pet.avatarImageData, let image = UIImage(data: data) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 48, height: 48)
-                        .clipShape(Circle())
-                } else {
-                    Text(pet.avatarEmoji)
-                        .font(.system(size: 24))
-                }
-            }
+            PetAvatarPortraitView(
+                imageData: pet.avatarImageData,
+                fallbackText: pet.avatarEmoji,
+                themeColor: themeColor,
+                size: 48,
+                backgroundOpacity: 0.16
+            )
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(pet.name)
                     .font(.system(size: 17, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(isCatPet ? "便便 / 铲屎 / 猫砂" : "便便记录")
+                Text("噗噗电台")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -546,7 +553,7 @@ struct QuickPottyDetailSheet: View {
                 }
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(isCatPet ? "便便管理" : "便便记录")
+                    Text("噗噗电台")
                         .font(.system(size: 24, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(pottyDashboardSubtitle)
@@ -822,24 +829,6 @@ struct QuickPottyDetailSheet: View {
             .transition(.move(edge: .top).combined(with: .opacity))
     }
 
-    private var removeQuickActionFooter: some View {
-        VStack(spacing: 14) {
-            Divider().opacity(0.35)
-            Button(role: .destructive) {
-                onRemove()
-                dismiss()
-            } label: {
-                Text("移除此快捷入口")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.goRed)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-            }
-            .buttonStyle(ScaleButtonStyle())
-        }
-        .padding(.top, 4)
-    }
-
     private var sheetSurface: some ShapeStyle {
         Color.ohanaCardSurface
     }
@@ -901,7 +890,14 @@ struct QuickPottyDetailSheet: View {
     private func sheetContent(_ sheet: ActiveSheet) -> some View {
         switch sheet {
         case .pottyType:
-            PottyTypeSheet(tint: pottyTint) { type in
+            PottyTypeSheet(
+                tint: pottyTint,
+                unknownGroupTitle: sameSpeciesPottyPets.count > 1 ? "猫砂盆未知便便" : nil,
+                onUnknownGroup: sameSpeciesPottyPets.count > 1 ? {
+                    logUnknownGroupPotty()
+                    dismissInlinePoopSheet()
+                } : nil
+            ) { type in
                 logPotty(type: type)
                 dismissInlinePoopSheet()
             }
@@ -912,51 +908,77 @@ struct QuickPottyDetailSheet: View {
                 chromePadding: 70
             )
         case .scoopCheckIn:
-            PoopCheckInSheet(
-                tint: scoopTint,
-                icon: "trash.fill",
-                title: "铲屎打卡",
-                value: dueText(daysUntil: daysUntilScoop),
-                subtitle: scoopSubtitle,
-                primaryTitle: scoopPrimaryTitle == "补打卡" ? "补打卡" : (todayLitterLogs.isEmpty ? "完成铲屎" : "今天已完成"),
-                secondaryTitle: "编辑计划",
-                isPrimaryDisabled: !todayLitterLogs.isEmpty && daysUntilScoop >= 0,
-                primaryAction: {
-                    recordScoop()
-                    dismissInlinePoopSheet()
-                },
-                secondaryAction: {
-                    openPottySheet(.scoopSettings)
+            VStack(spacing: 12) {
+                if sameSpeciesPottyPets.count > 1 {
+                    SharedCareTargetPicker(
+                        title: "共同铲砂",
+                        subtitle: "\(selectedPottyTargets.count)只\(pet.species)",
+                        pets: sameSpeciesPottyPets,
+                        selectedPetIds: $selectedSharedPottyPetIds,
+                        tint: scoopTint
+                    )
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
                 }
-            )
+                PoopCheckInSheet(
+                    tint: scoopTint,
+                    icon: "trash.fill",
+                    title: "铲屎打卡",
+                    value: dueText(daysUntil: daysUntilScoop),
+                    subtitle: scoopSubtitle,
+                    primaryTitle: scoopPrimaryTitle == "补打卡" ? "补打卡" : (todayLitterLogs.isEmpty ? "完成铲屎" : "今天已完成"),
+                    secondaryTitle: "编辑计划",
+                    isPrimaryDisabled: !todayLitterLogs.isEmpty && daysUntilScoop >= 0,
+                    primaryAction: {
+                        recordScoop()
+                        dismissInlinePoopSheet()
+                    },
+                    secondaryAction: {
+                        openPottySheet(.scoopSettings)
+                    }
+                )
+            }
             .ohanaAdaptiveSheetContentHeight(
                 $adaptiveSheetHeight,
-                minHeight: 330,
-                maxHeight: 560,
+                minHeight: sameSpeciesPottyPets.count > 1 ? 430 : 330,
+                maxHeight: 620,
                 chromePadding: 70
             )
         case .litterChangeCheckIn:
-            PoopCheckInSheet(
-                tint: litterTint,
-                icon: "tray.full.fill",
-                title: "换猫砂",
-                value: dueText(daysUntil: daysUntilLitterChange),
-                subtitle: litterChangeSubtitle,
-                primaryTitle: "记录换砂",
-                secondaryTitle: "编辑计划",
-                isPrimaryDisabled: false,
-                primaryAction: {
-                    doFullChange()
-                    dismissInlinePoopSheet()
-                },
-                secondaryAction: {
-                    openPottySheet(.litterSettings)
+            VStack(spacing: 12) {
+                if sameSpeciesPottyPets.count > 1 {
+                    SharedCareTargetPicker(
+                        title: "共同换砂",
+                        subtitle: "\(selectedPottyTargets.count)只\(pet.species)",
+                        pets: sameSpeciesPottyPets,
+                        selectedPetIds: $selectedSharedPottyPetIds,
+                        tint: litterTint
+                    )
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
                 }
-            )
+                PoopCheckInSheet(
+                    tint: litterTint,
+                    icon: "tray.full.fill",
+                    title: "换猫砂",
+                    value: dueText(daysUntil: daysUntilLitterChange),
+                    subtitle: litterChangeSubtitle,
+                    primaryTitle: "记录换砂",
+                    secondaryTitle: "编辑计划",
+                    isPrimaryDisabled: false,
+                    primaryAction: {
+                        doFullChange()
+                        dismissInlinePoopSheet()
+                    },
+                    secondaryAction: {
+                        openPottySheet(.litterSettings)
+                    }
+                )
+            }
             .ohanaAdaptiveSheetContentHeight(
                 $adaptiveSheetHeight,
-                minHeight: 330,
-                maxHeight: 560,
+                minHeight: sameSpeciesPottyPets.count > 1 ? 430 : 330,
+                maxHeight: 620,
                 chromePadding: 70
             )
         case .scoopSettings:
@@ -1326,29 +1348,13 @@ struct QuickPottyDetailSheet: View {
                     .frame(height: 160)
             } else {
                 let yDomain = OhanaChartStyle.yDomain(values: points.map(\.value), includeZero: true)
-                let renderedPoints = points.map {
-                    PoopChartPoint(date: $0.date, value: $0.value * overviewChartProgress)
-                }
-                Chart(renderedPoints) { point in
-                    AreaMark(
-                        x: .value("Day", point.date),
-                        y: .value("Value", point.value)
-                    )
-                    .foregroundStyle(OhanaChartStyle.areaGradient(for: tint, topOpacity: 0.26))
-                    .interpolationMethod(OhanaChartStyle.trendInterpolation)
-
-                    LineMark(
-                        x: .value("Day", point.date),
-                        y: .value("Value", point.value)
-                    )
-                    .interpolationMethod(OhanaChartStyle.trendInterpolation)
-                    .foregroundStyle(tint)
-                    .lineStyle(OhanaChartStyle.trendLineStyle)
-                }
-                .chartYScale(domain: yDomain)
-                .chartXAxis(.hidden)
-                .chartYAxis(.hidden)
-                .frame(height: 160)
+                OhanaMinimalTrendChart(
+                    points: points.map { OhanaMinimalChartPoint(date: $0.date, value: $0.value) },
+                    yDomain: yDomain,
+                    tint: tint,
+                    progress: overviewChartProgress
+                )
+                .frame(height: 128)
                 .animation(GoMotion.page, value: overviewChartProgress)
             }
         }
@@ -1479,28 +1485,40 @@ struct QuickPottyDetailSheet: View {
     }
 
     private func persistScoopSettings() {
+        persistScoopSettings(for: pet)
+    }
+
+    private func persistScoopSettings(for target: Pet) {
         let defaults = UserDefaults.standard
-        defaults.set(scoopIntervalDays, forKey: "scoopIntervalDays_\(petKey)")
-        defaults.set(scoopAnchorDate.timeIntervalSince1970, forKey: "scoopAnchorDate_\(petKey)")
-        defaults.set(scoopReminderOn, forKey: "scoopReminder_\(petKey)")
+        let key = target.id.uuidString
+        defaults.set(scoopIntervalDays, forKey: "scoopIntervalDays_\(key)")
+        defaults.set(scoopAnchorDate.timeIntervalSince1970, forKey: "scoopAnchorDate_\(key)")
+        defaults.set(scoopReminderOn, forKey: "scoopReminder_\(key)")
     }
 
     private func persistLitterChangeSettings() {
+        persistLitterChangeSettings(for: pet)
+    }
+
+    private func persistLitterChangeSettings(for target: Pet) {
         let defaults = UserDefaults.standard
-        defaults.set(litterChangeIntervalDays, forKey: "litterChangeInterval_\(petKey)")
-        defaults.set(litterCycleAnchorDate.timeIntervalSince1970, forKey: "litterChangeCycleAnchor_\(petKey)")
-        defaults.set(litterReminderOn, forKey: "litterReminder_\(petKey)")
+        let key = target.id.uuidString
+        defaults.set(litterChangeIntervalDays, forKey: "litterChangeInterval_\(key)")
+        defaults.set(litterCycleAnchorDate.timeIntervalSince1970, forKey: "litterChangeCycleAnchor_\(key)")
+        defaults.set(litterReminderOn, forKey: "litterReminder_\(key)")
     }
 
     private func syncScoopPlan(showToast: Bool) {
-        persistScoopSettings()
-        CarePlanCalendarSync.syncScoopPlan(
-            pet: pet,
-            context: modelContext,
-            intervalDays: scoopIntervalDays,
-            enabled: scoopReminderOn,
-            anchor: scoopAnchorDate
-        )
+        for target in selectedPottyTargets {
+            persistScoopSettings(for: target)
+            CarePlanCalendarSync.syncScoopPlan(
+                pet: target,
+                context: modelContext,
+                intervalDays: scoopIntervalDays,
+                enabled: scoopReminderOn,
+                anchor: scoopAnchorDate
+            )
+        }
         if scoopReminderOn {
             scheduleCarePlanReminders(titleContains: "铲屎")
         }
@@ -1511,14 +1529,16 @@ struct QuickPottyDetailSheet: View {
     }
 
     private func syncLitterChangePlan(showToast: Bool) {
-        persistLitterChangeSettings()
-        CarePlanCalendarSync.syncLitterFullChangePlan(
-            pet: pet,
-            context: modelContext,
-            intervalDays: litterChangeIntervalDays,
-            enabled: litterReminderOn,
-            cycleAnchor: litterCycleAnchorDate
-        )
+        for target in selectedPottyTargets {
+            persistLitterChangeSettings(for: target)
+            CarePlanCalendarSync.syncLitterFullChangePlan(
+                pet: target,
+                context: modelContext,
+                intervalDays: litterChangeIntervalDays,
+                enabled: litterReminderOn,
+                cycleAnchor: litterCycleAnchorDate
+            )
+        }
         if litterReminderOn {
             scheduleCarePlanReminders(titleContains: "猫砂")
         }
@@ -1573,6 +1593,20 @@ struct QuickPottyDetailSheet: View {
         showSaveConfirmation(delta > 0 ? "\(type.emoji) +\(delta)🥥" : "已记录便便")
     }
 
+    private func logUnknownGroupPotty() {
+        _ = CareEventService.recordUnknownSharedPotty(
+            sourcePet: pet,
+            targets: selectedPottyTargets,
+            type: .perfectPoop,
+            context: modelContext,
+            executorId: activeExecutorId()
+        )
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        pottyFeedbackToken = CheckInFeedbackToken(kind: .gain, deltaText: "+1", tint: pottyTint)
+        scheduleFeedbackClear()
+        showSaveConfirmation("已记录猫砂盆事件")
+    }
+
     private func doScoop() {
         guard !todayLitterLogs.isEmpty else {
             recordScoop()
@@ -1584,19 +1618,28 @@ struct QuickPottyDetailSheet: View {
     }
 
     private func recordScoop() {
-        let reward = CareEventService.recordCare(
-            pet: pet,
-            type: .litter,
-            context: modelContext,
-            executorId: activeExecutorId(),
-            reward: .potty(isLitter: true)
-        )
+        let targets = selectedPottyTargets
+        let reward = targets.count > 1
+            ? CareEventService.recordSharedLitterCare(
+                sourcePet: pet,
+                targets: targets,
+                context: modelContext,
+                executorId: activeExecutorId()
+            )
+            : CareEventService.recordCare(
+                pet: pet,
+                type: .litter,
+                context: modelContext,
+                executorId: activeExecutorId(),
+                reward: .potty(isLitter: true)
+            )
         syncScoopPlan(showToast: false)
         let delta = reward.humanGot + reward.petGot
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         scoopFeedbackToken = CheckInFeedbackToken(kind: .done, deltaText: "✓", tint: scoopTint)
         scheduleFeedbackClear()
-        showSaveConfirmation(delta > 0 ? "铲屎 +\(delta)🥥" : "已记录铲屎")
+        let actionText = targets.count > 1 ? "\(targets.count)只猫 已铲" : "已记录铲屎"
+        showSaveConfirmation(delta > 0 ? "\(actionText) +\(delta)🥥" : actionText)
     }
 
     private func doFullChange() {
@@ -1606,21 +1649,30 @@ struct QuickPottyDetailSheet: View {
         litterCycleAnchorDate = Calendar.current.startOfDay(for: now)
         defaults.set(litterCycleAnchorDate.timeIntervalSince1970, forKey: "litterChangeCycleAnchor_\(petKey)")
 
+        let targets = selectedPottyTargets
         if todayLitterLogs.isEmpty {
-            _ = CareEventService.recordCare(
-                pet: pet,
-                type: .litter,
-                context: modelContext,
-                executorId: activeExecutorId(),
-                reward: .potty(isLitter: true)
-            )
+            _ = targets.count > 1
+                ? CareEventService.recordSharedLitterCare(
+                    sourcePet: pet,
+                    targets: targets,
+                    context: modelContext,
+                    executorId: activeExecutorId(),
+                    isFullChange: true
+                )
+                : CareEventService.recordCare(
+                    pet: pet,
+                    type: .litter,
+                    context: modelContext,
+                    executorId: activeExecutorId(),
+                    reward: .potty(isLitter: true)
+                )
         }
         syncScoopPlan(showToast: false)
         syncLitterChangePlan(showToast: false)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         litterFeedbackToken = CheckInFeedbackToken(kind: .done, deltaText: "✓", tint: litterTint)
         scheduleFeedbackClear()
-        showSaveConfirmation("已记录换砂")
+        showSaveConfirmation(targets.count > 1 ? "\(targets.count)只猫 已换砂" : "已记录换砂")
     }
 
     private func scheduleFeedbackClear() {
@@ -1651,6 +1703,10 @@ struct QuickPottyDetailSheet: View {
     private func activeExecutorId() -> String? {
         UserDefaults.standard.string(forKey: "currentActiveHumanId")
             .flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    private func normalizedSpecies(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
     private func latestAllEvents() -> [Event] {

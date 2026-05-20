@@ -106,20 +106,14 @@ struct FeatureHubAvatar: View {
     let tint: Color
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(tint.opacity(0.18))
-            if let imageData, let image = UIImage(data: imageData) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Text(emoji.isEmpty ? fallback : emoji)
-                    .font(.system(size: 30))
-            }
-        }
-        .frame(width: 58, height: 58)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        PetAvatarPortraitRoundedView(
+            imageData: imageData,
+            fallbackText: emoji.isEmpty ? fallback : emoji,
+            themeColor: tint,
+            size: 58,
+            cornerRadius: 18,
+            backgroundOpacity: 0.18
+        )
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
@@ -238,7 +232,7 @@ private struct FeatureHubTile: View {
             HStack(spacing: 8) {
                 Image(systemName: data.icon)
                     .font(.system(size: 16, weight: .black))
-                    .foregroundStyle(data.tint)
+                    .foregroundStyle(Color.ohanaFunctionalIcon)
                     .ohanaSymbolPulse(trigger: data.value)
                 Spacer()
                 Text(data.value)

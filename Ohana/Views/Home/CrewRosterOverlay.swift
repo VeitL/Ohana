@@ -39,7 +39,6 @@ struct CrewRosterOverlay: View {
     @State private var selectedRosterMode: RosterMode = .members
     @State private var collaborationCreateTaskTrigger = 0
     @State private var collaborationEditorPresented = false
-    @State private var inlineAddEntityContentReady = false
     @State private var pendingInlineSavedPet: Pet? = nil
     @State private var pendingInlineSavedHuman: Human? = nil
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
@@ -127,10 +126,15 @@ struct CrewRosterOverlay: View {
                         .transition(.scale(scale: 0.86, anchor: .center).combined(with: .opacity))
                 }
 
-                inlineAddEntityOverlay
             }
             .toolbar(.hidden, for: .navigationBar)
-            .fullScreenCover(isPresented: $showingCoconutLog) { IslandWealthDashboardView() }
+            .fullScreenCover(isPresented: $showingCoconutLog) { CoconutLogView() }
+            .fullScreenCover(item: $activeAddEntityType, onDismiss: {
+                pendingInlineSavedPet = nil
+                pendingInlineSavedHuman = nil
+            }) { type in
+                addEntityCover(type)
+            }
             .sheet(item: $familyActivityPet) { pet in
                 NavigationStack {
                     ScrollView {
@@ -236,6 +240,7 @@ struct CrewRosterOverlay: View {
                     .font(OhanaFont.caption(.black))
                     .monospacedDigit()
                     .lineLimit(1)
+                    .ohanaNumericMotion(activeHumanCoconutBalance)
             }
             .foregroundStyle(Color.ohanaPrimaryActionText)
             .padding(.horizontal, 13)
@@ -244,6 +249,7 @@ struct CrewRosterOverlay: View {
             .contentShape(Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
+        .ohanaPhasePop(trigger: activeHumanCoconutBalance)
         .accessibilityLabel(l.tr(zh: "我的椰子 \(activeHumanCoconutBalance)", en: "My coconuts \(activeHumanCoconutBalance)", de: "Meine Kokosnuesse \(activeHumanCoconutBalance)"))
     }
 
@@ -327,78 +333,46 @@ struct CrewRosterOverlay: View {
     }
 
     @ViewBuilder
-    private var inlineAddEntityOverlay: some View {
-        if let type = activeAddEntityType {
-            ZStack(alignment: .topTrailing) {
-                if inlineAddEntityContentReady {
-                    AddEntityDestinationView(
-                        type: type,
-                        onComplete: { completeInlineAddEntity() },
-                        onPetSaved: { pet in
-                            pendingInlineSavedPet = pet
-                        },
-                        onHumanSaved: { human in
-                            pendingInlineSavedHuman = human
-                        }
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .ignoresSafeArea()
-                    .transition(addEntityContentTransition)
-                } else {
-                    inlineAddEntityLoadingView(type)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .ignoresSafeArea()
-                        .transition(.opacity)
+    private func addEntityCover(_ type: EntityType) -> some View {
+        ZStack(alignment: .topTrailing) {
+            AddEntityDestinationView(
+                type: type,
+                onComplete: { completeInlineAddEntity() },
+                onPetSaved: { pet in
+                    pendingInlineSavedPet = pet
+                },
+                onHumanSaved: { human in
+                    pendingInlineSavedHuman = human
                 }
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .ignoresSafeArea()
 
-                Button {
-                    dismissInlineAddEntity()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 42, height: 42)
-                        .background(Color.ohanaControlFill, in: Circle())
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .padding(.top, 18)
-                .padding(.trailing, 18)
-                .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+            Button {
+                dismissInlineAddEntity()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .frame(width: 42, height: 42)
+                    .background(Color.ohanaControlFill, in: Circle())
             }
-            .background(Color.clear)
-            .transition(addEntityOverlayTransition)
-            .zIndex(5_000)
+            .buttonStyle(ScaleButtonStyle())
+            .padding(.top, 18)
+            .padding(.trailing, 18)
+            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
         }
-    }
-
-    private var addEntityOverlayTransition: AnyTransition {
-        .asymmetric(
-            insertion: .opacity,
-            removal: .opacity
-        )
-    }
-
-    private var addEntityContentTransition: AnyTransition {
-        .asymmetric(
-            insertion: .opacity,
-            removal: .opacity
-        )
-    }
-
-    private func inlineAddEntityLoadingView(_ type: EntityType) -> some View {
-        OhanaAppBackground()
+        .background(OhanaAppBackground())
     }
 
     private func presentInlineAddEntity(_ type: EntityType) {
-        inlineAddEntityContentReady = false
-        withAnimation(GoMotion.sheet) {
-            activeAddEntityType = type
+        memberAddMenuItemsVisible = false
+        withAnimation(GoMotion.fab) {
+            memberAddMenuExpanded = false
         }
-        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 55) {
-            guard activeAddEntityType == type else { return }
-            withAnimation(GoMotion.quick) {
-                inlineAddEntityContentReady = true
-            }
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
+            guard activeAddEntityType == nil else { return }
+            activeAddEntityType = type
         }
     }
 
@@ -407,7 +381,6 @@ struct CrewRosterOverlay: View {
         pendingInlineSavedHuman = nil
         withAnimation(GoMotion.sheet) {
             activeAddEntityType = nil
-            inlineAddEntityContentReady = false
         }
     }
 
@@ -419,7 +392,6 @@ struct CrewRosterOverlay: View {
 
         withAnimation(GoMotion.sheet) {
             activeAddEntityType = nil
-            inlineAddEntityContentReady = false
         }
 
         OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
@@ -512,9 +484,9 @@ struct CrewRosterOverlay: View {
     private func memberAddActionRow(_ type: EntityType) -> some View {
         Button {
             OhanaFeedback.light()
-            memberAddMenuItemsVisible = false
-            memberAddMenuExpanded = false
             if let onAddEntity {
+                memberAddMenuItemsVisible = false
+                memberAddMenuExpanded = false
                 onAddEntity(type)
             } else {
                 presentInlineAddEntity(type)

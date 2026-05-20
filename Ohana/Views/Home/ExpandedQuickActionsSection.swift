@@ -37,6 +37,7 @@ struct ExpandedPetQuickActionsSection: View {
     let onHealthSelect: (String) -> Void
     let onLimitReached: () -> Void
     @State private var openActionId: String? = nil
+    @State private var lastDropTargetId: String? = nil
 
     var body: some View {
         VStack(spacing: 8) {
@@ -53,7 +54,7 @@ struct ExpandedPetQuickActionsSection: View {
                     columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4),
                     spacing: 10
                 ) {
-                    ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
+                    ForEach(Array(displayedItems.enumerated()), id: \.element.id) { idx, item in
                         ExpandedPetQuickActionGridItem(
                             idx: idx,
                             item: item,
@@ -63,6 +64,7 @@ struct ExpandedPetQuickActionsSection: View {
                             pressedActionId: $pressedActionId,
                             editItems: $editItems,
                             draggingItemId: $draggingItemId,
+                            lastDropTargetId: $lastDropTargetId,
                             isEditMode: isEditMode,
                             jiggle: jiggle,
                             shouldReduceWork: shouldReduceWork,
@@ -84,7 +86,7 @@ struct ExpandedPetQuickActionsSection: View {
                             onPottySelect: onPottySelect,
                             onHealthSelect: onHealthSelect
                         )
-                        .zIndex(openActionId == item.id ? 20 : Double(items.count - idx))
+                        .zIndex(itemZIndex(item, index: idx))
                     }
 
                     if isEditMode && QuickActionLimit.count(for: pet, in: editItems) < QuickActionLimit.maxItemsPerEntity {
@@ -95,6 +97,7 @@ struct ExpandedPetQuickActionsSection: View {
                         )
                     }
                 }
+                .animation(GoMotion.selection, value: displayedOrderSignature)
             }
 
             if isEditMode && QuickActionLimit.count(for: pet, in: editItems) >= QuickActionLimit.maxItemsPerEntity {
@@ -102,7 +105,24 @@ struct ExpandedPetQuickActionsSection: View {
             }
         }
         .padding(.horizontal, 2)
-        .onChange(of: isEditMode) { _, _ in closeMenu() }
+        .onChange(of: isEditMode) { _, _ in
+            closeMenu()
+            lastDropTargetId = nil
+        }
+    }
+
+    private var displayedItems: [QuickActionItem] {
+        isEditMode ? editItems : items
+    }
+
+    private var displayedOrderSignature: String {
+        displayedItems.map(\.id).joined(separator: "|")
+    }
+
+    private func itemZIndex(_ item: QuickActionItem, index: Int) -> Double {
+        if draggingItemId == item.id { return 40 }
+        if openActionId == item.id { return 20 }
+        return Double(displayedItems.count - index)
     }
 
     private func toggleMenu(for item: QuickActionItem) {
@@ -174,6 +194,7 @@ struct ExpandedHumanQuickActionsSection: View {
     let onLongPress: (QuickActionItem) -> Void
     let onLimitReached: () -> Void
     @State private var openActionId: String? = nil
+    @State private var lastDropTargetId: String? = nil
 
     var body: some View {
         VStack(spacing: 8) {
@@ -183,7 +204,7 @@ struct ExpandedHumanQuickActionsSection: View {
                 columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4),
                 spacing: 10
             ) {
-                ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
+                ForEach(Array(displayedItems.enumerated()), id: \.element.id) { idx, item in
                     ExpandedHumanQuickActionGridItem(
                         idx: idx,
                         item: item,
@@ -193,6 +214,7 @@ struct ExpandedHumanQuickActionsSection: View {
                         pressedActionId: $pressedActionId,
                         editItems: $editItems,
                         draggingItemId: $draggingItemId,
+                        lastDropTargetId: $lastDropTargetId,
                         isEditMode: isEditMode,
                         jiggle: jiggle,
                         shouldReduceWork: shouldReduceWork,
@@ -213,7 +235,7 @@ struct ExpandedHumanQuickActionsSection: View {
                             onLongPress(item)
                         }
                     )
-                    .zIndex(openActionId == item.id ? 20 : Double(items.count - idx))
+                    .zIndex(itemZIndex(item, index: idx))
                 }
 
                 if isEditMode && editItems.count < QuickActionLimit.maxItemsPerEntity {
@@ -224,13 +246,31 @@ struct ExpandedHumanQuickActionsSection: View {
                     )
                 }
             }
+            .animation(GoMotion.selection, value: displayedOrderSignature)
 
             if isEditMode && editItems.count >= QuickActionLimit.maxItemsPerEntity {
                 limitText
             }
         }
         .padding(.horizontal, 2)
-        .onChange(of: isEditMode) { _, _ in closeMenu() }
+        .onChange(of: isEditMode) { _, _ in
+            closeMenu()
+            lastDropTargetId = nil
+        }
+    }
+
+    private var displayedItems: [QuickActionItem] {
+        isEditMode ? editItems : items
+    }
+
+    private var displayedOrderSignature: String {
+        displayedItems.map(\.id).joined(separator: "|")
+    }
+
+    private func itemZIndex(_ item: QuickActionItem, index: Int) -> Double {
+        if draggingItemId == item.id { return 40 }
+        if openActionId == item.id { return 20 }
+        return Double(displayedItems.count - index)
     }
 
     private func toggleMenu(for item: QuickActionItem) {
@@ -295,7 +335,7 @@ struct LegacyExpandedQuickModulesView: View {
                     VStack(alignment: .leading, spacing: 9) {
                         Image(systemName: action.icon)
                             .font(.system(size: 22, weight: .black))
-                            .foregroundStyle(Color(hex: action.colorHex))
+                            .foregroundStyle(Color.ohanaFunctionalIcon)
                             .frame(width: 34, height: 34)
 
                         VStack(alignment: .leading, spacing: 1) {
@@ -372,6 +412,7 @@ private struct ExpandedPetQuickActionGridItem: View {
     @Binding var pressedActionId: String?
     @Binding var editItems: [QuickActionItem]
     @Binding var draggingItemId: String?
+    @Binding var lastDropTargetId: String?
     let isEditMode: Bool
     let jiggle: Bool
     let shouldReduceWork: Bool
@@ -401,7 +442,7 @@ private struct ExpandedPetQuickActionGridItem: View {
                 isCompletedToday: !isEditMode && isCompleted(item),
                 prefersLightForeground: true,
                 onTap: handleTap,
-                onLongPress: isEditMode ? nil : onToggleMenu,
+                onLongPress: isEditMode ? nil : (item.actionType == "health" ? onDetail : onToggleMenu),
                 onGroomCheckIn: nil,
                 onPottySelect: nil,
                 onHealthSelect: nil
@@ -410,7 +451,11 @@ private struct ExpandedPetQuickActionGridItem: View {
 
             if isMenuOpen {
                 ExpandedQuickInlineActionMenu(
-                    accent: Color(hex: item.colorHex),
+                    accent: Color.goPrimary,
+                    quickIcon: quickIconName,
+                    detailIcon: detailIconName,
+                    quickAccessibility: quickAccessibilityLabel,
+                    detailAccessibility: detailAccessibilityLabel,
                     isQuickDisabled: quickDisabled,
                     onQuick: onQuick,
                     onDetail: onDetail
@@ -424,19 +469,39 @@ private struct ExpandedPetQuickActionGridItem: View {
                 QAEditModeDragLayer(item: item, themeHex: themeHex, draggingItemId: $draggingItemId)
             }
         }
-        .rotationEffect(.degrees(isEditMode ? (jiggle ? -2.5 : 2.5) : 0))
+        .scaleEffect(isDragging ? 1.035 : 1)
+        .opacity(isDragging ? 0.72 : 1)
+        .rotationEffect(.degrees(editJiggleAngle))
         .animation(
-            isEditMode
+            isEditMode && !isDragging
                 ? (shouldReduceWork ? nil : GoMotion.quick.repeatForever(autoreverses: true))
                 : GoMotion.stateChange,
             value: jiggle
         )
+        .animation(GoMotion.selection, value: draggingItemId)
         .overlay(alignment: .topLeading) {
             if isEditMode {
                 removeButton
             }
         }
-        .onDrop(of: [.plainText, .utf8PlainText], delegate: QADropDelegate(targetItem: item, items: $editItems, draggingItemId: $draggingItemId))
+        .onDrop(
+            of: [.plainText, .utf8PlainText],
+            delegate: QADropDelegate(
+                targetItem: item,
+                items: $editItems,
+                draggingItemId: $draggingItemId,
+                lastDropTargetId: $lastDropTargetId
+            )
+        )
+    }
+
+    private var isDragging: Bool {
+        draggingItemId == item.id
+    }
+
+    private var editJiggleAngle: Double {
+        guard isEditMode, !isDragging else { return 0 }
+        return jiggle ? -1.15 : 1.15
     }
 
     private func handleTap() {
@@ -445,8 +510,28 @@ private struct ExpandedPetQuickActionGridItem: View {
         OhanaFeedback.medium()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
             pressedActionId = nil
-            onToggleMenu()
+            if item.actionType == "health" {
+                onDetail()
+            } else {
+                onToggleMenu()
+            }
         }
+    }
+
+    private var quickIconName: String {
+        item.actionType == "medication" ? "plus.circle.fill" : "checkmark.circle.fill"
+    }
+
+    private var detailIconName: String {
+        item.actionType == "medication" ? "list.bullet.rectangle.fill" : "chart.line.uptrend.xyaxis"
+    }
+
+    private var quickAccessibilityLabel: String {
+        item.actionType == "medication" ? "添加药物" : (quickDisabled ? "今日已完成" : "快速打卡")
+    }
+
+    private var detailAccessibilityLabel: String {
+        item.actionType == "medication" ? "用药详情" : "查看详情"
     }
 
     private var quickDisabled: Bool {
@@ -481,6 +566,7 @@ private struct ExpandedHumanQuickActionGridItem: View {
     @Binding var pressedActionId: String?
     @Binding var editItems: [QuickActionItem]
     @Binding var draggingItemId: String?
+    @Binding var lastDropTargetId: String?
     let isEditMode: Bool
     let jiggle: Bool
     let shouldReduceWork: Bool
@@ -522,7 +608,7 @@ private struct ExpandedHumanQuickActionGridItem: View {
 
             if isMenuOpen {
                 ExpandedQuickInlineActionMenu(
-                    accent: Color(hex: item.colorHex),
+                    accent: Color.goPrimary,
                     isQuickDisabled: false,
                     onQuick: onQuick,
                     onDetail: onDetail
@@ -536,19 +622,39 @@ private struct ExpandedHumanQuickActionGridItem: View {
                 QAEditModeDragLayer(item: item, themeHex: themeHex, draggingItemId: $draggingItemId)
             }
         }
-        .rotationEffect(.degrees(isEditMode ? (jiggle ? -2.5 : 2.5) : 0))
+        .scaleEffect(isDragging ? 1.035 : 1)
+        .opacity(isDragging ? 0.72 : 1)
+        .rotationEffect(.degrees(editJiggleAngle))
         .animation(
-            isEditMode
+            isEditMode && !isDragging
                 ? (shouldReduceWork ? nil : GoMotion.quick.repeatForever(autoreverses: true))
                 : GoMotion.stateChange,
             value: jiggle
         )
+        .animation(GoMotion.selection, value: draggingItemId)
         .overlay(alignment: .topLeading) {
             if isEditMode {
                 removeButton
             }
         }
-        .onDrop(of: [.plainText, .utf8PlainText], delegate: QADropDelegate(targetItem: item, items: $editItems, draggingItemId: $draggingItemId))
+        .onDrop(
+            of: [.plainText, .utf8PlainText],
+            delegate: QADropDelegate(
+                targetItem: item,
+                items: $editItems,
+                draggingItemId: $draggingItemId,
+                lastDropTargetId: $lastDropTargetId
+            )
+        )
+    }
+
+    private var isDragging: Bool {
+        draggingItemId == item.id
+    }
+
+    private var editJiggleAngle: Double {
+        guard isEditMode, !isDragging else { return 0 }
+        return jiggle ? -1.15 : 1.15
     }
 
     private func handleTap() {
@@ -582,6 +688,10 @@ private struct ExpandedHumanQuickActionGridItem: View {
 
 private struct ExpandedQuickInlineActionMenu: View {
     let accent: Color
+    var quickIcon: String = "checkmark.circle.fill"
+    var detailIcon: String = "chart.line.uptrend.xyaxis"
+    var quickAccessibility: String = "快速打卡"
+    var detailAccessibility: String = "查看详情"
     let isQuickDisabled: Bool
     let onQuick: () -> Void
     let onDetail: () -> Void
@@ -589,19 +699,19 @@ private struct ExpandedQuickInlineActionMenu: View {
     var body: some View {
         HStack(spacing: 8) {
             iconButton(
-                icon: isQuickDisabled ? "checkmark" : "checkmark.circle.fill",
+                icon: isQuickDisabled ? "checkmark" : quickIcon,
                 tint: isQuickDisabled ? Color.ohanaControlFill : accent,
                 foreground: isQuickDisabled ? Color.ohanaSecondaryText : Color.ohanaPrimaryActionText,
-                accessibility: isQuickDisabled ? "今日已完成" : "快速打卡",
+                accessibility: isQuickDisabled ? "今日已完成" : quickAccessibility,
                 isDisabled: isQuickDisabled,
                 action: onQuick
             )
 
             iconButton(
-                icon: "chart.line.uptrend.xyaxis",
+                icon: detailIcon,
                 tint: Color.ohanaCardSurface,
                 foreground: Color.ohanaPrimaryText,
-                accessibility: "查看详情",
+                accessibility: detailAccessibility,
                 isDisabled: false,
                 action: onDetail
             )

@@ -558,7 +558,7 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingBackgroundPicker) {
             AppBackgroundPickerSheet()
-                .presentationDetents([.large])
+                .presentationDetents([.large]) // ui-v4: allow background picker is a long visual chooser
                 .presentationBackground(.clear)
         }
         .sheet(item: $quickSwitchHuman) { human in
@@ -994,9 +994,9 @@ struct SettingsView: View {
     private func settingsIcon(_ icon: String, color: Color) -> some View {
         Image(systemName: icon)
             .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(color)
+            .foregroundStyle(Color.ohanaFunctionalIcon)
             .frame(width: 32, height: 32)
-            .background(color.opacity(colorScheme == .dark ? 0.16 : 0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .contentShape(Rectangle())
     }
 }
 
@@ -1213,10 +1213,10 @@ private struct AppBackgroundPickerSheet: View {
         .overlay(alignment: .bottomLeading) {
             Text(label)
                 .font(OhanaFont.caption2(.black))
-                .foregroundStyle(scheme == .dark ? Color.white.opacity(0.82) : Color(hex: "26364D").opacity(0.72))
+                .foregroundStyle(scheme == .dark ? Color(hex: "F8FAFC").opacity(0.82) : Color(hex: "26364D").opacity(0.72))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background((scheme == .dark ? Color.black : Color.white).opacity(0.18), in: Capsule())
+                .background((scheme == .dark ? Color(hex: "0B1020") : Color(hex: "F8FAFC")).opacity(0.18), in: Capsule())
                 .padding(7)
         }
     }
@@ -1228,21 +1228,21 @@ private struct AppBackgroundPickerSheet: View {
             .overlay {
                 LinearGradient(
                     colors: isDarkPreview
-                        ? [Color.black.opacity(0.58), Color(hex: "0F172A").opacity(0.48)]
+                        ? [Color(hex: "0B1020").opacity(0.58), Color(hex: "0F172A").opacity(0.48)]
                         : [Color(hex: "DDE8F6").opacity(0.54), Color(hex: "AEBFD4").opacity(0.42)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             }
             .overlay(alignment: .bottomLeading) {
-                Text(isDarkPreview ? l.tr(zh: "深", en: "Dark", de: "Dunkel") : l.tr(zh: "浅", en: "Light", de: "Hell"))
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(isDarkPreview ? Color.white.opacity(0.82) : Color(hex: "26364D").opacity(0.72))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background((isDarkPreview ? Color.black : Color.white).opacity(0.18), in: Capsule())
-                    .padding(7)
-            }
+                    Text(isDarkPreview ? l.tr(zh: "深", en: "Dark", de: "Dunkel") : l.tr(zh: "浅", en: "Light", de: "Hell"))
+                        .font(OhanaFont.caption2(.black))
+                        .foregroundStyle(isDarkPreview ? Color(hex: "F8FAFC").opacity(0.82) : Color(hex: "26364D").opacity(0.72))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background((isDarkPreview ? Color(hex: "0B1020") : Color(hex: "F8FAFC")).opacity(0.18), in: Capsule())
+                        .padding(7)
+                }
     }
 
     private func handlePhotoItem(_ item: PhotosPickerItem?) {

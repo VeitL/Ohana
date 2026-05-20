@@ -107,10 +107,15 @@ struct LayeredAvatarView: View {
     // MARK: – Photo avatar
     private func photoAvatar(_ img: UIImage) -> some View {
         ZStack {
-            Image(uiImage: img)
-                .resizable()
-                .scaledToFill()
-                .clipShape(Circle())
+            GeometryReader { geo in
+                let size = min(geo.size.width, geo.size.height)
+                PetAvatarPortraitImage(
+                    image: img,
+                    isTransparentAvatar: imageData.map { PetAvatarTransparencyCache.isTransparentAvatar($0) } ?? false,
+                    size: size
+                )
+                .frame(width: geo.size.width, height: geo.size.height)
+            }
 
             // Eye region overlay (top-third of circle, centered)
             if allowCustomize {

@@ -158,7 +158,7 @@ struct CareTrackingDetailSheet: View {
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     }
                     Spacer()
-                    CoconutBalanceCapsule { showingCoconutLog = true }
+                    CoconutBalanceCapsule(balance: pet.coconutBalance) { showingCoconutLog = true }
                     Button { showAddFeed = true } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.system(size: 20))
@@ -268,7 +268,7 @@ struct CareTrackingDetailSheet: View {
             }
         }
         .animation(GoMotion.page, value: showAddFeed)
-        .sheet(isPresented: $showingCoconutLog) { CoconutLogView() }
+        .sheet(isPresented: $showingCoconutLog) { CoconutLogView(subject: .pet(pet.id)) }
     }
 
     private func closeAddFeedOverlay() {

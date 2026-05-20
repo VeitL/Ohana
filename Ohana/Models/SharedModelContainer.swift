@@ -774,6 +774,51 @@ enum ArkSchemaV50: VersionedSchema {
     }
 }
 
+// MARK: - Schema V51（3D 破框卡片专用素材）
+enum ArkSchemaV51: VersionedSchema {
+    static var versionIdentifier = Schema.Version(51, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV50.models
+    }
+}
+
+// MARK: - Schema V52（同物种多宠共同照护记录）
+enum ArkSchemaV52: VersionedSchema {
+    static var versionIdentifier = Schema.Version(52, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV51.models + [SharedCareSession.self]
+    }
+}
+
+// MARK: - Schema V53（系列盲盒扭蛋收藏与抽取记录）
+enum ArkSchemaV53: VersionedSchema {
+    static var versionIdentifier = Schema.Version(53, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV52.models + [GachaOwnedItem.self, GachaDrawLog.self]
+    }
+}
+
+// MARK: - Schema V54（扭蛋非收藏结果与即时奖励记录）
+enum ArkSchemaV54: VersionedSchema {
+    static var versionIdentifier = Schema.Version(54, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV53.models
+    }
+}
+
+// MARK: - Schema V55（Oasis 电子宠物低压力生命状态）
+enum ArkSchemaV55: VersionedSchema {
+    static var versionIdentifier = Schema.Version(55, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV54.models
+    }
+}
+
 // MARK: - Migration Plan
 // NOTE: 只保留有真实 custom logic 的 stage。
 // SwiftData 的 lightweight migration 对于"只新增字段/模型"完全不需要显式 stage——
@@ -793,7 +838,8 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
          ArkSchemaV35.self, ArkSchemaV36.self, ArkSchemaV37.self, ArkSchemaV38.self, ArkSchemaV39.self,
          ArkSchemaV40.self, ArkSchemaV41.self, ArkSchemaV42.self, ArkSchemaV43.self, ArkSchemaV44.self,
          ArkSchemaV45.self, ArkSchemaV46.self, ArkSchemaV47.self, ArkSchemaV48.self, ArkSchemaV49.self,
-         ArkSchemaV50.self]
+         ArkSchemaV50.self, ArkSchemaV51.self, ArkSchemaV52.self, ArkSchemaV53.self, ArkSchemaV54.self,
+         ArkSchemaV55.self]
     }
 
     static var stages: [MigrationStage] { [] }
@@ -823,7 +869,7 @@ struct SharedModelContainer {
     }
 
     private static func createPersistentContainer() -> ModelContainer {
-        let schema = Schema(ArkSchemaV50.models)
+        let schema = Schema(ArkSchemaV55.models)
         let defaultConfig = ModelConfiguration(
             isStoredInMemoryOnly: false,
             cloudKitDatabase: .none

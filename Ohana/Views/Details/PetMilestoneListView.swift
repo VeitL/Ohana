@@ -108,13 +108,14 @@ struct PetMilestoneListView: View {
     // MARK: - Header
     private var headerSection: some View {
         HStack(spacing: 16) {
-            if let data = pet.avatarImageData, let img = UIImage(data: data) {
-                Image(uiImage: img).resizable().scaledToFill()
-                    .frame(width: 56, height: 56).clipShape(Circle())
-                    .overlay(Circle().strokeBorder(.primary.opacity(0.2), lineWidth: 2))
-            } else {
-                Text(pet.avatarEmoji).font(.system(size: 40))
-            }
+            PetAvatarPortraitView(
+                imageData: pet.avatarImageData,
+                fallbackText: pet.avatarEmoji,
+                themeColor: Color(hex: pet.safeThemeColorHex),
+                size: 56,
+                backgroundOpacity: 0.18
+            )
+            .overlay(Circle().strokeBorder(Color.ohanaSecondaryText.opacity(0.2), lineWidth: 2))
             VStack(alignment: .leading, spacing: 4) {
                 Text(pet.name)
                     .font(.system(size: 20, weight: .black, design: .rounded))

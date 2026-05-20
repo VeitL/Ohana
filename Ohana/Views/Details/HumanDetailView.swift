@@ -153,7 +153,9 @@ struct HumanDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 12) {
-                    CoconutBalanceCapsule { showingCoconutLog = true }
+                    if !human.isPrivate(.wishlist, viewedBy: activeHumanId) {
+                        CoconutBalanceCapsule(balance: human.coconutBalance) { showingCoconutLog = true }
+                    }
                     if isViewingOwnProfile {
                         Button { showingEditSheet = true } label: {
                             Image(systemName: "pencil.circle")
@@ -164,7 +166,7 @@ struct HumanDetailView: View {
             }
         }
         .sheet(isPresented: $showingEditSheet) { EditHumanSheet(human: human) }
-        .sheet(isPresented: $showingCoconutLog) { CoconutLogView() }
+        .sheet(isPresented: $showingCoconutLog) { CoconutLogView(subject: .human(human.id)) }
         .sheet(isPresented: $showWeightHistory) {
             NavigationStack { HumanWeightHistoryView(human: human) }
                 .presentationBackground(.clear)

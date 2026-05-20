@@ -552,6 +552,110 @@ final class QuestManager {
         return (finalHuman, finalPet)
     }
 
+    /// 多宠共同照护奖励：人类奖励只发一次，每只在世目标宠物各自获得成长椰子。
+    @MainActor
+    @discardableResult
+    func awardSharedCareAction(
+        type: OhanaActionType,
+        pets: [Pet],
+        context: ModelContext,
+        quality: QualityBonus = .none,
+        title: String? = nil
+    ) -> (humanGot: Int, petGot: Int) {
+        let livePets = pets.filter { !$0.hasPassedAway && !isOnCooldown(petId: $0.id, type: type) }
+        guard !livePets.isEmpty else { return (0, 0) }
+
+        let base = type.baseRewards
+        let crit = rollCrit()
+        var finalHuman = base.human * crit.multiplier
+        var finalPetEach = base.pet * crit.multiplier
+
+        let qMul = quality.multiplier
+        if qMul > 1.0 {
+            finalHuman = Int(ceil(Double(finalHuman) * qMul))
+            finalPetEach = Int(ceil(Double(finalPetEach) * qMul))
+        }
+
+        if case .feed = type, UserDefaults.standard.string(forKey: "shop_equipped_title") == "title_chef" {
+            finalHuman += 1
+        }
+
+        if UserDefaults.standard.bool(forKey: "shop_boostDoubleActive") {
+            finalHuman *= 2
+            finalPetEach *= 2
+            UserDefaults.standard.removeObject(forKey: "shop_boostDoubleActive")
+        }
+
+        var human: Human?
+        let humanIdStr = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
+        if let hid = humanIdStr {
+            human = (try? context.fetch(FetchDescriptor<Human>()))?.first { $0.id.uuidString == hid }
+        }
+
+        for pet in livePets where finalPetEach > 0 {
+            pet.coconutBalance += finalPetEach
+        }
+        if finalHuman > 0 {
+            human?.coconutBalance += finalHuman
+        }
+
+        let petTotal = finalPetEach * livePets.count
+        let humanTotal = human == nil ? 0 : finalHuman
+        let islandDelta = petTotal + humanTotal
+        if islandDelta > 0 {
+            coconutCount += islandDelta
+        }
+
+        let logEmoji = crit.isCrit && crit.multiplier == 5 ? "🎁" : type.emoji
+        let petNames = livePets.prefix(3).map(\.name).joined(separator: "、") + (livePets.count > 3 ? " 等\(livePets.count)只" : "")
+        let sharedTitle = title ?? (crit.isCrit ? crit.title : "共同照护 · \(petNames)")
+
+        for pet in livePets where finalPetEach > 0 {
+            appendLog(CoconutLogEntry(
+                emoji: logEmoji,
+                title: sharedTitle,
+                amount: finalPetEach,
+                actorId: pet.id.uuidString,
+                actorName: pet.name
+            ))
+        }
+        if let human, finalHuman > 0 {
+            appendLog(CoconutLogEntry(
+                emoji: "🥥",
+                title: crit.isCrit ? crit.title : "共同照护奖励",
+                amount: finalHuman,
+                actorId: human.id.uuidString,
+                actorName: human.name
+            ))
+        }
+
+        do {
+            try context.save()
+            flushToDefaults()
+            livePets.forEach { pet in
+                recordCooldown(petId: pet.id, type: type)
+                StreakRewardManager.shared.checkAndAward(pet: pet)
+            }
+        } catch {
+            for pet in livePets where finalPetEach > 0 {
+                pet.coconutBalance -= finalPetEach
+            }
+            if finalHuman > 0 {
+                human?.coconutBalance -= finalHuman
+            }
+            coconutCount -= islandDelta
+            let logCount = (finalPetEach > 0 ? livePets.count : 0) + (human != nil && finalHuman > 0 ? 1 : 0)
+            if logCount > 0, coconutLogs.count >= logCount {
+                coconutLogs.removeFirst(logCount)
+            }
+            #if DEBUG
+            print("❌ [QuestManager] shared care save failed: \(error.localizedDescription)")
+            #endif
+        }
+
+        return (humanTotal, petTotal)
+    }
+
     // MARK: - 旧版兼容方法（addCoconuts / awardAction with allHumans）
     // 这些方法仍保留，内部调用不再触发个人账户分润，仅用于无上下文场景（如首日登录奖励）
 

@@ -6,7 +6,6 @@
 
 import SwiftUI
 import SwiftData
-import Charts
 
 struct CoHealthDashboardView: View {
     let human: Human
@@ -226,85 +225,39 @@ struct CoHealthDashboardView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .frame(height: 80)
             } else {
-                Chart {
-                    if hPoints.count >= 2 {
-                        ForEach(hPoints) { pt in
-                            AreaMark(
-                                x: .value("日期", pt.index),
-                                y: .value("体重", pt.value)
-                            )
-                            .interpolationMethod(OhanaChartStyle.trendInterpolation)
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [Color.goTeal.opacity(0.18), .clear],
-                                    startPoint: .top, endPoint: .bottom
-                                )
-                            )
-                            .symbol(by: .value("who", pt.label))
-                            LineMark(
-                                x: .value("日期", pt.index),
-                                y: .value("体重", pt.value)
-                            )
-                            .interpolationMethod(OhanaChartStyle.trendInterpolation)
-                            .foregroundStyle(Color.goTeal.opacity(0.9))
-                            .lineStyle(StrokeStyle(lineWidth: 2))
-                            .symbol(by: .value("who", pt.label))
-                        }
-                    }
-                    if pPoints.count >= 2 {
-                        ForEach(pPoints) { pt in
-                            AreaMark(
-                                x: .value("日期", pt.index),
-                                y: .value("体重", pt.value)
-                            )
-                            .interpolationMethod(OhanaChartStyle.trendInterpolation)
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [(associatedPets.first?.themeColor.color ?? Color.goPrimary).opacity(0.18), .clear],
-                                    startPoint: .top, endPoint: .bottom
-                                )
-                            )
-                            .symbol(by: .value("who", pt.label))
-                            LineMark(
-                                x: .value("日期", pt.index),
-                                y: .value("体重", pt.value)
-                            )
-                            .interpolationMethod(OhanaChartStyle.trendInterpolation)
-                            .foregroundStyle(associatedPets.first?.themeColor.color ?? Color.goPrimary)
-                            .lineStyle(StrokeStyle(lineWidth: 2))
-                            .symbol(by: .value("who", pt.label))
-                        }
-                    }
-                }
-                .chartXAxis(.hidden)
-                .chartYAxis {
-                    AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { val in
-                        AxisValueLabel {
-                            if let v = val.as(Double.self) {
-                                Text(String(format: "%.0f", v))
-                                    .font(.system(size: 7, weight: .medium))
-                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
-                            }
-                        }
-                    }
-                }
-                .chartLegend(position: .top, alignment: .leading) {
+                let yDomain = OhanaChartStyle.yDomain(
+                    values: (hPoints + pPoints).map(\.value),
+                    includeZero: false,
+                    paddingRatio: 0.16,
+                    minimumSpan: 1
+                )
+                VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 12) {
                         legendItem(color: Color.goTeal, label: human.name)
                         if let pet = associatedPets.first {
                             legendItem(color: pet.themeColor.color, label: pet.name)
                         }
                     }
-                }
-                .chartPlotStyle { $0.background(.clear) }
-                .mask(alignment: .leading) {
-                    GeometryReader { geo in
-                        Rectangle()
-                            .frame(width: max(1, geo.size.width * chartRevealProgress))
-                    }
+                    OhanaMinimalMultiTrendChart(
+                        series: [
+                            OhanaMinimalLineSeries(
+                                id: "human",
+                                points: hPoints.map { OhanaMinimalChartPoint(date: $0.date, value: $0.value, id: $0.id.uuidString) },
+                                tint: Color.goTeal.opacity(0.9)
+                            ),
+                            OhanaMinimalLineSeries(
+                                id: "pet",
+                                points: pPoints.map { OhanaMinimalChartPoint(date: $0.date, value: $0.value, id: $0.id.uuidString) },
+                                tint: associatedPets.first?.themeColor.color ?? Color.goPrimary
+                            )
+                        ],
+                        yDomain: yDomain,
+                        progress: Double(chartRevealProgress)
+                    )
                 }
                 .frame(height: 110)
                 .onAppear { playWeightChartReveal() }
+                .onChange(of: hPoints.count + pPoints.count) { _, _ in playWeightChartReveal() }
             }
         }
     }

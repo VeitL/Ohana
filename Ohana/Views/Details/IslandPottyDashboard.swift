@@ -92,7 +92,9 @@ struct IslandPottyDashboard: View {
     var body: some View {
         dashboardBody
             .sheet(item: $sheetPet) { pet in
-                PottyOverviewView(pet: pet)
+                QuickPottyDetailSheet(pet: pet) {
+                    sheetPet = nil
+                }
             }
             .onAppear { animatePulse() }
             .onChange(of: selectedPetId) { _, _ in animatePulse() }

@@ -3,12 +3,11 @@
 //  Ohana
 //
 //  全岛探索详情页 — Bento Box 深色毛玻璃主题
-//  巡岛王者 + 劳模铲屎官 + 堆叠柱状图 + 成员里程榜
+//  巡岛王者 + 劳模铲屎官 + 极简里程条 + 成员里程榜
 //
 
 import SwiftUI
 import SwiftData
-import Charts
 
 // MARK: - Time Range
 
@@ -110,7 +109,7 @@ struct IslandExplorationDashboard: View {
         return HumanWalkStats(human: best.0, totalMeters: best.1)
     }
 
-    // MARK: - 图表数据（堆叠 BarMark）
+    // MARK: - 图表数据（极简里程条）
 
     private var stackedPoints: [DailyStackPoint] {
         let cal = Calendar.current
@@ -135,6 +134,19 @@ struct IslandExplorationDashboard: View {
             }
         }
         return result
+    }
+
+    private var dailyWalkTotalPoints: [OhanaMinimalChartPoint] {
+        let cal = Calendar.current
+        let grouped = Dictionary(grouping: stackedPoints) { cal.startOfDay(for: $0.date) }
+        return grouped
+            .sorted { $0.key < $1.key }
+            .map { day, items in
+                OhanaMinimalChartPoint(
+                    date: day,
+                    value: items.reduce(0) { $0 + $1.km }
+                )
+            }
     }
 
     // MARK: - 趣味副标题
@@ -191,7 +203,7 @@ struct IslandExplorationDashboard: View {
 
     private func triggerAnimation() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            withAnimation(.spring(response: 0.65, dampingFraction: 0.82)) {
+            withAnimation(GoMotion.page) {
                 animationProgress = 1.0
             }
         }
@@ -206,7 +218,7 @@ struct IslandExplorationDashboard: View {
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 36, height: 36)
-                    .background(.white.opacity(0.12), in: Circle())
+                    .background(Color.ohanaControlFill, in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())
             Spacer()
@@ -241,7 +253,7 @@ struct IslandExplorationDashboard: View {
                 .font(.system(size: 46, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .contentTransition(.numericText())
-                .animation(.spring(response: 0.4), value: totalMeters)
+                .animation(GoMotion.feedback, value: totalMeters)
 
                 Text("km")
                     .font(.system(size: 18, weight: .black, design: .rounded))
@@ -259,35 +271,15 @@ struct IslandExplorationDashboard: View {
             }
             .padding(.horizontal, 4)
 
-            // 悬浮堆叠柱状图（无背景卡片）
+            // 悬浮极简里程条（无背景卡片）
             let data = stackedPoints
             if !data.isEmpty {
-                let uniqueDays = Set(data.map { Calendar.current.startOfDay(for: $0.date) }).count
-                let barWidth: MarkDimension = uniqueDays <= 1 ? .fixed(16) : .automatic
-                Chart(data) { pt in
-                    BarMark(
-                        x: .value("日期", pt.date, unit: .day),
-                        y: .value("km", pt.km),
-                        width: barWidth
-                    )
-                    .foregroundStyle(pt.petColor)
-                    .cornerRadius(3)
-                }
-                .chartXAxis {
-                    AxisMarks(values: .stride(by: .day, count: uniqueDays > 14 ? 7 : 1)) { _ in
-                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.06))
-                        AxisValueLabel(format: .dateTime.day())
-                            .font(.system(size: 9))
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                    }
-                }
-                .chartYAxis {
-                    AxisMarks(values: .automatic(desiredCount: 3)) { _ in
-                        AxisGridLine().foregroundStyle(Color.ohanaPrimaryText.opacity(0.05))
-                        AxisValueLabel().font(.system(size: 8)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
-                    }
-                }
+                OhanaMinimalBarChart(
+                    points: dailyWalkTotalPoints,
+                    tint: Color.goPrimary,
+                    showsLabels: dailyWalkTotalPoints.count <= 10,
+                    maxBarHeight: 86
+                )
                 .frame(height: 120)
             }
         }
@@ -339,7 +331,7 @@ struct IslandExplorationDashboard: View {
                                 Text("🚀")
                                     .font(.system(size: 14))
                                     .padding(4)
-                                    .background(Color.white, in: Circle())
+                                    .background(Color.ohanaControlFill, in: Circle())
                                     .offset(x: 16, y: -16)
                             }
                         }
@@ -393,7 +385,7 @@ struct IslandExplorationDashboard: View {
             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
     }
 
-    // MARK: - 模块C：探索趋势图（堆叠 BarMark）
+    // MARK: - 模块C：探索趋势图（极简里程条）
 
     private var stackedBarChartCard: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -409,37 +401,12 @@ struct IslandExplorationDashboard: View {
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
                     .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
             } else {
-                // 单日数据时固定柱宽，防止撑满全屏
-                let uniqueDays = Set(data.map { Calendar.current.startOfDay(for: $0.date) }).count
-                let barWidth: MarkDimension = uniqueDays <= 1 ? .fixed(16) : .automatic
-
-                Chart(data) { pt in
-                    BarMark(
-                        x: .value("日期", pt.date, unit: .day),
-                        y: .value("km", pt.km),
-                        width: barWidth
-                    )
-                    .foregroundStyle(pt.petColor)
-                    .cornerRadius(3)
-                }
-                .chartXAxis {
-                    AxisMarks(values: .stride(by: .day, count: uniqueDays > 14 ? 7 : 1)) { _ in
-                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.06))
-                        AxisValueLabel(format: .dateTime.day().month(.abbreviated))
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
-                            .font(.system(size: 9, weight: .medium))
-                    }
-                }
-                .chartYAxis {
-                    AxisMarks(position: .leading) { _ in
-                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.06))
-                        AxisValueLabel()
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
-                            .font(.system(size: 9, weight: .medium))
-                    }
-                }
+                OhanaMinimalBarChart(
+                    points: dailyWalkTotalPoints,
+                    tint: Color.goPrimary,
+                    showsLabels: dailyWalkTotalPoints.count <= 10,
+                    maxBarHeight: 100
+                )
                 .frame(height: 140)
 
                 // 图例
@@ -460,8 +427,8 @@ struct IslandExplorationDashboard: View {
             }
         }
         .padding(16)
-        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(.white.opacity(0.08), lineWidth: 1))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.ohanaDivider, lineWidth: 1))
     }
 
     // MARK: - 模块D：成员贡献榜
@@ -501,7 +468,7 @@ struct IslandExplorationDashboard: View {
                                 GeometryReader { geo in
                                     ZStack(alignment: .leading) {
                                         Capsule()
-                                            .fill(.white.opacity(0.06))
+                                            .fill(Color.ohanaDivider.opacity(0.55))
                                             .frame(height: 5)
                                         Capsule()
                                             .fill(s.color)
@@ -509,7 +476,7 @@ struct IslandExplorationDashboard: View {
                                                 width: max(4, geo.size.width * CGFloat(s.totalMeters / maxM) * CGFloat(animationProgress)),
                                                 height: 5
                                             )
-                                            .animation(.spring(response: 0.65, dampingFraction: 0.82), value: animationProgress)
+                                            .animation(GoMotion.page, value: animationProgress)
                                     }
                                 }
                                 .frame(height: 5)
@@ -529,7 +496,7 @@ struct IslandExplorationDashboard: View {
             }
         }
         .padding(16)
-        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(.white.opacity(0.08), lineWidth: 1))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.ohanaDivider, lineWidth: 1))
     }
 }

@@ -212,17 +212,14 @@ struct WeeklyReportCard: View {
 
             // 宠物 Hero
             HStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(Color(hex: pet.themeColorHex).opacity(0.25))
-                        .frame(width: 64, height: 64)
-                    if let data = pet.avatarImageData, let img = UIImage(data: data) {
-                        Image(uiImage: img).resizable().scaledToFill()
-                            .frame(width: 56, height: 56).clipShape(Circle())
-                    } else {
-                        Text(pet.avatarEmoji).font(.system(size: 32))
-                    }
-                }
+                PetAvatarPortraitView(
+                    imageData: pet.avatarImageData,
+                    fallbackText: pet.avatarEmoji,
+                    themeColor: Color(hex: pet.safeThemeColorHex),
+                    size: 64,
+                    backgroundOpacity: 0.25,
+                    transparentScale: 0.78
+                )
                 VStack(alignment: .leading, spacing: 4) {
                     Text(pet.name)
                         .font(.system(size: 22, weight: .black, design: .rounded))

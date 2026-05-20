@@ -245,9 +245,13 @@ struct UIGuidelinesView: View {
         if !allowedButtons.contains(normalized.sheetButton) {
             normalized.sheetButton = "pill"
         }
+        let allowedIcons = Set(DesignSpecOptionCatalogV4.icons.map(\.id))
+        if !allowedIcons.contains(normalized.icon) {
+            normalized.icon = "monochromePrimary"
+        }
         let allowedSettingIcons = Set(DesignSpecOptionCatalogV4.settingIcons.map(\.id))
         if !allowedSettingIcons.contains(normalized.settingIcon) {
-            normalized.settingIcon = "tintedTile"
+            normalized.settingIcon = "plainGlyph"
         }
         let allowedBackButtons = Set(DesignSpecOptionCatalogV4.pageBackButtons.map(\.id))
         if !allowedBackButtons.contains(normalized.pageBackButton) {

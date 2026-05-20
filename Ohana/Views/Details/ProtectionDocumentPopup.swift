@@ -12,10 +12,12 @@ import UniformTypeIdentifiers
 
 struct ProtectionDocumentPopup: View {
     let pet: Pet
+    var existing: PetDocument?
     let onClose: () -> Void
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Human.createdAt) private var humans: [Human]
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var visible = false
     @State private var dragOffset: CGFloat = 0
     @State private var title = ""
@@ -25,6 +27,7 @@ struct ProtectionDocumentPopup: View {
     @State private var hasExpiryDate = true
     @State private var expiryDate = Calendar.current.date(byAdding: .year, value: 1, to: Date()) ?? Date()
     @State private var issuingAuthority = ""
+    @State private var notes = ""
     @State private var costText = ""
     @State private var selectedPayerId: String?
     @State private var photoItem: PhotosPickerItem?
@@ -33,10 +36,36 @@ struct ProtectionDocumentPopup: View {
     @State private var attachmentData: Data?
     @State private var attachmentFilename = ""
     @State private var attachmentIsImage = false
+    @State private var hasNewAttachment = false
 
+    private var isEdit: Bool { existing != nil }
     private var animation: Animation { GoMotion.page }
     private var hiddenOffset: CGFloat { 760 }
     private var canSave: Bool { !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    private var l: L10n { L10n(appLanguage) }
+    private var formSpec: ProtectionDocumentFormSpec { ProtectionDocumentFormSpec.spec(for: category, petName: pet.name, l: l) }
+
+    init(pet: Pet, existing: PetDocument? = nil, onClose: @escaping () -> Void) {
+        self.pet = pet
+        self.existing = existing
+        self.onClose = onClose
+        _title = State(initialValue: existing?.title ?? "")
+        _category = State(initialValue: existing?.documentCategory ?? .passport)
+        _hasIssueDate = State(initialValue: existing?.issueDate != nil)
+        _issueDate = State(initialValue: existing?.issueDate ?? Date())
+        _hasExpiryDate = State(initialValue: existing?.expiryDate != nil)
+        _expiryDate = State(initialValue: existing?.expiryDate ?? (Calendar.current.date(byAdding: .year, value: 1, to: Date()) ?? Date()))
+        _issuingAuthority = State(initialValue: existing?.issuingAuthority ?? "")
+        _notes = State(initialValue: ExpenseReceiptMetadata.visibleNotes(from: existing?.notes ?? ""))
+        _costText = State(initialValue: (existing?.cost ?? 0) > 0 ? CountryDecimalInput.format(existing?.cost ?? 0, countryCode: AppCountry.code, maxFractionDigits: 2) : "")
+        _attachmentData = State(initialValue: existing?.attachmentData ?? existing?.attachments.first?.data)
+        _attachmentFilename = State(initialValue: existing?.attachmentFilename ?? existing?.attachments.first?.filename ?? "")
+        _attachmentIsImage = State(initialValue: {
+            if let first = existing?.attachments.first { return first.isImage }
+            guard let filename = existing?.attachmentFilename, !filename.isEmpty else { return false }
+            return UTType(filenameExtension: (filename as NSString).pathExtension)?.conforms(to: .image) == true
+        }())
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -60,7 +89,9 @@ struct ProtectionDocumentPopup: View {
                             .frame(width: 48, height: 48)
                             .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("添加证件")
+                            Text(isEdit
+                                 ? l.tr(zh: "编辑证件", en: "Edit Document", de: "Dokument bearbeiten")
+                                 : l.tr(zh: "添加证件", en: "Add Document", de: "Dokument hinzufügen"))
                                 .font(OhanaFont.title3(.black))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Text(pet.name)
@@ -76,16 +107,7 @@ struct ProtectionDocumentPopup: View {
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 12) {
                             categoryPicker
-                            popupBlock {
-                                TextField("证件名称", text: $title)
-                                    .font(OhanaFont.subheadline(.bold))
-                                    .foregroundStyle(Color.ohanaPrimaryText)
-                            }
-                            popupBlock {
-                                TextField("机构 / 编号", text: $issuingAuthority)
-                                    .font(OhanaFont.subheadline(.bold))
-                                    .foregroundStyle(Color.ohanaPrimaryText)
-                            }
+                            keyFieldsSection
                             dateRows
                             attachmentSection
                             costSection
@@ -97,7 +119,7 @@ struct ProtectionDocumentPopup: View {
                     .frame(maxHeight: min(proxy.size.height * 0.58, 560))
 
                     Button(action: save) {
-                        Text("保存")
+                        Text(l.tr(zh: "保存", en: "Save", de: "Sichern"))
                             .font(OhanaFont.subheadline(.black))
                             .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity)
@@ -121,8 +143,12 @@ struct ProtectionDocumentPopup: View {
             .animation(animation, value: visible)
             .animation(animation, value: dragOffset)
         }
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .onAppear {
             selectedPayerId = currentPayerId
+            if !isEdit {
+                applyCategoryDefaults(force: true)
+            }
             withAnimation(animation) { visible = true }
         }
         .onChange(of: photoItem) { _, item in
@@ -133,6 +159,7 @@ struct ProtectionDocumentPopup: View {
                         attachmentData = data
                         attachmentFilename = "document.jpg"
                         attachmentIsImage = true
+                        hasNewAttachment = true
                     }
                 }
             }
@@ -145,6 +172,7 @@ struct ProtectionDocumentPopup: View {
                 attachmentData = data
                 attachmentFilename = url.lastPathComponent
                 attachmentIsImage = UTType(filenameExtension: url.pathExtension)?.conforms(to: .image) == true
+                hasNewAttachment = true
             }
         }
         .sheet(isPresented: $showingCamera) {
@@ -152,6 +180,7 @@ struct ProtectionDocumentPopup: View {
                 attachmentData = image.jpegData(compressionQuality: 0.82)
                 attachmentFilename = "camera.jpg"
                 attachmentIsImage = true
+                hasNewAttachment = true
                 showingCamera = false
             } onCancel: {
                 showingCamera = false
@@ -181,10 +210,16 @@ struct ProtectionDocumentPopup: View {
     private var categoryPicker: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(DocumentCategory.allCases, id: \.rawValue) { option in
+                ForEach(DocumentCategory.protectionDocumentCases, id: \.rawValue) { option in
                     Button {
-                        withAnimation(GoMotion.feedback) { category = option }
-                        if title.isEmpty { title = "\(pet.name)\(option.rawValue)" }
+                        let previousSpec = formSpec
+                        let shouldReplaceTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                            title == previousSpec.defaultTitle ||
+                            previousSpec.quickTitles.contains(title)
+                        withAnimation(GoMotion.feedback) {
+                            category = option
+                            applyCategoryDefaults(for: option, replaceTitle: shouldReplaceTitle, resetDates: true)
+                        }
                     } label: {
                         Text("\(option.emoji) \(option.rawValue)")
                             .font(OhanaFont.caption(.black))
@@ -199,25 +234,137 @@ struct ProtectionDocumentPopup: View {
         }
     }
 
-    private var dateRows: some View {
-        VStack(spacing: 10) {
-            popupBlock {
-                Toggle("签发日期", isOn: $hasIssueDate)
-                    .font(OhanaFont.subheadline(.bold))
-                    .tint(Color.goPrimary)
-                if hasIssueDate {
-                    DatePicker("", selection: $issueDate, displayedComponents: .date)
-                        .labelsHidden()
-                        .tint(Color.goPrimary)
+    private var keyFieldsSection: some View {
+        popupBlock {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(formSpec.sectionTitle)
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+
+                if !formSpec.quickTitles.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(formSpec.quickTitles, id: \.self) { option in
+                                Button {
+                                    withAnimation(GoMotion.feedback) { title = option }
+                                } label: {
+                                    Text(option)
+                                        .font(OhanaFont.caption2(.black))
+                                        .foregroundStyle(title == option ? Color.arkInk : Color.ohanaPrimaryText)
+                                        .padding(.horizontal, 10)
+                                        .frame(height: 30)
+                                        .background(title == option ? Color.goPrimary : Color.ohanaCardSurfaceElevated, in: Capsule())
+                                }
+                                .buttonStyle(ScaleButtonStyle())
+                            }
+                        }
+                    }
+                }
+
+                VStack(spacing: 10) {
+                    formTextField(
+                        label: formSpec.titleLabel,
+                        placeholder: formSpec.titlePlaceholder,
+                        text: $title,
+                        icon: formSpec.titleIcon
+                    )
+                    formTextField(
+                        label: formSpec.authorityLabel,
+                        placeholder: formSpec.authorityPlaceholder,
+                        text: $issuingAuthority,
+                        icon: formSpec.authorityIcon
+                    )
+                    formTextField(
+                        label: formSpec.notesLabel,
+                        placeholder: formSpec.notesPlaceholder,
+                        text: $notes,
+                        icon: "text.alignleft"
+                    )
                 }
             }
-            popupBlock {
-                Toggle("到期日期", isOn: $hasExpiryDate)
+        }
+    }
+
+    private func formTextField(label: String, placeholder: String, text: Binding<String>, icon: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .black))
+                .foregroundStyle(Color.goPrimary)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(label)
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                TextField(placeholder, text: text, axis: .vertical)
                     .font(OhanaFont.subheadline(.bold))
-                    .tint(Color.goPrimary)
-                if hasExpiryDate {
-                    DatePicker("", selection: $expiryDate, displayedComponents: .date)
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1...3)
+            }
+        }
+        .padding(12)
+        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var dateRows: some View {
+        VStack(spacing: 10) {
+            optionalDateBlock(
+                icon: "calendar.badge.checkmark",
+                title: formSpec.issueDateLabel,
+                isEnabled: $hasIssueDate,
+                date: $issueDate
+            )
+            optionalDateBlock(
+                icon: "clock.badge.checkmark",
+                title: formSpec.expiryDateLabel,
+                isEnabled: $hasExpiryDate,
+                date: $expiryDate
+            )
+        }
+    }
+
+    private func optionalDateBlock(
+        icon: String,
+        title: String,
+        isEnabled: Binding<Bool>,
+        date: Binding<Date>
+    ) -> some View {
+        popupBlock {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    Image(systemName: icon)
+                        .font(.system(size: 13, weight: .black))
+                        .foregroundStyle(Color.goPrimary)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                            .font(OhanaFont.subheadline(.black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                        Text(isEnabled.wrappedValue
+                             ? date.wrappedValue.formatted(.dateTime.year().month().day())
+                             : l.tr(zh: "可选", en: "Optional", de: "Optional"))
+                            .font(OhanaFont.caption(.semibold))
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                    }
+                    Spacer()
+                    Button {
+                        withAnimation(GoMotion.feedback) {
+                            isEnabled.wrappedValue.toggle()
+                        }
+                    } label: {
+                        Text(isEnabled.wrappedValue ? l.tr(zh: "清除", en: "Clear", de: "Leeren") : l.tr(zh: "添加", en: "Add", de: "Hinzufügen"))
+                            .font(OhanaFont.caption(.black))
+                            .foregroundStyle(isEnabled.wrappedValue ? Color.ohanaPrimaryText : Color.arkInk)
+                            .padding(.horizontal, 12)
+                            .frame(height: 32)
+                            .background(isEnabled.wrappedValue ? Color.ohanaCardSurfaceElevated : Color.goPrimary, in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
+
+                if isEnabled.wrappedValue {
+                    DatePicker("", selection: date, displayedComponents: .date)
                         .labelsHidden()
+                        .datePickerStyle(.compact)
                         .tint(Color.goPrimary)
                 }
             }
@@ -227,7 +374,7 @@ struct ProtectionDocumentPopup: View {
     private var attachmentSection: some View {
         popupBlock {
             VStack(alignment: .leading, spacing: 10) {
-                Text("附件")
+                Text(l.tr(zh: "附件", en: "Attachment", de: "Anhang"))
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 HStack(spacing: 10) {
@@ -241,7 +388,7 @@ struct ProtectionDocumentPopup: View {
                         attachmentButtonLabel("paperclip", "文件")
                     }
                 }
-                if !attachmentFilename.isEmpty {
+                if attachmentData != nil || !attachmentFilename.isEmpty {
                     Label(attachmentFilename, systemImage: attachmentIsImage ? "photo.fill" : "doc.fill")
                         .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
@@ -267,7 +414,7 @@ struct ProtectionDocumentPopup: View {
     private var costSection: some View {
         popupBlock {
             VStack(alignment: .leading, spacing: 10) {
-                Text("费用")
+                Text(l.tr(zh: "费用", en: "Cost", de: "Kosten"))
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 InlineNumericInput(
@@ -282,7 +429,7 @@ struct ProtectionDocumentPopup: View {
                     usesMiniKeypad: true
                 )
                 if humans.count > 1 {
-                    Picker("支付人", selection: Binding(
+                    Picker(l.tr(zh: "支付人", en: "Payer", de: "Zahler"), selection: Binding(
                         get: { selectedPayerId ?? currentPayerId ?? "" },
                         set: { selectedPayerId = $0 }
                     )) {
@@ -313,6 +460,7 @@ struct ProtectionDocumentPopup: View {
     }
 
     private func close() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         withAnimation(animation) {
             visible = false
             dragOffset = 0
@@ -323,13 +471,17 @@ struct ProtectionDocumentPopup: View {
     }
 
     private func save() {
-        let document = PetDocument(title: title.trimmingCharacters(in: .whitespacesAndNewlines), category: category, pet: pet)
+        let document = existing ?? PetDocument(title: title.trimmingCharacters(in: .whitespacesAndNewlines), category: category, pet: pet)
+        document.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        document.category = category.rawValue
+        document.pet = pet
         document.issuingAuthority = issuingAuthority
-        if hasIssueDate { document.issueDate = issueDate }
-        if hasExpiryDate { document.expiryDate = expiryDate }
+        document.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        document.issueDate = hasIssueDate ? issueDate : nil
+        document.expiryDate = hasExpiryDate ? expiryDate : nil
         let amount = CountryDecimalInput.parse(costText, countryCode: AppCountry.code) ?? 0
         document.cost = amount
-        if let attachmentData {
+        if hasNewAttachment, let attachmentData {
             document.attachmentData = attachmentData
             document.attachmentFilename = attachmentFilename.isEmpty ? "attachment" : attachmentFilename
             let attachment = PetDocumentAttachment(
@@ -339,9 +491,11 @@ struct ProtectionDocumentPopup: View {
             )
             document.attachments.append(attachment)
         }
-        modelContext.insert(document)
+        if existing == nil {
+            modelContext.insert(document)
+        }
 
-        if amount > 0 {
+        if existing == nil, amount > 0 {
             let payerId = selectedPayerId.flatMap { id in humans.contains(where: { $0.id.uuidString == id }) ? id : nil }
             let expenseDate = hasIssueDate ? issueDate : Date()
             for plan in DocumentExpenseSyncPlanner.plannedExpenses(
@@ -358,5 +512,116 @@ struct ProtectionDocumentPopup: View {
         modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         close()
+    }
+
+    private func applyCategoryDefaults(
+        for category: DocumentCategory? = nil,
+        replaceTitle: Bool = false,
+        resetDates: Bool = false,
+        force: Bool = false
+    ) {
+        let spec = ProtectionDocumentFormSpec.spec(for: category ?? self.category, petName: pet.name, l: l)
+        if force || replaceTitle || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            title = spec.defaultTitle
+        }
+        if force || resetDates {
+            hasIssueDate = spec.defaultHasIssueDate
+            hasExpiryDate = spec.defaultHasExpiryDate
+        }
+    }
+}
+
+private struct ProtectionDocumentFormSpec {
+    let sectionTitle: String
+    let titleLabel: String
+    let titlePlaceholder: String
+    let titleIcon: String
+    let authorityLabel: String
+    let authorityPlaceholder: String
+    let authorityIcon: String
+    let notesLabel: String
+    let notesPlaceholder: String
+    let issueDateLabel: String
+    let expiryDateLabel: String
+    let quickTitles: [String]
+    let defaultTitle: String
+    let defaultHasIssueDate: Bool
+    let defaultHasExpiryDate: Bool
+
+    static func spec(for category: DocumentCategory, petName: String, l: L10n) -> ProtectionDocumentFormSpec {
+        switch category {
+        case .passport:
+            return ProtectionDocumentFormSpec(
+                sectionTitle: l.tr(zh: "护照信息", en: "Passport Info", de: "Passdaten"),
+                titleLabel: l.tr(zh: "护照编号 / 名称", en: "Passport No. / Name", de: "Passnummer / Name"),
+                titlePlaceholder: l.tr(zh: "例如 \(petName) 护照", en: "e.g. \(petName) Passport", de: "z. B. \(petName) Pass"),
+                titleIcon: "number",
+                authorityLabel: l.tr(zh: "签发机关 / 国家", en: "Authority / Country", de: "Behörde / Land"),
+                authorityPlaceholder: l.tr(zh: "例如 宠物出入境办公室", en: "e.g. Pet travel office", de: "z. B. Haustier-Reisebehörde"),
+                authorityIcon: "building.columns.fill",
+                notesLabel: l.tr(zh: "备注", en: "Notes", de: "Notizen"),
+                notesPlaceholder: l.tr(zh: "芯片号、旅行备注等", en: "Chip number, travel notes", de: "Chipnummer, Reisenotizen"),
+                issueDateLabel: l.tr(zh: "签发日期（可选）", en: "Issue Date (optional)", de: "Ausstellungsdatum (optional)"),
+                expiryDateLabel: l.tr(zh: "到期日期（可选）", en: "Expiry Date (optional)", de: "Ablaufdatum (optional)"),
+                quickTitles: [l.tr(zh: "\(petName) 护照", en: "\(petName) Passport", de: "\(petName) Pass"), l.tr(zh: "出入境证件", en: "Travel Document", de: "Reisedokument")],
+                defaultTitle: l.tr(zh: "\(petName) 护照", en: "\(petName) Passport", de: "\(petName) Pass"),
+                defaultHasIssueDate: false,
+                defaultHasExpiryDate: true
+            )
+        case .medical:
+            return ProtectionDocumentFormSpec(
+                sectionTitle: l.tr(zh: "病历信息", en: "Medical Record Info", de: "Krankenakte"),
+                titleLabel: l.tr(zh: "病历 / 报告名称", en: "Record / Report Name", de: "Akte / Bericht"),
+                titlePlaceholder: l.tr(zh: "例如 体检报告", en: "e.g. Checkup Report", de: "z. B. Untersuchungsbericht"),
+                titleIcon: "heart.text.clipboard.fill",
+                authorityLabel: l.tr(zh: "医院 / 医生", en: "Hospital / Vet", de: "Klinik / Tierarzt"),
+                authorityPlaceholder: l.tr(zh: "就诊机构", en: "Care provider", de: "Behandelnde Stelle"),
+                authorityIcon: "stethoscope",
+                notesLabel: l.tr(zh: "诊断 / 备注", en: "Diagnosis / Notes", de: "Diagnose / Notizen"),
+                notesPlaceholder: l.tr(zh: "症状、检查结果、用药建议", en: "Symptoms, results, medication advice", de: "Symptome, Befunde, Medikation"),
+                issueDateLabel: l.tr(zh: "就诊日期（可选）", en: "Visit Date (optional)", de: "Besuchsdatum (optional)"),
+                expiryDateLabel: l.tr(zh: "复查 / 到期（可选）", en: "Follow-up / Expiry (optional)", de: "Kontrolle / Ablauf (optional)"),
+                quickTitles: [l.tr(zh: "体检报告", en: "Checkup Report", de: "Check-up-Bericht"), l.tr(zh: "化验报告", en: "Lab Report", de: "Laborbericht"), l.tr(zh: "诊断证明", en: "Diagnosis", de: "Diagnose")],
+                defaultTitle: l.tr(zh: "体检报告", en: "Checkup Report", de: "Check-up-Bericht"),
+                defaultHasIssueDate: false,
+                defaultHasExpiryDate: false
+            )
+        case .registration:
+            return ProtectionDocumentFormSpec(
+                sectionTitle: l.tr(zh: "登记信息", en: "Registration Info", de: "Registrierung"),
+                titleLabel: l.tr(zh: "登记编号 / 名称", en: "Registration No. / Name", de: "Registrierungsnummer / Name"),
+                titlePlaceholder: l.tr(zh: "例如 犬证", en: "e.g. Dog License", de: "z. B. Hundemarke"),
+                titleIcon: "tag.fill",
+                authorityLabel: l.tr(zh: "登记机构", en: "Registry", de: "Registerstelle"),
+                authorityPlaceholder: l.tr(zh: "城市、协会或登记平台", en: "City, club, or registry", de: "Stadt, Verein oder Register"),
+                authorityIcon: "building.2.fill",
+                notesLabel: l.tr(zh: "芯片 / 备注", en: "Chip / Notes", de: "Chip / Notizen"),
+                notesPlaceholder: l.tr(zh: "芯片号、登记说明等", en: "Chip no., registration notes", de: "Chipnummer, Hinweise"),
+                issueDateLabel: l.tr(zh: "登记日期（可选）", en: "Registration Date (optional)", de: "Registrierungsdatum (optional)"),
+                expiryDateLabel: l.tr(zh: "续期日期（可选）", en: "Renewal Date (optional)", de: "Verlängerung (optional)"),
+                quickTitles: [l.tr(zh: "犬证", en: "Dog License", de: "Hundemarke"), l.tr(zh: "芯片登记", en: "Microchip Registration", de: "Chipregistrierung"), l.tr(zh: "协会登记", en: "Club Registration", de: "Vereinsregistrierung")],
+                defaultTitle: l.tr(zh: "登记证", en: "Registration", de: "Registrierung"),
+                defaultHasIssueDate: false,
+                defaultHasExpiryDate: false
+            )
+        case .vaccine, .insurance, .other:
+            return ProtectionDocumentFormSpec(
+                sectionTitle: l.tr(zh: "文件信息", en: "File Info", de: "Dateiinfo"),
+                titleLabel: l.tr(zh: "文件名称", en: "File Name", de: "Dateiname"),
+                titlePlaceholder: l.tr(zh: "例如 领养协议", en: "e.g. Adoption Paper", de: "z. B. Adoptionsvertrag"),
+                titleIcon: "doc.text.fill",
+                authorityLabel: l.tr(zh: "来源 / 机构", en: "Source / Organization", de: "Quelle / Organisation"),
+                authorityPlaceholder: l.tr(zh: "可留空", en: "Optional", de: "Optional"),
+                authorityIcon: "person.text.rectangle.fill",
+                notesLabel: l.tr(zh: "备注", en: "Notes", de: "Notizen"),
+                notesPlaceholder: l.tr(zh: "补充说明", en: "Extra notes", de: "Zusätzliche Notizen"),
+                issueDateLabel: l.tr(zh: "日期（可选）", en: "Date (optional)", de: "Datum (optional)"),
+                expiryDateLabel: l.tr(zh: "到期日期（可选）", en: "Expiry Date (optional)", de: "Ablaufdatum (optional)"),
+                quickTitles: [l.tr(zh: "领养协议", en: "Adoption Paper", de: "Adoptionsvertrag"), l.tr(zh: "购买合同", en: "Purchase Contract", de: "Kaufvertrag"), l.tr(zh: "其他文件", en: "Other File", de: "Andere Datei")],
+                defaultTitle: l.tr(zh: "其他文件", en: "Other File", de: "Andere Datei"),
+                defaultHasIssueDate: false,
+                defaultHasExpiryDate: false
+            )
+        }
     }
 }

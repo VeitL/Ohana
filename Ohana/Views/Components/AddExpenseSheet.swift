@@ -803,21 +803,13 @@ struct AddExpenseSheet: View {
 
     @ViewBuilder
     private func petAvatar(size: CGFloat) -> some View {
-        ZStack {
-            Circle()
-                .fill(petThemeColor.opacity(0.22))
-                .frame(width: size, height: size)
-            if let data = pet.avatarImageData, let img = UIImage(data: data) {
-                Image(uiImage: img)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: size, height: size)
-                    .clipShape(Circle())
-            } else {
-                Text(pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji)
-                    .font(.system(size: size * 0.48))
-            }
-        }
+        PetAvatarPortraitView(
+            imageData: pet.avatarImageData,
+            fallbackText: pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji,
+            themeColor: petThemeColor,
+            size: size,
+            backgroundOpacity: 0.22
+        )
     }
 
     @ViewBuilder

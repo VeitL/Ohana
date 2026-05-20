@@ -4,14 +4,13 @@ import Testing
 struct PetAvatarAssetCatalogTests {
     @Test func devonRexCoatOptionsUseUnifiedBlackEyes() {
         let coats = PetAvatarAssetCatalog.coatColors(species: "猫", breed: "德文卷毛猫") ?? []
-        #expect(coats.map(\.name).contains("海豹重点色"))
-        #expect(coats.map(\.name).contains("蓝山猫重点色"))
+        #expect(coats.map(\.name) == ["黑色", "白色", "蓝灰色", "奶油色", "棕虎斑", "黑白", "海豹重点色", "蓝重点色", "巧克力重点色", "火焰重点色"])
 
         let bluePointEyes = PetAvatarAssetCatalog.eyeColors(species: "猫", breed: "德文卷毛猫", coatColor: "蓝重点色") ?? []
         #expect(bluePointEyes.map(\.name) == ["黑色"])
 
-        let tortieEyes = PetAvatarAssetCatalog.eyeColors(species: "猫", breed: "德文卷毛猫", coatColor: "玳瑁") ?? []
-        #expect(tortieEyes.map(\.name) == ["黑色"])
+        let flamePointEyes = PetAvatarAssetCatalog.eyeColors(species: "猫", breed: "德文卷毛猫", coatColor: "火焰重点色") ?? []
+        #expect(flamePointEyes.map(\.name) == ["黑色"])
     }
 
     @Test func shorthairCatBreedsUseGeneratedCoatOptionsAndBlackEyes() {
@@ -161,6 +160,21 @@ struct PetAvatarAssetCatalogTests {
 
         let borderCollieCoats = PetAvatarAssetCatalog.coatColors(species: "狗", breed: "Border Collie") ?? []
         #expect(borderCollieCoats.map(\.name) == ["黑白", "蓝白", "红白", "三色"])
+
+        let pomeranianCoats = PetAvatarAssetCatalog.coatColors(species: "狗", breed: "Pomeranian") ?? []
+        #expect(pomeranianCoats.map(\.name) == ["橙色", "白色", "黑色", "奶油色", "棕色"])
+
+        let cavalierCoats = PetAvatarAssetCatalog.coatColors(species: "狗", breed: "Cavalier King Charles Spaniel") ?? []
+        #expect(cavalierCoats.map(\.name) == ["红宝石色", "黑棕色", "三色", "布伦海姆色"])
+
+        let cockerCoats = PetAvatarAssetCatalog.coatColors(species: "狗", breed: "Cocker Spaniel") ?? []
+        #expect(cockerCoats.map(\.name) == ["黑色", "金色", "巧克力色", "花斑"])
+
+        let huskyCoats = PetAvatarAssetCatalog.coatColors(species: "狗", breed: "Siberian Husky") ?? []
+        #expect(huskyCoats.map(\.name) == ["黑白", "灰白", "红白", "纯白", "银白"])
+
+        let germanShepherdCoats = PetAvatarAssetCatalog.coatColors(species: "狗", breed: "German Shepherd") ?? []
+        #expect(germanShepherdCoats.map(\.name) == ["黑棕（鞍形）", "黑红色", "纯黑", "纯白"])
 
         let dachshundCoats = PetAvatarAssetCatalog.coatColors(species: "狗", breed: "Dachshund") ?? []
         #expect(dachshundCoats.map(\.name) == ["红色", "巧克力棕", "黑棕", "奶油色", "花斑"])
@@ -426,6 +440,106 @@ struct PetAvatarAssetCatalogTests {
         #expect(
             PetAvatarAssetCatalog.avatarFilename(
                 species: "狗",
+                breed: "博美犬",
+                gender: "male",
+                coatColor: "橙色",
+                eyeColor: "深棕色"
+            ) == "dog_pomeranian_boy_orange.png"
+        )
+
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "狗",
+                breed: "Pomeranian",
+                gender: "female",
+                coatColor: "奶油色",
+                eyeColor: "黑色"
+            ) == "dog_pomeranian_girl_cream.png"
+        )
+
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "狗",
+                breed: "查理王骑士犬",
+                gender: "male",
+                coatColor: "布伦海姆色",
+                eyeColor: "深棕色"
+            ) == "dog_cavalier_king_charles_spaniel_boy_blenheim.png"
+        )
+
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "狗",
+                breed: "Cavalier",
+                gender: "female",
+                coatColor: "黑棕色",
+                eyeColor: "黑色"
+            ) == "dog_cavalier_king_charles_spaniel_girl_black_tan.png"
+        )
+
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "狗",
+                breed: "可卡犬",
+                gender: "male",
+                coatColor: "金色",
+                eyeColor: "棕色"
+            ) == "dog_cocker_spaniel_boy_golden.png"
+        )
+
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "狗",
+                breed: "Cocker",
+                gender: "female",
+                coatColor: "花斑",
+                eyeColor: "榛色"
+            ) == "dog_cocker_spaniel_girl_parti.png"
+        )
+
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "狗",
+                breed: "西伯利亚哈士奇",
+                gender: "male",
+                coatColor: "灰白",
+                eyeColor: "冰蓝色"
+            ) == "dog_siberian_husky_boy_gray_white.png"
+        )
+
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "狗",
+                breed: "Husky",
+                gender: "female",
+                coatColor: "银白",
+                eyeColor: "异瞳"
+            ) == "dog_siberian_husky_girl_silver_white.png"
+        )
+
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "狗",
+                breed: "德国牧羊犬",
+                gender: "male",
+                coatColor: "黑棕（鞍形）",
+                eyeColor: "棕色"
+            ) == "dog_german_shepherd_boy_black_tan_saddle.png"
+        )
+
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "狗",
+                breed: "German Shepherd",
+                gender: "female",
+                coatColor: "纯白",
+                eyeColor: "黑色"
+            ) == "dog_german_shepherd_girl_solid_white.png"
+        )
+
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "狗",
                 breed: "腊肠犬",
                 gender: "female",
                 coatColor: "巧克力棕",
@@ -658,6 +772,126 @@ struct PetAvatarAssetCatalogTests {
         }
     }
 
+    @Test func pomeranianAvatarAssetsAreBundled() {
+        for coat in ["橙色", "白色", "黑色", "奶油色", "棕色"] {
+            #expect(
+                PetAvatarAssetCatalog.avatarData(
+                    species: "狗",
+                    breed: "博美",
+                    gender: "male",
+                    coatColor: coat,
+                    eyeColor: "深棕色"
+                ) != nil
+            )
+
+            #expect(
+                PetAvatarAssetCatalog.avatarData(
+                    species: "狗",
+                    breed: "Pomeranian",
+                    gender: "female",
+                    coatColor: coat,
+                    eyeColor: "黑色"
+                ) != nil
+            )
+        }
+    }
+
+    @Test func cavalierKingCharlesSpanielAvatarAssetsAreBundled() {
+        for coat in ["红宝石色", "黑棕色", "三色", "布伦海姆色"] {
+            #expect(
+                PetAvatarAssetCatalog.avatarData(
+                    species: "狗",
+                    breed: "查理王",
+                    gender: "male",
+                    coatColor: coat,
+                    eyeColor: "深棕色"
+                ) != nil
+            )
+
+            #expect(
+                PetAvatarAssetCatalog.avatarData(
+                    species: "狗",
+                    breed: "Cavalier King Charles Spaniel",
+                    gender: "female",
+                    coatColor: coat,
+                    eyeColor: "黑色"
+                ) != nil
+            )
+        }
+    }
+
+    @Test func cockerSpanielAvatarAssetsAreBundled() {
+        for coat in ["黑色", "金色", "巧克力色", "花斑"] {
+            #expect(
+                PetAvatarAssetCatalog.avatarData(
+                    species: "狗",
+                    breed: "可卡",
+                    gender: "male",
+                    coatColor: coat,
+                    eyeColor: "棕色"
+                ) != nil
+            )
+
+            #expect(
+                PetAvatarAssetCatalog.avatarData(
+                    species: "狗",
+                    breed: "Cocker Spaniel",
+                    gender: "female",
+                    coatColor: coat,
+                    eyeColor: "榛色"
+                ) != nil
+            )
+        }
+    }
+
+    @Test func siberianHuskyAvatarAssetsAreBundled() {
+        for coat in ["黑白", "灰白", "红白", "纯白", "银白"] {
+            #expect(
+                PetAvatarAssetCatalog.avatarData(
+                    species: "狗",
+                    breed: "哈士奇",
+                    gender: "male",
+                    coatColor: coat,
+                    eyeColor: "冰蓝色"
+                ) != nil
+            )
+
+            #expect(
+                PetAvatarAssetCatalog.avatarData(
+                    species: "狗",
+                    breed: "Siberian Husky",
+                    gender: "female",
+                    coatColor: coat,
+                    eyeColor: "异瞳"
+                ) != nil
+            )
+        }
+    }
+
+    @Test func germanShepherdAvatarAssetsAreBundled() {
+        for coat in ["黑棕（鞍形）", "黑红色", "纯黑", "纯白"] {
+            #expect(
+                PetAvatarAssetCatalog.avatarData(
+                    species: "狗",
+                    breed: "德牧",
+                    gender: "male",
+                    coatColor: coat,
+                    eyeColor: "棕色"
+                ) != nil
+            )
+
+            #expect(
+                PetAvatarAssetCatalog.avatarData(
+                    species: "狗",
+                    breed: "German Shepherd",
+                    gender: "female",
+                    coatColor: coat,
+                    eyeColor: "黑色"
+                ) != nil
+            )
+        }
+    }
+
     @Test func westHighlandWhiteTerrierAvatarAssetsAreBundled() {
         for coat in ["白色", "黑色"] {
             #expect(
@@ -823,6 +1057,30 @@ struct PetAvatarAssetCatalogTests {
                 eyeColor: "黑色"
             ) == "dog_golden_retriever_girl_dark_golden.png"
         )
+    }
+
+    @Test func devonRexAvatarAssetsAreBundled() {
+        for coat in ["黑色", "白色", "蓝灰色", "奶油色", "棕虎斑", "黑白", "海豹重点色", "蓝重点色", "巧克力重点色", "火焰重点色"] {
+            #expect(
+                PetAvatarAssetCatalog.avatarData(
+                    species: "猫",
+                    breed: "德文卷毛猫",
+                    gender: "male",
+                    coatColor: coat,
+                    eyeColor: "黑色"
+                ) != nil
+            )
+
+            #expect(
+                PetAvatarAssetCatalog.avatarData(
+                    species: "猫",
+                    breed: "Devon Rex",
+                    gender: "female",
+                    coatColor: coat,
+                    eyeColor: "黑色"
+                ) != nil
+            )
+        }
     }
 
     @Test func uncoveredCatBreedFallsBackToSpeciesStandard() {

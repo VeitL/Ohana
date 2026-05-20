@@ -70,6 +70,7 @@ struct AddPetWizardView: View {
     /// 品种列表默认收起，点按展开后再搜索与选择
     @State private var isBreedPickerExpanded = false
     @State private var wizardPageIndex: Int = 0
+    @State private var wizardPageDirection: Int = 1
     /// 裁剪 Sheet 关闭后递增，用于 `.id` 强制重建 `TabView`，避免与顶栏头像动画叠用时停在两页之间。
     @State private var wizardTabViewRemountID: Int = 0
     @State private var showBreedPickerSheet = false
@@ -389,8 +390,8 @@ struct AddPetWizardView: View {
         }
     }
 
-    /// 标准信用卡比例 1.586:1，左右各 7pt 边距（与首页 K.cardH / K.cardMargin 保持一致）
-    private var walletDraftCardHeight: CGFloat { (ScreenCompat.width - 7 * 2) / 1.586 }
+    /// 创建页使用压缩角色卡，给状态栏和下方卡片轨道留出稳定空间。
+    private var walletDraftCardHeight: CGFloat { min((ScreenCompat.width - 7 * 2) / 1.72, 214) }
     private let walletCardCorner: CGFloat = 24
 
     private var stickyWalletPreview: some View {
@@ -431,7 +432,7 @@ struct AddPetWizardView: View {
             .padding(.bottom, 14)
         }
         .padding(.horizontal, 7)   // 与首页卡片堆 K.cardMargin 保持一致
-        .padding(.top, 8)
+        .padding(.top, 10)
         .padding(.bottom, 6)
         // 不在 `name` 上套弹簧动画：每个按键都会触发布局+动画，输入会明显卡顿
         .animation(GoMotion.feedback, value: breed)
@@ -446,24 +447,25 @@ struct AddPetWizardView: View {
         .animation(GoMotion.feedback, value: themeColorHex)
     }
 
-    /// 只挂载当前阶段，避免进入向导时一次性构建外貌/头像/性格/确认全部重页面。
+    /// 横向卡片轨道：慢拖时相邻卡片会跟随出现，保持实体卡片感。
     private var wizardPagedContent: some View {
-        ZStack {
-            pagedCard(index: wizardPageIndex) {
-                activeWizardCard
-            }
-            .id("\(isCreatingFirstPet)-\(wizardPageIndex)")
-            .transition(.opacity.combined(with: .scale(scale: 0.985)))
+        AddWizardPagedCardCarousel(
+            pageIndex: $wizardPageIndex,
+            pageDirection: $wizardPageDirection,
+            pageCount: totalCards
+        ) { index in
+            AnyView(pagedCard(index: index) {
+                activeWizardCard(for: index)
+            })
         }
         .id(wizardTabViewRemountID)
-        .animation(GoMotion.page, value: wizardPageIndex)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
-    private var activeWizardCard: some View {
+    private func activeWizardCard(for index: Int) -> some View {
         if isCreatingFirstPet {
-            switch wizardPageIndex {
+            switch index {
             case 0: wizardCard1BasicAndBio
             case 1: wizardCard4Appearance
             case 2: wizardCard2Avatar
@@ -471,7 +473,7 @@ struct AddPetWizardView: View {
             default: wizardCard6Confirm
             }
         } else {
-            switch wizardPageIndex {
+            switch index {
             case 0: wizardCard1BasicAndBio
             case 1: wizardCard2Avatar
             case 2: wizardCard4Appearance
@@ -502,6 +504,7 @@ struct AddPetWizardView: View {
                 .offset(y: entranceReady ? 0 : 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.top, 4)
         .animation(GoMotion.sheet, value: entranceReady)
         // 阻止键盘弹出时压缩整列布局：TabView 相邻卡片的顶部内容
         // 否则会随键盘一起上移，收起时再滑落。键盘直接覆盖当前卡片下方区域。
@@ -511,9 +514,7 @@ struct AddPetWizardView: View {
     private var wizardPageDotRow: some View {
         AddWizardStageProgress(stages: wizardStages, currentIndex: wizardPageIndex) { index in
             GoKeyboard.dismiss()
-            withAnimation(GoMotion.feedback) {
-                wizardPageIndex = index
-            }
+            navigateToWizardPage(index)
         }
         .padding(.top, 8)
         .padding(.bottom, 4)
@@ -582,7 +583,16 @@ struct AddPetWizardView: View {
 
     private func clampWizardPageIndex(_ new: Int) {
         let clamped = min(max(new, 0), totalCards - 1)
-        if clamped != new { wizardPageIndex = clamped }
+        if clamped != new { navigateToWizardPage(clamped) }
+    }
+
+    private func navigateToWizardPage(_ index: Int) {
+        let clamped = min(max(index, 0), totalCards - 1)
+        guard clamped != wizardPageIndex else { return }
+        wizardPageDirection = clamped > wizardPageIndex ? 1 : -1
+        withAnimation(GoMotion.page) {
+            wizardPageIndex = clamped
+        }
     }
 
     private func handlePhotosPickerItemChanged(_ item: PhotosPickerItem?) {
@@ -766,35 +776,34 @@ struct AddPetWizardView: View {
     }
 
     // MARK: - Reusable helpers
-    private func themeCustomColorButton(size: CGFloat) -> some View {
+    @ViewBuilder
+    private func themeCustomColorButton() -> some View {
         let selectedHex = themeColorHex.uppercased()
-        let isCustom = !PetThemeColor.allCases.contains { $0.hexValue.uppercased() == selectedHex }
-        return Button {
+        let isCustom = !AddWizardThemePalette.memberOptions.contains { $0.hex.uppercased() == selectedHex }
+        Button {
             showThemeColorSheet = true
         } label: {
-            ZStack {
-                Circle()
-                    .fill(Color(hex: themeColorHex))
-                    .frame(width: size, height: size)
-                Circle()
-                    .strokeBorder(Color.ohanaGlassStroke, lineWidth: 1)
-                    .frame(width: size, height: size)
-                if isCustom {
-                    Circle()
-                        .strokeBorder(Color.goCardWhite, lineWidth: 2)
-                        .frame(width: size, height: size)
-                    Image(systemName: "checkmark")
-                        .font(.system(size: max(10, size * 0.3), weight: .black))
-                        .foregroundStyle(Color.arkInk)
-                } else {
-                    Image(systemName: "paintpalette.fill")
-                        .font(.system(size: max(12, size * 0.42), weight: .bold))
-                        .foregroundStyle(Color.goCardWhite)
-                        .shadow(color: Color.arkInk.opacity(0.35), radius: 3, y: 1) // ui-v4: allow swatch icon readability shadow.
-                }
+            if isCustom {
+                AddWizardThemeMatrixCell(
+                    fill: Color(hex: themeColorHex),
+                    liftColor: Color(hex: themeColorHex),
+                    checkmarkColor: AddWizardThemeMatrixContrast.readableCheckmarkColor(for: selectedHex),
+                    isSelected: true,
+                    accessibilityTitle: "自定义主题色"
+                )
+            } else {
+                AddWizardThemeMatrixCell(
+                    fill: LinearGradient(colors: [.red, .orange, .yellow, .green, .blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing),
+                    liftColor: Color.goPrimary,
+                    checkmarkColor: Color.goCardWhite,
+                    isSelected: false,
+                    showsPaletteIcon: true,
+                    accessibilityTitle: "自定义主题色"
+                )
             }
         }
         .buttonStyle(ScaleButtonStyle())
+        .zIndex(isCustom ? 2 : 0)
         .accessibilityLabel("自定义主题色")
     }
 
@@ -1308,23 +1317,38 @@ struct AddPetWizardView: View {
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text(l.petWizThemeSection).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText).padding(.horizontal, 20)
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6), spacing: 10) {
-                            ForEach(PetThemeColor.allCases, id: \.rawValue) { tc in
-                                let tcHex = tc.hexValue
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: AddWizardThemePalette.gridColumnCount), spacing: 0) {
+                            ForEach(AddWizardThemePalette.memberOptions, id: \.hex) { option in
+                                let tcHex = option.hex
+                                let swatchColor = Color(hex: option.hex)
                                 let isUsed = usedThemeColorHexes.contains(tcHex.uppercased())
-                                Button { if !isUsed { withAnimation(GoMotion.feedback) { themeColorHex = tcHex } } } label: {
-                                    ZStack {
-                                        Circle().fill(tc.color.opacity(isUsed ? 0.3 : 1.0)).frame(width: 36, height: 36)
-                                        if themeColorHex.uppercased() == tcHex.uppercased() {
-                                            Circle().strokeBorder(Color.goCardWhite, lineWidth: 2)
-                                            Image(systemName: "checkmark").font(.system(size: 11, weight: .black)).foregroundStyle(Color.arkInk)
-                                        }
-                                        if isUsed { Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(Color.ohanaTertiaryText) }
+                                let isSelected = themeColorHex.uppercased() == tcHex.uppercased()
+                                Button {
+                                    if !isUsed {
+                                        withAnimation(GoMotion.selection) { themeColorHex = tcHex }
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                     }
-                                }.disabled(isUsed)
+                                } label: {
+                                    AddWizardThemeMatrixCell(
+                                        fill: swatchColor,
+                                        liftColor: swatchColor,
+                                        checkmarkColor: AddWizardThemeMatrixContrast.readableCheckmarkColor(for: tcHex),
+                                        isSelected: isSelected,
+                                        isDisabled: isUsed,
+                                        accessibilityTitle: "\(l.petWizThemeSection) \(option.label)"
+                                    )
+                                }
+                                .buttonStyle(ScaleButtonStyle())
+                                .zIndex(isSelected ? 2 : isUsed ? -1 : 0)
+                                .disabled(isUsed)
                             }
-                            themeCustomColorButton(size: 36)
+                            themeCustomColorButton()
                         }
+                        .padding(.top, 4)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+                        )
                         .padding(.horizontal, 20)
                     }
                 }
@@ -1461,7 +1485,11 @@ struct AddPetWizardView: View {
 
                 HStack(spacing: 14) {
                     if let data = avatarImageData, let ui = UIImage(data: data) {
-                        Image(uiImage: ui).resizable().scaledToFill().frame(width: 56, height: 56).clipShape(Circle())
+                        PetAvatarPortraitImage(
+                            image: ui,
+                            isTransparentAvatar: PetAvatarTransparencyCache.isTransparentAvatar(data),
+                            size: 56
+                        )
                     } else {
                         Circle().fill(Color(hex: themeColorHex).opacity(0.3)).frame(width: 56, height: 56)
                             .overlay(Image(systemName: Pet.speciesSilhouetteSymbol(forSpecies: effectiveSpeciesForData)).font(.system(size: 22, weight: .bold)).symbolRenderingMode(.monochrome).foregroundStyle(Color.ohanaSecondaryText))
@@ -2660,7 +2688,7 @@ struct GoColorPickerSheet: View {
                     )
                     .padding(.horizontal, 24)
 
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6), spacing: 12) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 6), spacing: 0) {
                     ForEach(swatchHexes, id: \.self) { hex in
                         let color = Color(hex: hex)
                         let isSelected = pickerColor.toHex()?.uppercased() == hex
@@ -2670,22 +2698,23 @@ struct GoColorPickerSheet: View {
                             }
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         } label: {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(color)
-                                    .frame(height: 42)
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .strokeBorder(Color.ohanaGlassStroke.opacity(hex == "FFFFFF" ? 1 : 0.72), lineWidth: 1)
-                                if isSelected {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 14, weight: .black))
-                                        .foregroundStyle(hex == "FFFFFF" || hex == "F2F2F7" || hex == "FFCC00" || hex == "C8FF00" ? Color.arkInk : Color.goCardWhite)
-                                }
-                            }
+                            AddWizardThemeMatrixCell(
+                                fill: color,
+                                liftColor: color,
+                                checkmarkColor: AddWizardThemeMatrixContrast.readableCheckmarkColor(for: hex),
+                                isSelected: isSelected,
+                                accessibilityTitle: "自定义颜色"
+                            )
                         }
                         .buttonStyle(ScaleButtonStyle())
+                        .zIndex(isSelected ? 2 : 0)
                     }
                 }
+                .padding(.top, 4)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+                )
                 .padding(.horizontal, 24)
 
                 // 确认按钮

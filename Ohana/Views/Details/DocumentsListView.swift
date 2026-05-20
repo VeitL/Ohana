@@ -2,7 +2,7 @@
 //  DocumentsListView.swift
 //  Ohana
 //
-//  V4 protection cockpit for documents, vaccine passport, and insurance.
+//  V4 protection cockpit for documents and insurance.
 //
 
 import SwiftUI
@@ -10,18 +10,14 @@ import SwiftData
 
 struct DocumentsListView: View {
     let pet: Pet
-    var showsCloseButton: Bool = false
+    var showsCloseButton: Bool = true
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @State private var selectedSection: ProtectionSection = .documents
-    @State private var showingAddDocument = false
-    @State private var showingAddVaccine = false
-    @State private var showingAddInsurance = false
-    @State private var editingDoc: PetDocument?
+    @State private var activePopup: ActiveProtectionPopup?
     @State private var detailDoc: PetDocument?
     @State private var selectedInsurance: PetInsurance?
-    @State private var editingInsurance: PetInsurance?
     @State private var deleteDocument: PetDocument?
     @State private var deleteInsurance: PetInsurance?
 
@@ -29,17 +25,17 @@ struct DocumentsListView: View {
     private var state: PetProtectionDashboardState { PetProtectionDashboardState(pet: pet) }
 
     private var sortedDocs: [PetDocument] {
-        pet.documents.sorted { ($0.expiryDate ?? .distantFuture) < ($1.expiryDate ?? .distantFuture) }
-    }
-
-    private var vaccineLogs: [PetHealthLog] {
-        pet.healthLogs
-            .filter { $0.healthLogType == .vaccine }
-            .sorted { ($0.expirationDate ?? .distantFuture) < ($1.expirationDate ?? .distantFuture) }
+        pet.documents
+            .filter { $0.documentCategory != .vaccine && $0.documentCategory != .insurance }
+            .sorted { ($0.expiryDate ?? .distantFuture) < ($1.expiryDate ?? .distantFuture) }
     }
 
     private var sortedInsurances: [PetInsurance] {
         pet.insurances.sorted { $0.renewalDate < $1.renewalDate }
+    }
+
+    private var showingInlinePopup: Bool {
+        activePopup != nil
     }
 
     var body: some View {
@@ -57,35 +53,44 @@ struct DocumentsListView: View {
                 .padding(.horizontal, 18)
                 .padding(.top, 18)
             }
-            .disabled(showingAddDocument)
-            .blur(radius: showingAddDocument ? 1.1 : 0)
+            .disabled(showingInlinePopup)
+            .blur(radius: showingInlinePopup ? 1.1 : 0)
 
-            if showingAddDocument {
-                ProtectionDocumentPopup(pet: pet) {
-                    withAnimation(GoMotion.page) { showingAddDocument = false }
+            if let activePopup {
+                switch activePopup {
+                case .addDocument:
+                    ProtectionDocumentPopup(pet: pet, existing: nil) {
+                        withAnimation(GoMotion.page) { self.activePopup = nil }
+                    }
+                    .transition(.opacity)
+                    .zIndex(30)
+                case .editDocument(let doc):
+                    ProtectionDocumentPopup(pet: pet, existing: doc) {
+                        withAnimation(GoMotion.page) { self.activePopup = nil }
+                    }
+                    .transition(.opacity)
+                    .zIndex(30)
+                case .addInsurance:
+                    ProtectionInsurancePopup(pet: pet, existing: nil) {
+                        withAnimation(GoMotion.page) { self.activePopup = nil }
+                    }
+                    .transition(.opacity)
+                    .zIndex(31)
+                case .editInsurance(let insurance):
+                    ProtectionInsurancePopup(pet: pet, existing: insurance) {
+                        withAnimation(GoMotion.page) { self.activePopup = nil }
+                    }
+                    .transition(.opacity)
+                    .zIndex(31)
                 }
-                .transition(.opacity)
-                .zIndex(30)
             }
         }
         .toolbar(.hidden, for: .navigationBar)
-        .sheet(isPresented: $showingAddVaccine) {
-            AddVaccineSheet(pet: pet)
-        }
-        .sheet(isPresented: $showingAddInsurance) {
-            AddPetInsuranceSheet(pet: pet)
-        }
-        .sheet(item: $editingDoc) { doc in
-            EditDocumentSheet(doc: doc, pet: pet)
-        }
         .sheet(item: $detailDoc) { doc in
-            DocumentDetailSheet(doc: doc, pet: pet, onEdit: { editingDoc = doc })
+            DocumentDetailSheet(doc: doc, pet: pet, onEdit: { activePopup = .editDocument(doc) })
         }
         .sheet(item: $selectedInsurance) { insurance in
             InsurancePolicyDetailSheet(insurance: insurance, pet: pet)
-        }
-        .sheet(item: $editingInsurance) { insurance in
-            AddPetInsuranceSheet(pet: pet, existing: insurance)
         }
         .alert("删除证件？", isPresented: Binding(
             get: { deleteDocument != nil },
@@ -145,13 +150,12 @@ struct DocumentsListView: View {
         HStack(spacing: 12) {
             statusMetric(title: "状态", value: overallRisk.label, tint: overallRisk.color)
             statusMetric(title: "证件", value: "\(state.documentCount)", tint: ProtectionSection.documents.tint)
-            statusMetric(title: "疫苗", value: "\(state.vaccineCount)", tint: ProtectionSection.vaccines.tint)
             statusMetric(title: "保单", value: "\(state.insuranceCount)", tint: ProtectionSection.insurance.tint)
         }
     }
 
     private var overallRisk: ProtectionRiskLevel {
-        let risks = [state.documentsRisk, state.vaccineRisk, state.insuranceRisk]
+        let risks = [state.documentsRisk, state.insuranceRisk]
         if risks.contains(.expired) { return .expired }
         if risks.contains(.soon) { return .soon }
         if risks.allSatisfy({ $0 == .empty }) { return .empty }
@@ -203,14 +207,6 @@ struct DocumentsListView: View {
                     .font(OhanaFont.headline(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
-                Button { openAdd(for: selectedSection) } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 13, weight: .black))
-                        .foregroundStyle(Color.arkInk)
-                        .frame(width: 38, height: 34)
-                        .background(Color.goPrimary, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
             }
 
             switch selectedSection {
@@ -227,25 +223,9 @@ struct DocumentsListView: View {
                         DocumentDetailRow(
                             doc: doc,
                             onDetail: { detailDoc = doc },
-                            onEdit: { editingDoc = doc },
+                            onEdit: { activePopup = .editDocument(doc) },
                             onDelete: { deleteDocument = doc }
                         )
-                    }
-                }
-            case .vaccines:
-                if vaccineLogs.isEmpty {
-                    ProtectionEmptyState(
-                        icon: "syringe",
-                        title: "还没有疫苗记录",
-                        actionTitle: "添加疫苗",
-                        tint: selectedSection.tint
-                    ) { openAdd(for: .vaccines) }
-                } else {
-                    ForEach(vaccineLogs) { log in
-                        ProtectionVaccineRow(log: log) {
-                            modelContext.delete(log)
-                            modelContext.safeSave()
-                        }
                     }
                 }
             case .insurance:
@@ -261,7 +241,7 @@ struct DocumentsListView: View {
                         ProtectionInsuranceRow(
                             insurance: insurance,
                             onDetail: { selectedInsurance = insurance },
-                            onEdit: { editingInsurance = insurance },
+                            onEdit: { activePopup = .editInsurance(insurance) },
                             onDelete: { deleteInsurance = insurance }
                         )
                     }
@@ -274,11 +254,29 @@ struct DocumentsListView: View {
     private func openAdd(for section: ProtectionSection) {
         switch section {
         case .documents:
-            showingAddDocument = true
-        case .vaccines:
-            showingAddVaccine = true
+            activePopup = .addDocument
         case .insurance:
-            showingAddInsurance = true
+            activePopup = .addInsurance
+        }
+    }
+}
+
+private enum ActiveProtectionPopup: Identifiable {
+    case addDocument
+    case editDocument(PetDocument)
+    case addInsurance
+    case editInsurance(PetInsurance)
+
+    var id: String {
+        switch self {
+        case .addDocument:
+            return "addDocument"
+        case .editDocument(let doc):
+            return "editDocument-\(doc.id.uuidString)"
+        case .addInsurance:
+            return "addInsurance"
+        case .editInsurance(let insurance):
+            return "editInsurance-\(insurance.id.uuidString)"
         }
     }
 }

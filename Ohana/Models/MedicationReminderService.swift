@@ -113,14 +113,13 @@ final class MedicationReminderService {
         let dosesPerDay = med.frequency.dosesPerDay
         guard dosesPerDay > 0 else { return } // asNeeded / custom 不推送
 
-        // 每次提醒之间的小时间隔
-        let intervalHours = 24.0 / Double(dosesPerDay)
         let calendar = Calendar.current
         let now = Date()
+        let doseMinutes = PetMedicationSchedulePlan.doseMinutes(for: med, required: dosesPerDay)
 
         // 起始基准时间：今天 08:00
         var baseComponents = calendar.dateComponents([.year, .month, .day], from: now)
-        baseComponents.hour = 8
+        baseComponents.hour = 0
         baseComponents.minute = 0
         baseComponents.second = 0
         guard let baseTime = calendar.date(from: baseComponents) else { return }
@@ -138,7 +137,8 @@ final class MedicationReminderService {
             }
 
             for doseIdx in 0..<dosesPerDay {
-                let fireDate = dayDate.addingTimeInterval(Double(doseIdx) * intervalHours * 3600)
+                let minute = doseMinutes.indices.contains(doseIdx) ? doseMinutes[doseIdx] : 8 * 60
+                let fireDate = dayDate.addingTimeInterval(Double(minute) * 60)
                 guard fireDate > now else { continue }
                 if let endDate = med.endDate, fireDate > endDate { break outerLoop }
 

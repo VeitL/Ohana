@@ -26,6 +26,7 @@ enum ExpandedPetQuickLongPressRoute {
     case pottyDetail
     case hygiene
     case health
+    case medication
     case weightDetail
     case expenseDetail
     case momentHistory
@@ -177,6 +178,12 @@ enum ExpandedQuickActionLogic {
             return pet.careLogs.contains { $0.type == CareType.play.rawValue && cal.isDateInToday($0.date) }
         case "groom":
             return pet.hygieneLogs.contains { cal.isDateInToday($0.date) }
+        case "medication":
+            let activeMeds = pet.medications.filter(\.isActiveToday)
+            let planned = activeMeds.reduce(0) { $0 + PetMedicationDoseLogging.requiredDoses(on: now, for: $1) }
+            guard planned > 0 else { return false }
+            let done = activeMeds.reduce(0) { $0 + PetMedicationDoseLogging.todayDoseCount(events: allEvents, medicationId: $1.id) }
+            return done >= planned
         case "filterClean":
             return pet.careLogs.contains { $0.type == CareType.filterClean.rawValue && cal.isDateInToday($0.date) }
         case "cageCleaning":
@@ -276,6 +283,12 @@ enum ExpandedQuickActionLogic {
                 return String(format: "%.1fkg", last.weight)
             }
             return nil
+        case "medication":
+            let activeMeds = pet.medications.filter(\.isActiveToday)
+            guard !activeMeds.isEmpty else { return "待设置" }
+            let planned = activeMeds.reduce(0) { $0 + PetMedicationDoseLogging.requiredDoses(on: now, for: $1) }
+            let done = activeMeds.reduce(0) { $0 + PetMedicationDoseLogging.todayDoseCount(events: allEvents, medicationId: $1.id) }
+            return planned > 0 ? "今日 \(min(done, planned))/\(planned)" : "\(activeMeds.count)种药"
         case "expense":
             let total = pet.expenseLogs
                 .filter { cal.isDate($0.date, equalTo: Date(), toGranularity: .month) }
@@ -322,7 +335,7 @@ enum ExpandedQuickActionLogic {
 
     static func petTapRoute(for item: QuickActionItem, pet: Pet) -> ExpandedPetQuickTapRoute {
         switch item.actionType {
-        case "feed", "walk", "play", "litter", "cageCleaning", "freeFlight", "misting", "substrateChange":
+        case "feed", "walk", "play", "litter", "cageCleaning", "freeFlight", "misting", "substrateChange", "medication":
             return .perform(item.actionType)
         case "water":
             return WaterQuickActionPolicy.isAquatic(species: pet.species) ? .waterManagement : .perform("water")
@@ -350,6 +363,7 @@ enum ExpandedQuickActionLogic {
         case "potty", "litter": return .pottyDetail
         case "groom", "cageCleaning", "freeFlight", "misting", "substrateChange": return .hygiene
         case "health": return .health
+        case "medication": return .medication
         case "weight": return .weightDetail
         case "expense": return .expenseDetail
         case "moment": return .momentHistory

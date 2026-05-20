@@ -20,6 +20,7 @@ struct FocusWalletCardView: View {
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
     @AppStorage("shop_equipped_title") private var equippedTitle: String = ""
     @AppStorage("shop_equip_fx_lime_glow") private var equipFxLimeGlow: Bool = false
+    @AppStorage("shop_equip_fx_popout_card") private var equipFxPopoutCard: Bool = true
     @AppStorage(PetBondVaultStore.revisionKey) private var petBondVaultRevision: Int = 0
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -39,8 +40,13 @@ struct FocusWalletCardView: View {
             let avatarEntry = FocusWalletAvatarCache.entry(for: card.id, data: card.avatarImageData)
             let avatarImage = avatarEntry.image
             let hasPopout = avatarEntry.isTransparent && avatarImage != nil
-            let usesFullBleed = avatarImage != nil && !avatarEntry.isTransparent
             let avatarExpanded = isHeroExpanded
+            let popoutImage = FocusPopoutImageCache.image(
+                for: card.id,
+                data: equipFxPopoutCard ? (card.cardPopoutImageData ?? (card.cardStyleRaw == "popout" ? card.avatarImageData : nil)) : nil
+            )
+            let usesPopoutOverlay = equipFxPopoutCard && isHeroExpanded && !card.isHuman && card.cardStyleRaw == "popout" && popoutImage != nil
+            let usesFullBleed = avatarImage != nil && !avatarEntry.isTransparent && !usesPopoutOverlay
 
             ZStack(alignment: .topLeading) {
                 cardBackground(usesFullBleed: usesFullBleed)
@@ -62,7 +68,7 @@ struct FocusWalletCardView: View {
                     backgroundHeadlineLayer(w: w)
                 }
 
-                if !usesFullBleed {
+                if !usesFullBleed && !usesPopoutOverlay {
                     leftAvatarContent(
                         avatarImage: avatarImage,
                         hasPopout: hasPopout,
@@ -90,7 +96,15 @@ struct FocusWalletCardView: View {
                 topIdentityBar(usesFullBleed: usesFullBleed)
                     .opacity(isHeroExpanded ? 0 : 1)
             }
+            .clipShape(RoundedRectangle(cornerRadius: HeroAnim.stackCardCorner, style: .continuous))
             .petMemorialTone(isActive: card.hasPassedAway)
+            .overlay(alignment: .topLeading) {
+                if usesPopoutOverlay, let popoutImage {
+                    popoutHeroSubject(popoutImage, w: w, h: h)
+                        .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .bottomLeading)))
+                        .zIndex(6)
+                }
+            }
             .overlay(alignment: .topTrailing) {
                 if card.hasPassedAway {
                     PetMemorialBadge(
@@ -106,7 +120,6 @@ struct FocusWalletCardView: View {
             .animation(GoMotion.page, value: card.hasPassedAway)
         }
         .frame(height: isHeroExpanded ? K.expandedCardH : K.cardH)
-        .clipShape(RoundedRectangle(cornerRadius: HeroAnim.stackCardCorner, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: HeroAnim.stackCardCorner, style: .continuous)
                 .strokeBorder(cardBorderColor, lineWidth: cardBorderWidth)
@@ -369,6 +382,33 @@ struct FocusWalletCardView: View {
             .shadow(color: Color.arkInk.opacity(0.28), radius: 18, x: 0, y: 12) // ui-v4: allow transparent avatar grounding
     }
 
+    private func popoutHeroSubject(_ image: UIImage, w: CGFloat, h: CGFloat) -> some View {
+        let artHeight = h * 1.18
+        let artWidth = w * 0.70
+        return ZStack(alignment: .bottomLeading) {
+            Ellipse()
+                .fill(Color.arkInk.opacity(0.30))
+                .frame(width: w * 0.42, height: 34)
+                .blur(radius: 18)
+                .offset(x: w * 0.08, y: h * 0.88)
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .frame(width: artWidth, height: artHeight, alignment: .bottom)
+                .rotation3DEffect(
+                    .degrees(shouldReduceWork ? 0 : -4),
+                    axis: (x: 0, y: 1, z: 0),
+                    anchor: .bottomLeading,
+                    perspective: 0.54
+                )
+                .scaleEffect(shouldReduceWork ? 1.0 : 1.035, anchor: .bottomLeading)
+                .offset(x: w * 0.015, y: -h * 0.16)
+                .shadow(color: Color.arkInk.opacity(0.36), radius: 22, x: 0, y: 16) // ui-v4: allow popout subject depth
+        }
+        .frame(width: w, height: h, alignment: .bottomLeading)
+        .allowsHitTesting(false)
+    }
+
     private func rightInfoColumn(h: CGFloat, usesFullBleed: Bool) -> some View {
         return VStack(alignment: .trailing, spacing: isHeroExpanded ? 5 : 3) {
             if card.streak > 1 {
@@ -569,6 +609,31 @@ struct FocusWalletCardView: View {
         if s.contains("仓鼠") || l.contains("hamster") { return "仓鼠" }
         if s.contains("鸟") || l.contains("bird")      { return "鸟" }
         return s
+    }
+}
+
+@MainActor
+private enum FocusPopoutImageCache {
+    private struct Entry {
+        let signature: String
+        let image: UIImage?
+    }
+
+    private static var entries: [UUID: Entry] = [:]
+
+    static func image(for id: UUID, data: Data?) -> UIImage? {
+        guard let data, !data.isEmpty else {
+            entries.removeValue(forKey: id)
+            return nil
+        }
+        let signature = FocusWalletAvatarCache.signature(for: data)
+        if let cached = entries[id], cached.signature == signature {
+            return cached.image
+        }
+        let raw = UIImage(data: data)
+        let image = raw.flatMap { ImageCutoutService.trimmedTransparentSubjectImage(from: $0) } ?? raw
+        entries[id] = Entry(signature: signature, image: image)
+        return image
     }
 }
 

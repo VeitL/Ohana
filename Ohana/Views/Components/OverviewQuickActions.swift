@@ -27,6 +27,7 @@ enum QuickActionPickerCatalog {
         Option(id: "litter", label: "铲屎", icon: "trash.fill", colorHex: "5B6AFF"),
         Option(id: "groom", label: "护理", icon: "scissors", colorHex: "FF8C42"),
         Option(id: "health", label: "健康", icon: "heart.fill", colorHex: "FF4757"),
+        Option(id: "medication", label: "用药", icon: "pill.fill", colorHex: "A855F7"),
         Option(id: "expense", label: "花费", icon: AppCurrency.systemIconName, colorHex: "A78BFA"),
         Option(id: "weight", label: "体重", icon: "scalemass.fill", colorHex: "80FFEA"),
         Option(id: "play", label: "陪玩", icon: "tennisball.fill", colorHex: "FF6B6B"),
@@ -44,6 +45,7 @@ enum QuickActionPickerCatalog {
         if allowed.contains("care") { allowed.insert("groom") }
         allowed.insert("water")
         allowed.insert("moment")
+        allowed.insert("medication")
         if species.contains("猫") || species.lowercased().contains("cat") {
             allowed.insert("litter")
             allowed.insert("play")
@@ -217,20 +219,15 @@ struct GoQuickActionCard: View {
 
     /// 今日已打卡时图标/水浪用色：优先宠物主题色，否则快捷项自带色
     private var checkInAccentColor: Color {
-        if isCompletedToday { return Color.goPrimary }
-        if let hex = petThemeColorHex { return Color(hex: hex) }
-        return Color(hex: item.colorHex)
+        Color.ohanaFunctionalIcon
     }
 
     private var isWaterAction: Bool { item.actionType == "water" }
     private var isFeedAction: Bool { item.actionType == "feed" }
 
-    /// 深色背景上优先保证可读性；浅色模式保留原来的完成态主题色反馈。
+    /// V4: 功能 icon 统一为 goPrimary 单色 glyph，状态由卡片/数字/徽标表达。
     private var quickActionIconForeground: Color {
-        if isCompletedToday { return Color.goPrimary }
-        if usesLightForeground { return .white.opacity(isFeedAction && !isCompletedToday ? 0.72 : 0.92) }
-        if isFeedAction { return Color.secondary }
-        return Color.primary.opacity(0.75)
+        Color.ohanaFunctionalIcon.opacity(isCompletedToday ? 1 : 0.9)
     }
 
     @Environment(\.colorScheme) private var colorScheme
@@ -254,10 +251,7 @@ struct GoQuickActionCard: View {
 
     private var resolvedIcon: String { displayIcon ?? item.icon }
     private var iconTileColor: Color {
-        if isCompletedToday {
-            return Color.goPrimary.opacity(0.18)
-        }
-        return checkInAccentColor.opacity(usesLightForeground ? 0.18 : 0.12)
+        Color.ohanaFunctionalIcon.opacity(isCompletedToday ? 0.18 : 0.12)
     }
 
     /// 无菜单项时不挂 contextMenu，避免与长按打开详情 sheet 冲突（系统菜单盖住 sheet）
@@ -548,7 +542,7 @@ private struct PottyPopoverContent: View {
                     VStack(spacing: 6) {
                         Image(systemName: opt.icon)
                             .font(.system(size: 24, weight: .semibold))
-                            .foregroundStyle(Color(hex: opt.colorHex))
+                            .foregroundStyle(Color.ohanaFunctionalIcon)
                             .frame(width: 48, height: 48)
                         Text(opt.label)
                             .font(.system(size: 10, weight: .bold, design: .rounded))
@@ -599,7 +593,7 @@ private struct HealthPopoverContent: View {
                     VStack(spacing: 6) {
                         Image(systemName: opt.icon)
                             .font(.system(size: 24, weight: .semibold))
-                            .foregroundStyle(Color(hex: opt.colorHex))
+                            .foregroundStyle(Color.ohanaFunctionalIcon)
                             .frame(width: 48, height: 48)
                         Text(opt.label)
                             .font(.system(size: 10, weight: .bold, design: .rounded))
@@ -628,13 +622,10 @@ struct QAManageSheet: View {
             List {
                 ForEach(savedItems, id: \.id) { item in
                     HStack(spacing: 12) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color(hex: item.colorHex).opacity(0.15))
-                                .frame(width: 36, height: 36)
-                            Image(systemName: item.icon)
-                                .foregroundStyle(Color(hex: item.colorHex))
-                        }
+                        Image(systemName: item.icon)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Color.ohanaFunctionalIcon)
+                            .frame(width: 36, height: 36)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.label)
                                 .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -778,19 +769,13 @@ struct AddQuickActionSheet: View {
                         withAnimation(GoMotion.selection) { step = 2 }
                     } label: {
                         HStack(spacing: 14) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color(hex: pet.themeColorHex).opacity(0.22))
-                                    .frame(width: 48, height: 48)
-                                if let data = pet.avatarImageData, let img = UIImage(data: data) {
-                                    Image(uiImage: img)
-                                        .resizable().scaledToFill()
-                                        .frame(width: 48, height: 48)
-                                        .clipShape(Circle())
-                                } else {
-                                    Text(pet.avatarEmoji).font(.system(size: 26))
-                                }
-                            }
+                            PetAvatarPortraitView(
+                                imageData: pet.avatarImageData,
+                                fallbackText: pet.avatarEmoji,
+                                themeColor: Color(hex: pet.safeThemeColorHex),
+                                size: 48,
+                                backgroundOpacity: 0.22
+                            )
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(pet.name)
                                     .font(.system(size: 16, weight: .bold, design: .rounded))
@@ -831,16 +816,13 @@ struct AddQuickActionSheet: View {
                 .buttonStyle(ScaleButtonStyle())
 
                 if let pet = selectedPet {
-                    ZStack {
-                        Circle().fill(Color(hex: pet.themeColorHex).opacity(0.2))
-                            .frame(width: 36, height: 36)
-                        if let data = pet.avatarImageData, let img = UIImage(data: data) {
-                            Image(uiImage: img).resizable().scaledToFill()
-                                .frame(width: 36, height: 36).clipShape(Circle())
-                        } else {
-                            Text(pet.avatarEmoji).font(.system(size: 20))
-                        }
-                    }
+                    PetAvatarPortraitView(
+                        imageData: pet.avatarImageData,
+                        fallbackText: pet.avatarEmoji,
+                        themeColor: Color(hex: pet.safeThemeColorHex),
+                        size: 36,
+                        backgroundOpacity: 0.2
+                    )
                     VStack(alignment: .leading, spacing: 1) {
                         Text(pet.name)
                             .font(.system(size: 18, weight: .black, design: .rounded))
@@ -882,7 +864,7 @@ struct AddQuickActionSheet: View {
                                 .padding(.vertical, 40)
                         }
                         ForEach(available) { action in
-                            let accentColor = Color(hex: action.colorHex)
+                            let accentColor = Color.ohanaFunctionalIcon
                             let isPressed = pressedActionId == action.id
                             Button {
                                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -900,7 +882,7 @@ struct AddQuickActionSheet: View {
                                 VStack(spacing: 8) {
                                     Image(systemName: action.icon)
                                         .font(.system(size: 28, weight: .semibold))
-                                        .foregroundStyle(accentColor)
+                                        .foregroundStyle(Color.ohanaFunctionalIcon)
                                         .frame(width: 44, height: 44)
                                     Text(action.label)
                                         .font(.system(size: 11, weight: .bold, design: .rounded))
@@ -984,19 +966,13 @@ struct QuickFeedSheet: View {
 
     private var petHeader: some View {
         HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color.goPrimary.opacity(0.15))
-                    .frame(width: 52, height: 52)
-                if let data = pet.avatarImageData, let img = UIImage(data: data) {
-                    Image(uiImage: img)
-                        .resizable().scaledToFill()
-                        .frame(width: 52, height: 52).clipShape(Circle())
-                } else {
-                    Text(pet.avatarEmoji)
-                        .font(.system(size: 26))
-                }
-            }
+            PetAvatarPortraitView(
+                imageData: pet.avatarImageData,
+                fallbackText: pet.avatarEmoji,
+                themeColor: Color(hex: pet.safeThemeColorHex),
+                size: 52,
+                backgroundOpacity: 0.15
+            )
             VStack(alignment: .leading, spacing: 3) {
                 Text(pet.name)
                     .font(OhanaFont.body(.black))
@@ -1040,7 +1016,6 @@ struct QuickFeedSheet: View {
             .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 20)
 
-            removeButton
         }
     }
 
@@ -1089,19 +1064,7 @@ struct QuickFeedSheet: View {
             .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 20)
 
-            removeButton
         }
-    }
-
-    private var removeButton: some View {
-        Button(role: .destructive) {
-            onRemove(); dismiss()
-        } label: {
-            Text("移除此快捷入口")
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.goRed)
-        }
-        .buttonStyle(ScaleButtonStyle())
     }
 
     private var casualCopyText: String {
@@ -1322,16 +1285,11 @@ struct QuickActionReorderDragPreview: View {
     let item: QuickActionItem
     var themeHex: String?
 
-    private var accent: Color {
-        if let h = themeHex { return Color(hex: h) }
-        return Color(hex: item.colorHex)
-    }
-
     var body: some View {
         VStack(spacing: 6) {
             Image(systemName: item.icon)
                 .font(.system(size: 26, weight: .semibold))
-                .foregroundStyle(accent)
+                .foregroundStyle(Color.ohanaFunctionalIcon)
                 .frame(width: 44, height: 44)
             Text(item.label)
                 .font(OhanaFont.caption2(.semibold))
@@ -1351,7 +1309,10 @@ struct QAEditModeDragLayer: View {
         Color.clear
             .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .onDrag {
-                draggingItemId = item.id
+                OhanaFeedback.light()
+                withAnimation(GoMotion.selection) {
+                    draggingItemId = item.id
+                }
                 return NSItemProvider(object: item.id as NSString)
             } preview: {
                 QuickActionReorderDragPreview(item: item, themeHex: themeHex)
@@ -1363,13 +1324,17 @@ struct QADropDelegate: DropDelegate {
     let targetItem: QuickActionItem
     @Binding var items: [QuickActionItem]
     @Binding var draggingItemId: String?
+    @Binding var lastDropTargetId: String?
 
     func performDrop(info: DropInfo) -> Bool {
         draggingItemId = nil
+        lastDropTargetId = nil
         return true
     }
 
     func dropEntered(info: DropInfo) {
+        guard lastDropTargetId != targetItem.id else { return }
+
         if let draggingItemId {
             moveItem(fromId: draggingItemId)
             return
@@ -1390,12 +1355,20 @@ struct QADropDelegate: DropDelegate {
         DropProposal(operation: .move)
     }
 
+    func dropExited(info: DropInfo) {
+        if lastDropTargetId == targetItem.id {
+            lastDropTargetId = nil
+        }
+    }
+
     private func moveItem(fromId: String) {
         guard fromId != targetItem.id,
               let fromIdx = items.firstIndex(where: { $0.id == fromId }),
               let toIdx = items.firstIndex(where: { $0.id == targetItem.id })
         else { return }
 
+        lastDropTargetId = targetItem.id
+        OhanaFeedback.light()
         withAnimation(GoMotion.selection) {
             items.move(
                 fromOffsets: IndexSet(integer: fromIdx),

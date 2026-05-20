@@ -2,300 +2,356 @@
 //  EquipPopoutCardSheet.swift
 //  Ohana
 //
-//  3D 破框悬浮卡片换装引导 Sheet
-//  用户购买 fx_popout_card 后，通过此 Sheet 粘贴透明抠图并激活 popout 风格
+//  3D 破框卡片素材管理。破框主体独立于普通头像，只影响卡片特效。
 //
 
 import SwiftUI
 import SwiftData
+import PhotosUI
+
+enum PetPopoutCardSource: String, Codable {
+    case photoCutout
+    case avatar2d
+}
 
 struct EquipPopoutCardSheet: View {
     let pet: Pet
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("appLanguage") private var appLanguage = "zh"
 
-    @State private var isPasting = false
-    @State private var pasteBreathing = false
-    @State private var showErrorToast = false
-    @State private var showSuccessToast = false
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var previewData: Data?
+    @State private var previewSource: PetPopoutCardSource?
+    @State private var isProcessing = false
+    @State private var toast: Toast?
 
-    private var hasPasteboardImage: Bool { UIPasteboard.general.hasImages }
+    private struct Toast: Identifiable {
+        let id = UUID()
+        let title: String
+        let icon: String
+        let tint: Color
+    }
+
+    private var l: L10n { L10n(appLanguage) }
+    private var currentPreviewData: Data? { previewData ?? pet.cardPopoutImageData ?? pet.avatarImageData }
+    private var currentPreviewImage: UIImage? { currentPreviewData.flatMap(UIImage.init(data:)) }
+    private var isPopoutActive: Bool { pet.cardStyleRaw == "popout" }
 
     var body: some View {
         ZStack {
             OhanaAppBackground()
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // 把手
                 Capsule()
-                    .fill(.white.opacity(0.2))
-                    .frame(width: 36, height: 4)
-                    .padding(.top, 12)
-                    .padding(.bottom, 20)
+                    .fill(Color.ohanaSecondaryText.opacity(0.28))
+                    .frame(width: 42, height: 5)
+                    .padding(.top, 10)
+                    .padding(.bottom, 18)
 
-                // 标题栏
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("激活 3D 破框卡片")
-                            .font(.system(size: 20, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                        Text(pet.name)
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
-                    }
-                    Spacer()
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 22))
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
+                header
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 16)
 
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 16) {
-                        // 引导提示卡
-                        proTipBanner
-
-                        // 粘贴按钮
-                        pasteButton
-
-                        // 当前状态行
-                        if pet.cardStyleRaw == "popout" {
-                            HStack(spacing: 8) {
-                                Image(systemName: "checkmark.seal.fill")
-                                    .foregroundStyle(Color.goPrimary)
-                                Text("当前已激活破框风格")
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
-                            }
-                            .padding(.horizontal, 14).padding(.vertical, 10)
-                            .background(Color.goPrimary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-                            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.goPrimary.opacity(0.25), lineWidth: 1))
-                        }
-
-                        // 重置回默认按钮
-                        if pet.cardStyleRaw == "popout" {
-                            Button {
-                                pet.cardStyleRaw = "classic"
-                                modelContext.safeSave()
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                dismiss()
-                            } label: {
-                                Text("恢复默认风格")
-                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
-                            }
-                            .padding(.top, 4)
-                        }
+                    VStack(spacing: 14) {
+                        popoutPreview
+                        sourceActions
+                        statusBlock
+                        actionButtons
                     }
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 32)
+                    .padding(.bottom, 28)
                 }
             }
 
-            // 错误 Toast
-            if showErrorToast {
-                VStack {
-                    Spacer()
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(Color.goOrange)
-                        Text("剪贴板没有图片，请先在相册长按宠物并拷贝")
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                    }
-                    .padding(.horizontal, 16).padding(.vertical, 12)
-                    .background(Color.goDarkBlue, in: RoundedRectangle(cornerRadius: 14))
-                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.goOrange.opacity(0.4), lineWidth: 1))
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 40)
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .zIndex(10)
-            }
-
-            // 成功 Toast
-            if showSuccessToast {
-                VStack {
-                    HStack(spacing: 10) {
-                        Text("✨").font(.system(size: 22))
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("换装成功！")
-                                .font(.system(size: 14, weight: .black, design: .rounded))
-                                .foregroundStyle(.black)
-                            Text("3D 破框悬浮卡片已激活")
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .foregroundStyle(.black.opacity(0.6))
-                        }
-                        Spacer()
-                    }
-                    .padding(.horizontal, 16).padding(.vertical, 12)
-                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14))
-                    .shadow(color: Color.goPrimary.opacity(0.4), radius: 16, x: 0, y: 4)
-                    .padding(.horizontal, 24)
-                    .padding(.top, 60)
-                    Spacer()
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .zIndex(10)
+            if let toast {
+                toastView(toast)
+                    .transition(.ohanaPop)
+                    .zIndex(20)
             }
         }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
-                pasteBreathing = true
-            }
+        .tint(Color.goPrimary)
+        .interactiveDismissDisabled(isProcessing)
+        .onChange(of: selectedPhoto) { _, item in
+            guard let item else { return }
+            processPhoto(item)
         }
     }
 
-    // MARK: - 引导提示 Banner
-    private var proTipBanner: some View {
-        HStack(alignment: .top, spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color.goPrimary.opacity(0.18))
-                    .frame(width: 40, height: 40)
-                Image(systemName: "wand.and.stars")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(Color.goPrimary)
-            }
-            VStack(alignment: .leading, spacing: 6) {
-                Text("✨ 3D 破框悬浮效果")
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+    private var header: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(l.tr(zh: "3D 破框卡片", en: "3D Popout Card", de: "3D-Popout-Karte"))
+                    .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                VStack(alignment: .leading, spacing: 4) {
-                    guideStep("1", "打开系统相册，找到宠物照片")
-                    guideStep("2", "长按宠物主体，点击「拷贝」（iOS 自动抠图）")
-                    guideStep("3", "返回此页面，点击下方「粘贴并激活」")
-                }
+                Text(pet.name)
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
-        }
-        .padding(.horizontal, 14).padding(.vertical, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.goPrimary.opacity(0.08))
-                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color.goPrimary.opacity(0.25), lineWidth: 1))
-        )
-    }
 
-    // MARK: - 粘贴按钮
-    private var pasteButton: some View {
-        Button {
-            pasteAndActivate()
-        } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(
-                        hasPasteboardImage
-                            ? LinearGradient(colors: [Color.goPrimary, Color(hex: "A8E44A")],
-                                             startPoint: .topLeading, endPoint: .bottomTrailing)
-                            : LinearGradient(colors: [Color.white.opacity(0.08), Color.white.opacity(0.05)],
-                                             startPoint: .topLeading, endPoint: .bottomTrailing)
-                    )
-                    .shadow(
-                        color: hasPasteboardImage ? Color.goPrimary.opacity(pasteBreathing ? 0.55 : 0.15) : .clear,
-                        radius: pasteBreathing ? 18 : 6, x: 0, y: 4
-                    )
-
-                if isPasting {
-                    HStack(spacing: 10) {
-                        ProgressView()
-                            .progressViewStyle(.circular)
-                            .tint(hasPasteboardImage ? .black : .white)
-                            .scaleEffect(0.85)
-                        Text("正在处理…")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(hasPasteboardImage ? .black : .white.opacity(0.5))
-                    }
-                    .frame(maxWidth: .infinity).padding(.vertical, 18)
-                } else {
-                    HStack(spacing: 12) {
-                        ZStack {
-                            Circle()
-                                .fill(hasPasteboardImage ? Color.black.opacity(0.12) : Color.white.opacity(0.08))
-                                .frame(width: 44, height: 44)
-                            Image(systemName: hasPasteboardImage ? "doc.on.clipboard.fill" : "doc.on.clipboard")
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundStyle(hasPasteboardImage ? .black : .white.opacity(0.35))
-                        }
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(hasPasteboardImage ? "粘贴抠图并生成卡片" : "从剪贴板粘贴抠图")
-                                .font(.system(size: 15, weight: .black, design: .rounded))
-                                .foregroundStyle(hasPasteboardImage ? .black : .white.opacity(0.4))
-                            Text(hasPasteboardImage ? "检测到剪贴板有图 · 点击激活破框风格" : "先在相册长按宠物主体并拷贝")
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .foregroundStyle(hasPasteboardImage ? .black.opacity(0.5) : .white.opacity(0.22))
-                        }
-                        Spacer()
-                        Image(systemName: "arrow.right.circle.fill")
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundStyle(hasPasteboardImage ? .black.opacity(0.45) : .white.opacity(0.1))
-                            .scaleEffect(pasteBreathing && hasPasteboardImage ? 1.12 : 1.0)
-                    }
-                    .padding(.horizontal, 16).padding(.vertical, 14)
-                }
-            }
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .disabled(isPasting)
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(hasPasteboardImage ? Color.clear : Color.white.opacity(0.10), lineWidth: 1)
-        )
-        .animation(.easeInOut(duration: 0.25), value: hasPasteboardImage)
-    }
-
-    // MARK: - 引导步骤行
-    private func guideStep(_ num: String, _ text: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text(num)
-                .font(.system(size: 10, weight: .black, design: .rounded))
-                .foregroundStyle(.black)
-                .frame(width: 18, height: 18)
-                .background(Color.goPrimary, in: Circle())
-            Text(text)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.65))
             Spacer()
+
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .disabled(isProcessing)
         }
     }
 
-    // MARK: - 粘贴并激活
-    private func pasteAndActivate() {
-        guard let img = UIPasteboard.general.image else {
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
-            withAnimation(.spring(response: 0.3)) { showErrorToast = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                withAnimation { showErrorToast = false }
+    private var popoutPreview: some View {
+        ZStack(alignment: .bottomLeading) {
+            RoundedRectangle(cornerRadius: 34, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: pet.safeThemeColorHex).opacity(0.86),
+                            Color(hex: pet.safeThemeColorHex).mix(with: .black, by: 0.28)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(height: 190)
+                .overlay(alignment: .topTrailing) {
+                    Text(isPopoutActive ? l.tr(zh: "已启用", en: "Active", de: "Aktiv") : l.tr(zh: "预览", en: "Preview", de: "Vorschau"))
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(Color.arkInk)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.goPrimary, in: Capsule())
+                        .padding(14)
+                }
+
+            if let image = currentPreviewImage {
+                ZStack(alignment: .bottomLeading) {
+                    Ellipse()
+                        .fill(Color.arkInk.opacity(0.32))
+                        .frame(width: 160, height: 30)
+                        .blur(radius: 16)
+                        .offset(x: 26, y: -8)
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 180, height: 218, alignment: .bottom)
+                        .rotation3DEffect(.degrees(-4), axis: (x: 0, y: 1, z: 0), anchor: .bottomLeading, perspective: 0.55)
+                        .offset(x: 4, y: -28)
+                        .shadow(color: Color.arkInk.opacity(0.34), radius: 20, x: 0, y: 14) // ui-v4: allow popout preview depth
+                }
+            } else {
+                Image(systemName: "sparkles.rectangle.stack.fill")
+                    .font(.system(size: 52, weight: .black))
+                    .foregroundStyle(Color.goPrimary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .offset(y: -16)
             }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(pet.name.isEmpty ? l.tr(zh: "宠物", en: "Pet", de: "Tier") : pet.name)
+                    .font(OhanaFont.title3(.black))
+                    .foregroundStyle(WalletPetCardTheme.foreground(for: pet.safeThemeColorHex))
+                Text(l.tr(zh: "从卡片里跳出来", en: "Pops out of the card", de: "Springt aus der Karte"))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(WalletPetCardTheme.foreground(for: pet.safeThemeColorHex, opacity: 0.72))
+            }
+            .padding(18)
+            .padding(.leading, 150)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var sourceActions: some View {
+        HStack(spacing: 10) {
+            PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                sourceButton(
+                    icon: "photo.on.rectangle.angled",
+                    title: l.tr(zh: "相册抠图", en: "Photo cutout", de: "Foto-Freisteller"),
+                    isSelected: previewSource == .photoCutout || pet.cardPopoutSourceRaw == PetPopoutCardSource.photoCutout.rawValue
+                )
+            }
+            .disabled(isProcessing)
+
+            Button {
+                useAvatar2D()
+            } label: {
+                sourceButton(
+                    icon: "sparkles",
+                    title: "2.5D",
+                    isSelected: previewSource == .avatar2d || pet.cardPopoutSourceRaw == PetPopoutCardSource.avatar2d.rawValue
+                )
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .disabled(isProcessing)
+        }
+    }
+
+    private func sourceButton(icon: String, title: String, isSelected: Bool) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .black))
+            Text(title)
+                .font(OhanaFont.caption(.black))
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 13)
+        .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+    }
+
+    private var statusBlock: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: isPopoutActive ? "checkmark.seal.fill" : "wand.and.stars")
+                    .foregroundStyle(isPopoutActive ? Color.goPrimary : Color.goPurple)
+                Text(isPopoutActive
+                     ? l.tr(zh: "破框素材已保存，不会改变普通头像。", en: "Popout asset saved. Regular avatar is unchanged.", de: "Popout-Motiv gespeichert. Normaler Avatar bleibt unverändert.")
+                     : l.tr(zh: "先选择素材，再启用破框卡片。", en: "Pick a subject, then enable popout.", de: "Wähle ein Motiv und aktiviere Popout."))
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if isProcessing {
+                ProgressView()
+                    .tint(Color.goPrimary)
+                    .padding(.top, 2)
+            }
+        }
+        .padding(14)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    private var actionButtons: some View {
+        VStack(spacing: 10) {
+            Button {
+                savePopout()
+            } label: {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                    Text(l.tr(zh: "启用破框卡片", en: "Enable popout card", de: "Popout-Karte aktivieren"))
+                }
+                .font(OhanaFont.callout(.black))
+                .foregroundStyle(Color.ohanaPrimaryActionText)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(Color.goPrimary, in: Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .disabled(isProcessing || currentPreviewData == nil)
+
+            if isPopoutActive {
+                Button {
+                    pet.cardStyleRaw = "classic"
+                    modelContext.safeSave()
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    dismiss()
+                } label: {
+                    Text(l.tr(zh: "恢复普通卡片", en: "Restore regular card", de: "Normale Karte wiederherstellen"))
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.ohanaControlFill, in: Capsule())
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .disabled(isProcessing)
+            }
+        }
+    }
+
+    private func toastView(_ toast: Toast) -> some View {
+        VStack {
+            Spacer()
+            HStack(spacing: 10) {
+                Image(systemName: toast.icon)
+                    .foregroundStyle(toast.tint)
+                Text(toast.title)
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color.ohanaCardSurface, in: Capsule())
+            .padding(.horizontal, 24)
+            .padding(.bottom, 30)
+        }
+    }
+
+    private func processPhoto(_ item: PhotosPickerItem) {
+        isProcessing = true
+        Task {
+            defer { Task { @MainActor in isProcessing = false } }
+            guard let rawData = try? await item.loadTransferable(type: Data.self),
+                  let image = UIImage(data: rawData) else {
+                showError(l.tr(zh: "无法读取这张图片。", en: "Could not read this photo.", de: "Dieses Foto konnte nicht gelesen werden."))
+                return
+            }
+
+            let cutout = (try? await ImageCutoutService.shared.removeBackground(from: image)) ?? image
+            let trimmed = ImageCutoutService.trimmedTransparentSubjectImage(from: cutout) ?? cutout
+            let downsampled = AddPetWizardView.downsample(trimmed, maxDim: 1024)
+            guard let data = downsampled.pngData() else {
+                showError(l.tr(zh: "无法生成透明素材。", en: "Could not create a transparent asset.", de: "Transparentes Motiv konnte nicht erstellt werden."))
+                return
+            }
+            await MainActor.run {
+                previewData = data
+                previewSource = .photoCutout
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }
+        }
+    }
+
+    private func useAvatar2D() {
+        guard let data = PetAvatarAssetCatalog.avatarData(
+            species: pet.species,
+            breed: pet.breed,
+            gender: pet.gender,
+            coatColor: pet.coatColor,
+            eyeColor: pet.eyeColor
+        ) else {
+            showToast(l.tr(zh: "请先补全物种、品种或外貌信息。", en: "Complete species, breed, or appearance first.", de: "Ergänze zuerst Art, Rasse oder Aussehen."), icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
             return
         }
+        previewData = data
+        previewSource = .avatar2d
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
 
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        isPasting = true
+    private func savePopout() {
+        guard let data = currentPreviewData else { return }
+        pet.cardPopoutImageData = data
+        pet.cardPopoutSourceRaw = (previewSource ?? PetPopoutCardSource(rawValue: pet.cardPopoutSourceRaw ?? "") ?? .avatar2d).rawValue
+        pet.cardStyleRaw = "popout"
+        modelContext.safeSave()
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        showToast(l.tr(zh: "破框卡片已启用", en: "Popout card enabled", de: "Popout-Karte aktiviert"), icon: "checkmark.circle.fill", tint: Color.goPrimary)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
+            dismiss()
+        }
+    }
 
-        Task.detached(priority: .userInitiated) {
-            let processed = (try? await ImageCutoutService.shared.removeBackground(from: img)) ?? img
-            let maxDim: CGFloat = 1024
-            let downsampled = AddPetWizardView.downsample(processed, maxDim: maxDim)
-            let pngData = downsampled.pngData() ?? downsampled.jpegData(compressionQuality: 0.85)
+    @MainActor
+    private func showError(_ message: String) {
+        showToast(message, icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
+    }
 
-            await MainActor.run {
-                if let data = pngData {
-                    pet.avatarImageData = data
-                }
-                pet.cardStyleRaw = "popout"
-                modelContext.safeSave()
-                isPasting = false
-                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                withAnimation(.spring(response: 0.4)) { showSuccessToast = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
-                    withAnimation { showSuccessToast = false }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { dismiss() }
-                }
+    private func showToast(_ message: String, icon: String, tint: Color) {
+        withAnimation(GoMotion.feedback) {
+            toast = Toast(title: message, icon: icon, tint: tint)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.9) {
+            withAnimation(GoMotion.feedback) {
+                toast = nil
             }
         }
     }

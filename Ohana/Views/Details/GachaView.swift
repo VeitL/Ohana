@@ -2,482 +2,902 @@
 //  GachaView.swift
 //  Ohana
 //
-//  欧气扭蛋机 — 消耗 30🥥/次，抽取稀有图标/气候特效/称号
+//  Series blind-box gacha presented as an inline V4 glass popup.
 //
 
 import SwiftUI
 import SwiftData
 
-// MARK: - 奖品模型
-struct GachaPrize: Identifiable {
-    let id: String
-    let emoji: String
-    let name: String
-    let rarity: Rarity
-    let description: String
-
-    enum Rarity: String {
-        case common   = "普通"
-        case rare     = "稀有"
-        case epic     = "史诗"
-        case legend   = "传说"
-
-        /// 标签文字色（深浅色均可读；普通档用 primary 透明度，不用固定白）
-        var color: Color {
-            switch self {
-            case .common: return Color.primary.opacity(0.55)
-            case .rare:   return Color.goTeal
-            case .epic:   return Color.goPrimary
-            case .legend: return Color.goYellow
-            }
-        }
-
-        var glowColor: Color {
-            switch self {
-            case .common: return Color.primary.opacity(0.12)
-            case .rare:   return Color.goTeal.opacity(0.4)
-            case .epic:   return Color.goPrimary.opacity(0.5)
-            case .legend: return Color.goYellow.opacity(0.6)
-            }
-        }
-
-        var weight: Int {
-            switch self {
-            case .common: return 55
-            case .rare:   return 30
-            case .epic:   return 12
-            case .legend: return 3
-            }
-        }
-    }
-
-    /// 是否是补打卡券类型
-    var isBackdatePass: Bool {
-        id == "r_backdate_1day" || id == "e_backdate_3day"
-    }
-    /// 补打卡券可补天数
-    var backdateDays: Int {
-        id == "e_backdate_3day" ? 3 : (id == "r_backdate_1day" ? 1 : 0)
-    }
-
-    static let allPrizes: [GachaPrize] = [
-        // Common（概率合计 55%，调整后每张约11%）
-        GachaPrize(id: "c_paw",    emoji: "🐾", name: "肉球印章",    rarity: .common, description: "可爱肉球装饰徽章"),
-        GachaPrize(id: "c_bone",   emoji: "🦴", name: "骨头项圈",    rarity: .common, description: "经典骨头风格"),
-        GachaPrize(id: "c_fish",   emoji: "🐟", name: "小鱼干",      rarity: .common, description: "猫咪最爱"),
-        GachaPrize(id: "c_carrot", emoji: "🥕", name: "胡萝卜勋章",  rarity: .common, description: "兔兔能量补充"),
-        GachaPrize(id: "c_sun",    emoji: "☀️", name: "晴天徽章",    rarity: .common, description: "阳光明媚的一天"),
-        // Rare（概率合计 30%，含补打卡券 8%）
-        GachaPrize(id: "r_rainbow",      emoji: "🌈", name: "彩虹光环",      rarity: .rare,   description: "打卡时环绕彩虹光"),
-        GachaPrize(id: "r_moon",         emoji: "🌙", name: "月光守夜",      rarity: .rare,   description: "夜间打卡特效"),
-        GachaPrize(id: "r_flower",       emoji: "🌸", name: "樱花飘落",      rarity: .rare,   description: "春季风格特效"),
-        GachaPrize(id: "r_backdate_1day",emoji: "🎫", name: "昨日补打卡券",   rarity: .rare,   description: "补录昨天任意 1 次打卡，正常获得椰子奖励"),
-        // Epic（概率合计 12%，含补打卡券 3%）
-        GachaPrize(id: "e_diamond",      emoji: "💎", name: "钻石星光",      rarity: .epic,   description: "史诗级钻石光晕特效"),
-        GachaPrize(id: "e_rocket",       emoji: "🚀", name: "星际漫游",      rarity: .epic,   description: "宇宙探索者称号"),
-        GachaPrize(id: "e_aurora",       emoji: "🌌", name: "极光夜幕",      rarity: .epic,   description: "史诗级极光背景"),
-        GachaPrize(id: "e_backdate_3day",emoji: "📅", name: "三日补打卡券",   rarity: .epic,   description: "补录 3 天内任意 1 次打卡，正常获得奖励"),
-        // Legend
-        GachaPrize(id: "l_crown",   emoji: "👑", name: "岛主王冠",   rarity: .legend, description: "传说级！欧哈纳岛主专属"),
-        GachaPrize(id: "l_dragon",  emoji: "🐉", name: "神龙之力",   rarity: .legend, description: "传说级！龙年限定守护"),
-    ]
-
-    static func roll() -> GachaPrize {
-        // 每个奖品单独权重：同稀有度内均分（补打卡券单独权重）
-        // r_backdate_1day: 8, r_火焰/月光/彩虹/花: 各(30-8)/4=5.5→6/6/5/5
-        // e_backdate_3day: 3, e_其他3个: 各(12-3)/3=3
-        let weights: [String: Int] = [
-            "c_paw": 11, "c_bone": 11, "c_fish": 11, "c_carrot": 11, "c_sun": 11,
-            "r_rainbow": 5, "r_moon": 6, "r_flower": 6, "r_backdate_1day": 8,
-            "e_diamond": 3, "e_rocket": 3, "e_aurora": 3, "e_backdate_3day": 3,
-            "l_crown": 1, "l_dragon": 2,
-        ]
-        let total = weights.values.reduce(0, +)
-        var roll = Int.random(in: 0..<total)
-        for prize in allPrizes {
-            let w = weights[prize.id] ?? prize.rarity.weight
-            roll -= w
-            if roll < 0 { return prize }
-        }
-        return allPrizes.first!
-    }
-}
-
-// MARK: - 扭蛋机 View
 struct GachaView: View {
+    var drawsBackground: Bool = true
+    var onClose: (() -> Void)? = nil
+
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage("gachaHistory") private var historyRaw: String = ""
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @AppStorage("appLanguage") private var appLanguage: String = "zh"
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
+    @AppStorage("gachaHistory") private var legacyHistoryRaw: String = ""
+
     @Query(sort: \Human.createdAt) private var humans: [Human]
-    @State private var questManager = QuestManager.shared
+    @Query(sort: \GachaOwnedItem.latestObtainedAt, order: .reverse) private var ownedItems: [GachaOwnedItem]
+    @Query(sort: \GachaDrawLog.drawDate, order: .reverse) private var drawLogs: [GachaDrawLog]
 
-    private let cost = 30
+    @State private var selectedSeriesId = GachaSeriesCatalog.defaultSeriesId
+    @State private var isDrawing = false
+    @State private var revealPhase: CoconutGachaRevealPhase = .idle
+    @State private var showPrize = false
+    @State private var drawOutcome: GachaDrawOutcome?
+    @State private var feedbackText: String?
+    @State private var shakeToken = 0
+    @State private var revealingCollectibleItemId: String?
+    @State private var preRevealOwnedCounts: [String: Int] = [:]
+    @State private var revealCardPhase: GachaCollectibleRevealPhase = .idle
+    @State private var collectionPulseItemId: String?
+    @State private var pendingCollectionCompletion = false
+    @State private var collectionCompletionToken = 0
+    @State private var isCollectionCompletionCelebrating = false
+    @State private var showingCoconutLog = false
+    @State private var revealResetToken = 0
+    @State private var selectedCollectionItemId: String?
 
-    @State private var isRolling     = false
-    @State private var capsuleScale  : CGFloat = 1.0
-    @State private var capsuleRotation: Double = 0
-    @State private var showResult    = false
-    @State private var currentPrize  : GachaPrize? = nil
-    @State private var prizeBounce   = false
-    @State private var glowOpacity   : Double = 0
-    @State private var particles     : [(id: UUID, x: CGFloat, opacity: Double)] = []
-    @State private var historyItems  : [GachaPrize] = []
-    @State private var showBackdateSheet = false
-    @State private var backdatePrize: GachaPrize? = nil
-
-    private var primaryText: Color { colorScheme == .dark ? .white : .black }
-    private var secondaryText: Color { colorScheme == .dark ? .white.opacity(0.72) : .black.opacity(0.58) }
-    private var tertiaryText: Color { colorScheme == .dark ? .white.opacity(0.45) : .black.opacity(0.4) }
-
-    private var canRoll: Bool { questManager.coconutCount >= cost && !isRolling }
-
-    // 历史记录（最多显示12个）
-    private var recentHistory: [GachaPrize] {
-        let ids = historyRaw.split(separator: ",").prefix(12).map(String.init)
-        return ids.compactMap { id in GachaPrize.allPrizes.first { $0.id == id } }
+    private var l: L10n { L10n(appLanguage) }
+    private var series: GachaSeriesEntry { GachaSeriesCatalog.series(id: selectedSeriesId) }
+    private var currentHuman: Human? {
+        humans.first { $0.id.uuidString == activeHumanId }
+    }
+    private var currentCoconutBalance: Int { currentHuman?.coconutBalance ?? 0 }
+    private var currentHumanLogs: [GachaDrawLog] {
+        drawLogs.filter { $0.ownerHumanId == currentHuman?.id.uuidString && $0.seriesId == series.id }
+    }
+    private var collectionProgress: (owned: Int, total: Int) {
+        GachaDrawService.collectionProgress(
+            humanId: currentHuman?.id.uuidString ?? "",
+            seriesId: series.id,
+            ownedItems: ownedItems
+        )
+    }
+    private var displayedCollectionProgress: (owned: Int, total: Int) {
+        guard revealingCollectibleItemId != nil, revealCardPhase.holdsCollectionUpdate else {
+            return collectionProgress
+        }
+        return (
+            preRevealOwnedCounts.values.filter { $0 > 0 }.count,
+            series.items.count
+        )
+    }
+    private var canDraw: Bool {
+        guard let currentHuman else { return false }
+        return currentHuman.coconutBalance >= GachaDrawService.costPerDraw && !isDrawing
+    }
+    private var shouldAnimateReveal: Bool {
+        !reduceMotion && workloadPolicy.shouldAnimate(isVisible: true)
+    }
+    private var selectedCollectionItem: GachaItemEntry? {
+        guard let selectedCollectionItemId else { return nil }
+        return series.items.first { $0.id == selectedCollectionItemId }
     }
 
     var body: some View {
-        NavigationStack {
-            GeometryReader { geo in
+        GeometryReader { proxy in
             ZStack {
-                OhanaAppBackground()
-                    .ignoresSafeArea()
-
-                // 背景光晕
-                Circle()
-                    .fill(RadialGradient(
-                        colors: [Color.goPrimary.opacity(0.18 + glowOpacity * 0.3), .clear],
-                        center: .center, startRadius: 0, endRadius: 200
-                    ))
-                    .frame(width: 400, height: 400)
-                    .animation(.easeInOut(duration: 0.6), value: glowOpacity)
-
-                // 粒子
-                ForEach(particles, id: \.id) { p in
-                    Circle()
-                        .fill(Color.goPrimary.opacity(p.opacity))
-                        .frame(width: 6, height: 6)
-                        .position(x: p.x, y: geo.size.height * 0.42)
-                        .blur(radius: 2)
+                if drawsBackground {
+                    OhanaAppBackground()
+                        .ignoresSafeArea()
                 }
 
-                ScrollView {
-                    VStack(spacing: 32) {
-                        // 余额
-                        balanceRow
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(colorScheme == .dark ? 0.34 : 0.16), // ui-v4: allow modal scrim ink
+                        Color.black.opacity(colorScheme == .dark ? 0.10 : 0.05) // ui-v4: allow modal scrim ink
+                    ],
+                    startPoint: .bottom,
+                    endPoint: .top
+                )
+                .ignoresSafeArea()
+                .onTapGesture { close() }
 
-                        // 扭蛋机主体
-                        gachaMachine
-
-                        // 结果展示
-                        if showResult, let prize = currentPrize {
-                            prizeResultCard(prize)
-                                .transition(.scale.combined(with: .opacity))
-                        }
-
-                        // 历史记录
-                        if !recentHistory.isEmpty {
-                            historySection
-                        }
-
-                        Spacer(minLength: 80)
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 16)
+                VStack {
+                    Spacer(minLength: 0)
+                    popupPanel(maxHeight: proxy.size.height * 0.94)
+                        .padding(.horizontal, 6)
+                        .padding(.bottom, 4)
                 }
-            }
-            }
-            .navigationTitle("欧气扭蛋机")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.ohanaCardSurface, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 17, weight: .black))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .accessibilityLabel("关闭")
+
+                if let selectedCollectionItem {
+                    collectionItemDetailOverlay(selectedCollectionItem)
+                        .zIndex(4)
                 }
             }
         }
-        .tint(Color.goPrimary)
+        .ignoresSafeArea(.container, edges: .bottom)
+        .statusBarHidden(false)
+        .sheet(isPresented: $showingCoconutLog) {
+            if let currentHuman {
+                CoconutLogView(subject: .human(currentHuman.id))
+            } else {
+                CoconutLogView()
+            }
+        }
     }
 
-    // MARK: - 余额行
-    private var balanceRow: some View {
-        HStack {
-            HStack(spacing: 6) {
-                Text("🥥")
-                Text("\(questManager.coconutCount)")
-                    .font(OhanaFont.title3(.black))
-                    .foregroundStyle(Color.goYellow)
-                    .contentTransition(.numericText())
-                    .animation(.spring(response: 0.4), value: questManager.coconutCount)
+    private func popupPanel(maxHeight: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            OhanaPopupDragHandle(tint: Color.ohanaPrimaryText.opacity(0.24))
+                .padding(.top, 8)
+                .padding(.bottom, 6)
+
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(l.tr(zh: "Nana Ohana 盲盒", en: "Nana Ohana Blind Box", de: "Nana Ohana Blindbox"))
+                        .font(OhanaFont.title3(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(series.localizedName(l))
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
+
+                Spacer()
+
+                balancePill
+
+                OhanaPopupCloseButton(tint: Color.ohanaPrimaryText) { close() }
             }
-            .padding(.horizontal, 14).padding(.vertical, 8)
-            .background(
-                Capsule()
-                    .fill(Color.ohanaCardSurface)
-                    .overlay(Capsule().strokeBorder(Color.goPrimary.opacity(0.28), lineWidth: 1))
-            )
+            .padding(.horizontal, 22)
+            .padding(.bottom, 10)
+
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 16) {
+                    gachaStage
+                    drawButton
+                    if let feedbackText {
+                        Text(feedbackText)
+                            .font(OhanaFont.caption(.bold))
+                            .foregroundStyle(Color.goOrange)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+                    collectionSection
+                    recentSection
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 22)
+            }
+            .scrollDismissesKeyboard(.immediately)
+        }
+        .frame(maxHeight: maxHeight)
+        .background { OhanaPopupGlassSurface(cornerRadius: 52) }
+        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.32 : 0.18), radius: 34, x: 0, y: -8) // ui-v4: allow lifted inline popup shadow
+        .transition(.move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.985, anchor: .bottom)))
+    }
+
+    private var balancePill: some View {
+        Button {
+            showingCoconutLog = true
+            OhanaFeedback.light()
+        } label: {
+            HStack(spacing: 5) {
+                Text("🥥")
+                Text("\(currentCoconutBalance)")
+                    .contentTransition(.numericText())
+            }
+            .font(OhanaFont.caption(.black))
+            .foregroundStyle(Color.arkInk)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.goYellow, in: Capsule())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .disabled(currentHuman == nil)
+        .opacity(currentHuman == nil ? 0.62 : 1)
+        .animation(GoMotion.feedback, value: currentCoconutBalance)
+        .accessibilityLabel(l.tr(zh: "当前椰子余额 \(currentCoconutBalance)，打开椰子历史", en: "Current coconut balance \(currentCoconutBalance), open coconut history", de: "Aktueller Kokosnussstand \(currentCoconutBalance), Kokosnuss-Historie öffnen"))
+    }
+
+    private var gachaStage: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 34, style: .continuous)
+                .fill(Color.ohanaCardSurface)
+
+            VStack(spacing: 8) {
+                CoconutGachaRevealView(
+                    phase: revealPhase,
+                    prizeSymbol: drawOutcome?.displaySymbol,
+                    rarity: drawOutcome?.item?.rarity,
+                    trigger: shakeToken,
+                    collectibleItem: drawOutcome?.item,
+                    revealCardPhase: revealCardPhase,
+                    isNewCollectible: drawOutcome?.log.isNew == true,
+                    onCollectibleCardTap: revealCollectibleToyOnCard,
+                    onCollectibleKeepTap: releaseCollectibleFromCard
+                )
+                .frame(height: drawOutcome?.item == nil ? 230 : 376)
+
+                if showPrize, let outcome = drawOutcome {
+                    prizeSummary(outcome)
+                        .transition(.scale(scale: 0.86).combined(with: .opacity).combined(with: .move(edge: .bottom)))
+                }
+            }
+            .padding(.vertical, 14)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func prizeSummary(_ outcome: GachaDrawOutcome) -> some View {
+        let tint = outcomeTint(outcome)
+        return HStack(spacing: 10) {
+            if let item = outcome.item {
+                GachaCollectibleThumbnailView(
+                    item: item,
+                    ownedCount: max(1, outcome.ownedItem?.ownedCount ?? 1)
+                )
+            } else {
+                Text(outcome.displaySymbol)
+                    .font(.system(size: 34))
+                    .frame(width: 54, height: 54)
+                    .background(tint.opacity(0.18), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(outcomeTitle(outcome))
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    if outcome.log.isNew && outcome.item != nil {
+                        Text("NEW")
+                            .font(OhanaFont.caption2(.black))
+                            .foregroundStyle(Color.arkInk)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(Color.goPrimary, in: Capsule())
+                    }
+                }
+                Text(outcomeSubtitle(outcome))
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(tint)
+            }
 
             Spacer()
 
-            Text("每次消耗 \(cost)🥥")
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(tertiaryText)
+            if let owned = outcome.ownedItem {
+                Text("x\(owned.ownedCount)")
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+            } else if outcome.log.instantCoconutDelta > 0 {
+                Text("+\(outcome.log.instantCoconutDelta)🥥")
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(Color.goPrimary)
+            }
+        }
+        .padding(12)
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    private func outcomeTitle(_ outcome: GachaDrawOutcome) -> String {
+        if let item = outcome.item { return item.localizedName(l) }
+        if let instant = outcome.instantResult { return instant.localizedTitle(l) }
+        return outcome.log.instantTitle(l)
+    }
+
+    private func outcomeSubtitle(_ outcome: GachaDrawOutcome) -> String {
+        if let item = outcome.item { return item.rarity.name(l) }
+        if let instant = outcome.instantResult { return instant.localizedDetail(l) }
+        return outcome.log.instantDetail(l)
+    }
+
+    private func outcomeTint(_ outcome: GachaDrawOutcome) -> Color {
+        if let item = outcome.item { return item.rarity.tint }
+        switch outcome.outcomeKind {
+        case .collectible: return Color.goPrimary
+        case .instantReward: return Color.goYellow
+        case .message: return Color.goTeal
         }
     }
 
-    // MARK: - 扭蛋机主体
-    private var gachaMachine: some View {
-        VStack(spacing: 24) {
-            // 扭蛋球
+    private var drawButton: some View {
+        Button {
+            draw()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: canDraw ? "sparkles" : "lock.fill")
+                Text(drawButtonTitle)
+                if canDraw {
+                    Text("-\(GachaDrawService.costPerDraw)🥥")
+                        .foregroundStyle(Color.arkInk.opacity(0.58))
+                }
+            }
+            .font(OhanaFont.headline(.black))
+            .foregroundStyle(canDraw ? Color.arkInk : Color.ohanaSecondaryText)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 15)
+            .background(canDraw ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .disabled(!canDraw)
+    }
+
+    private var drawButtonTitle: String {
+        if currentHuman == nil {
+            return l.tr(zh: "先切换本人账户", en: "Choose your account", de: "Konto wählen")
+        }
+        if let currentHuman, currentHuman.coconutBalance < GachaDrawService.costPerDraw {
+            return l.tr(zh: "椰子不足", en: "Not enough coconuts", de: "Nicht genug Kokos")
+        }
+        return isDrawing
+            ? l.tr(zh: "打开中", en: "Opening", de: "Öffnet")
+            : l.tr(zh: "敲开椰子", en: "Crack it open", de: "Kokos öffnen")
+    }
+
+    private var collectionSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label(l.tr(zh: "系列收藏", en: "Collection", de: "Sammlung"), systemImage: "square.grid.3x3.fill")
+                    .font(OhanaFont.subheadline(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Spacer()
+                Text("\(displayedCollectionProgress.owned)/\(displayedCollectionProgress.total)")
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .contentTransition(.numericText())
+            }
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 8) {
+                ForEach(series.items) { item in
+                    collectionCell(item)
+                }
+            }
+        }
+        .padding(14)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay(collectionCompletionGlow)
+        .scaleEffect(isCollectionCompletionCelebrating ? 1.012 : 1)
+        .ohanaShine(
+            trigger: collectionCompletionToken,
+            cornerRadius: 26,
+            isEnabled: shouldAnimateReveal && collectionCompletionToken > 0
+        )
+        .animation(shouldAnimateReveal ? GoMotion.feedback : GoMotion.reduced, value: isCollectionCompletionCelebrating)
+    }
+
+    @ViewBuilder
+    private var collectionCompletionGlow: some View {
+        if isCollectionCompletionCelebrating {
             ZStack {
-                // 外光晕
-                Circle()
-                    .fill(RadialGradient(
-                        colors: [
-                            (currentPrize?.rarity.glowColor ?? Color.goPrimary.opacity(0.3)),
-                            .clear
-                        ],
-                        center: .center, startRadius: 20, endRadius: 100
-                    ))
-                    .frame(width: 200, height: 200)
-                    .opacity(isRolling ? 1.0 : 0.4)
-                    .animation(.easeInOut(duration: 0.4), value: isRolling)
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .strokeBorder(Color.goPrimary.opacity(0.54), lineWidth: 2)
 
-                // 球体
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.goPrimary, Color.goDeepNavy],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
+                ForEach(0..<9, id: \.self) { index in
+                    Image(systemName: index.isMultiple(of: 2) ? "sparkle" : "star.fill")
+                        .font(.system(size: index.isMultiple(of: 2) ? 15 : 9, weight: .black))
+                        .foregroundStyle(index.isMultiple(of: 2) ? Color.goPrimary : Color.goYellow)
+                        .offset(
+                            x: CGFloat([-124, -84, -44, 0, 44, 84, 124, -108, 108][index]),
+                            y: CGFloat([-42, -70, -48, -78, -48, -70, -42, 74, 74][index])
                         )
-                        .frame(width: 130, height: 130)
-                        .shadow(color: Color.goPrimary.opacity(0.6), radius: isRolling ? 30 : 10, x: 0, y: 0)
-
-                    // 分割线
-                    Rectangle()
-                        .fill(Color.primary.opacity(0.2))
-                        .frame(width: 130, height: 2)
-
-                    // 中心图标
-                    Text(isRolling ? "❓" : (currentPrize?.emoji ?? "🎲"))
-                        .font(.system(size: 48))
-                        .shadow(color: Color.primary.opacity(0.25), radius: 8)
+                        .opacity(shouldAnimateReveal ? 0.90 : 0.44)
                 }
-                .scaleEffect(capsuleScale)
-                .rotationEffect(.degrees(capsuleRotation))
             }
-            .frame(height: 200)
-
-            // 抽取按钮
-            Button {
-                rollGacha()
-            } label: {
-                HStack(spacing: 8) {
-                    if isRolling {
-                        ProgressView()
-                            .tint(Color.arkInk)
-                            .scaleEffect(0.8)
-                    } else {
-                        Text("🎰")
-                    }
-                    Text(isRolling ? "抽取中..." : "抽一次")
-                        .font(OhanaFont.headline(.black))
-                        .foregroundStyle(canRoll ? Color.arkInk : tertiaryText)
-                    if !isRolling {
-                        Text("-\(cost)🥥")
-                            .font(OhanaFont.callout(.bold))
-                            .foregroundStyle(canRoll ? Color.arkInk.opacity(0.55) : tertiaryText)
-                    }
-                }
-                .frame(width: 200)
-                .padding(.vertical, 16)
-                .background(
-                    canRoll ? Color.goPrimary : Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.08),
-                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-                )
-                .shadow(color: canRoll ? Color.goPrimary.opacity(0.5) : .clear, radius: 20, x: 0, y: 6)
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .opacity(canRoll ? 1 : 0.5)
-            .disabled(!canRoll)
-
-            if questManager.coconutCount < cost {
-                Text("椰子不足，快去打卡赚取吧 🥥")
-                    .font(OhanaFont.caption(.medium))
-                    .foregroundStyle(tertiaryText)
-            }
+            .allowsHitTesting(false)
+            .transition(.opacity.combined(with: .scale(scale: 0.96)))
         }
     }
 
-    // MARK: - 奖品结果卡
-    private func prizeResultCard(_ prize: GachaPrize) -> some View {
-        VStack(spacing: 14) {
-            Text("✨ 恭喜获得 ✨")
-                .font(OhanaFont.caption(.bold))
-                .foregroundStyle(secondaryText)
-                .tracking(2)
-
-            Text(prize.emoji)
-                .font(.system(size: 64))
-                .scaleEffect(prizeBounce ? 1.12 : 1.0)
-                .animation(.spring(response: 0.4, dampingFraction: 0.5).repeatCount(3), value: prizeBounce)
-
-            Text(prize.name)
-                .font(OhanaFont.title2(.black))
-                .foregroundStyle(primaryText)
-
-            Text(prize.rarity.rawValue)
-                .font(OhanaFont.caption(.bold))
-                .foregroundStyle(prize.rarity.color)
-                .padding(.horizontal, 12).padding(.vertical, 4)
-                .background(prize.rarity.color.opacity(0.15), in: Capsule())
-                .overlay(Capsule().strokeBorder(prize.rarity.color.opacity(0.4), lineWidth: 1))
-
-            Text(prize.description)
-                .font(OhanaFont.callout(.medium))
-                .foregroundStyle(secondaryText)
-                .multilineTextAlignment(.center)
-
-            // 补打卡券：立即使用 按钮
-            if prize.isBackdatePass {
-                Button {
-                    backdatePrize = prize
-                    showBackdateSheet = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Text("📅")
-                        Text("立即使用补打卡券")
-                            .font(OhanaFont.callout(.bold))
+    private func collectionCell(_ item: GachaItemEntry) -> some View {
+        let owned = ownedItems.first {
+            $0.ownerHumanId == currentHuman?.id.uuidString &&
+            $0.seriesId == series.id &&
+            $0.itemId == item.id
+        }
+        let ownedCount = displayedOwnedCount(for: item, actualCount: owned?.ownedCount ?? 0)
+        let isPulsing = collectionPulseItemId == item.id
+        let completionIndex = series.items.firstIndex { $0.id == item.id } ?? 0
+        let isCompletionCelebrating = isCollectionCompletionCelebrating && ownedCount > 0
+        return Button {
+            guard ownedCount > 0 else { return }
+            selectedCollectionItemId = item.id
+            OhanaFeedback.light()
+        } label: {
+            VStack(spacing: 4) {
+                GachaCollectibleThumbnailView(
+                    item: item,
+                    ownedCount: ownedCount,
+                    isPulsing: isPulsing
+                )
+                    .overlay(alignment: .topTrailing) {
+                        if ownedCount > 1 {
+                            Text("x\(ownedCount)")
+                                .font(OhanaFont.caption2(.black))
+                                .foregroundStyle(Color.arkInk)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(Color.goPrimary, in: Capsule())
+                                .offset(x: 5, y: -5)
+                        }
                     }
-                    .foregroundStyle(Color.arkInk)
-                    .padding(.horizontal, 20).padding(.vertical, 10)
-                    .background(Color.goPrimary, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .padding(.top, 4)
+                Text(collectionDisplayName(for: item))
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(ownedCount == 0 ? Color.ohanaTertiaryText : item.rarity.tint)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.62)
+                    .frame(minHeight: 24)
             }
         }
-        .padding(.vertical, 28).padding(.horizontal, 32)
+        .buttonStyle(ScaleButtonStyle())
+        .opacity(ownedCount > 0 ? 1 : 0.82)
+        .accessibilityLabel(collectionCellAccessibilityLabel(item, ownedCount: ownedCount))
         .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color.ohanaCardSurface)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .strokeBorder(prize.rarity.glowColor, lineWidth: 1.5)
-                )
+        .scaleEffect(isCompletionCelebrating ? 1.05 : 1)
+        .animation(
+            shouldAnimateReveal
+                ? GoMotion.feedback.delay(GoMotion.staggerDelay(completionIndex, step: 0.04, maxDelay: 0.24))
+                : GoMotion.reduced,
+            value: isCollectionCompletionCelebrating
         )
-        .shadow(color: prize.rarity.glowColor, radius: 24, x: 0, y: 8)
-        .sheet(isPresented: $showBackdateSheet) {
-            if let bp = backdatePrize {
-                BackdateCheckInSheet(backdateDays: bp.backdateDays)
+    }
+
+    private func collectionCellAccessibilityLabel(_ item: GachaItemEntry, ownedCount: Int) -> String {
+        if ownedCount > 0 {
+            return l.tr(
+                zh: "\(collectionDisplayName(for: item))，已拥有 \(ownedCount) 个，点按放大欣赏",
+                en: "\(collectionDisplayName(for: item)), owned \(ownedCount), tap to inspect",
+                de: "\(collectionDisplayName(for: item)), \(ownedCount) im Besitz, tippen zum Ansehen"
+            )
+        }
+        return l.tr(
+            zh: "\(collectionDisplayName(for: item))，尚未拥有",
+            en: "\(collectionDisplayName(for: item)), not owned yet",
+            de: "\(collectionDisplayName(for: item)), noch nicht im Besitz"
+        )
+    }
+
+    private func collectionItemDetailOverlay(_ item: GachaItemEntry) -> some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(colorScheme == .dark ? 0.44 : 0.22), // ui-v4: allow nested detail scrim
+                    Color.black.opacity(colorScheme == .dark ? 0.26 : 0.14) // ui-v4: allow nested detail scrim
+                ],
+                startPoint: .bottom,
+                endPoint: .top
+            )
+            .ignoresSafeArea()
+            .onTapGesture { dismissCollectionDetail() }
+
+            VStack(spacing: 14) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(collectionDisplayName(for: item))
+                            .font(OhanaFont.title3(.black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                        Text(item.rarity.name(l))
+                            .font(OhanaFont.caption(.black))
+                            .foregroundStyle(item.rarity.tint)
+                    }
+                    Spacer()
+                    OhanaPopupCloseButton(tint: Color.ohanaPrimaryText) {
+                        dismissCollectionDetail()
+                    }
+                }
+
+                collectionDetailImage(item)
+                    .frame(width: 230, height: 292)
+                    .padding(.vertical, 2)
+                    .ohanaShine(trigger: item.id, cornerRadius: 30, isEnabled: shouldAnimateReveal)
+
+                HStack(spacing: 8) {
+                    Label("x\(ownedCount(for: item))", systemImage: "square.stack.3d.up.fill")
+                    Text(item.localizedPersonality(l))
+                        .lineLimit(2)
+                }
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+                Text("“\(item.localizedMotto(l))”")
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.76)
+                    .padding(.horizontal, 8)
+            }
+            .padding(18)
+            .frame(maxWidth: 356)
+            .background { OhanaPopupGlassSurface(cornerRadius: 42) }
+            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.34 : 0.18), radius: 28, x: 0, y: 14) // ui-v4: allow focused collectible viewer lift
+            .padding(.horizontal, 18)
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.96)))
+    }
+
+    @ViewBuilder
+    private func collectionDetailImage(_ item: GachaItemEntry) -> some View {
+        if item.imageAssetName.isEmpty {
+            Text(item.placeholderSymbol)
+                .font(.system(size: 86))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            Image(item.imageAssetName)
+                .resizable()
+                .renderingMode(.original)
+                .scaledToFit()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private func dismissCollectionDetail() {
+        withAnimation(shouldAnimateReveal ? GoMotion.stateChange : GoMotion.reduced) {
+            selectedCollectionItemId = nil
+        }
+    }
+
+    private func ownedCount(for item: GachaItemEntry) -> Int {
+        ownedItems.first {
+            $0.ownerHumanId == currentHuman?.id.uuidString &&
+            $0.seriesId == series.id &&
+            $0.itemId == item.id
+        }?.ownedCount ?? 0
+    }
+
+    private func displayedOwnedCount(for item: GachaItemEntry, actualCount: Int) -> Int {
+        guard revealingCollectibleItemId == item.id, revealCardPhase.holdsCollectionUpdate else {
+            return actualCount
+        }
+        return preRevealOwnedCounts[item.id] ?? 0
+    }
+
+    private func collectionDisplayName(for item: GachaItemEntry) -> String {
+        strippedSeriesPrefix(from: item.localizedName(l))
+    }
+
+    private func strippedSeriesPrefix(from name: String) -> String {
+        let prefixes = ["Nana ", "Nana-", "nana "]
+        for prefix in prefixes where name.hasPrefix(prefix) {
+            let trimmed = String(name.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+        }
+        return name
+    }
+
+    @ViewBuilder
+    private var recentSection: some View {
+        let recent = currentHumanLogs.prefix(4)
+        if !recent.isEmpty || !legacyHistoryRaw.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Label(l.tr(zh: "最近", en: "Recent", de: "Zuletzt"), systemImage: "clock.fill")
+                    .font(OhanaFont.subheadline(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                ForEach(Array(recent), id: \.id) { log in
+                    if let row = recentRowData(log) {
+                        HStack(spacing: 10) {
+                            Text(row.symbol)
+                                .font(.system(size: 22))
+                                .frame(width: 38, height: 38)
+                                .background(row.tint.opacity(0.16), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(row.title)
+                                    .font(OhanaFont.caption(.black))
+                                    .foregroundStyle(Color.ohanaPrimaryText)
+                                Text(log.drawDate.formatted(.dateTime.month().day().hour().minute()))
+                                    .font(OhanaFont.caption2(.medium))
+                                    .foregroundStyle(Color.ohanaTertiaryText)
+                            }
+                            Spacer()
+                            Text(row.badge)
+                                .font(OhanaFont.caption2(.black))
+                                .foregroundStyle(row.isEmphasized ? Color.arkInk : Color.ohanaTertiaryText)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(row.isEmphasized ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+                        }
+                    }
+                }
+
+                if currentHumanLogs.isEmpty, !legacyHistoryRaw.isEmpty {
+                    Text(l.tr(zh: "旧版扭蛋记录已保留为历史，不会影响新系列收藏。", en: "Legacy gacha history is kept separately and will not affect the new collection.", de: "Alte Gacha-Historie bleibt separat und beeinflusst die neue Sammlung nicht."))
+                        .font(OhanaFont.caption(.medium))
+                        .foregroundStyle(Color.ohanaTertiaryText)
+                }
+            }
+            .padding(14)
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        }
+    }
+
+    private func recentRowData(_ log: GachaDrawLog) -> (symbol: String, title: String, badge: String, tint: Color, isEmphasized: Bool)? {
+        if log.outcomeKind == .collectible,
+           let item = GachaSeriesCatalog.item(seriesId: log.seriesId, itemId: log.itemId) {
+            return (
+                item.placeholderSymbol,
+                item.localizedName(l),
+                log.isNew ? "NEW" : "x",
+                item.rarity.tint,
+                log.isNew
+            )
+        }
+        let symbol = log.instantSymbol.isEmpty ? "✨" : log.instantSymbol
+        let title = log.instantTitle(l).isEmpty ? log.outcomeKind.name(l) : log.instantTitle(l)
+        let badge = log.instantCoconutDelta > 0 ? "+\(log.instantCoconutDelta)🥥" : log.outcomeKind.name(l)
+        let tint: Color = log.outcomeKind == .message ? Color.goTeal : Color.goYellow
+        return (symbol, title, badge, tint, log.instantCoconutDelta > 0)
+    }
+
+    private func draw() {
+        guard !isDrawing else { return }
+        do {
+            let countSnapshot = currentOwnedCounts()
+            let outcome = try GachaDrawService.draw(
+                seriesId: series.id,
+                human: currentHuman,
+                context: modelContext
+            )
+            drawOutcome = outcome
+            feedbackText = nil
+            isDrawing = true
+            revealResetToken += 1
+            let resetToken = revealResetToken
+            showPrize = false
+            revealPhase = .charging
+            revealCardPhase = .idle
+            shakeToken += 1
+            collectionPulseItemId = nil
+            pendingCollectionCompletion = isFirstCollectionCompletion(outcome: outcome, previousCounts: countSnapshot)
+            isCollectionCompletionCelebrating = false
+            preRevealOwnedCounts = countSnapshot
+            revealingCollectibleItemId = outcome.item?.id
+
+            OhanaFeedback.medium()
+
+            guard shouldAnimateReveal else {
+                if outcome.item != nil {
+                    runReducedCollectibleReveal()
+                    return
+                }
+                withAnimation(GoMotion.reduced) {
+                    revealPhase = .reveal
+                    revealCardPhase = .idle
+                    showPrize = true
+                    revealingCollectibleItemId = nil
+                }
+                OhanaFeedback.success()
+                returnToCoconut(resetToken: resetToken, delay: 1.12)
+                return
+            }
+
+            if outcome.item != nil {
+                runCollectibleReveal(outcome)
+                return
+            }
+
+            runNonCollectibleReveal(outcome, resetToken: resetToken)
+        } catch let error as GachaDrawError {
+            feedbackText = message(for: error)
+            OhanaFeedback.error()
+        } catch {
+            feedbackText = l.tr(zh: "扭蛋暂时打不开", en: "Gacha is not ready", de: "Gacha ist nicht bereit")
+            OhanaFeedback.error()
+        }
+    }
+
+    private func currentOwnedCounts() -> [String: Int] {
+        guard let currentHuman else { return [:] }
+        return ownedItems
+            .filter { $0.ownerHumanId == currentHuman.id.uuidString && $0.seriesId == series.id }
+            .reduce(into: [String: Int]()) { counts, owned in
+                counts[owned.itemId] = owned.ownedCount
+            }
+    }
+
+    private func isFirstCollectionCompletion(outcome: GachaDrawOutcome, previousCounts: [String: Int]) -> Bool {
+        guard outcome.item != nil, outcome.log.isNew else { return false }
+        let previouslyOwnedCount = previousCounts.values.filter { $0 > 0 }.count
+        return previouslyOwnedCount == series.items.count - 1
+    }
+
+    private func runNonCollectibleReveal(_ outcome: GachaDrawOutcome, resetToken: Int) {
+        withAnimation(GoMotion.feedback) {
+            revealPhase = .charging
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.30) {
+            withAnimation(GoMotion.feedback) {
+                revealPhase = .crack
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+                withAnimation(GoMotion.page) {
+                    revealPhase = .reveal
+                }
+                withAnimation(GoMotion.feedback) {
+                    showPrize = true
+                }
+                outcome.item?.isHidden == true ? OhanaFeedback.strong() : OhanaFeedback.light()
+                returnToCoconut(resetToken: resetToken, delay: 1.18)
             }
         }
     }
 
-    // MARK: - 历史记录
-    private var historySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("最近记录")
-                .font(OhanaFont.subheadline(.bold))
-                .foregroundStyle(tertiaryText)
-
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 10) {
-                ForEach(recentHistory) { prize in
-                    VStack(spacing: 4) {
-                        Text(prize.emoji)
-                            .font(.system(size: 26))
-                            .frame(width: 46, height: 46)
-                            .background(prize.rarity.glowColor, in: RoundedRectangle(cornerRadius: 12))
-                        Text(prize.rarity.rawValue)
-                            .font(OhanaFont.caption2(.bold))
-                            .foregroundStyle(prize.rarity.color)
+    private func runCollectibleReveal(_ outcome: GachaDrawOutcome) {
+        withAnimation(GoMotion.feedback) {
+            revealPhase = .charging
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
+            withAnimation(GoMotion.feedback) {
+                revealPhase = .crack
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
+                withAnimation(GoMotion.page) {
+                    revealPhase = .reveal
+                    revealCardPhase = .cardPopped
+                }
+                outcome.item?.isHidden == true ? OhanaFeedback.strong() : OhanaFeedback.light()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) {
+                    withAnimation(GoMotion.page.speed(0.42)) {
+                        revealCardPhase = .flipping
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.08) {
+                        withAnimation(GoMotion.stateChange) {
+                            revealCardPhase = .revealed
+                        }
+                        OhanaFeedback.light()
                     }
                 }
             }
         }
-        .padding(.horizontal, 16).padding(.vertical, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.ohanaCardSurface)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
-                )
-        )
     }
 
-    // MARK: - 抽取逻辑
-    private func rollGacha() {
-        guard canRoll else { return }
-        isRolling = true
-        showResult = false
-        questManager.addCoconuts(
-            -cost,
-            emoji: "🎰",
-            title: "欧气扭蛋机",
-            actorId: activeHumanId.isEmpty ? nil : activeHumanId,
-            actorName: humans.first(where: { $0.id.uuidString == activeHumanId })?.name
-        )
-
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-
-        // 旋转动画
-        withAnimation(.linear(duration: 0.8).repeatCount(3)) {
-            capsuleRotation = 360
+    private func runReducedCollectibleReveal() {
+        withAnimation(GoMotion.reduced) {
+            revealPhase = .reveal
+            revealCardPhase = .revealed
         }
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.5).repeatCount(4)) {
-            capsuleScale = 1.15
-        }
-        withAnimation(.easeInOut(duration: 0.6)) {
-            glowOpacity = 1.0
-        }
+        OhanaFeedback.light()
+    }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            capsuleRotation = 0
-            capsuleScale = 1.0
+    private func revealCollectibleToyOnCard() {
+        guard isDrawing, drawOutcome?.item != nil, revealCardPhase == .revealed else { return }
 
-            let prize = GachaPrize.roll()
-            currentPrize = prize
-
-            // 追加历史
-            var ids = historyRaw.split(separator: ",").map(String.init)
-            ids.insert(prize.id, at: 0)
-            historyRaw = ids.prefix(24).joined(separator: ",")
-
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.65)) {
-                showResult = true
+        guard shouldAnimateReveal else {
+            withAnimation(GoMotion.reduced) {
+                revealCardPhase = .toyReady
             }
-            prizeBounce = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                prizeBounce = false
-            }
+            OhanaFeedback.light()
+            return
+        }
 
-            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-            if prize.rarity == .legend {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        if drawOutcome?.item?.isHidden == true {
+            withAnimation(GoMotion.feedback) {
+                revealCardPhase = .secretBurst
+                shakeToken += 1
+            }
+            OhanaFeedback.strong()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.72) {
+                guard revealCardPhase == .secretBurst else { return }
+                OhanaFeedback.medium()
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.18) {
+                guard revealCardPhase == .secretBurst else { return }
+                withAnimation(GoMotion.stateChange) {
+                    revealCardPhase = .toyReady
                 }
+                OhanaFeedback.success()
             }
+            return
+        }
 
-            withAnimation(.easeOut(duration: 0.4)) {
-                glowOpacity = 0
+        withAnimation(GoMotion.feedback) {
+            revealCardPhase = .toyAppearing
+            shakeToken += 1
+        }
+        drawOutcome?.item?.isHidden == true ? OhanaFeedback.strong() : OhanaFeedback.medium()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.92) {
+            guard revealCardPhase == .toyAppearing else { return }
+            withAnimation(GoMotion.stateChange) {
+                revealCardPhase = .toyReady
             }
-            isRolling = false
+            OhanaFeedback.light()
+        }
+    }
+
+    private func releaseCollectibleFromCard() {
+        guard isDrawing, drawOutcome?.item != nil, revealCardPhase == .toyReady else { return }
+
+        guard shouldAnimateReveal else {
+            finishCollectibleReveal()
+            return
+        }
+
+        withAnimation(GoMotion.feedback) {
+            revealCardPhase = .cardGone
+        }
+        OhanaFeedback.medium()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.20) {
+            withAnimation(GoMotion.stateChange) {
+                revealCardPhase = .flying
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.23) {
+                finishCollectibleReveal()
+            }
+        }
+    }
+
+    private func finishCollectibleReveal() {
+        let itemId = drawOutcome?.item?.id
+        withAnimation(shouldAnimateReveal ? GoMotion.stateChange : GoMotion.reduced) {
+            revealPhase = .idle
+            revealCardPhase = .idle
+            showPrize = false
+            drawOutcome = nil
+            collectionPulseItemId = itemId
+            revealingCollectibleItemId = nil
+        }
+        OhanaFeedback.success()
+        isDrawing = false
+        triggerCollectionCompletionAnimationIfNeeded()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.64) {
+            withAnimation(GoMotion.reduced) {
+                if collectionPulseItemId == itemId {
+                    collectionPulseItemId = nil
+                }
+                preRevealOwnedCounts = [:]
+            }
+        }
+    }
+
+    private func returnToCoconut(resetToken: Int, delay: Double) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            guard resetToken == revealResetToken else { return }
+            withAnimation(shouldAnimateReveal ? GoMotion.stateChange : GoMotion.reduced) {
+                revealPhase = .idle
+                revealCardPhase = .idle
+                showPrize = false
+                drawOutcome = nil
+                revealingCollectibleItemId = nil
+                collectionPulseItemId = nil
+                preRevealOwnedCounts = [:]
+            }
+            isDrawing = false
+        }
+    }
+
+    private func triggerCollectionCompletionAnimationIfNeeded() {
+        guard pendingCollectionCompletion else { return }
+        pendingCollectionCompletion = false
+        collectionCompletionToken += 1
+        OhanaFeedback.strong()
+
+        withAnimation(shouldAnimateReveal ? GoMotion.feedback : GoMotion.reduced) {
+            isCollectionCompletionCelebrating = true
+        }
+
+        let holdDuration: Double = shouldAnimateReveal ? 1.35 : 0.42
+        DispatchQueue.main.asyncAfter(deadline: .now() + holdDuration) {
+            withAnimation(shouldAnimateReveal ? GoMotion.stateChange : GoMotion.reduced) {
+                isCollectionCompletionCelebrating = false
+            }
+        }
+    }
+
+    private func message(for error: GachaDrawError) -> String {
+        switch error {
+        case .missingHuman:
+            return l.tr(zh: "先切换到本人账户", en: "Switch to your account first", de: "Wechsle zuerst zu deinem Konto")
+        case .insufficientBalance(let missing):
+            return l.tr(zh: "还差 \(missing)🥥", en: "Need \(missing)🥥 more", de: "Noch \(missing)🥥 nötig")
+        case .invalidSeries:
+            return l.tr(zh: "这个系列概率配置不完整", en: "This series has invalid odds", de: "Diese Serie hat ungültige Chancen")
+        }
+    }
+
+    private func close() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
         }
     }
 }

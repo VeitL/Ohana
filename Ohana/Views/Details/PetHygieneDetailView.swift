@@ -194,21 +194,13 @@ struct PetHygieneDetailView: View {
 
     private var hygieneHeader: some View {
         HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(chromeAccent.opacity(isDark ? 0.18 : 0.12))
-                    .frame(width: 46, height: 46)
-                if let data = pet.avatarImageData, let image = UIImage(data: data) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 46, height: 46)
-                        .clipShape(Circle())
-                } else {
-                    Text(pet.avatarEmoji)
-                        .font(.system(size: 24))
-                }
-            }
+            PetAvatarPortraitView(
+                imageData: pet.avatarImageData,
+                fallbackText: pet.avatarEmoji,
+                themeColor: chromeAccent,
+                size: 46,
+                backgroundOpacity: isDark ? 0.18 : 0.12
+            )
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(pet.name)

@@ -208,8 +208,8 @@ struct DesignSpecSelectionV4: Codable, Equatable {
         segment: "capsule",
         progress: "bar",
         type: "rounded",
-        icon: "filled",
-        settingIcon: "tintedTile",
+        icon: "monochromePrimary",
+        settingIcon: "plainGlyph",
         navigation: "floating",
         pageBackButton: "floatingCircle",
         pageCloseButton: "iconOnly",
@@ -308,8 +308,8 @@ struct DesignSpecSelectionV4: Codable, Equatable {
         value.segment = legacy["segment"] ?? value.segment
         value.progress = legacy["progress"] ?? value.progress
         value.type = legacy["type"] ?? value.type
-        value.icon = legacy["icon"] ?? value.icon
-        value.settingIcon = legacy["settingIcon"] ?? value.settingIcon
+        value.icon = Self.normalizedIcon(legacy["icon"] ?? value.icon)
+        value.settingIcon = Self.normalizedSettingIcon(legacy["settingIcon"] ?? value.settingIcon)
         value.navigation = legacy["navigation"] ?? value.navigation
         value.pageBackButton = legacy["pageBackButton"] ?? value.pageBackButton
         value.pageCloseButton = legacy["pageCloseButton"] ?? value.pageCloseButton
@@ -411,8 +411,8 @@ extension DesignSpecSelectionV4 {
         segment = try container.decodeIfPresent(String.self, forKey: .segment) ?? defaults.segment
         progress = try container.decodeIfPresent(String.self, forKey: .progress) ?? defaults.progress
         type = try container.decodeIfPresent(String.self, forKey: .type) ?? defaults.type
-        icon = try container.decodeIfPresent(String.self, forKey: .icon) ?? defaults.icon
-        settingIcon = try container.decodeIfPresent(String.self, forKey: .settingIcon) ?? defaults.settingIcon
+        icon = Self.normalizedIcon(try container.decodeIfPresent(String.self, forKey: .icon) ?? defaults.icon)
+        settingIcon = Self.normalizedSettingIcon(try container.decodeIfPresent(String.self, forKey: .settingIcon) ?? defaults.settingIcon)
         navigation = try container.decodeIfPresent(String.self, forKey: .navigation) ?? defaults.navigation
         pageBackButton = try container.decodeIfPresent(String.self, forKey: .pageBackButton) ?? defaults.pageBackButton
         pageCloseButton = try container.decodeIfPresent(String.self, forKey: .pageCloseButton) ?? defaults.pageCloseButton
@@ -438,6 +438,26 @@ extension DesignSpecSelectionV4 {
         fabMotion = try container.decodeIfPresent(String.self, forKey: .fabMotion) ?? defaults.fabMotion
         transition = try container.decodeIfPresent(String.self, forKey: .transition) ?? defaults.transition
         reward = try container.decodeIfPresent(String.self, forKey: .reward) ?? defaults.reward
+    }
+}
+
+fileprivate extension DesignSpecSelectionV4 {
+    static func normalizedIcon(_ rawValue: String) -> String {
+        switch rawValue {
+        case "monochromePrimary":
+            return rawValue
+        default:
+            return ohanaDefault.icon
+        }
+    }
+
+    static func normalizedSettingIcon(_ rawValue: String) -> String {
+        switch rawValue {
+        case "plainGlyph":
+            return rawValue
+        default:
+            return ohanaDefault.settingIcon
+        }
     }
 }
 

@@ -61,21 +61,37 @@ struct FeatureAggregateView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [Color(hex: "1A2E8A"), Color(hex: "0C1640")],
-                startPoint: .top, endPoint: .bottom
-            )
+            OhanaAppBackground()
             .ignoresSafeArea()
 
             VStack(spacing: 0) {
+                if showsNavigationChrome {
+                    pageHeader
+                }
                 if showsEntityChips {
                     chipRow
-                    Rectangle().fill(.white.opacity(0.08)).frame(height: 1)
+                    Rectangle().fill(Color.ohanaDivider).frame(height: 1)
                 }
                 featureContent
             }
         }
-        .modifier(FeatureAggregateNavigationChrome(title: feature.title, isEnabled: showsNavigationChrome))
+    }
+
+    private var pageHeader: some View {
+        HStack(spacing: 10) {
+            Image(systemName: feature.icon)
+                .font(.system(size: 17, weight: .black))
+                .foregroundStyle(Color.goPrimary)
+                .frame(width: 34, height: 34)
+            Text(feature.title)
+                .font(OhanaFont.title2(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(1)
+            Spacer(minLength: 54)
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 12)
+        .padding(.bottom, 6)
     }
 
     // MARK: - Chip Row
@@ -90,9 +106,9 @@ struct FeatureAggregateView: View {
                     Text("全部")
                         .font(.system(size: 13, weight: .bold))
                 }
-                .foregroundStyle(.black)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .padding(.horizontal, 14).padding(.vertical, 8)
-                .background(Color.goLime, in: Capsule())
+                .background(Color.goPrimary, in: Capsule())
 
                 // Pet chips
                 ForEach(chipsForFeature) { pet in
@@ -122,10 +138,10 @@ struct FeatureAggregateView: View {
             avatar()
             Text(name)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.ohanaPrimaryText)
         }
         .padding(.horizontal, 12).padding(.vertical, 7)
-        .background(.white.opacity(0.12), in: Capsule())
+        .background(Color.ohanaControlFill, in: Capsule())
     }
 
     @ViewBuilder
@@ -193,21 +209,21 @@ struct FeatureAggregateView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(pet.name)
                                 .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Color.ohanaPrimaryText)
                             Text(subtitle(for: pet))
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(Color.ohanaSecondaryText)
                         }
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.3))
+                            .foregroundStyle(Color.ohanaTertiaryText)
                     }
                     .padding(.vertical, 4)
                 }
                 .buttonStyle(ScaleButtonStyle())
-                .listRowBackground(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.07)))
-                .listRowSeparatorTint(.white.opacity(0.08))
+                .listRowBackground(RoundedRectangle(cornerRadius: 12).fill(Color.ohanaCardSurface))
+                .listRowSeparatorTint(Color.ohanaDivider)
             }
         }
         .listStyle(.insetGrouped)

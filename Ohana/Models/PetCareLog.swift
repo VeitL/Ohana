@@ -86,6 +86,7 @@ final class PetCareLog {
     var note: String
     var foodKindRaw: String = FeedFoodKind.dry.rawValue
     var treatKindRaw: String = ""
+    var sharedSessionId: String = ""
     var executorId: String?  // ArkSchemaV11: 执行该动作的 Human.id.uuidString
     var pet: Pet?
 
@@ -97,6 +98,7 @@ final class PetCareLog {
         note: String = "",
         foodKind: FeedFoodKind = .dry,
         treatKind: FeedTreatKind? = nil,
+        sharedSessionId: String = "",
         pet: Pet? = nil,
         executorId: String? = nil
     ) {
@@ -108,6 +110,7 @@ final class PetCareLog {
         self.note = note
         self.foodKindRaw = foodKind.rawValue
         self.treatKindRaw = treatKind?.rawValue ?? ""
+        self.sharedSessionId = sharedSessionId
         self.executorId = executorId
         self.pet = pet
     }

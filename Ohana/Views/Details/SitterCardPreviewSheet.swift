@@ -65,20 +65,15 @@ struct SitterCardPreviewSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             // 头部：头像 + 名字 + 物种
             HStack(spacing: 16) {
-                ZStack {
-                    Circle()
-                        .fill(Color(hex: pet.themeColorHex).opacity(0.25))
-                        .frame(width: 72, height: 72)
-                        .overlay(Circle().strokeBorder(Color(hex: pet.themeColorHex).opacity(0.5), lineWidth: 2))
-                    if let data = pet.avatarImageData, let img = UIImage(data: data) {
-                        Image(uiImage: img)
-                            .resizable().scaledToFill()
-                            .frame(width: 64, height: 64)
-                            .clipShape(Circle())
-                    } else {
-                        Text(pet.avatarEmoji).font(.system(size: 36))
-                    }
-                }
+                PetAvatarPortraitView(
+                    imageData: pet.avatarImageData,
+                    fallbackText: pet.avatarEmoji,
+                    themeColor: Color(hex: pet.safeThemeColorHex),
+                    size: 72,
+                    backgroundOpacity: 0.25,
+                    transparentScale: 0.78
+                )
+                .overlay(Circle().strokeBorder(Color(hex: pet.safeThemeColorHex).opacity(0.5), lineWidth: 2))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(pet.name)
                         .font(.system(size: 24, weight: .black, design: .rounded))

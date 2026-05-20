@@ -46,12 +46,15 @@ struct OhanaBackup: Codable {
     var wishlistItems: [WishlistItemBackup]
     var careLedgerEvents: [CareLedgerEventBackup]?
     var familyCollaborationTasks: [FamilyCollaborationTaskBackup]?
+    var sharedCareSessions: [SharedCareSessionBackup]?
     var coconutExchangeRequests: [CoconutExchangeRequestBackup]?
     var oasisUpgradeCoconuts: [OasisUpgradeCoconutBackup]?
     var oasisElectronicPets: [OasisElectronicPetBackup]?
     var oasisCritterFragments: [OasisCritterFragmentBackup]?
     var oasisUnlocks: [OasisUnlockBackup]?
     var oasisCritterActionLogs: [OasisCritterActionLogBackup]?
+    var gachaOwnedItems: [GachaOwnedItemBackup]?
+    var gachaDrawLogs: [GachaDrawLogBackup]?
     // App 状态
     var appState: AppStateBackup
 }
@@ -82,6 +85,9 @@ struct PetBackup: Codable {
     var foodTrackingModeRaw: String; var casualOpenDate: String?; var casualDurationDays: Int
     var foodReminderEnabled: Bool?; var foodReminderAdvanceDays: Int?
     var coconutBalance: Int; var passedAwayDate: String?
+    var cardStyleRaw: String?
+    var cardPopoutImageBase64: String?
+    var cardPopoutSourceRaw: String?
     /// ArkSchemaV26：性格标签 id，逗号分隔；旧备份缺省为 nil
     var personalityTagsRaw: String?
 }
@@ -117,6 +123,44 @@ struct ReminderBackup: Codable {
     var createdAt: String?
 }
 
+struct GachaOwnedItemBackup: Codable {
+    var id: String
+    var ownerHumanId: String
+    var seriesId: String
+    var itemId: String
+    var rarityRaw: String
+    var isHidden: Bool
+    var ownedCount: Int
+    var firstObtainedAt: String
+    var latestObtainedAt: String
+    var createdAt: String
+}
+
+struct GachaDrawLogBackup: Codable {
+    var id: String
+    var ownerHumanId: String
+    var ownerName: String
+    var seriesId: String
+    var itemId: String
+    var rarityRaw: String
+    var isHidden: Bool
+    var isNew: Bool
+    var outcomeKindRaw: String?
+    var instantResultId: String?
+    var instantTitleZh: String?
+    var instantTitleEn: String?
+    var instantTitleDe: String?
+    var instantDetailZh: String?
+    var instantDetailEn: String?
+    var instantDetailDe: String?
+    var instantSymbol: String?
+    var instantCoconutDelta: Int?
+    var costCoconuts: Int
+    var dailySequence: Int
+    var drawDate: String
+    var createdAt: String
+}
+
 struct HouseholdBackup: Codable {
     var id: String; var name: String; var createdAt: String; var totalProsperity: Int
 }
@@ -133,7 +177,7 @@ struct PetCareLogBackup: Codable {
     var id: String; var date: String; var type: String
     var amountGrams: Double; var amountMl: Double; var note: String
     var foodKindRaw: String?; var treatKindRaw: String?
-    var executorId: String?; var petId: String?
+    var sharedSessionId: String?; var executorId: String?; var petId: String?
 }
 
 struct PetPottyLogBackup: Codable {
@@ -141,6 +185,24 @@ struct PetPottyLogBackup: Codable {
     var executorId: String?; var petId: String?
     var latitude: Double?; var longitude: Double?
     var locationAccuracyMeters: Double?; var walkLogId: String?
+    var sharedSessionId: String?
+}
+
+struct SharedCareSessionBackup: Codable {
+    var id: String
+    var date: String
+    var actionKindRaw: String
+    var executorId: String?
+    var sourcePetId: String
+    var targetPetIdsRaw: String
+    var speciesRaw: String
+    var totalAmountGrams: Double
+    var totalAmountMl: Double
+    var allocationModeRaw: String
+    var foodKindRaw: String
+    var stockOwnerPetId: String
+    var note: String
+    var createdAt: String
 }
 
 struct PetWalkLogBackup: Codable {
@@ -376,6 +438,7 @@ struct OasisElectronicPetBackup: Codable {
     var xp: Int
     var hunger: Int
     var mood: Int
+    var health: Int?
     var bond: Int
     var appearanceStage: Int
     var isFeaturedOnOasis: Bool?
@@ -388,6 +451,12 @@ struct OasisElectronicPetBackup: Codable {
     var obtainedAt: String
     var lastInteractionAt: String
     var lastStateRefreshAt: String?
+    var lifeStateRaw: String?
+    var deathReasonRaw: String?
+    var riskStartedAt: String?
+    var criticalStartedAt: String?
+    var diedAt: String?
+    var lastGentlePromptAt: String?
     var isArchived: Bool
 }
 
@@ -493,12 +562,15 @@ final class DataBackupManager {
         let wishlist    = try context.fetch(FetchDescriptor<WishlistItem>())
         let ledger      = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         let familyTasks = try context.fetch(FetchDescriptor<FamilyCollaborationTask>())
+        let sharedCareSessions = try context.fetch(FetchDescriptor<SharedCareSession>())
         let exchanges   = try context.fetch(FetchDescriptor<CoconutExchangeRequest>())
         let oasisUpgradeCoconuts = try context.fetch(FetchDescriptor<OasisUpgradeCoconut>())
         let oasisElectronicPets = try context.fetch(FetchDescriptor<OasisElectronicPet>())
         let oasisFragments = try context.fetch(FetchDescriptor<OasisCritterFragmentBalance>())
         let oasisUnlocks = try context.fetch(FetchDescriptor<OasisUnlock>())
         let oasisCritterActionLogs = try context.fetch(FetchDescriptor<OasisCritterActionLog>())
+        let gachaOwnedItems = try context.fetch(FetchDescriptor<GachaOwnedItem>())
+        let gachaDrawLogs = try context.fetch(FetchDescriptor<GachaDrawLog>())
 
         let ud = UserDefaults.standard
         let coconutLogsJSON: String = {
@@ -551,12 +623,15 @@ final class DataBackupManager {
             wishlistItems:    wishlist.map(encodeWishlist),
             careLedgerEvents: ledger.map(encodeCareLedgerEvent),
             familyCollaborationTasks: familyTasks.map(encodeFamilyCollaborationTask),
+            sharedCareSessions: sharedCareSessions.map(encodeSharedCareSession),
             coconutExchangeRequests: exchanges.map(encodeCoconutExchangeRequest),
             oasisUpgradeCoconuts: oasisUpgradeCoconuts.map(encodeOasisUpgradeCoconut),
             oasisElectronicPets: oasisElectronicPets.map(encodeOasisElectronicPet),
             oasisCritterFragments: oasisFragments.map(encodeOasisCritterFragment),
             oasisUnlocks: oasisUnlocks.map(encodeOasisUnlock),
             oasisCritterActionLogs: oasisCritterActionLogs.map(encodeOasisCritterActionLog),
+            gachaOwnedItems: gachaOwnedItems.map(encodeGachaOwnedItem),
+            gachaDrawLogs: gachaDrawLogs.map(encodeGachaDrawLog),
             appState:         appState
         )
     }
@@ -573,12 +648,15 @@ final class DataBackupManager {
         let existingReminderIds = Set((try? context.fetch(FetchDescriptor<Reminder>()))?.map { $0.id.uuidString } ?? [])
         let existingLedgerIds = Set((try? context.fetch(FetchDescriptor<CareLedgerEvent>()))?.map { $0.id.uuidString } ?? [])
         let existingFamilyTaskIds = Set((try? context.fetch(FetchDescriptor<FamilyCollaborationTask>()))?.map { $0.id.uuidString } ?? [])
+        let existingSharedCareSessionIds = Set((try? context.fetch(FetchDescriptor<SharedCareSession>()))?.map { $0.id.uuidString } ?? [])
         let existingExchangeIds = Set((try? context.fetch(FetchDescriptor<CoconutExchangeRequest>()))?.map { $0.id.uuidString } ?? [])
         let existingOasisCoconutIds = Set((try? context.fetch(FetchDescriptor<OasisUpgradeCoconut>()))?.map { $0.id.uuidString } ?? [])
         let existingOasisCritterIds = Set((try? context.fetch(FetchDescriptor<OasisElectronicPet>()))?.map { $0.id.uuidString } ?? [])
         let existingOasisFragmentIds = Set((try? context.fetch(FetchDescriptor<OasisCritterFragmentBalance>()))?.map { $0.id.uuidString } ?? [])
         let existingOasisUnlockIds = Set((try? context.fetch(FetchDescriptor<OasisUnlock>()))?.map { $0.id.uuidString } ?? [])
         let existingOasisActionLogIds = Set((try? context.fetch(FetchDescriptor<OasisCritterActionLog>()))?.map { $0.id.uuidString } ?? [])
+        let existingGachaOwnedIds = Set((try? context.fetch(FetchDescriptor<GachaOwnedItem>()))?.map { $0.id.uuidString } ?? [])
+        let existingGachaDrawLogIds = Set((try? context.fetch(FetchDescriptor<GachaDrawLog>()))?.map { $0.id.uuidString } ?? [])
         let existingDocumentAttachmentIds = Set((try? context.fetch(FetchDescriptor<PetDocumentAttachment>()))?.map { $0.id.uuidString } ?? [])
         let existingPhotoIds = Set((try? context.fetch(FetchDescriptor<PetPhotoLog>()))?.map { $0.id.uuidString } ?? [])
         let existingInsuranceIds = Set((try? context.fetch(FetchDescriptor<PetInsurance>()))?.map { $0.id.uuidString } ?? [])
@@ -680,6 +758,9 @@ final class DataBackupManager {
         for dto in backup.familyCollaborationTasks ?? [] where !existingFamilyTaskIds.contains(dto.id) {
             context.insert(decodeFamilyCollaborationTask(dto))
         }
+        for dto in backup.sharedCareSessions ?? [] where !existingSharedCareSessionIds.contains(dto.id) {
+            context.insert(decodeSharedCareSession(dto))
+        }
         for dto in backup.coconutExchangeRequests ?? [] where !existingExchangeIds.contains(dto.id) {
             context.insert(decodeCoconutExchangeRequest(dto))
         }
@@ -697,6 +778,12 @@ final class DataBackupManager {
         }
         for dto in backup.oasisCritterActionLogs ?? [] where !existingOasisActionLogIds.contains(dto.id) {
             context.insert(decodeOasisCritterActionLog(dto))
+        }
+        for dto in backup.gachaOwnedItems ?? [] where !existingGachaOwnedIds.contains(dto.id) {
+            context.insert(decodeGachaOwnedItem(dto))
+        }
+        for dto in backup.gachaDrawLogs ?? [] where !existingGachaDrawLogIds.contains(dto.id) {
+            context.insert(decodeGachaDrawLog(dto))
         }
 
         try context.save()
@@ -748,6 +835,9 @@ final class DataBackupManager {
             foodReminderAdvanceDays: p.foodReminderAdvanceDays,
             coconutBalance: p.coconutBalance,
             passedAwayDate: d(p.passedAwayDate),
+            cardStyleRaw: p.cardStyleRaw.isEmpty ? nil : p.cardStyleRaw,
+            cardPopoutImageBase64: p.cardPopoutImageData?.base64EncodedString(),
+            cardPopoutSourceRaw: (p.cardPopoutSourceRaw ?? "").isEmpty ? nil : p.cardPopoutSourceRaw,
             personalityTagsRaw: p.personalityTagsRaw.isEmpty ? nil : p.personalityTagsRaw
         )
     }
@@ -825,6 +915,7 @@ final class DataBackupManager {
         PetCareLogBackup(id: l.id.uuidString, date: d(l.date), type: l.type,
             amountGrams: l.amountGrams, amountMl: l.amountMl, note: l.note,
             foodKindRaw: l.foodKindRaw, treatKindRaw: l.treatKindRaw,
+            sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId,
             executorId: l.executorId, petId: l.pet?.id.uuidString)
     }
 
@@ -832,7 +923,27 @@ final class DataBackupManager {
         PetPottyLogBackup(id: l.id.uuidString, date: d(l.date), type: l.type,
             executorId: l.executorId, petId: l.pet?.id.uuidString,
             latitude: l.latitude, longitude: l.longitude,
-            locationAccuracyMeters: l.locationAccuracyMeters, walkLogId: l.walkLogId)
+            locationAccuracyMeters: l.locationAccuracyMeters, walkLogId: l.walkLogId,
+            sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId)
+    }
+
+    private func encodeSharedCareSession(_ session: SharedCareSession) -> SharedCareSessionBackup {
+        SharedCareSessionBackup(
+            id: session.id.uuidString,
+            date: d(session.date),
+            actionKindRaw: session.actionKindRaw,
+            executorId: session.executorId,
+            sourcePetId: session.sourcePetId,
+            targetPetIdsRaw: session.targetPetIdsRaw,
+            speciesRaw: session.speciesRaw,
+            totalAmountGrams: session.totalAmountGrams,
+            totalAmountMl: session.totalAmountMl,
+            allocationModeRaw: session.allocationModeRaw,
+            foodKindRaw: session.foodKindRaw,
+            stockOwnerPetId: session.stockOwnerPetId,
+            note: session.note,
+            createdAt: d(session.createdAt)
+        )
     }
 
     private func encodeWalkLog(_ l: PetWalkLog) -> PetWalkLogBackup {
@@ -1167,6 +1278,7 @@ final class DataBackupManager {
             xp: critter.xp,
             hunger: critter.hunger,
             mood: critter.mood,
+            health: critter.health,
             bond: critter.bond,
             appearanceStage: critter.appearanceStage,
             isFeaturedOnOasis: critter.isFeaturedOnOasis,
@@ -1179,6 +1291,12 @@ final class DataBackupManager {
             obtainedAt: d(critter.obtainedAt),
             lastInteractionAt: d(critter.lastInteractionAt),
             lastStateRefreshAt: d(critter.lastStateRefreshAt),
+            lifeStateRaw: critter.lifeStateRaw,
+            deathReasonRaw: critter.deathReasonRaw,
+            riskStartedAt: d(critter.riskStartedAt),
+            criticalStartedAt: d(critter.criticalStartedAt),
+            diedAt: d(critter.diedAt),
+            lastGentlePromptAt: d(critter.lastGentlePromptAt),
             isArchived: critter.isArchived
         )
     }
@@ -1220,6 +1338,48 @@ final class DataBackupManager {
         )
     }
 
+    private func encodeGachaOwnedItem(_ item: GachaOwnedItem) -> GachaOwnedItemBackup {
+        GachaOwnedItemBackup(
+            id: item.id.uuidString,
+            ownerHumanId: item.ownerHumanId,
+            seriesId: item.seriesId,
+            itemId: item.itemId,
+            rarityRaw: item.rarityRaw,
+            isHidden: item.isHidden,
+            ownedCount: item.ownedCount,
+            firstObtainedAt: d(item.firstObtainedAt),
+            latestObtainedAt: d(item.latestObtainedAt),
+            createdAt: d(item.createdAt)
+        )
+    }
+
+    private func encodeGachaDrawLog(_ log: GachaDrawLog) -> GachaDrawLogBackup {
+        GachaDrawLogBackup(
+            id: log.id.uuidString,
+            ownerHumanId: log.ownerHumanId,
+            ownerName: log.ownerName,
+            seriesId: log.seriesId,
+            itemId: log.itemId,
+            rarityRaw: log.rarityRaw,
+            isHidden: log.isHidden,
+            isNew: log.isNew,
+            outcomeKindRaw: log.outcomeKindRaw,
+            instantResultId: log.instantResultId,
+            instantTitleZh: log.instantTitleZh,
+            instantTitleEn: log.instantTitleEn,
+            instantTitleDe: log.instantTitleDe,
+            instantDetailZh: log.instantDetailZh,
+            instantDetailEn: log.instantDetailEn,
+            instantDetailDe: log.instantDetailDe,
+            instantSymbol: log.instantSymbol,
+            instantCoconutDelta: log.instantCoconutDelta,
+            costCoconuts: log.costCoconuts,
+            dailySequence: log.dailySequence,
+            drawDate: d(log.drawDate),
+            createdAt: d(log.createdAt)
+        )
+    }
+
     // MARK: - Decode helpers
 
     private func parseDate(_ s: String?) -> Date? {
@@ -1258,6 +1418,11 @@ final class DataBackupManager {
         p.foodReminderAdvanceDays = dto.foodReminderAdvanceDays ?? 7
         p.coconutBalance = dto.coconutBalance
         p.passedAwayDate = parseDate(dto.passedAwayDate)
+        p.cardStyleRaw = dto.cardStyleRaw ?? "classic"
+        if let raw = dto.cardPopoutImageBase64, let data = Data(base64Encoded: raw) {
+            p.cardPopoutImageData = data
+        }
+        p.cardPopoutSourceRaw = dto.cardPopoutSourceRaw
         p.personalityTagsRaw = dto.personalityTagsRaw ?? ""
         return p
     }
@@ -1331,6 +1496,7 @@ final class DataBackupManager {
                            amountGrams: dto.amountGrams, amountMl: dto.amountMl, note: dto.note,
                            foodKind: FeedFoodKind(rawValue: dto.foodKindRaw ?? "") ?? .dry,
                            treatKind: dto.treatKindRaw.flatMap(FeedTreatKind.init(rawValue:)),
+                           sharedSessionId: dto.sharedSessionId ?? "",
                            pet: dto.petId.flatMap { pets[$0] },
                            executorId: dto.executorId)
         if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
@@ -1345,9 +1511,30 @@ final class DataBackupManager {
                             latitude: dto.latitude,
                             longitude: dto.longitude,
                             locationAccuracyMeters: dto.locationAccuracyMeters,
-                            walkLogId: dto.walkLogId)
+                            walkLogId: dto.walkLogId,
+                            sharedSessionId: dto.sharedSessionId ?? "")
         if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
         return l
+    }
+
+    private func decodeSharedCareSession(_ dto: SharedCareSessionBackup) -> SharedCareSession {
+        let session = SharedCareSession(
+            date: parseDate(dto.date) ?? Date(),
+            actionKind: SharedCareActionKind(rawValue: dto.actionKindRaw) ?? .feeding,
+            executorId: dto.executorId,
+            sourcePetId: dto.sourcePetId,
+            targetPetIds: dto.targetPetIdsRaw.split(separator: "|").map(String.init),
+            species: dto.speciesRaw,
+            totalAmountGrams: dto.totalAmountGrams,
+            totalAmountMl: dto.totalAmountMl,
+            allocationMode: SharedCareAllocationMode(rawValue: dto.allocationModeRaw) ?? .equal,
+            foodKind: FeedFoodKind(rawValue: dto.foodKindRaw) ?? .dry,
+            stockOwnerPetId: dto.stockOwnerPetId,
+            note: dto.note
+        )
+        if let uuid = UUID(uuidString: dto.id) { session.id = uuid }
+        session.createdAt = parseDate(dto.createdAt) ?? session.createdAt
+        return session
     }
 
     private func decodeWalkLog(_ dto: PetWalkLogBackup, pets: [String: Pet]) -> PetWalkLog {
@@ -1730,6 +1917,7 @@ final class DataBackupManager {
             xp: dto.xp,
             hunger: dto.hunger,
             mood: dto.mood,
+            health: dto.health ?? 100,
             bond: dto.bond,
             appearanceStage: dto.appearanceStage,
             isFeaturedOnOasis: dto.isFeaturedOnOasis ?? false,
@@ -1742,6 +1930,12 @@ final class DataBackupManager {
             obtainedAt: parseDate(dto.obtainedAt) ?? Date(),
             lastInteractionAt: parseDate(dto.lastInteractionAt) ?? Date(),
             lastStateRefreshAt: parseDate(dto.lastStateRefreshAt) ?? parseDate(dto.lastInteractionAt) ?? Date(),
+            lifeStateRaw: dto.lifeStateRaw ?? OasisCritterLifeState.healthy.rawValue,
+            deathReasonRaw: dto.deathReasonRaw ?? "",
+            riskStartedAt: parseDate(dto.riskStartedAt),
+            criticalStartedAt: parseDate(dto.criticalStartedAt),
+            diedAt: parseDate(dto.diedAt),
+            lastGentlePromptAt: parseDate(dto.lastGentlePromptAt),
             isArchived: dto.isArchived
         )
         if let uuid = UUID(uuidString: dto.id) { critter.id = uuid }
@@ -1784,6 +1978,50 @@ final class DataBackupManager {
             noteEn: dto.noteEn,
             noteDe: dto.noteDe
         )
+        if let uuid = UUID(uuidString: dto.id) { log.id = uuid }
+        return log
+    }
+
+    private func decodeGachaOwnedItem(_ dto: GachaOwnedItemBackup) -> GachaOwnedItem {
+        let item = GachaOwnedItem(
+            ownerHumanId: dto.ownerHumanId,
+            seriesId: dto.seriesId,
+            itemId: dto.itemId,
+            rarity: GachaRarity(rawValue: dto.rarityRaw) ?? .common,
+            isHidden: dto.isHidden,
+            ownedCount: dto.ownedCount,
+            firstObtainedAt: parseDate(dto.firstObtainedAt) ?? Date(),
+            latestObtainedAt: parseDate(dto.latestObtainedAt) ?? Date()
+        )
+        item.createdAt = parseDate(dto.createdAt) ?? item.firstObtainedAt
+        if let uuid = UUID(uuidString: dto.id) { item.id = uuid }
+        return item
+    }
+
+    private func decodeGachaDrawLog(_ dto: GachaDrawLogBackup) -> GachaDrawLog {
+        let log = GachaDrawLog(
+            ownerHumanId: dto.ownerHumanId,
+            ownerName: dto.ownerName,
+            seriesId: dto.seriesId,
+            itemId: dto.itemId,
+            rarity: GachaRarity(rawValue: dto.rarityRaw) ?? .common,
+            isHidden: dto.isHidden,
+            isNew: dto.isNew,
+            outcomeKind: GachaOutcomeKind(rawValue: dto.outcomeKindRaw ?? "") ?? .collectible,
+            costCoconuts: dto.costCoconuts,
+            dailySequence: dto.dailySequence,
+            drawDate: parseDate(dto.drawDate) ?? Date()
+        )
+        log.instantResultId = dto.instantResultId ?? ""
+        log.instantTitleZh = dto.instantTitleZh ?? ""
+        log.instantTitleEn = dto.instantTitleEn ?? ""
+        log.instantTitleDe = dto.instantTitleDe ?? ""
+        log.instantDetailZh = dto.instantDetailZh ?? ""
+        log.instantDetailEn = dto.instantDetailEn ?? ""
+        log.instantDetailDe = dto.instantDetailDe ?? ""
+        log.instantSymbol = dto.instantSymbol ?? ""
+        log.instantCoconutDelta = dto.instantCoconutDelta ?? 0
+        log.createdAt = parseDate(dto.createdAt) ?? log.drawDate
         if let uuid = UUID(uuidString: dto.id) { log.id = uuid }
         return log
     }

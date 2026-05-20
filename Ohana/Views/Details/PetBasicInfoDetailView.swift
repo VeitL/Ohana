@@ -413,22 +413,14 @@ struct PetBasicInfoDetailView: View {
     }
 
     private func profileAvatarImage(data: Data?, fallbackEmoji: String, accent: Color, size: CGFloat) -> some View {
-        ZStack {
-            Circle()
-                .fill(accent.opacity(0.25))
-                .frame(width: size, height: size)
-            if let data, let img = UIImage(data: data) {
-                Image(uiImage: img)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: size - 8, height: size - 8, alignment: .center)
-                    .clipShape(Circle())
-            } else {
-                Text(fallbackEmoji)
-                    .font(.system(size: size * 0.5))
-            }
-        }
-        .frame(width: size, height: size, alignment: .center)
+        PetAvatarPortraitView(
+            imageData: data,
+            fallbackText: fallbackEmoji,
+            themeColor: accent,
+            size: size,
+            backgroundOpacity: 0.25,
+            transparentScale: 0.78
+        )
     }
 
     // MARK: - Helpers

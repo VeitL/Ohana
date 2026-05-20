@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import Charts
 
 // MARK: - PDF 渲染入口
 @MainActor
@@ -15,7 +14,7 @@ enum PetVetSummaryPDFRenderer {
     static func render(pet: Pet) async -> URL? {
         let view = PetVetSummaryPDFView(pet: pet)
             .frame(width: 595, height: 842) // A4 @ 72 dpi
-            .background(Color.white)
+            .background(Color.white) // ui-v4: allow PDF export uses white paper
 
         let renderer = ImageRenderer(content: view)
         renderer.scale = 2.0 // Retina
@@ -96,22 +95,20 @@ struct PetVetSummaryPDFView: View {
             pdfFooter.padding(.horizontal, 24).padding(.bottom, 12)
         }
         .frame(width: 595, height: 842)
-        .background(Color.white)
+        .background(Color.white) // ui-v4: allow PDF export uses white paper
     }
 
     // MARK: - Header
     private var pdfHeader: some View {
         HStack(spacing: 14) {
             // 头像
-            ZStack {
-                Circle().fill(themeColor.opacity(0.15)).frame(width: 56, height: 56)
-                if let data = pet.avatarImageData, let ui = UIImage(data: data) {
-                    Image(uiImage: ui).resizable().scaledToFill()
-                        .frame(width: 56, height: 56).clipShape(Circle())
-                } else {
-                    Text(pet.avatarEmoji).font(.system(size: 30))
-                }
-            }
+            PetAvatarPortraitView(
+                imageData: pet.avatarImageData,
+                fallbackText: pet.avatarEmoji,
+                themeColor: themeColor,
+                size: 56,
+                backgroundOpacity: 0.15
+            )
             VStack(alignment: .leading, spacing: 3) {
                 Text(pet.name)
                     .font(.system(size: 22, weight: .black, design: .rounded))
@@ -292,37 +289,12 @@ struct PetVetSummaryPDFView: View {
             Text("近3个月体重趋势")
                 .font(.system(size: 11, weight: .black)).foregroundStyle(.gray).tracking(1)
 
-            Chart(weightLogs3Mo) { log in
-                LineMark(
-                    x: .value("日期", log.date),
-                    y: .value("体重", log.weight)
-                )
-                .foregroundStyle(themeColor)
-                .interpolationMethod(OhanaChartStyle.trendInterpolation)
-
-                PointMark(
-                    x: .value("日期", log.date),
-                    y: .value("体重", log.weight)
-                )
-                .foregroundStyle(themeColor)
-                .symbolSize(30)
-            }
-            .chartXAxis {
-                AxisMarks(values: .stride(by: .month)) { _ in
-                    AxisValueLabel(format: .dateTime.month(.abbreviated))
-                        .font(.system(size: 8))
-                }
-            }
-            .chartYAxis {
-                AxisMarks { value in
-                    AxisValueLabel {
-                        if let v = value.as(Double.self) {
-                            Text(String(format: "%.1f", v))
-                                .font(.system(size: 8))
-                        }
-                    }
-                }
-            }
+            OhanaMinimalTrendChart(
+                points: weightLogs3Mo.map {
+                    OhanaMinimalChartPoint(date: $0.date, value: $0.weight, id: $0.id.uuidString)
+                },
+                tint: themeColor
+            )
             .frame(height: 100)
         }
     }
@@ -386,7 +358,7 @@ struct PetVetPDFShareSheet: View {
                             Text("分享 / 保存 PDF")
                                 .font(.system(size: 16, weight: .black, design: .rounded))
                         }
-                        .foregroundStyle(.black)
+                        .foregroundStyle(.black) // ui-v4: allow ink on PDF action preview
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))

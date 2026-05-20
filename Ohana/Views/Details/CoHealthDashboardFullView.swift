@@ -6,7 +6,6 @@
 
 import SwiftUI
 import SwiftData
-import Charts
 
 struct CoHealthDashboardFullView: View {
     let human: Human
@@ -158,37 +157,19 @@ struct CoHealthDashboardFullView: View {
             if data.allSatisfy({ $0.km == 0 }) {
                 emptyLabel("暂无遛狗记录")
             } else {
-                Chart(data) { pt in
-                    BarMark(
-                        x: .value("日期", pt.label),
-                        y: .value("km", pt.km)
-                    )
-                    .foregroundStyle(pt.isToday ? Color.goPrimary : Color.goPrimary.opacity(0.3))
-                    .cornerRadius(6)
-                }
-                .chartXAxis {
-                    AxisMarks { val in
-                        AxisValueLabel {
-                            if let s = val.as(String.self) {
-                                Text(s)
-                                    .font(.system(size: 9, weight: .medium))
-                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                            }
-                        }
-                    }
-                }
-                .chartYAxis {
-                    AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { val in
-                        AxisValueLabel {
-                            if let v = val.as(Double.self) {
-                                Text(String(format: "%.1f", v))
-                                    .font(.system(size: 8, weight: .medium))
-                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
-                            }
-                        }
-                    }
-                }
-                .chartPlotStyle { $0.background(.clear) }
+                OhanaMinimalBarChart(
+                    points: data.enumerated().map { index, pt in
+                        OhanaMinimalChartPoint(
+                            date: Date(timeIntervalSinceReferenceDate: Double(index) * 86_400),
+                            value: pt.km,
+                            label: pt.label,
+                            id: pt.id.uuidString
+                        )
+                    },
+                    tint: Color.goPrimary,
+                    showsLabels: true,
+                    maxBarHeight: 92
+                )
                 .frame(height: 130)
             }
         }
@@ -233,13 +214,13 @@ struct CoHealthDashboardFullView: View {
             sectionTitle("🐾 毛孩子健康摘要")
             ForEach(associatedPets) { pet in
                 HStack(spacing: 14) {
-                    if let data = pet.avatarImageData, let img = UIImage(data: data) {
-                        Image(uiImage: img).resizable().scaledToFill()
-                            .frame(width: 44, height: 44).clipShape(Circle())
-                    } else {
-                        Text(pet.avatarEmoji).font(.system(size: 30))
-                            .frame(width: 44, height: 44)
-                    }
+                    PetAvatarPortraitView(
+                        imageData: pet.avatarImageData,
+                        fallbackText: pet.avatarEmoji,
+                        themeColor: Color(hex: pet.safeThemeColorHex),
+                        size: 44,
+                        backgroundOpacity: 0.18
+                    )
                     VStack(alignment: .leading, spacing: 4) {
                         Text(pet.name)
                             .font(.system(size: 14, weight: .black, design: .rounded))

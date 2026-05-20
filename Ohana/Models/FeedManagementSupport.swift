@@ -362,12 +362,23 @@ enum FeedStockCalculator {
         let startDate = stock.map { stockOpenDay(for: $0) } ?? (foodKind == .dry ? pet.restockDate : nil)
         return mainFoodLogs(for: pet, foodKind: foodKind, since: startDate, careLogs: careLogs)
             .reduce(0) { total, log in
-                total + effectiveMainFoodAmount(for: log, pet: pet)
+                total + stockDeductionAmount(for: log, pet: pet)
             }
     }
 
     static func effectiveMainFoodAmount(for log: PetCareLog, pet: Pet) -> Double {
         log.amountGrams > 0 ? log.amountGrams : pet.dailyPortionGrams
+    }
+
+    static func stockDeductionAmount(for log: PetCareLog, pet: Pet) -> Double {
+        if let sharedStockTotal = SharedCareMetadata.stockDeductionGrams(from: log.note) {
+            return max(0, sharedStockTotal)
+        }
+        if !log.sharedSessionId.isEmpty,
+           log.note.hasPrefix(SharedCareMetadata.sharedFeedNotePrefix) {
+            return 0
+        }
+        return effectiveMainFoodAmount(for: log, pet: pet)
     }
 
     static func recentDailyAverageGrams(
@@ -469,7 +480,7 @@ enum FeedStockCalculator {
            let correctionDate = stockRecord.remainingCorrectionDate {
             consumed = mainFoodLogs(for: pet, foodKind: foodKind, since: correctionDate, careLogs: careLogs)
                 .filter { $0.date <= now }
-                .reduce(0) { $0 + effectiveMainFoodAmount(for: $1, pet: pet) }
+                .reduce(0) { $0 + stockDeductionAmount(for: $1, pet: pet) }
             remaining = max(0, correctionGrams - consumed)
         } else {
             consumed = mainConsumedSinceRestock(for: pet, foodKind: foodKind, careLogs: careLogs, foodRecords: foodRecords, now: now)

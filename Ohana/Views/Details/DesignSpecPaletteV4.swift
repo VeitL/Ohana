@@ -193,11 +193,11 @@ enum DesignSpecUIV4 {
     }
 
     static func iconName(_ icon: String, selection: DesignSpecSelectionV4) -> String {
-        selection.icon == "line" ? icon.replacingOccurrences(of: ".fill", with: "") : icon
+        selection.icon == "monochromePrimary" ? icon : icon.replacingOccurrences(of: ".fill", with: "")
     }
 
     static func iconWeight(_ selection: DesignSpecSelectionV4) -> Font.Weight {
-        selection.icon == "line" ? .medium : .black
+        selection.icon == "monochromePrimary" ? .semibold : .medium
     }
 
     static func motionAnimation(_ selection: DesignSpecSelectionV4) -> Animation {

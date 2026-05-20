@@ -2,7 +2,7 @@
 //  AchievementWallView.swift
 //  Ohana
 //
-//  成就解锁页 — 真实进度、宠物切换、解锁奖励领取
+//  成就徽章墙 — V4 游戏化进度与领取
 //
 
 import SwiftUI
@@ -13,19 +13,38 @@ struct AchievementWallView: View {
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("achievement_claimedRewardIDs") private var claimedRewardRaw: String = ""
+    @AppStorage("appLanguage") private var appLanguageRaw: String = AppLanguage.fallbackCode
 
     @State private var selectedPetId: UUID?
     @State private var selectedFilter: AchievementFilter = .all
     @State private var selectedAchievement: Achievement?
 
     private enum AchievementFilter: String, CaseIterable {
-        case all = "全部"
-        case unlocked = "已解锁"
-        case locked = "进行中"
+        case all
+        case claimable
+        case unlocked
+        case inProgress
+
+        func title(_ l: L10n) -> String {
+            switch self {
+            case .all: return l.tr(zh: "全部", en: "All", de: "Alle")
+            case .claimable: return l.tr(zh: "可领取", en: "Claim", de: "Abholen")
+            case .unlocked: return l.tr(zh: "已解锁", en: "Unlocked", de: "Freigeschaltet")
+            case .inProgress: return l.tr(zh: "进行中", en: "Progress", de: "In Arbeit")
+            }
+        }
+    }
+
+    private enum AchievementRewardState {
+        case claimable
+        case claimed
+        case unlocked
+        case locked
     }
 
     private let rewardPerAchievement = 10
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+    private var l: L10n { L10n(appLanguageRaw) }
 
     private var pets: [Pet] {
         var seen = Set<UUID>()
@@ -52,88 +71,115 @@ struct AchievementWallView: View {
         unlocked.filter { !isRewardClaimed($0) }
     }
 
+    private var nextAchievement: Achievement? {
+        achievements
+            .filter { !$0.isUnlocked }
+            .sorted { progress(for: $0).fraction > progress(for: $1).fraction }
+            .first
+    }
+
     private var displayedAchievements: [Achievement] {
         achievements
             .filter { badge in
                 switch selectedFilter {
                 case .all: return true
+                case .claimable: return badge.isUnlocked && !isRewardClaimed(badge)
                 case .unlocked: return badge.isUnlocked
-                case .locked: return !badge.isUnlocked
+                case .inProgress: return !badge.isUnlocked
                 }
             }
             .sorted { lhs, rhs in
-                if lhs.isUnlocked != rhs.isUnlocked { return lhs.isUnlocked && !rhs.isUnlocked }
+                let leftState = sortRank(for: lhs)
+                let rightState = sortRank(for: rhs)
+                if leftState != rightState { return leftState < rightState }
                 return progress(for: lhs).fraction > progress(for: rhs).fraction
             }
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                OhanaAppBackground()
-                    .ignoresSafeArea()
+        ZStack {
+            OhanaAppBackground()
+                .ignoresSafeArea()
 
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 16) {
-                        if pets.count > 1 {
-                            petSelector
-                        }
-                        progressHeader
-                        nextUnlockCard
-                        filterChips
-                        achievementGrid
-                        Color.clear.frame(height: 32)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    header
+                    if pets.count > 1 { petSelector }
+                    progressHero
+                    filterChips
+                    achievementGrid
+                    Color.clear.frame(height: 36)
                 }
+                .padding(.horizontal, 18)
+                .padding(.top, 14)
             }
-            .navigationTitle("成就解锁")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 17, weight: .black))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .accessibilityLabel("关闭")
-                }
+            .blur(radius: selectedAchievement == nil ? 0 : 1.2)
+            .allowsHitTesting(selectedAchievement == nil)
+
+            if let selectedAchievement {
+                achievementPopup(selectedAchievement)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .bottom).combined(with: .opacity)
+                    ))
+                    .zIndex(4)
             }
         }
         .tint(Color.goPrimary)
         .onAppear {
             if selectedPetId == nil { selectedPetId = pet.id }
         }
-        .sheet(item: $selectedAchievement) { badge in
-            achievementDetailSheet(badge)
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
+        .animation(GoMotion.sheet, value: selectedAchievement?.id)
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(l.tr(zh: "成就解锁", en: "Badges", de: "Abzeichen"))
+                    .font(OhanaFont.title3(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text(activePet.name)
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+            Spacer()
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
         }
     }
 
     private var petSelector: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 ForEach(pets) { item in
+                    let isSelected = selectedPetId == item.id
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                        withAnimation(GoMotion.selection) {
                             selectedPetId = item.id
                         }
                     } label: {
-                        HStack(spacing: 7) {
-                            Text(item.avatarEmoji.isEmpty ? item.speciesEmoji : item.avatarEmoji)
+                        VStack(spacing: 5) {
+                            PetAvatarPortraitView(
+                                pet: item,
+                                size: 44,
+                                backgroundOpacity: isSelected ? 0.22 : 0.12,
+                                transparentScale: 0.76,
+                                transparentYOffset: 0.04
+                            )
                             Text(item.name)
+                                .font(OhanaFont.caption2(.black))
+                                .foregroundStyle(isSelected ? Color.goPrimary : Color.ohanaSecondaryText)
                                 .lineLimit(1)
+                                .frame(width: 58)
                         }
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(selectedPetId == item.id ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(selectedPetId == item.id ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
@@ -141,139 +187,135 @@ struct AchievementWallView: View {
         }
     }
 
-    private var progressHeader: some View {
+    private var progressHero: some View {
         let total = max(achievements.count, 1)
         let percent = Double(unlocked.count) / Double(total)
 
         return VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 14) {
-                petAvatar(size: 54)
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(activePet.name)
-                        .font(.system(size: 26, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(1)
-                    Text("\(unlocked.count)/\(achievements.count) 已解锁 · \(claimable.count) 个奖励待领取")
-                        .font(OhanaFont.caption(.bold))
+                petAvatar(size: 58)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(unlocked.count)/\(achievements.count)")
+                        .font(OhanaFont.metric(size: 42))
+                        .foregroundStyle(Color.goPrimary)
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                    Text(l.tr(zh: "已解锁", en: "unlocked", de: "freigeschaltet"))
+                        .font(OhanaFont.caption(.black))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
-                Text("\(Int(percent * 100))%")
-                    .font(.system(size: 30, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.goPrimary)
-                    .monospacedDigit()
-            }
-
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.ohanaControlFill)
-                    Capsule()
-                        .fill(LinearGradient(colors: [Color.goPrimary, Color.goTeal], startPoint: .leading, endPoint: .trailing))
-                        .frame(width: geo.size.width * percent)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("\(Int(percent * 100))%")
+                        .font(OhanaFont.metric(size: 30))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                    Text(l.tr(zh: "\(claimable.count) 个可领取", en: "\(claimable.count) rewards", de: "\(claimable.count) Belohnungen"))
+                        .font(OhanaFont.caption2(.black))
+                        .foregroundStyle(claimable.isEmpty ? Color.ohanaSecondaryText : Color.goPrimary)
                 }
             }
-            .frame(height: 9)
+
+            progressBar(percent, tint: Color.goPrimary)
+
+            if let next = nextAchievement {
+                Button { selectedAchievement = next } label: {
+                    nextTargetRow(next)
+                }
+                .buttonStyle(ScaleButtonStyle())
+            } else {
+                completedRow
+            }
 
             if !claimable.isEmpty {
                 Button { claimAllRewards() } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "gift.fill")
-                        Text("领取全部 +\(claimable.count * rewardPerAchievement)🥥")
+                        Text(l.tr(
+                            zh: "领取全部 +\(claimable.count * rewardPerAchievement)🥥",
+                            en: "Claim all +\(claimable.count * rewardPerAchievement)🥥",
+                            de: "Alle abholen +\(claimable.count * rewardPerAchievement)🥥"
+                        ))
                     }
                     .font(OhanaFont.subheadline(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 11)
+                    .padding(.vertical, 12)
                     .background(Color.goPrimary, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
         }
-        .padding(18)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
-        }
+        .animation(GoMotion.stateChange, value: unlocked.count)
+        .animation(GoMotion.stateChange, value: claimable.count)
     }
 
-    private var nextUnlockCard: some View {
-        let locked = achievements
-            .filter { !$0.isUnlocked }
-            .sorted { progress(for: $0).fraction > progress(for: $1).fraction }
-
-        return Group {
-            if let next = locked.first {
-                let progress = progress(for: next)
-                Button { selectedAchievement = next } label: {
-                    HStack(spacing: 12) {
-                        Text(next.emoji)
-                            .font(.system(size: 28))
-                            .frame(width: 46, height: 46)
-                            .background(next.color.opacity(0.16), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("下一枚成就")
-                                .font(OhanaFont.caption2(.black))
-                                .foregroundStyle(Color.goPrimary)
-                            Text(next.title)
-                                .font(OhanaFont.callout(.black))
-                                .foregroundStyle(Color.ohanaPrimaryText)
-                            ProgressView(value: progress.fraction)
-                                .tint(next.color)
-                            Text(progress.summary)
-                                .font(OhanaFont.caption2(.bold))
-                                .foregroundStyle(Color.ohanaSecondaryText)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(OhanaFont.caption(.bold))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                    }
-                    .padding(14)
-                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
-                            .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
-                    }
-                }
-                .buttonStyle(ScaleButtonStyle())
-            } else {
-                HStack(spacing: 12) {
-                    Text("🏆").font(.system(size: 28))
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("全部成就已解锁")
-                            .font(OhanaFont.callout(.black))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                        Text("继续记录生活，新的成就体系会优先从这些数据扩展")
-                            .font(OhanaFont.caption2(.bold))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                    }
-                    Spacer()
-                }
-                .padding(14)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    private func nextTargetRow(_ badge: Achievement) -> some View {
+        let info = progress(for: badge)
+        return HStack(spacing: 12) {
+            Text(badge.emoji)
+                .font(.system(size: 30))
+                .frame(width: 52, height: 52)
+                .background(badge.color.opacity(0.16), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            VStack(alignment: .leading, spacing: 5) {
+                Text(l.tr(zh: "下一枚", en: "Next badge", de: "Nächstes Abzeichen"))
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(Color.goPrimary)
+                Text(badge.title)
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                progressBar(info.fraction, tint: badge.color)
+                Text(info.summary)
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
             }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
+        .padding(14)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    private var completedRow: some View {
+        HStack(spacing: 12) {
+            Text("🏆").font(.system(size: 30))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(l.tr(zh: "全部成就已解锁", en: "All badges unlocked", de: "Alle Abzeichen freigeschaltet"))
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text(l.tr(zh: "继续记录，新的徽章会从这些故事里长出来", en: "Keep logging; future badges grow from these stories", de: "Weitere Abzeichen wachsen aus euren Geschichten"))
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+            Spacer()
+        }
+        .padding(14)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private var filterChips: some View {
-        HStack(spacing: 8) {
-            ForEach(AchievementFilter.allCases, id: \.self) { filter in
-                Button {
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
-                        selectedFilter = filter
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(AchievementFilter.allCases, id: \.self) { filter in
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        withAnimation(GoMotion.selection) {
+                            selectedFilter = filter
+                        }
+                    } label: {
+                        Text(filter.title(l))
+                            .font(OhanaFont.caption(.black))
+                            .foregroundStyle(selectedFilter == filter ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
+                            .padding(.horizontal, 13)
+                            .padding(.vertical, 9)
+                            .background(selectedFilter == filter ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
                     }
-                } label: {
-                    Text(filter.rawValue)
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(selectedFilter == filter ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(selectedFilter == filter ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+                    .buttonStyle(ScaleButtonStyle())
                 }
-                .buttonStyle(ScaleButtonStyle())
             }
-            Spacer()
         }
     }
 
@@ -283,137 +325,198 @@ struct AchievementWallView: View {
                 achievementCard(badge)
             }
         }
+        .animation(GoMotion.stateChange, value: selectedFilter)
     }
 
     private func achievementCard(_ badge: Achievement) -> some View {
-        let progress = progress(for: badge)
-        let claimed = isRewardClaimed(badge)
+        let info = progress(for: badge)
+        let state = rewardState(for: badge)
 
         return Button { selectedAchievement = badge } label: {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text(badge.emoji)
-                        .font(.system(size: 26))
-                        .opacity(badge.isUnlocked ? 1 : 0.35)
-                        .grayscale(badge.isUnlocked ? 0 : 1)
+                    badgeGlyph(badge, state: state)
                     Spacer()
-                    if badge.isUnlocked {
-                        Image(systemName: claimed ? "checkmark.seal.fill" : "gift.fill")
-                            .foregroundStyle(claimed ? badge.color : Color.goPrimary)
-                    } else {
-                        Text("\(Int(progress.fraction * 100))%")
-                            .font(OhanaFont.caption2(.black))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                            .monospacedDigit()
-                    }
+                    stateMark(state, tint: badge.color)
                 }
 
                 Text(badge.title)
                     .font(OhanaFont.callout(.black))
-                    .foregroundStyle(badge.isUnlocked ? Color.ohanaPrimaryText : Color.ohanaSecondaryText)
+                    .foregroundStyle(state == .locked ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
 
-                Text(badge.isUnlocked ? (claimed ? "奖励已领取" : "可领取 +\(rewardPerAchievement)🥥") : progress.summary)
+                Text(stateText(for: badge, state: state, info: info))
                     .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(badge.isUnlocked ? Color.goPrimary : Color.ohanaSecondaryText)
+                    .foregroundStyle(state == .claimable ? Color.goPrimary : Color.ohanaSecondaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
-                ProgressView(value: progress.fraction)
-                    .tint(badge.isUnlocked ? Color.goPrimary : badge.color)
+                progressBar(info.fraction, tint: state == .locked ? badge.color.opacity(0.72) : Color.goPrimary)
             }
             .padding(14)
-            .frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
-            .background(
-                badge.isUnlocked
-                ? badge.color.opacity(0.16)
-                : Color.ohanaCardSurface,
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(badge.isUnlocked ? badge.color.opacity(0.35) : Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
-            }
+            .frame(maxWidth: .infinity, minHeight: 148, alignment: .topLeading)
+            .background(cardBackground(for: state, tint: badge.color), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }
 
-    private func achievementDetailSheet(_ badge: Achievement) -> some View {
-        let progress = progress(for: badge)
-        let claimed = isRewardClaimed(badge)
+    private func badgeGlyph(_ badge: Achievement, state: AchievementRewardState) -> some View {
+        Text(badge.emoji)
+            .font(.system(size: 28))
+            .opacity(state == .locked ? 0.32 : 1)
+            .grayscale(state == .locked ? 1 : 0)
+            .frame(width: 42, height: 42)
+            .background((state == .locked ? Color.ohanaControlFill : badge.color.opacity(0.14)), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
 
-        return ZStack {
-            OhanaAppBackground().ignoresSafeArea()
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(spacing: 14) {
-                    Text(badge.emoji)
-                        .font(.system(size: 42))
-                        .frame(width: 64, height: 64)
-                        .background(badge.color.opacity(0.18), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(badge.title)
-                            .font(.system(size: 24, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                        Text(badge.isUnlocked ? "已解锁" : "进行中")
-                            .font(OhanaFont.caption(.black))
-                            .foregroundStyle(badge.isUnlocked ? Color.goPrimary : Color.ohanaSecondaryText)
-                    }
-                    Spacer()
-                }
+    @ViewBuilder
+    private func stateMark(_ state: AchievementRewardState, tint: Color) -> some View {
+        switch state {
+        case .claimable:
+            Image(systemName: "gift.fill")
+                .foregroundStyle(Color.goPrimary)
+        case .claimed:
+            Image(systemName: "checkmark.seal.fill")
+                .foregroundStyle(tint)
+        case .unlocked:
+            Image(systemName: "seal.fill")
+                .foregroundStyle(tint)
+        case .locked:
+            Image(systemName: "lock.fill")
+                .font(.system(size: 11, weight: .black))
+                .foregroundStyle(Color.ohanaSecondaryText)
+        }
+    }
 
-                Text(badge.description)
-                    .font(OhanaFont.body(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
+    private func cardBackground(for state: AchievementRewardState, tint: Color) -> Color {
+        switch state {
+        case .claimable: return Color.goPrimary.opacity(0.18)
+        case .claimed, .unlocked: return tint.opacity(0.15)
+        case .locked: return Color.ohanaCardSurface
+        }
+    }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text(progress.actionTitle)
-                            .font(OhanaFont.caption(.black))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                        Spacer()
-                        Text(progress.summary)
-                            .font(OhanaFont.caption(.black))
-                            .foregroundStyle(badge.color)
-                    }
-                    ProgressView(value: progress.fraction)
-                        .tint(badge.color)
-                }
-                .padding(14)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    private func stateText(for badge: Achievement, state: AchievementRewardState, info: ProgressInfo) -> String {
+        switch state {
+        case .claimable:
+            return l.tr(zh: "可领取 +\(rewardPerAchievement)🥥", en: "Claim +\(rewardPerAchievement)🥥", de: "+\(rewardPerAchievement)🥥 abholen")
+        case .claimed:
+            return l.tr(zh: "奖励已领取", en: "Reward claimed", de: "Belohnung abgeholt")
+        case .unlocked:
+            return l.tr(zh: "已解锁", en: "Unlocked", de: "Freigeschaltet")
+        case .locked:
+            return info.summary
+        }
+    }
 
-                if badge.isUnlocked && !claimed {
-                    Button { claimReward(for: badge) } label: {
-                        Text("领取 +\(rewardPerAchievement)🥥")
-                            .font(OhanaFont.subheadline(.black))
-                            .foregroundStyle(Color.arkInk)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Color.goPrimary, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                }
-
-                Spacer()
+    private func progressBar(_ value: Double, tint: Color) -> some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.ohanaControlFill)
+                Capsule()
+                    .fill(tint)
+                    .frame(width: max(6, proxy.size.width * min(max(value, 0), 1)))
             }
-            .padding(20)
+        }
+        .frame(height: 8)
+    }
+
+    private func achievementPopup(_ badge: Achievement) -> some View {
+        let info = progress(for: badge)
+        let state = rewardState(for: badge)
+
+        return ZStack(alignment: .bottom) {
+            Color.ohanaPrimaryText.opacity(0.18)
+                .ignoresSafeArea()
+                .onTapGesture { closePopup() }
+
+            VStack(spacing: 0) {
+                OhanaPopupDragHandle(tint: Color.ohanaPrimaryText.opacity(0.24))
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 16)
+                            .onEnded { value in
+                                if value.translation.height > 48 { closePopup() }
+                            }
+                    )
+
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(spacing: 14) {
+                        Text(badge.emoji)
+                            .font(.system(size: 42))
+                            .frame(width: 66, height: 66)
+                            .background(badge.color.opacity(0.18), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(badge.title)
+                                .font(OhanaFont.title3(.black))
+                                .foregroundStyle(Color.ohanaPrimaryText)
+                            Text(statusTitle(for: state))
+                                .font(OhanaFont.caption(.black))
+                                .foregroundStyle(state == .claimable ? Color.goPrimary : Color.ohanaSecondaryText)
+                        }
+                        Spacer()
+                        OhanaPopupCloseButton(tint: Color.ohanaPrimaryText) { closePopup() }
+                    }
+
+                    Text(badge.description)
+                        .font(OhanaFont.body(.semibold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    VStack(alignment: .leading, spacing: 9) {
+                        HStack {
+                            Text(info.actionTitle)
+                                .font(OhanaFont.caption(.black))
+                                .foregroundStyle(Color.ohanaPrimaryText)
+                            Spacer()
+                            Text(info.summary)
+                                .font(OhanaFont.caption(.black))
+                                .foregroundStyle(badge.color)
+                        }
+                        progressBar(info.fraction, tint: badge.color)
+                    }
+                    .padding(14)
+                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+                    if state == .claimable {
+                        Button {
+                            claimReward(for: badge)
+                            closePopup()
+                        } label: {
+                            Text(l.tr(zh: "领取 +\(rewardPerAchievement)🥥", en: "Claim +\(rewardPerAchievement)🥥", de: "+\(rewardPerAchievement)🥥 abholen"))
+                                .font(OhanaFont.subheadline(.black))
+                                .foregroundStyle(Color.ohanaPrimaryActionText)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 13)
+                                .background(Color.goPrimary, in: Capsule())
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                    }
+                }
+                .padding(.horizontal, 22)
+                .padding(.bottom, 22)
+            }
+            .padding(.horizontal, 6)
+            .padding(.bottom, 8)
+            .background { OhanaPopupGlassSurface(cornerRadius: 52) }
+        }
+    }
+
+    private func closePopup() {
+        withAnimation(GoMotion.sheet) {
+            selectedAchievement = nil
         }
     }
 
     @ViewBuilder
     private func petAvatar(size: CGFloat) -> some View {
-        if let data = activePet.avatarImageData, let image = UIImage(data: data) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-                .frame(width: size, height: size)
-                .clipShape(Circle())
-        } else {
-            Text(activePet.avatarEmoji.isEmpty ? activePet.speciesEmoji : activePet.avatarEmoji)
-                .font(.system(size: size * 0.52))
-                .frame(width: size, height: size)
-                .background(Color(hex: activePet.themeColorHex).opacity(0.18), in: Circle())
-        }
+        PetAvatarPortraitView(
+            pet: activePet,
+            size: size,
+            backgroundOpacity: 0.16,
+            transparentScale: 0.76,
+            transparentYOffset: 0.04
+        )
     }
 
     private struct ProgressInfo {
@@ -537,6 +640,30 @@ struct AchievementWallView: View {
         || activePet.weightLogs.contains { calendar.isDateInToday($0.date) }
     }
 
+    private func rewardState(for badge: Achievement) -> AchievementRewardState {
+        guard badge.isUnlocked else { return .locked }
+        if isRewardClaimed(badge) { return .claimed }
+        return .claimable
+    }
+
+    private func sortRank(for badge: Achievement) -> Int {
+        switch rewardState(for: badge) {
+        case .claimable: return 0
+        case .unlocked: return 1
+        case .claimed: return 2
+        case .locked: return 3
+        }
+    }
+
+    private func statusTitle(for state: AchievementRewardState) -> String {
+        switch state {
+        case .claimable: return l.tr(zh: "可领取", en: "Ready to claim", de: "Bereit")
+        case .claimed: return l.tr(zh: "已领取", en: "Claimed", de: "Abgeholt")
+        case .unlocked: return l.tr(zh: "已解锁", en: "Unlocked", de: "Freigeschaltet")
+        case .locked: return l.tr(zh: "进行中", en: "In progress", de: "In Arbeit")
+        }
+    }
+
     private func rewardKey(for badge: Achievement) -> String {
         "\(activePet.id.uuidString)_\(badge.id)"
     }
@@ -557,7 +684,7 @@ struct AchievementWallView: View {
         QuestManager.shared.addCoconuts(
             rewardPerAchievement,
             emoji: badge.emoji,
-            title: "成就奖励 · \(badge.title)",
+            title: l.tr(zh: "成就奖励 · \(badge.title)", en: "Badge reward · \(badge.title)", de: "Abzeichen-Belohnung · \(badge.title)"),
             actorId: activePet.id.uuidString,
             actorName: activePet.name
         )

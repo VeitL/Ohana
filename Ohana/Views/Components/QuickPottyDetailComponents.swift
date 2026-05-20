@@ -528,6 +528,8 @@ struct PoopCheckInSheet: View {
 
 struct PottyTypeSheet: View {
     let tint: Color
+    var unknownGroupTitle: String? = nil
+    var onUnknownGroup: (() -> Void)? = nil
     let onSelect: (PottyType) -> Void
 
     private let columns = [
@@ -561,6 +563,18 @@ struct PottyTypeSheet: View {
                         }
                         .buttonStyle(ScaleButtonStyle())
                     }
+                }
+
+                if let unknownGroupTitle, let onUnknownGroup {
+                    Button(action: onUnknownGroup) {
+                        Label(unknownGroupTitle, systemImage: "questionmark.circle.fill")
+                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.arkInk)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(tint, in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
                 }
 
                 PoopInlineNotice(icon: "chart.bar.fill", text: "记录次数和状态后，首页会自动更新趋势。", tint: tint)

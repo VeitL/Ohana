@@ -378,9 +378,8 @@ struct DesignSpecPreviewCanvasV4: View {
 
             Image(systemName: icon(iconName))
                 .font(.system(size: 12, weight: iconWeight))
-                .foregroundStyle(tint)
+                .foregroundStyle(palette.accent)
                 .frame(width: 28, height: 28)
-                .background(tint.opacity(0.12), in: Circle())
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
@@ -1015,7 +1014,7 @@ struct DesignSpecPreviewCanvasV4: View {
         return HStack(spacing: 5) {
             Image(systemName: state.icon)
                 .font(.system(size: 10, weight: iconWeight))
-                .foregroundStyle(tint)
+                .foregroundStyle(palette.accent)
             Text(state.zh)
                 .font(font(9, .black))
                 .foregroundStyle(state == .disabled ? palette.secondaryText : palette.primaryText)
@@ -1069,10 +1068,8 @@ struct DesignSpecPreviewCanvasV4: View {
     private func iconCircle(_ iconName: String) -> some View {
         Image(systemName: icon(iconName))
             .font(.system(size: 13, weight: iconWeight))
-            .foregroundStyle(palette.primaryText)
+            .foregroundStyle(palette.accent)
             .frame(width: 34, height: 34)
-            .background(palette.controlFill, in: Circle())
-            .overlay(Circle().strokeBorder(palette.stroke, lineWidth: 1))
     }
 
     private var background: some View {

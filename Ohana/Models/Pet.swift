@@ -148,6 +148,9 @@ final class Pet {
     var passedAwayDate: Date?      // 离世日期；nil = 在世
     // P2: 卡片风格（"classic" | "minimal"）
     var cardStyleRaw: String
+    // ArkSchemaV51：3D 破框卡片专用主体图，独立于全局头像
+    @Attribute(.externalStorage) var cardPopoutImageData: Data?
+    var cardPopoutSourceRaw: String?
     // ArkSchemaV23 步行周目标（km，0 = 未设置）
     var weeklyWalkGoalKm: Double
     /// ArkSchemaV26：性格标签 id，逗号分隔，最多 3 个（见 `PetPersonalityTag`）
@@ -229,6 +232,8 @@ final class Pet {
         self.coconutBalance = 0
         self.passedAwayDate = nil
         self.cardStyleRaw = "classic"
+        self.cardPopoutImageData = nil
+        self.cardPopoutSourceRaw = nil
         self.weeklyWalkGoalKm = 0
         self.personalityTagsRaw = ""
         self.expenseLogs = []

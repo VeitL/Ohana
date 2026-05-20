@@ -57,6 +57,66 @@ enum OasisElectronicPetRarity: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum OasisCritterLifeState: String, Codable, CaseIterable, Identifiable {
+    case healthy
+    case needsCare
+    case atRisk
+    case sick
+    case critical
+    case dead
+
+    var id: String { rawValue }
+
+    func name(_ l: L10n) -> String {
+        switch self {
+        case .healthy:
+            return l.tr(zh: "安稳", en: "Settled", de: "Ruhig")
+        case .needsCare:
+            return l.tr(zh: "想被照顾", en: "Needs a little care", de: "Braucht etwas Pflege")
+        case .atRisk:
+            return l.tr(zh: "需要你一下", en: "Needs you soon", de: "Braucht dich bald")
+        case .sick:
+            return l.tr(zh: "有点不舒服", en: "A little unwell", de: "Etwas unwohl")
+        case .critical:
+            return l.tr(zh: "需要救回", en: "Needs rescue", de: "Braucht Rettung")
+        case .dead:
+            return l.tr(zh: "纪念中", en: "Remembered", de: "In Erinnerung")
+        }
+    }
+}
+
+enum OasisCritterDeathReason: String, Codable, CaseIterable, Identifiable {
+    case hungry
+    case sick
+    case bored
+    case oldAge
+
+    var id: String { rawValue }
+
+    func name(_ l: L10n) -> String {
+        switch self {
+        case .hungry:
+            return l.tr(zh: "太久没有吃东西", en: "too long without food", de: "zu lange ohne Futter")
+        case .sick:
+            return l.tr(zh: "久病没有恢复", en: "illness that was not healed", de: "Krankheit ohne Erholung")
+        case .bored:
+            return l.tr(zh: "太久没有陪伴", en: "too long without company", de: "zu lange ohne Gesellschaft")
+        case .oldAge:
+            return l.tr(zh: "自然老去", en: "old age", de: "Alter")
+        }
+    }
+}
+
+struct OasisCritterLifecycleSnapshot: Equatable {
+    let state: OasisCritterLifeState
+    let deathReason: OasisCritterDeathReason?
+    let recommendedAction: OasisCritterAction?
+    let isRescuable: Bool
+    let hoursUntilDeath: Int?
+    let ageDays: Int
+    let urgencyScore: Int
+}
+
 @Model
 final class OasisUpgradeCoconut {
     #Index<OasisUpgradeCoconut>([\.level], [\.openedAt], [\.createdAt])
@@ -156,6 +216,7 @@ final class OasisElectronicPet {
     var xp: Int
     var hunger: Int
     var mood: Int
+    var health: Int = 100
     var bond: Int
     var appearanceStage: Int
     var isFeaturedOnOasis: Bool
@@ -168,6 +229,12 @@ final class OasisElectronicPet {
     var obtainedAt: Date
     var lastInteractionAt: Date
     var lastStateRefreshAt: Date = Date()
+    var lifeStateRaw: String = OasisCritterLifeState.healthy.rawValue
+    var deathReasonRaw: String = ""
+    var riskStartedAt: Date?
+    var criticalStartedAt: Date?
+    var diedAt: Date?
+    var lastGentlePromptAt: Date?
     var isArchived: Bool
 
     init(
@@ -184,6 +251,7 @@ final class OasisElectronicPet {
         xp: Int = 0,
         hunger: Int = 80,
         mood: Int = 82,
+        health: Int = 100,
         bond: Int = 0,
         appearanceStage: Int = 1,
         isFeaturedOnOasis: Bool = false,
@@ -196,6 +264,12 @@ final class OasisElectronicPet {
         obtainedAt: Date = Date(),
         lastInteractionAt: Date = Date(),
         lastStateRefreshAt: Date = Date(),
+        lifeStateRaw: String = OasisCritterLifeState.healthy.rawValue,
+        deathReasonRaw: String = "",
+        riskStartedAt: Date? = nil,
+        criticalStartedAt: Date? = nil,
+        diedAt: Date? = nil,
+        lastGentlePromptAt: Date? = nil,
         isArchived: Bool = false
     ) {
         self.id = id
@@ -211,6 +285,7 @@ final class OasisElectronicPet {
         self.xp = xp
         self.hunger = hunger
         self.mood = mood
+        self.health = health
         self.bond = bond
         self.appearanceStage = appearanceStage
         self.isFeaturedOnOasis = isFeaturedOnOasis
@@ -223,12 +298,31 @@ final class OasisElectronicPet {
         self.obtainedAt = obtainedAt
         self.lastInteractionAt = lastInteractionAt
         self.lastStateRefreshAt = lastStateRefreshAt
+        self.lifeStateRaw = lifeStateRaw
+        self.deathReasonRaw = deathReasonRaw
+        self.riskStartedAt = riskStartedAt
+        self.criticalStartedAt = criticalStartedAt
+        self.diedAt = diedAt
+        self.lastGentlePromptAt = lastGentlePromptAt
         self.isArchived = isArchived
     }
 
     var rarity: OasisElectronicPetRarity {
         get { OasisElectronicPetRarity(rawValue: rarityRaw) ?? .common }
         set { rarityRaw = newValue.rawValue }
+    }
+
+    var lifeState: OasisCritterLifeState {
+        get { OasisCritterLifeState(rawValue: lifeStateRaw) ?? .healthy }
+        set { lifeStateRaw = newValue.rawValue }
+    }
+
+    var deathReason: OasisCritterDeathReason? {
+        get {
+            guard !deathReasonRaw.isEmpty else { return nil }
+            return OasisCritterDeathReason(rawValue: deathReasonRaw)
+        }
+        set { deathReasonRaw = newValue?.rawValue ?? "" }
     }
 
     func displayName(_ l: L10n) -> String {
@@ -427,6 +521,7 @@ struct OasisOpenedUpgradeReward: Identifiable, Equatable {
     let id = UUID()
     let level: Int
     let kind: OasisUpgradeRewardKind
+    let critterCatalogId: String?
     let titleZh: String
     let titleEn: String
     let titleDe: String
@@ -445,6 +540,62 @@ struct OasisOpenedUpgradeReward: Identifiable, Equatable {
     }
 }
 
+struct OasisCritterDailyWish: Identifiable, Equatable {
+    let id: String
+    let action: OasisCritterAction
+    let icon: String
+    let titleZh: String
+    let titleEn: String
+    let titleDe: String
+    let detailZh: String
+    let detailEn: String
+    let detailDe: String
+    let rewardXP: Int
+    let rewardBond: Int
+    let rewardFragments: Int
+    let rewardCoconuts: Int
+
+    func title(_ l: L10n) -> String {
+        l.tr(zh: titleZh, en: titleEn, de: titleDe)
+    }
+
+    func detail(_ l: L10n) -> String {
+        l.tr(zh: detailZh, en: detailEn, de: detailDe)
+    }
+
+    func rewardText(_ l: L10n) -> String {
+        "+\(rewardXP)XP +\(rewardBond)\(l.tr(zh: "羁绊", en: "bond", de: "Bindung")) +\(rewardFragments)◇ +\(rewardCoconuts)🥥"
+    }
+}
+
+struct OasisCritterInteractionOutcome: Equatable {
+    let success: Bool
+    let action: OasisCritterAction
+    let completedDailyWish: Bool
+    let wish: OasisCritterDailyWish?
+    let messageZh: String
+    let messageEn: String
+    let messageDe: String
+    let rewardXP: Int
+    let rewardBond: Int
+    let rewardFragments: Int
+    let rewardCoconuts: Int
+
+    func message(_ l: L10n) -> String {
+        l.tr(zh: messageZh, en: messageEn, de: messageDe)
+    }
+
+    func rewardText(_ l: L10n) -> String {
+        guard rewardXP != 0 || rewardBond != 0 || rewardFragments != 0 || rewardCoconuts != 0 else { return "" }
+        var parts: [String] = []
+        if rewardXP != 0 { parts.append("+\(rewardXP)XP") }
+        if rewardBond != 0 { parts.append("+\(rewardBond)\(l.tr(zh: "羁绊", en: "bond", de: "Bindung"))") }
+        if rewardFragments != 0 { parts.append("+\(rewardFragments)◇") }
+        if rewardCoconuts != 0 { parts.append("+\(rewardCoconuts)🥥") }
+        return parts.joined(separator: " ")
+    }
+}
+
 enum OasisUpgradeRewardCatalog {
     static let firstCritterId = "sprout_mochi"
     static let legendaryCritterId = "aurora_luma"
@@ -459,18 +610,18 @@ enum OasisUpgradeRewardCatalog {
             emoji: "🥥",
             rarity: .rare,
             sourceLevel: 5,
-            assetName: "CritterNana",
+            assetName: "CritterLumo",
             unlockHintZh: "生命树 Lv.5 保底",
             unlockHintEn: "Guaranteed at Tree Lv.5",
             unlockHintDe: "Garantiert bei Baum Lv.5",
-            personalityRaw: "gentle",
+            personalityRaw: "mischievous",
             preferredItemId: "coconut_milk",
-            nameZh: "nana",
-            nameEn: "nana",
-            nameDe: "nana",
-            taglineZh: "头顶毛绒椰子、从生命椰子里醒来的幼态小伙伴",
-            taglineEn: "A baby-faced coconut plush companion awakened from the Life Coconut.",
-            taglineDe: "Ein kindlicher Kokos-Plüschbegleiter aus der Lebenskokosnuss."
+            nameZh: "Lumo",
+            nameEn: "Lumo",
+            nameDe: "Lumo",
+            taglineZh: "长耳毛绒帽里藏着小坏笑的俏皮伙伴",
+            taglineEn: "A quietly mischievous plush companion with tall ears and a tiny smirk.",
+            taglineDe: "Ein still schelmischer Plüschbegleiter mit langen Ohren und kleinem Grinsen."
         ),
         .init(
             id: legendaryCritterId,
@@ -585,9 +736,9 @@ enum OasisUpgradeRewardCatalog {
                 titleZh: "第一只电子宠物",
                 titleEn: "First Critter",
                 titleDe: "Erstes Critter",
-                descriptionZh: "保底唤醒稀有伙伴 nana。",
-                descriptionEn: "Guaranteed rare companion: nana.",
-                descriptionDe: "Garantierter seltener Begleiter: nana."
+                descriptionZh: "保底唤醒稀有伙伴 Lumo。",
+                descriptionEn: "Guaranteed rare companion: Lumo.",
+                descriptionDe: "Garantierter seltener Begleiter: Lumo."
             )
         case 10:
             return .init(
@@ -778,6 +929,15 @@ enum OasisCritterEconomyService {
 
 @MainActor
 enum OasisUpgradeRewardService {
+    private static let lifecycleDay: TimeInterval = 86_400
+    private static let needsCareThreshold = 45
+    private static let atRiskThreshold = 20
+    private static let sickHealthThreshold = 45
+    private static let elderWarningDays = 180
+    private static let oldAgeDeathDays = 210
+    private static let riskToCriticalHours = 72
+    private static let criticalToDeathHours = 72
+
     @discardableResult
     static func ensureUpgradeCoconuts(from firstLevel: Int, through lastLevel: Int, context: ModelContext) -> Int {
         guard lastLevel >= max(2, firstLevel) else { return 0 }
@@ -876,36 +1036,128 @@ enum OasisUpgradeRewardService {
         return openedResult(for: coconut, duplicate: duplicateCritter)
     }
 
+    static func dailyWish(for critter: OasisElectronicPet, context: ModelContext, now: Date = Date()) -> OasisCritterDailyWish {
+        normalizeLifecycle(for: critter, context: context, now: now)
+        let snapshot = lifecycleSnapshot(for: critter, context: context, now: now)
+        return displayDailyWish(for: critter, snapshot: snapshot, now: now)
+    }
+
+    static func displayDailyWish(
+        for critter: OasisElectronicPet,
+        snapshot: OasisCritterLifecycleSnapshot,
+        now: Date = Date()
+    ) -> OasisCritterDailyWish {
+        if snapshot.state == .dead {
+            return dailyWish(for: .rest)
+        }
+        if snapshot.state == .atRisk || snapshot.state == .sick || snapshot.state == .critical {
+            return dailyWish(for: .rescue)
+        }
+
+        let action: OasisCritterAction
+        if critter.hunger < 45 {
+            action = .feed
+        } else if critter.health < 70 {
+            action = .rest
+        } else if critter.mood < 45 {
+            action = .play
+        } else {
+            let day = Calendar.current.ordinality(of: .day, in: .era, for: now) ?? Int(now.timeIntervalSince1970 / 86_400)
+            let catalogScore = critter.catalogId.unicodeScalars.reduce(0) { $0 + Int($1.value) }
+            let index = abs(day + catalogScore + critter.level * 17 + critter.starLevel * 31) % 3
+            action = [.feed, .play, .rest][index]
+        }
+        return dailyWish(for: action)
+    }
+
+    static func isDailyWishCompleted(for critter: OasisElectronicPet, wish: OasisCritterDailyWish, context: ModelContext) -> Bool {
+        actionLogs(for: critter, context: context).contains { $0.action == wish.action }
+    }
+
+    static func bondLevel(for critter: OasisElectronicPet) -> Int {
+        min(10, max(1, critter.bond / 100 + 1))
+    }
+
+    static func bondProgress(for critter: OasisElectronicPet) -> Int {
+        max(0, min(100, critter.bond % 100))
+    }
+
     @discardableResult
     static func interact(with critter: OasisElectronicPet, action: OasisCritterAction, context: ModelContext) throws -> Bool {
-        normalizeDecay(for: critter)
+        try interactWithOutcome(with: critter, action: action, context: context).success
+    }
+
+    @discardableResult
+    static func interactWithOutcome(with critter: OasisElectronicPet, action: OasisCritterAction, context: ModelContext) throws -> OasisCritterInteractionOutcome {
+        normalizeLifecycle(for: critter, context: context)
+        if critter.lifeState == .dead {
+            return deadInteractionOutcome(for: critter, action: action)
+        }
+        let wish = dailyWish(for: critter, context: context)
+        let wasWishCompleted = isDailyWishCompleted(for: critter, wish: wish, context: context)
+
         switch action {
         case .feed:
             let cost = interactionCost(for: critter, action: action, context: context)
-            guard OasisCritterEconomyService.spendCurrentHumanCoconuts(cost, emoji: "🍽️", title: "喂养电子宠物", context: context) else { return false }
+            guard OasisCritterEconomyService.spendCurrentHumanCoconuts(cost, emoji: "🍽️", title: "喂养电子宠物", context: context) else {
+                return failedInteraction(action: action, wish: wish)
+            }
             critter.hunger = min(100, critter.hunger + 24)
             critter.mood = min(100, critter.mood + 6)
+            critter.health = min(100, critter.health + 8)
             critter.bond = min(999, critter.bond + 3)
             critter.xp += 10
             context.insert(actionLog(for: critter, action: action, coconutDelta: -cost, xpDelta: 10))
         case .play:
             let cost = interactionCost(for: critter, action: action, context: context)
-            guard OasisCritterEconomyService.spendCurrentHumanCoconuts(cost, emoji: "🪀", title: "陪电子宠物玩耍", context: context) else { return false }
+            guard OasisCritterEconomyService.spendCurrentHumanCoconuts(cost, emoji: "🪀", title: "陪电子宠物玩耍", context: context) else {
+                return failedInteraction(action: action, wish: wish)
+            }
             critter.hunger = max(0, critter.hunger - 5)
             critter.mood = min(100, critter.mood + 18)
+            critter.health = min(100, critter.health + 4)
             critter.bond = min(999, critter.bond + 5)
             critter.xp += 12
             context.insert(actionLog(for: critter, action: action, coconutDelta: -cost, xpDelta: 12))
         case .rest:
-            guard dailyActionCount(for: action, critter: critter, context: context) < 3 else { return false }
+            guard dailyActionCount(for: action, critter: critter, context: context) < 3 else {
+                return failedInteraction(action: action, wish: wish)
+            }
             critter.hunger = max(0, critter.hunger - 2)
             critter.mood = min(100, critter.mood + 8)
+            critter.health = min(100, critter.health + 10)
             critter.bond = min(999, critter.bond + 1)
             critter.xp += 4
             context.insert(actionLog(for: critter, action: action, xpDelta: 4))
-        case .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho:
-            return false
+        case .rescue, .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho, .death:
+            return failedInteraction(action: action, wish: wish)
         }
+
+        let completedWish = action == wish.action && !wasWishCompleted
+        if completedWish {
+            critter.xp += wish.rewardXP
+            critter.bond = min(999, critter.bond + wish.rewardBond)
+            addFragments(critterId: critter.catalogId, amount: wish.rewardFragments, context: context)
+            OasisCritterEconomyService.awardCurrentHumanCoconuts(
+                wish.rewardCoconuts,
+                emoji: "💌",
+                title: "电子宠物小愿望",
+                context: context
+            )
+            context.insert(OasisCritterActionLog(
+                critterId: critter.id,
+                critterCatalogId: critter.catalogId,
+                action: .careEcho,
+                coconutDelta: wish.rewardCoconuts,
+                fragmentDelta: wish.rewardFragments,
+                xpDelta: wish.rewardXP,
+                sourceLevel: critter.sourceLevel,
+                noteZh: "完成今日小愿望",
+                noteEn: "Completed today's tiny wish.",
+                noteDe: "Heutigen kleinen Wunsch erfüllt."
+            ))
+        }
+
         while critter.xp >= 100 {
             critter.xp -= 100
             critter.level += 1
@@ -915,11 +1167,13 @@ enum OasisUpgradeRewardService {
         }
         critter.lastInteractionAt = Date()
         critter.lastStateRefreshAt = Date()
+        refreshLifecycleState(for: critter, now: Date())
         try context.save()
-        return true
+        return interactionOutcome(action: action, wish: wish, completedWish: completedWish)
     }
 
     static func canInteract(with critter: OasisElectronicPet, action: OasisCritterAction, context: ModelContext) -> Bool {
+        guard critter.lifeState != .dead else { return false }
         switch action {
         case .feed:
             return OasisCritterEconomyService.canSpendCurrentHumanCoconuts(
@@ -933,7 +1187,7 @@ enum OasisUpgradeRewardService {
             )
         case .rest:
             return dailyActionCount(for: action, critter: critter, context: context) < 3
-        case .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho:
+        case .rescue, .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho, .death:
             return false
         }
     }
@@ -945,7 +1199,8 @@ enum OasisUpgradeRewardService {
 
     @discardableResult
     static func upgradeStar(for critter: OasisElectronicPet, context: ModelContext) throws -> Bool {
-        normalizeDecay(for: critter)
+        normalizeLifecycle(for: critter, context: context)
+        guard critter.lifeState != .dead else { return false }
         let cost = starUpgradeCost(for: critter)
         guard let balance = fragmentBalance(critterId: critter.catalogId, context: context),
               balance.amount >= cost.fragments,
@@ -1029,6 +1284,8 @@ enum OasisUpgradeRewardService {
     }
 
     static func setFeatured(_ critter: OasisElectronicPet, context: ModelContext) throws {
+        normalizeLifecycle(for: critter, context: context)
+        guard critter.lifeState != .dead else { return }
         let all = (try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? []
         for item in all {
             item.isFeaturedOnOasis = item.id == critter.id
@@ -1043,20 +1300,29 @@ enum OasisUpgradeRewardService {
     }
 
     static func rewardFeaturedCritterFromCare(type: QuestManager.OhanaActionType, context: ModelContext) {
-        guard let critter = ((try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? [])
+        let candidates = ((try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? [])
             .filter({ !$0.isArchived })
             .sorted(by: {
                 if $0.isFeaturedOnOasis != $1.isFeaturedOnOasis { return $0.isFeaturedOnOasis && !$1.isFeaturedOnOasis }
                 if $0.habitatSlot != $1.habitatSlot { return $0.habitatSlot < $1.habitatSlot }
                 return $0.obtainedAt < $1.obtainedAt
             })
-            .first else { return }
+        guard let critter = candidates.first(where: {
+            normalizeLifecycle(for: $0, context: context)
+            return $0.lifeState != .dead
+        }) else { return }
 
-        normalizeDecay(for: critter)
         let gain = careEchoGain(for: type)
         critter.xp += gain.xp
         critter.bond = min(999, critter.bond + gain.bond)
         critter.mood = min(100, critter.mood + gain.mood)
+        critter.health = min(100, critter.health + gain.health)
+        switch type {
+        case .feed, .water:
+            critter.hunger = min(100, critter.hunger + 6)
+        default:
+            break
+        }
         while critter.xp >= 100 {
             critter.xp -= 100
             critter.level += 1
@@ -1065,6 +1331,7 @@ enum OasisUpgradeRewardService {
             }
         }
         critter.lastStateRefreshAt = Date()
+        refreshLifecycleState(for: critter, now: Date())
         context.insert(actionLog(
             for: critter,
             action: .careEcho,
@@ -1073,22 +1340,22 @@ enum OasisUpgradeRewardService {
         try? context.save()
     }
 
-    private static func careEchoGain(for type: QuestManager.OhanaActionType) -> (xp: Int, bond: Int, mood: Int) {
+    private static func careEchoGain(for type: QuestManager.OhanaActionType) -> (xp: Int, bond: Int, mood: Int, health: Int) {
         switch type {
         case .walk:
-            return (8, 3, 3)
+            return (8, 3, 3, 4)
         case .health, .care:
-            return (7, 3, 2)
+            return (7, 3, 2, 8)
         case .feed, .water:
-            return (4, 2, 2)
+            return (4, 2, 2, 4)
         case .potty, .weight:
-            return (3, 1, 1)
+            return (3, 1, 1, 3)
         case .expense:
-            return (2, 1, 0)
+            return (2, 1, 0, 1)
         case .milestone:
-            return (12, 5, 4)
+            return (12, 5, 4, 6)
         case .general:
-            return (4, 2, 1)
+            return (4, 2, 1, 2)
         }
     }
 
@@ -1100,7 +1367,7 @@ enum OasisUpgradeRewardService {
             return dailyActionCount(for: action, critter: critter, context: context) == 0 ? 0 : 3
         case .rest:
             return 0
-        case .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho:
+        case .rescue, .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho, .death:
             return 0
         }
     }
@@ -1119,11 +1386,296 @@ enum OasisUpgradeRewardService {
     }
 
     static func normalizeDecay(for critter: OasisElectronicPet) {
-        let hours = max(0, Int(Date().timeIntervalSince(critter.lastStateRefreshAt) / 3600))
-        guard hours > 0 else { return }
-        critter.hunger = max(0, critter.hunger - hours * 3)
-        critter.mood = max(0, critter.mood - hours * 2)
-        critter.lastStateRefreshAt = Date()
+        normalizeLifecycle(for: critter)
+    }
+
+    static func normalizeLifecycle(for critter: OasisElectronicPet, context: ModelContext? = nil, now: Date = Date()) {
+        let before = lifecycleFingerprint(for: critter)
+        let wasDead = critter.lifeState == .dead
+        guard !wasDead else { return }
+
+        settleElapsedNeeds(for: critter, now: now)
+        refreshLifecycleState(for: critter, now: now)
+
+        if critter.lifeState == .dead, before.lifeState != OasisCritterLifeState.dead.rawValue {
+            critter.isFeaturedOnOasis = false
+            if let context {
+                context.insert(deathLog(for: critter, now: now))
+            }
+        }
+
+        if lifecycleFingerprint(for: critter) != before, let context {
+            try? context.save()
+        }
+    }
+
+    static func lifecycleSnapshot(
+        for critter: OasisElectronicPet,
+        context: ModelContext? = nil,
+        now: Date = Date()
+    ) -> OasisCritterLifecycleSnapshot {
+        _ = context
+        let state = critter.lifeState
+        let remainingHours: Int?
+        if state == .critical, let criticalStartedAt = critter.criticalStartedAt {
+            remainingHours = max(0, criticalToDeathHours - hoursBetween(criticalStartedAt, now))
+        } else {
+            remainingHours = nil
+        }
+        let urgency: Int
+        switch state {
+        case .healthy: urgency = 0
+        case .needsCare: urgency = 1
+        case .atRisk: urgency = 2
+        case .sick: urgency = 3
+        case .critical: urgency = 4
+        case .dead: urgency = 5
+        }
+        return OasisCritterLifecycleSnapshot(
+            state: state,
+            deathReason: critter.deathReason,
+            recommendedAction: recommendedCareAction(for: critter),
+            isRescuable: state == .atRisk || state == .sick || state == .critical,
+            hoursUntilDeath: remainingHours,
+            ageDays: ageDays(for: critter, now: now),
+            urgencyScore: urgency
+        )
+    }
+
+    static func gentlePrompt(for critter: OasisElectronicPet, snapshot: OasisCritterLifecycleSnapshot, l: L10n) -> String {
+        let name = critter.displayName(l)
+        switch snapshot.state {
+        case .healthy:
+            return l.tr(
+                zh: "\(name) 今天很安稳，像一团小小的云贴在你身边。",
+                en: "\(name) feels settled today, soft and close by.",
+                de: "\(name) fühlt sich heute ruhig an, weich und nah bei dir."
+            )
+        case .needsCare:
+            if snapshot.ageDays >= elderWarningDays {
+                return l.tr(
+                    zh: "\(name) 最近动作慢了一点，想被轻轻陪一会儿。",
+                    en: "\(name) moves a little slower lately and wants gentle company.",
+                    de: "\(name) bewegt sich langsam und möchte sanfte Nähe."
+                )
+            }
+            return l.tr(
+                zh: "\(name) 轻轻碰了碰椰壳，像是在说想你了。",
+                en: "\(name) taps the coconut shell softly, as if missing you.",
+                de: "\(name) stupst die Kokosschale leise an, als würde es dich vermissen."
+            )
+        case .atRisk:
+            return l.tr(
+                zh: "\(name) 缩进椰壳里等一会儿，照顾一下就会缓过来。",
+                en: "\(name) is curled in the coconut shell. A little care will help.",
+                de: "\(name) kuschelt in der Kokosschale. Ein wenig Pflege hilft."
+            )
+        case .sick:
+            return l.tr(
+                zh: "\(name) 有点没精神，还来得及温柔地救回来。",
+                en: "\(name) is low on energy, but you can still gently bring it back.",
+                de: "\(name) hat wenig Energie, aber du kannst es sanft zurückholen."
+            )
+        case .critical:
+            let hours = snapshot.hoursUntilDeath ?? criticalToDeathHours
+            return l.tr(
+                zh: "\(name) 真的需要你一下，约 \(hours) 小时内照顾都能救回来。",
+                en: "\(name) really needs you. Care within about \(hours)h can still rescue it.",
+                de: "\(name) braucht dich wirklich. Pflege innerhalb von etwa \(hours) Std. kann es retten."
+            )
+        case .dead:
+            let reason = snapshot.deathReason?.name(l) ?? l.tr(zh: "生命结束", en: "life ended", de: "das Leben endete")
+            return l.tr(
+                zh: "\(name) 已经安静地回到纪念册里，原因是\(reason)。",
+                en: "\(name) is resting in the memorial album because of \(reason).",
+                de: "\(name) ruht im Erinnerungsalbum wegen \(reason)."
+            )
+        }
+    }
+
+    @discardableResult
+    static func rescueIfNeeded(for critter: OasisElectronicPet, context: ModelContext, now: Date = Date()) throws -> OasisCritterInteractionOutcome {
+        normalizeLifecycle(for: critter, context: context, now: now)
+        let snapshot = lifecycleSnapshot(for: critter, context: context, now: now)
+        let wish = dailyWish(for: .rescue)
+        guard critter.lifeState != .dead else {
+            return deadInteractionOutcome(for: critter, action: .rescue)
+        }
+        guard snapshot.isRescuable else {
+            return OasisCritterInteractionOutcome(
+                success: false,
+                action: .rescue,
+                completedDailyWish: false,
+                wish: wish,
+                messageZh: "现在不用急，它只是想被轻轻陪一下。",
+                messageEn: "No rush right now. It only wants gentle company.",
+                messageDe: "Kein Stress gerade. Es möchte nur sanfte Nähe.",
+                rewardXP: 0,
+                rewardBond: 0,
+                rewardFragments: 0,
+                rewardCoconuts: 0
+            )
+        }
+
+        critter.hunger = max(critter.hunger, 58)
+        critter.mood = max(critter.mood, 58)
+        critter.health = max(critter.health, 74)
+        critter.bond = min(999, critter.bond + 4)
+        critter.xp += 8
+        critter.riskStartedAt = nil
+        critter.criticalStartedAt = nil
+        critter.lifeState = .healthy
+        critter.deathReason = nil
+        critter.lastInteractionAt = now
+        critter.lastStateRefreshAt = now
+        critter.lastGentlePromptAt = now
+        context.insert(actionLog(for: critter, action: .rescue, xpDelta: 8))
+        try context.save()
+        return OasisCritterInteractionOutcome(
+            success: true,
+            action: .rescue,
+            completedDailyWish: false,
+            wish: wish,
+            messageZh: "你轻轻照顾了一下，它慢慢从椰壳里探出头。",
+            messageEn: "You gave gentle care, and it slowly peeks out of the coconut shell.",
+            messageDe: "Du hast sanft geholfen, und es schaut langsam aus der Kokosschale.",
+            rewardXP: 8,
+            rewardBond: 4,
+            rewardFragments: 0,
+            rewardCoconuts: 0
+        )
+    }
+
+    private struct LifecycleFingerprint: Equatable {
+        var hunger: Int
+        var mood: Int
+        var health: Int
+        var lifeState: String
+        var deathReason: String
+        var riskStartedAt: Date?
+        var criticalStartedAt: Date?
+        var diedAt: Date?
+        var lastStateRefreshAt: Date
+        var isFeaturedOnOasis: Bool
+    }
+
+    private static func lifecycleFingerprint(for critter: OasisElectronicPet) -> LifecycleFingerprint {
+        LifecycleFingerprint(
+            hunger: critter.hunger,
+            mood: critter.mood,
+            health: critter.health,
+            lifeState: critter.lifeStateRaw,
+            deathReason: critter.deathReasonRaw,
+            riskStartedAt: critter.riskStartedAt,
+            criticalStartedAt: critter.criticalStartedAt,
+            diedAt: critter.diedAt,
+            lastStateRefreshAt: critter.lastStateRefreshAt,
+            isFeaturedOnOasis: critter.isFeaturedOnOasis
+        )
+    }
+
+    private static func settleElapsedNeeds(for critter: OasisElectronicPet, now: Date) {
+        let elapsed = max(0, now.timeIntervalSince(critter.lastStateRefreshAt))
+        let days = Int(elapsed / lifecycleDay)
+        guard days > 0 else { return }
+        let wasLow = isLowCondition(critter)
+        critter.hunger = max(0, critter.hunger - days * 14)
+        critter.mood = max(0, critter.mood - days * 10)
+        if wasLow || isLowCondition(critter) {
+            critter.health = max(0, critter.health - days * 8)
+        } else {
+            critter.health = min(100, critter.health + days * 2)
+        }
+        critter.lastStateRefreshAt = now
+    }
+
+    private static func refreshLifecycleState(for critter: OasisElectronicPet, now: Date) {
+        guard critter.lifeState != .dead else { return }
+        let age = ageDays(for: critter, now: now)
+        if age >= oldAgeDeathDays {
+            markDead(critter, reason: .oldAge, now: now)
+            return
+        }
+
+        if isLowCondition(critter) {
+            if critter.riskStartedAt == nil {
+                critter.riskStartedAt = now
+            }
+            let riskHours = hoursBetween(critter.riskStartedAt ?? now, now)
+            if riskHours >= riskToCriticalHours {
+                if critter.criticalStartedAt == nil {
+                    critter.criticalStartedAt = now
+                }
+                if hoursBetween(critter.criticalStartedAt ?? now, now) >= criticalToDeathHours {
+                    markDead(critter, reason: deathReason(for: critter), now: now)
+                    return
+                }
+                critter.lifeState = .critical
+            } else if critter.health < sickHealthThreshold || riskHours >= 48 {
+                critter.lifeState = .sick
+            } else {
+                critter.lifeState = .atRisk
+            }
+            return
+        }
+
+        critter.riskStartedAt = nil
+        critter.criticalStartedAt = nil
+        if critter.hunger < needsCareThreshold ||
+            critter.mood < needsCareThreshold ||
+            critter.health < 70 ||
+            age >= elderWarningDays {
+            critter.lifeState = .needsCare
+        } else {
+            critter.lifeState = .healthy
+        }
+        critter.deathReason = nil
+        critter.diedAt = nil
+    }
+
+    private static func isLowCondition(_ critter: OasisElectronicPet) -> Bool {
+        critter.hunger < atRiskThreshold ||
+            critter.mood < atRiskThreshold ||
+            critter.health < sickHealthThreshold
+    }
+
+    private static func recommendedCareAction(for critter: OasisElectronicPet) -> OasisCritterAction? {
+        guard critter.lifeState != .dead else { return nil }
+        if critter.health < 70 { return .rest }
+        if critter.hunger < needsCareThreshold && critter.hunger <= critter.mood { return .feed }
+        if critter.mood < needsCareThreshold { return .play }
+        if critter.hunger < needsCareThreshold { return .feed }
+        return nil
+    }
+
+    private static func deathReason(for critter: OasisElectronicPet) -> OasisCritterDeathReason {
+        if critter.health <= 0 || (critter.health < sickHealthThreshold && critter.hunger < atRiskThreshold && critter.mood < atRiskThreshold) {
+            return .sick
+        }
+        if critter.hunger < atRiskThreshold && critter.hunger <= critter.mood {
+            return .hungry
+        }
+        if critter.mood < atRiskThreshold {
+            return .bored
+        }
+        return .sick
+    }
+
+    private static func markDead(_ critter: OasisElectronicPet, reason: OasisCritterDeathReason, now: Date) {
+        critter.lifeState = .dead
+        critter.deathReason = reason
+        critter.diedAt = critter.diedAt ?? now
+        critter.riskStartedAt = nil
+        critter.criticalStartedAt = nil
+        critter.isFeaturedOnOasis = false
+    }
+
+    private static func ageDays(for critter: OasisElectronicPet, now: Date) -> Int {
+        max(0, Int(now.timeIntervalSince(critter.obtainedAt) / lifecycleDay))
+    }
+
+    private static func hoursBetween(_ start: Date, _ end: Date) -> Int {
+        max(0, Int(end.timeIntervalSince(start) / 3600))
     }
 
     private static func dailyActionCount(for action: OasisCritterAction, critter: OasisElectronicPet, context: ModelContext) -> Int {
@@ -1166,12 +1718,187 @@ enum OasisUpgradeRewardService {
         context.insert(OasisUnlock(unlockId: id, unlockKind: kind, sourceLevel: sourceLevel))
     }
 
+    private static func dailyWish(for action: OasisCritterAction) -> OasisCritterDailyWish {
+        switch action {
+        case .feed:
+            return OasisCritterDailyWish(
+                id: "daily_feed",
+                action: .feed,
+                icon: "fork.knife",
+                titleZh: "想喝一点椰奶",
+                titleEn: "Wants coconut milk",
+                titleDe: "Möchte Kokosmilch",
+                detailZh: "喂养一次，把今天的小肚子填得软软的。",
+                detailEn: "Feed once and fill today's tiny belly.",
+                detailDe: "Einmal füttern und den kleinen Bauch füllen.",
+                rewardXP: 14,
+                rewardBond: 6,
+                rewardFragments: 1,
+                rewardCoconuts: 3
+            )
+        case .play:
+            return OasisCritterDailyWish(
+                id: "daily_play",
+                action: .play,
+                icon: "sparkles",
+                titleZh: "想玩星星捉迷藏",
+                titleEn: "Wants star hide-and-seek",
+                titleDe: "Möchte Stern-Verstecken",
+                detailZh: "陪它玩一次，心情会亮起来。",
+                detailEn: "Play once and brighten its mood.",
+                detailDe: "Einmal spielen und die Stimmung aufhellen.",
+                rewardXP: 14,
+                rewardBond: 6,
+                rewardFragments: 1,
+                rewardCoconuts: 3
+            )
+        case .rest:
+            return OasisCritterDailyWish(
+                id: "daily_rest",
+                action: .rest,
+                icon: "moon.fill",
+                titleZh: "想窝进椰壳午睡",
+                titleEn: "Wants a coconut-shell nap",
+                titleDe: "Möchte Kokosschalen-Schlaf",
+                detailZh: "让它休息一次，醒来会更黏人。",
+                detailEn: "Let it rest once and wake up closer.",
+                detailDe: "Einmal ruhen lassen, danach ist es anhänglicher.",
+                rewardXP: 14,
+                rewardBond: 6,
+                rewardFragments: 1,
+                rewardCoconuts: 3
+            )
+        case .rescue:
+            return OasisCritterDailyWish(
+                id: "daily_rescue",
+                action: .rescue,
+                icon: "cross.case.fill",
+                titleZh: "想被轻轻照顾一下",
+                titleEn: "Wants gentle care",
+                titleDe: "Möchte sanfte Pflege",
+                detailZh: "点一键照顾，把它从椰壳里温柔地带回来。",
+                detailEn: "Use one-tap care and gently bring it back from the coconut shell.",
+                detailDe: "Nutze Ein-Klick-Pflege und hol es sanft aus der Kokosschale.",
+                rewardXP: 8,
+                rewardBond: 4,
+                rewardFragments: 0,
+                rewardCoconuts: 0
+            )
+        case .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho, .death:
+            return dailyWish(for: .play)
+        }
+    }
+
+    private static func failedInteraction(action: OasisCritterAction, wish: OasisCritterDailyWish) -> OasisCritterInteractionOutcome {
+        OasisCritterInteractionOutcome(
+            success: false,
+            action: action,
+            completedDailyWish: false,
+            wish: wish,
+            messageZh: "现在还不能这样互动。",
+            messageEn: "This interaction is not available right now.",
+            messageDe: "Diese Interaktion ist gerade nicht verfügbar.",
+            rewardXP: 0,
+            rewardBond: 0,
+            rewardFragments: 0,
+            rewardCoconuts: 0
+        )
+    }
+
+    private static func deadInteractionOutcome(for critter: OasisElectronicPet, action: OasisCritterAction) -> OasisCritterInteractionOutcome {
+        let reason = critter.deathReasonRaw
+        let reasonZh: String
+        let reasonEn: String
+        let reasonDe: String
+        switch OasisCritterDeathReason(rawValue: reason) {
+        case .hungry:
+            reasonZh = "太久没有吃东西"
+            reasonEn = "too long without food"
+            reasonDe = "zu lange ohne Futter"
+        case .sick:
+            reasonZh = "久病没有恢复"
+            reasonEn = "illness that was not healed"
+            reasonDe = "Krankheit ohne Erholung"
+        case .bored:
+            reasonZh = "太久没有陪伴"
+            reasonEn = "too long without company"
+            reasonDe = "zu lange ohne Gesellschaft"
+        case .oldAge:
+            reasonZh = "自然老去"
+            reasonEn = "old age"
+            reasonDe = "Alter"
+        case .none:
+            reasonZh = "生命已经结束"
+            reasonEn = "life has ended"
+            reasonDe = "das Leben ist zu Ende"
+        }
+        return OasisCritterInteractionOutcome(
+            success: false,
+            action: action,
+            completedDailyWish: false,
+            wish: nil,
+            messageZh: "它已经进入纪念册，原因是\(reasonZh)。",
+            messageEn: "It is now in the memorial album because of \(reasonEn).",
+            messageDe: "Es ist jetzt im Erinnerungsalbum wegen \(reasonDe).",
+            rewardXP: 0,
+            rewardBond: 0,
+            rewardFragments: 0,
+            rewardCoconuts: 0
+        )
+    }
+
+    private static func interactionOutcome(action: OasisCritterAction, wish: OasisCritterDailyWish, completedWish: Bool) -> OasisCritterInteractionOutcome {
+        if completedWish {
+            return OasisCritterInteractionOutcome(
+                success: true,
+                action: action,
+                completedDailyWish: true,
+                wish: wish,
+                messageZh: "完成今日小愿望，它更信任你了。",
+                messageEn: "Tiny wish complete. It trusts you a little more.",
+                messageDe: "Kleiner Wunsch erfüllt. Es vertraut dir etwas mehr.",
+                rewardXP: wish.rewardXP,
+                rewardBond: wish.rewardBond,
+                rewardFragments: wish.rewardFragments,
+                rewardCoconuts: wish.rewardCoconuts
+            )
+        }
+
+        let message: (zh: String, en: String, de: String)
+        switch action {
+        case .feed:
+            message = ("它抱着小碗眯起眼，精神多了一点。", "It hugs the little bowl and perks up.", "Es umarmt die kleine Schale und wirkt munterer.")
+        case .play:
+            message = ("它追着小星星转了一圈，心情亮起来。", "It chases a tiny star and brightens up.", "Es jagt einen kleinen Stern und strahlt mehr.")
+        case .rest:
+            message = ("它缩进小窝，睡出一朵软软的梦。", "It curls into the nest and dreams softly.", "Es rollt sich im Nest ein und träumt sanft.")
+        case .rescue:
+            message = ("你轻轻照顾了一下，它从椰壳里探出头。", "You gave gentle care, and it peeks out.", "Du hast sanft geholfen, und es schaut heraus.")
+        case .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho, .death:
+            message = ("互动完成。", "Interaction complete.", "Interaktion abgeschlossen.")
+        }
+        return OasisCritterInteractionOutcome(
+            success: true,
+            action: action,
+            completedDailyWish: false,
+            wish: wish,
+            messageZh: message.zh,
+            messageEn: message.en,
+            messageDe: message.de,
+            rewardXP: 0,
+            rewardBond: 0,
+            rewardFragments: 0,
+            rewardCoconuts: 0
+        )
+    }
+
     private static func openedResult(for coconut: OasisUpgradeCoconut, duplicate: Bool) -> OasisOpenedUpgradeReward {
         if duplicate, let critterId = coconut.guaranteedCritterId,
            let entry = OasisUpgradeRewardCatalog.critter(id: critterId) {
             return OasisOpenedUpgradeReward(
                 level: coconut.level,
                 kind: .fragments,
+                critterCatalogId: nil,
                 titleZh: "重复伙伴转为碎片",
                 titleEn: "Duplicate Became Fragments",
                 titleDe: "Duplikat wurde Fragmente",
@@ -1196,6 +1923,7 @@ enum OasisUpgradeRewardService {
         return OasisOpenedUpgradeReward(
             level: coconut.level,
             kind: coconut.rewardKind,
+            critterCatalogId: coconut.rewardKind == .electronicPet ? coconut.guaranteedCritterId : nil,
             titleZh: coconut.titleZh,
             titleEn: coconut.titleEn,
             titleDe: coconut.titleDe,
@@ -1222,6 +1950,8 @@ enum OasisUpgradeRewardService {
             note = ("陪伙伴玩耍", "Played with companion", "Mit Begleiter gespielt")
         case .rest:
             note = ("伙伴休息", "Companion rested", "Begleiter hat geruht")
+        case .rescue:
+            note = ("温柔救回伙伴", "Gently rescued companion", "Begleiter sanft gerettet")
         case .starUpgrade:
             note = ("伙伴升星", "Companion star upgrade", "Begleiter-Sternupgrade")
         case .unlock:
@@ -1232,6 +1962,8 @@ enum OasisUpgradeRewardService {
             note = ("设为小窝展示", "Featured in nest", "Im Nest gezeigt")
         case .careEcho:
             note = ("照护共鸣", "Care echo", "Pflege-Echo")
+        case .death:
+            note = ("伙伴进入纪念册", "Companion entered the memorial album", "Begleiter kam ins Erinnerungsalbum")
         }
         return OasisCritterActionLog(
             critterId: critter.id,
@@ -1246,17 +1978,58 @@ enum OasisUpgradeRewardService {
             noteDe: note.de
         )
     }
+
+    private static func deathLog(for critter: OasisElectronicPet, now: Date) -> OasisCritterActionLog {
+        let reason = critter.deathReason
+        let reasonZh: String
+        let reasonEn: String
+        let reasonDe: String
+        switch reason {
+        case .hungry:
+            reasonZh = "太久没有吃东西"
+            reasonEn = "too long without food"
+            reasonDe = "zu lange ohne Futter"
+        case .sick:
+            reasonZh = "久病没有恢复"
+            reasonEn = "illness that was not healed"
+            reasonDe = "Krankheit ohne Erholung"
+        case .bored:
+            reasonZh = "太久没有陪伴"
+            reasonEn = "too long without company"
+            reasonDe = "zu lange ohne Gesellschaft"
+        case .oldAge:
+            reasonZh = "自然老去"
+            reasonEn = "old age"
+            reasonDe = "Alter"
+        case .none:
+            reasonZh = "生命结束"
+            reasonEn = "life ended"
+            reasonDe = "das Leben endete"
+        }
+        return OasisCritterActionLog(
+            critterId: critter.id,
+            critterCatalogId: critter.catalogId,
+            action: .death,
+            createdAt: now,
+            sourceLevel: critter.sourceLevel,
+            noteZh: "伙伴进入纪念册：\(reasonZh)",
+            noteEn: "Companion entered the memorial album: \(reasonEn).",
+            noteDe: "Begleiter kam ins Erinnerungsalbum: \(reasonDe)."
+        )
+    }
 }
 
 enum OasisCritterAction: String, CaseIterable, Identifiable {
     case feed
     case play
     case rest
+    case rescue
     case starUpgrade
     case unlock
     case fragmentAwaken
     case feature
     case careEcho
+    case death
 
     var id: String { rawValue }
 }

@@ -6,11 +6,10 @@
 //
 
 import SwiftUI
-import Charts
 
 enum OhanaChartStyle {
-    static let trendInterpolation: InterpolationMethod = .monotone
     static let trendLineStyle = StrokeStyle(lineWidth: 2.8, lineCap: .round, lineJoin: .round)
+    static let quietReferenceLineStyle = StrokeStyle(lineWidth: 0.7, lineCap: .round, dash: [3, 7])
 
     static func areaGradient(for tint: Color, topOpacity: Double = 0.24, bottomOpacity: Double = 0.02) -> LinearGradient {
         LinearGradient(
@@ -49,6 +48,14 @@ enum OhanaChartStyle {
         return lower...upper
     }
 
+    static func weightReferenceLabel(kilograms: Double, domain: ClosedRange<Double>) -> String {
+        let convertedSpan = AppMeasurementSystem.code == "imperial"
+            ? (domain.upperBound - domain.lowerBound) * 2.2046226218
+            : domain.upperBound - domain.lowerBound
+        let fractionDigits = convertedSpan < 6 ? 1 : 0
+        return AppMeasurementSystem.formatWeightKilograms(kilograms, fractionDigits: fractionDigits)
+    }
+
     static func softenedLinePath(points: [CGPoint]) -> Path {
         Path { path in
             guard let first = points.first else { return }
@@ -70,15 +77,407 @@ enum OhanaChartStyle {
 
     private static func appendSoftSegments(to path: inout Path, points: [CGPoint]) {
         guard points.count > 1 else { return }
-        for index in 1..<points.count {
-            let previous = points[index - 1]
-            let current = points[index]
-            let midpoint = CGPoint(
-                x: (previous.x + current.x) / 2,
-                y: (previous.y + current.y) / 2
+        for index in 0..<(points.count - 1) {
+            let p0 = points[max(index - 1, 0)]
+            let p1 = points[index]
+            let p2 = points[index + 1]
+            let p3 = points[min(index + 2, points.count - 1)]
+            let segmentMinY = min(p1.y, p2.y)
+            let segmentMaxY = max(p1.y, p2.y)
+            let tension: CGFloat = 0.22
+
+            let c1 = CGPoint(
+                x: clamp(p1.x + (p2.x - p0.x) * tension, min(p1.x, p2.x), max(p1.x, p2.x)),
+                y: clamp(p1.y + (p2.y - p0.y) * tension, segmentMinY, segmentMaxY)
             )
-            path.addQuadCurve(to: midpoint, control: previous)
-            path.addQuadCurve(to: current, control: current)
+            let c2 = CGPoint(
+                x: clamp(p2.x - (p3.x - p1.x) * tension, min(p1.x, p2.x), max(p1.x, p2.x)),
+                y: clamp(p2.y - (p3.y - p1.y) * tension, segmentMinY, segmentMaxY)
+            )
+            path.addCurve(to: p2, control1: c1, control2: c2)
+        }
+    }
+
+    private static func clamp(_ value: CGFloat, _ lower: CGFloat, _ upper: CGFloat) -> CGFloat {
+        min(max(value, lower), upper)
+    }
+}
+
+struct OhanaMinimalChartPoint: Identifiable, Hashable {
+    let id: String
+    let date: Date
+    let value: Double
+    var label: String?
+
+    init(date: Date, value: Double, label: String? = nil, id: String? = nil) {
+        let timestamp = Int(date.timeIntervalSinceReferenceDate.rounded())
+        let scaledValue = Int((value * 1000).rounded())
+        self.id = id ?? "\(timestamp)-\(scaledValue)-\(label ?? "")"
+        self.date = date
+        self.value = value
+        self.label = label
+    }
+}
+
+struct OhanaMinimalLineSeries: Identifiable {
+    let id: String
+    let points: [OhanaMinimalChartPoint]
+    let tint: Color
+
+    init(id: String, points: [OhanaMinimalChartPoint], tint: Color) {
+        self.id = id
+        self.points = points
+        self.tint = tint
+    }
+}
+
+struct OhanaMinimalTrendChart: View {
+    let points: [OhanaMinimalChartPoint]
+    var xDomain: ClosedRange<Date>?
+    var yDomain: ClosedRange<Double>?
+    var tint: Color = .goPrimary
+    var progress: Double = 1
+    var showsLatestPoint: Bool = true
+    var yReferenceLineCount: Int = 0
+    var yReferenceFormatter: ((Double, ClosedRange<Double>) -> String)? = nil
+
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @State private var entranceProgress: Double = 0
+
+    private var sortedPoints: [OhanaMinimalChartPoint] {
+        points.sorted { $0.date < $1.date }
+    }
+
+    private var resolvedYDomain: ClosedRange<Double> {
+        yDomain ?? OhanaChartStyle.yDomain(values: sortedPoints.map(\.value), includeZero: false)
+    }
+
+    private var animationKey: String {
+        sortedPoints.map(\.id).joined(separator: "|")
+    }
+
+    private var effectiveProgress: Double {
+        max(0, min(1, progress)) * max(0, min(1, entranceProgress))
+    }
+
+    private var showsYReferenceLines: Bool {
+        yReferenceLineCount > 0 && yReferenceFormatter != nil
+    }
+
+    private var plotLeadingInset: CGFloat {
+        showsYReferenceLines ? 46 : 0
+    }
+
+    private var yReferenceValues: [Double] {
+        guard showsYReferenceLines else { return [] }
+        let count = max(2, yReferenceLineCount)
+        let domain = resolvedYDomain
+        let span = domain.upperBound - domain.lowerBound
+        guard span.isFinite, span > 0 else { return [] }
+        return (0..<count).map { index in
+            domain.lowerBound + span * Double(index) / Double(count - 1)
+        }
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let chartPoints = resolvedPoints(in: proxy.size)
+            ZStack {
+                if showsYReferenceLines {
+                    referenceLayer(in: proxy.size)
+                }
+
+                if chartPoints.count >= 2 {
+                    OhanaChartStyle.softenedAreaPath(points: chartPoints, baselineY: proxy.size.height)
+                        .fill(OhanaChartStyle.areaGradient(for: tint, topOpacity: 0.20, bottomOpacity: 0.01))
+                        .mask(alignment: .leading) {
+                            Rectangle()
+                                .frame(width: max(1, proxy.size.width * effectiveProgress))
+                        }
+                    OhanaChartStyle.softenedLinePath(points: chartPoints)
+                        .trim(from: 0, to: effectiveProgress)
+                        .stroke(tint, style: OhanaChartStyle.trendLineStyle)
+                } else if let point = chartPoints.first {
+                    Circle()
+                        .fill(tint)
+                        .frame(width: 9, height: 9)
+                        .position(point)
+                        .scaleEffect(0.72 + 0.28 * effectiveProgress)
+                        .opacity(effectiveProgress)
+                }
+
+                if showsLatestPoint, let latest = chartPoints.last {
+                    Circle()
+                        .fill(tint)
+                        .frame(width: 9, height: 9)
+                        .overlay(Circle().stroke(Color.ohanaCardSurface, lineWidth: 2))
+                        .position(latest)
+                        .scaleEffect(0.72 + 0.28 * effectiveProgress)
+                        .opacity(max(0, min(1, (effectiveProgress - 0.82) / 0.18)))
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .opacity(sortedPoints.isEmpty ? 0.35 : 1)
+        .onAppear(perform: playEntrance)
+        .onChange(of: animationKey) { _, _ in playEntrance() }
+        .onChange(of: workloadPolicy.isReduceMotionEnabled) { _, _ in playEntrance() }
+        .onChange(of: workloadPolicy.isLowPowerModeEnabled) { _, _ in playEntrance() }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Minimal trend chart")
+    }
+
+    @ViewBuilder
+    private func referenceLayer(in size: CGSize) -> some View {
+        ForEach(yReferenceValues.indices, id: \.self) { index in
+            let value = yReferenceValues[index]
+            let lineY = yPosition(for: value, in: size)
+            Path { path in
+                path.move(to: CGPoint(x: plotLeadingInset, y: lineY))
+                path.addLine(to: CGPoint(x: size.width, y: lineY))
+            }
+            .stroke(Color.ohanaSecondaryText.opacity(0.18), style: OhanaChartStyle.quietReferenceLineStyle)
+
+            if let formatter = yReferenceFormatter {
+                Text(formatter(value, resolvedYDomain))
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.68))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .frame(width: plotLeadingInset - 6, alignment: .leading)
+                    .position(x: max(18, plotLeadingInset / 2 - 1), y: min(max(lineY, 8), size.height - 8))
+            }
+        }
+    }
+
+    private func resolvedPoints(in size: CGSize) -> [CGPoint] {
+        let sorted = sortedPoints
+        guard !sorted.isEmpty, size.width > 0, size.height > 0 else { return [] }
+        let dateDomain = resolvedDateDomain(from: sorted)
+        let start = dateDomain.lowerBound.timeIntervalSinceReferenceDate
+        let span = max(dateDomain.upperBound.timeIntervalSinceReferenceDate - start, 1)
+        let y = resolvedYDomain
+        let ySpan = max(y.upperBound - y.lowerBound, 0.0001)
+        let plotWidth = max(size.width - plotLeadingInset, 1)
+
+        return sorted.map { point in
+            let xRatio = (point.date.timeIntervalSinceReferenceDate - start) / span
+            let animatedValue = y.lowerBound + (point.value - y.lowerBound) * effectiveProgress
+            let yRatio = (animatedValue - y.lowerBound) / ySpan
+            return CGPoint(
+                x: plotLeadingInset + min(max(CGFloat(xRatio) * plotWidth, 0), plotWidth),
+                y: min(max(size.height - CGFloat(yRatio) * size.height, 0), size.height)
+            )
+        }
+    }
+
+    private func yPosition(for value: Double, in size: CGSize) -> CGFloat {
+        let domain = resolvedYDomain
+        let span = max(domain.upperBound - domain.lowerBound, 0.0001)
+        let ratio = (value - domain.lowerBound) / span
+        return min(max(size.height - CGFloat(ratio) * size.height, 0), size.height)
+    }
+
+    private func resolvedDateDomain(from points: [OhanaMinimalChartPoint]) -> ClosedRange<Date> {
+        if let xDomain { return xDomain }
+        guard let first = points.first?.date, let last = points.last?.date else {
+            let now = Date()
+            return now...now.addingTimeInterval(1)
+        }
+        if first == last {
+            return first.addingTimeInterval(-43_200)...last.addingTimeInterval(43_200)
+        }
+        return first...last
+    }
+
+    private func playEntrance() {
+        guard workloadPolicy.shouldAnimate(isVisible: true) else {
+            entranceProgress = 1
+            return
+        }
+        entranceProgress = 0
+        withAnimation(GoMotion.page) {
+            entranceProgress = 1
+        }
+    }
+}
+
+struct OhanaMinimalMultiTrendChart: View {
+    let series: [OhanaMinimalLineSeries]
+    var xDomain: ClosedRange<Date>?
+    var yDomain: ClosedRange<Double>?
+    var progress: Double = 1
+    var showsLatestPoint: Bool = true
+    var drawProgress: Double = 1
+
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @State private var entranceProgress: Double = 0
+
+    private var allPoints: [OhanaMinimalChartPoint] {
+        series.flatMap(\.points).sorted { $0.date < $1.date }
+    }
+
+    private var resolvedYDomain: ClosedRange<Double> {
+        yDomain ?? OhanaChartStyle.yDomain(values: allPoints.map(\.value), includeZero: false)
+    }
+
+    private var animationKey: String {
+        series
+            .map { "\($0.id):\($0.points.map(\.id).joined(separator: ","))" }
+            .joined(separator: "|")
+    }
+
+    private var effectiveProgress: Double {
+        max(0, min(1, progress)) * max(0, min(1, entranceProgress))
+    }
+
+    private var effectiveDrawProgress: Double {
+        max(0, min(1, drawProgress)) * max(0, min(1, entranceProgress))
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                ForEach(series) { item in
+                    let chartPoints = resolvedPoints(item.points, in: proxy.size)
+                    if chartPoints.count >= 2 {
+                        OhanaChartStyle.softenedLinePath(points: chartPoints)
+                            .trim(from: 0, to: effectiveDrawProgress)
+                            .stroke(item.tint, style: StrokeStyle(lineWidth: 2.6, lineCap: .round, lineJoin: .round))
+                    }
+                    if showsLatestPoint, effectiveDrawProgress > 0.82, let latest = chartPoints.last {
+                        Circle()
+                            .fill(item.tint)
+                            .frame(width: 8, height: 8)
+                            .overlay(Circle().stroke(Color.ohanaCardSurface, lineWidth: 2))
+                            .position(latest)
+                            .scaleEffect(max(0.72, min(1, effectiveDrawProgress)))
+                            .opacity(max(0, min(1, (effectiveDrawProgress - 0.82) / 0.18)))
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .opacity(allPoints.isEmpty ? 0.35 : 1)
+        .onAppear(perform: playEntrance)
+        .onChange(of: animationKey) { _, _ in playEntrance() }
+        .onChange(of: workloadPolicy.isReduceMotionEnabled) { _, _ in playEntrance() }
+        .onChange(of: workloadPolicy.isLowPowerModeEnabled) { _, _ in playEntrance() }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Minimal multi-series trend chart")
+    }
+
+    private func resolvedPoints(_ points: [OhanaMinimalChartPoint], in size: CGSize) -> [CGPoint] {
+        let sorted = points.sorted { $0.date < $1.date }
+        guard !sorted.isEmpty, size.width > 0, size.height > 0 else { return [] }
+        let dateDomain = resolvedDateDomain()
+        let start = dateDomain.lowerBound.timeIntervalSinceReferenceDate
+        let span = max(dateDomain.upperBound.timeIntervalSinceReferenceDate - start, 1)
+        let y = resolvedYDomain
+        let ySpan = max(y.upperBound - y.lowerBound, 0.0001)
+
+        return sorted.map { point in
+            let xRatio = (point.date.timeIntervalSinceReferenceDate - start) / span
+            let animatedValue = y.lowerBound + (point.value - y.lowerBound) * effectiveProgress
+            let yRatio = (animatedValue - y.lowerBound) / ySpan
+            return CGPoint(
+                x: min(max(CGFloat(xRatio) * size.width, 0), size.width),
+                y: min(max(size.height - CGFloat(yRatio) * size.height, 0), size.height)
+            )
+        }
+    }
+
+    private func resolvedDateDomain() -> ClosedRange<Date> {
+        if let xDomain { return xDomain }
+        guard let first = allPoints.first?.date, let last = allPoints.last?.date else {
+            let now = Date()
+            return now...now.addingTimeInterval(1)
+        }
+        if first == last {
+            return first.addingTimeInterval(-43_200)...last.addingTimeInterval(43_200)
+        }
+        return first...last
+    }
+
+    private func playEntrance() {
+        guard workloadPolicy.shouldAnimate(isVisible: true) else {
+            entranceProgress = 1
+            return
+        }
+        entranceProgress = 0
+        withAnimation(GoMotion.page) {
+            entranceProgress = 1
+        }
+    }
+}
+
+struct OhanaMinimalBarChart: View {
+    let points: [OhanaMinimalChartPoint]
+    var tint: Color = .goPrimary
+    var progress: Double = 1
+    var showsLabels: Bool = true
+    var maxBarHeight: CGFloat = 90
+    var emptyBarColor: Color = Color.ohanaControlFill.opacity(0.70)
+
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @State private var entranceProgress: Double = 0
+
+    private var maxValue: Double {
+        max(1, points.map(\.value).max() ?? 1)
+    }
+
+    private var animationKey: String {
+        points.map(\.id).joined(separator: "|")
+    }
+
+    private var effectiveProgress: Double {
+        max(0, min(1, progress)) * max(0, min(1, entranceProgress))
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let spacing: CGFloat = points.count <= 10 ? 7 : (points.count <= 35 ? 4 : 2)
+            let count = max(points.count, 1)
+            let width = max(2, (proxy.size.width - spacing * CGFloat(count - 1)) / CGFloat(count))
+            HStack(alignment: .bottom, spacing: spacing) {
+                ForEach(points) { point in
+                    let visibleValue = max(0, point.value) * effectiveProgress
+                    let ratio = CGFloat(visibleValue / maxValue)
+                    VStack(spacing: 4) {
+                        RoundedRectangle(cornerRadius: max(1, width / 2), style: .continuous)
+                            .fill(point.value > 0 ? tint : emptyBarColor)
+                            .frame(width: width, height: max(point.value > 0 ? 10 : 4, ratio * maxBarHeight))
+                            .opacity(point.value > 0 ? 0.95 : 0.42)
+                            .scaleEffect(x: 1, y: 0.98 + 0.02 * effectiveProgress, anchor: .bottom)
+                        if showsLabels, points.count <= 10 {
+                            Text(point.label ?? point.date.formatted(.dateTime.weekday(.narrow)))
+                                .font(.system(size: 9, weight: .black, design: .rounded))
+                                .foregroundStyle(Calendar.current.isDateInToday(point.date) ? tint : Color.ohanaTertiaryText)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .bottom)
+                    .accessibilityLabel("\(point.label ?? point.date.formatted(date: .abbreviated, time: .omitted)): \(point.value)")
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        }
+        .accessibilityElement(children: .contain)
+        .onAppear(perform: playEntrance)
+        .onChange(of: animationKey) { _, _ in playEntrance() }
+        .onChange(of: workloadPolicy.isReduceMotionEnabled) { _, _ in playEntrance() }
+        .onChange(of: workloadPolicy.isLowPowerModeEnabled) { _, _ in playEntrance() }
+    }
+
+    private func playEntrance() {
+        guard workloadPolicy.shouldAnimate(isVisible: true) else {
+            entranceProgress = 1
+            return
+        }
+        entranceProgress = 0
+        withAnimation(GoMotion.page) {
+            entranceProgress = 1
         }
     }
 }
