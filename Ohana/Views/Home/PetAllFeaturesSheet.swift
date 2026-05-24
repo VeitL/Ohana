@@ -123,7 +123,7 @@ struct PetAllFeaturesSheet: View {
         case .basicInfo:     PetBasicInfoDetailView(pet: pet)
         case .documents:     DocumentsListView(pet: pet, showsCloseButton: true)
         case .moments:       PetMomentsHubView(pet: pet)
-        case .timeline:      PetUnifiedTimelineSheet(pet: pet)
+        case .timeline:      PetMomentsHubView(pet: pet)
         case .achievements:  AchievementWallView(pet: pet)
         case .retention:     PetRetentionHubView(pet: pet, showsCloseButton: true)
         case .weight:        WeightHistoryView(pet: pet, showsCloseButton: true)

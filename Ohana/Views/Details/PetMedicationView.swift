@@ -136,7 +136,6 @@ struct PetMedicationView: View {
                         .padding(.vertical, 10)
                         .background(Color.goPrimary, in: Capsule())
                         .padding(.bottom, 18)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
@@ -167,7 +166,7 @@ struct PetMedicationView: View {
 
     private var addMedicationOverlay: some View {
         GeometryReader { proxy in
-            ZStack(alignment: .bottom) {
+            OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: showingAddSheet) {
                 LinearGradient(
                     colors: [
                         Color.black.opacity(colorScheme == .dark ? 0.16 : 0.08), // ui-v4: allow modal scrim
@@ -194,16 +193,6 @@ struct PetMedicationView: View {
                 .frame(maxHeight: min(proxy.size.height * 0.88, 690))
                 .padding(.horizontal, 6)
                 .padding(.bottom, max(proxy.safeAreaInsets.bottom, 8) + 6)
-                .transition(
-                    .asymmetric(
-                        insertion: .move(edge: .bottom)
-                            .combined(with: .opacity)
-                            .combined(with: .scale(scale: 0.985, anchor: .bottom)),
-                        removal: .move(edge: .bottom)
-                            .combined(with: .opacity)
-                            .combined(with: .scale(scale: 0.985, anchor: .bottom))
-                    )
-                )
             }
             .animation(GoMotion.sheet, value: showingAddSheet)
         }

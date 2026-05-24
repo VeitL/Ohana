@@ -4,6 +4,8 @@ Use this when creating or heavily refactoring an app view. The machine source of
 
 ## Default Page Shape
 
+Use `ZStack` as the visual root. For static content it is simply the background/content layering tool. For key motion interactions, use a stable motion scene: keep layers mounted, freeze the UI snapshot before animation, and drive transforms/masks from one progress value.
+
 ```swift
 import SwiftUI
 
@@ -164,9 +166,44 @@ ZStack(alignment: .bottom) {
 }
 ```
 
+## Stable ZStack Motion Scene
+
+Use this pattern for hero cards, FAB/menu reveals, reward reveals, gacha/Oasis rewards, role creation cards, and chart range switches. Do not use it to over-engineer ordinary static lists.
+
+```swift
+OhanaMotionScene(role: .hero, isActive: selectedID != nil, reduceMotion: reduceMotion) {
+    backgroundLayer
+        .ohanaSceneLayer(zIndex: 0, hitTesting: false)
+
+    supportingLayer
+        .offset(y: supportingOffset(progress))
+        .opacity(supportingOpacity(progress))
+        .ohanaSceneLayer(zIndex: 10, hitTesting: progress > 0.98)
+
+    activeLayer
+        .frame(width: activeFrame.width, height: activeFrame.height)
+        .position(x: activeFrame.midX, y: activeFrame.midY)
+        .ohanaSceneLayer(zIndex: 20)
+}
+```
+
+Rules:
+
+- One user action owns one progress value.
+- Do not insert/remove the active visual layers mid-transition.
+- Prefer reveal masks and transforms over delayed fade-ins.
+- No image decoding, SwiftData scans, reward writes, or heavy state aggregation on the tap-to-first-frame path.
+- Reduce Motion should keep the same final states but use short fade/scale.
+
 ## Required Checklist
 
 - Read `ui规范.selection.json` before designing or editing.
+- Reserve fixed chrome before laying out content: status bar/Dynamic Island, fixed headers, bottom navigation, sheet chrome, and host insets. Main content must not start under fixed UI.
+- Verify hero cards, avatars, charts, CTAs, close buttons, and quick actions are fully visible on the smallest supported iPhone viewport and in embedded containers.
+- Do not create accidental double backgrounds or double borders. Use one primary card surface unless the design is an intentional physical stack of multiple real cards.
+- Give decorative ZStack layers `.allowsHitTesting(false)` and keep close buttons, top buttons, CTAs, and quick actions on explicit foreground zIndex layers.
+- Check long localized text, large numbers, missing images, 2.5D full-body avatars, and real dense data before considering the page done.
+- Check dark and light mode together. Glass must remain visibly refractive while preserving text and icon contrast.
 - Use `OhanaAppBackground()` for full-screen pages.
 - Use `Color.ohanaPrimaryText`, `Color.ohanaSecondaryText`, and `Color.ohanaTertiaryText`; avoid system `.primary` / `.secondary` in custom surfaces.
 - Use `goTranslucentCard`, `goIslandModuleCard`, `goGlassBackground`, or a local token-based surface; avoid ad hoc card stacks.
@@ -175,6 +212,7 @@ ZStack(alignment: .bottom) {
 - Keep compact density, but preserve a 44pt hit target for buttons, toggles, rows, chips, and icon actions.
 - Use `ScaleButtonStyle()` for tappable controls unless there is a specific reason not to.
 - Use `GoMotion.page`, `GoMotion.feedback`, `GoMotion.fab`, `GoMotion.quick`, or `GoMotion.reduced`; do not invent one-off spring values.
+- For key animated interactions, use `OhanaMotionScene` or an equivalent stable `ZStack + single progress` scene; avoid independent delayed animations for the same action.
 - Settings rows must follow `settingIcon`; non-sheet pages must follow `pageBackButton` and `pageCloseButton`; sheet close controls must follow `sheetChrome`.
 - New sheets must follow independent sheet tokens from `ui规范.selection.json`: compact layout, nativeRegular background, flat card/input, pill button, iconOnly chrome, and an adaptive content-height detent for short record/confirm sheets.
 - Charts use area trends and quiet axes.

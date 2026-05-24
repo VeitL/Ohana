@@ -22,7 +22,7 @@ struct IslandMoodHeaderStrip: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
     @State private var cloudOffsetA: CGFloat = -8
     @State private var cloudOffsetB: CGFloat = 8
     @State private var breath: CGFloat = 0

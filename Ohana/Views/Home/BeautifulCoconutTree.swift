@@ -312,7 +312,7 @@ struct BeautifulCoconutTree: View {
             )
             // 注入能量脉冲
             .scaleEffect(isInjecting ? 1.1 : 1.0)
-            .animation(GoMotion.feedback, value: isInjecting)
+            .animation(GoMotion.quick, value: isInjecting)
         }
         // 整体 scale 随等级变化（React 源码 animate.scale）
         .scaleEffect(CGFloat(cfg.scale))
@@ -431,7 +431,7 @@ private struct EnergyRootPulseView: View {
     private func run() {
         scale = 0.72
         opacity = 0.9
-        withAnimation(GoMotion.feedback) {
+        withAnimation(.interactiveSpring(response: 0.22, dampingFraction: 0.84, blendDuration: 0.02)) {
             scale = 2.4
             opacity = 0
         }

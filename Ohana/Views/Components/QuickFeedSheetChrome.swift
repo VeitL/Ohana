@@ -10,49 +10,66 @@ import UIKit
 
 struct TreatCelebrationOverlay: View {
     let tint: Color
+    @State private var isVisible = false
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+
+    private var shouldRunCelebrationMotion: Bool {
+        workloadPolicy.shouldRunRepeatingAnimation(isVisible: isVisible)
+    }
 
     var body: some View {
-        TimelineView(.animation) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate
-            ZStack {
-                Color.arkInk.opacity(0.22)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-
-                VStack(spacing: 10) {
-                    ZStack {
-                        ForEach(0..<10, id: \.self) { index in
-                            Image(systemName: index.isMultiple(of: 2) ? "heart.fill" : "sparkle")
-                                .font(.system(size: index.isMultiple(of: 2) ? 13 : 10, weight: .black))
-                                .foregroundStyle(index.isMultiple(of: 2) ? tint : Color(hex: "FF69B4"))
-                                .offset(
-                                    x: cos(t * 1.8 + Double(index)) * CGFloat(48 + index * 3),
-                                    y: sin(t * 1.6 + Double(index)) * CGFloat(28 + index * 2)
-                                )
-                                .opacity(0.9)
-                        }
-                        if UIImage(named: "feed_treat_celebration") != nil {
-                            Image("feed_treat_celebration")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 138, height: 138)
-                                .scaleEffect(1 + sin(t * 4.0) * 0.035)
-                        } else {
-                            Image(systemName: "birthday.cake.fill")
-                                .font(.system(size: 72, weight: .black))
-                                .foregroundStyle(tint)
-                                .scaleEffect(1 + sin(t * 4.0) * 0.035)
-                        }
-                    }
-                    Text("零食已记录")
-                        .font(.system(size: 20, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
+        ZStack {
+            if shouldRunCelebrationMotion {
+                TimelineView(.animation) { timeline in
+                    celebrationContent(at: timeline.date.timeIntervalSinceReferenceDate)
                 }
-                .padding(24)
-                .feedGlassSurface(cornerRadius: 28, tint: tint, tintOpacity: 0.045)
+            } else {
+                celebrationContent(at: 0)
             }
         }
+        .onAppear { isVisible = true }
+        .onDisappear { isVisible = false }
         .allowsHitTesting(false)
+    }
+
+    private func celebrationContent(at t: TimeInterval) -> some View {
+        ZStack {
+            Color.arkInk.opacity(0.22)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+
+            VStack(spacing: 10) {
+                ZStack {
+                    ForEach(0..<10, id: \.self) { index in
+                        Image(systemName: index.isMultiple(of: 2) ? "heart.fill" : "sparkle")
+                            .font(.system(size: index.isMultiple(of: 2) ? 13 : 10, weight: .black))
+                            .foregroundStyle(index.isMultiple(of: 2) ? tint : Color(hex: "FF69B4"))
+                            .offset(
+                                x: cos(t * 1.8 + Double(index)) * CGFloat(48 + index * 3),
+                                y: sin(t * 1.6 + Double(index)) * CGFloat(28 + index * 2)
+                            )
+                            .opacity(0.9)
+                    }
+                    if UIImage(named: "feed_treat_celebration") != nil {
+                        Image("feed_treat_celebration")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 138, height: 138)
+                            .scaleEffect(1 + sin(t * 4.0) * 0.035)
+                    } else {
+                        Image(systemName: "birthday.cake.fill")
+                            .font(.system(size: 72, weight: .black))
+                            .foregroundStyle(tint)
+                            .scaleEffect(1 + sin(t * 4.0) * 0.035)
+                    }
+                }
+                Text("零食已记录")
+                    .font(.system(size: 20, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+            }
+            .padding(24)
+            .feedGlassSurface(cornerRadius: 28, tint: tint, tintOpacity: 0.045)
+        }
     }
 }
 

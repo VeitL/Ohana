@@ -65,7 +65,6 @@ struct HumanNoteHistorySheet: View {
                         onDismiss: { showAddSheet = false }
                     )
                     .zIndex(20)
-                    .transition(.opacity)
                 }
             }
             .toolbar(.hidden, for: .navigationBar)

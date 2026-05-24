@@ -182,6 +182,12 @@ struct MemoryEngine {
 struct MemoryDropCard: View {
     let fragment: MemoryFragment
     @State private var shimmer = false
+    @State private var isVisible = false
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+
+    private var shouldRunShimmer: Bool {
+        workloadPolicy.shouldRunRepeatingAnimation(isVisible: isVisible)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -215,8 +221,18 @@ struct MemoryDropCard: View {
                     Text("今日回忆")
                         .font(.system(size: 9, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(shimmer ? 0.7 : 0.25))
-                        .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: shimmer)
-                        .onAppear { shimmer = true }
+                        .animation(shouldRunShimmer ? .easeInOut(duration: 2.0).repeatForever(autoreverses: true) : GoMotion.reduced, value: shimmer)
+                        .onAppear {
+                            isVisible = true
+                            shimmer = shouldRunShimmer
+                        }
+                        .onDisappear {
+                            isVisible = false
+                            shimmer = false
+                        }
+                        .onChange(of: shouldRunShimmer) { _, canRun in
+                            shimmer = canRun
+                        }
                 }
 
                 // 主标题

@@ -1246,18 +1246,15 @@ struct ArkCrewIDCardView: View {
         // sheet 路由（由长按手势触发，非单击）
         .sheet(isPresented: $showWeightSheet) {
             WeightHistoryView(pet: pet)
-                .presentationDetents([.large]) // ui-v4: allow long history sheet
-                .presentationDragIndicator(.visible)
+                .ohanaSheetPagePresentation() // ui-v4: allow long history sheet
         }
         .sheet(isPresented: $showWalkSheet) {
             WalkSummarySheet(pet: pet)
-                .presentationDetents([.medium, .large]) // ui-v4: allow long walk summary sheet
-                .presentationDragIndicator(.visible)
+                .ohanaCompactSheetPresentation(detents: [.medium, .large]) // ui-v4: allow long walk summary sheet
         }
         .sheet(isPresented: $showHealthSheet) {
             NavigationStack { PetHealthDetailView(pet: pet, isModal: true) }
-                .presentationDetents([.large]) // ui-v4: allow long health detail sheet
-                .presentationDragIndicator(.visible)
+                .ohanaSheetPagePresentation() // ui-v4: allow long health detail sheet
         }
         .onChange(of: showHealthSheet) { _, newVal in
             // C3: 若有外部回调，优先使用外部 modal（关闭内部 sheet 再调用）
@@ -1268,13 +1265,11 @@ struct ArkCrewIDCardView: View {
         }
         .sheet(isPresented: $showCareSheet) {
             CareTrackingDetailSheet(pet: pet)
-                .presentationDetents([.large]) // ui-v4: allow long care detail sheet
-                .presentationDragIndicator(.visible)
+                .ohanaSheetPagePresentation() // ui-v4: allow long care detail sheet
         }
         .sheet(isPresented: $showFoodSheet) {
             NavigationStack { PetFoodManagementView(pet: pet) }
-                .presentationDetents([.large]) // ui-v4: allow long food management sheet
-                .presentationDragIndicator(.visible)
+                .ohanaSheetPagePresentation() // ui-v4: allow long food management sheet
         }
     }
 

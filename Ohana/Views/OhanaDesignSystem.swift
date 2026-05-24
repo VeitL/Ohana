@@ -23,6 +23,14 @@ enum GoMotion {
     static let selection: Animation = .interactiveSpring(response: 0.32, dampingFraction: 0.88, blendDuration: 0.16)
     static let stateChange: Animation = .interactiveSpring(response: 0.38, dampingFraction: 0.90, blendDuration: 0.18)
     static let sheet: Animation = .interactiveSpring(response: 0.40, dampingFraction: 0.88, blendDuration: 0.22)
+    static let heroExpand: Animation = .interactiveSpring(response: 0.62, dampingFraction: 0.91, blendDuration: 0.18)
+    static let heroCollapse: Animation = .interactiveSpring(response: 0.54, dampingFraction: 0.94, blendDuration: 0.14)
+    static let heroAvatarParallax: Animation = .interactiveSpring(response: 0.50, dampingFraction: 0.84, blendDuration: 0.12)
+    static let sheetEnter: Animation = .interactiveSpring(response: 0.40, dampingFraction: 0.88, blendDuration: 0.22)
+    static let rewardPop: Animation = .interactiveSpring(response: 0.30, dampingFraction: 0.72, blendDuration: 0.12)
+    static let zStackHero: Animation = .interactiveSpring(response: 0.62, dampingFraction: 0.92, blendDuration: 0.18)
+    static let zStackMenu: Animation = .interactiveSpring(response: 0.34, dampingFraction: 0.78, blendDuration: 0.16)
+    static let zStackPopup: Animation = .interactiveSpring(response: 0.40, dampingFraction: 0.88, blendDuration: 0.20)
 
     static func staggerDelay(_ index: Int, step: Double = 0.035, maxDelay: Double = 0.24) -> Double {
         min(Double(max(index, 0)) * step, maxDelay)
@@ -35,19 +43,32 @@ struct CoconutBalanceCapsule: View {
     @State private var previousCount: Int
     @State private var pulse = false
     @State private var floatingDelta: Int? = nil
+    @State private var floatingDeltaProgress: CGFloat = 1
+    @State private var floatingDeltaToken = 0
     private let balanceOverride: Int?
     private let showsDeltaAnimation: Bool
+    private let deltaAnimationContext: String
     let onTap: () -> Void
 
-    init(balance: Int? = nil, showsDeltaAnimation: Bool? = nil, onTap: @escaping () -> Void = {}) {
+    init(
+        balance: Int? = nil,
+        showsDeltaAnimation: Bool? = nil,
+        deltaAnimationContext: String? = nil,
+        onTap: @escaping () -> Void = {}
+    ) {
         self.balanceOverride = balance
-        self.showsDeltaAnimation = showsDeltaAnimation ?? (balance == nil)
+        self.showsDeltaAnimation = showsDeltaAnimation ?? true
+        self.deltaAnimationContext = deltaAnimationContext ?? "global"
         self.onTap = onTap
         _previousCount = State(initialValue: balance ?? QuestManager.shared.coconutCount)
     }
 
     private var visibleCount: Int {
         balanceOverride ?? questManager.coconutCount
+    }
+
+    private var deltaState: CoconutBalanceDeltaState {
+        CoconutBalanceDeltaState(count: visibleCount, context: deltaAnimationContext)
     }
 
     private var capsuleCore: some View {
@@ -63,21 +84,40 @@ struct CoconutBalanceCapsule: View {
         .fixedSize(horizontal: true, vertical: false)
         .background(Color.goPrimary, in: Capsule())
         .scaleEffect(pulse ? 1.12 : 1.0)
-        .overlay(alignment: .topTrailing) {
-            if let delta = floatingDelta, delta > 0 {
-                Text("+\(delta)")
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(Color.goLime)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.arkInk.opacity(0.82), in: Capsule())
-                    .offset(x: 8, y: -18)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+        .overlay(alignment: .bottom) {
+            if let delta = floatingDelta, delta != 0 {
+                floatingDeltaLabel(delta)
+                    .offset(y: floatingDeltaOffsetY)
+                    .scaleEffect(pulse ? 1.035 : 1)
+                    .opacity(floatingDeltaOpacity)
                     .allowsHitTesting(false)
             }
         }
         .animation(GoMotion.feedback, value: pulse)
-        .animation(GoMotion.feedback, value: floatingDelta)
+    }
+
+    private var floatingDeltaOffsetY: CGFloat {
+        let eased = floatingDeltaEase(floatingDeltaProgress)
+        return 18 + (-22 - 18) * eased
+    }
+
+    private var floatingDeltaOpacity: Double {
+        let eased = floatingDeltaEase(floatingDeltaProgress)
+        return Double(max(0, 1 - eased))
+    }
+
+    private func floatingDeltaLabel(_ delta: Int) -> some View {
+        let tint = delta > 0 ? Color.goLime : Color.goRed
+        return HStack(alignment: .firstTextBaseline, spacing: 2) {
+            Text(delta > 0 ? "+\(delta)" : "\(delta)")
+                .font(.system(size: 13, weight: .black, design: .rounded))
+                .monospacedDigit()
+                .contentTransition(.numericText())
+            Text("🥥")
+                .font(.system(size: 11))
+        }
+        .foregroundStyle(tint)
+        .shadow(color: tint.opacity(0.18), radius: 8, x: 0, y: 4) // ui-v4: allow minimal floating balance delta
     }
 
     var body: some View {
@@ -88,32 +128,67 @@ struct CoconutBalanceCapsule: View {
         .onAppear {
             previousCount = visibleCount
         }
-        .onChange(of: visibleCount) { oldValue, newValue in
-            let baseline = max(previousCount, oldValue)
-            let delta = newValue - baseline
-            previousCount = newValue
-            guard showsDeltaAnimation, delta > 0 else {
-                floatingDelta = nil
-                pulse = false
+        .onChange(of: deltaState) { oldValue, newValue in
+            let delta = newValue.count - oldValue.count
+            previousCount = newValue.count
+            guard showsDeltaAnimation, oldValue.context == newValue.context, delta != 0 else {
+                resetFloatingDelta()
                 return
             }
-            floatingDelta = delta
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            withAnimation(GoMotion.feedback) {
-                pulse = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-                withAnimation(GoMotion.feedback) {
-                    pulse = false
-                }
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.05) {
-                withAnimation(GoMotion.quick) {
-                    floatingDelta = nil
-                }
-            }
+            showFloatingDelta(delta)
         }
     }
+
+    private func showFloatingDelta(_ delta: Int) {
+        let isInFlight = floatingDelta != nil && floatingDeltaProgress < 1
+        let nextDelta = (isInFlight ? (floatingDelta ?? 0) : 0) + delta
+        floatingDelta = nextDelta == 0 ? delta : nextDelta
+        floatingDeltaToken += 1
+        let token = floatingDeltaToken
+
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            floatingDeltaProgress = 0
+        }
+        withAnimation(GoMotion.feedback) {
+            pulse = true
+        }
+        withAnimation(.easeOut(duration: 1.12)) { // ui-v4: allow one-shot floating balance delta drift
+            floatingDeltaProgress = 1
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+            guard token == floatingDeltaToken else { return }
+            withAnimation(GoMotion.feedback) {
+                pulse = false
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.16) {
+            guard token == floatingDeltaToken else { return }
+            resetFloatingDelta()
+        }
+    }
+
+    private func resetFloatingDelta() {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            floatingDelta = nil
+            pulse = false
+            floatingDeltaProgress = 1
+        }
+    }
+
+    private func floatingDeltaEase(_ value: CGFloat) -> CGFloat {
+        let x = min(max(value, 0), 1)
+        return 1 - pow(1 - x, 3)
+    }
+}
+
+private struct CoconutBalanceDeltaState: Equatable {
+    let count: Int
+    let context: String
 }
 
 // MARK: - Screen Compat（优先 UIWindowScene，避免直接读 UIScreen.main）
@@ -516,36 +591,136 @@ struct GoBottomTabBar: View {
 }
 
 // MARK: - Ohana Sheet Wrapper
+struct OhanaSheetPageScaffold<Leading: View, Trailing: View, Content: View, Floating: View>: View {
+    let title: String
+    var subtitle: String? = nil
+    var showsCloseButton: Bool = true
+    let onClose: () -> Void
+    @ViewBuilder let leading: () -> Leading
+    @ViewBuilder let trailing: () -> Trailing
+    @ViewBuilder let content: () -> Content
+    @ViewBuilder let floating: () -> Floating
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            OhanaAppBackground()
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                fixedHeader
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, 10)
+                    .zIndex(2)
+
+                ScrollView(showsIndicators: false) {
+                    content()
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .padding(.bottom, 128)
+                }
+                .scrollBounceBehavior(.always, axes: .vertical)
+                .scrollDismissesKeyboard(.interactively)
+            }
+
+            floating()
+                .padding(.trailing, 18)
+                .padding(.bottom, 24)
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var fixedHeader: some View {
+        HStack(spacing: 12) {
+            leading()
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(OhanaFont.title2(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+
+                if let subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+            }
+
+            Spacer(minLength: 8)
+            trailing()
+
+            if showsCloseButton {
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 15, weight: .black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(L10n(AppLanguage.code).tr(zh: "关闭", en: "Close", de: "Schließen"))
+            }
+        }
+    }
+}
+
 struct OhanaSheetWrapper<Content: View>: View {
     let title: String
     let onDismiss: () -> Void
     @ViewBuilder let content: () -> Content
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                OhanaAppBackground()
-                ScrollView {
-                    content()
-                        .padding(.horizontal, 16)
-                }
-            }
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { onDismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(OhanaFont.callout(.black))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .frame(width: 38, height: 34)
-                            .background(Color.ohanaControlFill, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                }
-            }
+        OhanaSheetPageScaffold(
+            title: title,
+            onClose: onDismiss,
+            leading: { EmptyView() },
+            trailing: { EmptyView() },
+            content: {
+                content()
+            },
+            floating: { EmptyView() }
+        )
+        .presentationBackground {
+            Color.clear
         }
-        .presentationBackground(Color.ohanaCardSurface)
+    }
+}
+
+extension View {
+    /// Standard presentation chrome for long Ohana sheet pages.
+    ///
+    /// The page content itself should use `OhanaSheetPageScaffold` (fixed title/close
+    /// chrome, hidden navigation bar, elastic vertical content). This modifier keeps
+    /// the host sheet behavior consistent across entry points.
+    func ohanaSheetPagePresentation(
+        detents: Set<PresentationDetent> = [.large],
+        cornerRadius: CGFloat = 36
+    ) -> some View {
+        self
+            .presentationDetents(detents)
+            .presentationDragIndicator(.hidden)
+            .presentationCornerRadius(cornerRadius)
+            .presentationBackground(Color.clear)
+            .presentationContentInteraction(.scrolls)
+    }
+
+    /// Standard presentation chrome for compact account/security pickers that are
+    /// still system sheets rather than inline popups.
+    func ohanaCompactSheetPresentation(
+        detents: Set<PresentationDetent>,
+        cornerRadius: CGFloat = 32
+    ) -> some View {
+        self
+            .presentationDetents(detents)
+            .presentationDragIndicator(.hidden)
+            .presentationCornerRadius(cornerRadius)
+            .presentationBackground(Color.clear)
     }
 }
 
@@ -882,6 +1057,7 @@ public extension View {
 
 public struct OhanaPopupGlassSurface: View {
     var cornerRadius: CGFloat = 34
+    @Environment(\.colorScheme) private var colorScheme
 
     public init(cornerRadius: CGFloat = 34) {
         self.cornerRadius = cornerRadius
@@ -889,9 +1065,43 @@ public struct OhanaPopupGlassSurface: View {
 
     public var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        shape
-            .fill(.clear)
-            .glassEffect(.regular.interactive(false), in: shape)
+        ZStack {
+            shape
+                .fill(.clear)
+                .glassEffect(.regular.interactive(false), in: shape)
+
+            shape
+                .fill(Color.ohanaPopupSurfaceFill)
+                .allowsHitTesting(false)
+
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(colorScheme == .dark ? 0.12 : 0.20), // ui-v4: allow native glass sheen
+                    Color.clear,
+                    Color.black.opacity(colorScheme == .dark ? 0.08 : 0.03) // ui-v4: allow native glass depth tint
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .clipShape(shape)
+            .allowsHitTesting(false)
+
+            shape
+                .strokeBorder(Color.ohanaPopupSurfaceStroke, lineWidth: colorScheme == .dark ? 1.15 : 0.8)
+                .allowsHitTesting(false)
+
+            shape
+                .strokeBorder(Color.ohanaPopupSurfaceHighlight, lineWidth: 1)
+                .blendMode(.screen)
+                .mask(
+                    LinearGradient(
+                        colors: [.white, .white.opacity(0.28), .clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .allowsHitTesting(false)
+        }
     }
 }
 

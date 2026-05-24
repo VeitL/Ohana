@@ -21,7 +21,8 @@ struct SettingsView: View {
     @AppStorage(AppCurrency.storageKey) private var appCurrency = AppCurrency.fallbackCode
     @AppStorage("appThemePreference") private var appThemePreference: String = "dark"
     @AppStorage("appBackgroundStyle") private var appBackgroundStyle: String = AppBackgroundStyle.goIsland.rawValue
-    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @AppStorage(OhanaHomeStyle.storageKey) private var homeStyleRaw = OhanaHomeStyle.defaultStyle.rawValue
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
     @State private var showingClearDataAlert = false
     @State private var showingDeletePetSheet = false
@@ -78,6 +79,9 @@ struct SettingsView: View {
     }
     private var selectedCurrency: AppCurrency.Option {
         AppCurrency.supported.first { $0.code == AppCurrency.normalize(appCurrency) } ?? AppCurrency.supported[0]
+    }
+    private var selectedHomeStyle: OhanaHomeStyle {
+        OhanaHomeStyle(rawValue: homeStyleRaw) ?? OhanaHomeStyle.defaultStyle
     }
 
     var body: some View {
@@ -231,6 +235,10 @@ struct SettingsView: View {
                             ) {
                                 showingBackgroundPicker = true
                             }
+
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+
+                            homeStylePickerRow
 
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
                             performanceToggleRow
@@ -424,6 +432,54 @@ struct SettingsView: View {
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
 
                             NavigationLink {
+                                WalletMotionLabView()
+                            } label: {
+                                HStack(spacing: 12) {
+                                    settingsIcon("creditcard.fill", color: Color.goPrimary)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(l.tr(zh: "Apple Wallet 动效实验室", en: "Apple Wallet motion lab", de: "Apple-Wallet-Bewegungslabor"))
+                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                            .foregroundStyle(primaryText)
+                                        Text(l.tr(zh: "卡片堆、抽出、收回与调试", en: "Stack, hero, collapse, and debug", de: "Stapel, Hero, Zurück und Debug"))
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(tertiaryText)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(tertiaryText.opacity(0.6))
+                                }
+                                .frame(minHeight: 44)
+                            }
+                            .buttonStyle(ScaleButtonStyle())
+
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+
+                            NavigationLink {
+                                VerticalGlassHomeLabView()
+                            } label: {
+                                HStack(spacing: 12) {
+                                    settingsIcon("rectangle.portrait.on.rectangle.portrait", color: Color.goPrimary)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(l.tr(zh: "竖版实色首页实验室", en: "Solid portrait home lab", de: "Solides Hochformat-Home-Labor"))
+                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                            .foregroundStyle(primaryText)
+                                        Text(l.tr(zh: "底部导航、竖卡片、内嵌快捷操作", en: "Bottom nav, portrait cards, embedded actions", de: "Untere Navigation, Hochformatkarten, Aktionen"))
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(tertiaryText)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(tertiaryText.opacity(0.6))
+                                }
+                                .frame(minHeight: 44)
+                            }
+                            .buttonStyle(ScaleButtonStyle())
+
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+
+                            NavigationLink {
                                 CoconutBalanceTestView()
                             } label: {
                                 HStack(spacing: 12) {
@@ -554,21 +610,18 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingAccountSwitcher) {
             HumanAccountSwitcherSheet()
-                .presentationBackground(.clear)
+                .ohanaCompactSheetPresentation(detents: [.medium, .large])
         }
         .sheet(isPresented: $showingBackgroundPicker) {
             AppBackgroundPickerSheet()
-                .presentationDetents([.large]) // ui-v4: allow background picker is a long visual chooser
-                .presentationBackground(.clear)
+                .ohanaSheetPagePresentation() // ui-v4: allow background picker is a long visual chooser
         }
         .sheet(item: $quickSwitchHuman) { human in
             HumanQuickSwitchPasscodeSheet(human: human) {
                 currentActiveHumanId = human.id.uuidString
                 quickSwitchHuman = nil
             }
-            .presentationDetents([.height(420)])
-            .presentationBackground(.clear)
-            .presentationDragIndicator(.visible)
+            .ohanaCompactSheetPresentation(detents: [.height(420)])
         }
     }
     
@@ -907,14 +960,53 @@ struct SettingsView: View {
         .buttonStyle(ScaleButtonStyle())
     }
 
+    private var homeStylePickerRow: some View {
+        HStack(spacing: 12) {
+            settingsIcon("rectangle.stack.fill", color: Color.goPrimary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(l.tr(zh: "首页样式", en: "Home style", de: "Startseitenstil"))
+                    .font(OhanaFont.body(.semibold))
+                    .foregroundStyle(primaryText)
+                Text(selectedHomeStyle.subtitle(l))
+                    .font(OhanaFont.caption2(.semibold))
+                    .foregroundStyle(tertiaryText)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            Menu {
+                ForEach(OhanaHomeStyle.allCases) { style in
+                    Button {
+                        homeStyleRaw = style.rawValue
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        Label(
+                            style.title(l),
+                            systemImage: style == selectedHomeStyle ? "checkmark" : "rectangle.stack"
+                        )
+                    }
+                }
+            } label: {
+                menuValueLabel(selectedHomeStyle.title(l))
+            }
+        }
+        .foregroundStyle(primaryText)
+        .frame(minHeight: 52)
+        .animation(GoMotion.feedback, value: homeStyleRaw)
+    }
+
     private var performanceToggleRow: some View {
         HStack(spacing: 12) {
             settingsIcon("battery.75percent", color: Color.goPrimary)
             VStack(alignment: .leading, spacing: 2) {
-                Text("省电模式")
+                Text(l.tr(zh: "省电模式", en: "Power Saving", de: "Energiesparen"))
                     .font(OhanaFont.body(.semibold))
                     .foregroundStyle(primaryText)
-                Text("减少动效")
+                Text(l.tr(
+                    zh: "减少后台刷新和装饰动效",
+                    en: "Reduces background refresh and decorative motion",
+                    de: "Reduziert Hintergrundaktualisierung und Deko-Bewegung"
+                ))
                     .font(OhanaFont.footnote())
                     .foregroundStyle(tertiaryText)
             }
@@ -925,6 +1017,9 @@ struct SettingsView: View {
         }
         .frame(minHeight: 44)
         .animation(GoMotion.feedback, value: powerSavingMode)
+        .onChange(of: powerSavingMode) { _, _ in
+            AppWorkloadPolicy.shared.refresh(reason: "settingsPowerSavingChanged")
+        }
     }
 
     private func notificationToggleRow(icon: String, iconColor: Color, title: String, key: String) -> some View {

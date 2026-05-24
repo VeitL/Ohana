@@ -46,7 +46,7 @@ struct ProtectionInsurancePopup: View {
 
     var body: some View {
         GeometryReader { proxy in
-            ZStack(alignment: .bottom) {
+            OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: visible) {
                 LinearGradient(
                     colors: [Color.black.opacity(0.08), Color.black.opacity(0.34)], // ui-v4: allow popup scrimGradient
                     startPoint: .top,
@@ -121,7 +121,6 @@ struct ProtectionInsurancePopup: View {
                 .padding(.bottom, max(8, proxy.safeAreaInsets.bottom + 2))
                 .offset(y: visible ? dragOffset : hiddenOffset)
             }
-            .animation(animation, value: visible)
             .animation(animation, value: dragOffset)
         }
         .onAppear {

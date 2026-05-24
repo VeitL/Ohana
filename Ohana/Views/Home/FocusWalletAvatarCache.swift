@@ -38,6 +38,21 @@ enum FocusWalletAvatarCache {
         return entry
     }
 
+    static func frozenEntry(for cardId: UUID, data: Data?) -> Entry {
+        guard let data else {
+            return Entry(image: nil, isTransparent: false, signature: "", isFinal: true)
+        }
+
+        let signature = signature(for: data)
+        if let cached = entries[cardId], cached.signature == signature, cached.image != nil {
+            return cached
+        }
+
+        let entry = decodedEntry(from: data, signature: signature)
+        entries[cardId] = entry
+        return entry
+    }
+
     @discardableResult
     static func preload(payloads: [Payload]) async -> Bool {
         var didChange = false

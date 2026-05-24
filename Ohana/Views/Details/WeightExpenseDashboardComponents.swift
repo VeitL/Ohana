@@ -259,56 +259,31 @@ struct PetWeightDashboardContent: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            OhanaAppBackground().ignoresSafeArea()
-
-            ScrollView(showsIndicators: false) {
+        OhanaSheetPageScaffold(
+            title: l.tr(zh: "体重趋势", en: "Weight Trend", de: "Gewicht"),
+            subtitle: pet.name,
+            showsCloseButton: showsCloseButton,
+            onClose: onClose,
+            leading: {
+                FeatureHubAvatar(
+                    imageData: pet.avatarImageData,
+                    emoji: pet.avatarEmoji,
+                    fallback: pet.speciesEmoji,
+                    tint: Color(hex: pet.safeThemeColorHex)
+                )
+            },
+            trailing: { EmptyView() },
+            content: {
                 VStack(alignment: .leading, spacing: 16) {
-                    header
                     metrics
                     chartBlock
                     historyBlock
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 18)
-                .padding(.bottom, 110)
+            },
+            floating: {
+                addButton
             }
-
-            addButton
-                .padding(.trailing, 18)
-                .padding(.bottom, 24)
-        }
-        .toolbar(.hidden, for: .navigationBar)
-    }
-
-    private var header: some View {
-        HStack(spacing: 12) {
-            FeatureHubAvatar(
-                imageData: pet.avatarImageData,
-                emoji: pet.avatarEmoji,
-                fallback: pet.speciesEmoji,
-                tint: Color(hex: pet.safeThemeColorHex)
-            )
-            VStack(alignment: .leading, spacing: 3) {
-                Text(l.tr(zh: "体重趋势", en: "Weight Trend", de: "Gewicht"))
-                    .font(OhanaFont.title2(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(pet.name)
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
-            Spacer()
-            if showsCloseButton {
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-            }
-        }
+        )
     }
 
     private var metrics: some View {
@@ -481,47 +456,46 @@ struct HumanWeightDashboardContent: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            OhanaAppBackground().ignoresSafeArea()
-
-            if isPrivacyLocked {
-                HumanModulePrivacyLockedView(
-                    title: l.tr(zh: "体重记录仅本人可见", en: "Weight is private", de: "Gewicht ist privat"),
-                    message: l.tr(zh: "请切换到本人账户后查看。", en: "Switch to this account to view it.", de: "Wechsle zu diesem Konto, um es zu sehen.")
+        OhanaSheetPageScaffold(
+            title: l.tr(zh: "体重趋势", en: "Weight Trend", de: "Gewicht"),
+            subtitle: human.name,
+            onClose: onClose,
+            leading: {
+                FeatureHubAvatar(
+                    imageData: human.avatarImageData,
+                    emoji: human.avatarEmoji,
+                    fallback: "👤",
+                    tint: Color(hex: human.safeThemeColorHex)
                 )
-            } else {
-                ScrollView(showsIndicators: false) {
+            },
+            trailing: {
+                if isViewingOwnProfile {
+                    HumanPrivacyToggleButton(human: human, field: .weight)
+                }
+            },
+            content: {
+                if isPrivacyLocked {
+                    HumanModulePrivacyLockedView(
+                        title: l.tr(zh: "体重记录仅本人可见", en: "Weight is private", de: "Gewicht ist privat"),
+                        message: l.tr(zh: "请切换到本人账户后查看。", en: "Switch to this account to view it.", de: "Wechsle zu diesem Konto, um es zu sehen.")
+                    )
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 80)
+                } else {
                     VStack(alignment: .leading, spacing: 16) {
-                        header
                         HumanPrivateDataNotice(human: human, field: .weight)
                         metrics
                         chartBlock
                         historyBlock
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 18)
-                    .padding(.bottom, 110)
                 }
-
-                addButton
-                    .padding(.trailing, 18)
-                    .padding(.bottom, 24)
+            },
+            floating: {
+                if !isPrivacyLocked {
+                    addButton
+                }
             }
-        }
-        .toolbar(.hidden, for: .navigationBar)
-    }
-
-    private var header: some View {
-        HumanModulePageHeader(
-            human: human,
-            title: l.tr(zh: "体重趋势", en: "Weight Trend", de: "Gewicht"),
-            subtitle: human.name,
-            onClose: onClose
-        ) {
-            if isViewingOwnProfile {
-                HumanPrivacyToggleButton(human: human, field: .weight)
-            }
-        }
+        )
     }
 
     private var metrics: some View {
@@ -669,49 +643,32 @@ struct PetExpenseDashboardContent: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            OhanaAppBackground().ignoresSafeArea()
-            ScrollView(showsIndicators: false) {
+        OhanaSheetPageScaffold(
+            title: l.tr(zh: "花费记录", en: "Expenses", de: "Kosten"),
+            subtitle: pet.name,
+            showsCloseButton: showsCloseButton,
+            onClose: onClose,
+            leading: {
+                FeatureHubAvatar(
+                    imageData: pet.avatarImageData,
+                    emoji: pet.avatarEmoji,
+                    fallback: pet.speciesEmoji,
+                    tint: Color(hex: pet.safeThemeColorHex)
+                )
+            },
+            trailing: { EmptyView() },
+            content: {
                 VStack(alignment: .leading, spacing: 16) {
-                    header
                     metrics
                     chartBlock
                     categoryStrip
                     historyBlock
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 18)
-                .padding(.bottom, 110)
+            },
+            floating: {
+                addButton
             }
-            addButton
-                .padding(.trailing, 18)
-                .padding(.bottom, 24)
-        }
-        .toolbar(.hidden, for: .navigationBar)
-    }
-
-    private var header: some View {
-        HStack(spacing: 12) {
-            FeatureHubAvatar(imageData: pet.avatarImageData, emoji: pet.avatarEmoji, fallback: pet.speciesEmoji, tint: Color(hex: pet.safeThemeColorHex))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(l.tr(zh: "花费记录", en: "Expenses", de: "Kosten"))
-                    .font(OhanaFont.title2(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(pet.name)
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
-            Spacer()
-            if showsCloseButton {
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(ScaleButtonStyle())
-            }
-        }
+        )
     }
 
     private var metrics: some View {
@@ -891,46 +848,47 @@ struct HumanExpenseDashboardContent: View {
     private var total: Double { positiveLogs.reduce(0) { $0 + $1.amount } }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            OhanaAppBackground().ignoresSafeArea()
-            if isPrivacyLocked {
-                HumanModulePrivacyLockedView(
-                    title: PrivacyService.lockedMessage(for: .expense),
-                    message: l.tr(zh: "请切换到本人档案后再查看。", en: "Switch to this account to view it.", de: "Wechsle zu diesem Konto, um es zu sehen.")
+        OhanaSheetPageScaffold(
+            title: l.tr(zh: "花费记录", en: "Expenses", de: "Kosten"),
+            subtitle: human.name,
+            onClose: onClose,
+            leading: {
+                FeatureHubAvatar(
+                    imageData: human.avatarImageData,
+                    emoji: human.avatarEmoji,
+                    fallback: "👤",
+                    tint: Color(hex: human.safeThemeColorHex)
                 )
-            } else {
-                ScrollView(showsIndicators: false) {
+            },
+            trailing: {
+                if isViewingOwnProfile {
+                    HumanPrivacyToggleButton(human: human, field: .expense)
+                }
+            },
+            content: {
+                if isPrivacyLocked {
+                    HumanModulePrivacyLockedView(
+                        title: PrivacyService.lockedMessage(for: .expense),
+                        message: l.tr(zh: "请切换到本人档案后再查看。", en: "Switch to this account to view it.", de: "Wechsle zu diesem Konto, um es zu sehen.")
+                    )
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 80)
+                } else {
                     VStack(alignment: .leading, spacing: 16) {
-                        header
                         HumanPrivateDataNotice(human: human, field: .expense)
                         metrics
                         chartBlock
                         categoryStrip
                         historyBlock
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 18)
-                    .padding(.bottom, 110)
                 }
-                addButton
-                    .padding(.trailing, 18)
-                    .padding(.bottom, 24)
+            },
+            floating: {
+                if !isPrivacyLocked {
+                    addButton
+                }
             }
-        }
-        .toolbar(.hidden, for: .navigationBar)
-    }
-
-    private var header: some View {
-        HumanModulePageHeader(
-            human: human,
-            title: l.tr(zh: "花费记录", en: "Expenses", de: "Kosten"),
-            subtitle: human.name,
-            onClose: onClose
-        ) {
-            if isViewingOwnProfile {
-                HumanPrivacyToggleButton(human: human, field: .expense)
-            }
-        }
+        )
     }
 
     private var metrics: some View {

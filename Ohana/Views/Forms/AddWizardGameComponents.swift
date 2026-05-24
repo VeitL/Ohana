@@ -13,6 +13,61 @@ struct AddWizardStageItem: Identifiable, Equatable {
     let systemImage: String
 }
 
+struct AddWizardThreePanelLayout<Preview: View, Content: View, Footer: View>: View {
+    var previewPanelHeight: CGFloat = 204
+    var footerPanelHeight: CGFloat = 66
+    var topInsetFallback: CGFloat = 50
+    var bottomInsetFallback: CGFloat = 12
+    @ViewBuilder var preview: () -> Preview
+    @ViewBuilder var content: () -> Content
+    @ViewBuilder var footer: () -> Footer
+
+    init(
+        previewPanelHeight: CGFloat = 204,
+        footerPanelHeight: CGFloat = 66,
+        topInsetFallback: CGFloat = 50,
+        bottomInsetFallback: CGFloat = 12,
+        @ViewBuilder preview: @escaping () -> Preview,
+        @ViewBuilder content: @escaping () -> Content,
+        @ViewBuilder footer: @escaping () -> Footer
+    ) {
+        self.previewPanelHeight = previewPanelHeight
+        self.footerPanelHeight = footerPanelHeight
+        self.topInsetFallback = topInsetFallback
+        self.bottomInsetFallback = bottomInsetFallback
+        self.preview = preview
+        self.content = content
+        self.footer = footer
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let topInset = max(geo.safeAreaInsets.top, topInsetFallback)
+            let bottomInset = max(geo.safeAreaInsets.bottom, bottomInsetFallback)
+            let usableHeight = max(0, geo.size.height - topInset - bottomInset)
+            let previewHeight = min(previewPanelHeight, max(188, usableHeight * 0.42))
+            let footerHeight = min(footerPanelHeight, max(58, usableHeight * 0.12))
+            let contentHeight = max(0, usableHeight - previewHeight - footerHeight)
+
+            VStack(spacing: 0) {
+                preview()
+                    .frame(height: previewHeight, alignment: .top)
+
+                content()
+                    .frame(height: contentHeight)
+
+                footer()
+                    .frame(height: footerHeight, alignment: .center)
+            }
+            .frame(width: geo.size.width, height: usableHeight, alignment: .top)
+            .padding(.top, topInset)
+            .padding(.bottom, bottomInset)
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
+        }
+        .ignoresSafeArea(.keyboard)
+    }
+}
+
 struct AddWizardStageProgress: View {
     let stages: [AddWizardStageItem]
     let currentIndex: Int
@@ -140,6 +195,58 @@ struct AddWizardThemeMatrixCell<Fill: ShapeStyle>: View {
 
 }
 
+enum AddWizardPlainAvatarPlaceholderKind {
+    case human
+    case pet(symbol: String)
+}
+
+struct AddWizardPlainAvatarPlaceholder: View {
+    let kind: AddWizardPlainAvatarPlaceholderKind
+    var tint: Color = Color.goPrimary
+
+    var body: some View {
+        GeometryReader { geo in
+            let side = min(geo.size.width, geo.size.height)
+
+            ZStack {
+                Circle()
+                    .fill(tint.opacity(0.16))
+                    .frame(width: side * 0.74, height: side * 0.74)
+                    .offset(x: -side * 0.08, y: -side * 0.06)
+                Circle()
+                    .fill(Color.ohanaCardSurface)
+                    .frame(width: side * 0.58, height: side * 0.58)
+                    .offset(x: side * 0.14, y: side * 0.12)
+                Circle()
+                    .strokeBorder(tint.opacity(0.42), lineWidth: max(1, side * 0.018))
+                    .frame(width: side * 0.78, height: side * 0.78)
+
+                Image(systemName: symbolName)
+                    .font(.system(size: side * 0.34, weight: .black, design: .rounded))
+                    .symbolRenderingMode(.monochrome)
+                    .foregroundStyle(tint)
+
+                RoundedRectangle(cornerRadius: side * 0.03, style: .continuous)
+                    .fill(Color.ohanaSecondaryText.opacity(0.18))
+                    .frame(width: side * 0.34, height: side * 0.035)
+                    .offset(y: side * 0.37)
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .accessibilityHidden(true)
+    }
+
+    private var symbolName: String {
+        switch kind {
+        case .human:
+            return "person.crop.circle"
+        case .pet(let symbol):
+            return symbol
+        }
+    }
+}
+
 enum AddWizardThemePalette {
     static let gridColumnCount = 10
 
@@ -171,22 +278,26 @@ enum AddWizardThemeMatrixContrast {
 struct AddWizardPagedCardCarousel: View {
     @Binding var pageIndex: Int
     @Binding var pageDirection: Int
+    private var isDragging: Binding<Bool>?
     let pageCount: Int
     var spacing: CGFloat = 12
     var page: (Int) -> AnyView
 
-    @GestureState private var dragOffset: CGFloat = 0
+    @State private var dragOffset: CGFloat = 0
+    @State private var isHorizontalDragActive = false
     private let settleAnimation = Animation.interactiveSpring(response: 0.42, dampingFraction: 0.88, blendDuration: 0.12)
 
     init(
         pageIndex: Binding<Int>,
         pageDirection: Binding<Int>,
+        isDragging: Binding<Bool>? = nil,
         pageCount: Int,
         spacing: CGFloat = 12,
         page: @escaping (Int) -> AnyView
     ) {
         self._pageIndex = pageIndex
         self._pageDirection = pageDirection
+        self.isDragging = isDragging
         self.pageCount = pageCount
         self.spacing = spacing
         self.page = page
@@ -197,72 +308,55 @@ struct AddWizardPagedCardCarousel: View {
             let pageWidth = geo.size.width
             let step = pageWidth + spacing
             let displayedDrag = rubberBanded(dragOffset)
-            let visualPage = CGFloat(pageIndex) - displayedDrag / max(step, 1)
-
             HStack(spacing: spacing) {
                 ForEach(0..<pageCount, id: \.self) { index in
                     page(index)
+                        .allowsHitTesting(!isHorizontalDragActive)
                         .frame(width: pageWidth, height: geo.size.height)
-                        .scaleEffect(scale(for: index, visualPage: visualPage), anchor: .top)
-                        .opacity(opacity(for: index, visualPage: visualPage))
                         .shadow( // ui-v4: allow wizard card depth during direct manipulation
-                            color: Color.black.opacity(shadowOpacity(for: index, visualPage: visualPage)), // ui-v4: allow physical card shadow
-                            radius: shadowRadius(for: index, visualPage: visualPage),
-                            y: shadowY(for: index, visualPage: visualPage)
+                            color: Color.black.opacity(0.12), // ui-v4: allow physical card shadow
+                            radius: 14,
+                            y: 7
                         )
                 }
             }
             .offset(x: -CGFloat(pageIndex) * step + displayedDrag)
             .contentShape(Rectangle())
-            .simultaneousGesture(pageSwipeGesture(width: pageWidth))
-            .animation(settleAnimation, value: pageIndex)
+            .highPriorityGesture(pageSwipeGesture(width: pageWidth), including: .gesture)
         }
         .clipped()
     }
 
-    private func scale(for index: Int, visualPage: CGFloat) -> CGFloat {
-        let distance = min(abs(CGFloat(index) - visualPage), 1.6)
-        return 1 - distance * 0.035
-    }
-
-    private func opacity(for index: Int, visualPage: CGFloat) -> Double {
-        let distance = min(abs(CGFloat(index) - visualPage), 1.4)
-        return 1 - Double(distance) * 0.14
-    }
-
-    private func shadowOpacity(for index: Int, visualPage: CGFloat) -> Double {
-        let distance = min(abs(CGFloat(index) - visualPage), 1)
-        return 0.14 - Double(distance) * 0.06
-    }
-
-    private func shadowRadius(for index: Int, visualPage: CGFloat) -> CGFloat {
-        let distance = min(abs(CGFloat(index) - visualPage), 1)
-        return 16 - distance * 5
-    }
-
-    private func shadowY(for index: Int, visualPage: CGFloat) -> CGFloat {
-        let distance = min(abs(CGFloat(index) - visualPage), 1)
-        return 8 - distance * 3
-    }
-
     private func pageSwipeGesture(width: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 6, coordinateSpace: .local)
-            .updating($dragOffset) { value, state, _ in
-                guard isHorizontalIntent(value) else { return }
-                state = value.translation.width
+            .onChanged { value in
+                guard isHorizontalDragActive || isHorizontalIntent(value) else { return }
+                isHorizontalDragActive = true
+                isDragging?.wrappedValue = true
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    dragOffset = value.translation.width
+                }
             }
             .onEnded { value in
-                guard isHorizontalIntent(value) else { return }
+                defer {
+                    isHorizontalDragActive = false
+                    isDragging?.wrappedValue = false
+                }
+                guard isHorizontalDragActive || isHorizontalIntent(value) else {
+                    withAnimation(settleAnimation) { dragOffset = 0 }
+                    return
+                }
                 let projected = abs(value.predictedEndTranslation.width) > abs(value.translation.width)
                     ? value.predictedEndTranslation.width
                     : value.translation.width
                 let threshold = max(78, width * 0.22)
-                guard abs(projected) > threshold else { return }
-                if projected < 0 {
-                    movePage(by: 1)
-                } else {
-                    movePage(by: -1)
+                guard abs(projected) > threshold else {
+                    withAnimation(settleAnimation) { dragOffset = 0 }
+                    return
                 }
+                movePage(by: projected < 0 ? 1 : -1)
             }
     }
 
@@ -282,12 +376,16 @@ struct AddWizardPagedCardCarousel: View {
 
     private func movePage(by delta: Int) {
         let next = min(max(pageIndex + delta, 0), pageCount - 1)
-        guard next != pageIndex else { return }
+        guard next != pageIndex else {
+            withAnimation(settleAnimation) { dragOffset = 0 }
+            return
+        }
         GoKeyboard.dismiss()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         pageDirection = delta >= 0 ? 1 : -1
         withAnimation(settleAnimation) {
             pageIndex = next
+            dragOffset = 0
         }
     }
 }
@@ -306,6 +404,32 @@ struct AddWizardStatusBadge: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .background(tint, in: Capsule())
+    }
+}
+
+struct AddWizardCardCloseButton: View {
+    @AppStorage("appLanguage") private var appLanguage = "zh"
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 14, weight: .black, design: .rounded))
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(Color.arkInk)
+                .frame(width: 44, height: 44)
+                .background(
+                    Circle()
+                        .fill(Color.goPrimary)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.goCardWhite.opacity(0.18), lineWidth: 1)
+                        )
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(L10n(appLanguage).tr(zh: "关闭", en: "Close", de: "Schließen"))
     }
 }
 

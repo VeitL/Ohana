@@ -65,7 +65,7 @@ struct WalkDetailView: View {
     }
 
     private var shouldAnimateRainbowWalkEffects: Bool {
-        (equipFxRainbow || equipFxRainbowPoop) && workloadPolicy.shouldAnimate(isVisible: true)
+        (equipFxRainbow || equipFxRainbowPoop) && workloadPolicy.ambientMotionBudget(isVisible: true).allowsMotion
     }
 
     private var walkEndDateText: String {

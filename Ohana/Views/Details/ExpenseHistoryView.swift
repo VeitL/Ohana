@@ -134,7 +134,6 @@ struct ExpenseHistoryView: View {
                     }
                 )
                 .zIndex(20)
-                .transition(.opacity)
             }
         }
         .toolbar(.hidden, for: .navigationBar)

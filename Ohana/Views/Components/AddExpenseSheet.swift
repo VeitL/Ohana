@@ -138,7 +138,7 @@ struct AddExpenseSheet: View {
             let panelHeightEstimate = min(maxPanelHeight, max(adaptiveSheetHeight, 430))
             let hiddenOffset = panelHeightEstimate + 72
 
-            ZStack(alignment: .bottom) {
+            OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: popupVisible) {
                 popupBackdrop
                     .opacity(popupVisible ? 1 : 0)
 
@@ -161,7 +161,6 @@ struct AddExpenseSheet: View {
 
                             if hasSavedMedicalExpense {
                                 claimHintCard
-                                    .transition(.move(edge: .bottom).combined(with: .opacity))
                             }
                         }
                         .padding(.bottom, 18)
@@ -173,8 +172,8 @@ struct AddExpenseSheet: View {
                 }
                 .background { OhanaPopupGlassSurface(cornerRadius: 52) }
                 .clipShape(RoundedRectangle(cornerRadius: 52, style: .continuous))
-                .shadow(color: Color.black.opacity(0.56), radius: 48, x: 0, y: -18)
-                .shadow(color: Color(hex: "0B102C").opacity(0.46), radius: 28, x: 0, y: 12)
+                .shadow(color: Color.black.opacity(0.56), radius: 48, x: 0, y: -18) // ui-v4: allow confirmed inline popup liftedAlert shadow token
+                .shadow(color: Color(hex: "0B102C").opacity(0.46), radius: 28, x: 0, y: 12) // ui-v4: allow confirmed inline popup liftedAlert shadow token
                 .padding(.horizontal, 6)
                 .padding(.bottom, 8)
                 .offset(y: popupVisible ? popupDragOffset : hiddenOffset)
@@ -187,7 +186,6 @@ struct AddExpenseSheet: View {
                 )
             }
         }
-        .transition(.opacity)
         .allowsHitTesting(popupVisible && !isClosing)
         .animation(popupAnimation, value: popupVisible)
         .presentationBackground(.clear)
@@ -219,7 +217,7 @@ struct AddExpenseSheet: View {
         .fullScreenCover(item: $previewReceipt) { receipt in
             if let image = UIImage(data: receipt.data) {
                 ZStack {
-                    Color.black.ignoresSafeArea()
+                    Color.black.ignoresSafeArea() // ui-v4: allow receipt preview full-screen black viewer
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
@@ -230,7 +228,7 @@ struct AddExpenseSheet: View {
                             Button { previewReceipt = nil } label: {
                                 Image(systemName: "xmark.circle.fill")
                                     .font(.system(size: 28, weight: .semibold))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.white) // ui-v4: allow receipt preview close control on black viewer
                                     .padding(16)
                             }
                         }
@@ -298,11 +296,11 @@ struct AddExpenseSheet: View {
 
     private var popupBackdrop: some View {
         ZStack {
-            Color.black.opacity(0.14)
+            Color.black.opacity(0.14) // ui-v4: allow inline popup scrimGradient token
             LinearGradient(
                 colors: [
                     Color.clear,
-                    Color.black.opacity(0.22)
+                    Color.black.opacity(0.22) // ui-v4: allow inline popup scrimGradient token
                 ],
                 startPoint: .top,
                 endPoint: .bottom

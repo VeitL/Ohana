@@ -15,6 +15,7 @@ struct UnifiedLogItem: Identifiable {
     let subtitle: String
     let iconName: String
     let color: Color
+    var photos: [PetPhotoLog] = []
     var style: PetTimelineItemStyle = .rail
     var isHighlight: Bool = false
 }
@@ -210,6 +211,7 @@ enum PetTimelineItemsBuilder {
                 subtitle: note,
                 iconName: hasImage ? "photo.on.rectangle.angled" : "text.quote",
                 color: .goPurple,
+                photos: group.filter { renderableImageData($0.imageData) },
                 style: .story,
                 isHighlight: true
             )

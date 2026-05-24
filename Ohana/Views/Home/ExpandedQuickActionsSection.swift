@@ -21,6 +21,8 @@ struct ExpandedPetQuickActionsSection: View {
     let isEditMode: Bool
     let jiggle: Bool
     let shouldReduceWork: Bool
+    var showsHeader: Bool = true
+    var longPressStartsEdit: Bool = false
     let showFirstSuccessPrompt: Bool
     let waterManagementLabel: String
     let onToggleEdit: () -> Void
@@ -37,11 +39,16 @@ struct ExpandedPetQuickActionsSection: View {
     let onHealthSelect: (String) -> Void
     let onLimitReached: () -> Void
     @State private var openActionId: String? = nil
+    @State private var showingAddPanel = false
     @State private var lastDropTargetId: String? = nil
 
     var body: some View {
         VStack(spacing: 8) {
-            header
+            if showsHeader {
+                header
+            } else if isEditMode {
+                compactDoneRow
+            }
 
             if showFirstSuccessPrompt && !isEditMode {
                 ExpandedFirstSuccessPrompt(
@@ -68,12 +75,14 @@ struct ExpandedPetQuickActionsSection: View {
                             isEditMode: isEditMode,
                             jiggle: jiggle,
                             shouldReduceWork: shouldReduceWork,
+                            longPressStartsEdit: longPressStartsEdit,
                             isMenuOpen: !isEditMode && openActionId == item.id,
                             waterManagementLabel: waterManagementLabel,
                             showsAttentionDot: showsAttentionDot,
                             countText: countText,
                             isCompleted: isCompleted,
                             onToggleMenu: { toggleMenu(for: item) },
+                            onStartEdit: onToggleEdit,
                             onQuick: {
                                 closeMenu()
                                 onTap(item)
@@ -91,10 +100,9 @@ struct ExpandedPetQuickActionsSection: View {
 
                     if isEditMode && QuickActionLimit.count(for: pet, in: editItems) < QuickActionLimit.maxItemsPerEntity {
                         ExpandedPetQuickAddButton(
-                            pet: pet,
-                            editItems: $editItems,
-                            onLimitReached: onLimitReached
+                            onTap: openAddPanel
                         )
+                        .zIndex(60)
                     }
                 }
                 .animation(GoMotion.selection, value: displayedOrderSignature)
@@ -105,8 +113,22 @@ struct ExpandedPetQuickActionsSection: View {
             }
         }
         .padding(.horizontal, 2)
+        .overlay(alignment: .bottom) {
+            if isEditMode && showingAddPanel {
+                ExpandedQuickAddInlinePanel(
+                    items: availableAddItems,
+                    emptyTitle: "已全部添加",
+                    onAdd: addQuickAction,
+                    onClose: closeAddPanel
+                )
+                .padding(.horizontal, 6)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(120)
+            }
+        }
         .onChange(of: isEditMode) { _, _ in
             closeMenu()
+            closeAddPanel()
             lastDropTargetId = nil
         }
     }
@@ -117,6 +139,21 @@ struct ExpandedPetQuickActionsSection: View {
 
     private var displayedOrderSignature: String {
         displayedItems.map(\.id).joined(separator: "|")
+    }
+
+    private var availableAddItems: [QuickActionItem] {
+        let existing = Set(editItems.filter { $0.petId == pet.id }.map(\.actionType))
+        return QuickActionPickerCatalog.available(for: pet, existingActionTypes: existing).map { option in
+            QuickActionItem(
+                label: option.label,
+                icon: option.icon,
+                colorHex: option.colorHex,
+                petId: pet.id,
+                actionType: option.id,
+                entityId: pet.id,
+                entityKind: .pet
+            )
+        }
     }
 
     private func itemZIndex(_ item: QuickActionItem, index: Int) -> Double {
@@ -135,6 +172,36 @@ struct ExpandedPetQuickActionsSection: View {
     private func closeMenu() {
         withAnimation(GoMotion.feedback) {
             openActionId = nil
+        }
+    }
+
+    private func openAddPanel() {
+        OhanaFeedback.light()
+        guard QuickActionLimit.count(for: pet, in: editItems) < QuickActionLimit.maxItemsPerEntity else {
+            onLimitReached()
+            return
+        }
+        withAnimation(GoMotion.feedback) {
+            showingAddPanel.toggle()
+        }
+    }
+
+    private func closeAddPanel() {
+        withAnimation(GoMotion.feedback) {
+            showingAddPanel = false
+        }
+    }
+
+    private func addQuickAction(_ item: QuickActionItem) {
+        guard QuickActionLimit.count(for: pet, in: editItems) < QuickActionLimit.maxItemsPerEntity else {
+            onLimitReached()
+            closeAddPanel()
+            return
+        }
+        OhanaFeedback.medium()
+        withAnimation(HeroAnim.buttonSpring) {
+            editItems.append(item)
+            showingAddPanel = false
         }
     }
 
@@ -159,13 +226,30 @@ struct ExpandedPetQuickActionsSection: View {
         .padding(.horizontal, 4)
     }
 
+    private var compactDoneRow: some View {
+        HStack {
+            Spacer(minLength: 0)
+            Button {
+                OhanaFeedback.light()
+                onToggleEdit()
+            } label: {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 11, weight: .black))
+                .foregroundStyle(Color.ohanaPrimaryActionText)
+                .frame(width: 30, height: 26)
+                .background(Color.goPrimary, in: Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+        }
+        .padding(.horizontal, 4)
+    }
+
     private var limitText: some View {
         Text("8 max")
             .font(OhanaFont.caption2(.medium))
             .foregroundStyle(Color.ohanaTertiaryText)
             .frame(maxWidth: .infinity)
             .padding(.top, 2)
-            .transition(.opacity)
     }
 }
 
@@ -182,6 +266,8 @@ struct ExpandedHumanQuickActionsSection: View {
     let isEditMode: Bool
     let jiggle: Bool
     let shouldReduceWork: Bool
+    var showsHeader: Bool = true
+    var longPressStartsEdit: Bool = false
     let onToggleEdit: () -> Void
     let countText: (QuickActionItem) -> String?
     let privacyIconName: (QuickActionItem) -> String?
@@ -194,11 +280,16 @@ struct ExpandedHumanQuickActionsSection: View {
     let onLongPress: (QuickActionItem) -> Void
     let onLimitReached: () -> Void
     @State private var openActionId: String? = nil
+    @State private var showingAddPanel = false
     @State private var lastDropTargetId: String? = nil
 
     var body: some View {
         VStack(spacing: 8) {
-            header
+            if showsHeader {
+                header
+            } else if isEditMode {
+                compactDoneRow
+            }
 
             LazyVGrid(
                 columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4),
@@ -218,6 +309,7 @@ struct ExpandedHumanQuickActionsSection: View {
                         isEditMode: isEditMode,
                         jiggle: jiggle,
                         shouldReduceWork: shouldReduceWork,
+                        longPressStartsEdit: longPressStartsEdit,
                         isMenuOpen: !isEditMode && openActionId == item.id,
                         countText: countText,
                         privacyIconName: privacyIconName,
@@ -226,6 +318,7 @@ struct ExpandedHumanQuickActionsSection: View {
                         isCompleted: isCompleted,
                         feedbackToken: feedbackActionKey == actionKey(for: item) ? feedbackToken : nil,
                         onToggleMenu: { toggleMenu(for: item) },
+                        onStartEdit: onToggleEdit,
                         onQuick: {
                             closeMenu()
                             onTap(item)
@@ -240,10 +333,9 @@ struct ExpandedHumanQuickActionsSection: View {
 
                 if isEditMode && editItems.count < QuickActionLimit.maxItemsPerEntity {
                     ExpandedHumanQuickAddButton(
-                        defaultItems: defaultItems,
-                        editItems: $editItems,
-                        onLimitReached: onLimitReached
+                        onTap: openAddPanel
                     )
+                    .zIndex(60)
                 }
             }
             .animation(GoMotion.selection, value: displayedOrderSignature)
@@ -253,8 +345,22 @@ struct ExpandedHumanQuickActionsSection: View {
             }
         }
         .padding(.horizontal, 2)
+        .overlay(alignment: .bottom) {
+            if isEditMode && showingAddPanel {
+                ExpandedQuickAddInlinePanel(
+                    items: availableAddItems,
+                    emptyTitle: "已全部添加",
+                    onAdd: addQuickAction,
+                    onClose: closeAddPanel
+                )
+                .padding(.horizontal, 6)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(120)
+            }
+        }
         .onChange(of: isEditMode) { _, _ in
             closeMenu()
+            closeAddPanel()
             lastDropTargetId = nil
         }
     }
@@ -265,6 +371,11 @@ struct ExpandedHumanQuickActionsSection: View {
 
     private var displayedOrderSignature: String {
         displayedItems.map(\.id).joined(separator: "|")
+    }
+
+    private var availableAddItems: [QuickActionItem] {
+        let existing = Set(editItems.map(\.actionType))
+        return defaultItems.filter { !existing.contains($0.actionType) }
     }
 
     private func itemZIndex(_ item: QuickActionItem, index: Int) -> Double {
@@ -283,6 +394,36 @@ struct ExpandedHumanQuickActionsSection: View {
     private func closeMenu() {
         withAnimation(GoMotion.feedback) {
             openActionId = nil
+        }
+    }
+
+    private func openAddPanel() {
+        OhanaFeedback.light()
+        guard editItems.count < QuickActionLimit.maxItemsPerEntity else {
+            onLimitReached()
+            return
+        }
+        withAnimation(GoMotion.feedback) {
+            showingAddPanel.toggle()
+        }
+    }
+
+    private func closeAddPanel() {
+        withAnimation(GoMotion.feedback) {
+            showingAddPanel = false
+        }
+    }
+
+    private func addQuickAction(_ item: QuickActionItem) {
+        guard editItems.count < QuickActionLimit.maxItemsPerEntity else {
+            onLimitReached()
+            closeAddPanel()
+            return
+        }
+        OhanaFeedback.medium()
+        withAnimation(HeroAnim.buttonSpring) {
+            editItems.append(item)
+            showingAddPanel = false
         }
     }
 
@@ -311,13 +452,30 @@ struct ExpandedHumanQuickActionsSection: View {
         .padding(.horizontal, 4)
     }
 
+    private var compactDoneRow: some View {
+        HStack {
+            Spacer(minLength: 0)
+            Button {
+                OhanaFeedback.light()
+                onToggleEdit()
+            } label: {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 11, weight: .black))
+                .foregroundStyle(Color.ohanaPrimaryActionText)
+                .frame(width: 30, height: 26)
+                .background(Color.goPrimary, in: Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+        }
+        .padding(.horizontal, 4)
+    }
+
     private var limitText: some View {
         Text("8 max")
             .font(OhanaFont.caption2(.medium))
             .foregroundStyle(Color.ohanaTertiaryText)
             .frame(maxWidth: .infinity)
             .padding(.top, 2)
-            .transition(.opacity)
     }
 }
 
@@ -416,12 +574,14 @@ private struct ExpandedPetQuickActionGridItem: View {
     let isEditMode: Bool
     let jiggle: Bool
     let shouldReduceWork: Bool
+    let longPressStartsEdit: Bool
     let isMenuOpen: Bool
     let waterManagementLabel: String
     let showsAttentionDot: (QuickActionItem) -> Bool
     let countText: (QuickActionItem) -> String?
     let isCompleted: (QuickActionItem) -> Bool
     let onToggleMenu: () -> Void
+    let onStartEdit: () -> Void
     let onQuick: () -> Void
     let onDetail: () -> Void
     let onGroomCheckIn: (String) -> Void
@@ -442,7 +602,7 @@ private struct ExpandedPetQuickActionGridItem: View {
                 isCompletedToday: !isEditMode && isCompleted(item),
                 prefersLightForeground: true,
                 onTap: handleTap,
-                onLongPress: isEditMode ? nil : (item.actionType == "health" ? onDetail : onToggleMenu),
+                onLongPress: longPressAction,
                 onGroomCheckIn: nil,
                 onPottySelect: nil,
                 onHealthSelect: nil
@@ -460,9 +620,9 @@ private struct ExpandedPetQuickActionGridItem: View {
                     onQuick: onQuick,
                     onDetail: onDetail
                 )
-                .offset(y: 52)
+                .offset(x: inlineMenuOffsetX, y: inlineMenuOffsetY)
                 .ohanaInlineMenuMotion(trigger: isMenuOpen)
-                .zIndex(12)
+                .zIndex(80)
             }
 
             if isEditMode {
@@ -472,12 +632,8 @@ private struct ExpandedPetQuickActionGridItem: View {
         .scaleEffect(isDragging ? 1.035 : 1)
         .opacity(isDragging ? 0.72 : 1)
         .rotationEffect(.degrees(editJiggleAngle))
-        .animation(
-            isEditMode && !isDragging
-                ? (shouldReduceWork ? nil : GoMotion.quick.repeatForever(autoreverses: true))
-                : GoMotion.stateChange,
-            value: jiggle
-        )
+        .id("\(item.id)-\(isEditMode ? "edit" : "normal")")
+        .animation(jiggleAnimation, value: jiggle)
         .animation(GoMotion.selection, value: draggingItemId)
         .overlay(alignment: .topLeading) {
             if isEditMode {
@@ -504,22 +660,47 @@ private struct ExpandedPetQuickActionGridItem: View {
         return jiggle ? -1.15 : 1.15
     }
 
+    private var jiggleAnimation: Animation? {
+        if isEditMode && !isDragging {
+            return shouldReduceWork ? nil : GoMotion.quick.repeatForever(autoreverses: true)
+        }
+        return GoMotion.stateChange
+    }
+
+    private var longPressAction: (() -> Void)? {
+        guard !isEditMode else { return nil }
+        return { handleLongPress() }
+    }
+
     private func handleTap() {
         guard !isEditMode else { return }
-        pressedActionId = item.id
+        withAnimation(GoMotion.feedback) {
+            pressedActionId = item.id
+        }
         OhanaFeedback.medium()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+        if item.actionType == "health" {
+            onDetail()
+        } else {
+            onToggleMenu()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.10) {
             pressedActionId = nil
-            if item.actionType == "health" {
-                onDetail()
-            } else {
-                onToggleMenu()
-            }
+        }
+    }
+
+    private func handleLongPress() {
+        if longPressStartsEdit {
+            OhanaFeedback.medium()
+            onStartEdit()
+        } else if item.actionType == "health" {
+            onDetail()
+        } else {
+            onToggleMenu()
         }
     }
 
     private var quickIconName: String {
-        item.actionType == "medication" ? "plus.circle.fill" : "checkmark.circle.fill"
+        "plus"
     }
 
     private var detailIconName: String {
@@ -536,6 +717,20 @@ private struct ExpandedPetQuickActionGridItem: View {
 
     private var quickDisabled: Bool {
         ExpandedQuickActionLogic.singleUseLabel(for: item.actionType) != nil && isCompleted(item)
+    }
+
+    private var inlineMenuOffsetY: CGFloat {
+        guard longPressStartsEdit else { return 52 }
+        return idx >= 4 ? -52 : 52
+    }
+
+    private var inlineMenuOffsetX: CGFloat {
+        guard longPressStartsEdit else { return 0 }
+        switch idx % 4 {
+        case 0: return 12
+        case 3: return -12
+        default: return 0
+        }
     }
 
     private var removeButton: some View {
@@ -570,6 +765,7 @@ private struct ExpandedHumanQuickActionGridItem: View {
     let isEditMode: Bool
     let jiggle: Bool
     let shouldReduceWork: Bool
+    let longPressStartsEdit: Bool
     let isMenuOpen: Bool
     let countText: (QuickActionItem) -> String?
     let privacyIconName: (QuickActionItem) -> String?
@@ -578,6 +774,7 @@ private struct ExpandedHumanQuickActionGridItem: View {
     let isCompleted: (QuickActionItem) -> Bool
     let feedbackToken: CheckInFeedbackToken?
     let onToggleMenu: () -> Void
+    let onStartEdit: () -> Void
     let onQuick: () -> Void
     let onDetail: () -> Void
 
@@ -595,7 +792,7 @@ private struct ExpandedHumanQuickActionGridItem: View {
                 isCompletedToday: !isEditMode && isCompleted(item),
                 prefersLightForeground: true,
                 onTap: handleTap,
-                onLongPress: isEditMode ? nil : onToggleMenu
+                onLongPress: longPressAction
             )
             .allowsHitTesting(!isEditMode)
             .checkInPulse(feedbackToken)
@@ -613,9 +810,9 @@ private struct ExpandedHumanQuickActionGridItem: View {
                     onQuick: onQuick,
                     onDetail: onDetail
                 )
-                .offset(y: 52)
+                .offset(x: inlineMenuOffsetX, y: inlineMenuOffsetY)
                 .ohanaInlineMenuMotion(trigger: isMenuOpen)
-                .zIndex(12)
+                .zIndex(80)
             }
 
             if isEditMode {
@@ -625,12 +822,8 @@ private struct ExpandedHumanQuickActionGridItem: View {
         .scaleEffect(isDragging ? 1.035 : 1)
         .opacity(isDragging ? 0.72 : 1)
         .rotationEffect(.degrees(editJiggleAngle))
-        .animation(
-            isEditMode && !isDragging
-                ? (shouldReduceWork ? nil : GoMotion.quick.repeatForever(autoreverses: true))
-                : GoMotion.stateChange,
-            value: jiggle
-        )
+        .id("\(item.id)-\(isEditMode ? "edit" : "normal")")
+        .animation(jiggleAnimation, value: jiggle)
         .animation(GoMotion.selection, value: draggingItemId)
         .overlay(alignment: .topLeading) {
             if isEditMode {
@@ -657,13 +850,50 @@ private struct ExpandedHumanQuickActionGridItem: View {
         return jiggle ? -1.15 : 1.15
     }
 
+    private var jiggleAnimation: Animation? {
+        if isEditMode && !isDragging {
+            return shouldReduceWork ? nil : GoMotion.quick.repeatForever(autoreverses: true)
+        }
+        return GoMotion.stateChange
+    }
+
+    private var longPressAction: (() -> Void)? {
+        guard !isEditMode else { return nil }
+        return { handleLongPress() }
+    }
+
     private func handleTap() {
         guard !isEditMode else { return }
-        pressedActionId = item.id
+        withAnimation(GoMotion.feedback) {
+            pressedActionId = item.id
+        }
         OhanaFeedback.medium()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+        onToggleMenu()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.10) {
             pressedActionId = nil
+        }
+    }
+
+    private func handleLongPress() {
+        if longPressStartsEdit {
+            OhanaFeedback.medium()
+            onStartEdit()
+        } else {
             onToggleMenu()
+        }
+    }
+
+    private var inlineMenuOffsetY: CGFloat {
+        guard longPressStartsEdit else { return 52 }
+        return idx >= 4 ? -52 : 52
+    }
+
+    private var inlineMenuOffsetX: CGFloat {
+        guard longPressStartsEdit else { return 0 }
+        switch idx % 4 {
+        case 0: return 12
+        case 3: return -12
+        default: return 0
         }
     }
 
@@ -688,7 +918,7 @@ private struct ExpandedHumanQuickActionGridItem: View {
 
 private struct ExpandedQuickInlineActionMenu: View {
     let accent: Color
-    var quickIcon: String = "checkmark.circle.fill"
+    var quickIcon: String = "plus"
     var detailIcon: String = "chart.line.uptrend.xyaxis"
     var quickAccessibility: String = "快速打卡"
     var detailAccessibility: String = "查看详情"
@@ -751,33 +981,15 @@ private struct ExpandedQuickInlineActionMenu: View {
 }
 
 private struct ExpandedPetQuickAddButton: View {
-    let pet: Pet
-    @Binding var editItems: [QuickActionItem]
-    let onLimitReached: () -> Void
-    @State private var showingQuickAdd = false
+    let onTap: () -> Void
 
     var body: some View {
         Button {
-            OhanaFeedback.light()
-            guard QuickActionLimit.count(for: pet, in: editItems) < QuickActionLimit.maxItemsPerEntity else {
-                onLimitReached()
-                return
-            }
-            showingQuickAdd = true
+            onTap()
         } label: {
             addButtonLabel
         }
         .buttonStyle(ScaleButtonStyle())
-        .popover(isPresented: $showingQuickAdd, attachmentAnchor: .point(.top), arrowEdge: .bottom) {
-            QAQuickAddPopoverContent(pet: pet, existingItems: editItems) { newItem in
-                withAnimation(HeroAnim.buttonSpring) {
-                    if QuickActionLimit.count(for: pet, in: editItems) < QuickActionLimit.maxItemsPerEntity {
-                        editItems.append(newItem)
-                    }
-                }
-            }
-            .presentationCompactAdaptation(.popover)
-        }
         .transition(.scale(scale: 0.8).combined(with: .opacity))
     }
 
@@ -798,31 +1010,11 @@ private struct ExpandedPetQuickAddButton: View {
 }
 
 private struct ExpandedHumanQuickAddButton: View {
-    let defaultItems: [QuickActionItem]
-    @Binding var editItems: [QuickActionItem]
-    let onLimitReached: () -> Void
+    let onTap: () -> Void
 
     var body: some View {
-        Menu {
-            if editItems.count >= QuickActionLimit.maxItemsPerEntity {
-                Button("已达 8 个上限，可去「全部功能」查看更多") {
-                    onLimitReached()
-                }
-            }
-            let existing = Set(editItems.map(\.actionType))
-            ForEach(defaultItems.filter { !existing.contains($0.actionType) }) { item in
-                Button {
-                    guard editItems.count < QuickActionLimit.maxItemsPerEntity else {
-                        onLimitReached()
-                        return
-                    }
-                    withAnimation(HeroAnim.buttonSpring) {
-                        editItems.append(item)
-                    }
-                } label: {
-                    Label(item.label, systemImage: item.icon)
-                }
-            }
+        Button {
+            onTap()
         } label: {
             addButtonLabel
         }
@@ -843,5 +1035,77 @@ private struct ExpandedHumanQuickAddButton: View {
         .frame(maxWidth: .infinity, minHeight: 80)
         .padding(.horizontal, 8)
         .padding(.vertical, 10)
+    }
+}
+
+private struct ExpandedQuickAddInlinePanel: View {
+    let items: [QuickActionItem]
+    let emptyTitle: String
+    let onAdd: (QuickActionItem) -> Void
+    let onClose: () -> Void
+
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 8) {
+                Text("添加")
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Spacer(minLength: 0)
+                Button {
+                    OhanaFeedback.light()
+                    onClose()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .frame(width: 24, height: 24)
+                        .background(Color.ohanaControlFill, in: Circle())
+                }
+                .buttonStyle(ScaleButtonStyle())
+            }
+
+            if items.isEmpty {
+                Text(emptyTitle)
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+            } else {
+                LazyVGrid(columns: columns, spacing: 8) {
+                    ForEach(Array(items.prefix(8))) { item in
+                        Button {
+                            onAdd(item)
+                        } label: {
+                            VStack(spacing: 5) {
+                                Image(systemName: item.icon)
+                                    .font(.system(size: 15, weight: .black))
+                                    .foregroundStyle(Color.ohanaFunctionalIcon)
+                                    .frame(width: 30, height: 30)
+                                    .background(Color.ohanaControlFill, in: Circle())
+                                Text(item.label)
+                                    .font(OhanaFont.caption2(.bold))
+                                    .foregroundStyle(Color.ohanaPrimaryText)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.65)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 54)
+                            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+        }
+        .shadow(color: Color.black.opacity(0.18), radius: 18, x: 0, y: 10) // ui-v4: allow floating inline quick-add menu
+        .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 }

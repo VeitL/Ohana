@@ -94,15 +94,11 @@ struct HumanHealthReportView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showAddSheet) {
             AddHumanHealthReportSheet(human: human)
-                .presentationBackground(.clear)
-                .presentationDetents([.large]) // ui-v4: allow complex report editor uses full-height system sheet
-                .presentationDragIndicator(.visible)
+                .ohanaSheetPagePresentation() // ui-v4: allow complex report editor uses full-height system sheet
         }
         .sheet(item: $editingReport) { report in
             AddHumanHealthReportSheet(human: human, editing: report)
-                .presentationBackground(.clear)
-                .presentationDetents([.large]) // ui-v4: allow complex report editor uses full-height system sheet
-                .presentationDragIndicator(.visible)
+                .ohanaSheetPagePresentation() // ui-v4: allow complex report editor uses full-height system sheet
         }
     }
 

@@ -16,23 +16,21 @@ struct AddEventView: View {
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @Query(sort: \Plant.createdAt) private var plants: [Plant]
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+    @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
 
     @State private var title = ""
     @State private var eventType: EventType = .daily
     @State private var startDate = Date()
-    @State private var endDate = Calendar.current.date(byAdding: .hour, value: 1, to: Date()) ?? Date()
     @State private var isAllDay = false
-    @State private var hasEndDate = false
     @State private var relatedEntityType = ""
     @State private var relatedEntityId = ""
     @State private var recurrenceOption: RecurrenceOption = .none
     @State private var recurrenceDays = 2
     @State private var recurrenceEndDate = Calendar.current.date(byAdding: .month, value: 1, to: Date()) ?? Date()
-    @State private var hasRecurrenceEnd = false
-    @State private var reminderAdvanceDays = 0
+    @State private var reminderLeadOption: ReminderLeadOption = .thirtyMinutes
     @State private var hasReminder = true
     @State private var assigneeId: String? = nil
-    @State private var showsAdvanced = false
+    @State private var showsTypePicker = false
     @State private var isSaving = false
     @State private var didSave = false
     @FocusState private var titleFocused: Bool
@@ -69,6 +67,24 @@ struct AddEventView: View {
         }
     }
 
+    private enum ReminderLeadOption: Int, CaseIterable, Identifiable {
+        case thirtyMinutes = 30
+        case oneHour = 60
+        case threeHours = 180
+        case oneDay = 1440
+
+        var id: Int { rawValue }
+
+        func title(_ l: L10n) -> String {
+            switch self {
+            case .thirtyMinutes: return l.tr(zh: "前30分钟", en: "30m before", de: "30 Min. vorher")
+            case .oneHour: return l.tr(zh: "前1小时", en: "1h before", de: "1 Std. vorher")
+            case .threeHours: return l.tr(zh: "前3小时", en: "3h before", de: "3 Std. vorher")
+            case .oneDay: return l.tr(zh: "前一天", en: "1 day before", de: "1 Tag vorher")
+            }
+        }
+    }
+
     private var trimmedTitle: String {
         title.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -78,9 +94,17 @@ struct AddEventView: View {
     }
 
     private var manualEventTypes: [EventType] {
-        EventType.allCases.filter { type in
-            ![.petMedicationDose, .insurancePremium].contains(type)
-        }
+        [.daily, .task, .health, .birthday, .anniversary, .chore, .shoppingList, .medication]
+    }
+
+    private var visibleRecurrenceOptions: [RecurrenceOption] {
+        [.none, .daily, .weekly, .monthly]
+    }
+
+    private var allowedReminderLeadOptions: [ReminderLeadOption] {
+        recurrenceOption == .none
+            ? [.thirtyMinutes, .oneHour, .threeHours, .oneDay]
+            : [.thirtyMinutes, .oneHour, .threeHours]
     }
 
     private var selectedRecurrenceDays: Int {
@@ -93,6 +117,7 @@ struct AddEventView: View {
                 .ignoresSafeArea()
                 .onTapGesture {
                     titleFocused = false
+                    showsTypePicker = false
                     GoKeyboard.dismiss()
                 }
 
@@ -105,11 +130,15 @@ struct AddEventView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 14) {
                         titleSection
-                        eventTypeSection
+                            .zIndex(showsTypePicker ? 10 : 0)
                         timeSection
+                        recurrenceSection
+                        if recurrenceOption != .none {
+                            recurrenceEndSection
+                        }
+                        reminderLeadSection
                         relatedSection
-                        reminderSection
-                        advancedSection
+                        assigneeSection
                     }
                     .padding(.horizontal, 20)
                     .padding(.bottom, 104)
@@ -119,21 +148,25 @@ struct AddEventView: View {
 
             saveBar
                 .frame(maxHeight: .infinity, alignment: .bottom)
+
         }
-        .presentationBackground(.clear)
-        .presentationDragIndicator(.hidden)
-        .presentationDetents([.large]) // ui-v4: allow long calendar editor uses system sheet
+        .ohanaSheetPagePresentation() // ui-v4: allow long calendar editor uses system sheet
         .interactiveDismissDisabled(isSaving)
         .onChange(of: startDate) { _, newValue in
             keepDependentDatesAfter(newValue)
+        }
+        .onChange(of: recurrenceOption) { _, option in
+            normalizeRecurrenceState(for: option)
         }
         .onChange(of: isAllDay) { _, allDay in
             let cal = Calendar.current
             if allDay {
                 startDate = cal.startOfDay(for: startDate)
-                endDate = cal.startOfDay(for: endDate)
-            } else if endDate <= startDate {
-                endDate = cal.date(byAdding: .hour, value: 1, to: startDate) ?? startDate
+            }
+        }
+        .onAppear {
+            if assigneeId == nil, humans.contains(where: { $0.id.uuidString == currentActiveHumanId }) {
+                assigneeId = currentActiveHumanId
             }
         }
     }
@@ -171,69 +204,63 @@ struct AddEventView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionLabel(l.tr(zh: "标题", en: "Title", de: "Titel"))
 
-            HStack(spacing: 10) {
-                Image(systemName: eventType.silhouetteSymbol)
-                    .font(.system(size: 18, weight: .black))
-                    .foregroundStyle(Color.goPrimary)
-                    .frame(width: 32, height: 32)
-
-                TextField(l.tr(zh: "给这件事起个名字", en: "Name this event", de: "Termin benennen"), text: $title)
-                    .focused($titleFocused)
-                    .submitLabel(.done)
-                    .textInputAutocapitalization(.sentences)
-                    .autocorrectionDisabled()
-                    .font(.system(size: 20, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .onSubmit {
+            ZStack(alignment: .topLeading) {
+                HStack(spacing: 10) {
+                    Button {
                         titleFocused = false
                         GoKeyboard.dismiss()
-                    }
-
-                if !title.isEmpty {
-                    Button {
-                        withAnimation(GoMotion.feedback) { title = "" }
+                        withAnimation(GoMotion.selection) { showsTypePicker.toggle() }
+                        OhanaFeedback.light()
                     } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 17, weight: .bold))
-                            .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
+                        HStack(spacing: 3) {
+                            Image(systemName: eventType.silhouetteSymbol)
+                                .font(.system(size: 18, weight: .black))
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 8, weight: .black))
+                                .rotationEffect(.degrees(showsTypePicker ? 180 : 0))
+                                .offset(y: 1)
+                        }
+                        .foregroundStyle(Color.goPrimary)
+                        .frame(width: 46, height: 34)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityLabel(l.tr(zh: "更换类型", en: "Change type", de: "Typ ändern"))
+
+                    TextField(l.tr(zh: "给这件事起个名字", en: "Name this event", de: "Termin benennen"), text: $title)
+                        .focused($titleFocused)
+                        .submitLabel(.done)
+                        .textInputAutocapitalization(.sentences)
+                        .autocorrectionDisabled()
+                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .onSubmit {
+                            titleFocused = false
+                            GoKeyboard.dismiss()
+                        }
+
+                    if !title.isEmpty {
+                        Button {
+                            withAnimation(GoMotion.feedback) { title = "" }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 17, weight: .bold))
+                                .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                    }
                 }
-            }
-            .padding(14)
-            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        }
-    }
+                .padding(14)
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
 
-    private var eventTypeSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionLabel(l.tr(zh: "类型", en: "Type", de: "Typ"))
-
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                ForEach(manualEventTypes) { type in
-                    let selected = eventType == type
-                    Button {
-                        withAnimation(GoMotion.selection) {
-                            eventType = type
-                            if trimmedTitle.isEmpty {
-                                title = eventTypeTitle(type)
-                            }
-                        }
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Text(type.emoji)
-                            Text(eventTypeTitle(type))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.72)
-                        }
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(selected ? Color.arkInk : Color.ohanaPrimaryText)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(selected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
+                if showsTypePicker {
+                    eventTypeAnchorMenu
+                        .offset(x: 14, y: 54)
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.96, anchor: .topLeading).combined(with: .opacity),
+                            removal: .scale(scale: 0.98, anchor: .topLeading).combined(with: .opacity)
+                        ))
+                        .zIndex(4)
                 }
             }
         }
@@ -336,139 +363,13 @@ struct AddEventView: View {
         }
     }
 
-    private var reminderSection: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Image(systemName: hasReminder ? "bell.badge.fill" : "bell.slash.fill")
-                    .font(.system(size: 18, weight: .black))
-                    .foregroundStyle(hasReminder ? Color.goPrimary : Color.ohanaSecondaryText)
-                    .frame(width: 34, height: 34)
-                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(l.tr(zh: "提醒", en: "Reminder", de: "Erinnerung"))
-                        .font(OhanaFont.callout(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(reminderSummary)
-                        .font(OhanaFont.caption2(.bold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                }
-
-                Spacer()
-
-                Toggle("", isOn: $hasReminder)
-                    .labelsHidden()
-                    .tint(Color.goPrimary)
-            }
-            .padding(14)
-            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        }
-    }
-
-    private var advancedSection: some View {
-        VStack(spacing: 10) {
-            Button {
-                withAnimation(GoMotion.page) { showsAdvanced.toggle() }
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 15, weight: .black))
-                    Text(l.tr(zh: "更多", en: "More", de: "Mehr"))
-                        .font(OhanaFont.callout(.black))
-                    Spacer()
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 12, weight: .black))
-                        .rotationEffect(.degrees(showsAdvanced ? 180 : 0))
-                }
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .padding(14)
-                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            }
-            .buttonStyle(ScaleButtonStyle())
-
-            if showsAdvanced {
-                VStack(spacing: 14) {
-                    endDateSection
-                    recurrenceSection
-                    if hasReminder { reminderAdvanceSection }
-                    assigneeSection
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-        }
-    }
-
-    private var endDateSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Toggle(isOn: $hasEndDate) {
-                sectionLabel(isAllDay ? l.tr(zh: "结束日期", en: "End date", de: "Enddatum") : l.tr(zh: "结束时间", en: "End time", de: "Endzeit"))
-            }
-            .tint(Color.goPrimary)
-            .onChange(of: hasEndDate) { _, on in
-                if on { keepDependentDatesAfter(startDate) }
-            }
-
-            if hasEndDate {
-                VStack(spacing: 10) {
-                    datePickerRow(
-                        icon: "calendar.badge.clock",
-                        title: l.tr(zh: "日期", en: "Date", de: "Datum"),
-                        selection: $endDate,
-                        components: .date
-                    )
-                    if !isAllDay {
-                        datePickerRow(
-                            icon: "clock",
-                            title: l.tr(zh: "时间", en: "Hour", de: "Uhrzeit"),
-                            selection: $endDate,
-                            components: .hourAndMinute
-                        )
-                    }
-                }
-            }
-        }
-        .padding(14)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-    }
-
     private var recurrenceSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionLabel(l.tr(zh: "循环", en: "Repeat", de: "Wiederholen"))
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                ForEach(RecurrenceOption.allCases) { option in
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                ForEach(visibleRecurrenceOptions) { option in
                     recurrenceChip(option)
-                }
-            }
-
-            if recurrenceOption == .custom {
-                Stepper(value: $recurrenceDays, in: 2...365) {
-                    Text(l.tr(zh: "每 \(recurrenceDays) 天", en: "Every \(recurrenceDays) days", de: "Alle \(recurrenceDays) Tage"))
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                }
-                .tint(Color.goPrimary)
-                .padding(12)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            }
-
-            if recurrenceOption != .none {
-                Toggle(isOn: $hasRecurrenceEnd) {
-                    Text(l.tr(zh: "循环结束日期", en: "Repeat end date", de: "Enddatum"))
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                }
-                .tint(Color.goPrimary)
-
-                if hasRecurrenceEnd {
-                    datePickerRow(
-                        icon: "calendar.badge.exclamationmark",
-                        title: l.tr(zh: "结束", en: "End", de: "Ende"),
-                        selection: $recurrenceEndDate,
-                        components: .date
-                    )
-                    .padding(12)
-                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
             }
         }
@@ -476,18 +377,44 @@ struct AddEventView: View {
         .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
-    private var reminderAdvanceSection: some View {
-        Stepper(value: $reminderAdvanceDays, in: 0...30) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(l.tr(zh: "提前提醒", en: "Remind before", de: "Vorher erinnern"))
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(reminderSummary)
-                    .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
+    private var recurrenceEndSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel(l.tr(zh: "结束日期", en: "End date", de: "Enddatum"))
+            datePickerRow(
+                icon: "calendar.badge.exclamationmark",
+                title: l.tr(zh: "结束", en: "End", de: "Ende"),
+                selection: $recurrenceEndDate,
+                components: .date
+            )
+            .padding(12)
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .padding(14)
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    private var reminderLeadSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel(l.tr(zh: "提前提醒", en: "Remind before", de: "Vorher erinnern"))
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                ForEach(allowedReminderLeadOptions) { option in
+                    let selected = reminderLeadOption == option
+                    Button {
+                        withAnimation(GoMotion.selection) { reminderLeadOption = option }
+                        OhanaFeedback.light()
+                    } label: {
+                        Text(option.title(l))
+                            .font(OhanaFont.caption(.black))
+                            .foregroundStyle(selected ? Color.arkInk : Color.ohanaPrimaryText)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(selected ? Color.goPrimary : Color.ohanaCardSurface, in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
             }
         }
-        .tint(Color.goPrimary)
         .padding(14)
         .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
@@ -566,19 +493,70 @@ struct AddEventView: View {
     }
 
     private var reminderSummary: String {
-        guard hasReminder else {
-            return l.tr(zh: "不创建提醒", en: "No reminder", de: "Keine Erinnerung")
-        }
-        if reminderAdvanceDays == 0 {
-            return l.tr(zh: "准时提醒", en: "At event time", de: "Zur Terminzeit")
-        }
-        return l.tr(zh: "提前 \(reminderAdvanceDays) 天", en: "\(reminderAdvanceDays)d before", de: "\(reminderAdvanceDays) Tage vorher")
+        reminderLeadOption.title(l)
+    }
+
+    private var recurrenceEndOfDay: Date {
+        let day = Calendar.current.startOfDay(for: recurrenceEndDate)
+        return Calendar.current.date(byAdding: DateComponents(day: 1, second: -1), to: day) ?? recurrenceEndDate
     }
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
             .font(OhanaFont.caption(.black))
             .foregroundStyle(Color.ohanaSecondaryText)
+    }
+
+    private var eventTypeAnchorMenu: some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+            ForEach(manualEventTypes) { type in
+                eventTypeAnchorMenuCell(type)
+            }
+        }
+        .padding(10)
+        .frame(width: 268)
+        .background { OhanaPopupGlassSurface(cornerRadius: 24) }
+        .shadow(color: Color.black.opacity(0.34), radius: 24, x: 0, y: 14) // ui-v4: allow anchored menu shadow
+    }
+
+    private func eventTypeAnchorMenuCell(_ type: EventType) -> some View {
+        let selected = eventType == type
+        return Button {
+            withAnimation(GoMotion.selection) {
+                eventType = type
+                if trimmedTitle.isEmpty {
+                    title = eventTypeTitle(type)
+                }
+                showsTypePicker = false
+            }
+            OhanaFeedback.light()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: type.silhouetteSymbol)
+                    .font(.system(size: 15, weight: .black))
+                    .foregroundStyle(Color.goPrimary)
+                    .frame(width: 20, height: 20)
+
+                Text(eventTypeTitle(type))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+
+                Spacer()
+
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .black))
+                        .foregroundStyle(Color.goPrimary)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 10)
+            .background(selected ? Color.goPrimary.opacity(0.16) : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func datePickerRow(
@@ -592,7 +570,6 @@ struct AddEventView: View {
                 .font(.system(size: 14, weight: .black))
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 28, height: 28)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
             Text(title)
                 .font(OhanaFont.caption(.black))
@@ -612,13 +589,8 @@ struct AddEventView: View {
         return Button {
             withAnimation(GoMotion.selection) {
                 recurrenceOption = option
-                if option == .custom {
-                    recurrenceDays = max(recurrenceDays, 2)
-                } else if option == .none {
-                    hasRecurrenceEnd = false
-                }
             }
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            OhanaFeedback.light()
         } label: {
             Text(option.title(l))
                 .font(OhanaFont.caption(.black))
@@ -628,6 +600,17 @@ struct AddEventView: View {
                 .background(selected ? Color.goPrimary : Color.ohanaCardSurface, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
+    }
+
+    private func normalizeRecurrenceState(for option: RecurrenceOption) {
+        if option == .none {
+            return
+        } else {
+            if !allowedReminderLeadOptions.contains(reminderLeadOption) {
+                withAnimation(GoMotion.selection) { reminderLeadOption = .threeHours }
+            }
+            keepDependentDatesAfter(startDate)
+        }
     }
 
     private func relatedChip(
@@ -719,9 +702,6 @@ struct AddEventView: View {
 
     private func keepDependentDatesAfter(_ base: Date) {
         let cal = Calendar.current
-        if hasEndDate, endDate < base {
-            endDate = isAllDay ? cal.startOfDay(for: base) : (cal.date(byAdding: .hour, value: 1, to: base) ?? base)
-        }
         if recurrenceEndDate < base {
             recurrenceEndDate = cal.date(byAdding: .month, value: 1, to: base) ?? base
         }
@@ -737,14 +717,14 @@ struct AddEventView: View {
         let event = Event(
             title: trimmedTitle,
             startDate: startDate,
-            endDate: hasEndDate ? endDate : nil,
+            endDate: nil,
             isAllDay: isAllDay,
             eventType: eventType.rawValue,
             relatedEntityType: relatedEntityType,
             relatedEntityId: relatedEntityId
         )
         event.recurrenceDays = repeats ? selectedRecurrenceDays : 0
-        event.recurrenceEndDate = repeats && hasRecurrenceEnd ? recurrenceEndDate : nil
+        event.recurrenceEndDate = repeats ? recurrenceEndOfDay : nil
         event.assigneeId = assigneeId
         modelContext.insert(event)
         var createdReminders: [Reminder] = []
@@ -752,14 +732,12 @@ struct AddEventView: View {
         if hasReminder {
             let cal = Calendar.current
             if repeats && selectedRecurrenceDays >= 1 {
-                let hardCap: Date = hasRecurrenceEnd
-                    ? recurrenceEndDate
-                    : (cal.date(byAdding: .day, value: 365, to: startDate) ?? startDate)
+                let hardCap = recurrenceEndOfDay
                 var cursor = startDate
                 var safetyCount = 0
                 let maxOccurrences = 500
                 while cursor <= hardCap && safetyCount < maxOccurrences {
-                    let scheduled = cal.date(byAdding: .day, value: -reminderAdvanceDays, to: cursor) ?? cursor
+                    let scheduled = cal.date(byAdding: .minute, value: -reminderLeadOption.rawValue, to: cursor) ?? cursor
                     let reminder = Reminder(event: event, scheduledAt: scheduled)
                     modelContext.insert(reminder)
                     createdReminders.append(reminder)
@@ -769,7 +747,7 @@ struct AddEventView: View {
                     safetyCount += 1
                 }
             } else {
-                let scheduled = cal.date(byAdding: .day, value: -reminderAdvanceDays, to: startDate) ?? startDate
+                let scheduled = cal.date(byAdding: .minute, value: -reminderLeadOption.rawValue, to: startDate) ?? startDate
                 let reminder = Reminder(event: event, scheduledAt: scheduled)
                 modelContext.insert(reminder)
                 createdReminders.append(reminder)

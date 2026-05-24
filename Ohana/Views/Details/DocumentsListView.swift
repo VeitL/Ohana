@@ -62,25 +62,21 @@ struct DocumentsListView: View {
                     ProtectionDocumentPopup(pet: pet, existing: nil) {
                         withAnimation(GoMotion.page) { self.activePopup = nil }
                     }
-                    .transition(.opacity)
                     .zIndex(30)
                 case .editDocument(let doc):
                     ProtectionDocumentPopup(pet: pet, existing: doc) {
                         withAnimation(GoMotion.page) { self.activePopup = nil }
                     }
-                    .transition(.opacity)
                     .zIndex(30)
                 case .addInsurance:
                     ProtectionInsurancePopup(pet: pet, existing: nil) {
                         withAnimation(GoMotion.page) { self.activePopup = nil }
                     }
-                    .transition(.opacity)
                     .zIndex(31)
                 case .editInsurance(let insurance):
                     ProtectionInsurancePopup(pet: pet, existing: insurance) {
                         withAnimation(GoMotion.page) { self.activePopup = nil }
                     }
-                    .transition(.opacity)
                     .zIndex(31)
                 }
             }

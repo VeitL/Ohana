@@ -183,7 +183,7 @@ struct PetHygieneDetailView: View {
                 hygieneCycleRefresh += 1
             }
                 .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+                .presentationDragIndicator(.hidden)
         }
         .alert("今天已经完成了", isPresented: $showSingleUseNotice) {
             Button("知道了", role: .cancel) {}

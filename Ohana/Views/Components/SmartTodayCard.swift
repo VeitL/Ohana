@@ -276,7 +276,7 @@ private struct GoldenRewardRow: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
     @State private var didFeed = false
     @State private var feedScale: CGFloat = 1.0
     @State private var sparkleOpacity: CGFloat = 0.0

@@ -17,6 +17,8 @@ struct ContentView: View {
     @State private var selectedPetTab: PetDetailTab = .overview
     @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
+    @AppStorage(OhanaHomeStyle.storageKey) private var homeStyleRaw = OhanaHomeStyle.defaultStyle.rawValue
+    @AppStorage(OhanaHomeStyle.verticalDefaultMigrationKey) private var didMigrateVerticalHomeDefault = false
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @State private var showingRequiredHumanProfile = false
     @State private var showingRequiredAccountSwitch = false
@@ -31,13 +33,7 @@ struct ContentView: View {
                     .zIndex(100)
             }
             NavigationStack {
-                FocusStackHomeTestView(
-                    selectedPet: $selectedPet,
-                    selectedHuman: $selectedHuman,
-                    selectedPlant: $selectedPlant,
-                    selectedPetTab: $selectedPetTab,
-                    heroNS: heroNS
-                )
+                selectedHomeView
                 .navigationDestination(item: $selectedPet) { pet in
                     petDestination(for: pet)
                 }
@@ -71,6 +67,7 @@ struct ContentView: View {
                 .zIndex(120)
         }
         .onAppear {
+            migrateVerticalHomeDefaultIfNeeded()
             allowSystemAutoLock()
             AppWorkloadPolicy.shared.updateScenePhase(scenePhase)
             AppWorkloadPolicy.shared.refresh(reason: "contentAppear")
@@ -122,6 +119,43 @@ struct ContentView: View {
             handleScenePhaseChange(newPhase)
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
+    }
+
+    @ViewBuilder
+    private var selectedHomeView: some View {
+        switch effectiveHomeStyle {
+        case .walletV3:
+            FocusHomeV3View(
+                selectedPet: $selectedPet,
+                selectedHuman: $selectedHuman,
+                selectedPlant: $selectedPlant,
+                selectedPetTab: $selectedPetTab,
+                heroNS: heroNS
+            )
+        case .walletV2:
+            FocusHomeV2View(
+                selectedPet: $selectedPet,
+                selectedHuman: $selectedHuman,
+                selectedPlant: $selectedPlant,
+                selectedPetTab: $selectedPetTab,
+                heroNS: heroNS
+            )
+        case .verticalSolid:
+            FocusHomeVerticalSolidView(
+                selectedPet: $selectedPet,
+                selectedHuman: $selectedHuman,
+                selectedPlant: $selectedPlant,
+                selectedPetTab: $selectedPetTab,
+                heroNS: heroNS
+            )
+        }
+    }
+
+    private var effectiveHomeStyle: OhanaHomeStyle {
+        if !didMigrateVerticalHomeDefault && homeStyleRaw == OhanaHomeStyle.walletV3.rawValue {
+            return .verticalSolid
+        }
+        return OhanaHomeStyle(rawValue: homeStyleRaw) ?? OhanaHomeStyle.defaultStyle
     }
 
     @ViewBuilder
@@ -181,6 +215,14 @@ struct ContentView: View {
         @unknown default:
             PetWalkingManager.shared.handleAppInactiveTransition()
         }
+    }
+
+    private func migrateVerticalHomeDefaultIfNeeded() {
+        guard !didMigrateVerticalHomeDefault else { return }
+        if homeStyleRaw == OhanaHomeStyle.walletV3.rawValue {
+            homeStyleRaw = OhanaHomeStyle.verticalSolid.rawValue
+        }
+        didMigrateVerticalHomeDefault = true
     }
 
     private func allowSystemAutoLock() {
@@ -244,10 +286,10 @@ private struct RequiredHumanProfileView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("先建立你的本人档案")
                         .font(.system(size: 30, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Text("当前没有人类成员。Ohana 需要至少一个人类成员，用来记录谁完成了喂食、喂水、护理、健康记录和花费。")
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.72))
+                        .foregroundStyle(Color.ohanaSecondaryText)
                         .lineSpacing(3)
                 }
 
@@ -258,13 +300,13 @@ private struct RequiredHumanProfileView: View {
                 }
 
                 Button {
-                    withAnimation(.spring(response: 0.42, dampingFraction: 0.88)) {
+                    withAnimation(GoMotion.page) {
                         isCreatingProfile = true
                     }
                 } label: {
                     Text("建立我的档案")
                         .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .background(Color.goLime, in: Capsule())
@@ -288,7 +330,7 @@ private struct RequiredHumanProfileView: View {
                 .frame(width: 22)
             Text(text)
                 .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.78))
+                .foregroundStyle(Color.ohanaSecondaryText)
             Spacer()
         }
     }

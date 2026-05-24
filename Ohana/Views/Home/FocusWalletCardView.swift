@@ -13,7 +13,9 @@ struct FocusWalletCardView: View {
     let heroNS: Namespace.ID
     let expandedId: UUID?
     let isHeroExpanded: Bool
+    let heroProgress: CGFloat
     let avatarCacheRevision: Int
+    var usesMatchedGeometry: Bool = true
 
     private let accent = Color(hex: "FF5A3D")
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
@@ -22,11 +24,11 @@ struct FocusWalletCardView: View {
     @AppStorage("shop_equip_fx_lime_glow") private var equipFxLimeGlow: Bool = false
     @AppStorage("shop_equip_fx_popout_card") private var equipFxPopoutCard: Bool = true
     @AppStorage(PetBondVaultStore.revisionKey) private var petBondVaultRevision: Int = 0
-    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     private var shouldReduceWork: Bool {
-        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
+        reduceMotion || workloadPolicy.interactionMotionBudget(isVisible: true) != .full
     }
 
     private var walletAnimation: Animation {
@@ -37,52 +39,58 @@ struct FocusWalletCardView: View {
         GeometryReader { geo in
             let w = geo.size.width
             let h = geo.size.height
+            let visualProgress = isHeroExpanded ? HomeHeroTransitionProgress(value: heroProgress).clamped : 0
+            let avatarVisualProgress = shouldReduceWork ? visualProgress : HomeWalletHeroTimeline.avatarProgress(progress: visualProgress)
+            let renderH = OhanaHeroGeometry.lerp(K.cardH, h, progress: visualProgress)
             let avatarEntry = FocusWalletAvatarCache.entry(for: card.id, data: card.avatarImageData)
             let avatarImage = avatarEntry.image
             let hasPopout = avatarEntry.isTransparent && avatarImage != nil
-            let avatarExpanded = isHeroExpanded
             let popoutImage = FocusPopoutImageCache.image(
                 for: card.id,
                 data: equipFxPopoutCard ? (card.cardPopoutImageData ?? (card.cardStyleRaw == "popout" ? card.avatarImageData : nil)) : nil
             )
-            let usesPopoutOverlay = equipFxPopoutCard && isHeroExpanded && !card.isHuman && card.cardStyleRaw == "popout" && popoutImage != nil
+            let usesPopoutOverlay = equipFxPopoutCard && avatarVisualProgress > 0.12 && !card.isHuman && card.cardStyleRaw == "popout" && popoutImage != nil
             let usesFullBleed = avatarImage != nil && !avatarEntry.isTransparent && !usesPopoutOverlay
 
             ZStack(alignment: .topLeading) {
-                cardBackground(usesFullBleed: usesFullBleed)
+                cardBackground(usesFullBleed: usesFullBleed, progress: visualProgress)
 
-                Color.clear
-                    .matchedGeometryEffect(
-                        id: HeroShellID(cardId: card.id),
-                        in: namespace,
-                        isSource: !(expandedId == card.id)
-                    )
-                    .allowsHitTesting(false)
-
-                if usesFullBleed, let img = avatarImage {
-                    cardPhotoLayer(img, w: w, h: h)
+                if card.isElectronicPet {
+                    electronicPetCardEffects(w: w, h: renderH, progress: visualProgress)
                         .allowsHitTesting(false)
                 }
 
-                if isHeroExpanded {
-                    backgroundHeadlineLayer(w: w)
+                maybeMatchedShell(Color.clear)
+                    .allowsHitTesting(false)
+
+                if usesFullBleed, let img = avatarImage {
+                    cardPhotoLayer(img, w: w, h: renderH, progress: visualProgress)
+                        .allowsHitTesting(false)
                 }
+
+                backgroundHeadlineLayer(w: w, progress: visualProgress)
+                    .opacity(Double(WalletHeroTimeline.smooth(visualProgress, 0.02, 0.16)))
 
                 if !usesFullBleed && !usesPopoutOverlay {
                     leftAvatarContent(
                         avatarImage: avatarImage,
                         hasPopout: hasPopout,
-                        avatarExpanded: avatarExpanded,
+                        avatarProgress: avatarVisualProgress,
                         w: w,
-                        h: h
+                        h: renderH
                     )
-                    .matchedGeometryEffect(
-                        id: HeroArtID(cardId: card.id),
-                        in: namespace,
-                        isSource: !(expandedId == card.id)
-                    )
+                    .modifier(OptionalHeroArtMatch(
+                        cardId: card.id,
+                        namespace: namespace,
+                        expandedId: expandedId,
+                        isEnabled: usesMatchedGeometry
+                    ))
                     .frame(
-                        width: w * avatarContentWidthRatio(hasPopout: hasPopout, avatarExpanded: avatarExpanded),
+                        width: w * avatarContentWidthRatio(
+                            hasPopout: hasPopout,
+                            avatarProgress: avatarVisualProgress,
+                            contentProgress: visualProgress
+                        ),
                         height: h,
                         alignment: .leading
                     )
@@ -91,16 +99,16 @@ struct FocusWalletCardView: View {
                     .allowsHitTesting(false)
                 }
 
-                rightInfoColumn(h: h, usesFullBleed: usesFullBleed)
+                rightInfoColumn(h: renderH, usesFullBleed: usesFullBleed, progress: visualProgress)
 
                 topIdentityBar(usesFullBleed: usesFullBleed)
-                    .opacity(isHeroExpanded ? 0 : 1)
+                    .opacity(1 - Double(WalletHeroTimeline.smooth(visualProgress, 0, 0.12)))
             }
             .clipShape(RoundedRectangle(cornerRadius: HeroAnim.stackCardCorner, style: .continuous))
             .petMemorialTone(isActive: card.hasPassedAway)
             .overlay(alignment: .topLeading) {
                 if usesPopoutOverlay, let popoutImage {
-                    popoutHeroSubject(popoutImage, w: w, h: h)
+                    popoutHeroSubject(popoutImage, w: w, h: h, progress: avatarVisualProgress)
                         .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .bottomLeading)))
                         .zIndex(6)
                 }
@@ -111,77 +119,126 @@ struct FocusWalletCardView: View {
                         passedAwayDate: card.passedAwayDate,
                         daysTogether: card.daysTogetherAtPassing
                     )
-                    .padding(.top, isHeroExpanded ? 16 : 12)
-                    .padding(.trailing, isHeroExpanded ? 16 : 12)
+                    .padding(.top, OhanaHeroGeometry.lerp(12, 16, progress: visualProgress))
+                    .padding(.trailing, OhanaHeroGeometry.lerp(12, 16, progress: visualProgress))
                     .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .topTrailing)))
                 }
             }
-            .animation(walletAnimation, value: isHeroExpanded)
             .animation(GoMotion.page, value: card.hasPassedAway)
         }
-        .frame(height: isHeroExpanded ? K.expandedCardH : K.cardH)
+        .frame(height: OhanaHeroGeometry.lerp(
+            K.cardH,
+            K.expandedCardH,
+            progress: isHeroExpanded ? HomeHeroTransitionProgress(value: heroProgress).clamped : 0
+        ))
         .overlay(
             RoundedRectangle(cornerRadius: HeroAnim.stackCardCorner, style: .continuous)
                 .strokeBorder(cardBorderColor, lineWidth: cardBorderWidth)
         )
         .shadow(color: cardBorderShadow, radius: cardBorderShadowRadius, y: 0) // ui-v4: allow equipped/pet-bond card border glow
-        .modifier(RealPetTransitionModifier(card: card, heroNS: heroNS))
+    }
+
+    @ViewBuilder
+    private func maybeMatchedShell<Content: View>(_ content: Content) -> some View {
+        if usesMatchedGeometry, expandedId != nil {
+            content.matchedGeometryEffect(
+                id: HeroShellID(cardId: card.id),
+                in: namespace,
+                isSource: !(expandedId == card.id)
+            )
+        } else {
+            content
+        }
     }
 
     private var petBondBorderActive: Bool {
         !card.isHuman &&
+        !card.isElectronicPet &&
         petBondVaultRevision >= 0 &&
         PetBondVaultStore.isUnlocked(.cardBorder, for: card.id)
     }
 
     private var petBondNameplateActive: Bool {
         !card.isHuman &&
+        !card.isElectronicPet &&
         petBondVaultRevision >= 0 &&
         PetBondVaultStore.isUnlocked(.nameplate, for: card.id)
     }
 
     private var cardBorderColor: Color {
+        if card.isElectronicPet { return electronicPetTint.opacity(electronicPetNeedsCare ? 0.90 : 0.72) }
         if petBondBorderActive { return Color.goYellow.opacity(0.78) }
         if equipFxLimeGlow { return Color.goPrimary.opacity(0.72) }
         return .white.opacity(0.15)
     }
 
     private var cardBorderWidth: CGFloat {
-        petBondBorderActive ? 1.8 : (equipFxLimeGlow ? 1.4 : 0.5)
+        if card.isElectronicPet { return electronicPetNeedsCare ? 1.8 : 1.25 }
+        return petBondBorderActive ? 1.8 : (equipFxLimeGlow ? 1.4 : 0.5)
     }
 
     private var cardBorderShadow: Color {
+        if card.isElectronicPet { return electronicPetTint.opacity(electronicPetNeedsCare ? 0.46 : 0.30) }
         if petBondBorderActive { return Color.goYellow.opacity(0.32) }
         if equipFxLimeGlow { return Color.goPrimary.opacity(0.34) }
         return .clear
     }
 
     private var cardBorderShadowRadius: CGFloat {
-        (petBondBorderActive || equipFxLimeGlow) ? 18 : 0
+        if card.isElectronicPet { return electronicPetNeedsCare ? 24 : 18 }
+        return (petBondBorderActive || equipFxLimeGlow) ? 18 : 0
     }
 
-    private func avatarContentWidthRatio(hasPopout: Bool, avatarExpanded: Bool) -> CGFloat {
-        let shouldUseExpandedWidth = hasPopout ? avatarExpanded : isHeroExpanded
-        if shouldUseExpandedWidth {
-            return card.isHuman ? 0.76 : 0.98
+    private var electronicPetState: OasisCritterLifeState {
+        OasisCritterLifeState(rawValue: card.critterLifeStateRaw) ?? .healthy
+    }
+
+    private var electronicPetNeedsCare: Bool {
+        switch electronicPetState {
+        case .healthy, .dead:
+            return false
+        case .needsCare, .atRisk, .sick, .critical:
+            return true
         }
+    }
+
+    private var electronicPetTint: Color {
+        switch electronicPetState {
+        case .healthy:
+            return Color.goPrimary
+        case .dead:
+            return Color.ohanaTertiaryText
+        case .needsCare, .atRisk, .sick, .critical:
+            return Color.goRed
+        }
+    }
+
+    private func avatarContentWidthRatio(hasPopout: Bool, avatarProgress: CGFloat, contentProgress: CGFloat) -> CGFloat {
+        let collapsed: CGFloat
         if hasPopout && !card.isHuman {
-            return 1.0
+            collapsed = 1.0
+        } else {
+            collapsed = 0.52
         }
-        return 0.52
+        let expanded: CGFloat = card.isHuman ? 0.76 : 0.98
+        let progress = hasPopout ? avatarProgress : contentProgress
+        return OhanaHeroGeometry.lerp(collapsed, expanded, progress: progress)
     }
 
-    private func backgroundHeadlineLayer(w: CGFloat) -> some View {
-        VStack(spacing: 4) {
+    private func backgroundHeadlineLayer(w: CGFloat, progress: CGFloat) -> some View {
+        let headlineSize = WalletPetCardTheme.headlinePointSize(cardWidth: w, headlineCount: card.name.count)
+        let textScale = OhanaHeroGeometry.lerp(0.24, 1, progress: WalletHeroTimeline.smooth(progress, 0, 1))
+        return VStack(spacing: 4) {
             Text(card.name.uppercased())
                 .font(.system(
-                    size: WalletPetCardTheme.headlinePointSize(cardWidth: w, headlineCount: card.name.count),
+                    size: headlineSize,
                     weight: .black, design: .rounded
                 ))
                 .foregroundStyle(accent.opacity(0.85))
                 .lineLimit(1)
                 .minimumScaleFactor(0.22)
                 .frame(maxWidth: .infinity, alignment: .center)
+                .scaleEffect(textScale, anchor: .top)
         }
         .padding(.horizontal, 8)
         .padding(.top, 8)
@@ -190,7 +247,7 @@ struct FocusWalletCardView: View {
     }
 
     @ViewBuilder
-    private func cardBackground(usesFullBleed: Bool) -> some View {
+    private func cardBackground(usesFullBleed: Bool, progress: CGFloat) -> some View {
         if !card.themeColorHex.isEmpty {
             let palette = WalletPetCardTheme.meshColors(for: card.themeColorHex)
             if shouldReduceWork {
@@ -225,7 +282,7 @@ struct FocusWalletCardView: View {
             colors: [
                 .clear,
                 useDarkText
-                    ? Color.goCardWhite.opacity(isHeroExpanded ? 0.30 : 0.20)
+                    ? Color.goCardWhite.opacity(Double(OhanaHeroGeometry.lerp(0.20, 0.30, progress: progress)))
                     : Color.arkInk.opacity(usesFullBleed ? 0.12 : 0.28)
             ],
             startPoint: .top, endPoint: .bottom
@@ -234,8 +291,8 @@ struct FocusWalletCardView: View {
     }
 
     @ViewBuilder
-    private func cardPhotoLayer(_ img: UIImage, w: CGFloat, h: CGFloat) -> some View {
-        if isHeroExpanded {
+    private func cardPhotoLayer(_ img: UIImage, w: CGFloat, h: CGFloat, progress: CGFloat) -> some View {
+        ZStack(alignment: .leading) {
             ZStack {
                 Image(uiImage: img)
                     .resizable()
@@ -247,7 +304,8 @@ struct FocusWalletCardView: View {
                 WalletCardTrailingReadabilityOverlay(width: w, height: h)
                 bottomRightTextShadow(width: w, height: h, isExpanded: true)
             }
-        } else {
+            .opacity(Double(progress))
+
             let photoW = compactPhotoRenderedWidth(img, h: h, cardW: w)
             ZStack(alignment: .leading) {
                 Image(uiImage: img)
@@ -261,6 +319,7 @@ struct FocusWalletCardView: View {
                     .mask(compactPhotoSoftMask(width: w, height: h))
                 bottomRightTextShadow(width: w, height: h, isExpanded: false)
             }
+            .opacity(Double(1 - progress))
         }
     }
 
@@ -312,21 +371,22 @@ struct FocusWalletCardView: View {
     }
 
     @ViewBuilder
-    private func leftAvatarContent(avatarImage: UIImage?, hasPopout: Bool, avatarExpanded: Bool, w: CGFloat, h: CGFloat) -> some View {
+    private func leftAvatarContent(avatarImage: UIImage?, hasPopout: Bool, avatarProgress: CGFloat, w: CGFloat, h: CGFloat) -> some View {
         if let img = avatarImage, hasPopout {
-            if !card.isHuman && !avatarExpanded {
-                compactPetUpperBodyAvatar(img, w: w, h: h)
-            } else {
-                fullTransparentAvatar(img, avatarExpanded: avatarExpanded, w: w, h: h)
-            }
+            transparentAvatar(img, avatarProgress: avatarProgress, w: w, h: h)
+        } else if card.isElectronicPet, let catalogId = card.critterCatalogId {
+            electronicPetAvatar(catalogId: catalogId, avatarProgress: avatarProgress, w: w, h: h)
         } else if !card.isHuman, let species = card.petSpecies {
             let silSpecies = FocusWalletCardView.normalizeSpecies(species)
             ZStack {
                 Ellipse()
                     .fill(Color.arkInk.opacity(0.16))
-                    .frame(width: w * (isHeroExpanded ? 0.32 : 0.28), height: isHeroExpanded ? 26 : 24)
+                    .frame(
+                        width: w * OhanaHeroGeometry.lerp(0.28, 0.32, progress: avatarProgress),
+                        height: OhanaHeroGeometry.lerp(24, 26, progress: avatarProgress)
+                    )
                     .blur(radius: 10)
-                    .offset(y: h * (isHeroExpanded ? 0.18 : 0.14))
+                    .offset(y: h * OhanaHeroGeometry.lerp(0.14, 0.18, progress: avatarProgress))
                 PetSilhouetteView(
                     species: silSpecies,
                     coatColor: card.coatColor,
@@ -334,12 +394,15 @@ struct FocusWalletCardView: View {
                     patternName: card.patternName,
                     isAnimationEnabled: false
                 )
-                .scaleEffect(isHeroExpanded ? 1.0 : 0.92)
+                .scaleEffect(OhanaHeroGeometry.lerp(0.92, 1.0, progress: avatarProgress))
                 .frame(
-                    width: w * (isHeroExpanded ? 0.78 : 0.38),
-                    height: h * (isHeroExpanded ? 0.90 : 0.68)
+                    width: w * OhanaHeroGeometry.lerp(0.38, 0.78, progress: avatarProgress),
+                    height: h * OhanaHeroGeometry.lerp(0.68, 0.90, progress: avatarProgress)
                 )
-                .offset(x: isHeroExpanded ? -w * 0.03 : 0, y: isHeroExpanded ? h * 0.04 : 0)
+                .offset(
+                    x: OhanaHeroGeometry.lerp(0, -w * 0.03, progress: avatarProgress),
+                    y: OhanaHeroGeometry.lerp(0, h * 0.04, progress: avatarProgress)
+                )
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if card.isHuman {
@@ -354,23 +417,24 @@ struct FocusWalletCardView: View {
         }
     }
 
-    private func compactPetUpperBodyAvatar(_ image: UIImage, w: CGFloat, h: CGFloat) -> some View {
-        Image(uiImage: image)
-            .resizable()
-            .scaledToFit()
-            .frame(width: w * 0.68, height: h * 1.42, alignment: .bottom)
-            .frame(width: w, height: h, alignment: .bottomLeading)
-            .offset(x: w * 0.01, y: h * 0.42)
-            .allowsHitTesting(false)
-            .shadow(color: Color.arkInk.opacity(0.28), radius: 18, x: 0, y: 12) // ui-v4: allow transparent avatar grounding
-    }
-
-    private func fullTransparentAvatar(_ image: UIImage, avatarExpanded: Bool, w: CGFloat, h: CGFloat) -> some View {
+    private func transparentAvatar(_ image: UIImage, avatarProgress: CGFloat, w: CGFloat, h: CGFloat) -> some View {
         let expandedColumnRatio: CGFloat = card.isHuman ? 0.70 : 0.72
-        let columnWidth = w * (avatarExpanded ? expandedColumnRatio : 0.50)
-        let avatarOffsetX = avatarExpanded ? w * (card.isHuman ? 0.04 : 0.06) : w * 0.015
-        let avatarHeight = avatarExpanded && !card.isHuman ? h * 0.94 : h
-        let avatarOffsetY = avatarExpanded && !card.isHuman ? -h * 0.02 : 0
+        let collapsedColumnRatio: CGFloat = card.isHuman ? 0.50 : 0.68
+        let columnWidth = w * OhanaHeroGeometry.lerp(collapsedColumnRatio, expandedColumnRatio, progress: avatarProgress)
+        let avatarOffsetX = OhanaHeroGeometry.lerp(
+            w * (card.isHuman ? 0.015 : 0.01),
+            w * (card.isHuman ? 0.04 : 0.06),
+            progress: avatarProgress
+        )
+        let avatarHeight: CGFloat
+        let avatarOffsetY: CGFloat
+        if card.isHuman {
+            avatarHeight = h
+            avatarOffsetY = 0
+        } else {
+            avatarHeight = OhanaHeroGeometry.lerp(h * 1.42, h * 0.94, progress: avatarProgress)
+            avatarOffsetY = OhanaHeroGeometry.lerp(h * 0.42, -h * 0.02, progress: avatarProgress)
+        }
 
         return Image(uiImage: image)
             .resizable()
@@ -382,9 +446,141 @@ struct FocusWalletCardView: View {
             .shadow(color: Color.arkInk.opacity(0.28), radius: 18, x: 0, y: 12) // ui-v4: allow transparent avatar grounding
     }
 
-    private func popoutHeroSubject(_ image: UIImage, w: CGFloat, h: CGFloat) -> some View {
+    private func electronicPetAvatar(catalogId: String, avatarProgress: CGFloat, w: CGFloat, h: CGFloat) -> some View {
+        let state = electronicPetState
+        let tint = electronicPetTint
+        return ZStack {
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [tint.opacity(state == .healthy ? 0.38 : 0.58), tint.opacity(0.16), .clear],
+                        center: .center,
+                        startRadius: 8,
+                        endRadius: w * 0.24
+                    )
+                )
+                .frame(width: w * 0.46, height: w * 0.46)
+                .blur(radius: 10)
+            electronicPetOrbitRings(tint: tint, state: state, avatarProgress: avatarProgress, w: w)
+            OasisCritterIllustration(
+                catalogId: catalogId,
+                locked: false,
+                size: min(w * OhanaHeroGeometry.lerp(0.36, 0.62, progress: avatarProgress), h * 0.72),
+                critter: nil,
+                appearanceStageOverride: card.critterAppearanceStage
+            )
+            .scaleEffect(OhanaHeroGeometry.lerp(0.94, 1.06, progress: avatarProgress))
+        }
+        .frame(width: w * 0.66, height: h, alignment: .center)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .offset(x: w * OhanaHeroGeometry.lerp(0.02, 0.05, progress: avatarProgress))
+        .allowsHitTesting(false)
+    }
+
+    private func electronicPetCardEffects(w: CGFloat, h: CGFloat, progress: CGFloat) -> some View {
+        let tint = electronicPetTint
+        let needsCare = electronicPetNeedsCare
+        let leftCenterX = w * OhanaHeroGeometry.lerp(0.24, 0.36, progress: progress)
+        let leftCenterY = h * OhanaHeroGeometry.lerp(0.54, 0.48, progress: progress)
+        return ZStack(alignment: .topLeading) {
+            RadialGradient(
+                colors: [
+                    tint.opacity(needsCare ? 0.42 : 0.30),
+                    tint.opacity(needsCare ? 0.18 : 0.12),
+                    .clear
+                ],
+                center: .center,
+                startRadius: 6,
+                endRadius: min(w, h) * OhanaHeroGeometry.lerp(0.42, 0.62, progress: progress)
+            )
+            .frame(width: w * 0.82, height: h * 0.98)
+            .position(x: leftCenterX, y: leftCenterY)
+            .blur(radius: needsCare ? 8 : 12)
+
+            electronicPetConstellation(tint: tint, needsCare: needsCare, w: w, h: h)
+
+            Capsule()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            .clear,
+                            Color.goCardWhite.opacity(needsCare ? 0.18 : 0.24),
+                            .clear
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(width: w * 0.70, height: 14)
+                .rotationEffect(.degrees(-18))
+                .offset(
+                    x: w * OhanaHeroGeometry.lerp(-0.20, 0.02, progress: progress),
+                    y: h * OhanaHeroGeometry.lerp(0.18, 0.12, progress: progress)
+                )
+                .opacity(needsCare ? 0.46 : 0.68)
+                .blur(radius: 1.5)
+
+            if needsCare {
+                RoundedRectangle(cornerRadius: HeroAnim.stackCardCorner - 2, style: .continuous)
+                    .strokeBorder(tint.opacity(0.38), style: StrokeStyle(lineWidth: 2, dash: [9, 8], dashPhase: progress * 18))
+                    .padding(5)
+                    .shadow(color: tint.opacity(0.34), radius: 14, y: 0) // ui-v4: allow critter attention glow
+            }
+        }
+        .frame(width: w, height: h)
+        .opacity(card.hasPassedAway ? 0.42 : 1)
+    }
+
+    private func electronicPetOrbitRings(tint: Color, state: OasisCritterLifeState, avatarProgress: CGFloat, w: CGFloat) -> some View {
+        let isAttention = state != .healthy && state != .dead
+        return ZStack {
+            Ellipse()
+                .strokeBorder(tint.opacity(isAttention ? 0.46 : 0.30), lineWidth: isAttention ? 1.7 : 1.1)
+                .frame(width: w * 0.40, height: w * 0.18)
+                .rotationEffect(.degrees(OhanaHeroGeometry.lerp(-16, -8, progress: avatarProgress)))
+            Ellipse()
+                .strokeBorder(Color.goCardWhite.opacity(isAttention ? 0.22 : 0.18), lineWidth: 0.8)
+                .frame(width: w * 0.34, height: w * 0.14)
+                .rotationEffect(.degrees(OhanaHeroGeometry.lerp(18, 10, progress: avatarProgress)))
+            if isAttention {
+                Image(systemName: "exclamationmark")
+                    .font(.system(size: 10, weight: .black))
+                    .foregroundStyle(Color.arkInk)
+                    .frame(width: 22, height: 22)
+                    .background(tint, in: Circle())
+                    .offset(x: w * 0.15, y: -w * 0.12)
+                    .shadow(color: tint.opacity(0.46), radius: 10, y: 0) // ui-v4: allow critter alert badge glow
+            }
+        }
+        .opacity(state == .dead ? 0.28 : 1)
+    }
+
+    private func electronicPetConstellation(tint: Color, needsCare: Bool, w: CGFloat, h: CGFloat) -> some View {
+        let points: [(CGFloat, CGFloat, CGFloat)] = [
+            (0.12, 0.25, 3.0),
+            (0.20, 0.70, 2.4),
+            (0.34, 0.18, 2.8),
+            (0.44, 0.82, 2.2),
+            (0.58, 0.26, 2.6),
+            (0.72, 0.62, 2.0)
+        ]
+        return ZStack {
+            ForEach(Array(points.enumerated()), id: \.offset) { _, point in
+                Circle()
+                    .fill((needsCare ? tint : Color.goCardWhite).opacity(needsCare ? 0.54 : 0.38))
+                    .frame(width: point.2, height: point.2)
+                    .position(x: w * point.0, y: h * point.1)
+                    .shadow(color: tint.opacity(needsCare ? 0.36 : 0.22), radius: 8, y: 0) // ui-v4: allow critter ambient particles
+            }
+        }
+        .frame(width: w, height: h)
+    }
+
+    private func popoutHeroSubject(_ image: UIImage, w: CGFloat, h: CGFloat, progress: CGFloat) -> some View {
         let artHeight = h * 1.18
         let artWidth = w * 0.70
+        let liftedY = OhanaHeroGeometry.lerp(h * 0.10, -h * 0.16, progress: progress)
+        let subjectScale = OhanaHeroGeometry.lerp(0.92, shouldReduceWork ? 1.0 : 1.035, progress: progress)
         return ZStack(alignment: .bottomLeading) {
             Ellipse()
                 .fill(Color.arkInk.opacity(0.30))
@@ -401,16 +597,17 @@ struct FocusWalletCardView: View {
                     anchor: .bottomLeading,
                     perspective: 0.54
                 )
-                .scaleEffect(shouldReduceWork ? 1.0 : 1.035, anchor: .bottomLeading)
-                .offset(x: w * 0.015, y: -h * 0.16)
+                .scaleEffect(subjectScale, anchor: .bottomLeading)
+                .offset(x: w * 0.015, y: liftedY)
                 .shadow(color: Color.arkInk.opacity(0.36), radius: 22, x: 0, y: 16) // ui-v4: allow popout subject depth
         }
         .frame(width: w, height: h, alignment: .bottomLeading)
         .allowsHitTesting(false)
     }
 
-    private func rightInfoColumn(h: CGFloat, usesFullBleed: Bool) -> some View {
-        return VStack(alignment: .trailing, spacing: isHeroExpanded ? 5 : 3) {
+    private func rightInfoColumn(h: CGFloat, usesFullBleed: Bool, progress: CGFloat) -> some View {
+        let spacing = OhanaHeroGeometry.lerp(3, 5, progress: progress)
+        return VStack(alignment: .trailing, spacing: spacing) {
             if card.streak > 1 {
                 Text("🔥 \(card.streak)天连续")
                     .font(.system(size: 10, weight: .black, design: .rounded))
@@ -420,27 +617,30 @@ struct FocusWalletCardView: View {
             }
             Spacer(minLength: 4)
             if card.isHuman {
-                humanInfoStack(usesFullBleed: usesFullBleed)
+                humanInfoStack(usesFullBleed: usesFullBleed, progress: progress)
+            } else if card.isElectronicPet {
+                electronicPetInfoStack(usesFullBleed: usesFullBleed, progress: progress)
             } else {
-                petInfoStack(usesFullBleed: usesFullBleed)
+                petInfoStack(usesFullBleed: usesFullBleed, progress: progress)
             }
-            if isHeroExpanded {
-                homeVisibilityStatusBadge.padding(.top, 8)
-            }
+            homeVisibilityStatusBadge
+                .padding(.top, 8)
+                .opacity(Double(WalletHeroTimeline.smooth(progress, 0.72, 1)))
         }
         .padding(.trailing, 16).padding(.top, 18).padding(.bottom, 16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
     }
 
-    private func humanInfoStack(usesFullBleed: Bool) -> some View {
+    private func humanInfoStack(usesFullBleed: Bool, progress: CGFloat) -> some View {
         let details = [card.zodiacText, card.mbtiText]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+        let spacing = OhanaHeroGeometry.lerp(3, 5, progress: progress)
 
-        return VStack(alignment: .trailing, spacing: isHeroExpanded ? 5 : 3) {
+        return VStack(alignment: .trailing, spacing: spacing) {
             if let title = equippedTitleBadge {
                 Text(title)
-                    .font(.system(size: isHeroExpanded ? 11 : 9, weight: .black, design: .rounded))
+                    .font(.system(size: OhanaHeroGeometry.lerp(9, 11, progress: progress), weight: .black, design: .rounded))
                     .foregroundStyle(Color.arkInk)
                     .lineLimit(1)
                     .padding(.horizontal, 8)
@@ -448,14 +648,14 @@ struct FocusWalletCardView: View {
                     .background(Color.goPrimary, in: Capsule())
             }
             Text(details.first ?? "OHANA MEMBER")
-                .font(.system(size: isHeroExpanded ? 20 : 15, weight: .black, design: .rounded))
+                .font(.system(size: OhanaHeroGeometry.lerp(15, 20, progress: progress), weight: .black, design: .rounded))
                 .foregroundStyle(cardPrimaryText(usesFullBleed: usesFullBleed))
                 .lineLimit(1)
                 .minimumScaleFactor(0.55)
 
             if details.count > 1 {
                 Text(details.dropFirst().joined(separator: " · "))
-                    .font(.system(size: isHeroExpanded ? 11 : 9, weight: .bold, design: .rounded))
+                    .font(.system(size: OhanaHeroGeometry.lerp(9, 11, progress: progress), weight: .bold, design: .rounded))
                     .foregroundStyle(cardSecondaryText(usesFullBleed: usesFullBleed, opacity: 0.78))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -463,14 +663,15 @@ struct FocusWalletCardView: View {
         }
     }
 
-    private func petInfoStack(usesFullBleed: Bool) -> some View {
+    private func petInfoStack(usesFullBleed: Bool, progress: CGFloat) -> some View {
         let meta = [card.ageText, card.humanEquivalentAgeText, card.zodiacText]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty && $0 != "未知" }
+        let spacing = OhanaHeroGeometry.lerp(3, 5, progress: progress)
 
-        return VStack(alignment: .trailing, spacing: isHeroExpanded ? 5 : 3) {
+        return VStack(alignment: .trailing, spacing: spacing) {
             Text(petTogetherHeadline)
-                .font(.system(size: isHeroExpanded ? 20 : 15, weight: .black, design: .rounded))
+                .font(.system(size: OhanaHeroGeometry.lerp(15, 20, progress: progress), weight: .black, design: .rounded))
                 .foregroundStyle(cardPrimaryText(usesFullBleed: usesFullBleed))
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
@@ -478,20 +679,46 @@ struct FocusWalletCardView: View {
             if let hint = card.personalityHint?.trimmingCharacters(in: .whitespacesAndNewlines),
                !hint.isEmpty {
                 Text(hint)
-                    .font(.system(size: isHeroExpanded ? 10.5 : 8.5, weight: .bold, design: .rounded))
+                    .font(.system(size: OhanaHeroGeometry.lerp(8.5, 10.5, progress: progress), weight: .bold, design: .rounded))
                     .foregroundStyle(cardSecondaryText(usesFullBleed: usesFullBleed, opacity: 0.82))
-                    .lineLimit(isHeroExpanded ? 2 : 1)
+                    .lineLimit(progress > 0.72 ? 2 : 1)
                     .multilineTextAlignment(.trailing)
                     .minimumScaleFactor(0.62)
             }
 
             if !meta.isEmpty {
                 Text(meta.joined(separator: " · "))
-                    .font(.system(size: isHeroExpanded ? 10 : 8.5, weight: .bold, design: .rounded))
+                    .font(.system(size: OhanaHeroGeometry.lerp(8.5, 10, progress: progress), weight: .bold, design: .rounded))
                     .foregroundStyle(cardSecondaryText(usesFullBleed: usesFullBleed, opacity: 0.76))
-                    .lineLimit(isHeroExpanded ? 2 : 1)
+                    .lineLimit(progress > 0.72 ? 2 : 1)
                     .multilineTextAlignment(.trailing)
                     .minimumScaleFactor(0.62)
+            }
+        }
+    }
+
+    private func electronicPetInfoStack(usesFullBleed: Bool, progress: CGFloat) -> some View {
+        let l = L10n(AppLanguage.code)
+        return VStack(alignment: .trailing, spacing: OhanaHeroGeometry.lerp(3, 5, progress: progress)) {
+            Text(l.tr(zh: "电子宠物", en: "Critter", de: "Critter"))
+                .font(.system(size: OhanaHeroGeometry.lerp(15, 20, progress: progress), weight: .black, design: .rounded))
+                .foregroundStyle(cardPrimaryText(usesFullBleed: usesFullBleed))
+                .lineLimit(1)
+
+            if let hint = card.personalityHint?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !hint.isEmpty {
+                Text(hint)
+                    .font(.system(size: OhanaHeroGeometry.lerp(8.5, 10.5, progress: progress), weight: .bold, design: .rounded))
+                    .foregroundStyle(cardSecondaryText(usesFullBleed: usesFullBleed, opacity: 0.82))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+
+            if let ageText = card.ageText {
+                Text(ageText)
+                    .font(.system(size: OhanaHeroGeometry.lerp(8.5, 10, progress: progress), weight: .bold, design: .rounded))
+                    .foregroundStyle(cardSecondaryText(usesFullBleed: usesFullBleed, opacity: 0.76))
+                    .lineLimit(1)
             }
         }
     }
@@ -509,9 +736,9 @@ struct FocusWalletCardView: View {
     }
 
     private var homeVisibilityStatusBadge: some View {
-        let isShown = card.isHuman
+        let isShown = card.isElectronicPet
             ? card.isShownOnHome
-            : HomeCardVisibility.isPetIDVisible(card.id, raw: hiddenHomePetIDsRaw)
+            : (card.isHuman ? card.isShownOnHome : HomeCardVisibility.isPetIDVisible(card.id, raw: hiddenHomePetIDsRaw))
         return HStack(spacing: 6) {
             Image(systemName: isShown ? "house.fill" : "house.slash.fill")
                 .font(.system(size: 10, weight: .black))
@@ -613,7 +840,7 @@ struct FocusWalletCardView: View {
 }
 
 @MainActor
-private enum FocusPopoutImageCache {
+enum FocusPopoutImageCache {
     private struct Entry {
         let signature: String
         let image: UIImage?
@@ -634,6 +861,26 @@ private enum FocusPopoutImageCache {
         let image = raw.flatMap { ImageCutoutService.trimmedTransparentSubjectImage(from: $0) } ?? raw
         entries[id] = Entry(signature: signature, image: image)
         return image
+    }
+}
+
+private struct OptionalHeroArtMatch: ViewModifier {
+    let cardId: UUID
+    let namespace: Namespace.ID
+    let expandedId: UUID?
+    let isEnabled: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isEnabled, expandedId != nil {
+            content.matchedGeometryEffect(
+                id: HeroArtID(cardId: cardId),
+                in: namespace,
+                isSource: !(expandedId == cardId)
+            )
+        } else {
+            content
+        }
     }
 }
 

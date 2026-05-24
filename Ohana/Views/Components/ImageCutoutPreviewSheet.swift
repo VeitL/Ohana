@@ -107,7 +107,7 @@ struct ImageCutoutPreviewSheet: View {
             }
         }
         .presentationDetents([.height(520)])
-        .presentationDragIndicator(.visible)
+        .presentationDragIndicator(.hidden)
         .task { await runCutout() }
     }
 

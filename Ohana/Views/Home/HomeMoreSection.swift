@@ -28,13 +28,9 @@ struct HomeMoreSection<Memory: View, Stats: View>: View {
                         if hasStats {  stats()  }
                     }
                     .padding(.top, 16)
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .move(edge: .top)),
-                        removal: .opacity
-                    ))
                 }
             }
-            .animation(.spring(response: 0.45, dampingFraction: 0.82), value: expanded)
+            .animation(GoMotion.quick, value: expanded)
         } else {
             EmptyView()
         }
@@ -43,7 +39,7 @@ struct HomeMoreSection<Memory: View, Stats: View>: View {
     private var header: some View {
         Button {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            withAnimation { expanded.toggle() }
+            withAnimation(GoMotion.quick) { expanded.toggle() }
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: expanded ? "chevron.up" : "chevron.down")

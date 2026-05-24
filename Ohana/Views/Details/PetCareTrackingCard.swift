@@ -100,14 +100,13 @@ struct PetCareTrackingCard: View {
                 .padding(.horizontal, 14).padding(.vertical, 10)
                 .background(Color.arkInk.opacity(0.8), in: Capsule())
                 .padding(.horizontal, 8).padding(.bottom, 4)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .animation(GoMotion.feedback, value: undoLog != nil)
         .sheet(isPresented: $showingDetail) {
             CareTrackingDetailSheet(pet: pet)
                 .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+                .presentationDragIndicator(.hidden)
         }
     }
 }
@@ -215,13 +214,12 @@ struct CareTrackingDetailSheet: View {
                 .frame(maxHeight: .infinity)
             }
 
-            if showAddFeed {
-                Color.arkInk.opacity(0.22) // ui-v4: allow modal scrim behind inline numeric popup
-                    .ignoresSafeArea()
-                    .onTapGesture { closeAddFeedOverlay() }
-                    .transition(.opacity)
+                if showAddFeed {
+                    Color.arkInk.opacity(0.22) // ui-v4: allow modal scrim behind inline numeric popup
+                        .ignoresSafeArea()
+                        .onTapGesture { closeAddFeedOverlay() }
 
-                VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 14) {
                     HStack {
                         Label("添加喂食", systemImage: "fork.knife")
                             .font(OhanaFont.title3(.black))
@@ -263,7 +261,6 @@ struct CareTrackingDetailSheet: View {
                 .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
                 .padding(.horizontal, 12)
                 .padding(.bottom, 20)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
                 .zIndex(2)
             }
         }

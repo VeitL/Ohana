@@ -260,7 +260,7 @@ struct FeedPlanMonthlyCalendarView: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 38)
                 }
-                .buttonStyle(.plain) // ui-v4: allow calendar day cells use custom press surface
+                .buttonStyle(ScaleButtonStyle())
             } else {
                 Color.clear
                     .frame(maxWidth: .infinity, minHeight: 38)

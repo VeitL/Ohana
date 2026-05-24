@@ -235,7 +235,7 @@ struct FamilyCollaborationDashboardView: View {
                     }
                 }
             }
-            .presentationDetents([.large]) // ui-v4: allow more collaboration is a long overview
+            .ohanaSheetPagePresentation() // ui-v4: allow more collaboration is a long overview
         }
         .interactiveDismissDisabled(activeEditor != nil)
     }

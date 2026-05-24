@@ -65,7 +65,7 @@ struct CoconutRewardFeedbackOverlay: View {
     @State private var burstPhase = false
 
     private var shouldAnimate: Bool {
-        !reduceMotion && workloadPolicy.shouldAnimate(isVisible: true)
+        !reduceMotion && workloadPolicy.shouldRunInteractionAnimation(isVisible: true)
     }
 
     var body: some View {

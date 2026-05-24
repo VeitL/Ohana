@@ -119,7 +119,7 @@ struct GenericWeightEntrySheet: View {
             let panelHeightEstimate = min(maxPanelHeight, max(adaptiveSheetHeight, minPanelHeight))
             let hiddenOffset = panelHeightEstimate + 72
 
-            ZStack(alignment: .bottom) {
+            OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: popupVisible) {
                 popupBackdrop
                     .opacity(popupVisible ? 1 : 0)
 
@@ -179,7 +179,6 @@ struct GenericWeightEntrySheet: View {
                 )
             }
         }
-        .transition(.opacity)
         .allowsHitTesting(popupVisible && !isClosing)
         .animation(popupAnimation, value: popupVisible)
         .presentationBackground(.clear)

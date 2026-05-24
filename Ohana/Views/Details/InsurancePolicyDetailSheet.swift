@@ -75,7 +75,6 @@ struct InsurancePolicyDetailSheet: View {
                 ProtectionInsurancePopup(pet: pet, existing: insurance) {
                     withAnimation(GoMotion.page) { showEdit = false }
                 }
-                .transition(.opacity)
                 .zIndex(30)
             }
 
@@ -83,7 +82,6 @@ struct InsurancePolicyDetailSheet: View {
                 InsuranceClaimPopup(insurance: insurance, pet: pet) {
                     withAnimation(GoMotion.page) { showAddClaim = false }
                 }
-                .transition(.opacity)
                 .zIndex(31)
             }
         }

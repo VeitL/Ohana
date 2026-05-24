@@ -186,9 +186,7 @@ private enum InputLatencyWarmupService {
         guard !didWarmUp else { return }
         didWarmUp = true
 
-        UIImpactFeedbackGenerator(style: .light).prepare()
-        UIImpactFeedbackGenerator(style: .medium).prepare()
-        UISelectionFeedbackGenerator().prepare()
+        OhanaFeedback.prepareInteraction()
 
         guard UIApplication.shared.applicationState == .active,
               let scene = UIApplication.shared.connectedScenes

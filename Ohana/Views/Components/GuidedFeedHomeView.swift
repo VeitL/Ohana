@@ -80,7 +80,6 @@ struct GuidedFeedHomeView: View {
 
             FeedDiscoveryDock(items: dockItems)
         }
-        .animation(GoMotion.page, value: task.metricValue)
     }
 }
 

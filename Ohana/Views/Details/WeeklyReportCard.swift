@@ -13,6 +13,12 @@ struct WeeklyReportCard: View {
     @State private var isSharing = false
     @State private var shareImage: UIImage? = nil
     @State private var pulseShare = false
+    @State private var isVisible = false
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+
+    private var shouldPulseShare: Bool {
+        workloadPolicy.shouldRunRepeatingAnimation(isVisible: isVisible)
+    }
     
     private var weekStart: Date {
         Calendar.current.dateInterval(of: .weekOfYear, for: Date())?.start ?? Date()
@@ -71,9 +77,19 @@ struct WeeklyReportCard: View {
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 10).padding(.vertical, 5)
                         .background(Color.goPrimary, in: Capsule())
-                        .scaleEffect(pulseShare ? 1.06 : 1.0)
-                        .animation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: pulseShare)
-                        .onAppear { pulseShare = true }
+                        .scaleEffect(shouldPulseShare && pulseShare ? 1.06 : 1.0)
+                        .animation(shouldPulseShare ? .easeInOut(duration: 1.4).repeatForever(autoreverses: true) : GoMotion.reduced, value: pulseShare)
+                        .onAppear {
+                            isVisible = true
+                            pulseShare = shouldPulseShare
+                        }
+                        .onDisappear {
+                            isVisible = false
+                            pulseShare = false
+                        }
+                        .onChange(of: shouldPulseShare) { _, canRun in
+                            pulseShare = canRun
+                        }
                     }
                 }
                 .disabled(isRendering)

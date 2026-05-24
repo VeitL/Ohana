@@ -12,6 +12,7 @@ struct OasisRewardView: View {
     var hideToolbar: Bool = false
     var rulesTrigger: Bool = false
     var inventoryTrigger: Bool = false
+    var injectEnergyTrigger: Int = 0
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -34,6 +35,7 @@ struct OasisRewardView: View {
     @State private var showCheckInCalendar  = false
     @State private var showCheckInSheet     = false
     @State private var showCritterNest      = false
+    @State private var critterNestPopupProgress: CGFloat = 0
     @State private var showCritterCodex     = false
     @State private var energyParticles: [EnergyParticle] = []
     // 模块六：打卡日历
@@ -87,8 +89,31 @@ struct OasisRewardView: View {
         activeHuman?.coconutBalance ?? QuestManager.shared.coconutCount
     }
 
+    private var contentTopInset: CGFloat {
+        hideToolbar ? 32 : 64
+    }
+
+    private var treeSceneTopPadding: CGFloat {
+        hideToolbar ? 10 : 12
+    }
+
     private var shouldRunAmbientMotion: Bool {
         workloadPolicy.shouldAnimate(isVisible: isVisible)
+    }
+
+    private var makeupConfirmationTitle: String {
+        showMakeupConfirm.map { "补签 \($0)？" } ?? ""
+    }
+
+    private var makeupConfirmationBinding: Binding<Bool> {
+        Binding(
+            get: { showMakeupConfirm != nil },
+            set: { newValue in
+                if !newValue {
+                    showMakeupConfirm = nil
+                }
+            }
+        )
     }
 
     private struct EnergyParticle: Identifiable {
@@ -141,25 +166,12 @@ struct OasisRewardView: View {
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 0) {
-                    // R6: 全局 header 占位
-                    Spacer().frame(height: 70)
-
-                    // 新手任务面板
-                    if !QuestManager.shared.isAllWelcomeQuestsCompleted {
-                        WelcomeQuestBentoView()
-                            .padding(.horizontal, 20).padding(.top, 12)
-                            .transition(.move(edge: .top).combined(with: .opacity))
-                    }
-
-                    // ── 页面标题区
-                    oasisHeader
-                        .padding(.top, 16)
-                        .padding(.horizontal, 24)
+                    Spacer().frame(height: contentTopInset)
 
                     // ── 生命之树核心卡片（夜空风格）
                     treeSceneCard
                         .padding(.horizontal, 16)
-                        .padding(.top, 18)
+                        .padding(.top, treeSceneTopPadding)
 
                     // ── Bento 功能区（紧凑小卡）
                     oasisBentoGrid
@@ -176,45 +188,42 @@ struct OasisRewardView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .zIndex(120)
             }
+
+            if showCritterNest || critterNestPopupProgress > 0.001 {
+                critterNestPopupOverlay
+                    .zIndex(180)
+            }
         }
         .fullScreenCover(isPresented: $showingCoconutLog) { CoconutLogView() }
-        .sheet(isPresented: $showCoconutRules) { CoconutRulesSheet() }
+        .sheet(isPresented: $showCoconutRules) {
+            CoconutRulesSheet()
+                .ohanaSheetPagePresentation() // ui-v4: allow rules reference sheet
+        }
         .sheet(isPresented: $showAchievements) {
             if let pet = pets.first {
                 AchievementWallView(pet: pet, allPets: pets)
-                    .presentationDetents([.large]) // ui-v4: allow long achievement overview
+                    .ohanaSheetPagePresentation() // ui-v4: allow long achievement overview
             }
         }
         .sheet(isPresented: $showInventory) {
             InventoryView()
-                .presentationDetents([.large]) // ui-v4: allow long inventory overview
+                .ohanaSheetPagePresentation() // ui-v4: allow long inventory overview
         }
         .sheet(isPresented: $showCoconutShop) {
             CoconutShopView(initialCategory: coconutShopInitialCategory)
-                .presentationDetents([.large]) // ui-v4: allow long shop overview
+                .ohanaSheetPagePresentation() // ui-v4: allow long shop overview
         }
-        .overlay {
-            if showGacha {
-                GachaView(drawsBackground: false) {
-                    withAnimation(GoMotion.page) {
-                        showGacha = false
-                    }
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .zIndex(20)
-            }
+        .sheet(isPresented: $showGacha) {
+            GachaView()
+                .ohanaSheetPagePresentation() // ui-v4: allow long blind-box overview
         }
         .sheet(isPresented: $showCheckInSheet) {
             DailyStreakDetailView(pets: pets, onClose: { showCheckInSheet = false })
-                .presentationDetents([.large]) // ui-v4: allow long streak overview
+                .ohanaSheetPagePresentation() // ui-v4: allow long streak overview
         }
         .sheet(isPresented: $showCritterCodex) {
             OasisCritterCodexView(mode: .codex)
-                .presentationDetents([.large]) // ui-v4: allow long critter codex overview
-        }
-        .sheet(isPresented: $showCritterNest) {
-            OasisCritterCodexView(mode: .nest)
-                .presentationDetents([.large]) // ui-v4: allow long critter nest overview
+                .ohanaSheetPagePresentation() // ui-v4: allow long critter codex overview
         }
         .onAppear {
             isVisible = true
@@ -242,8 +251,8 @@ struct OasisRewardView: View {
         }
         // 补签确认弹窗
         .confirmationDialog(
-            showMakeupConfirm.map { "补签 \($0)？" } ?? "",
-            isPresented: Binding(get: { showMakeupConfirm != nil }, set: { if !$0 { showMakeupConfirm = nil } }),
+            makeupConfirmationTitle,
+            isPresented: makeupConfirmationBinding,
             titleVisibility: .visible
         ) {
             Button("消耗1个补签包确认补签") {
@@ -258,6 +267,7 @@ struct OasisRewardView: View {
         .onChange(of: electronicPets.count) { _, _ in refreshFeaturedCritterLifecycle() }
         .onChange(of: rulesTrigger) { _, _ in showCoconutRules = true }
         .onChange(of: inventoryTrigger) { _, _ in showInventory = true }
+        .onChange(of: injectEnergyTrigger) { _, _ in injectTreeEnergy() }
     }
 
     // MARK: - Navy Background
@@ -327,29 +337,16 @@ struct OasisRewardView: View {
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             Spacer()
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                showingCoconutLog = true
-            } label: {
-                HStack(spacing: 5) {
-                    Text("🥥")
-                        .font(.system(size: 15))
-                    Text("\(activeHumanCoconutBalance)")
-                        .font(.system(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryActionText)
-                        .contentTransition(.numericText())
-                        .ohanaNumericMotion(activeHumanCoconutBalance)
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.system(size: 10, weight: .black))
-                        .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
-                }
-                .padding(.horizontal, 14).padding(.vertical, 7)
-                .background(Color.goPrimary, in: Capsule())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel("椰子资产 \(activeHumanCoconutBalance)")
-            .accessibilityHint("打开椰子历史")
+            headerCoconutBalanceButton
         }
+    }
+
+    private var headerCoconutBalanceButton: some View {
+        CoconutBalanceCapsule(balance: activeHumanCoconutBalance, showsDeltaAnimation: true) {
+            showingCoconutLog = true
+        }
+        .accessibilityLabel("椰子资产 \(activeHumanCoconutBalance)")
+        .accessibilityHint("打开椰子历史")
     }
 
     // MARK: - Life Tree Stage
@@ -407,10 +404,9 @@ struct OasisRewardView: View {
                     }
 
                     treeCritterEntryButton
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                        .padding(.trailing, 26)
-                        .padding(.bottom, 140)
-                        .zIndex(4)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .offset(x: 78, y: -28)
+                        .zIndex(5)
                 }
 
                 stageUpgradeCoconutDock
@@ -573,7 +569,7 @@ struct OasisRewardView: View {
                 .blur(radius: isInjecting ? 5 : 10)
                 .opacity(isInjecting ? 0.9 : 0)
                 .offset(y: isInjecting ? -138 : -18)
-                .animation(GoMotion.feedback, value: injectionPulseToken)
+                .animation(GoMotion.quick, value: injectionPulseToken)
         }
         .allowsHitTesting(false)
     }
@@ -611,15 +607,26 @@ struct OasisRewardView: View {
             openCritterEntry()
         } label: {
             ZStack(alignment: .bottomTrailing) {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(Color.ohanaControlFill)
-                    .frame(width: 66, height: 66)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
-                            .strokeBorder(tint.opacity(isLocked ? 0.28 : 0.62), lineWidth: isLocked ? 1 : 1.6)
-                    )
+                if !isLocked {
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    critterLifecycleAuraTint(snapshot?.state ?? .healthy).opacity(snapshot?.state == .healthy ? 0.42 : 0.68),
+                                    critterLifecycleAuraTint(snapshot?.state ?? .healthy).opacity(0.18),
+                                    .clear
+                                ],
+                                center: .center,
+                                startRadius: 6,
+                                endRadius: 42
+                            )
+                        )
+                        .frame(width: 82, height: 82)
+                        .blur(radius: snapshot?.state == .healthy ? 8 : 12)
+                        .shadow(color: critterLifecycleAuraTint(snapshot?.state ?? .healthy).opacity(snapshot?.state == .healthy ? 0.24 : 0.54), radius: 18, y: 0) // ui-v4: allow state aura for tree critter
+                }
 
-                OasisCritterIllustration(catalogId: catalogId, locked: isLocked, size: 54, critter: critter)
+                OasisCritterIllustration(catalogId: catalogId, locked: isLocked, size: 60, critter: critter)
                     .offset(y: -2)
 
                 Image(systemName: statusIcon)
@@ -631,7 +638,7 @@ struct OasisRewardView: View {
                     .offset(x: 3, y: 3)
             }
             .overlay(alignment: .bottom) {
-                Text(critter?.displayName(l) ?? l.tr(zh: "Lv.5", en: "Lv.5", de: "Lv.5"))
+                Text(critter?.displayName(l) ?? l.tr(zh: "Lv.10", en: "Lv.10", de: "Lv.10"))
                     .font(.system(size: 9, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
@@ -641,11 +648,62 @@ struct OasisRewardView: View {
                     .background(Color.ohanaCardSurface.opacity(0.84), in: Capsule())
                     .offset(y: 13)
             }
-            .frame(width: 74, height: 82)
+            .frame(width: 82, height: 88)
             .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(critter == nil ? nextCritterGoalText : l.tr(zh: "电子宠物小窝", en: "Critter nest", de: "Critter-Nest"))
+    }
+
+    private var critterNestPopupOverlay: some View {
+        GeometryReader { proxy in
+            let progress = min(max(critterNestPopupProgress, 0), 1)
+            ZStack {
+                Color.black.opacity(0.34 * Double(progress)) // ui-v4: allow modal scrim
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        closeCritterNest()
+                    }
+
+                OasisCritterCodexView(mode: .nest, isPopup: true) {
+                    closeCritterNest()
+                }
+                .frame(
+                    width: min(proxy.size.width - 20, 430),
+                    height: min(proxy.size.height - 86, 760)
+                )
+                .padding(.horizontal, 10)
+                .scaleEffect(0.92 + 0.08 * progress, anchor: .center)
+                .offset(y: (1 - progress) * 24)
+                .opacity(Double(progress))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .allowsHitTesting(progress > 0.04)
+        }
+    }
+
+    private var critterNestPopupOpenAnimation: Animation {
+        shouldRunAmbientMotion ? GoMotion.heroExpand : GoMotion.reduced
+    }
+
+    private var critterNestPopupCloseAnimation: Animation {
+        shouldRunAmbientMotion ? GoMotion.heroCollapse : GoMotion.reduced
+    }
+
+    private var critterNestPopupCloseDelay: Double {
+        shouldRunAmbientMotion ? 0.54 : 0.12
+    }
+
+    private func closeCritterNest() {
+        guard showCritterNest || critterNestPopupProgress > 0.001 else { return }
+        withAnimation(critterNestPopupCloseAnimation) {
+            critterNestPopupProgress = 0
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + critterNestPopupCloseDelay) {
+            if critterNestPopupProgress <= 0.001 {
+                showCritterNest = false
+            }
+        }
     }
 
     private var stageUpgradeCoconutDock: some View {
@@ -743,7 +801,7 @@ struct OasisRewardView: View {
     }
 
     private var stageInjectButton: some View {
-        let canInject = OasisCritterEconomyService.canSpendCurrentHumanCoconuts(10, context: modelContext) && !isInjecting
+        let canInject = OasisCritterEconomyService.canSpendCurrentHumanCoconuts(10, context: modelContext)
         return Button {
             injectTreeEnergy()
         } label: {
@@ -879,9 +937,11 @@ struct OasisRewardView: View {
     }
 
     private var nextCritterTargetCatalogId: String {
-        treeMgr.treeLevel.rawValue < 5
-            ? OasisUpgradeRewardCatalog.firstCritterId
-            : OasisUpgradeRewardCatalog.legendaryCritterId
+        let ownedIds = Set(electronicPets.filter { !$0.isArchived }.map(\.catalogId))
+        return OasisUpgradeRewardCatalog.critters
+            .sorted { $0.sourceLevel < $1.sourceLevel }
+            .first { !ownedIds.contains($0.id) }?
+            .id ?? OasisUpgradeRewardCatalog.firstCritterId
     }
 
     private func harvestTreeCoconut(_ idx: Int) {
@@ -923,31 +983,36 @@ struct OasisRewardView: View {
     private func openCritterEntry() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         showCritterNest = true
+        critterNestPopupProgress = max(critterNestPopupProgress, 0.001)
+        withAnimation(critterNestPopupOpenAnimation) {
+            critterNestPopupProgress = 1
+        }
     }
 
     private func injectTreeEnergy() {
-        guard !isInjecting else { return }
         guard OasisCritterEconomyService.canSpendCurrentHumanCoconuts(10, context: modelContext) else {
             UINotificationFeedbackGenerator().notificationOccurred(.error)
             return
         }
 
         let beforeLevel = treeMgr.treeLevel
-        withAnimation(GoMotion.feedback) {
-            injectionPulseToken += 1
-            isInjecting = true
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.72) {
-            withAnimation(GoMotion.quick) {
-                isInjecting = false
-            }
-        }
 
         if treeMgr.injectEnergy(cost: 10, modelContext: modelContext) {
-            spawnEnergyParticles(count: 12)
+            injectionPulseToken += 1
+            let pulseToken = injectionPulseToken
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            withAnimation(GoMotion.quick) {
+                isInjecting = true
+            }
+            spawnEnergyParticles(count: 8)
             if treeMgr.treeLevel != beforeLevel {
                 triggerLevelUpFeedback()
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
+                guard injectionPulseToken == pulseToken else { return }
+                withAnimation(GoMotion.quick) {
+                    isInjecting = false
+                }
             }
         } else {
             withAnimation(GoMotion.quick) {
@@ -1012,8 +1077,8 @@ struct OasisRewardView: View {
 
                 if featuredCritter == nil {
                     HStack(spacing: 10) {
-                        critterMilestonePill(level: 5, catalogId: OasisUpgradeRewardCatalog.firstCritterId)
-                        critterMilestonePill(level: 10, catalogId: OasisUpgradeRewardCatalog.legendaryCritterId)
+                        critterMilestonePill(level: 10, catalogId: OasisUpgradeRewardCatalog.firstCritterId)
+                        critterMilestonePill(level: 20, catalogId: OasisUpgradeRewardCatalog.legendaryCritterId)
                     }
                 } else if let critter = featuredCritter {
                     let snapshot = OasisUpgradeRewardService.lifecycleSnapshot(for: critter, context: modelContext)
@@ -1097,17 +1162,21 @@ struct OasisRewardView: View {
     }
 
     private var nextCritterMilestoneLevel: Int {
-        treeMgr.treeLevel.rawValue < 5 ? 5 : 10
+        OasisUpgradeRewardCatalog.critter(id: nextCritterTargetCatalogId)?.sourceLevel ?? 10
     }
 
     private var nextCritterGoalText: String {
-        if treeMgr.treeLevel.rawValue < 5 {
-            return l.tr(zh: "Lv.5 保底 Lumo", en: "Lv.5 guarantees Lumo", de: "Lv.5 garantiert Lumo")
+        guard let entry = OasisUpgradeRewardCatalog.critter(id: nextCritterTargetCatalogId) else {
+            return l.tr(zh: "Lv.10 保底 Lumo", en: "Lv.10 guarantees Lumo", de: "Lv.10 garantiert Lumo")
         }
-        if treeMgr.treeLevel.rawValue < 10 {
-            return l.tr(zh: "Lv.10 保底极光灵", en: "Lv.10 guarantees Aurora Luma", de: "Lv.10 garantiert Aurora Luma")
+        if treeMgr.treeLevel.rawValue < entry.sourceLevel {
+            return l.tr(
+                zh: "Lv.\(entry.sourceLevel) 保底 \(entry.nameZh)",
+                en: "Lv.\(entry.sourceLevel) guarantees \(entry.nameEn)",
+                de: "Lv.\(entry.sourceLevel) garantiert \(entry.nameDe)"
+            )
         }
-        return l.tr(zh: "传说伙伴已在树顶等待", en: "Legendary companion awaits", de: "Legendärer Begleiter wartet")
+        return l.tr(zh: "\(entry.nameZh) 正在树上等待", en: "\(entry.nameEn) is waiting in the tree", de: "\(entry.nameDe) wartet im Baum")
     }
 
     private var milestoneProgressBar: some View {
@@ -1295,6 +1364,17 @@ struct OasisRewardView: View {
         case .sick: return Color.goPurple
         case .critical: return Color.goYellow
         case .dead: return Color.ohanaCardSurface
+        }
+    }
+
+    private func critterLifecycleAuraTint(_ state: OasisCritterLifeState) -> Color {
+        switch state {
+        case .healthy:
+            return Color.goPrimary
+        case .dead:
+            return Color.ohanaTertiaryText
+        case .needsCare, .atRisk, .sick, .critical:
+            return Color.goRed
         }
     }
 
@@ -2286,15 +2366,13 @@ struct OasisRewardView: View {
             // 行二：伙伴图鉴 + 盲盒
             HStack(spacing: 8) {
                 bentoMiniCard(emoji: "🐾", title: l.tr(zh: "伙伴", en: "Critters", de: "Critter"),
-                    metric: electronicPets.isEmpty ? "Lv.5" : "\(electronicPets.filter { !$0.isArchived }.count)/\(OasisUpgradeRewardCatalog.critters.count)",
+                    metric: electronicPets.isEmpty ? "Lv.10" : "\(electronicPets.filter { !$0.isArchived }.count)/\(OasisUpgradeRewardCatalog.critters.count)",
                     accent: Color.goTeal,
                     action: { showCritterCodex = true })
                 bentoMiniCard(emoji: "🎁", title: l.tr(zh: "盲盒", en: "Blind Box", de: "Blind Box"),
                     metric: "80🥥", accent: Color.goPrimary,
                     action: {
-                        withAnimation(GoMotion.page) {
-                            showGacha = true
-                        }
+                        showGacha = true
                     })
             }
         }
@@ -2505,8 +2583,7 @@ private struct CoconutRulesSheet: View {
                 }
             }
         }
-        .presentationDetents([.large]) // ui-v4: allow rules reference sheet
-        .presentationDragIndicator(.visible)
+        .ohanaSheetPagePresentation() // ui-v4: allow rules reference sheet
         .onAppear {
             withAnimation(GoMotion.page) { appeared = true }
         }

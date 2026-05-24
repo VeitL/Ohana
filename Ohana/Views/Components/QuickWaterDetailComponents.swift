@@ -111,11 +111,20 @@ struct WaterCoreCard: View {
     var secondaryAction: (() -> Void)?
     var tapAction: (() -> Void)?
     var feedbackToken: CheckInFeedbackToken? = nil
+    var isWarning: Bool = false
 
     @Environment(\.colorScheme) private var colorScheme
 
-    private var surface: some ShapeStyle {
-        Color.ohanaCardSurface
+    private var cardTint: Color {
+        isWarning ? Color.goRed : tint
+    }
+
+    private var cardSurface: Color {
+        isWarning ? Color.goRed.opacity(0.18) : Color.ohanaCardSurface
+    }
+
+    private var cardStroke: Color {
+        isWarning ? Color.goRed.opacity(0.72) : Color.ohanaCardStroke
     }
 
     var body: some View {
@@ -135,7 +144,7 @@ struct WaterCoreCard: View {
                         .frame(minWidth: 72)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 9)
-                        .background(tint, in: Capsule())
+                        .background(cardTint, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
 
@@ -143,11 +152,11 @@ struct WaterCoreCard: View {
                         Button(action: secondaryAction) {
                             Text(secondaryTitle)
                                 .font(.system(size: 12, weight: .black, design: .rounded))
-                                .foregroundStyle(tint)
+                                .foregroundStyle(cardTint)
                                 .frame(minWidth: 72)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 7)
-                                .background(Color.ohanaCardSurfaceElevated, in: Capsule())
+                                .background(isWarning ? Color.goRed.opacity(0.16) : Color.ohanaCardSurfaceElevated, in: Capsule())
                         }
                         .buttonStyle(ScaleButtonStyle())
                     }
@@ -160,10 +169,10 @@ struct WaterCoreCard: View {
             }
         }
         .padding(16)
-        .background(surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(cardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+                .strokeBorder(cardStroke, lineWidth: isWarning ? 1.5 : 1)
         )
         .checkInPulse(feedbackToken)
     }
@@ -184,31 +193,37 @@ struct WaterCoreCard: View {
         HStack(spacing: 14) {
             ZStack {
                 if let progress {
-                    WaterProgressRing(progress: progress, tint: tint)
+                    WaterProgressRing(progress: progress, tint: cardTint)
                         .frame(width: 58, height: 58)
                 } else {
                     Circle()
-                        .stroke(tint.opacity(0.2), lineWidth: 7)
+                        .stroke(cardTint.opacity(0.2), lineWidth: 7)
                         .frame(width: 58, height: 58)
                 }
                 Image(systemName: icon)
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(tint)
+                    .foregroundStyle(cardTint)
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
+                HStack(spacing: 6) {
+                    Text(title)
+                        .font(.system(size: 16, weight: .black, design: .rounded))
+                    if isWarning {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 12, weight: .black))
+                    }
+                }
+                .foregroundStyle(isWarning ? Color.goRed : Color.ohanaPrimaryText)
                 Text(value)
                     .font(.system(size: 24, weight: .black, design: .rounded))
-                    .foregroundStyle(tint)
+                    .foregroundStyle(cardTint)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                     .contentTransition(.numericText())
                 Text(subtitle)
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .foregroundStyle(isWarning ? Color.goRed.opacity(0.92) : Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }

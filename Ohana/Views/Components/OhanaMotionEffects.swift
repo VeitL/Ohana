@@ -4,6 +4,16 @@ import UIKit
 #endif
 
 enum OhanaFeedback {
+    private static let lightGenerator = UIImpactFeedbackGenerator(style: .light)
+    private static let mediumGenerator = UIImpactFeedbackGenerator(style: .medium)
+    private static let strongGenerator = UIImpactFeedbackGenerator(style: .heavy)
+    private static let softGenerator = UIImpactFeedbackGenerator(style: .soft)
+    private static let selectionGenerator = UISelectionFeedbackGenerator()
+    private static let notificationGenerator = UINotificationFeedbackGenerator()
+    private static var lastImpactAt: CFAbsoluteTime = 0
+    private static var lastSelectionAt: CFAbsoluteTime = 0
+    private static var lastNotificationAt: CFAbsoluteTime = 0
+
     static func light() {
         impact(.light)
     }
@@ -14,6 +24,21 @@ enum OhanaFeedback {
 
     static func strong() {
         impact(.heavy)
+    }
+
+    static func soft() {
+        impact(.soft)
+    }
+
+    static func selection() {
+        #if os(iOS)
+        guard canPlayFeedback else { return }
+        let now = CFAbsoluteTimeGetCurrent()
+        guard now - lastSelectionAt > 0.035 else { return }
+        lastSelectionAt = now
+        selectionGenerator.selectionChanged()
+        selectionGenerator.prepare()
+        #endif
     }
 
     static func success() {
@@ -28,18 +53,58 @@ enum OhanaFeedback {
         notification(.error)
     }
 
+    static func prepareInteraction() {
+        #if os(iOS)
+        guard canPlayFeedback else { return }
+        lightGenerator.prepare()
+        mediumGenerator.prepare()
+        softGenerator.prepare()
+        selectionGenerator.prepare()
+        #endif
+    }
+
     private static func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
         #if os(iOS)
-        guard !ProcessInfo.processInfo.isLowPowerModeEnabled else { return }
-        UIImpactFeedbackGenerator(style: style).impactOccurred()
+        guard canPlayFeedback else { return }
+        let now = CFAbsoluteTimeGetCurrent()
+        guard now - lastImpactAt > 0.045 else { return }
+        lastImpactAt = now
+        let generator = impactGenerator(for: style)
+        generator.impactOccurred()
+        generator.prepare()
         #endif
     }
 
     private static func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
         #if os(iOS)
-        guard !ProcessInfo.processInfo.isLowPowerModeEnabled else { return }
-        UINotificationFeedbackGenerator().notificationOccurred(type)
+        guard canPlayFeedback else { return }
+        let now = CFAbsoluteTimeGetCurrent()
+        guard now - lastNotificationAt > 0.20 else { return }
+        lastNotificationAt = now
+        notificationGenerator.notificationOccurred(type)
+        notificationGenerator.prepare()
         #endif
+    }
+
+    private static var canPlayFeedback: Bool {
+        !ProcessInfo.processInfo.isLowPowerModeEnabled
+    }
+
+    private static func impactGenerator(for style: UIImpactFeedbackGenerator.FeedbackStyle) -> UIImpactFeedbackGenerator {
+        switch style {
+        case .light:
+            return lightGenerator
+        case .medium:
+            return mediumGenerator
+        case .heavy:
+            return strongGenerator
+        case .soft:
+            return softGenerator
+        case .rigid:
+            return mediumGenerator
+        @unknown default:
+            return mediumGenerator
+        }
     }
 }
 
@@ -279,7 +344,7 @@ private struct OhanaStaggeredMenuItemModifier: ViewModifier {
     let anchor: UnitPoint
 
     private var canAnimate: Bool {
-        !reduceMotion && workloadPolicy.shouldAnimate(isVisible: true)
+        !reduceMotion && workloadPolicy.shouldRunInteractionAnimation(isVisible: true)
     }
 
     private var delay: Double {
@@ -304,9 +369,10 @@ private struct OhanaInlineMenuMotionModifier<Trigger: Equatable>: ViewModifier {
     let trigger: Trigger
 
     func body(content: Content) -> some View {
+        let canAnimate = !reduceMotion && workloadPolicy.shouldRunInteractionAnimation(isVisible: true)
         content
-            .transition(.ohanaPop)
-            .ohanaPhasePop(trigger: trigger, enabled: !reduceMotion && workloadPolicy.shouldAnimate(isVisible: true))
+            .transition(.ohanaInlineMenu)
+            .animation(canAnimate ? GoMotion.selection : GoMotion.reduced, value: "\(trigger)")
     }
 }
 
@@ -322,6 +388,17 @@ extension AnyTransition {
         .asymmetric(
             insertion: .opacity.combined(with: .scale(scale: 0.97)),
             removal: .opacity.combined(with: .scale(scale: 0.98))
+        )
+    }
+
+    static var ohanaInlineMenu: AnyTransition {
+        .asymmetric(
+            insertion: .opacity
+                .combined(with: .move(edge: .top))
+                .combined(with: .scale(scale: 0.92)),
+            removal: .opacity
+                .combined(with: .move(edge: .top))
+                .combined(with: .scale(scale: 0.96))
         )
     }
 }

@@ -54,11 +54,13 @@ struct AddEntityDestinationView: View {
         case .pet:
             AddPetWizardView(
                 onComplete: onComplete,
+                onCancel: onComplete,
                 onPetSaved: { pet in onPetSaved?(pet) }
             )
         case .human:
             AddHumanWizardView(
                 onComplete: onComplete,
+                onCancel: onComplete,
                 onHumanSaved: { human in
                     currentActiveHumanId = human.id.uuidString
                     onHumanSaved?(human)

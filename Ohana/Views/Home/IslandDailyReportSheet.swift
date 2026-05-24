@@ -46,7 +46,7 @@ struct IslandDailyReportSheet: View {
     }
 
     var body: some View {
-        ZStack {
+        OhanaMotionScene(role: .sheet, isActive: true) {
             // 背景
             Color.black.opacity(0.6).ignoresSafeArea() // ui-v4: allow launch report modal scrim
                 .background(Color.ohanaCardSurface)

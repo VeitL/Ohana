@@ -4,6 +4,20 @@ import Testing
 @testable import Ohana
 
 struct OasisCritterDailyWishTests {
+    @Test func critterMilestonesStartAtLevelTenThenRepeatEveryTenLevels() {
+        let levelFive = OasisUpgradeRewardCatalog.rule(for: 5)
+        #expect(levelFive.rewardKind != .electronicPet)
+
+        let levelTen = OasisUpgradeRewardCatalog.rule(for: 10)
+        #expect(levelTen.rewardKind == .electronicPet)
+        #expect(levelTen.guaranteedCritterId == OasisUpgradeRewardCatalog.firstCritterId)
+        #expect(OasisUpgradeRewardCatalog.critter(id: OasisUpgradeRewardCatalog.firstCritterId)?.sourceLevel == 10)
+
+        let levelTwenty = OasisUpgradeRewardCatalog.rule(for: 20)
+        #expect(levelTwenty.rewardKind == .electronicPet)
+        #expect(levelTwenty.guaranteedCritterId == OasisUpgradeRewardCatalog.legendaryCritterId)
+    }
+
     @MainActor
     @Test func completingDailyWishAddsBonusAndMarksWishComplete() throws {
         let container = try makeContainer()
@@ -17,7 +31,7 @@ struct OasisCritterDailyWishTests {
             rarity: .rare,
             hunger: 30,
             mood: 80,
-            sourceLevel: 5
+            sourceLevel: 10
         )
         context.insert(critter)
         try context.save()
@@ -31,7 +45,7 @@ struct OasisCritterDailyWishTests {
         #expect(outcome.success)
         #expect(outcome.completedDailyWish)
         #expect(OasisUpgradeRewardService.isDailyWishCompleted(for: critter, wish: wish, context: context))
-        #expect(critter.xp == 24)
+        #expect(critter.xp == 10)
         #expect(critter.bond == 9)
 
         let fragments = try context.fetch(FetchDescriptor<OasisCritterFragmentBalance>())
@@ -39,7 +53,97 @@ struct OasisCritterDailyWishTests {
 
         let logs = try context.fetch(FetchDescriptor<OasisCritterActionLog>())
         #expect(logs.contains { $0.action == .feed })
-        #expect(logs.contains { $0.action == .careEcho && $0.fragmentDelta == 1 && $0.xpDelta == 14 })
+        #expect(logs.contains { $0.action == .careEcho && $0.fragmentDelta == 1 && $0.xpDelta == 6 })
+    }
+
+    @MainActor
+    @Test func feedingWhenFullMakesCritterUncomfortableAndSpendsAfterAllowance() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let critter = makeCritter(hunger: 98, mood: 80, health: 80)
+        let human = Human(name: "Ava")
+        human.coconutBalance = 20
+        UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        defer { UserDefaults.standard.removeObject(forKey: "currentActiveHumanId") }
+        context.insert(human)
+        context.insert(critter)
+        context.insert(OasisCritterActionLog(critterId: critter.id, critterCatalogId: critter.catalogId, action: .feed, noteZh: "早饭", noteEn: "Breakfast", noteDe: "Frühstück"))
+        try context.save()
+
+        #expect(OasisUpgradeRewardService.interactionCost(for: critter, action: .feed, context: context) == 5)
+
+        let outcome = try OasisUpgradeRewardService.interactWithOutcome(with: critter, action: .feed, context: context)
+
+        #expect(outcome.success)
+        #expect(!outcome.completedDailyWish)
+        #expect(outcome.messageZh.contains("吃撑"))
+        #expect(critter.hunger == 98)
+        #expect(critter.mood == 74)
+        #expect(critter.health == 75)
+        #expect(critter.bond == 0)
+        #expect(critter.xp == 0)
+        #expect(human.coconutBalance == 15)
+
+        let logs = try context.fetch(FetchDescriptor<OasisCritterActionLog>())
+        #expect(logs.contains { $0.action == .feed && $0.coconutDelta == -5 && $0.xpDelta == 0 })
+    }
+
+    @MainActor
+    @Test func careActionsAreFreeOnceThenRequireCoconuts() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let critter = makeCritter()
+        let human = Human(name: "Ava")
+        human.coconutBalance = 1
+        UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        defer { UserDefaults.standard.removeObject(forKey: "currentActiveHumanId") }
+        context.insert(human)
+        context.insert(critter)
+        try context.save()
+
+        #expect(OasisUpgradeRewardService.interactionCost(for: critter, action: .feed, context: context) == 0)
+        #expect(OasisUpgradeRewardService.interactionCost(for: critter, action: .play, context: context) == 0)
+        #expect(OasisUpgradeRewardService.interactionCost(for: critter, action: .rest, context: context) == 0)
+
+        context.insert(OasisCritterActionLog(critterId: critter.id, critterCatalogId: critter.catalogId, action: .feed, noteZh: "喂过", noteEn: "Fed", noteDe: "Gefüttert"))
+        context.insert(OasisCritterActionLog(critterId: critter.id, critterCatalogId: critter.catalogId, action: .play, noteZh: "玩过", noteEn: "Played", noteDe: "Gespielt"))
+        context.insert(OasisCritterActionLog(critterId: critter.id, critterCatalogId: critter.catalogId, action: .rest, noteZh: "睡过", noteEn: "Rested", noteDe: "Geruht"))
+        try context.save()
+
+        #expect(OasisUpgradeRewardService.interactionCost(for: critter, action: .feed, context: context) == 5)
+        #expect(OasisUpgradeRewardService.interactionCost(for: critter, action: .play, context: context) == 3)
+        #expect(OasisUpgradeRewardService.interactionCost(for: critter, action: .rest, context: context) == 2)
+        #expect(!OasisUpgradeRewardService.canInteract(with: critter, action: .feed, context: context))
+        #expect(!OasisUpgradeRewardService.canInteract(with: critter, action: .play, context: context))
+        #expect(!OasisUpgradeRewardService.canInteract(with: critter, action: .rest, context: context))
+    }
+
+    @MainActor
+    @Test func repeatedFeedingHasDiminishingReturnsWithoutHarmingCritter() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let critter = makeCritter(hunger: 40, mood: 80, health: 80)
+        let human = Human(name: "Ava")
+        human.coconutBalance = 100
+        UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        defer { UserDefaults.standard.removeObject(forKey: "currentActiveHumanId") }
+        context.insert(human)
+        context.insert(critter)
+        context.insert(OasisCritterActionLog(critterId: critter.id, critterCatalogId: critter.catalogId, action: .feed, noteZh: "早饭", noteEn: "Breakfast", noteDe: "Frühstück"))
+        context.insert(OasisCritterActionLog(critterId: critter.id, critterCatalogId: critter.catalogId, action: .feed, noteZh: "午饭", noteEn: "Lunch", noteDe: "Mittag"))
+        try context.save()
+
+        let outcome = try OasisUpgradeRewardService.interactWithOutcome(with: critter, action: .feed, context: context)
+
+        #expect(outcome.success)
+        #expect(!outcome.completedDailyWish)
+        #expect(outcome.messageZh.contains("小小咬了一口"))
+        #expect(critter.hunger == 48)
+        #expect(critter.mood == 81)
+        #expect(critter.health == 80)
+        #expect(critter.bond == 1)
+        #expect(critter.xp == 1)
+        #expect(human.coconutBalance == 95)
     }
 
     @MainActor
@@ -48,22 +152,44 @@ struct OasisCritterDailyWishTests {
         let context = container.mainContext
         let now = Date()
         let twoDaysAgo = Calendar.current.date(byAdding: .day, value: -2, to: now) ?? now
-        let critter = makeCritter(lastStateRefreshAt: twoDaysAgo)
+        let critter = makeCritter(lastInteractionAt: twoDaysAgo, lastStateRefreshAt: twoDaysAgo)
         context.insert(critter)
 
         OasisUpgradeRewardService.normalizeLifecycle(for: critter, context: context, now: now)
         #expect(critter.lifeState != .dead)
-        #expect(critter.hunger == 52)
-        #expect(critter.mood == 62)
+        #expect(critter.hunger == 56)
+        #expect(critter.mood == 72)
 
         let sixDaysAgo = Calendar.current.date(byAdding: .day, value: -6, to: now) ?? now
-        let neglected = makeCritter(lastStateRefreshAt: sixDaysAgo)
+        let neglected = makeCritter(lastInteractionAt: sixDaysAgo, lastStateRefreshAt: sixDaysAgo)
         context.insert(neglected)
 
         OasisUpgradeRewardService.normalizeLifecycle(for: neglected, context: context, now: now)
         #expect(neglected.lifeState == .atRisk)
         #expect(neglected.lifeState != .dead)
         #expect(neglected.riskStartedAt != nil)
+    }
+
+    @MainActor
+    @Test func lifecycleSettlesInSixHourBlocksWithoutBackgroundTimers() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = Date()
+        let fiveHoursAgo = Calendar.current.date(byAdding: .hour, value: -5, to: now) ?? now
+        let twelveHoursAgo = Calendar.current.date(byAdding: .hour, value: -12, to: now) ?? now
+
+        let unchanged = makeCritter(lastInteractionAt: fiveHoursAgo, lastStateRefreshAt: fiveHoursAgo)
+        context.insert(unchanged)
+        OasisUpgradeRewardService.normalizeLifecycle(for: unchanged, context: context, now: now)
+        #expect(unchanged.hunger == 80)
+        #expect(unchanged.mood == 82)
+
+        let settled = makeCritter(lastInteractionAt: twelveHoursAgo, lastStateRefreshAt: twelveHoursAgo)
+        context.insert(settled)
+        OasisUpgradeRewardService.normalizeLifecycle(for: settled, context: context, now: now)
+        #expect(settled.hunger == 74)
+        #expect(settled.mood == 82)
+        #expect(settled.health == 100)
     }
 
     @MainActor
@@ -137,7 +263,58 @@ struct OasisCritterDailyWishTests {
         #expect(critter.mood >= 58)
         #expect(critter.health >= 74)
         let logs = try context.fetch(FetchDescriptor<OasisCritterActionLog>())
-        #expect(logs.contains { $0.action == .rescue && $0.xpDelta == 8 })
+        #expect(logs.contains { $0.action == .rescue && $0.xpDelta == 3 })
+    }
+
+    @MainActor
+    @Test func critterLevelRequiresThreeHundredXPAndCapsAtFinalForm() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let critter = makeCritter()
+        critter.xp = OasisUpgradeRewardService.critterXPPerLevel - 1
+        context.insert(critter)
+
+        #expect(!OasisUpgradeRewardService.canUpgradeLevel(for: critter))
+
+        critter.xp = OasisUpgradeRewardService.critterXPPerLevel
+        #expect(try OasisUpgradeRewardService.upgradeLevel(for: critter, context: context))
+        #expect(critter.level == 2)
+        #expect(critter.xp == 0)
+        #expect(critter.appearanceStage == 1)
+
+        critter.level = OasisUpgradeRewardService.maxCritterLevel
+        critter.xp = OasisUpgradeRewardService.critterXPPerLevel
+        #expect(!OasisUpgradeRewardService.canUpgradeLevel(for: critter))
+        #expect(!((try? OasisUpgradeRewardService.upgradeLevel(for: critter, context: context)) ?? true))
+        #expect(critter.level == OasisUpgradeRewardService.maxCritterLevel)
+    }
+
+    @MainActor
+    @Test func critterEvolutionStagesFollowLevelThresholds() {
+        #expect(OasisUpgradeRewardService.appearanceStage(forLevel: 1) == 1)
+        #expect(OasisUpgradeRewardService.appearanceStage(forLevel: 3) == 2)
+        #expect(OasisUpgradeRewardService.appearanceStage(forLevel: 6) == 3)
+        #expect(OasisUpgradeRewardService.appearanceStage(forLevel: 9) == 4)
+        #expect(OasisUpgradeRewardService.appearanceStage(forLevel: 12) == 5)
+    }
+
+    @MainActor
+    @Test func starUpgradeCanStillReachAppearanceStageFive() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let critter = makeCritter()
+        critter.level = OasisUpgradeRewardService.maxCritterLevel
+        critter.starLevel = 4
+        critter.appearanceStage = 4
+        context.insert(critter)
+        context.insert(OasisCritterFragmentBalance(catalogId: critter.catalogId, amount: 400))
+        let human = Human(name: "Ava")
+        human.coconutBalance = 1_000
+        UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        context.insert(human)
+
+        #expect(try OasisUpgradeRewardService.upgradeStar(for: critter, context: context))
+        #expect(critter.appearanceStage == 5)
     }
 
     @MainActor
@@ -197,6 +374,7 @@ struct OasisCritterDailyWishTests {
         mood: Int = 82,
         health: Int = 100,
         obtainedAt: Date = Date(),
+        lastInteractionAt: Date = Date(),
         lastStateRefreshAt: Date = Date()
     ) -> OasisElectronicPet {
         OasisElectronicPet(
@@ -209,8 +387,9 @@ struct OasisCritterDailyWishTests {
             hunger: hunger,
             mood: mood,
             health: health,
-            sourceLevel: 5,
+            sourceLevel: 10,
             obtainedAt: obtainedAt,
+            lastInteractionAt: lastInteractionAt,
             lastStateRefreshAt: lastStateRefreshAt
         )
     }

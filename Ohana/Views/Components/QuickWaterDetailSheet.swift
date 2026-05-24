@@ -177,6 +177,12 @@ struct QuickWaterDetailSheet: View {
     private var daysUntilWaterChange: Int { waterIntervalDays - waterElapsedDays }
     private var daysUntilFilterClean: Int? { filterCleanElapsedDays.map { filterCleanIntervalDays - $0 } }
     private var daysUntilFilterReplace: Int? { filterReplaceElapsedDays.map { filterReplaceIntervalDays - $0 } }
+    private var isWaterChangeOverdue: Bool { daysUntilWaterChange < 0 }
+    private var isFilterCleanOverdue: Bool { (daysUntilFilterClean ?? 1) < 0 }
+    private var isFilterReplaceOverdue: Bool { (daysUntilFilterReplace ?? 1) < 0 }
+    private var isFilterOverdue: Bool { isFilterCleanOverdue || isFilterReplaceOverdue }
+    private var waterChangeStatusTint: Color { isWaterChangeOverdue ? Color.goRed : waterChangeTint }
+    private var filterStatusTint: Color { isFilterOverdue ? Color.goRed : filterTint }
 
     var body: some View {
         NavigationStack {
@@ -245,11 +251,7 @@ struct QuickWaterDetailSheet: View {
                     }
                     .toolbar(.hidden, for: .navigationBar)
                 }
-                .presentationDetents([.large]) // ui-v4: allow long overview/history uses system sheet
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color.ohanaCardSurface)
-                .presentationCornerRadius(30)
-                .presentationContentInteraction(.scrolls)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/history uses system sheet
             }
             .ignoresSafeArea(.keyboard, edges: .bottom)
             .petMemorialTone(isActive: pet.hasPassedAway)
@@ -526,8 +528,18 @@ struct QuickWaterDetailSheet: View {
 
             HStack(spacing: 8) {
                 waterSummaryPill(title: "喂水", value: isAquatic ? "水族" : "\(todayWaterLogs.count)次", tint: chromeTint)
-                waterSummaryPill(title: "换水", value: dueText(daysUntil: daysUntilWaterChange), tint: waterChangeTint)
-                waterSummaryPill(title: "滤芯", value: optionalDueText(daysUntilFilterClean), tint: filterTint)
+                waterSummaryPill(
+                    title: "换水",
+                    value: dueText(daysUntil: daysUntilWaterChange),
+                    tint: waterChangeStatusTint,
+                    isWarning: isWaterChangeOverdue
+                )
+                waterSummaryPill(
+                    title: "滤芯",
+                    value: optionalDueText(daysUntilFilterClean),
+                    tint: filterStatusTint,
+                    isWarning: isFilterOverdue
+                )
             }
 
             if !isAquatic {
@@ -537,11 +549,17 @@ struct QuickWaterDetailSheet: View {
         .padding(.vertical, 2)
     }
 
-    private func waterSummaryPill(title: String, value: String, tint: Color) -> some View {
+    private func waterSummaryPill(title: String, value: String, tint: Color, isWarning: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.system(size: 10, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
+            HStack(spacing: 4) {
+                Text(title)
+                if isWarning {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 8, weight: .black))
+                }
+            }
+            .font(.system(size: 10, weight: .black, design: .rounded))
+            .foregroundStyle(isWarning ? Color.goRed : Color.ohanaSecondaryText)
             Text(value)
                 .font(.system(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(tint)
@@ -551,7 +569,11 @@ struct QuickWaterDetailSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(isWarning ? Color.goRed.opacity(0.16) : Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(isWarning ? Color.goRed.opacity(0.62) : Color.clear, lineWidth: 1)
+        )
     }
 
     private var waterHero: some View {
@@ -614,7 +636,7 @@ struct QuickWaterDetailSheet: View {
         WaterCoreCard(
             title: "换水",
             icon: "arrow.2.circlepath",
-            tint: waterChangeTint,
+            tint: waterChangeStatusTint,
             value: dueText(daysUntil: daysUntilWaterChange),
             subtitle: waterChangeSubtitle,
             progress: cycleProgress(elapsed: waterElapsedDays, interval: waterIntervalDays),
@@ -636,7 +658,8 @@ struct QuickWaterDetailSheet: View {
                 }
             },
             tapAction: { openRootWaterSheet(.waterChangeOverview) },
-            feedbackToken: waterChangeFeedbackToken
+            feedbackToken: waterChangeFeedbackToken,
+            isWarning: isWaterChangeOverdue
         )
     }
 
@@ -644,7 +667,7 @@ struct QuickWaterDetailSheet: View {
         WaterCoreCard(
             title: "滤芯",
             icon: "sparkles",
-            tint: filterTint,
+            tint: filterStatusTint,
             value: optionalDueText(daysUntilFilterClean),
             subtitle: filterSubtitle,
             progress: cycleProgress(elapsed: filterCleanElapsedDays ?? 0, interval: filterCleanIntervalDays),
@@ -666,7 +689,8 @@ struct QuickWaterDetailSheet: View {
                 }
             },
             tapAction: { openRootWaterSheet(.filterOverview) },
-            feedbackToken: filterFeedbackToken
+            feedbackToken: filterFeedbackToken,
+            isWarning: isFilterOverdue
         )
     }
 
@@ -757,6 +781,9 @@ struct QuickWaterDetailSheet: View {
     }
 
     private var waterChangeSubtitle: String {
+        if isWaterChangeOverdue {
+            return "逾期\(abs(daysUntilWaterChange))天 · 立即换水"
+        }
         if let lastWaterChange {
             return "\(relativeDayText(for: lastWaterChange.date)) · \(waterIntervalDays)天周期"
         }
@@ -764,6 +791,12 @@ struct QuickWaterDetailSheet: View {
     }
 
     private var filterSubtitle: String {
+        if let daysUntilFilterClean, daysUntilFilterClean < 0 {
+            return "清洗逾期\(abs(daysUntilFilterClean))天 · 立即处理"
+        }
+        if let daysUntilFilterReplace, daysUntilFilterReplace < 0 {
+            return "更换逾期\(abs(daysUntilFilterReplace))天 · 立即处理"
+        }
         let replaceText = daysUntilFilterReplace.map { "更换 \(dueText(daysUntil: $0))" } ?? "先清洗一次"
         if let lastFilterClean {
             return "\(relativeDayText(for: lastFilterClean.date)) · \(replaceText)"
@@ -951,27 +984,33 @@ struct QuickWaterDetailSheet: View {
     private var waterChangeOverviewSheet: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                overviewRangePicker(tint: waterChangeTint)
+                overviewRangePicker(tint: waterChangeStatusTint)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    overviewMetric(title: "周期", value: "\(waterIntervalDays)天", icon: "repeat", tint: waterChangeTint)
-                    overviewMetric(title: "下次", value: waterNextDateText, icon: "calendar", tint: waterChangeTint)
+                    overviewMetric(title: "周期", value: "\(waterIntervalDays)天", icon: "repeat", tint: waterChangeStatusTint)
+                    overviewMetric(title: "下次", value: waterNextDateText, icon: "calendar", tint: waterChangeStatusTint)
                 }
-                overviewProgressCard(title: "换水进度", elapsed: waterElapsedDays, interval: waterIntervalDays, tint: waterChangeTint)
+                overviewProgressCard(
+                    title: isWaterChangeOverdue ? "换水逾期" : "换水进度",
+                    elapsed: waterElapsedDays,
+                    interval: waterIntervalDays,
+                    tint: waterChangeStatusTint,
+                    isWarning: isWaterChangeOverdue
+                )
                 overviewLineChart(
                     title: "换水记录",
                     subtitle: "按天统计换水次数。",
                     points: careChartPoints(for: .waterChange),
-                    tint: waterChangeTint,
+                    tint: waterChangeStatusTint,
                     emptyText: "换水后会出现趋势"
                 )
                 HStack(spacing: 10) {
-                    WaterPrimaryButton(title: "记录换水", icon: "checkmark", tint: waterChangeTint) { doWaterChange() }
+                    WaterPrimaryButton(title: "记录换水", icon: "checkmark", tint: waterChangeStatusTint) { doWaterChange() }
                     Button {
                         openWaterSheet(.waterSettings)
                     } label: {
                         Label("管理", systemImage: "slider.horizontal.3")
                             .font(.system(size: 14, weight: .black, design: .rounded))
-                            .foregroundStyle(waterChangeTint)
+                            .foregroundStyle(waterChangeStatusTint)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 15)
                             .background(Color.ohanaControlFill, in: Capsule())
@@ -984,7 +1023,7 @@ struct QuickWaterDetailSheet: View {
                     emptyInlineState(icon: "arrow.2.circlepath", text: "还没有换水记录")
                 } else {
                     ForEach(logs) { log in
-                        WaterLogRow(log: log, tint: waterChangeTint, showDelete: true) { deleteLog(log) }
+                        WaterLogRow(log: log, tint: waterChangeStatusTint, showDelete: true) { deleteLog(log) }
                     }
                 }
             }
@@ -996,27 +1035,33 @@ struct QuickWaterDetailSheet: View {
     private var filterOverviewSheet: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                overviewRangePicker(tint: filterTint)
+                overviewRangePicker(tint: filterStatusTint)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    overviewMetric(title: "清洗", value: filterNextCleanText, icon: "sparkles", tint: filterTint)
-                    overviewMetric(title: "更换", value: filterNextReplaceText, icon: "arrow.triangle.2.circlepath", tint: filterTint)
+                    overviewMetric(title: "清洗", value: filterNextCleanText, icon: "sparkles", tint: filterStatusTint)
+                    overviewMetric(title: "更换", value: filterNextReplaceText, icon: "arrow.triangle.2.circlepath", tint: filterStatusTint)
                 }
-                overviewProgressCard(title: "清洗进度", elapsed: filterCleanElapsedDays ?? 0, interval: filterCleanIntervalDays, tint: filterTint)
+                overviewProgressCard(
+                    title: isFilterOverdue ? "滤芯逾期" : "清洗进度",
+                    elapsed: filterCleanElapsedDays ?? 0,
+                    interval: filterCleanIntervalDays,
+                    tint: filterStatusTint,
+                    isWarning: isFilterOverdue
+                )
                 overviewLineChart(
                     title: "滤芯清洗",
                     subtitle: "按天统计清洗次数。",
                     points: careChartPoints(for: .filterClean),
-                    tint: filterTint,
+                    tint: filterStatusTint,
                     emptyText: "清洗滤芯后会出现趋势"
                 )
                 HStack(spacing: 10) {
-                    WaterPrimaryButton(title: "记录清洗", icon: "checkmark", tint: filterTint) { doFilterClean() }
+                    WaterPrimaryButton(title: "记录清洗", icon: "checkmark", tint: filterStatusTint) { doFilterClean() }
                     Button {
                         openWaterSheet(.filterSettings)
                     } label: {
                         Label("管理", systemImage: "slider.horizontal.3")
                             .font(.system(size: 14, weight: .black, design: .rounded))
-                            .foregroundStyle(filterTint)
+                            .foregroundStyle(filterStatusTint)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 15)
                             .background(Color.ohanaControlFill, in: Capsule())
@@ -1029,7 +1074,7 @@ struct QuickWaterDetailSheet: View {
                     emptyInlineState(icon: "sparkles", text: "还没有滤芯清洗记录")
                 } else {
                     ForEach(logs) { log in
-                        WaterLogRow(log: log, tint: filterTint, showDelete: true) { deleteLog(log) }
+                        WaterLogRow(log: log, tint: filterStatusTint, showDelete: true) { deleteLog(log) }
                     }
                 }
             }
@@ -1184,12 +1229,24 @@ struct QuickWaterDetailSheet: View {
         .padding(.vertical, 8)
     }
 
-    private func overviewProgressCard(title: String, elapsed: Int, interval: Int, tint: Color) -> some View {
+    private func overviewProgressCard(
+        title: String,
+        elapsed: Int,
+        interval: Int,
+        tint: Color,
+        isWarning: Bool = false
+    ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(title)
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
+                HStack(spacing: 6) {
+                    Text(title)
+                    if isWarning {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 12, weight: .black))
+                    }
+                }
+                .font(.system(size: 15, weight: .black, design: .rounded))
+                .foregroundStyle(isWarning ? Color.goRed : Color.ohanaPrimaryText)
                 Spacer()
                 Text("\(elapsed)/\(max(interval, 1))天")
                     .font(.system(size: 13, weight: .black, design: .rounded))
@@ -1207,7 +1264,7 @@ struct QuickWaterDetailSheet: View {
             .frame(height: 10)
         }
         .padding(16)
-        .waterGlassSurface(cornerRadius: 20, tint: tint, tintOpacity: 0.04)
+        .waterGlassSurface(cornerRadius: 20, tint: tint, tintOpacity: isWarning ? 0.16 : 0.04)
     }
 
     private func overviewSectionHeader(_ title: String) -> some View {

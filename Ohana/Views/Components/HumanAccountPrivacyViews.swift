@@ -57,7 +57,6 @@ struct HumanAccountSwitcherSheet: View {
                     accountList
                     if let pendingHuman {
                         pinPanel(for: pendingHuman)
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
                 .padding(.horizontal, 18)
@@ -66,7 +65,7 @@ struct HumanAccountSwitcherSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
+        .presentationDragIndicator(.hidden)
         .animation(GoMotion.feedback, value: pendingHuman?.id)
         .sheet(item: $securityHuman) { human in
             HumanAccountSecuritySheet(human: human)
@@ -399,7 +398,6 @@ struct HumanExecutorSwitchSheet: View {
                 }
                 if let pendingHuman {
                     pinPanel(for: pendingHuman)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .padding(.horizontal, 18)
@@ -407,7 +405,7 @@ struct HumanExecutorSwitchSheet: View {
             .padding(.bottom, 20)
         }
         .presentationDetents([.height(pendingHuman == nil ? 330 : 430)])
-        .presentationDragIndicator(.visible)
+        .presentationDragIndicator(.hidden)
         .animation(GoMotion.feedback, value: pendingHuman?.id)
     }
 
@@ -666,7 +664,7 @@ struct HumanPasscodeManagementSheet: View {
             .padding(20)
         }
         .presentationDetents([.height(470), .medium])
-        .presentationDragIndicator(.visible)
+        .presentationDragIndicator(.hidden)
         .onChange(of: currentPin) { _, value in currentPin = sanitized(value) }
         .onChange(of: newPin) { _, value in newPin = sanitized(value) }
         .onChange(of: confirmPin) { _, value in confirmPin = sanitized(value) }
@@ -1000,7 +998,7 @@ struct HumanAccountSecuritySheet: View {
             }
         }
         .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
+        .presentationDragIndicator(.hidden)
         .sheet(isPresented: $showingPasscodeSheet) {
             HumanPasscodeManagementSheet(human: human)
         }

@@ -102,6 +102,9 @@ extension Color {
     static let ohanaTertiaryText = Color(light: Color.arkInk.opacity(0.42), dark: Color.white.opacity(0.42)) // ui-v4: allow semantic color token source
     static let ohanaDivider = Color(light: Color.black.opacity(0.08), dark: Color.white.opacity(0.12)) // ui-v4: allow semantic color token source
     static let ohanaControlFill = Color(light: Color(hex: "E9EDF4"), dark: Color.white.opacity(0.09)) // ui-v4: allow semantic color token source
+    static let ohanaPopupSurfaceFill = Color(light: Color.white.opacity(0.30), dark: Color(hex: "101827").opacity(0.30)) // ui-v4: allow semantic popup glass contrast tint
+    static let ohanaPopupSurfaceStroke = Color(light: Color.black.opacity(0.08), dark: Color.white.opacity(0.24)) // ui-v4: allow semantic popup glass contrast stroke
+    static let ohanaPopupSurfaceHighlight = Color(light: Color.white.opacity(0.38), dark: Color.white.opacity(0.22)) // ui-v4: allow semantic popup glass edge highlight
     static let ohanaCardStroke = Color(light: Color.clear, dark: Color.clear)
     static let ohanaGlassStroke = Color(light: Color.black.opacity(0.08), dark: Color.white.opacity(0.14)) // ui-v4: allow semantic color token source
     static let ohanaPrimaryActionText = Color(light: Color.white, dark: Color.arkInk) // ui-v4: allow semantic color token source

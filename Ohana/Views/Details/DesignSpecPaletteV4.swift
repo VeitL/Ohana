@@ -114,6 +114,16 @@ struct DesignSpecTokenButtonStyleV4: ButtonStyle {
             .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(stroke, lineWidth: 1))
             .scaleEffect(configuration.isPressed ? pressScale : 1)
             .brightness(configuration.isPressed && selection.tap == "bright" ? 0.08 : 0)
+            .modifier(
+                OhanaButtonPressFeedbackModifier(
+                    isPressed: configuration.isPressed,
+                    isEnabled: true,
+                    pressedScale: 1,
+                    pressedOffset: 0,
+                    pressedOpacity: 1,
+                    addsDepth: false
+                )
+            )
             .animation(buttonAnimation, value: configuration.isPressed)
     }
 

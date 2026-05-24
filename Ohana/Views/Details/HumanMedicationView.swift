@@ -159,15 +159,11 @@ struct HumanMedicationView: View {
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showAddSheet) {
             AddMedicationSheet(human: human)
-                .presentationBackground(.clear)
-                .presentationDetents([.large]) // ui-v4: allow complex medication editor uses full-height system sheet
-                .presentationDragIndicator(.visible)
+                .ohanaSheetPagePresentation() // ui-v4: allow complex medication editor uses full-height system sheet
         }
         .sheet(item: $editingMed) { med in
             AddMedicationSheet(human: human, editing: med)
-                .presentationBackground(.clear)
-                .presentationDetents([.large]) // ui-v4: allow complex medication editor uses full-height system sheet
-                .presentationDragIndicator(.visible)
+                .ohanaSheetPagePresentation() // ui-v4: allow complex medication editor uses full-height system sheet
         }
     }
 
@@ -275,7 +271,6 @@ struct HumanMedicationView: View {
                     .background(Color.ohanaCardSurfaceElevated, in: Capsule())
                     .overlay(Capsule().strokeBorder(Color.ohanaCardStroke, lineWidth: 1))
                     .padding(.horizontal, 16).padding(.bottom, 8)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
 
                 Button { showAddSheet = true } label: {

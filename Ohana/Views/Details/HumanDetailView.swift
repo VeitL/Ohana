@@ -169,18 +169,14 @@ struct HumanDetailView: View {
         .sheet(isPresented: $showingCoconutLog) { CoconutLogView(subject: .human(human.id)) }
         .sheet(isPresented: $showWeightHistory) {
             NavigationStack { HumanWeightHistoryView(human: human) }
-                .presentationBackground(.clear)
-                .presentationDetents([.large]) // ui-v4: allow long weight history uses large sheet
-                .presentationDragIndicator(.visible)
+                .ohanaSheetPagePresentation() // ui-v4: allow long weight history uses large sheet
         }
         .navigationDestination(isPresented: $showingWishlist) { HumanWishlistView(human: human) }
         .navigationDestination(isPresented: $showingCoHealth) { CoHealthDashboardFullView(human: human) }
         .navigationDestination(isPresented: $showingExpenses) { HumanExpenseDetailView(human: human) }
         .sheet(isPresented: $showingMedication) {
             NavigationStack { HumanMedicationView(human: human) }
-                .presentationBackground(.clear)
-                .presentationDetents([.large]) // ui-v4: allow long medication management uses large sheet
-                .presentationDragIndicator(.visible)
+                .ohanaSheetPagePresentation() // ui-v4: allow long medication management uses large sheet
         }
         .navigationDestination(isPresented: $showingHealthReport) { HumanHealthReportView(human: human) }
         .alert("确认删除", isPresented: $showingDeleteConfirm) {

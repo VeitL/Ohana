@@ -19,6 +19,7 @@ struct FocusHomeTodayFocusSection: View {
     let isExpanded: Bool
     let cardMargin: CGFloat
     let animation: Animation
+    let onOpenQuest: (IslandQuest) -> Void
     let onCompleteQuest: (IslandQuest) -> Void
     let onTapNegativeSignal: (IslandNegativeSignal) -> Void
     let onTapOasis: () -> Void
@@ -41,6 +42,7 @@ struct FocusHomeTodayFocusSection: View {
                     humans: humans,
                     events: events,
                     activePet: activePet,
+                    onOpenQuest: onOpenQuest,
                     onCompleteQuest: onCompleteQuest,
                     onTapNegativeSignal: onTapNegativeSignal,
                     onTapOasis: onTapOasis,
@@ -58,13 +60,11 @@ struct FocusHomeTodayFocusSection: View {
                         onMoment: { onFirstSuccessMoment(activePet) }
                     )
                     .frame(width: cardWidth)
-                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
             .opacity(isExpanded ? 0 : 1)
             .scaleEffect(isExpanded ? 0.965 : 1, anchor: .top)
             .allowsHitTesting(!isExpanded)
-            .transition(.opacity)
             .animation(animation, value: isExpanded)
         }
         .frame(height: 228, alignment: .top)

@@ -51,6 +51,35 @@ enum CarePlanCalendarSync {
         }
     }
 
+    /// Calendar display boundary:
+    /// default recommendation events are implementation scaffolding, not user-created calendar items.
+    /// Explicit plans created from feature settings use non-default keys or reminder-backed events and remain visible.
+    static func isDefaultGeneratedCalendarPlan(_ event: Event, pets: [Pet]) -> Bool {
+        let entityType = event.relatedEntityType.lowercased()
+        guard entityType == EntityKind.pet.rawValue.lowercased() || entityType == "pet" else {
+            return false
+        }
+
+        let petKey = event.relatedEntityId
+        if knownDefaultPlanKinds.contains(where: { kind in
+            UserDefaults.standard.string(forKey: eventStorageKey(kind: kind, petKey: petKey)) == event.id.uuidString
+        }) {
+            return true
+        }
+
+        guard
+            event.recurrenceDays > 0,
+            event.feedRuleKindRaw.isEmpty,
+            event.reminders.isEmpty,
+            let pet = pets.first(where: { $0.id.uuidString == petKey })
+        else {
+            return false
+        }
+
+        let generatedTitles = Set(defaultPlanItems(for: pet).map { "\(pet.name) \($0.title)" })
+        return generatedTitles.contains(event.title)
+    }
+
     private static func shouldSkipDefaultPlan(kind: String, petKey: String, context: ModelContext) -> Bool {
         if UserDefaults.standard.bool(forKey: defaultSuppressionKey(kind: kind, petKey: petKey)) {
             return true

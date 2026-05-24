@@ -185,7 +185,7 @@ struct PetWalletStack: View {
     /// 顶部卡片空闲时微漂浮（首页简化 · 可爱化）
     @State private var idleBreath: CGFloat = 0
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
-    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var shouldReduceWork: Bool {

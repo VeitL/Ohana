@@ -85,7 +85,7 @@ struct RainbowPoopPin: View {
     @State private var rotation: Double = 0
 
     private var shouldFlow: Bool {
-        isRainbow && isFlowing && workloadPolicy.shouldAnimate(isVisible: true)
+        isRainbow && isFlowing && workloadPolicy.ambientMotionBudget(isVisible: true).allowsMotion
     }
 
     var body: some View {

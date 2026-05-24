@@ -287,10 +287,7 @@ struct QuickPottyDetailSheet: View {
                     }
                     .toolbar(.hidden, for: .navigationBar)
                 }
-                .presentationDetents([.large]) // ui-v4: allow long overview/history uses system sheet
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color.ohanaCardSurface)
-                .presentationCornerRadius(30)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/history uses system sheet
             }
             .alert("今天已经完成了", isPresented: $showSingleUseNotice) {
                 Button("知道了", role: .cancel) {}

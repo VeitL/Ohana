@@ -10,25 +10,41 @@ struct StreakBadgeView: View {
     let streak: Int
     let petName: String
     @State private var flamePulse = false
+    @State private var isVisible = false
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+
+    private var shouldRunPulse: Bool {
+        streak > 0 && workloadPolicy.shouldRunRepeatingAnimation(isVisible: isVisible)
+    }
 
     var body: some View {
         HStack(spacing: 6) {
             Text(streak > 0 ? "🔥" : "💤")
                 .font(.system(size: 14))
-                .scaleEffect(flamePulse ? 1.15 : 1.0)
+                .scaleEffect(shouldRunPulse && flamePulse ? 1.15 : 1.0)
                 .animation(
-                    streak > 0
+                    shouldRunPulse
                         ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true)
-                        : .default,
+                        : GoMotion.reduced,
                     value: flamePulse
                 )
-                .onAppear { if streak > 0 { flamePulse = true } }
+                .onAppear {
+                    isVisible = true
+                    flamePulse = shouldRunPulse
+                }
+                .onDisappear {
+                    isVisible = false
+                    flamePulse = false
+                }
+                .onChange(of: shouldRunPulse) { _, canRun in
+                    flamePulse = canRun
+                }
 
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 3) {
                     Text("\(streak)")
                         .font(.system(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(streak >= 7 ? Color.goPrimary : .white)
+                        .foregroundStyle(streak >= 7 ? Color.goPrimary : Color.ohanaPrimaryText)
                         .contentTransition(.numericText())
                     Text("天")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
@@ -43,7 +59,7 @@ struct StreakBadgeView: View {
         .background(
             streak >= 7
                 ? Color.goPrimary.opacity(0.12)
-                : Color.white.opacity(0.08),
+                : Color.ohanaControlFill.opacity(0.72),
             in: Capsule()
         )
         .overlay(

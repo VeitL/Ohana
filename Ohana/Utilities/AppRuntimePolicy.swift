@@ -18,6 +18,21 @@ enum AppPerformanceMode {
     }
 }
 
+enum OhanaMotionBudget: Equatable {
+    case full
+    case efficient
+    case `static`
+
+    var allowsMotion: Bool { self != .static }
+    var usesFullMotion: Bool { self == .full }
+}
+
+enum OhanaRefreshBudget: Equatable {
+    case live
+    case throttled
+    case paused
+}
+
 enum OhanaFrameScheduler {
     @MainActor
     @discardableResult
@@ -48,6 +63,7 @@ final class AppWorkloadPolicy: ObservableObject {
     @Published private(set) var isForeground = true
     @Published private(set) var isLowPowerModeEnabled = ProcessInfo.processInfo.isLowPowerModeEnabled
     @Published private(set) var isReduceMotionEnabled = UIAccessibility.isReduceMotionEnabled
+    @Published private(set) var isUserPowerSavingMode = UserDefaults.standard.bool(forKey: AppPerformanceMode.powerSavingKey)
     @Published private(set) var lastReductionReason = "foreground"
 
     private var cancellables: Set<AnyCancellable> = []
@@ -73,7 +89,7 @@ final class AppWorkloadPolicy: ObservableObject {
     }
 
     var userPowerSavingMode: Bool {
-        UserDefaults.standard.bool(forKey: AppPerformanceMode.powerSavingKey)
+        isUserPowerSavingMode
     }
 
     var hasRunningWalk: Bool {
@@ -91,6 +107,7 @@ final class AppWorkloadPolicy: ObservableObject {
     func refresh(reason: String) {
         isLowPowerModeEnabled = ProcessInfo.processInfo.isLowPowerModeEnabled
         isReduceMotionEnabled = UIAccessibility.isReduceMotionEnabled
+        isUserPowerSavingMode = UserDefaults.standard.bool(forKey: AppPerformanceMode.powerSavingKey)
         recordPolicySample(reason: reason)
     }
 
@@ -99,15 +116,56 @@ final class AppWorkloadPolicy: ObservableObject {
     }
 
     func shouldRunTimer(isVisible: Bool = true, allowDuringActiveWalk: Bool = false) -> Bool {
-        !shouldReduceWork(isVisible: isVisible, allowDuringActiveWalk: allowDuringActiveWalk)
+        refreshBudget(isVisible: isVisible, allowDuringActiveWalk: allowDuringActiveWalk) == .live
     }
 
     func shouldRunRepeatingAnimation(isVisible: Bool = true) -> Bool {
-        !shouldReduceWork(isVisible: isVisible)
+        ambientMotionBudget(isVisible: isVisible).allowsMotion
     }
 
     func shouldAnimate(isVisible: Bool = true) -> Bool {
         shouldRunRepeatingAnimation(isVisible: isVisible)
+    }
+
+    func shouldRunInteractionAnimation(isVisible: Bool = true) -> Bool {
+        interactionMotionBudget(isVisible: isVisible).allowsMotion
+    }
+
+    func interactionMotionBudget(isVisible: Bool = true) -> OhanaMotionBudget {
+        guard isVisible else { return .static }
+        guard isForeground else { return .static }
+        if isReduceMotionEnabled { return .efficient }
+        return .full
+    }
+
+    func ambientMotionBudget(isVisible: Bool = true, allowDuringActiveWalk: Bool = false) -> OhanaMotionBudget {
+        guard isVisible else { return .static }
+        guard isForeground || (allowDuringActiveWalk && hasRunningWalk) else { return .static }
+        if isLowPowerModeEnabled || isReduceMotionEnabled || userPowerSavingMode { return .static }
+        return .full
+    }
+
+    func refreshBudget(isVisible: Bool = true, allowDuringActiveWalk: Bool = false) -> OhanaRefreshBudget {
+        guard isVisible else { return .paused }
+        guard isForeground else {
+            return allowDuringActiveWalk && hasRunningWalk ? .throttled : .paused
+        }
+        if isLowPowerModeEnabled || isReduceMotionEnabled || userPowerSavingMode { return .throttled }
+        return .live
+    }
+
+    func refreshInterval(
+        default liveInterval: TimeInterval,
+        throttled throttledInterval: TimeInterval = 60,
+        paused pausedInterval: TimeInterval = 60,
+        isVisible: Bool = true,
+        allowDuringActiveWalk: Bool = false
+    ) -> TimeInterval {
+        switch refreshBudget(isVisible: isVisible, allowDuringActiveWalk: allowDuringActiveWalk) {
+        case .live: return liveInterval
+        case .throttled: return throttledInterval
+        case .paused: return pausedInterval
+        }
     }
 
     private func reductionReason(isVisible: Bool, allowDuringActiveWalk: Bool) -> String? {

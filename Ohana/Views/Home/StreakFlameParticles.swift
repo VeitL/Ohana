@@ -10,7 +10,7 @@ import SwiftUI
 struct StreakFlameParticles: View {
     @State private var phase: Double = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
 
     private let particles: [Particle] = [
         Particle(emoji: "✨", delay: 0.0, dx: 4,  dyMax: -10),

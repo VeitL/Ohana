@@ -332,7 +332,7 @@ struct OnboardingView: View {
     @AppStorage(AppCountry.storageKey) private var appCountry: String = AppCountry.detectedCode
     @AppStorage(AppMeasurementSystem.storageKey) private var appMeasurementSystem: String = AppMeasurementSystem.fallbackCode
     @AppStorage(AppCurrency.storageKey) private var appCurrency: String = AppCurrency.fallbackCode
-    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var isReplay: Bool = false
     var onReplayFinished: (() -> Void)?
@@ -939,7 +939,7 @@ struct OnboardingView: View {
                 }
                 .preferredColorScheme(.dark)
                 .environment(\.colorScheme, .dark)
-                .presentationDetents([.large]) // ui-v4: allow first-pet creation wizard
+                .ohanaSheetPagePresentation() // ui-v4: allow first-pet creation wizard
                 .interactiveDismissDisabled(false)
             }
         }

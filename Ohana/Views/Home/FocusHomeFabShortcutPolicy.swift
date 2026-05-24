@@ -35,4 +35,27 @@ enum FocusHomeFabShortcutPolicy {
             return ExpandedCardFabShortcut(label: option.label, icon: option.icon, action: .quick(option.id))
         }
     }
+
+    static func petShortcuts(
+        for pet: Pet,
+        displayedItems: [QuickActionItem],
+        localization l: L10n
+    ) -> [ExpandedCardFabShortcut] {
+        let displayedActionTypes = Set(
+            displayedItems
+                .prefix(QuickActionLimit.maxItemsPerEntity)
+                .map(\.actionType)
+        )
+        let hiddenQuickItems = QuickActionPickerCatalog
+            .available(for: pet, existingActionTypes: displayedActionTypes)
+            .map { petShortcut(from: $0) }
+
+        return hiddenQuickItems + [
+            ExpandedCardFabShortcut(
+                label: l.tr(zh: "全部功能", en: "All Features", de: "Alle Funktionen"),
+                icon: "ellipsis.circle.fill",
+                action: .allFeatures
+            )
+        ]
+    }
 }

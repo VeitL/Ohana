@@ -95,11 +95,14 @@ struct QuickFeedDetailSheet: View {
     @State private var loadedCareLogs: [PetCareLog] = []
     @State private var loadedFoodRecords: [PetFoodRecord] = []
     @State private var hasLoadedFeedSnapshots = false
+    @State private var feedHomeSnapshot: QuickFeedHomeSnapshot?
     @State private var didApplyInitialSheet = false
     @State private var didScheduleBootstrapMaintenance = false
     @State private var overviewChartProgress: Double = 1
+    @State private var displayedFeedMode: FeedOperatingMode
     @State private var feedModeStorageTick = 0
     @State private var clockTick = Date()
+    @State private var feedHomeAuxiliaryReady = false
     @State private var feedFeedbackToken: CheckInFeedbackToken?
     @State private var feedFeedbackMetricId: String?
     @State private var stockFeedbackToken: CheckInFeedbackToken?
@@ -122,6 +125,7 @@ struct QuickFeedDetailSheet: View {
         self.showsRemoveQuickActionFooter = showsRemoveQuickActionFooter
         self.showsCloseButton = showsCloseButton
         self.opensManualSheetOnAppear = opensManualSheetOnAppear
+        _displayedFeedMode = State(initialValue: FeedOperatingMode.stored(for: pet.id) ?? .manual)
 
         let petID = pet.id
         let petKey = petID.uuidString
@@ -154,6 +158,9 @@ struct QuickFeedDetailSheet: View {
     }
 
     private var l: L10n { L10n(appLanguage) }
+    private var feedClockInterval: TimeInterval {
+        workloadPolicy.refreshInterval(default: 30, throttled: 120, paused: 300)
+    }
     private var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
     private var dashboard: FeedingDashboardState {
         FeedingDashboardState(
@@ -169,7 +176,10 @@ struct QuickFeedDetailSheet: View {
     private var autoFeederEvents: [Event] { dashboard.autoFeederEvents }
     private var activeFeedingMode: FeedOperatingMode {
         _ = feedModeStorageTick
-        return dashboard.operatingMode
+        return displayedFeedMode
+    }
+    private var feedHomeRenderSnapshot: QuickFeedHomeSnapshot {
+        feedHomeSnapshot ?? makeFeedHomeSnapshot()
     }
     private var currentUserId: String? {
         UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
@@ -267,7 +277,6 @@ struct QuickFeedDetailSheet: View {
 
                 if showToast {
                     toastView
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
                         .zIndex(10)
                 }
 
@@ -341,6 +350,7 @@ struct QuickFeedDetailSheet: View {
         }
         .onChange(of: allEvents.count) { _, _ in
             reloadFeedSnapshots()
+            syncDisplayedFeedMode()
             ensureUpcomingPlanReminders()
         }
         .onChange(of: allCareLogs.count) { _, _ in
@@ -348,6 +358,9 @@ struct QuickFeedDetailSheet: View {
         }
         .onChange(of: allFoodRecords.count) { _, _ in
             reloadFeedSnapshots()
+        }
+        .onChange(of: appLanguage) { _, _ in
+            refreshFeedHomeSnapshot()
         }
         .sheet(item: systemSheetBinding) { sheet in
             NavigationStack {
@@ -395,7 +408,7 @@ struct QuickFeedDetailSheet: View {
             .toolbarBackground(.hidden, for: .navigationBar)
             .background(Color.clear)
             .presentationDetents(sheet.detents(measuredHeight: adaptiveSheetHeight))
-            .presentationDragIndicator(.visible)
+            .presentationDragIndicator(.hidden)
             .presentationBackground {
                 FeedNativeSheetGlassSurface(
                     cornerRadius: 30,
@@ -415,9 +428,10 @@ struct QuickFeedDetailSheet: View {
                 inlineKeyboardHeight = 0
             }
         }
-        .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { date in
-            guard workloadPolicy.shouldRunTimer() else { return }
+        .onReceive(Timer.publish(every: feedClockInterval, on: .main, in: .common).autoconnect()) { date in
             clockTick = date
+            refreshFeedHomeSnapshot()
+            syncDisplayedFeedMode()
         }
         .alert(antiRepeatTitle, isPresented: $showingAntiRepeatAlert) {
             Button(l.tr(zh: "继续打卡", en: "Log anyway", de: "Trotzdem")) {
@@ -472,7 +486,7 @@ struct QuickFeedDetailSheet: View {
             let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             let hiddenOffset = panelHeight + bottomInset + 64
 
-            ZStack(alignment: .bottom) {
+            OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: inlineSheetVisible) {
                 inlineSheetBackdrop
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -728,18 +742,20 @@ struct QuickFeedDetailSheet: View {
     }
 
     private var guidedFeedHome: some View {
-        GuidedFeedHomeView(
-            task: guidedFeedTask,
+        let snapshot = feedHomeRenderSnapshot
+        return GuidedFeedHomeView(
+            task: guidedFeedTask(snapshot),
             modeTitle: l.tr(zh: "喂食模式", en: "Feeding mode", de: "Fütterungsmodus"),
             modeOptions: guidedFeedModeOptions,
-            chart: guidedFeedChart,
-            dockItems: guidedFeedDockItems,
+            chart: feedHomeAuxiliaryReady ? guidedFeedChart(snapshot) : nil,
+            dockItems: feedHomeAuxiliaryReady ? guidedFeedDockItems(snapshot) : lightweightGuidedFeedDockItems,
             primaryAction: handleGuidedFeedPrimaryTap
         )
     }
 
-    private var guidedFeedTask: FeedGuidedTaskState {
+    private func guidedFeedTask(_ snapshot: QuickFeedHomeSnapshot) -> FeedGuidedTaskState {
         let mode = activeFeedingMode
+        let todayMainFoodGrams = snapshot.todayMainFoodGrams
         let title: String
         let metricTitle: String
         let metricValue: String
@@ -751,7 +767,7 @@ struct QuickFeedDetailSheet: View {
         if pet.hasPassedAway {
             title = l.tr(zh: "纪念饮食记录", en: "Memorial food log", de: "Futter im Gedenken")
             metricTitle = l.tr(zh: "今日", en: "Today", de: "Heute")
-            metricValue = dashboard.todayMainFoodGrams > 0 ? formattedFoodCardWeight(dashboard.todayMainFoodGrams) : "--"
+            metricValue = todayMainFoodGrams > 0 ? formattedFoodCardWeight(todayMainFoodGrams) : "--"
             detail = l.tr(zh: "只保留历史查看。", en: "History only.", de: "Nur Verlauf.")
             primaryTitle = l.tr(zh: "查看", en: "View", de: "Ansehen")
             primaryIcon = "clock.arrow.circlepath"
@@ -771,23 +787,25 @@ struct QuickFeedDetailSheet: View {
                 metricTitle = l.tr(zh: "默认", en: "Default", de: "Standard")
                 metricValue = formattedFoodCardWeight(pet.dailyPortionGrams)
                 detail = l.tr(
-                    zh: "\(pet.mainFoodKind.title(l)) · 今天 \(formattedFoodCardWeight(dashboard.todayMainFoodGrams))",
-                    en: "\(pet.mainFoodKind.title(l)) · today \(formattedFoodCardWeight(dashboard.todayMainFoodGrams))",
-                    de: "\(pet.mainFoodKind.title(l)) · heute \(formattedFoodCardWeight(dashboard.todayMainFoodGrams))"
+                    zh: "\(pet.mainFoodKind.title(l)) · 今天 \(formattedFoodCardWeight(todayMainFoodGrams))",
+                    en: "\(pet.mainFoodKind.title(l)) · today \(formattedFoodCardWeight(todayMainFoodGrams))",
+                    de: "\(pet.mainFoodKind.title(l)) · heute \(formattedFoodCardWeight(todayMainFoodGrams))"
                 )
                 primaryTitle = l.tr(zh: "喂食", en: "Feed", de: "Füttern")
                 primaryIcon = "checkmark"
                 isPrimaryEnabled = true
             case .manualReminder:
-                let hasPending = dashboard.nextManualReminder != nil
-                title = dashboard.hasMissedManualPlan
+                let hasPending = snapshot.hasNextManualReminder
+                let hasMissedPlan = snapshot.hasMissedManualPlan
+                let completionText = snapshot.todayManualPlanCompletionText
+                title = hasMissedPlan
                     ? l.tr(zh: "有计划餐待补", en: "Meal missed", de: "Mahlzeit verpasst")
                     : (hasPending ? l.tr(zh: "有计划餐待打卡", en: "Planned meal ready", de: "Planmahlzeit bereit") : l.tr(zh: "下一餐已安排", en: "Next meal is set", de: "Nächste Mahlzeit steht"))
                 metricTitle = l.tr(zh: "今日计划", en: "Today plan", de: "Heute Plan")
-                metricValue = dashboard.todayManualPlanCompletionText
+                metricValue = completionText
                 detail = nextFeedDetailText(
-                    events: feedScheduleEvents,
-                    fallback: l.tr(zh: "今天 \(dashboard.todayManualPlanCompletionText)", en: "Today \(dashboard.todayManualPlanCompletionText)", de: "Heute \(dashboard.todayManualPlanCompletionText)")
+                    events: snapshot.manualPlanEvents,
+                    fallback: l.tr(zh: "今天 \(completionText)", en: "Today \(completionText)", de: "Heute \(completionText)")
                 )
                 primaryTitle = hasPending ? l.tr(zh: "完成", en: "Complete", de: "Erledigen") : l.tr(zh: "查看", en: "View", de: "Ansehen")
                 primaryIcon = hasPending ? "checkmark" : "calendar"
@@ -795,8 +813,8 @@ struct QuickFeedDetailSheet: View {
             case .autoFeeder:
                 title = l.tr(zh: "自动记录中", en: "Auto logging", de: "Auto-Aufzeichnung")
                 metricTitle = l.tr(zh: "今日自动", en: "Auto today", de: "Heute Auto")
-                metricValue = "\(dashboard.todayAutoFeedCount)x"
-                detail = nextFeedDetailText(events: autoFeederEvents, fallback: autoFeederStatusText)
+                metricValue = "\(snapshot.todayAutoFeedCount)x"
+                detail = nextFeedDetailText(events: snapshot.autoFeederEvents, fallback: autoFeederStatusText(snapshot))
                 primaryTitle = l.tr(zh: "历史", en: "History", de: "Verlauf")
                 primaryIcon = "chart.line.uptrend.xyaxis"
                 isPrimaryEnabled = true
@@ -814,14 +832,14 @@ struct QuickFeedDetailSheet: View {
             primaryTitle: primaryTitle,
             primaryIcon: primaryIcon,
             isPrimaryEnabled: isPrimaryEnabled,
-            metrics: guidedFeedMetrics,
+            metrics: guidedFeedMetrics(snapshot),
             feedbackToken: feedFeedbackToken,
             stockFeedbackToken: stockFeedbackToken
         )
     }
 
-    private var guidedFeedMetrics: [FeedGuidedMetric] {
-        feedingCardMetricLines.map { line in
+    private func guidedFeedMetrics(_ snapshot: QuickFeedHomeSnapshot) -> [FeedGuidedMetric] {
+        feedingCardMetricLines(snapshot).map { line in
             FeedGuidedMetric(
                 id: line.id,
                 title: line.title,
@@ -833,21 +851,22 @@ struct QuickFeedDetailSheet: View {
     }
 
     private var guidedFeedModeOptions: [FeedGuidedModeOption] {
-        FeedOperatingMode.allCases.map { mode in
+        let currentMode = activeFeedingMode
+        return FeedOperatingMode.allCases.map { mode in
             FeedGuidedModeOption(
                 id: mode.rawValue,
                 title: feedModeShortTitle(mode),
                 icon: feedModeIcon(mode),
                 tint: feedModeTint(mode),
-                isSelected: activeFeedingMode == mode
+                isSelected: currentMode == mode
             ) {
                 handleFeedModeChipTap(mode)
             }
         }
     }
 
-    private var guidedFeedChart: FeedGuidedChartState {
-        let points = guidedSevenDayMainFoodPoints
+    private func guidedFeedChart(_ snapshot: QuickFeedHomeSnapshot) -> FeedGuidedChartState {
+        let points = snapshot.guidedSevenDayMainFoodPoints
         let total = points.reduce(0) { $0 + $1.value }
         return FeedGuidedChartState(
             title: l.tr(zh: "7日进食", en: "7-day food", de: "7 Tage Futter"),
@@ -861,30 +880,13 @@ struct QuickFeedDetailSheet: View {
         )
     }
 
-    private var guidedSevenDayMainFoodPoints: [OhanaMinimalChartPoint] {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let start = calendar.date(byAdding: .day, value: -6, to: today) ?? today
-        return (0..<7).map { offset in
-            let day = calendar.date(byAdding: .day, value: offset, to: start) ?? start
-            let total = mainFoodLogsInRange
-                .filter { calendar.isDate($0.date, inSameDayAs: day) }
-                .reduce(0) { $0 + FeedStockCalculator.effectiveMainFoodAmount(for: $1, pet: pet) }
-            return OhanaMinimalChartPoint(
-                date: day,
-                value: total,
-                label: calendar.isDateInToday(day) ? l.tr(zh: "今", en: "T", de: "H") : day.formatted(.dateTime.weekday(.narrow))
-            )
-        }
-    }
-
-    private var guidedFeedDockItems: [FeedDiscoveryDockItem] {
+    private func guidedFeedDockItems(_ snapshot: QuickFeedHomeSnapshot) -> [FeedDiscoveryDockItem] {
         [
             FeedDiscoveryDockItem(
                 id: "stock",
                 icon: "shippingbox.fill",
                 title: l.tr(zh: "粮仓", en: "Stock", de: "Vorrat"),
-                value: stockCardValue,
+                value: stockCardValue(snapshot),
                 tint: stockTint
             ) {
                 openRootFeedSheet(.stockOverview)
@@ -893,7 +895,7 @@ struct QuickFeedDetailSheet: View {
                 id: "treat",
                 icon: "birthday.cake.fill",
                 title: l.tr(zh: "零食", en: "Treats", de: "Snacks"),
-                value: todayTreatCount > 0 ? "\(todayTreatCount)x" : "--",
+                value: snapshot.todayTreatCount > 0 ? "\(snapshot.todayTreatCount)x" : "--",
                 tint: treatTint
             ) {
                 openRootFeedSheet(.treatOverview)
@@ -923,8 +925,49 @@ struct QuickFeedDetailSheet: View {
         ]
     }
 
-    private var todayTreatCount: Int {
-        dashboard.recentFeedLogs.filter { FeedLogMetadata.isTreatLog($0) }.count
+    private var lightweightGuidedFeedDockItems: [FeedDiscoveryDockItem] {
+        [
+            FeedDiscoveryDockItem(
+                id: "stock",
+                icon: "shippingbox.fill",
+                title: l.tr(zh: "粮仓", en: "Stock", de: "Vorrat"),
+                value: "--",
+                tint: stockTint
+            ) {
+                openRootFeedSheet(.stockOverview)
+            },
+            FeedDiscoveryDockItem(
+                id: "treat",
+                icon: "birthday.cake.fill",
+                title: l.tr(zh: "零食", en: "Treats", de: "Snacks"),
+                value: "--",
+                tint: treatTint
+            ) {
+                openRootFeedSheet(.treatOverview)
+            },
+            FeedDiscoveryDockItem(
+                id: "history",
+                icon: "clock.arrow.circlepath",
+                title: l.tr(zh: "历史", en: "History", de: "Verlauf"),
+                value: feedModeShortTitle(activeFeedingMode),
+                tint: feedingModeTint
+            ) {
+                if activeFeedingMode == .manual {
+                    openRootFeedSheet(.history)
+                } else {
+                    openRootFeedSheet(.feedModeHistory)
+                }
+            },
+            FeedDiscoveryDockItem(
+                id: "manage",
+                icon: "slider.horizontal.3",
+                title: l.tr(zh: "管理", en: "Manage", de: "Verwalten"),
+                value: feedModeShortTitle(activeFeedingMode),
+                tint: Color.goPrimary
+            ) {
+                openFeedSheet(.manage)
+            }
+        ]
     }
 
     private var feedingHeroCard: some View {
@@ -2615,17 +2658,15 @@ struct QuickFeedDetailSheet: View {
 
         switch mode {
         case .manual:
-            withAnimation(GoMotion.page) {
-                switchToManualFeedMode()
-            }
+            switchToManualFeedMode()
         case .manualReminder:
-            if latestFeedRuleEvents(kind: .manualReminder).isEmpty {
+            if currentFeedRuleEvents(kind: .manualReminder).isEmpty {
                 openPlanEditor(.manualReminder)
             } else {
                 activateExistingFeedRuleMode(.manualReminder)
             }
         case .autoFeeder:
-            if latestFeedRuleEvents(kind: .autoFeeder).isEmpty {
+            if currentFeedRuleEvents(kind: .autoFeeder).isEmpty {
                 openPlanEditor(.autoFeeder)
             } else {
                 activateExistingFeedRuleMode(.autoFeeder)
@@ -4294,7 +4335,36 @@ struct QuickFeedDetailSheet: View {
         }
     }
 
+    private func syncDisplayedFeedMode(animated: Bool = false) {
+        let resolvedMode = FeedOperatingMode.resolved(pet: pet, allEvents: allEvents, now: clockTick)
+        guard displayedFeedMode != resolvedMode else { return }
+        if animated {
+            withAnimation(GoMotion.quick) {
+                displayedFeedMode = resolvedMode
+            }
+        } else {
+            displayedFeedMode = resolvedMode
+        }
+        feedModeStorageTick += 1
+    }
+
+    private func makeFeedHomeSnapshot() -> QuickFeedHomeSnapshot {
+        QuickFeedHomeSnapshot.make(
+            pet: pet,
+            allEvents: allEvents,
+            careLogs: observedCareLogs,
+            foodRecords: observedFoodRecords,
+            now: clockTick,
+            todayLabel: l.tr(zh: "今", en: "T", de: "H")
+        )
+    }
+
+    private func refreshFeedHomeSnapshot() {
+        feedHomeSnapshot = makeFeedHomeSnapshot()
+    }
+
     private func bootstrap() {
+        feedHomeAuxiliaryReady = false
         if manualGramsText.isEmpty, let grams = currentPortionAmount {
             manualGramsText = String(format: "%.0f", grams)
         }
@@ -4308,6 +4378,14 @@ struct QuickFeedDetailSheet: View {
         stockReminderEnabled = pet.foodReminderEnabled
         stockReminderAdvanceDays = pet.foodReminderAdvanceDays
         reloadFeedSnapshots()
+        syncDisplayedFeedMode()
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 90_000_000)
+            withAnimation(GoMotion.quick) {
+                feedHomeAuxiliaryReady = true
+            }
+        }
 
         if !didScheduleBootstrapMaintenance {
             didScheduleBootstrapMaintenance = true
@@ -4569,14 +4647,24 @@ struct QuickFeedDetailSheet: View {
             )
             latestEvents = latestEvents
                 .filter { existing in
-                    !(FeedRuleMetadata.isManualReminderEvent(existing, pet: target) ||
-                      FeedRuleMetadata.isAutoFeederEvent(existing, pet: target))
+                    switch kind {
+                    case .manualReminder:
+                        return !FeedRuleMetadata.isManualReminderEvent(existing, pet: target)
+                    case .autoFeeder:
+                        return !FeedRuleMetadata.isAutoFeederEvent(existing, pet: target)
+                    }
                 } + result.events
+            FeedOperatingMode.set(target.id, mode: kind == .manualReminder ? .manualReminder : .autoFeeder)
             HomeFeedRecordMode.set(target.id, mode: .planned)
 
             if kind == .manualReminder {
                 createdReminders.append(contentsOf: result.reminders)
             } else {
+                FeedingPlanWriter.deactivateManualReminderOperations(
+                    pet: target,
+                    allEvents: latestEvents,
+                    context: modelContext
+                )
                 _ = FeedAutoLogMaterializer.materializeDueLogs(pet: target, allEvents: latestEvents, context: modelContext)
             }
             scheduleStockReminders(FeedingPlanWriter.rebuildFoodStockReminders(pet: target, allEvents: latestEvents, context: modelContext))
@@ -4605,51 +4693,63 @@ struct QuickFeedDetailSheet: View {
             closeActiveFeedSheet()
             return
         }
-        setActiveFeedMode(.manual)
+        withAnimation(GoMotion.page) {
+            setActiveFeedMode(.manual)
+        }
         closeActiveFeedSheet()
-        triggerToast(l.tr(zh: "已切换为手动打卡", en: "Manual mode on", de: "Manueller Modus aktiv"), tint: mainFoodTint)
+        runDeferredFeedModeMaintenance {
+            FeedingPlanWriter.deactivateManualReminderOperations(
+                pet: pet,
+                allEvents: latestAllEvents(),
+                context: modelContext
+            )
+            reloadFeedSnapshots()
+        }
     }
 
     private func activateExistingFeedRuleMode(_ kind: FeedRuleKind) {
-        let currentEvents = latestAllEvents()
-        let targetEvents = FeedingPlanWriter.planEvents(pet: pet, kind: kind, allEvents: currentEvents)
-        guard !targetEvents.isEmpty else {
-            openPlanEditor(kind)
-            return
-        }
-
         let targetMode: FeedOperatingMode = kind == .manualReminder ? .manualReminder : .autoFeeder
         guard activeFeedingMode != targetMode else {
             UISelectionFeedbackGenerator().selectionChanged()
             return
         }
 
-        if kind == .manualReminder {
-            setActiveFeedMode(.manualReminder)
-            scheduleReminders(
-                FeedingPlanWriter.ensureUpcomingManualReminders(
+        withAnimation(GoMotion.page) {
+            setActiveFeedMode(targetMode)
+        }
+        closeActiveFeedSheet()
+
+        runDeferredFeedModeMaintenance {
+            let currentEvents = latestAllEvents()
+            let targetEvents = FeedingPlanWriter.planEvents(pet: pet, kind: kind, allEvents: currentEvents)
+            guard !targetEvents.isEmpty else {
+                syncDisplayedFeedMode(animated: true)
+                openPlanEditor(kind)
+                return
+            }
+
+            if kind == .manualReminder {
+                scheduleReminders(
+                    FeedingPlanWriter.ensureUpcomingManualReminders(
+                        pet: pet,
+                        allEvents: targetEvents,
+                        context: modelContext
+                    )
+                )
+            } else {
+                FeedingPlanWriter.deactivateManualReminderOperations(
+                    pet: pet,
+                    allEvents: currentEvents,
+                    context: modelContext
+                )
+                _ = FeedAutoLogMaterializer.materializeDueLogs(
                     pet: pet,
                     allEvents: targetEvents,
                     context: modelContext
                 )
-            )
-        } else {
-            setActiveFeedMode(.autoFeeder)
-            _ = FeedAutoLogMaterializer.materializeDueLogs(
-                pet: pet,
-                allEvents: targetEvents,
-                context: modelContext
-            )
+            }
+            reloadFeedSnapshots()
         }
-
-        reloadFeedSnapshots()
-        closeActiveFeedSheet()
-        triggerToast(
-            kind == .manualReminder
-                ? l.tr(zh: "已切换为喂食计划", en: "Plan mode on", de: "Planmodus aktiv")
-                : l.tr(zh: "已切换为自动记录", en: "Auto mode on", de: "Automodus aktiv"),
-            tint: kind == .manualReminder ? Color.goPurple : Color.goTeal
-        )
     }
 
     private func eventsReplacingFeedRules(kind: FeedRuleKind, with replacement: [Event]) -> [Event] {
@@ -4664,6 +4764,7 @@ struct QuickFeedDetailSheet: View {
     }
 
     private func setActiveFeedMode(_ mode: FeedOperatingMode) {
+        displayedFeedMode = mode
         FeedOperatingMode.set(pet.id, mode: mode)
         feedModeStorageTick += 1
         switch mode {
@@ -4683,8 +4784,15 @@ struct QuickFeedDetailSheet: View {
         return (try? modelContext.fetch(descriptor)) ?? allEvents
     }
 
-    private func latestFeedRuleEvents(kind: FeedRuleKind) -> [Event] {
-        FeedingPlanWriter.planEvents(pet: pet, kind: kind, allEvents: latestAllEvents())
+    private func currentFeedRuleEvents(kind: FeedRuleKind) -> [Event] {
+        FeedingPlanWriter.planEvents(pet: pet, kind: kind, allEvents: allEvents)
+    }
+
+    private func runDeferredFeedModeMaintenance(_ operation: @escaping @MainActor () -> Void) {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 180_000_000)
+            operation()
+        }
     }
 
     private func deletePlan(_ kind: FeedRuleKind) {
@@ -5000,6 +5108,7 @@ struct QuickFeedDetailSheet: View {
         loadedCareLogs = (try? modelContext.fetch(careDescriptor)) ?? allCareLogs.filter { $0.pet?.id == petID && $0.careType == .feeding }
         loadedFoodRecords = (try? modelContext.fetch(foodDescriptor)) ?? allFoodRecords.filter { $0.pet?.id == petID }
         hasLoadedFeedSnapshots = true
+        refreshFeedHomeSnapshot()
     }
 
     private func ensureUpcomingPlanReminders() {
@@ -5138,16 +5247,20 @@ struct QuickFeedDetailSheet: View {
     }
 
     private var feedingCardMetricLines: [FoodCardMetricLine] {
+        feedingCardMetricLines(feedHomeRenderSnapshot)
+    }
+
+    private func feedingCardMetricLines(_ snapshot: QuickFeedHomeSnapshot) -> [FoodCardMetricLine] {
         [
             FoodCardMetricLine(
                 title: FeedFoodKind.dry.title(l),
-                value: dashboard.todayDryFoodGrams > 0 ? formattedFoodCardWeight(dashboard.todayDryFoodGrams) : "--",
+                value: snapshot.todayDryFoodGrams > 0 ? formattedFoodCardWeight(snapshot.todayDryFoodGrams) : "--",
                 tint: dryFoodTint,
                 isCurrent: pet.mainFoodKind == .dry
             ),
             FoodCardMetricLine(
                 title: FeedFoodKind.wet.title(l),
-                value: dashboard.todayWetFoodGrams > 0 ? formattedFoodCardWeight(dashboard.todayWetFoodGrams) : "--",
+                value: snapshot.todayWetFoodGrams > 0 ? formattedFoodCardWeight(snapshot.todayWetFoodGrams) : "--",
                 tint: wetFoodTint,
                 isCurrent: pet.mainFoodKind == .wet
             )
@@ -5364,6 +5477,25 @@ struct QuickFeedDetailSheet: View {
         return l.tr(zh: "\(daily)/天 · 自动补记", en: "\(daily)/day · auto logging", de: "\(daily)/Tag · Auto")
     }
 
+    private func autoFeederStatusText(_ snapshot: QuickFeedHomeSnapshot) -> String {
+        let daily = formattedFoodWeight(snapshot.autoDailyTotalGrams)
+        if let latest = snapshot.latestAutoFeedDate {
+            return l.tr(
+                zh: "\(daily)/天 · 上次 \(latest.formatted(date: .omitted, time: .shortened))",
+                en: "\(daily)/day · last \(latest.formatted(date: .omitted, time: .shortened))",
+                de: "\(daily)/Tag · zuletzt \(latest.formatted(date: .omitted, time: .shortened))"
+            )
+        }
+        if let next = snapshot.nextAutoFeedDate {
+            return l.tr(
+                zh: "\(daily)/天 · 下次 \(next.formatted(date: .omitted, time: .shortened))",
+                en: "\(daily)/day · next \(next.formatted(date: .omitted, time: .shortened))",
+                de: "\(daily)/Tag · nächste \(next.formatted(date: .omitted, time: .shortened))"
+            )
+        }
+        return l.tr(zh: "\(daily)/天 · 自动补记", en: "\(daily)/day · auto logging", de: "\(daily)/Tag · Auto")
+    }
+
     private var latestAutoFeedLog: PetCareLog? {
         observedCareLogs
             .filter { FeedLogMetadata.source(for: $0) == .autoMain }
@@ -5418,6 +5550,11 @@ struct QuickFeedDetailSheet: View {
         let wet = dashboard.stock(foodKind: .wet)
         let days = [dry, wet].filter { $0.totalGrams > 0 && $0.remainingDays > 0 }.map(\.remainingDays).min()
         guard let days else { return "--" }
+        return "\(days) \(l.tr(zh: "天", en: "days", de: "Tage"))"
+    }
+
+    private func stockCardValue(_ snapshot: QuickFeedHomeSnapshot) -> String {
+        guard let days = snapshot.stockCardRemainingDays else { return "--" }
         return "\(days) \(l.tr(zh: "天", en: "days", de: "Tage"))"
     }
 
@@ -5763,41 +5900,43 @@ struct QuickFeedDetailSheet: View {
 
     private var mainFoodChartPoints: [FeedOverviewChartPoint] {
         let calendar = Calendar.current
+        let logs = mainFoodLogsInRange
+        let totalsByDay = Dictionary(grouping: logs) { calendar.startOfDay(for: $0.date) }
+            .mapValues { logs in
+                logs.reduce(0) { $0 + FeedStockCalculator.effectiveMainFoodAmount(for: $1, pet: pet) }
+            }
         return overviewDates.map { day in
-            let total = mainFoodLogsInRange
-                .filter { calendar.isDate($0.date, inSameDayAs: day) }
-                .reduce(0) { $0 + FeedStockCalculator.effectiveMainFoodAmount(for: $1, pet: pet) }
-            return FeedOverviewChartPoint(date: day, value: total)
+            FeedOverviewChartPoint(date: day, value: totalsByDay[calendar.startOfDay(for: day)] ?? 0)
         }
     }
 
     private var feedModeChartPoints: [FeedOverviewChartPoint] {
         let calendar = Calendar.current
+        let logs = feedModeLogsInRange
+        let totalsByDay = Dictionary(grouping: logs) { calendar.startOfDay(for: $0.date) }
+            .mapValues { logs in
+                logs.reduce(0) { $0 + FeedStockCalculator.effectiveMainFoodAmount(for: $1, pet: pet) }
+            }
         return overviewDates.map { day in
-            let total = feedModeLogsInRange
-                .filter { calendar.isDate($0.date, inSameDayAs: day) }
-                .reduce(0) { $0 + FeedStockCalculator.effectiveMainFoodAmount(for: $1, pet: pet) }
-            return FeedOverviewChartPoint(date: day, value: total)
+            FeedOverviewChartPoint(date: day, value: totalsByDay[calendar.startOfDay(for: day)] ?? 0)
         }
     }
 
     private var treatChartPoints: [FeedOverviewChartPoint] {
         let calendar = Calendar.current
+        let countsByDay = Dictionary(grouping: treatLogsInRange) { calendar.startOfDay(for: $0.date) }
+            .mapValues { $0.count }
         return overviewDates.map { day in
-            let count = treatLogsInRange
-                .filter { calendar.isDate($0.date, inSameDayAs: day) }
-                .count
-            return FeedOverviewChartPoint(date: day, value: Double(count))
+            FeedOverviewChartPoint(date: day, value: Double(countsByDay[calendar.startOfDay(for: day)] ?? 0))
         }
     }
 
     private var filteredTreatChartPoints: [FeedOverviewChartPoint] {
         let calendar = Calendar.current
+        let countsByDay = Dictionary(grouping: filteredTreatLogsInRange) { calendar.startOfDay(for: $0.date) }
+            .mapValues { $0.count }
         return overviewDates.map { day in
-            let count = filteredTreatLogsInRange
-                .filter { calendar.isDate($0.date, inSameDayAs: day) }
-                .count
-            return FeedOverviewChartPoint(date: day, value: Double(count))
+            FeedOverviewChartPoint(date: day, value: Double(countsByDay[calendar.startOfDay(for: day)] ?? 0))
         }
     }
 

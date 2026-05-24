@@ -8,6 +8,39 @@
 import SwiftUI
 import Observation
 
+private let legacyChartBaseDate = Date(timeIntervalSinceReferenceDate: 0)
+
+private func legacyTrendPoints(_ values: [Double], idPrefix: String) -> [OhanaMinimalChartPoint] {
+    values.enumerated().compactMap { index, value in
+        guard value.isFinite else { return nil }
+        return OhanaMinimalChartPoint(
+            date: legacyChartBaseDate.addingTimeInterval(Double(index) * 86_400),
+            value: value,
+            id: "\(idPrefix)-\(index)-\(Int((value * 1000).rounded()))"
+        )
+    }
+}
+
+private func legacyBarPoints(_ values: [Double], labels: [String]) -> [OhanaMinimalChartPoint] {
+    values.enumerated().compactMap { index, value in
+        guard value.isFinite else { return nil }
+        let label = index < labels.count ? labels[index] : nil
+        return OhanaMinimalChartPoint(
+            date: legacyChartBaseDate.addingTimeInterval(Double(index) * 86_400),
+            value: max(0, value),
+            label: label,
+            id: "legacy-bar-\(index)-\(Int((value * 1000).rounded()))-\(label ?? "")"
+        )
+    }
+}
+
+private var legacyChartEmptyState: some View {
+    Text(L10n().tr(zh: "暂无数据", en: "No data", de: "Keine Daten"))
+        .font(OhanaFont.caption2(.medium))
+        .foregroundStyle(Color.ohanaTertiaryText)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+}
+
 // MARK: - Overlapping Avatars（微型头像组）
 struct OverlappingAvatarsView: View {
     let emojis: [String]
@@ -120,75 +153,22 @@ struct IslandStatCard<Chart: View>: View {
 struct MultiPetLineChart: View {
     // [(petName, values, color)]
     let series: [(String, [Double], Color)]
-    @State private var revealProgress: CGFloat = 0.0
 
-    private var allValues: [Double] { series.flatMap { $0.1 } }
-    private var minV: Double { (allValues.min() ?? 0) - 0.1 }
-    private var maxV: Double { (allValues.max() ?? 1) + 0.1 }
-    private var range: Double { max(maxV - minV, 0.01) }
-
-    private func xPos(_ i: Int, count: Int, w: CGFloat) -> CGFloat {
-        count <= 1 ? w / 2 : CGFloat(i) / CGFloat(count - 1) * w
-    }
-    private func yPos(_ v: Double, h: CGFloat) -> CGFloat {
-        h - CGFloat((v - minV) / range) * h
-    }
-
-    private var animationKey: String {
-        series
-            .map { name, values, _ in
-                let joined = values.map { String(format: "%.3f", $0) }.joined(separator: ",")
-                return "\(name):\(joined)"
-            }
-            .joined(separator: "|")
-    }
-
-    private func playAnimation() {
-        revealProgress = 0
-        withAnimation(GoMotion.page) {
-            revealProgress = 1.0
+    private var chartSeries: [OhanaMinimalLineSeries] {
+        series.map { name, values, color in
+            OhanaMinimalLineSeries(
+                id: name,
+                points: legacyTrendPoints(values, idPrefix: name),
+                tint: color
+            )
         }
     }
 
     var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width, h = geo.size.height
-            let chartContent = ZStack {
-                if allValues.isEmpty {
-                    Text("暂无数据")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    ForEach(Array(series.enumerated()), id: \.offset) { _, s in
-                        let (_, values, color) = s
-                        if values.count >= 2 {
-                            let chartPoints = values.enumerated().map { index, value in
-                                CGPoint(x: xPos(index, count: values.count, w: w), y: yPos(value, h: h))
-                            }
-                            OhanaChartStyle.softenedAreaPath(points: chartPoints, baselineY: h)
-                                .fill(OhanaChartStyle.areaGradient(for: color, topOpacity: 0.22, bottomOpacity: 0))
-
-                            OhanaChartStyle.softenedLinePath(points: chartPoints)
-                                .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-
-                            // 最新点
-                            if let last = values.last {
-                                Circle().fill(color).frame(width: 5, height: 5)
-                                    .position(x: xPos(values.count-1, count: values.count, w: w), y: yPos(last, h: h))
-                                    .opacity(revealProgress > 0.98 ? 1 : 0)
-                            }
-                        }
-                    }
-                }
-            }
-            chartContent
-                .mask(alignment: .leading) {
-                    Rectangle()
-                        .frame(width: max(1, w * revealProgress))
-                }
-            .onAppear { playAnimation() }
-            .onChange(of: animationKey) { _, _ in playAnimation() }
+        if chartSeries.flatMap(\.points).count >= 2 {
+            OhanaMinimalMultiTrendChart(series: chartSeries)
+        } else {
+            legacyChartEmptyState
         }
     }
 }
@@ -197,66 +177,13 @@ struct MultiPetLineChart: View {
 struct MiniLineChart: View {
     let values: [Double]
     let accentColor: Color
-    @State private var revealProgress: CGFloat = 0.0
-
-    private var minV: Double { (values.min() ?? 0) - 0.1 }
-    private var maxV: Double { (values.max() ?? 1) + 0.1 }
-    private var range: Double { max(maxV - minV, 0.01) }
-
-    private func xPos(_ i: Int, w: CGFloat) -> CGFloat {
-        values.count <= 1 ? w / 2 : CGFloat(i) / CGFloat(values.count - 1) * w
-    }
-    private func yPos(_ v: Double, h: CGFloat) -> CGFloat {
-        h - CGFloat((v - minV) / range) * h
-    }
-
-    private var animationKey: String {
-        values.map { String(format: "%.3f", $0) }.joined(separator: ",")
-    }
-
-    private func playAnimation() {
-        revealProgress = 0
-        withAnimation(GoMotion.page) {
-            revealProgress = 1.0
-        }
-    }
 
     var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width, h = geo.size.height
-            let chartContent = ZStack {
-                if values.count >= 2 {
-                    let chartPoints = values.enumerated().map { index, value in
-                        CGPoint(x: xPos(index, w: w), y: yPos(value, h: h))
-                    }
-                    OhanaChartStyle.softenedAreaPath(points: chartPoints, baselineY: h)
-                        .fill(OhanaChartStyle.areaGradient(for: accentColor, topOpacity: 0.28, bottomOpacity: 0))
-
-                    OhanaChartStyle.softenedLinePath(points: chartPoints)
-                        .stroke(accentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-
-                    // 最新点
-                    if let last = values.last {
-                        Circle()
-                            .fill(accentColor)
-                            .frame(width: 5, height: 5)
-                            .position(x: xPos(values.count - 1, w: w), y: yPos(last, h: h))
-                            .opacity(revealProgress > 0.98 ? 1 : 0)
-                    }
-                } else {
-                    Text("暂无数据")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-            }
-            chartContent
-                .mask(alignment: .leading) {
-                    Rectangle()
-                        .frame(width: max(1, w * revealProgress))
-                }
-            .onAppear { playAnimation() }
-            .onChange(of: animationKey) { _, _ in playAnimation() }
+        let points = legacyTrendPoints(values, idPrefix: "mini-line")
+        if points.count >= 2 {
+            OhanaMinimalTrendChart(points: points, tint: accentColor)
+        } else {
+            legacyChartEmptyState
         }
     }
 }
@@ -266,53 +193,21 @@ struct MiniBarChart: View {
     let values: [Double]
     let labels: [String]
     let accentColor: Color
-    @State private var animPhase: CGFloat = 0.0
-
-    private var animationKey: String {
-        values.map { String(format: "%.3f", $0) }.joined(separator: ",")
-    }
-
-    private func playAnimation() {
-        animPhase = 0
-        withAnimation(GoMotion.page) {
-            animPhase = 1.0
-        }
-    }
 
     var body: some View {
         GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            let maxV = max(values.max() ?? 1, 1)
-            let count = values.count
-            let barW = count > 0 ? (w - CGFloat(count - 1) * 3) / CGFloat(count) : w
-
-            HStack(alignment: .bottom, spacing: 3) {
-                ForEach(Array(values.enumerated()), id: \.offset) { i, val in
-                    VStack(spacing: 2) {
-                        Spacer(minLength: 0)
-                        RoundedRectangle(cornerRadius: 3, style: .continuous)
-                            .fill(
-                                val == values.max()
-                                    ? accentColor
-                                    : accentColor.opacity(0.35)
-                            )
-                            .frame(
-                                width: barW,
-                                height: max(3, CGFloat(val / maxV) * (h - (labels.isEmpty ? 0 : 14)) * animPhase)
-                            )
-                        if !labels.isEmpty && i < labels.count {
-                            Text(labels[i])
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
-                                .frame(width: barW)
-                        }
-                    }
-                }
+            let points = legacyBarPoints(values, labels: labels)
+            if points.isEmpty {
+                legacyChartEmptyState
+            } else {
+                OhanaMinimalBarChart(
+                    points: points,
+                    tint: accentColor,
+                    showsLabels: !labels.isEmpty,
+                    maxBarHeight: max(8, geo.size.height - (labels.isEmpty ? 0 : 14)),
+                    emptyBarColor: accentColor.opacity(0.16)
+                )
             }
-            .frame(width: w, height: h, alignment: .bottom)
-            .onAppear { playAnimation() }
-            .onChange(of: animationKey) { _, _ in playAnimation() }
         }
     }
 }

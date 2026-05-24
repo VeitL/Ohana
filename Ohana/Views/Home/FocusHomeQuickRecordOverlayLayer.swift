@@ -9,37 +9,15 @@ import SwiftUI
 
 enum FocusHomeOverlayState {
     static func hasInlineRecordOverlay(
-        petWeight: ExpandedQuickPetRecordRoute?,
-        petExpense: ExpandedQuickPetRecordRoute?,
-        humanWeight: ExpandedQuickHumanRecordRoute?,
-        humanWorkout: ExpandedQuickHumanRecordRoute?,
-        humanMedication: ExpandedQuickHumanRecordRoute?,
-        petMedication: ExpandedQuickPetRecordRoute?,
-        humanNote: ExpandedQuickHumanRecordRoute?,
-        humanExpense: ExpandedQuickHumanRecordRoute?,
+        router: FocusHomeQuickRecordRouter,
         quickActionMenu: ExpandedQuickActionMenuTarget?
     ) -> Bool {
-        petWeight != nil
-        || petExpense != nil
-        || humanWeight != nil
-        || humanWorkout != nil
-        || humanMedication != nil
-        || petMedication != nil
-        || humanNote != nil
-        || humanExpense != nil
-        || quickActionMenu != nil
+        router.hasActiveOverlay || quickActionMenu != nil
     }
 }
 
 struct FocusHomeQuickRecordOverlayLayer: View {
-    let petWeight: ExpandedQuickPetRecordRoute?
-    let petExpense: ExpandedQuickPetRecordRoute?
-    let humanWeight: ExpandedQuickHumanRecordRoute?
-    let humanWorkout: ExpandedQuickHumanRecordRoute?
-    let humanMedication: ExpandedQuickHumanRecordRoute?
-    let petMedication: ExpandedQuickPetRecordRoute?
-    let humanNote: ExpandedQuickHumanRecordRoute?
-    let humanExpense: ExpandedQuickHumanRecordRoute?
+    @ObservedObject var router: FocusHomeQuickRecordRouter
     let preselectedPayerId: String?
 
     let onPetWeightRewarded: (UUID, Int) -> Void
@@ -48,18 +26,9 @@ struct FocusHomeQuickRecordOverlayLayer: View {
     let onManageHumanMedication: (Human) -> Void
     let onPetMedicationSaved: (Pet) -> Void
 
-    let dismissPetWeight: (UUID) -> Void
-    let dismissPetExpense: (UUID) -> Void
-    let dismissHumanWeight: (UUID) -> Void
-    let dismissHumanWorkout: (UUID) -> Void
-    let dismissHumanMedication: (UUID) -> Void
-    let dismissPetMedication: (UUID) -> Void
-    let dismissHumanNote: (UUID) -> Void
-    let dismissHumanExpense: (UUID) -> Void
-
     var body: some View {
-        ZStack {
-            if let route = petWeight {
+        OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: router.hasActiveOverlay) {
+            if let route = router.petWeight {
                 let pet = route.pet
                 GenericWeightEntrySheet(
                     target: .pet(pet),
@@ -67,14 +36,14 @@ struct FocusHomeQuickRecordOverlayLayer: View {
                         onPetWeightRewarded(pet.id, delta)
                     },
                     onDismiss: {
-                        dismissPetWeight(route.id)
+                        router.dismissPetWeight(routeID: route.id)
                     }
                 )
                 .id(route.id)
                 .zIndex(1)
             }
 
-            if let route = petExpense {
+            if let route = router.petExpense {
                 let pet = route.pet
                 AddExpenseSheet(
                     pet: pet,
@@ -83,14 +52,14 @@ struct FocusHomeQuickRecordOverlayLayer: View {
                         onPetExpenseRewarded(pet.id, delta)
                     },
                     onDismiss: {
-                        dismissPetExpense(route.id)
+                        router.dismissPetExpense(routeID: route.id)
                     }
                 )
                 .id(route.id)
                 .zIndex(2)
             }
 
-            if let route = humanWeight {
+            if let route = router.humanWeight {
                 let human = route.human
                 GenericWeightEntrySheet(
                     target: .human(human),
@@ -98,14 +67,14 @@ struct FocusHomeQuickRecordOverlayLayer: View {
                         onHumanSaved(human.id, route.actionKey)
                     },
                     onDismiss: {
-                        dismissHumanWeight(route.id)
+                        router.dismissHumanWeight(routeID: route.id)
                     }
                 )
                 .id(route.id)
                 .zIndex(3)
             }
 
-            if let route = humanExpense {
+            if let route = router.humanExpense {
                 let human = route.human
                 QuickHumanExpenseSheet(
                     human: human,
@@ -113,14 +82,14 @@ struct FocusHomeQuickRecordOverlayLayer: View {
                         onHumanSaved(human.id, route.actionKey)
                     },
                     onDismiss: {
-                        dismissHumanExpense(route.id)
+                        router.dismissHumanExpense(routeID: route.id)
                     }
                 )
                 .id(route.id)
                 .zIndex(4)
             }
 
-            if let route = humanNote {
+            if let route = router.humanNote {
                 let human = route.human
                 QuickHumanNoteSheet(
                     human: human,
@@ -128,14 +97,14 @@ struct FocusHomeQuickRecordOverlayLayer: View {
                         onHumanSaved(human.id, route.actionKey)
                     },
                     onDismiss: {
-                        dismissHumanNote(route.id)
+                        router.dismissHumanNote(routeID: route.id)
                     }
                 )
                 .id(route.id)
                 .zIndex(5)
             }
 
-            if let route = humanWorkout {
+            if let route = router.humanWorkout {
                 let human = route.human
                 QuickHumanWorkoutSheet(
                     human: human,
@@ -143,14 +112,14 @@ struct FocusHomeQuickRecordOverlayLayer: View {
                         onHumanSaved(human.id, route.actionKey)
                     },
                     onDismiss: {
-                        dismissHumanWorkout(route.id)
+                        router.dismissHumanWorkout(routeID: route.id)
                     }
                 )
                 .id(route.id)
                 .zIndex(6)
             }
 
-            if let route = humanMedication {
+            if let route = router.humanMedication {
                 let human = route.human
                 QuickHumanMedicationSheet(
                     human: human,
@@ -161,29 +130,65 @@ struct FocusHomeQuickRecordOverlayLayer: View {
                         onManageHumanMedication(human)
                     },
                     onDismiss: {
-                        dismissHumanMedication(route.id)
+                        router.dismissHumanMedication(routeID: route.id)
                     }
                 )
                 .id(route.id)
                 .zIndex(7)
             }
 
-            if let route = petMedication {
+            if let route = router.petMedication {
                 let pet = route.pet
-                AddPetMedicationSheet(
+                PetMedicationQuickRecordPopupLayer(
                     pet: pet,
-                    isInlinePopup: true,
                     onClose: {
-                        dismissPetMedication(route.id)
+                        router.dismissPetMedication(routeID: route.id)
                     },
                     onSaved: {
                         onPetMedicationSaved(pet)
-                        dismissPetMedication(route.id)
+                        router.dismissPetMedication(routeID: route.id)
                     }
                 )
                 .id(route.id)
                 .zIndex(8)
             }
         }
+    }
+}
+
+private struct PetMedicationQuickRecordPopupLayer: View {
+    let pet: Pet
+    let onClose: () -> Void
+    let onSaved: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .bottom) {
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(colorScheme == .dark ? 0.14 : 0.07), // ui-v4: allow modal scrim
+                        Color.black.opacity(colorScheme == .dark ? 0.38 : 0.20) // ui-v4: allow modal scrim
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                .onTapGesture(perform: onClose)
+
+                AddPetMedicationSheet(
+                    pet: pet,
+                    isInlinePopup: true,
+                    onClose: onClose,
+                    onSaved: onSaved
+                )
+                .frame(maxHeight: min(proxy.size.height * 0.88, 690))
+                .padding(.horizontal, 6)
+                .padding(.bottom, max(proxy.safeAreaInsets.bottom, 8) + 6)
+            }
+        }
+        .ignoresSafeArea()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

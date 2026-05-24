@@ -57,42 +57,113 @@ enum OhanaChartStyle {
     }
 
     static func softenedLinePath(points: [CGPoint]) -> Path {
-        Path { path in
+        let points = normalizedTrendPoints(points)
+        return Path { path in
             guard let first = points.first else { return }
             path.move(to: first)
-            appendSoftSegments(to: &path, points: points)
+            appendMonotoneSegments(to: &path, points: points)
         }
     }
 
     static func softenedAreaPath(points: [CGPoint], baselineY: CGFloat) -> Path {
-        Path { path in
+        let points = normalizedTrendPoints(points)
+        return Path { path in
             guard let first = points.first, let last = points.last else { return }
             path.move(to: CGPoint(x: first.x, y: baselineY))
             path.addLine(to: first)
-            appendSoftSegments(to: &path, points: points)
+            appendMonotoneSegments(to: &path, points: points)
             path.addLine(to: CGPoint(x: last.x, y: baselineY))
             path.closeSubpath()
         }
     }
 
-    private static func appendSoftSegments(to path: inout Path, points: [CGPoint]) {
+    private static func normalizedTrendPoints(_ points: [CGPoint]) -> [CGPoint] {
+        let sorted = points
+            .filter { $0.x.isFinite && $0.y.isFinite }
+            .sorted { $0.x < $1.x }
+        guard !sorted.isEmpty else { return [] }
+
+        let duplicateThreshold: CGFloat = 0.5
+        var result: [CGPoint] = []
+        var group: [CGPoint] = []
+
+        func averaged(_ values: [CGPoint]) -> CGPoint? {
+            guard !values.isEmpty else { return nil }
+            let x = values.map(\.x).reduce(0, +) / CGFloat(values.count)
+            let y = values.map(\.y).reduce(0, +) / CGFloat(values.count)
+            return CGPoint(x: x, y: y)
+        }
+
+        for point in sorted {
+            if let anchor = group.first, abs(point.x - anchor.x) > duplicateThreshold {
+                if let averagedPoint = averaged(group) {
+                    result.append(averagedPoint)
+                }
+                group = [point]
+            } else {
+                group.append(point)
+            }
+        }
+        if let averagedPoint = averaged(group) {
+            result.append(averagedPoint)
+        }
+
+        return result
+    }
+
+    private static func appendMonotoneSegments(to path: inout Path, points: [CGPoint]) {
         guard points.count > 1 else { return }
-        for index in 0..<(points.count - 1) {
-            let p0 = points[max(index - 1, 0)]
+
+        guard points.count > 2 else {
+            path.addLine(to: points[1])
+            return
+        }
+
+        let count = points.count
+        var slopes = Array(repeating: CGFloat.zero, count: count - 1)
+        for index in 0..<(count - 1) {
+            let dx = max(points[index + 1].x - points[index].x, 0.0001)
+            slopes[index] = (points[index + 1].y - points[index].y) / dx
+        }
+
+        var tangents = Array(repeating: CGFloat.zero, count: count)
+        tangents[0] = slopes[0]
+        tangents[count - 1] = slopes[count - 2]
+
+        if count > 2 {
+            for index in 1..<(count - 1) {
+                let previous = slopes[index - 1]
+                let next = slopes[index]
+                if previous == 0 || next == 0 || previous.sign != next.sign {
+                    tangents[index] = 0
+                } else {
+                    let h0 = max(points[index].x - points[index - 1].x, 0.0001)
+                    let h1 = max(points[index + 1].x - points[index].x, 0.0001)
+                    let w1 = 2 * h1 + h0
+                    let w2 = h1 + 2 * h0
+                    tangents[index] = (w1 + w2) / (w1 / previous + w2 / next)
+                }
+            }
+        }
+
+        for index in 0..<(count - 1) {
             let p1 = points[index]
             let p2 = points[index + 1]
-            let p3 = points[min(index + 2, points.count - 1)]
+            let dx = p2.x - p1.x
+            guard dx > 0.0001 else {
+                path.addLine(to: p2)
+                continue
+            }
             let segmentMinY = min(p1.y, p2.y)
             let segmentMaxY = max(p1.y, p2.y)
-            let tension: CGFloat = 0.22
 
             let c1 = CGPoint(
-                x: clamp(p1.x + (p2.x - p0.x) * tension, min(p1.x, p2.x), max(p1.x, p2.x)),
-                y: clamp(p1.y + (p2.y - p0.y) * tension, segmentMinY, segmentMaxY)
+                x: p1.x + dx / 3,
+                y: clamp(p1.y + tangents[index] * dx / 3, segmentMinY, segmentMaxY)
             )
             let c2 = CGPoint(
-                x: clamp(p2.x - (p3.x - p1.x) * tension, min(p1.x, p2.x), max(p1.x, p2.x)),
-                y: clamp(p2.y - (p3.y - p1.y) * tension, segmentMinY, segmentMaxY)
+                x: p2.x - dx / 3,
+                y: clamp(p2.y - tangents[index + 1] * dx / 3, segmentMinY, segmentMaxY)
             )
             path.addCurve(to: p2, control1: c1, control2: c2)
         }
@@ -291,7 +362,7 @@ struct OhanaMinimalTrendChart: View {
     }
 
     private func playEntrance() {
-        guard workloadPolicy.shouldAnimate(isVisible: true) else {
+        guard workloadPolicy.shouldRunInteractionAnimation(isVisible: true) else {
             entranceProgress = 1
             return
         }
@@ -400,7 +471,7 @@ struct OhanaMinimalMultiTrendChart: View {
     }
 
     private func playEntrance() {
-        guard workloadPolicy.shouldAnimate(isVisible: true) else {
+        guard workloadPolicy.shouldRunInteractionAnimation(isVisible: true) else {
             entranceProgress = 1
             return
         }
@@ -471,7 +542,7 @@ struct OhanaMinimalBarChart: View {
     }
 
     private func playEntrance() {
-        guard workloadPolicy.shouldAnimate(isVisible: true) else {
+        guard workloadPolicy.shouldRunInteractionAnimation(isVisible: true) else {
             entranceProgress = 1
             return
         }

@@ -168,14 +168,12 @@ struct CritterDeckCarousel: View {
                     }
                 }
             )
-            .presentationDetents([.large]) // ui-v4: allow all cards overview sheet
-            .presentationDragIndicator(.visible)
+            .ohanaSheetPagePresentation() // ui-v4: allow all cards overview sheet
         }
         // C3: 宠物背面健康格 → modal sheet（避免 NavigationStack push 死锁）
         .sheet(item: $quickHealthPet) { pet in
             NavigationStack { PetHealthDetailView(pet: pet, isModal: true) }
-                .presentationDetents([.large]) // ui-v4: allow long health detail sheet
-                .presentationDragIndicator(.visible)
+                .ohanaSheetPagePresentation() // ui-v4: allow long health detail sheet
         }
     }
 
@@ -1009,13 +1007,11 @@ struct HumanQuickAccessGrid: View {
         }
         .sheet(isPresented: $showWeightSheet) {
             GenericWeightEntrySheet(target: .human(human))
-                .presentationDetents([.height(690), .large])
-                .presentationDragIndicator(.visible)
+                .ohanaCompactSheetPresentation(detents: [.height(690), .large])
         }
         .sheet(isPresented: $showWishSheet) {
             HumanWishlistView(human: human)
-                .presentationDetents([.large]) // ui-v4: allow long wishlist detail sheet
-                .presentationDragIndicator(.visible)
+                .ohanaSheetPagePresentation() // ui-v4: allow long wishlist detail sheet
         }
         .alert("仅本人可见", isPresented: $showPrivacyAlert) {
             Button("知道了", role: .cancel) {}

@@ -62,7 +62,6 @@ struct PetInsuranceView: View {
                         insuranceToEdit = nil
                     }
                 }
-                .transition(.opacity)
                 .zIndex(40)
             }
         }

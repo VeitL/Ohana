@@ -41,6 +41,13 @@ struct CrewRosterOverlay: View {
     @State private var collaborationEditorPresented = false
     @State private var pendingInlineSavedPet: Pet? = nil
     @State private var pendingInlineSavedHuman: Human? = nil
+    @State private var expandedRosterPet: Pet? = nil
+    @State private var expandedRosterHuman: Human? = nil
+    @State private var expandedRosterCardId: UUID? = nil
+    @State private var rosterHeroProgress: CGFloat = 0
+    @State private var rosterHeroDirection: Int = 1
+    @Namespace private var rosterWalletNamespace
+    @Namespace private var rosterHeroNamespace
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @Environment(\.colorScheme) private var colorScheme
@@ -98,14 +105,9 @@ struct CrewRosterOverlay: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .transition(.opacity.combined(with: .scale(scale: 0.985)))
                     } else {
-                        ScrollView(.vertical, showsIndicators: false) {
-                            VStack(spacing: 20) {
-                                bentoDex
-                                Spacer(minLength: 60)
-                            }
-                            .padding(.top, 4)
+                        rosterWalletDeck
+                            .transition(.opacity.combined(with: .scale(scale: 0.992)))
                             .animation(GoMotion.page, value: selectedRosterMode)
-                        }
                     }
                 }
 
@@ -115,7 +117,6 @@ struct CrewRosterOverlay: View {
                         .onTapGesture {
                             closeMemberAddMenu()
                         }
-                        .transition(.opacity)
                 }
 
                 if shouldShowRosterFab {
@@ -230,26 +231,11 @@ struct CrewRosterOverlay: View {
     }
 
     private var rosterCoconutButton: some View {
-        Button {
+        CoconutBalanceCapsule(balance: activeHumanCoconutBalance) {
             showingCoconutLog = true
-        } label: {
-            HStack(spacing: 7) {
-                Text("🥥")
-                    .font(.system(size: 12, weight: .black))
-                Text("\(activeHumanCoconutBalance)")
-                    .font(OhanaFont.caption(.black))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .ohanaNumericMotion(activeHumanCoconutBalance)
-            }
-            .foregroundStyle(Color.ohanaPrimaryActionText)
-            .padding(.horizontal, 13)
-            .frame(height: 34)
-            .background(Color.goPrimary, in: Capsule())
-            .contentShape(Capsule())
         }
-        .buttonStyle(ScaleButtonStyle())
-        .ohanaPhasePop(trigger: activeHumanCoconutBalance)
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
         .accessibilityLabel(l.tr(zh: "我的椰子 \(activeHumanCoconutBalance)", en: "My coconuts \(activeHumanCoconutBalance)", de: "Meine Kokosnuesse \(activeHumanCoconutBalance)"))
     }
 
@@ -326,6 +312,7 @@ struct CrewRosterOverlay: View {
 
     private var shouldShowRosterFab: Bool {
         guard activeAddEntityType == nil else { return false }
+        guard expandedRosterPet == nil && expandedRosterHuman == nil && expandedRosterCardId == nil else { return false }
         if showsFamilyCollaboration && selectedRosterMode == .collaboration {
             return !collaborationEditorPresented
         }
@@ -334,34 +321,18 @@ struct CrewRosterOverlay: View {
 
     @ViewBuilder
     private func addEntityCover(_ type: EntityType) -> some View {
-        ZStack(alignment: .topTrailing) {
-            AddEntityDestinationView(
-                type: type,
-                onComplete: { completeInlineAddEntity() },
-                onPetSaved: { pet in
-                    pendingInlineSavedPet = pet
-                },
-                onHumanSaved: { human in
-                    pendingInlineSavedHuman = human
-                }
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .ignoresSafeArea()
-
-            Button {
-                dismissInlineAddEntity()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 42, height: 42)
-                    .background(Color.ohanaControlFill, in: Circle())
+        AddEntityDestinationView(
+            type: type,
+            onComplete: { completeInlineAddEntity() },
+            onPetSaved: { pet in
+                pendingInlineSavedPet = pet
+            },
+            onHumanSaved: { human in
+                pendingInlineSavedHuman = human
             }
-            .buttonStyle(ScaleButtonStyle())
-            .padding(.top, 18)
-            .padding(.trailing, 18)
-            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-        }
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea()
         .background(OhanaAppBackground())
     }
 
@@ -373,14 +344,6 @@ struct CrewRosterOverlay: View {
         OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
             guard activeAddEntityType == nil else { return }
             activeAddEntityType = type
-        }
-    }
-
-    private func dismissInlineAddEntity() {
-        pendingInlineSavedPet = nil
-        pendingInlineSavedHuman = nil
-        withAnimation(GoMotion.sheet) {
-            activeAddEntityType = nil
         }
     }
 
@@ -531,22 +494,117 @@ struct CrewRosterOverlay: View {
     }
 
     // MARK: - Bento Dex 主体
+    private var rosterFocusCards: [FocusCard] {
+        let petCards = filteredPets.map { FocusCard.from($0, includeAvatarData: true) }
+        let humanCards = filteredHumans.map { FocusCard.from($0, includeAvatarData: true) }
+        let plantCards = filteredPlants.map { plantFocusCard($0) }
+        return (petCards + humanCards + plantCards).sorted { lhs, rhs in
+            if lhs.createdAt != rhs.createdAt {
+                return lhs.createdAt > rhs.createdAt
+            }
+            return lhs.name.localizedCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    private var rosterWalletDeck: some View {
+        CrewRosterWalletScene(
+            cards: rosterFocusCards,
+            pets: filteredPets,
+            safeTop: 0,
+            safeBottom: 20,
+            selectedCardId: expandedRosterCardId,
+            progress: rosterHeroProgress,
+            heroDirection: rosterHeroDirection,
+            reduceMotion: AppWorkloadPolicy.shared.interactionMotionBudget(isVisible: true) != .full,
+            namespace: rosterWalletNamespace,
+            heroNamespace: rosterHeroNamespace,
+            avatarCacheRevision: 0,
+            expandedInfo: { card in
+                CrewRosterWalletInfoOverlay(card: card)
+            },
+            onSelect: openRosterWalletCard,
+            onCollapse: closeRosterWalletCard
+        )
+        .padding(.top, 2)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func plantFocusCard(_ plant: Plant) -> FocusCard {
+        let days = max(0, Calendar.current.dateComponents([.day], from: plant.createdAt, to: Date()).day ?? 0)
+        let needsCare = plant.needsWatering || plant.needsFertilizing
+        let status = needsCare
+            ? l.tr(zh: "待照护", en: "Needs care", de: "Braucht Pflege")
+            : l.tr(zh: "状态良好", en: "All good", de: "Alles gut")
+        return FocusCard(
+            id: plant.id,
+            name: plant.name.isEmpty ? l.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.name,
+            kind: plant.species.isEmpty ? l.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.species,
+            emoji: plant.avatarEmoji.isEmpty ? "leaf" : plant.avatarEmoji,
+            color: Color(hex: plant.themeColorHex),
+            streak: 0,
+            coconutBalance: 0,
+            createdAt: plant.createdAt,
+            daysTogetherText: l.tr(zh: "\(days) 天", en: "\(days) days", de: "\(days) Tage"),
+            ageText: status,
+            personalityHint: plant.location.isEmpty ? nil : plant.location,
+            avatarImageData: plant.avatarImageData,
+            themeColorHex: plant.themeColorHex,
+            daysTogether: days,
+            statusBadgeText: status,
+            statusBadgeIsWarning: needsCare,
+            isReal: true,
+            actions: [
+                .init(label: l.tr(zh: "浇水", en: "WATER", de: "GIESSEN"), icon: "drop.fill", colorHex: "00D4AA"),
+                .init(label: l.tr(zh: "施肥", en: "FEED", de: "DUENGEN"), icon: "leaf.fill", colorHex: "9EF06A")
+            ]
+        )
+    }
+
+    private func openRosterWalletCard(_ card: FocusCard) {
+        guard expandedRosterCardId == nil else { return }
+        memberAddMenuItemsVisible = false
+        memberAddMenuExpanded = false
+        rosterHeroDirection = 1
+        rosterHeroProgress = 0
+        expandedRosterCardId = card.id
+        OhanaFeedback.medium()
+        OhanaFrameScheduler.runAfterNextFrame {
+            withAnimation(HeroAnim.walletSpring) {
+                rosterHeroProgress = 1
+            }
+        }
+    }
+
+    private func closeRosterWalletCard() {
+        guard expandedRosterCardId != nil else { return }
+        rosterHeroDirection = -1
+        OhanaFeedback.light()
+        withAnimation(HeroAnim.walletCollapseSpring) {
+            rosterHeroProgress = 0
+        }
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 520) {
+            guard rosterHeroProgress <= 0.02 else { return }
+            expandedRosterCardId = nil
+            rosterHeroDirection = 1
+        }
+    }
+
     private var bentoDex: some View {
         VStack(spacing: 16) {
-            // ── 宠物区（正方形卡片 2列 Bento）
+            // ── 宠物区（Wallet 栈）
             if !filteredPets.isEmpty {
                 dexSectionLabel(l.tr(zh: "宠物", en: "Pets", de: "Tiere"), count: filteredPets.count, symbol: "pawprint.fill")
                 BentoPetGrid(pets: filteredPets, onSelect: { pet in
-                    onSelectPet(pet)
+                    openRosterPetDetail(pet)
                 })
                 .padding(.horizontal, 16)
             }
 
-            // ── 人类区（正方形卡片 2列 Bento）
+            // ── 人类区（Wallet 栈）
             if !filteredHumans.isEmpty {
                 dexSectionLabel(l.tr(zh: "人类", en: "Humans", de: "Menschen"), count: filteredHumans.count, symbol: "person.2.fill")
                 BentoHumanGrid(humans: filteredHumans, onSelect: { human in
-                    onSelectHuman(human)
+                    openRosterHumanDetail(human)
                 })
                 .padding(.horizontal, 16)
             }
@@ -607,32 +665,109 @@ struct CrewRosterOverlay: View {
         .padding(.top, 80)
         .padding(.horizontal, 32)
     }
+
+    private func openRosterPetDetail(_ pet: Pet) {
+        OhanaFeedback.light()
+        withAnimation(GoMotion.page) {
+            expandedRosterHuman = nil
+            expandedRosterPet = pet
+            memberAddMenuItemsVisible = false
+            memberAddMenuExpanded = false
+        }
+    }
+
+    private func openRosterHumanDetail(_ human: Human) {
+        OhanaFeedback.light()
+        withAnimation(GoMotion.page) {
+            expandedRosterPet = nil
+            expandedRosterHuman = human
+            memberAddMenuItemsVisible = false
+            memberAddMenuExpanded = false
+        }
+    }
+
+    private func closeRosterMemberDetail() {
+        withAnimation(GoMotion.sheet) {
+            expandedRosterPet = nil
+            expandedRosterHuman = nil
+        }
+    }
 }
 
-// MARK: - 宠物两列网格
+// MARK: - 成员 Wallet 栈
+
+private struct RosterWalletStack<Card: View>: View {
+    let count: Int
+    let cardAspectRatio: CGFloat
+    let card: (Int) -> Card
+
+    private let overlap: CGFloat = 52
+    private let maxDepth = 6
+
+    init(
+        count: Int,
+        cardAspectRatio: CGFloat = 1.586,
+        @ViewBuilder card: @escaping (Int) -> Card
+    ) {
+        self.count = count
+        self.cardAspectRatio = cardAspectRatio
+        self.card = card
+    }
+
+    var body: some View {
+        if count > 0 {
+            GeometryReader { geo in
+                let width = geo.size.width
+                ZStack(alignment: .top) {
+                    ForEach(0..<count, id: \.self) { index in
+                        let depth = CGFloat(min(index, maxDepth))
+                        card(index)
+                            .frame(width: width)
+                            .scaleEffect(1 - depth * 0.028, anchor: .top)
+                            .rotationEffect(.degrees(rotation(for: index)))
+                            .offset(y: CGFloat(index) * overlap)
+                            .zIndex(Double(count - index))
+                    }
+                }
+                .frame(width: width, height: stackHeight(for: width), alignment: .top)
+            }
+            .frame(height: stackHeight(for: estimatedWidth))
+        }
+    }
+
+    private var estimatedWidth: CGFloat {
+        max(280, ScreenCompat.bounds.width - 32)
+    }
+
+    private func stackHeight(for width: CGFloat) -> CGFloat {
+        let cardHeight = width / cardAspectRatio
+        return cardHeight + CGFloat(max(count - 1, 0)) * overlap + 10
+    }
+
+    private func rotation(for index: Int) -> Double {
+        let pattern: [Double] = [0, -1.4, 1.15, -0.75, 0.9, -0.55]
+        return pattern[index % pattern.count]
+    }
+}
+
+// MARK: - 宠物 Wallet 栈
 
 private struct BentoPetGrid: View {
     let pets: [Pet]
     let onSelect: (Pet) -> Void
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
-    ]
-
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 12) {
-            ForEach(Array(pets.enumerated()), id: \.element.id) { index, pet in
-                PetSquareCard(pet: pet) {
-                    onSelect(pet)
-                }
-                .ohanaSmoothAppear(index: index)
+        RosterWalletStack(count: pets.count) { index in
+            let pet = pets[index]
+            PetSquareCard(pet: pet) {
+                onSelect(pet)
             }
+            .ohanaSmoothAppear(index: index)
         }
     }
 }
 
-// MARK: - 宠物小卡片（两列网格用，单击进详情）
+// MARK: - 宠物小卡片（Wallet 栈用，单击进详情）
 
 private struct PetSquareCard: View {
     let pet: Pet
@@ -669,8 +804,7 @@ private struct PetSquareCard: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
-            cardFace
+        cardFace
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .onTapGesture {
                 guard Date() >= suppressTapUntil else { return }
@@ -680,6 +814,10 @@ private struct PetSquareCard: View {
             .rotationEffect(.degrees(isDeletePressing ? -1.35 : 0))
             .animation(deletePressAnimation, value: isDeletePressing)
             .overlay(alignment: .topTrailing) {
+                homeVisibilityToggle
+                    .padding(7)
+            }
+            .overlay(alignment: .topLeading) {
                 if isDeletePressing {
                     deletePreviewBadge
                         .padding(7)
@@ -692,9 +830,7 @@ private struct PetSquareCard: View {
                 pressing: updateDeletePressFeedback,
                 perform: triggerDeleteAlert
             )
-            homeVisibilityToggle
-        }
-        .alert("删除 \(pet.name)？", isPresented: $showDeleteAlert) {
+            .alert("删除 \(pet.name)？", isPresented: $showDeleteAlert) {
             Button("取消", role: .cancel) {}
             Button("删除", role: .destructive) {
                 let petIdStr = pet.id.uuidString
@@ -797,29 +933,16 @@ private struct PetSquareCard: View {
     }
 
     private var homeVisibilityToggle: some View {
-        HStack(spacing: 6) {
-            Image(systemName: isShownOnHome ? "house.fill" : "house.slash.fill")
-                .font(.system(size: 11, weight: .black))
-                .foregroundStyle(isShownOnHome ? Color.goPrimary : Color.ohanaTertiaryText)
-                .frame(width: 16)
-            Text(isShownOnHome ? "首页显示" : "已隐藏")
-                .font(.system(size: 10, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(isShownOnHome ? 0.86 : 0.52))
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
-            Toggle("", isOn: homeVisibilityBinding)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .tint(Color.goPrimary)
-                .scaleEffect(0.62)
-                .frame(width: 34, height: 22)
-        }
-        .padding(.leading, 9)
-        .padding(.trailing, 7)
-        .padding(.vertical, 4)
-        .background(Color.ohanaControlFill, in: Capsule())
-        .fixedSize(horizontal: true, vertical: false)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        Toggle("", isOn: homeVisibilityBinding)
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .tint(Color.goPrimary)
+            .scaleEffect(0.58)
+            .frame(width: 38, height: 24)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 4)
+            .background(Color.arkInk.opacity(0.42), in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.goCardWhite.opacity(0.16), lineWidth: 0.5))
         .accessibilityLabel("首页显示")
         .accessibilityValue(isShownOnHome ? "开启" : "关闭")
         .alert("首页卡片堆已满", isPresented: $showHomeStackFullAlert) {
@@ -1105,30 +1228,24 @@ private struct PetSquareCard: View {
     }
 }
 
-// MARK: - 人类两列网格
+// MARK: - 人类 Wallet 栈
 
 private struct BentoHumanGrid: View {
     let humans: [Human]
     let onSelect: (Human) -> Void
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
-    ]
-
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 12) {
-            ForEach(Array(humans.enumerated()), id: \.element.id) { index, human in
-                HumanSquareCard(human: human) {
-                    onSelect(human)
-                }
-                .ohanaSmoothAppear(index: index)
+        RosterWalletStack(count: humans.count) { index in
+            let human = humans[index]
+            HumanSquareCard(human: human) {
+                onSelect(human)
             }
+            .ohanaSmoothAppear(index: index)
         }
     }
 }
 
-// MARK: - 人类小卡片（两列网格用，单击进详情）
+// MARK: - 人类小卡片（Wallet 栈用，单击进详情）
 
 private struct HumanSquareCard: View {
     let human: Human
@@ -1161,8 +1278,7 @@ private struct HumanSquareCard: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
-            cardFace
+        cardFace
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .onTapGesture {
                 guard Date() >= suppressTapUntil else { return }
@@ -1172,6 +1288,10 @@ private struct HumanSquareCard: View {
             .rotationEffect(.degrees(isDeletePressing ? -1.35 : 0))
             .animation(deletePressAnimation, value: isDeletePressing)
             .overlay(alignment: .topTrailing) {
+                homeVisibilityToggle
+                    .padding(7)
+            }
+            .overlay(alignment: .topLeading) {
                 if isDeletePressing {
                     deletePreviewBadge
                         .padding(7)
@@ -1184,9 +1304,7 @@ private struct HumanSquareCard: View {
                 pressing: updateDeletePressFeedback,
                 perform: triggerDeleteAlert
             )
-            homeVisibilityToggle
-        }
-        .alert("删除 \(human.name)？", isPresented: $showDeleteAlert) {
+            .alert("删除 \(human.name)？", isPresented: $showDeleteAlert) {
             Button("取消", role: .cancel) { }
             Button("删除", role: .destructive) {
                 modelContext.delete(human)
@@ -1292,29 +1410,16 @@ private struct HumanSquareCard: View {
     }
 
     private var homeVisibilityToggle: some View {
-        HStack(spacing: 6) {
-            Image(systemName: human.shouldShowOnHome ? "house.fill" : "house.slash.fill")
-                .font(.system(size: 11, weight: .black))
-                .foregroundStyle(human.shouldShowOnHome ? Color.goPrimary : Color.ohanaTertiaryText)
-                .frame(width: 16)
-            Text(human.shouldShowOnHome ? "首页显示" : "已隐藏")
-                .font(.system(size: 10, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(human.shouldShowOnHome ? 0.86 : 0.52))
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
-            Toggle("", isOn: homeVisibilityBinding)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .tint(Color.goPrimary)
-                .scaleEffect(0.62)
-                .frame(width: 34, height: 22)
-        }
-        .padding(.leading, 9)
-        .padding(.trailing, 7)
-        .padding(.vertical, 4)
-        .background(Color.ohanaControlFill, in: Capsule())
-        .fixedSize(horizontal: true, vertical: false)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        Toggle("", isOn: homeVisibilityBinding)
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .tint(Color.goPrimary)
+            .scaleEffect(0.58)
+            .frame(width: 38, height: 24)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 4)
+            .background(Color.arkInk.opacity(0.42), in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.goCardWhite.opacity(0.16), lineWidth: 0.5))
         .accessibilityLabel("首页显示")
         .accessibilityValue(human.shouldShowOnHome ? "开启" : "关闭")
         .alert("首页卡片堆已满", isPresented: $showHomeStackFullAlert) {

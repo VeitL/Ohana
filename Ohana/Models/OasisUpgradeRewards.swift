@@ -609,29 +609,29 @@ enum OasisUpgradeRewardCatalog {
             id: firstCritterId,
             emoji: "🥥",
             rarity: .rare,
-            sourceLevel: 5,
+            sourceLevel: 10,
             assetName: "CritterLumo",
-            unlockHintZh: "生命树 Lv.5 保底",
-            unlockHintEn: "Guaranteed at Tree Lv.5",
-            unlockHintDe: "Garantiert bei Baum Lv.5",
+            unlockHintZh: "生命树 Lv.10 保底",
+            unlockHintEn: "Guaranteed at Tree Lv.10",
+            unlockHintDe: "Garantiert bei Baum Lv.10",
             personalityRaw: "mischievous",
             preferredItemId: "coconut_milk",
             nameZh: "Lumo",
             nameEn: "Lumo",
             nameDe: "Lumo",
-            taglineZh: "长耳毛绒帽里藏着小坏笑的俏皮伙伴",
-            taglineEn: "A quietly mischievous plush companion with tall ears and a tiny smirk.",
-            taglineDe: "Ein still schelmischer Plüschbegleiter mit langen Ohren und kleinem Grinsen."
+            taglineZh: "会从小毛团进化成云尾守护者的俏皮伙伴",
+            taglineEn: "A playful little fluff that evolves into a cloud-tailed guardian.",
+            taglineDe: "Ein verspielter kleiner Flausch, der zum Wolkenschweif-Hüter wird."
         ),
         .init(
             id: legendaryCritterId,
             emoji: "✨",
             rarity: .legendary,
-            sourceLevel: 10,
+            sourceLevel: 20,
             assetName: "CritterAuroraLuma",
-            unlockHintZh: "生命树 Lv.10 保底",
-            unlockHintEn: "Guaranteed at Tree Lv.10",
-            unlockHintDe: "Garantiert bei Baum Lv.10",
+            unlockHintZh: "生命树 Lv.20 保底",
+            unlockHintEn: "Guaranteed at Tree Lv.20",
+            unlockHintDe: "Garantiert bei Baum Lv.20",
             personalityRaw: "mystic",
             preferredItemId: "aurora_crystal",
             nameZh: "极光灵",
@@ -645,11 +645,11 @@ enum OasisUpgradeRewardCatalog {
             id: "moss_bun",
             emoji: "🍃",
             rarity: .common,
-            sourceLevel: 3,
+            sourceLevel: 30,
             assetName: "CritterMossBun",
-            unlockHintZh: "碎片唤醒 · Lv.3 后更容易获得",
-            unlockHintEn: "Fragment awakening · easier after Lv.3",
-            unlockHintDe: "Fragmente · leichter ab Lv.3",
+            unlockHintZh: "生命树 Lv.30 保底",
+            unlockHintEn: "Guaranteed at Tree Lv.30",
+            unlockHintDe: "Garantiert bei Baum Lv.30",
             personalityRaw: "sleepy",
             preferredItemId: "moss_cookie",
             nameZh: "苔团",
@@ -663,11 +663,11 @@ enum OasisUpgradeRewardCatalog {
             id: "pebble_pop",
             emoji: "🫧",
             rarity: .common,
-            sourceLevel: 4,
+            sourceLevel: 40,
             assetName: "CritterPebblePop",
-            unlockHintZh: "碎片唤醒 · Oasis 装饰奖励池",
-            unlockHintEn: "Fragment awakening · Oasis decor pool",
-            unlockHintDe: "Fragmente · Oasis-Deko-Pool",
+            unlockHintZh: "生命树 Lv.40 保底",
+            unlockHintEn: "Guaranteed at Tree Lv.40",
+            unlockHintDe: "Garantiert bei Baum Lv.40",
             personalityRaw: "playful",
             preferredItemId: "bubble_pebble",
             nameZh: "泡泡石",
@@ -681,11 +681,11 @@ enum OasisUpgradeRewardCatalog {
             id: "ember_pip",
             emoji: "🔥",
             rarity: .epic,
-            sourceLevel: 8,
+            sourceLevel: 50,
             assetName: "CritterEmberPip",
-            unlockHintZh: "碎片唤醒 · 高级升级椰子",
-            unlockHintEn: "Fragment awakening · high-level coconuts",
-            unlockHintDe: "Fragmente · höhere Upgrade-Kokosnüsse",
+            unlockHintZh: "生命树 Lv.50 保底",
+            unlockHintEn: "Guaranteed at Tree Lv.50",
+            unlockHintDe: "Garantiert bei Baum Lv.50",
             personalityRaw: "brave",
             preferredItemId: "warm_coal",
             nameZh: "烬豆",
@@ -699,11 +699,11 @@ enum OasisUpgradeRewardCatalog {
             id: "moon_jelly",
             emoji: "🌙",
             rarity: .epic,
-            sourceLevel: 9,
+            sourceLevel: 60,
             assetName: "CritterMoonJelly",
-            unlockHintZh: "活动/碎片预留",
-            unlockHintEn: "Event or fragment reserve",
-            unlockHintDe: "Event- oder Fragmentreserve",
+            unlockHintZh: "生命树 Lv.60 保底",
+            unlockHintEn: "Guaranteed at Tree Lv.60",
+            unlockHintDe: "Garantiert bei Baum Lv.60",
             personalityRaw: "calm",
             preferredItemId: "moon_drop",
             nameZh: "月冻",
@@ -720,45 +720,28 @@ enum OasisUpgradeRewardCatalog {
     }
 
     static func rule(for level: Int) -> OasisUpgradeRewardRule {
+        if level % 10 == 0,
+           let entry = critters.first(where: { $0.sourceLevel == level }) {
+            return .init(
+                level: level,
+                rewardKind: .electronicPet,
+                rewardCatalogId: "level_\(level)_critter_\(entry.id)",
+                guaranteedCritterId: entry.id,
+                coconutAmount: max(50, level * 5),
+                treeEnergyAmount: 0,
+                fragmentAmount: max(60, level * 6),
+                decorUnlockId: entry.id == firstCritterId ? "oasis_first_nest" : nil,
+                storyStyleUnlockId: nil,
+                temporaryEffectId: nil,
+                titleZh: level == 10 ? "第一只电子宠物" : "新的电子宠物",
+                titleEn: level == 10 ? "First Critter" : "New Critter",
+                titleDe: level == 10 ? "Erstes Critter" : "Neues Critter",
+                descriptionZh: "保底唤醒伙伴 \(entry.nameZh)。",
+                descriptionEn: "Guaranteed companion: \(entry.nameEn).",
+                descriptionDe: "Garantierter Begleiter: \(entry.nameDe)."
+            )
+        }
         switch level {
-        case 5:
-            return .init(
-                level: level,
-                rewardKind: .electronicPet,
-                rewardCatalogId: "level_5_first_critter",
-                guaranteedCritterId: firstCritterId,
-                coconutAmount: 50,
-                treeEnergyAmount: 0,
-                fragmentAmount: 60,
-                decorUnlockId: "oasis_first_nest",
-                storyStyleUnlockId: nil,
-                temporaryEffectId: nil,
-                titleZh: "第一只电子宠物",
-                titleEn: "First Critter",
-                titleDe: "Erstes Critter",
-                descriptionZh: "保底唤醒稀有伙伴 Lumo。",
-                descriptionEn: "Guaranteed rare companion: Lumo.",
-                descriptionDe: "Garantierter seltener Begleiter: Lumo."
-            )
-        case 10:
-            return .init(
-                level: level,
-                rewardKind: .electronicPet,
-                rewardCatalogId: "level_10_legendary_critter",
-                guaranteedCritterId: legendaryCritterId,
-                coconutAmount: 120,
-                treeEnergyAmount: 0,
-                fragmentAmount: 160,
-                decorUnlockId: "legendary_tree_frame",
-                storyStyleUnlockId: nil,
-                temporaryEffectId: nil,
-                titleZh: "传说电子宠物",
-                titleEn: "Legendary Critter",
-                titleDe: "Legendäres Critter",
-                descriptionZh: "满级纪念，保底唤醒极光灵。",
-                descriptionEn: "Peak milestone reward: Aurora Luma.",
-                descriptionDe: "Gipfel-Meilenstein: Aurora Luma."
-            )
         case 3, 6, 9:
             let amount = level == 3 ? 12 : (level == 6 ? 24 : 48)
             return .init(
@@ -859,7 +842,11 @@ enum OasisUpgradeRewardCatalog {
     }
 
     static func fragmentTargetCritterId(for level: Int) -> String {
-        if level >= 9 { return legendaryCritterId }
+        if let next = critters
+            .sorted(by: { $0.sourceLevel < $1.sourceLevel })
+            .first(where: { level <= $0.sourceLevel }) {
+            return next.id
+        }
         switch level % 5 {
         case 0: return firstCritterId
         case 1: return emberPipId
@@ -929,7 +916,12 @@ enum OasisCritterEconomyService {
 
 @MainActor
 enum OasisUpgradeRewardService {
+    static let maxCritterLevel = 12
+    static let maxCritterAppearanceStage = 5
+    static let critterXPPerLevel = 300
+
     private static let lifecycleDay: TimeInterval = 86_400
+    private static let lifecycleCareTick: TimeInterval = 21_600
     private static let needsCareThreshold = 45
     private static let atRiskThreshold = 20
     private static let sickHealthThreshold = 45
@@ -963,6 +955,22 @@ enum OasisUpgradeRewardService {
 
         var duplicateCritter = false
         coconut.openedAt = Date()
+
+        if coconut.rewardKind == .electronicPet,
+           let critterId = coconut.guaranteedCritterId,
+           let entry = OasisUpgradeRewardCatalog.critter(id: critterId),
+           coconut.level < entry.sourceLevel {
+            coconut.rewardKind = .fragments
+            coconut.rewardCatalogId = "level_\(coconut.level)_critter_fragments"
+            coconut.fragmentAmount = max(coconut.fragmentAmount, 60)
+            coconut.decorUnlockId = nil
+            coconut.titleZh = "电子宠物碎片"
+            coconut.titleEn = "Critter Fragments"
+            coconut.titleDe = "Critter-Fragmente"
+            coconut.descriptionZh = "电子宠物将在生命树 Lv.\(entry.sourceLevel) 保底唤醒。"
+            coconut.descriptionEn = "This critter is guaranteed at Life Tree Lv.\(entry.sourceLevel)."
+            coconut.descriptionDe = "Dieser Begleiter ist bei Lebensbaum Lv.\(entry.sourceLevel) garantiert."
+        }
 
         OasisCritterEconomyService.awardCurrentHumanCoconuts(
             coconut.coconutAmount,
@@ -1082,6 +1090,62 @@ enum OasisUpgradeRewardService {
         max(0, min(100, critter.bond % 100))
     }
 
+    static func appearanceStage(forLevel level: Int) -> Int {
+        switch max(1, min(maxCritterLevel, level)) {
+        case 1...2:
+            return 1
+        case 3...5:
+            return 2
+        case 6...8:
+            return 3
+        case 9...11:
+            return 4
+        default:
+            return maxCritterAppearanceStage
+        }
+    }
+
+    static func xpProgress(for critter: OasisElectronicPet) -> Int {
+        critter.level >= maxCritterLevel ? critterXPPerLevel : max(0, min(critterXPPerLevel, critter.xp))
+    }
+
+    static func canUpgradeLevel(for critter: OasisElectronicPet) -> Bool {
+        critter.lifeState != .dead &&
+            critter.level < maxCritterLevel &&
+            critter.xp >= critterXPPerLevel
+    }
+
+    @discardableResult
+    static func upgradeLevel(for critter: OasisElectronicPet, context: ModelContext) throws -> Bool {
+        normalizeLifecycle(for: critter, context: context)
+        guard canUpgradeLevel(for: critter) else { return false }
+        critter.xp = 0
+        critter.level = min(maxCritterLevel, critter.level + 1)
+        critter.appearanceStage = appearanceStage(forLevel: critter.level)
+        critter.mood = min(100, critter.mood + 10)
+        critter.bond = min(999, critter.bond + 8)
+        critter.lastInteractionAt = Date()
+        critter.lastStateRefreshAt = Date()
+        context.insert(actionLog(for: critter, action: .levelUpgrade, xpDelta: 0))
+        refreshLifecycleState(for: critter, now: Date())
+        try context.save()
+        return true
+    }
+
+    @discardableResult
+    private static func addXP(_ amount: Int, to critter: OasisElectronicPet) -> Int {
+        guard amount > 0, critter.level < maxCritterLevel else {
+            critter.xp = critter.level >= maxCritterLevel ? 0 : max(0, min(critterXPPerLevel, critter.xp))
+            critter.appearanceStage = appearanceStage(forLevel: critter.level)
+            return 0
+        }
+        let before = max(0, min(critterXPPerLevel, critter.xp))
+        let after = min(critterXPPerLevel, before + amount)
+        critter.xp = after
+        critter.appearanceStage = appearanceStage(forLevel: critter.level)
+        return after - before
+    }
+
     @discardableResult
     static func interact(with critter: OasisElectronicPet, action: OasisCritterAction, context: ModelContext) throws -> Bool {
         try interactWithOutcome(with: critter, action: action, context: context).success
@@ -1095,19 +1159,45 @@ enum OasisUpgradeRewardService {
         }
         let wish = dailyWish(for: critter, context: context)
         let wasWishCompleted = isDailyWishCompleted(for: critter, wish: wish, context: context)
+        var interactionOverride: OasisCritterInteractionOutcome?
 
         switch action {
         case .feed:
+            let feedCount = dailyActionCount(for: action, critter: critter, context: context)
+            let effect = feedEffect(for: critter, dailyFeedCount: feedCount)
             let cost = interactionCost(for: critter, action: action, context: context)
             guard OasisCritterEconomyService.spendCurrentHumanCoconuts(cost, emoji: "🍽️", title: "喂养电子宠物", context: context) else {
                 return failedInteraction(action: action, wish: wish)
             }
-            critter.hunger = min(100, critter.hunger + 24)
-            critter.mood = min(100, critter.mood + 6)
-            critter.health = min(100, critter.health + 8)
-            critter.bond = min(999, critter.bond + 3)
-            critter.xp += 10
-            context.insert(actionLog(for: critter, action: action, coconutDelta: -cost, xpDelta: 10))
+            critter.hunger = clampedPercent(critter.hunger + effect.hungerDelta)
+            critter.mood = clampedPercent(critter.mood + effect.moodDelta)
+            critter.health = clampedPercent(critter.health + effect.healthDelta)
+            critter.bond = min(999, critter.bond + effect.bondDelta)
+            let xpDelta = addXP(effect.xp, to: critter)
+            context.insert(OasisCritterActionLog(
+                critterId: critter.id,
+                critterCatalogId: critter.catalogId,
+                action: action,
+                coconutDelta: -cost,
+                xpDelta: xpDelta,
+                sourceLevel: critter.sourceLevel,
+                noteZh: effect.messageZh,
+                noteEn: effect.messageEn,
+                noteDe: effect.messageDe
+            ))
+            interactionOverride = OasisCritterInteractionOutcome(
+                success: true,
+                action: action,
+                completedDailyWish: false,
+                wish: wish,
+                messageZh: effect.messageZh,
+                messageEn: effect.messageEn,
+                messageDe: effect.messageDe,
+                rewardXP: xpDelta,
+                rewardBond: effect.bondDelta,
+                rewardFragments: 0,
+                rewardCoconuts: 0
+            )
         case .play:
             let cost = interactionCost(for: critter, action: action, context: context)
             guard OasisCritterEconomyService.spendCurrentHumanCoconuts(cost, emoji: "🪀", title: "陪电子宠物玩耍", context: context) else {
@@ -1117,25 +1207,26 @@ enum OasisUpgradeRewardService {
             critter.mood = min(100, critter.mood + 18)
             critter.health = min(100, critter.health + 4)
             critter.bond = min(999, critter.bond + 5)
-            critter.xp += 12
-            context.insert(actionLog(for: critter, action: action, coconutDelta: -cost, xpDelta: 12))
+            let xpDelta = addXP(5, to: critter)
+            context.insert(actionLog(for: critter, action: action, coconutDelta: -cost, xpDelta: xpDelta))
         case .rest:
-            guard dailyActionCount(for: action, critter: critter, context: context) < 3 else {
+            let cost = interactionCost(for: critter, action: action, context: context)
+            guard OasisCritterEconomyService.spendCurrentHumanCoconuts(cost, emoji: "🌙", title: "电子宠物休息", context: context) else {
                 return failedInteraction(action: action, wish: wish)
             }
             critter.hunger = max(0, critter.hunger - 2)
             critter.mood = min(100, critter.mood + 8)
             critter.health = min(100, critter.health + 10)
             critter.bond = min(999, critter.bond + 1)
-            critter.xp += 4
-            context.insert(actionLog(for: critter, action: action, xpDelta: 4))
-        case .rescue, .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho, .death:
+            let xpDelta = addXP(2, to: critter)
+            context.insert(actionLog(for: critter, action: action, coconutDelta: -cost, xpDelta: xpDelta))
+        case .rescue, .levelUpgrade, .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho, .death:
             return failedInteraction(action: action, wish: wish)
         }
 
         let completedWish = action == wish.action && !wasWishCompleted
         if completedWish {
-            critter.xp += wish.rewardXP
+            let wishXPDelta = addXP(wish.rewardXP, to: critter)
             critter.bond = min(999, critter.bond + wish.rewardBond)
             addFragments(critterId: critter.catalogId, amount: wish.rewardFragments, context: context)
             OasisCritterEconomyService.awardCurrentHumanCoconuts(
@@ -1150,7 +1241,7 @@ enum OasisUpgradeRewardService {
                 action: .careEcho,
                 coconutDelta: wish.rewardCoconuts,
                 fragmentDelta: wish.rewardFragments,
-                xpDelta: wish.rewardXP,
+                xpDelta: wishXPDelta,
                 sourceLevel: critter.sourceLevel,
                 noteZh: "完成今日小愿望",
                 noteEn: "Completed today's tiny wish.",
@@ -1158,17 +1249,15 @@ enum OasisUpgradeRewardService {
             ))
         }
 
-        while critter.xp >= 100 {
-            critter.xp -= 100
-            critter.level += 1
-            if critter.level % 3 == 0 {
-                critter.appearanceStage = min(4, critter.appearanceStage + 1)
-            }
-        }
+        critter.xp = critter.level >= maxCritterLevel ? 0 : max(0, min(critterXPPerLevel, critter.xp))
+        critter.appearanceStage = appearanceStage(forLevel: critter.level)
         critter.lastInteractionAt = Date()
         critter.lastStateRefreshAt = Date()
         refreshLifecycleState(for: critter, now: Date())
         try context.save()
+        if !completedWish, let interactionOverride {
+            return interactionOverride
+        }
         return interactionOutcome(action: action, wish: wish, completedWish: completedWish)
     }
 
@@ -1186,8 +1275,11 @@ enum OasisUpgradeRewardService {
                 context: context
             )
         case .rest:
-            return dailyActionCount(for: action, critter: critter, context: context) < 3
-        case .rescue, .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho, .death:
+            return OasisCritterEconomyService.canSpendCurrentHumanCoconuts(
+                interactionCost(for: critter, action: action, context: context),
+                context: context
+            )
+        case .rescue, .levelUpgrade, .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho, .death:
             return false
         }
     }
@@ -1218,7 +1310,7 @@ enum OasisUpgradeRewardService {
         critter.starLevel += 1
         critter.bond = min(999, critter.bond + 20)
         critter.mood = min(100, critter.mood + 16)
-        critter.appearanceStage = min(4, max(critter.appearanceStage, critter.starLevel))
+        critter.appearanceStage = min(maxCritterAppearanceStage, max(appearanceStage(forLevel: critter.level), critter.starLevel))
         critter.lastInteractionAt = Date()
         critter.lastStateRefreshAt = Date()
         context.insert(actionLog(
@@ -1236,6 +1328,9 @@ enum OasisUpgradeRewardService {
     static func awakenWithFragments(catalogId: String, context: ModelContext) throws -> OasisElectronicPet? {
         guard !ownsCritter(catalogId, context: context),
               let entry = OasisUpgradeRewardCatalog.critter(id: catalogId) else {
+            return nil
+        }
+        guard OasisTreeManager.shared.treeLevel.rawValue >= entry.sourceLevel else {
             return nil
         }
         let cost = awakeningCost(for: entry.rarity)
@@ -1266,7 +1361,7 @@ enum OasisUpgradeRewardService {
             habitatSlot: hasFeatured ? 1 : 0,
             favoriteItemId: entry.preferredItemId,
             personalityRaw: entry.personalityRaw,
-            sourceLevel: 0
+            sourceLevel: entry.sourceLevel
         )
         context.insert(critter)
         context.insert(OasisCritterActionLog(
@@ -1299,6 +1394,14 @@ enum OasisUpgradeRewardService {
         try context.save()
     }
 
+    static func clearFeatured(_ critter: OasisElectronicPet, context: ModelContext) throws {
+        normalizeLifecycle(for: critter, context: context)
+        guard critter.lifeState != .dead else { return }
+        critter.isFeaturedOnOasis = false
+        context.insert(actionLog(for: critter, action: .feature))
+        try context.save()
+    }
+
     static func rewardFeaturedCritterFromCare(type: QuestManager.OhanaActionType, context: ModelContext) {
         let candidates = ((try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? [])
             .filter({ !$0.isArchived })
@@ -1313,7 +1416,7 @@ enum OasisUpgradeRewardService {
         }) else { return }
 
         let gain = careEchoGain(for: type)
-        critter.xp += gain.xp
+        let xpDelta = addXP(gain.xp, to: critter)
         critter.bond = min(999, critter.bond + gain.bond)
         critter.mood = min(100, critter.mood + gain.mood)
         critter.health = min(100, critter.health + gain.health)
@@ -1323,19 +1426,14 @@ enum OasisUpgradeRewardService {
         default:
             break
         }
-        while critter.xp >= 100 {
-            critter.xp -= 100
-            critter.level += 1
-            if critter.level % 3 == 0 {
-                critter.appearanceStage = min(4, critter.appearanceStage + 1)
-            }
-        }
+        critter.xp = critter.level >= maxCritterLevel ? 0 : max(0, min(critterXPPerLevel, critter.xp))
+        critter.appearanceStage = appearanceStage(forLevel: critter.level)
         critter.lastStateRefreshAt = Date()
         refreshLifecycleState(for: critter, now: Date())
         context.insert(actionLog(
             for: critter,
             action: .careEcho,
-            xpDelta: gain.xp
+            xpDelta: xpDelta
         ))
         try? context.save()
     }
@@ -1343,19 +1441,19 @@ enum OasisUpgradeRewardService {
     private static func careEchoGain(for type: QuestManager.OhanaActionType) -> (xp: Int, bond: Int, mood: Int, health: Int) {
         switch type {
         case .walk:
-            return (8, 3, 3, 4)
+            return (2, 3, 3, 4)
         case .health, .care:
-            return (7, 3, 2, 8)
+            return (2, 3, 2, 8)
         case .feed, .water:
-            return (4, 2, 2, 4)
+            return (1, 2, 2, 4)
         case .potty, .weight:
-            return (3, 1, 1, 3)
+            return (1, 1, 1, 3)
         case .expense:
-            return (2, 1, 0, 1)
+            return (0, 1, 0, 1)
         case .milestone:
-            return (12, 5, 4, 6)
+            return (3, 5, 4, 6)
         case .general:
-            return (4, 2, 1, 2)
+            return (1, 2, 1, 2)
         }
     }
 
@@ -1366,8 +1464,8 @@ enum OasisUpgradeRewardService {
         case .play:
             return dailyActionCount(for: action, critter: critter, context: context) == 0 ? 0 : 3
         case .rest:
-            return 0
-        case .rescue, .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho, .death:
+            return dailyActionCount(for: action, critter: critter, context: context) == 0 ? 0 : 2
+        case .rescue, .levelUpgrade, .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho, .death:
             return 0
         }
     }
@@ -1521,7 +1619,7 @@ enum OasisUpgradeRewardService {
         critter.mood = max(critter.mood, 58)
         critter.health = max(critter.health, 74)
         critter.bond = min(999, critter.bond + 4)
-        critter.xp += 8
+        let xpDelta = addXP(3, to: critter)
         critter.riskStartedAt = nil
         critter.criticalStartedAt = nil
         critter.lifeState = .healthy
@@ -1529,7 +1627,7 @@ enum OasisUpgradeRewardService {
         critter.lastInteractionAt = now
         critter.lastStateRefreshAt = now
         critter.lastGentlePromptAt = now
-        context.insert(actionLog(for: critter, action: .rescue, xpDelta: 8))
+        context.insert(actionLog(for: critter, action: .rescue, xpDelta: xpDelta))
         try context.save()
         return OasisCritterInteractionOutcome(
             success: true,
@@ -1539,7 +1637,7 @@ enum OasisUpgradeRewardService {
             messageZh: "你轻轻照顾了一下，它慢慢从椰壳里探出头。",
             messageEn: "You gave gentle care, and it slowly peeks out of the coconut shell.",
             messageDe: "Du hast sanft geholfen, und es schaut langsam aus der Kokosschale.",
-            rewardXP: 8,
+            rewardXP: xpDelta,
             rewardBond: 4,
             rewardFragments: 0,
             rewardCoconuts: 0
@@ -1576,17 +1674,37 @@ enum OasisUpgradeRewardService {
 
     private static func settleElapsedNeeds(for critter: OasisElectronicPet, now: Date) {
         let elapsed = max(0, now.timeIntervalSince(critter.lastStateRefreshAt))
-        let days = Int(elapsed / lifecycleDay)
-        guard days > 0 else { return }
-        let wasLow = isLowCondition(critter)
-        critter.hunger = max(0, critter.hunger - days * 14)
-        critter.mood = max(0, critter.mood - days * 10)
-        if wasLow || isLowCondition(critter) {
-            critter.health = max(0, critter.health - days * 8)
-        } else {
-            critter.health = min(100, critter.health + days * 2)
+        let ticks = Int(elapsed / lifecycleCareTick)
+        guard ticks > 0 else { return }
+
+        let start = critter.lastStateRefreshAt
+        var hunger = critter.hunger
+        var mood = critter.mood
+        var health = critter.health
+
+        for index in 0..<ticks {
+            let tickDate = start.addingTimeInterval(Double(index + 1) * lifecycleCareTick)
+            let idleHours = hoursBetween(critter.lastInteractionAt, tickDate)
+
+            hunger = max(0, hunger - 3)
+
+            if idleHours >= 24 || hunger < needsCareThreshold {
+                mood = max(0, mood - (hunger < atRiskThreshold ? 3 : 2))
+            }
+
+            if hunger < atRiskThreshold || mood < atRiskThreshold {
+                health = max(0, health - 2)
+            } else if hunger < needsCareThreshold || mood < needsCareThreshold {
+                health = max(0, health - 1)
+            } else if health < 100 && (index + 1).isMultiple(of: 4) {
+                health = min(100, health + 1)
+            }
         }
-        critter.lastStateRefreshAt = now
+
+        critter.hunger = hunger
+        critter.mood = mood
+        critter.health = health
+        critter.lastStateRefreshAt = start.addingTimeInterval(Double(ticks) * lifecycleCareTick)
     }
 
     private static func refreshLifecycleState(for critter: OasisElectronicPet, now: Date) {
@@ -1678,6 +1796,10 @@ enum OasisUpgradeRewardService {
         max(0, Int(end.timeIntervalSince(start) / 3600))
     }
 
+    private static func clampedPercent(_ value: Int) -> Int {
+        max(0, min(100, value))
+    }
+
     private static func dailyActionCount(for action: OasisCritterAction, critter: OasisElectronicPet, context: ModelContext) -> Int {
         actionLogs(for: critter, context: context).filter { $0.action == action }.count
     }
@@ -1689,6 +1811,69 @@ enum OasisUpgradeRewardService {
             $0.critterId == critter.id &&
             $0.createdAt >= startOfDay
         }
+    }
+
+    private struct FeedInteractionEffect {
+        let hungerDelta: Int
+        let moodDelta: Int
+        let healthDelta: Int
+        let bondDelta: Int
+        let xp: Int
+        let messageZh: String
+        let messageEn: String
+        let messageDe: String
+    }
+
+    private static func feedEffect(for critter: OasisElectronicPet, dailyFeedCount: Int) -> FeedInteractionEffect {
+        if critter.hunger >= 95 {
+            return FeedInteractionEffect(
+                hungerDelta: 0,
+                moodDelta: -6,
+                healthDelta: -5,
+                bondDelta: 0,
+                xp: 0,
+                messageZh: "它已经饱饱的，继续喂有点吃撑，心情和身体都不太舒服。",
+                messageEn: "It is already full. Another bite makes it uncomfortably stuffed.",
+                messageDe: "Es ist schon satt. Noch ein Bissen fühlt sich unangenehm voll an."
+            )
+        }
+
+        if dailyFeedCount >= 2 {
+            return FeedInteractionEffect(
+                hungerDelta: 8,
+                moodDelta: 1,
+                healthDelta: 0,
+                bondDelta: 1,
+                xp: 1,
+                messageZh: "它有点吃撑，只小小咬了一口。",
+                messageEn: "It is getting full and only takes a tiny bite.",
+                messageDe: "Es wird langsam satt und nimmt nur einen kleinen Bissen."
+            )
+        }
+
+        if critter.hunger >= 80 {
+            return FeedInteractionEffect(
+                hungerDelta: 10,
+                moodDelta: 3,
+                healthDelta: 2,
+                bondDelta: 2,
+                xp: 2,
+                messageZh: "它还不太饿，慢慢把小碗推近一点。",
+                messageEn: "It is not very hungry, but nudges the bowl closer.",
+                messageDe: "Es ist nicht sehr hungrig, schiebt die Schale aber näher."
+            )
+        }
+
+        return FeedInteractionEffect(
+            hungerDelta: 24,
+            moodDelta: 6,
+            healthDelta: 8,
+            bondDelta: 3,
+            xp: 4,
+            messageZh: "它抱着小碗眯起眼，精神多了一点。",
+            messageEn: "It hugs the little bowl and perks up.",
+            messageDe: "Es umarmt die kleine Schale und wirkt munterer."
+        )
     }
 
     private static func ownsCritter(_ catalogId: String, context: ModelContext) -> Bool {
@@ -1731,7 +1916,7 @@ enum OasisUpgradeRewardService {
                 detailZh: "喂养一次，把今天的小肚子填得软软的。",
                 detailEn: "Feed once and fill today's tiny belly.",
                 detailDe: "Einmal füttern und den kleinen Bauch füllen.",
-                rewardXP: 14,
+                rewardXP: 6,
                 rewardBond: 6,
                 rewardFragments: 1,
                 rewardCoconuts: 3
@@ -1747,7 +1932,7 @@ enum OasisUpgradeRewardService {
                 detailZh: "陪它玩一次，心情会亮起来。",
                 detailEn: "Play once and brighten its mood.",
                 detailDe: "Einmal spielen und die Stimmung aufhellen.",
-                rewardXP: 14,
+                rewardXP: 6,
                 rewardBond: 6,
                 rewardFragments: 1,
                 rewardCoconuts: 3
@@ -1763,7 +1948,7 @@ enum OasisUpgradeRewardService {
                 detailZh: "让它休息一次，醒来会更黏人。",
                 detailEn: "Let it rest once and wake up closer.",
                 detailDe: "Einmal ruhen lassen, danach ist es anhänglicher.",
-                rewardXP: 14,
+                rewardXP: 6,
                 rewardBond: 6,
                 rewardFragments: 1,
                 rewardCoconuts: 3
@@ -1779,12 +1964,12 @@ enum OasisUpgradeRewardService {
                 detailZh: "点一键照顾，把它从椰壳里温柔地带回来。",
                 detailEn: "Use one-tap care and gently bring it back from the coconut shell.",
                 detailDe: "Nutze Ein-Klick-Pflege und hol es sanft aus der Kokosschale.",
-                rewardXP: 8,
+                rewardXP: 3,
                 rewardBond: 4,
                 rewardFragments: 0,
                 rewardCoconuts: 0
             )
-        case .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho, .death:
+        case .levelUpgrade, .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho, .death:
             return dailyWish(for: .play)
         }
     }
@@ -1874,7 +2059,7 @@ enum OasisUpgradeRewardService {
             message = ("它缩进小窝，睡出一朵软软的梦。", "It curls into the nest and dreams softly.", "Es rollt sich im Nest ein und träumt sanft.")
         case .rescue:
             message = ("你轻轻照顾了一下，它从椰壳里探出头。", "You gave gentle care, and it peeks out.", "Du hast sanft geholfen, und es schaut heraus.")
-        case .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho, .death:
+        case .levelUpgrade, .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho, .death:
             message = ("互动完成。", "Interaction complete.", "Interaktion abgeschlossen.")
         }
         return OasisCritterInteractionOutcome(
@@ -1952,6 +2137,8 @@ enum OasisUpgradeRewardService {
             note = ("伙伴休息", "Companion rested", "Begleiter hat geruht")
         case .rescue:
             note = ("温柔救回伙伴", "Gently rescued companion", "Begleiter sanft gerettet")
+        case .levelUpgrade:
+            note = ("伙伴升级", "Companion level up", "Begleiter-Levelaufstieg")
         case .starUpgrade:
             note = ("伙伴升星", "Companion star upgrade", "Begleiter-Sternupgrade")
         case .unlock:
@@ -1959,7 +2146,7 @@ enum OasisUpgradeRewardService {
         case .fragmentAwaken:
             note = ("碎片唤醒", "Fragment awakening", "Fragment-Weckung")
         case .feature:
-            note = ("设为小窝展示", "Featured in nest", "Im Nest gezeigt")
+            note = ("设为主页展示", "Featured on home", "Auf Start gezeigt")
         case .careEcho:
             note = ("照护共鸣", "Care echo", "Pflege-Echo")
         case .death:
@@ -2024,6 +2211,7 @@ enum OasisCritterAction: String, CaseIterable, Identifiable {
     case play
     case rest
     case rescue
+    case levelUpgrade
     case starUpgrade
     case unlock
     case fragmentAwaken

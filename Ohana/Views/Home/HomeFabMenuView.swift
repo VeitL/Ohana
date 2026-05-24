@@ -32,13 +32,8 @@ struct HomeFabMenuView: View {
     var onExpandedShortcut: (ExpandedCardFabShortcut) -> Void
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 14) {
-            if isExpanded, activeCard != nil {
-                expandedShortcutRows
-            } else if isExpanded {
-                homeShortcutRows
-            }
-
+        ZStack(alignment: .bottomTrailing) {
+            menuRows
             HomeFabMainButton(
                 isExpanded: isExpanded,
                 accessibilityLabel: isExpanded ? "收起菜单" : "展开菜单",
@@ -47,40 +42,40 @@ struct HomeFabMenuView: View {
         }
         .padding(.trailing, 20)
         .padding(.bottom, bottomPadding)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
     }
 
-    private var expandedShortcutRows: some View {
-        ForEach(Array(expandedShortcuts.enumerated()), id: \.element.id) { idx, item in
-            HomeFabActionRow(
-                item: HomeFabFunctionShortcut(
-                    label: item.label,
-                    icon: item.icon,
-                    isAvailable: item.isAvailable,
-                    badge: item.badge
-                ),
-                rowHeight: 48
-            )
-            .ohanaStaggeredMenuItem(isVisible: itemsVisible, index: idx, total: expandedShortcuts.count)
-            .onTapGesture { onExpandedShortcut(item) }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(item.label)
-            .accessibilityHint("前往\(item.label)详情")
-            .allowsHitTesting(itemsVisible)
-            .accessibilityHidden(!itemsVisible)
-        }
-    }
-
-    private var homeShortcutRows: some View {
-        ForEach(Array(homeShortcuts.enumerated()), id: \.element.id) { idx, item in
-            HomeFabActionRow(item: item, rowHeight: 48)
-                .ohanaStaggeredMenuItem(isVisible: itemsVisible, index: idx, total: homeShortcuts.count)
-                .onTapGesture { onHomeShortcut(item) }
+    @ViewBuilder
+    private var menuRows: some View {
+        if activeCard != nil {
+            ForEach(Array(expandedShortcuts.enumerated()), id: \.element.id) { idx, item in
+                HomeFabActionRow(
+                    item: HomeFabFunctionShortcut(
+                        label: item.label,
+                        icon: item.icon,
+                        isAvailable: item.isAvailable,
+                        badge: item.badge
+                    ),
+                    rowHeight: 48
+                )
+                .homeFabOrbitItem(isVisible: itemsVisible, index: idx, total: expandedShortcuts.count)
+                .onTapGesture { onExpandedShortcut(item) }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel(item.label)
-                .accessibilityHint(item.isAvailable ? "前往\(item.label)" : "当前不可用")
+                .accessibilityHint("前往\(item.label)详情")
                 .allowsHitTesting(itemsVisible)
                 .accessibilityHidden(!itemsVisible)
+            }
+        } else {
+            ForEach(Array(homeShortcuts.enumerated()), id: \.element.id) { idx, item in
+                HomeFabActionRow(item: item, rowHeight: 48)
+                    .homeFabOrbitItem(isVisible: itemsVisible, index: idx, total: homeShortcuts.count)
+                    .onTapGesture { onHomeShortcut(item) }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(item.label)
+                    .accessibilityHint(item.isAvailable ? "前往\(item.label)" : "当前不可用")
+                    .allowsHitTesting(itemsVisible)
+                    .accessibilityHidden(!itemsVisible)
+            }
         }
     }
 }
@@ -182,5 +177,45 @@ struct ExpandedCardFabMenuView: View {
                 action: onToggle
             )
         }
+    }
+}
+
+private struct HomeFabOrbitItemModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    let isVisible: Bool
+    let index: Int
+    let total: Int
+
+    private var canAnimate: Bool {
+        !reduceMotion && workloadPolicy.shouldRunInteractionAnimation(isVisible: true)
+    }
+
+    private var visibleOffset: CGFloat {
+        -CGFloat(max(total - index, 1)) * 62
+    }
+
+    private var delay: Double {
+        let visibleIndex = max(total - 1 - index, 0)
+        return isVisible
+            ? GoMotion.staggerDelay(visibleIndex, step: 0.052, maxDelay: 0.28)
+            : GoMotion.staggerDelay(index, step: 0.028, maxDelay: 0.16)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(canAnimate ? (isVisible ? 1 : 0.78) : 1, anchor: .bottomTrailing)
+            .opacity(isVisible ? 1 : 0)
+            .offset(
+                x: canAnimate ? (isVisible ? 0 : 10) : 0,
+                y: canAnimate ? (isVisible ? visibleOffset : -6) : visibleOffset
+            )
+            .animation(canAnimate ? GoMotion.fab.delay(delay) : GoMotion.reduced, value: isVisible)
+    }
+}
+
+private extension View {
+    func homeFabOrbitItem(isVisible: Bool, index: Int, total: Int) -> some View {
+        modifier(HomeFabOrbitItemModifier(isVisible: isVisible, index: index, total: total))
     }
 }

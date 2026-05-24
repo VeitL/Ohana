@@ -37,12 +37,8 @@ enum K {
 enum HeroAnim {
     static let stackCardCorner: CGFloat = 24
     static var transitionSpring: Animation { GoMotion.page }
-    static var walletSpring: Animation {
-        .interactiveSpring(response: 0.58, dampingFraction: 0.9, blendDuration: 0.18)
-    }
-    static var walletCollapseSpring: Animation {
-        .interactiveSpring(response: 0.5, dampingFraction: 0.94, blendDuration: 0.16)
-    }
+    static var walletSpring: Animation { GoMotion.heroExpand }
+    static var walletCollapseSpring: Animation { GoMotion.heroCollapse }
     static var walletContentSpring: Animation {
         .interactiveSpring(response: 0.34, dampingFraction: 0.9, blendDuration: 0.12)
     }
@@ -54,6 +50,66 @@ enum HeroAnim {
 
 struct HeroShellID: Hashable { let cardId: UUID }
 struct HeroArtID: Hashable { let cardId: UUID }
+
+enum HeroTransitionPhase: Equatable {
+    case collapsed
+    case expanding
+    case expanded
+    case collapsing
+}
+
+struct HomeHeroTransitionProgress: Equatable {
+    var value: CGFloat
+
+    var clamped: CGFloat {
+        min(max(value, 0), 1)
+    }
+
+    var phase: HeroTransitionPhase {
+        if clamped <= 0.001 { return .collapsed }
+        if clamped >= 0.999 { return .expanded }
+        return .expanding
+    }
+}
+
+enum OhanaHeroGeometry {
+    static func lerp(_ start: CGFloat, _ end: CGFloat, progress: CGFloat) -> CGFloat {
+        start + (end - start) * min(max(progress, 0), 1)
+    }
+}
+
+typealias HomeWalletHeroTimeline = WalletHeroTimeline
+
+struct HomeHeroQuickModuleRevealModifier: AnimatableModifier {
+    var progress: CGFloat
+
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        let reveal = WalletHeroTimeline.quickReveal(progress: progress)
+        content
+            .opacity(reveal > 0.015 ? 1 : 0)
+            .clipShape(HomeHeroTopRevealShape(reveal: reveal))
+            .allowsHitTesting(reveal > 0.98)
+    }
+}
+
+private struct HomeHeroTopRevealShape: Shape {
+    var reveal: CGFloat
+
+    var animatableData: CGFloat {
+        get { reveal }
+        set { reveal = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let visibleHeight = rect.height * min(max(reveal, 0), 1)
+        return Path(CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: visibleHeight))
+    }
+}
 
 struct ExpandedQuickPetRecordRoute: Identifiable {
     let id = UUID()

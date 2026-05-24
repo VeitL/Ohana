@@ -8,7 +8,7 @@ cd "${REPO_ROOT}"
 
 SCHEME="${SCHEME:-Ohana}"
 CONFIGURATION="${CONFIGURATION:-Debug}"
-DESTINATION="${DESTINATION:-platform=iOS Simulator,name=iPhone 17,OS=26.4.1}"
+DESTINATION="${DESTINATION:-platform=iOS Simulator,name=iPhone 17}"
 
 echo "Building ${SCHEME} (${CONFIGURATION})"
 echo "Destination: ${DESTINATION}"

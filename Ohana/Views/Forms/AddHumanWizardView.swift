@@ -14,6 +14,7 @@ import Foundation
 
 struct AddHumanWizardView: View {
     let onComplete: () -> Void
+    var onCancel: (() -> Void)? = nil
     var onHumanSaved: ((Human) -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
@@ -112,8 +113,8 @@ struct AddHumanWizardView: View {
         AppCurrency.supported.first { $0.code == AppCurrency.normalize(appCurrency) } ?? AppCurrency.supported[0]
     }
 
-    /// 创建页使用压缩角色卡，给状态栏和下方卡片轨道留出稳定空间。
-    private var walletDraftCardHeight: CGFloat { min((ScreenCompat.width - 7 * 2) / 1.72, 214) }
+    /// 创建页顶卡与首页卡片堆保持同一尺寸，不再压缩。
+    private var walletDraftCardHeight: CGFloat { K.cardH }
     private let walletCardCorner: CGFloat = 24
 
     private var wizardStages: [AddWizardStageItem] {
@@ -197,6 +198,9 @@ struct AddHumanWizardView: View {
 
     private var canUseAutomatic2DAvatar: Bool {
         Avatar2DAccess.usesFreeSlot(kind: .human, existingCount: existingHumans.count)
+    }
+    private var isShowingAutomatic2DAvatar: Bool {
+        usesAutomaticAvatarAsset && canUseAutomatic2DAvatar
     }
 
     // MARK: - Body
@@ -332,17 +336,15 @@ struct AddHumanWizardView: View {
     // MARK: - Layout
 
     private var wizardMainColumn: some View {
-        VStack(spacing: 0) {
+        AddWizardThreePanelLayout(previewPanelHeight: walletDraftCardHeight + 12) {
             stickyWalletHumanPreview
-
+        } content: {
             pagedCards
                 .padding(.horizontal, 7) // Match the wallet preview card width above.
-                .frame(maxHeight: .infinity)
-
+        } footer: {
             wizardPageDotRow
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.top, 4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     /// 与添加宠物向导同比例钱包顶卡
@@ -367,19 +369,26 @@ struct AddHumanWizardView: View {
                     systemImage: "sparkles",
                     tint: Color.goPrimary
                 )
-                AddWizardStatusBadge(
-                    title: canUseAutomatic2DAvatar
-                        ? l.tr(zh: "2.5D 头像", en: "2.5D avatar", de: "2,5D-Avatar")
-                        : l.tr(zh: "商店解锁", en: "Shop unlock", de: "Shop-Freischaltung"),
-                    systemImage: canUseAutomatic2DAvatar ? "wand.and.stars" : "lock.fill",
-                    tint: canUseAutomatic2DAvatar ? Color.goTeal : Color.ohanaCardSurfaceElevated
-                )
+                if isShowingAutomatic2DAvatar {
+                    AddWizardStatusBadge(
+                        title: l.tr(zh: "2.5D 头像", en: "2.5D avatar", de: "2,5D-Avatar"),
+                        systemImage: "wand.and.stars",
+                        tint: Color.goTeal
+                    )
+                }
             }
             .padding(.leading, 16)
             .padding(.bottom, 14)
         }
+        .overlay(alignment: .topTrailing) {
+            if let onCancel {
+                AddWizardCardCloseButton(action: onCancel)
+                    .padding(.top, 12)
+                    .padding(.trailing, 12)
+            }
+        }
         .padding(.horizontal, 7)   // 与首页卡片堆 K.cardMargin 保持一致
-        .padding(.top, 10)
+        .padding(.top, 6)
         .padding(.bottom, 6)
         .animation(GoMotion.feedback, value: name)
         .animation(GoMotion.feedback, value: gender)
@@ -494,6 +503,7 @@ struct AddHumanWizardView: View {
             }
             .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 16)
         }
+        .scrollDisabled(true)
     }
 
     private var humanNameSection: some View {
@@ -658,15 +668,15 @@ struct AddHumanWizardView: View {
                             avatarActionButton(icon: "camera.fill", label: l.humanWizCamera)
                         }
                     }
-                    HStack {
-                        AddWizardStatusBadge(
-                            title: canUseAutomatic2DAvatar
-                                ? l.tr(zh: "2.5D 头像", en: "2.5D avatar", de: "2,5D-Avatar")
-                                : l.tr(zh: "2.5D 商店解锁", en: "2.5D in shop", de: "2.5D im Shop"),
-                            systemImage: canUseAutomatic2DAvatar ? "sparkles" : "lock.fill",
-                            tint: canUseAutomatic2DAvatar ? Color.goPrimary : Color.ohanaCardSurfaceElevated
-                        )
-                        Spacer()
+                    if isShowingAutomatic2DAvatar {
+                        HStack {
+                            AddWizardStatusBadge(
+                                title: l.tr(zh: "2.5D 头像", en: "2.5D avatar", de: "2,5D-Avatar"),
+                                systemImage: "sparkles",
+                                tint: Color.goPrimary
+                            )
+                            Spacer()
+                        }
                     }
                     if canUseAutomatic2DAvatar && !usesAutomaticAvatarAsset {
                         Button {
@@ -690,6 +700,7 @@ struct AddHumanWizardView: View {
             }
             .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 12)
         }
+        .scrollDisabled(true)
     }
 
     // MARK: - Card 4: Family (Role + Nationality + Notes)
@@ -870,6 +881,7 @@ struct AddHumanWizardView: View {
             }
             .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 12)
         }
+        .scrollDisabled(true)
     }
 
     // MARK: - Card 5: Body data + Privacy
@@ -930,6 +942,7 @@ struct AddHumanWizardView: View {
             }
             .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 16)
         }
+        .scrollDisabled(true)
     }
 
     // MARK: - Card 6: Theme + Role + Confirm
@@ -997,6 +1010,7 @@ struct AddHumanWizardView: View {
             }
             .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 12)
         }
+        .scrollDisabled(true)
     }
 
     // MARK: - Component helpers
@@ -1319,17 +1333,17 @@ struct AddHumanWizardView: View {
                     .scaledToFit()
                     .padding(decodedAvatarTransparent ? 18 : 28)
             } else {
-                Text(fallbackAvatarEmoji(for: gender))
-                    .font(.system(size: 74))
+                AddWizardPlainAvatarPlaceholder(kind: .human, tint: memberThemeColor)
+                    .padding(22)
             }
             VStack {
                 HStack {
                     AddWizardStatusBadge(
-                        title: usesAutomaticAvatarAsset
-                            ? l.tr(zh: "自动形象", en: "Auto avatar", de: "Auto-Avatar")
-                            : l.tr(zh: "手动形象", en: "Custom avatar", de: "Eigenes Bild"),
-                        systemImage: usesAutomaticAvatarAsset ? "wand.and.stars" : "photo.fill",
-                        tint: usesAutomaticAvatarAsset ? Color.goTeal : wizardAccent
+                        title: isShowingAutomatic2DAvatar
+                            ? l.tr(zh: "2.5D 头像", en: "2.5D avatar", de: "2,5D-Avatar")
+                            : l.tr(zh: "普通头像", en: "Plain avatar", de: "Einfacher Avatar"),
+                        systemImage: isShowingAutomatic2DAvatar ? "wand.and.stars" : "person.crop.circle",
+                        tint: isShowingAutomatic2DAvatar ? Color.goTeal : memberThemeColor
                     )
                     Spacer()
                 }

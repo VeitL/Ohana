@@ -208,13 +208,21 @@ struct GoQuickActionCard: View {
 
     private var cardBgColor: Color {
         if isCompletedToday { return Color.goPrimary.opacity(0.18) }
+        if isWarningState {
+            return Color.goRed.mix(with: Color.ohanaCardSurface, by: colorScheme == .dark ? 0.52 : 0.72)
+        }
         let base = petThemeColorHex.map { Color(hex: $0) } ?? Color(hex: item.colorHex)
         return pendingReminder != nil ? base.opacity(0.16) : Color.ohanaCardSurface
     }
     private var cardBorderColor: Color {
         if isCompletedToday { return Color.goPrimary.opacity(0.68) }
+        if isWarningState { return Color.goRed.opacity(0.72) }
         let base = petThemeColorHex.map { Color(hex: $0) } ?? Color(hex: item.colorHex)
         return pendingReminder != nil ? base.opacity(0.54) : Color.ohanaGlassStroke.opacity(0.42)
+    }
+
+    private var isWarningState: Bool {
+        showsAttentionDot
     }
 
     /// 今日已打卡时图标/水浪用色：优先宠物主题色，否则快捷项自带色
@@ -415,8 +423,14 @@ struct GoQuickActionCard: View {
         .frame(maxWidth: .infinity, minHeight: 82)
         .padding(.horizontal, 8)
         .padding(.vertical, 8)
+        .background(cardBgColor, in: premiumShape)
+        .overlay {
+            premiumShape
+                .strokeBorder(cardBorderColor, lineWidth: isWarningState ? 1.2 : 1)
+        }
         .animation(GoMotion.feedback, value: isPressed)
         .animation(GoMotion.feedback, value: isCompletedToday)
+        .animation(GoMotion.feedback, value: isWarningState)
         .ohanaSelectionMotion(isSelected: isCompletedToday, scale: 1.015)
         .ohanaStateMotion(pendingReminder?.id)
     }
@@ -728,9 +742,7 @@ struct AddQuickActionSheet: View {
                 Spacer(minLength: 32)
             }
         }
-        .presentationBackground(Color.ohanaCardSurface)
-        .presentationDetents([.height(380), .medium])
-        .presentationDragIndicator(.hidden)
+        .ohanaCompactSheetPresentation(detents: [.height(380), .medium])
         .onAppear {
             if let pid = defaultPetId, let pet = pets.first(where: { $0.id == pid }) {
                 selectedPet = pet
@@ -1106,12 +1118,12 @@ private struct QuickActionWaterDropWithWaves: View {
     var isPressed: Bool = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     private var dropSize: CGFloat { 30 }
     private var shouldReduceWork: Bool {
-        powerSavingMode || reduceMotion || workloadPolicy.shouldReduceWork()
+        reduceMotion || workloadPolicy.ambientMotionBudget(isVisible: true) == .static
     }
 
     var body: some View {

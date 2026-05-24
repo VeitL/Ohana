@@ -609,6 +609,9 @@ enum FeedAutoLogMaterializer {
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> Int {
+        guard FeedOperatingMode.resolved(pet: pet, allEvents: allEvents, now: now, calendar: calendar) == .autoFeeder else {
+            return 0
+        }
         let autoEvents = FeedRuleState(pet: pet, allEvents: allEvents, now: now, calendar: calendar).autoFeederEvents
         guard !autoEvents.isEmpty else { return 0 }
 
@@ -839,8 +842,7 @@ enum FeedingPlanWriter {
         calendar: Calendar = .current
     ) -> FeedingPlanWriteResult {
         CarePlanCalendarSync.suppressDefaultPlan(kind: "feed", pet: pet, context: context)
-        deletePlan(pet: pet, kind: .manualReminder, allEvents: allEvents, context: context)
-        deletePlan(pet: pet, kind: .autoFeeder, allEvents: allEvents, context: context)
+        deletePlan(pet: pet, kind: draft.kind, allEvents: allEvents, context: context)
 
         let meals = FeedPlanDraft.normalizedMeals(draft.meals, count: draft.dailyCount, now: now, calendar: calendar)
         var createdEvents: [Event] = []
@@ -886,6 +888,28 @@ enum FeedingPlanWriter {
             deleteEvent(event, context: context)
         }
         context.safeSave()
+    }
+
+    @MainActor
+    static func deactivateManualReminderOperations(
+        pet: Pet,
+        allEvents: [Event],
+        context: ModelContext,
+        now: Date = Date()
+    ) {
+        var didChange = false
+        for event in planEvents(pet: pet, kind: .manualReminder, allEvents: allEvents) {
+            for reminder in event.reminders where reminder.isPending {
+                NotificationManager.shared.cancel(notificationId: reminder.notificationId)
+                if reminder.scheduledAt > now {
+                    context.delete(reminder)
+                    didChange = true
+                }
+            }
+        }
+        if didChange {
+            context.safeSave()
+        }
     }
 
     @MainActor

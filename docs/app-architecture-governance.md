@@ -26,10 +26,14 @@ Apple 的审核和能耗边界很清楚：后台能力必须服务于用户明�
 ## 能耗与动画
 
 - 全局能耗判断统一走 `AppWorkloadPolicy`，不要在单个页面里随手写一套低功耗判断。
+- 动效/能耗分成三类预算：核心交互走 `interactionMotionBudget`，装饰循环走 `ambientMotionBudget`，计时/地图/UI 刷新走 `refreshBudget`。
 - 正常前台、当前可见页面的点击、FAB、弹窗、卡片展开、奖励反馈保持完整动效。
+- App 内省电模式默认关闭；开启后也不能牺牲当前可见核心交互的顺滑度，只能静态化装饰动效、降低刷新频率、停止离屏工作。
 - 后台、锁屏、低电量、Reduce Motion、省电模式、离屏页面，只允许保留必要业务；常驻动画、`repeatForever`、粒子、Canvas、TimelineView、Timer 应暂停或降频。
 - 时长、倒计时、计划状态优先用“当前时间 - 开始时间”计算，不依赖后台每秒 timer。
 - Map UI 使用降采样路线点；数据记录不能被降采样影响。
+- 关键空间动效统一使用稳定 `ZStack` motion scene：动画开始前冻结 UI snapshot，动画期间保持视觉层挂载，只用单一 progress 驱动 transform、mask、opacity、zIndex 和 hit-testing；动画完成后再解冻真实业务状态。
+- 首页卡片、FAB/菜单、inline popup、奖励 reveal、扭蛋/Oasis 奖励、添加人类/宠物角色卡和图表范围切换应复用 `OhanaMotionScene` / Wallet-style timeline，不要在交互中途插入/移除复杂 View 或启动业务重算。
 
 ### 常驻动画接入模式
 

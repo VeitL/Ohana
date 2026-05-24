@@ -157,7 +157,7 @@ struct InventoryView: View {
         .sheet(item: $equipPopoutPet) { pet in
             EquipPopoutCardSheet(pet: pet)
                 .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+                .presentationDragIndicator(.hidden)
         }
     }
 

@@ -732,11 +732,9 @@ struct PetHealthDetailView: View {
         .overlay {
             if let dest = healthPlusDestination, dest.usesInlineRecordPopup {
                 healthRecordInlineOverlay(dest)
-                    .transition(.opacity)
             }
             if showingMedicationPopup {
                 medicationInlineOverlay
-                    .transition(.opacity)
             }
         }
         .sheet(item: sheetHealthPlusDestination) { dest in
@@ -760,10 +758,7 @@ struct PetHealthDetailView: View {
         }
         .sheet(item: $activeHealthSheet) { sheet in
             healthOverviewSheet(sheet)
-                .presentationDetents([.large]) // ui-v4: allow long health overview sheet
-                .presentationDragIndicator(.visible)
-                .presentationContentInteraction(.scrolls)
-                .presentationBackground(Color.ohanaCardSurface)
+                .ohanaSheetPagePresentation() // ui-v4: allow long health overview sheet
         }
         .navigationDestination(isPresented: $showingHistory) {
             PetHealthArchiveView(pet: pet)

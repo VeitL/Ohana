@@ -13,6 +13,7 @@ enum FocusHomeCardDataSource {
     static func sourceSignature(
         pets: [Pet],
         humans: [Human],
+        electronicPets: [OasisElectronicPet],
         hiddenPetIDsRaw: String,
         homeCardOrderRaw: String,
         showDummyCards: Bool,
@@ -31,7 +32,8 @@ enum FocusHomeCardDataSource {
                 "\(pet.hasPassedAway)",
                 "\(pet.currentStreak)",
                 "\(pet.coconutBalance)",
-                "\(pet.daysTogether)"
+                "\(pet.daysTogether)",
+                homeWaterWarningSignature(for: pet)
             ].joined(separator: "|")
         }.joined(separator: ";")
 
@@ -46,9 +48,27 @@ enum FocusHomeCardDataSource {
             ].joined(separator: "|")
         }.joined(separator: ";")
 
+        let electronicPetSignature = electronicPets.map { critter in
+            [
+                critter.id.uuidString,
+                critter.catalogId,
+                critter.displayName(L10n(appLanguage)),
+                "\(critter.isFeaturedOnOasis)",
+                "\(critter.level)",
+                "\(critter.appearanceStage)",
+                "\(critter.hunger)",
+                "\(critter.mood)",
+                "\(critter.health)",
+                "\(critter.bond)",
+                critter.lifeStateRaw,
+                "\(critter.isArchived)"
+            ].joined(separator: "|")
+        }.joined(separator: ";")
+
         return [
             petSignature,
             humanSignature,
+            electronicPetSignature,
             hiddenPetIDsRaw,
             homeCardOrderRaw,
             "\(showDummyCards)",
@@ -59,6 +79,7 @@ enum FocusHomeCardDataSource {
     static func buildSnapshot(
         pets: [Pet],
         humans: [Human],
+        electronicPets: [OasisElectronicPet],
         hiddenPetIDsRaw: String,
         homeCardOrderRaw: String,
         showDummyCards: Bool
@@ -70,6 +91,9 @@ enum FocusHomeCardDataSource {
             + humans
                 .filter { $0.shouldShowOnHome }
                 .map { FocusCard.from($0, includeAvatarData: false) }
+            + electronicPets
+                .filter { !$0.isArchived && $0.lifeState != .dead && $0.isFeaturedOnOasis }
+                .map { FocusCard.from($0) }
         )
         .sorted { lhs, rhs in
             if lhs.createdAt != rhs.createdAt {
@@ -86,6 +110,13 @@ enum FocusHomeCardDataSource {
         let usedNames = Set(real.map { $0.name })
         let extras = FocusCard.dummies.filter { !usedNames.contains($0.name) }
         return orderedByPreference(real + extras, homeCardOrderRaw: homeCardOrderRaw)
+    }
+
+    private static func homeWaterWarningSignature(for pet: Pet) -> String {
+        guard let warning = WaterCareCycleStatusCalculator.mostUrgentWaterWarning(for: pet) else {
+            return "water:ok"
+        }
+        return "water:\(warning.title):\(warning.status.overdueDays)"
     }
 
     static func orderedByPreference(_ base: [FocusCard], homeCardOrderRaw: String) -> [FocusCard] {

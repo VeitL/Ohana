@@ -15,6 +15,11 @@
 import SwiftUI
 import SwiftData
 
+enum TodayFocusCardPresentation {
+    case board
+    case compactStack
+}
+
 // MARK: - TodayFocusCard
 
 struct TodayFocusCard: View {
@@ -23,6 +28,8 @@ struct TodayFocusCard: View {
     let quests: [IslandQuest]        // passed from parent; isCompleted may be stale
     let humans: [Human]
     let activePet: Pet?
+    let presentation: TodayFocusCardPresentation
+    var onOpenQuest: (IslandQuest) -> Void = { _ in }
     var onCompleteQuest: (IslandQuest) -> Void = { _ in }
     var onTapNegativeSignal: (IslandNegativeSignal) -> Void = { _ in }
     var onTapMemory: () -> Void = {}
@@ -43,12 +50,13 @@ struct TodayFocusCard: View {
     @State private var selectedFocusIndex = 0
     @State private var skippedFocusKeys: Set<String> = TodayFocusCard.loadSkippedFocusKeys()
     @State private var closedNegativeKeys: Set<String> = TodayFocusCard.loadClosedNegativeKeys()
+    @GestureState private var focusDragY: CGFloat = 0
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.modelContext) private var modelContext
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
-    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
     @AppStorage("currentActiveHumanId") private var activeHumanId = ""
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
@@ -60,6 +68,8 @@ struct TodayFocusCard: View {
         quests: [IslandQuest],
         humans: [Human],
         activePet: Pet?,
+        presentation: TodayFocusCardPresentation = .board,
+        onOpenQuest: @escaping (IslandQuest) -> Void = { _ in },
         onCompleteQuest: @escaping (IslandQuest) -> Void = { _ in },
         onTapNegativeSignal: @escaping (IslandNegativeSignal) -> Void = { _ in },
         onTapMemory: @escaping () -> Void = {},
@@ -71,6 +81,8 @@ struct TodayFocusCard: View {
         self.quests = quests
         self.humans = humans
         self.activePet = activePet
+        self.presentation = presentation
+        self.onOpenQuest = onOpenQuest
         self.onCompleteQuest = onCompleteQuest
         self.onTapNegativeSignal = onTapNegativeSignal
         self.onTapMemory = onTapMemory
@@ -101,7 +113,7 @@ struct TodayFocusCard: View {
     }
 
     private var shouldReduceWork: Bool {
-        powerSavingMode || reduceMotion || workloadPolicy.shouldReduceWork()
+        reduceMotion || workloadPolicy.ambientMotionBudget(isVisible: true) == .static
     }
 
     private var refreshedQuests: [IslandQuest] {
@@ -212,6 +224,34 @@ struct TodayFocusCard: View {
     // MARK: - Body
 
     var body: some View {
+        Group {
+            switch presentation {
+            case .board:
+                boardBody
+            case .compactStack:
+                compactBody
+            }
+        }
+        .onAppear {
+            startAmbientPulseIfNeeded()
+        }
+        .onChange(of: shouldReduceWork) { _, reduced in
+            if reduced {
+                pulse = 0
+                bounceEmoji = false
+            } else {
+                startAmbientPulseIfNeeded()
+            }
+        }
+        .onChange(of: focusCards.count) { _, count in
+            if selectedFocusIndex >= count {
+                selectedFocusIndex = max(0, count - 1)
+            }
+        }
+        .animation(GoMotion.hero, value: contentIdentity)
+    }
+
+    private var boardBody: some View {
         ZStack {
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
@@ -241,7 +281,7 @@ struct TodayFocusCard: View {
                 .padding(.top, 14)
                 .padding(.bottom, 4)
 
-                card
+                card(showsPageIndicator: true)
                     .padding(.horizontal, 16)
                     .padding(.top, 2)
                     .padding(.bottom, 16)
@@ -251,25 +291,14 @@ struct TodayFocusCard: View {
                         removal: .move(edge: .leading).combined(with: .opacity)
                     ))
             }
+        }
+    }
 
-        }
-        .onAppear {
-            startAmbientPulseIfNeeded()
-        }
-        .onChange(of: shouldReduceWork) { _, reduced in
-            if reduced {
-                pulse = 0
-                bounceEmoji = false
-            } else {
-                startAmbientPulseIfNeeded()
-            }
-        }
-        .onChange(of: focusCards.count) { _, count in
-            if selectedFocusIndex >= count {
-                selectedFocusIndex = max(0, count - 1)
-            }
-        }
-        .animation(GoMotion.hero, value: contentIdentity)
+    private var compactBody: some View {
+        card(showsPageIndicator: false)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .id(contentIdentity)
     }
 
     private func startAmbientPulseIfNeeded() {
@@ -280,25 +309,133 @@ struct TodayFocusCard: View {
 
     // MARK: - Card switcher
 
+    private struct FocusDeckCard: Identifiable {
+        let id: String
+        let content: TodayFocusService.Content
+    }
+
+    private var focusDeckCards: [FocusDeckCard] {
+        focusCards.map { FocusDeckCard(id: contentKey($0), content: $0) }
+    }
+
     @ViewBuilder
-    private var card: some View {
+    private func card(showsPageIndicator: Bool) -> some View {
         let cards = focusCards
+        if presentation == .compactStack {
+            physicalStackCard(cards: focusDeckCards)
+        } else if cards.count > 1 {
+            legacySwitchingCard(cards: cards, showsPageIndicator: showsPageIndicator)
+        } else {
+            cardContent(cards.first ?? .welcome)
+        }
+    }
+
+    @ViewBuilder
+    private func physicalStackCard(cards: [FocusDeckCard]) -> some View {
+        if cards.count > 1 {
+            GeometryReader { geo in
+                let width = max(298, min(geo.size.width, 390))
+                VerticalGlassCardStack(
+                    cards: cards,
+                    activeIndex: $selectedFocusIndex,
+                    cardSize: CGSize(width: width, height: 92),
+                    visibleBackCardCount: min(3, max(cards.count - 1, 0)),
+                    backCardSpacing: 9,
+                    swipeThreshold: 54,
+                    wraps: true,
+                    onIndexChanged: { _ in OhanaFeedback.light() }
+                ) { item, _ in
+                    cardContent(item.content)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
+            .frame(height: 128)
+            .onChange(of: cards.count) { _, count in
+                if selectedFocusIndex >= count {
+                    selectedFocusIndex = max(0, count - 1)
+                }
+            }
+        } else {
+            cardContent(cards.first?.content ?? .welcome)
+                .frame(height: 92)
+        }
+    }
+
+    @ViewBuilder
+    private func legacySwitchingCard(cards: [TodayFocusService.Content], showsPageIndicator: Bool) -> some View {
         if cards.count > 1 {
             VStack(spacing: 4) {
-                TabView(selection: $selectedFocusIndex) {
-                    ForEach(Array(cards.enumerated()), id: \.offset) { idx, item in
+                ZStack {
+                    ForEach(Array(cards.enumerated()), id: \.offset) { index, item in
+                        let relative = focusRelativeIndex(for: index, count: cards.count)
                         cardContent(item)
                             .padding(.horizontal, 2)
-                            .tag(idx)
+                            .offset(y: focusItemOffset(relative: relative))
+                            .scaleEffect(focusItemScale(relative: relative))
+                            .opacity(focusItemOpacity(relative: relative))
+                            .allowsHitTesting(relative == 0)
+                            .accessibilityHidden(relative != 0)
                     }
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
                 .frame(height: 112)
+                .clipped()
+                .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .highPriorityGesture(focusSwipeGesture(count: cards.count))
 
-                focusPageIndicator(count: cards.count, selected: selectedFocusIndex)
+                if showsPageIndicator {
+                    focusPageIndicator(count: cards.count, selected: selectedFocusIndex)
+                }
             }
         } else {
             cardContent(cards.first ?? .welcome)
+        }
+    }
+
+    private func focusSwipeGesture(count: Int) -> some Gesture {
+        DragGesture(minimumDistance: 8, coordinateSpace: .local)
+            .updating($focusDragY) { value, state, _ in
+                guard abs(value.translation.height) > abs(value.translation.width) else { return }
+                state = max(-76, min(76, value.translation.height))
+            }
+            .onEnded { value in
+                let vertical = value.translation.height
+                guard abs(vertical) > abs(value.translation.width) else { return }
+                let predicted = value.predictedEndTranslation.height
+                guard abs(vertical) > 44 || abs(predicted) > 92 else { return }
+                shiftFocus(vertical < 0 ? 1 : -1, count: count)
+            }
+    }
+
+    private func focusRelativeIndex(for index: Int, count: Int) -> Int {
+        guard count > 0 else { return 0 }
+        let forward = (index - selectedFocusIndex + count) % count
+        let backward = (selectedFocusIndex - index + count) % count
+        return forward <= backward ? forward : -backward
+    }
+
+    private func focusItemOffset(relative: Int) -> CGFloat {
+        CGFloat(relative) * 58 + focusDragY
+    }
+
+    private func focusItemScale(relative: Int) -> CGFloat {
+        let dragProgress = min(1, abs(focusDragY) / 76)
+        return relative == 0 ? (1 - dragProgress * 0.025) : (0.96 + dragProgress * 0.04)
+    }
+
+    private func focusItemOpacity(relative: Int) -> Double {
+        let dragProgress = min(1, abs(focusDragY) / 76)
+        if relative == 0 {
+            return Double(1 - dragProgress * 0.34)
+        }
+        let isIncoming = (focusDragY < 0 && relative == 1) || (focusDragY > 0 && relative == -1)
+        return isIncoming ? Double(dragProgress) : 0
+    }
+
+    private func shiftFocus(_ delta: Int, count: Int) {
+        guard count > 0 else { return }
+        OhanaFeedback.light()
+        withAnimation(GoMotion.selection) {
+            selectedFocusIndex = (selectedFocusIndex + delta + count) % count
         }
     }
 
@@ -319,33 +456,37 @@ struct TodayFocusCard: View {
 
     private func questCard(_ q: IslandQuest) -> some View {
         let accent = Color.goPrimary
-        let isMedicationQuest = IslandQuestEngine.medicationId(fromQuestId: q.id) != nil
-        let actionTitle = isMedicationQuest
-            ? l.tr(zh: "打卡", en: "Check in", de: "Abhaken")
-            : l.tr(zh: "去完成", en: "Open", de: "Öffnen")
-        let actionIcon = isMedicationQuest ? "checkmark" : "arrow.right"
         return HStack(spacing: 14) {
-            iconBubble(emoji: q.emoji, accent: accent)
+            Button {
+                OhanaFeedback.light()
+                onOpenQuest(q)
+            } label: {
+                HStack(spacing: 14) {
+                    iconBubble(emoji: q.emoji, accent: accent)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(q.title)
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(2)
-                questMetaRow(q)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(q.title)
+                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .lineLimit(2)
+                        questMetaRow(q)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
             }
-
-            Spacer(minLength: 6)
+            .buttonStyle(ScaleButtonStyle())
 
             VStack(spacing: 6) {
                 Button {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    OhanaFeedback.medium()
                     onCompleteQuest(q)
                 } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: actionIcon)
+                        Image(systemName: "checkmark")
                             .font(.system(size: 12, weight: .black))
-                        Text(actionTitle)
+                        Text(l.tr(zh: "打卡", en: "Check in", de: "Abhaken"))
                             .font(.system(size: 13, weight: .black, design: .rounded))
                     }
                     .foregroundStyle(Color.arkInk)
@@ -369,24 +510,33 @@ struct TodayFocusCard: View {
             ? l.tr(zh: "去确认", en: "Review", de: "Prüfen")
             : l.tr(zh: "去处理", en: "Open", de: "Öffnen")
         return HStack(spacing: 14) {
-            iconBubble(emoji: task.emoji, accent: accent)
+            Button {
+                OhanaFeedback.light()
+                onTapFamilyTask(task)
+            } label: {
+                HStack(spacing: 14) {
+                    iconBubble(emoji: task.emoji, accent: accent)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(task.title)
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(2)
-                Text(taskStatusLine(task, performer: performer, rewardText: rewardText))
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
-                    .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(task.title)
+                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .lineLimit(2)
+                        Text(taskStatusLine(task, performer: performer, rewardText: rewardText))
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
+                            .lineLimit(1)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
             }
-
-            Spacer(minLength: 6)
+            .buttonStyle(ScaleButtonStyle())
 
             VStack(spacing: 6) {
                 Button {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    OhanaFeedback.medium()
                     onTapFamilyTask(task)
                 } label: {
                     HStack(spacing: 4) {
@@ -858,15 +1008,37 @@ struct TodayFocusCard: View {
         "todayFocus.closedNegativeSignals"
     }
 
+    @ViewBuilder
     private func cardBackground(_ accent: Color) -> some View {
         let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
-        return ZStack {
+        if presentation == .compactStack {
             shape
-                .fill(.clear)
-                .glassEffect(.regular.interactive(false), in: shape) // ui-v4: allow Today Focus card glass preview
-                .ohanaBreathingGlow(accent: accent, isActive: !shouldReduceWork)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            accent.mix(with: .white, by: 0.22).opacity(0.96),
+                            accent.mix(with: .black, by: 0.10).opacity(0.96),
+                            Color.arkInk.opacity(0.94)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay {
+                    shape
+                        .strokeBorder(Color.goCardWhite.opacity(0.16), lineWidth: 1)
+                }
+                .clipShape(shape)
+                .compositingGroup()
+        } else {
+            ZStack {
+                shape
+                    .fill(.clear)
+                    .glassEffect(.regular.interactive(false), in: shape) // ui-v4: allow Today Focus card glass preview
+                    .ohanaBreathingGlow(accent: accent, isActive: !shouldReduceWork)
+            }
+            .clipShape(shape)
+            .compositingGroup()
         }
-        .clipShape(shape)
-        .compositingGroup()
     }
 }

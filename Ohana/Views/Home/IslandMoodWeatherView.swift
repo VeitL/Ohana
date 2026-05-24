@@ -32,7 +32,7 @@ struct IslandMoodWeatherView: View {
     @State private var particles: [WeatherParticle] = []
     @State private var timer: Timer?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
 
     private var shouldReduceWork: Bool {
         powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork

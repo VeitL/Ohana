@@ -1510,22 +1510,11 @@ struct DesignSpecPreviewCanvasV4: View {
     }
 
     private func linePath(points: [CGPoint]) -> Path {
-        Path { path in
-            guard let first = points.first else { return }
-            path.move(to: first)
-            points.dropFirst().forEach { path.addLine(to: $0) }
-        }
+        OhanaChartStyle.softenedLinePath(points: points)
     }
 
     private func areaPath(points: [CGPoint], size: CGSize) -> Path {
-        Path { path in
-            guard let first = points.first, let last = points.last else { return }
-            path.move(to: CGPoint(x: first.x, y: size.height))
-            path.addLine(to: first)
-            points.dropFirst().forEach { path.addLine(to: $0) }
-            path.addLine(to: CGPoint(x: last.x, y: size.height))
-            path.closeSubpath()
-        }
+        OhanaChartStyle.softenedAreaPath(points: points, baselineY: size.height)
     }
 
     private func dismissSheet() {

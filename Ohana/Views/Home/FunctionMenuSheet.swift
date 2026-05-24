@@ -11,6 +11,7 @@ struct FunctionMenuSheet: View {
 
     @State private var path = NavigationPath()
     @State private var didOpenInitialDestination = false
+    @State private var directLandingIsReady = false
     @State private var plantRouteStub: Plant?
 
     init(initialDestination: FMDest? = nil) {
@@ -41,12 +42,10 @@ struct FunctionMenuSheet: View {
     var body: some View {
         NavigationStack(path: $path) {
             if let landing = directLandingDestination {
-                directLandingHost(landing) {
-                    dismiss()
+                directLandingShell(landing)
+                .navigationDestination(for: FMDest.self) { dest in
+                    navigationDestinationView(dest)
                 }
-                    .navigationDestination(for: FMDest.self) { dest in
-                        navigationDestinationView(dest)
-                    }
             } else {
                 FunctionMenuRootView(
                     appLanguage: appLanguage,
@@ -64,6 +63,38 @@ struct FunctionMenuSheet: View {
         .onAppear(perform: openInitialDestinationIfNeeded)
     }
 
+    private func directLandingShell(_ landing: FMDest) -> some View {
+        ZStack {
+            if directLandingIsReady {
+                directLandingHost(landing) {
+                    dismiss()
+                }
+                .transition(.opacity)
+            } else {
+                directLandingPlaceholder(landing) {
+                    dismiss()
+                }
+                .transition(.opacity)
+            }
+        }
+        .task(id: landing) {
+            await MainActor.run {
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    directLandingIsReady = false
+                }
+            }
+            await OhanaFrameScheduler.waitAfterNextFrame()
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                withAnimation(GoMotion.quick) {
+                    directLandingIsReady = true
+                }
+            }
+        }
+    }
+
     private func openInitialDestinationIfNeeded() {
         guard directLandingDestination == nil else { return }
         guard !didOpenInitialDestination, let initialDestination else { return }
@@ -75,7 +106,7 @@ struct FunctionMenuSheet: View {
 
     @ViewBuilder
     private func directLandingHost(_ landing: FMDest, closeAction: @escaping () -> Void) -> some View {
-        ZStack(alignment: .topTrailing) {
+        OhanaMotionScene(role: .hero, alignment: .topTrailing, isActive: true) {
             destinationRouter(landing)
 
             if directLandingNeedsHostClose(landing) {
@@ -84,6 +115,40 @@ struct FunctionMenuSheet: View {
                     .padding(.trailing, 16)
                     .zIndex(100)
             }
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
+    }
+
+    private func directLandingPlaceholder(_ landing: FMDest, closeAction: @escaping () -> Void) -> some View {
+        ZStack(alignment: .topTrailing) {
+            OhanaAppBackground()
+                .ignoresSafeArea()
+
+            VStack(spacing: 14) {
+                Spacer(minLength: 0)
+                Image(systemName: destinationChrome(for: landing).icon)
+                    .font(.system(size: 26, weight: .black))
+                    .symbolRenderingMode(.monochrome)
+                    .foregroundStyle(Color.goPrimary)
+                    .frame(width: 58, height: 58)
+                    .background(Color.ohanaCardSurface, in: Circle())
+
+                Text(destinationChrome(for: landing).title)
+                    .font(OhanaFont.title3(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+
+                ProgressView()
+                    .tint(Color.goPrimary)
+                    .scaleEffect(0.88)
+                    .padding(.top, 2)
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            pageCloseButton(action: closeAction)
+                .padding(.top, 12)
+                .padding(.trailing, 16)
         }
         .toolbar(.hidden, for: .navigationBar)
         .toolbarBackground(.hidden, for: .navigationBar)
@@ -143,5 +208,32 @@ struct FunctionMenuSheet: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(L10n(appLanguage).tr(zh: "关闭", en: "Close", de: "Schließen"))
+    }
+
+    private func destinationChrome(for destination: FMDest) -> (title: String, icon: String) {
+        switch destination {
+        case .featureGroup(let group):
+            return (group.title, group.icon)
+        case .featureAggregate(let feature):
+            return (feature.title, feature.icon)
+        case .calendar:
+            return (L10n(appLanguage).tr(zh: "日历", en: "Calendar", de: "Kalender"), "calendar")
+        case .familyWeeklyReport:
+            return (L10n(appLanguage).tr(zh: "家庭周报", en: "Weekly Report", de: "Wochenbericht"), "chart.bar.xaxis")
+        case .careLedgerAnalysis:
+            return (L10n(appLanguage).tr(zh: "照护账本", en: "Care Ledger", de: "Pflegebuch"), "list.bullet.rectangle.fill")
+        case .reminderObservability:
+            return (L10n(appLanguage).tr(zh: "提醒观测", en: "Reminder Monitor", de: "Erinnerungen"), "bell.badge.fill")
+        case .coconutShop:
+            return (L10n(appLanguage).tr(zh: "椰子商店", en: "Coconut Shop", de: "Kokos-Shop"), "bag.fill")
+        case .gacha:
+            return (L10n(appLanguage).tr(zh: "扭蛋机", en: "Gacha", de: "Gacha"), "circle.grid.cross.fill")
+        case .wealthDashboard:
+            return (L10n(appLanguage).tr(zh: "Ohana 财富", en: "Ohana Wealth", de: "Ohana Vermögen"), "chart.pie.fill")
+        case .plantsDashboard:
+            return (L10n(appLanguage).tr(zh: "植物", en: "Plants", de: "Pflanzen"), "leaf.fill")
+        default:
+            return (L10n(appLanguage).tr(zh: "详情", en: "Details", de: "Details"), "square.grid.2x2.fill")
+        }
     }
 }

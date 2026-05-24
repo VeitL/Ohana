@@ -275,7 +275,7 @@ enum CustomAppBackgroundStore {
 struct ArkBackgroundView: View {
     @AppStorage("appBackgroundStyle") private var styleRaw: String = AppBackgroundStyle.goIsland.rawValue
     @AppStorage("appCustomBackgroundVersion") private var customBackgroundVersion = 0
-    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
@@ -285,7 +285,7 @@ struct ArkBackgroundView: View {
     }
 
     private var shouldReduceWork: Bool {
-        powerSavingMode || reduceMotion || workloadPolicy.shouldReduceWork()
+        workloadPolicy.ambientMotionBudget(isVisible: true) == .static
     }
 
     var body: some View {
@@ -872,7 +872,7 @@ private struct NeonGridBackground: View {
 // MARK: - GO 岛屿向导底（与 GO Focus 渐变 + 浮动色球一致）
 /// 添加宠物 / 家庭成员等全屏向导使用，避免误用 `ArkBackgroundView` 的 `go_default` 浅色底。
 struct GoIslandWizardBackdrop: View {
-    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var blobPulse = false
 

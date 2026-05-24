@@ -77,7 +77,7 @@ struct QuickMomentSheet: View {
             let panelHeightEstimate = min(maxPanelHeight, max(adaptiveSheetHeight, minPanelHeight))
             let hiddenOffset = panelHeightEstimate + 72
 
-            ZStack(alignment: .bottom) {
+            OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: popupVisible) {
                 popupBackdrop
                     .opacity(popupVisible ? 1 : 0)
 
@@ -125,7 +125,6 @@ struct QuickMomentSheet: View {
                 )
             }
         }
-        .transition(.opacity)
         .allowsHitTesting(popupVisible && !isClosing)
         .animation(popupAnimation, value: popupVisible)
         .presentationBackground(.clear)
@@ -607,7 +606,6 @@ struct QuickMomentSheet: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.black.opacity(0.18)) // ui-v4: allow transient success overlay scrim
-        .transition(.opacity)
     }
 
     // MARK: - Save Logic

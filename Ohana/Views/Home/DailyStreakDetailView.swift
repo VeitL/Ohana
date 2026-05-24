@@ -33,31 +33,37 @@ struct DailyStreakDetailView: View {
         activeHuman?.id.uuidString ?? currentActiveHumanId
     }
 
-    private var safeTop: CGFloat {
-        (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
-            .keyWindow?.safeAreaInsets.top ?? 52
-    }
-    private var navBarHeight: CGFloat { safeTop + 56 }
-
     var body: some View {
-        ZStack {
-            OhanaAppBackground().ignoresSafeArea()
-
-            ScrollView(.vertical, showsIndicators: false) {
+        OhanaSheetPageScaffold(
+            title: "打卡连击",
+            subtitle: activeHuman?.name ?? "Ohana",
+            onClose: closePage,
+            leading: {
+                Image(systemName: "flame.fill")
+                    .font(.system(size: 18, weight: .black))
+                    .foregroundStyle(Color.goPrimary)
+                    .frame(width: 38, height: 38)
+                    .background(Color.ohanaControlFill, in: Circle())
+            },
+            trailing: {
+                CoconutBalanceCapsule(balance: activeHuman?.coconutBalance ?? 0) {
+                    showingCoconutLog = true
+                }
+            },
+            content: {
                 VStack(spacing: 16) {
-                    Spacer().frame(height: navBarHeight)
                     myStreakCard
                     if humans.count > 1 {
                         familyCompetitionSection
                     }
                     checkInCalendarSection
-                    Spacer(minLength: 40)
                 }
-                .padding(.horizontal, 16)
+                .padding(.bottom, 18)
+            },
+            floating: {
+                EmptyView()
             }
-        }
-        .navigationBarHidden(true)
-        .overlay(alignment: .top) { navBar }
+        )
         .onAppear {
             selectedMonth = Date()
             loadCheckInData()
@@ -84,8 +90,7 @@ struct DailyStreakDetailView: View {
         }
         .sheet(isPresented: $showCoconutShop) {
             CoconutShopView(initialCategory: .boost)
-                .presentationDetents([.large]) // ui-v4: allow long shop overview
-                .presentationDragIndicator(.visible)
+                .ohanaSheetPagePresentation() // ui-v4: allow long shop overview
         }
         .sheet(isPresented: $showingCoconutLog) {
             CoconutLogView()
@@ -93,36 +98,6 @@ struct DailyStreakDetailView: View {
         .onChange(of: showCoconutShop) { _, isShowing in
             if !isShowing { loadCheckInData() }
         }
-    }
-
-    // MARK: - Nav Bar (matches IslandWealthDashboardView)
-
-    private var navBar: some View {
-        HStack {
-            Button { closePage() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 17, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .accessibilityLabel("关闭")
-            .buttonStyle(ScaleButtonStyle())
-
-            Spacer()
-
-            Text("打卡连击")
-                .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-
-            Spacer()
-
-            CoconutBalanceCapsule(balance: activeHuman?.coconutBalance ?? 0) { showingCoconutLog = true }
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, safeTop + 8)
-        .padding(.bottom, 12)
-        .background(Color.ohanaCardSurface.opacity(0.01))
     }
 
     private func closePage() {

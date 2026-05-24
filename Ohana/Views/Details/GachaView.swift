@@ -59,6 +59,27 @@ struct GachaView: View {
             ownedItems: ownedItems
         )
     }
+    private var selectedSeriesUnlocked: Bool {
+        GachaDrawService.isSeriesUnlocked(
+            seriesId: series.id,
+            humanId: currentHuman?.id.uuidString ?? "",
+            ownedItems: ownedItems
+        )
+    }
+    private var defaultCommonProgress: (owned: Int, total: Int) {
+        let firstSeries = GachaSeriesCatalog.series(id: GachaSeriesCatalog.defaultSeriesId)
+        let ownedIds = Set(ownedItems
+            .filter {
+                $0.ownerHumanId == currentHuman?.id.uuidString &&
+                $0.seriesId == firstSeries.id &&
+                $0.ownedCount > 0
+            }
+            .map(\.itemId))
+        return (
+            firstSeries.commonItems.filter { ownedIds.contains($0.id) }.count,
+            firstSeries.commonItems.count
+        )
+    }
     private var displayedCollectionProgress: (owned: Int, total: Int) {
         guard revealingCollectibleItemId != nil, revealCardPhase.holdsCollectionUpdate else {
             return collectionProgress
@@ -70,10 +91,10 @@ struct GachaView: View {
     }
     private var canDraw: Bool {
         guard let currentHuman else { return false }
-        return currentHuman.coconutBalance >= GachaDrawService.costPerDraw && !isDrawing
+        return currentHuman.coconutBalance >= GachaDrawService.costPerDraw && !isDrawing && selectedSeriesUnlocked
     }
     private var shouldAnimateReveal: Bool {
-        !reduceMotion && workloadPolicy.shouldAnimate(isVisible: true)
+        !reduceMotion && workloadPolicy.shouldRunInteractionAnimation(isVisible: true)
     }
     private var selectedCollectionItem: GachaItemEntry? {
         guard let selectedCollectionItemId else { return nil }
@@ -82,7 +103,7 @@ struct GachaView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            ZStack {
+            OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: true) {
                 if drawsBackground {
                     OhanaAppBackground()
                         .ignoresSafeArea()
@@ -131,7 +152,7 @@ struct GachaView: View {
 
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(l.tr(zh: "Nana Ohana 盲盒", en: "Nana Ohana Blind Box", de: "Nana Ohana Blindbox"))
+                    Text(l.tr(zh: "Ohana 盲盒", en: "Ohana Blind Box", de: "Ohana Blindbox"))
                         .font(OhanaFont.title3(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(series.localizedName(l))
@@ -150,6 +171,7 @@ struct GachaView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
+                    seriesSelector
                     gachaStage
                     drawButton
                     if let feedbackText {
@@ -169,29 +191,117 @@ struct GachaView: View {
         .frame(maxHeight: maxHeight)
         .background { OhanaPopupGlassSurface(cornerRadius: 52) }
         .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.32 : 0.18), radius: 34, x: 0, y: -8) // ui-v4: allow lifted inline popup shadow
-        .transition(.move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.985, anchor: .bottom)))
+    }
+
+    private var seriesSelector: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(GachaSeriesCatalog.allSeries) { entry in
+                    seriesChip(entry)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .scrollClipDisabled()
+    }
+
+    private func seriesChip(_ entry: GachaSeriesEntry) -> some View {
+        let isSelected = entry.id == series.id
+        let isUnlocked = GachaDrawService.isSeriesUnlocked(
+            seriesId: entry.id,
+            humanId: currentHuman?.id.uuidString ?? "",
+            ownedItems: ownedItems
+        )
+        return Button {
+            guard !isDrawing else { return }
+            if isUnlocked {
+                withAnimation(shouldAnimateReveal ? GoMotion.selection : GoMotion.reduced) {
+                    selectedSeriesId = entry.id
+                    selectedCollectionItemId = nil
+                    feedbackText = nil
+                }
+                OhanaFeedback.light()
+            } else {
+                feedbackText = lockedSeriesMessage
+                OhanaFeedback.light()
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: isUnlocked ? seriesIconName(entry) : "lock.fill")
+                    .font(.system(size: 13, weight: .black))
+                    .frame(width: 24, height: 24)
+                    .foregroundStyle(isSelected && isUnlocked ? Color.arkInk : Color.ohanaPrimaryText)
+                    .background(
+                        (isSelected && isUnlocked ? Color.goPrimary : Color.ohanaControlFill),
+                        in: Circle()
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(entry.localizedName(l))
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .lineLimit(1)
+                    Text(seriesChipSubtitle(entry, isUnlocked: isUnlocked))
+                        .font(OhanaFont.caption2(.bold))
+                        .foregroundStyle(isUnlocked ? Color.ohanaSecondaryText : Color.goYellow)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 11)
+            .padding(.vertical, 9)
+            .frame(minHeight: 48)
+            .background(isSelected ? Color.ohanaCardSurface : Color.ohanaControlFill, in: Capsule())
+            .overlay(
+                Capsule()
+                    .strokeBorder(isSelected ? Color.goPrimary.opacity(0.58) : Color.ohanaCardStroke, lineWidth: isSelected ? 1.5 : 1)
+            )
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .opacity(isUnlocked ? 1 : 0.78)
+        .accessibilityLabel(seriesChipAccessibility(entry, isUnlocked: isUnlocked))
+    }
+
+    private func seriesIconName(_ entry: GachaSeriesEntry) -> String {
+        entry.id == GachaSeriesCatalog.defaultSeriesId ? "sparkles" : "moon.stars.fill"
+    }
+
+    private func seriesChipSubtitle(_ entry: GachaSeriesEntry, isUnlocked: Bool) -> String {
+        if entry.id == GachaSeriesCatalog.defaultSeriesId {
+            return l.tr(zh: "第一套", en: "Set 1", de: "Set 1")
+        }
+        if isUnlocked {
+            return l.tr(zh: "已解锁", en: "Unlocked", de: "Freigeschaltet")
+        }
+        return l.tr(
+            zh: "Nana 普通款 \(defaultCommonProgress.owned)/\(defaultCommonProgress.total) 解锁",
+            en: "Unlock at Nana regulars \(defaultCommonProgress.owned)/\(defaultCommonProgress.total)",
+            de: "Frei bei Nana normal \(defaultCommonProgress.owned)/\(defaultCommonProgress.total)"
+        )
+    }
+
+    private func seriesChipAccessibility(_ entry: GachaSeriesEntry, isUnlocked: Bool) -> String {
+        isUnlocked
+            ? l.tr(zh: "\(entry.localizedName(l))，可选择", en: "\(entry.localizedName(l)), selectable", de: "\(entry.localizedName(l)), auswählbar")
+            : lockedSeriesMessage
+    }
+
+    private var lockedSeriesMessage: String {
+        l.tr(
+            zh: "集齐第一套 Nana 的 8 个普通款后解锁 Midnight Atelier。",
+            en: "Complete the 8 Nana regulars to unlock Midnight Atelier.",
+            de: "Sammle alle 8 normalen Nana-Figuren, um Midnight Atelier freizuschalten."
+        )
     }
 
     private var balancePill: some View {
-        Button {
+        CoconutBalanceCapsule(balance: currentCoconutBalance, showsDeltaAnimation: true) {
             showingCoconutLog = true
             OhanaFeedback.light()
-        } label: {
-            HStack(spacing: 5) {
-                Text("🥥")
-                Text("\(currentCoconutBalance)")
-                    .contentTransition(.numericText())
-            }
-            .font(OhanaFont.caption(.black))
-            .foregroundStyle(Color.arkInk)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Color.goYellow, in: Capsule())
         }
-        .buttonStyle(ScaleButtonStyle())
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
         .disabled(currentHuman == nil)
         .opacity(currentHuman == nil ? 0.62 : 1)
-        .animation(GoMotion.feedback, value: currentCoconutBalance)
         .accessibilityLabel(l.tr(zh: "当前椰子余额 \(currentCoconutBalance)，打开椰子历史", en: "Current coconut balance \(currentCoconutBalance), open coconut history", de: "Aktueller Kokosnussstand \(currentCoconutBalance), Kokosnuss-Historie öffnen"))
     }
 
@@ -206,6 +316,7 @@ struct GachaView: View {
                     prizeSymbol: drawOutcome?.displaySymbol,
                     rarity: drawOutcome?.item?.rarity,
                     trigger: shakeToken,
+                    instantCoconutDelta: drawOutcome?.log.instantCoconutDelta ?? 0,
                     collectibleItem: drawOutcome?.item,
                     revealCardPhase: revealCardPhase,
                     isNewCollectible: drawOutcome?.log.isNew == true,
@@ -323,6 +434,9 @@ struct GachaView: View {
         }
         if let currentHuman, currentHuman.coconutBalance < GachaDrawService.costPerDraw {
             return l.tr(zh: "椰子不足", en: "Not enough coconuts", de: "Nicht genug Kokos")
+        }
+        if !selectedSeriesUnlocked {
+            return l.tr(zh: "系列未解锁", en: "Series locked", de: "Serie gesperrt")
         }
         return isDrawing
             ? l.tr(zh: "打开中", en: "Opening", de: "Öffnet")
@@ -700,6 +814,7 @@ struct GachaView: View {
     }
 
     private func runNonCollectibleReveal(_ outcome: GachaDrawOutcome, resetToken: Int) {
+        let isGrandBundle = outcome.log.instantCoconutDelta >= 500
         withAnimation(GoMotion.feedback) {
             revealPhase = .charging
         }
@@ -713,9 +828,18 @@ struct GachaView: View {
                 }
                 withAnimation(GoMotion.feedback) {
                     showPrize = true
+                    if isGrandBundle {
+                        shakeToken += 1
+                    }
                 }
-                outcome.item?.isHidden == true ? OhanaFeedback.strong() : OhanaFeedback.light()
-                returnToCoconut(resetToken: resetToken, delay: 1.18)
+                isGrandBundle ? OhanaFeedback.strong() : OhanaFeedback.light()
+                if isGrandBundle {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.46) {
+                        guard resetToken == revealResetToken else { return }
+                        OhanaFeedback.medium()
+                    }
+                }
+                returnToCoconut(resetToken: resetToken, delay: isGrandBundle ? 1.86 : 1.18)
             }
         }
     }
@@ -890,6 +1014,8 @@ struct GachaView: View {
             return l.tr(zh: "还差 \(missing)🥥", en: "Need \(missing)🥥 more", de: "Noch \(missing)🥥 nötig")
         case .invalidSeries:
             return l.tr(zh: "这个系列概率配置不完整", en: "This series has invalid odds", de: "Diese Serie hat ungültige Chancen")
+        case .lockedSeries:
+            return lockedSeriesMessage
         }
     }
 

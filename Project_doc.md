@@ -1,14 +1,14 @@
 # Ohana iOS App 项目文档
 
-> 最后更新: 2026-05-18（V4 UI / 任务协作 / Oasis 电子宠物 / 能耗治理 / 添加成员体验 / 毛绒 Icon 样张规范）| Build: ✅ `xcodebuild -scheme Ohana -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.4' build` | Schema: ArkSchemaV51
+> 最后更新: 2026-05-24（竖版实色默认首页 / 全局计划逾期警告 / V4 UI / 任务协作 / Oasis 电子宠物 / 能耗治理）| Build: ✅ `scripts/build-debug-fast.sh`（默认 iPhone 17 / Xcode installed default iOS 26.5 simulator runtime）| Schema: ArkSchemaV55
 >
-> **当前事实优先级**：本文件顶部“当前快照”代表 2026-05-18 的实现状态；下方早期长章节保留为历史实现记录，若与当前快照、`AGENTS.md`、`ui规范.selection.json` 或 `docs/app-architecture-governance.md` 冲突，以后四者为准。
+> **当前事实优先级**：本文件顶部“当前快照”代表 2026-05-24 的实现状态；下方早期长章节保留为历史实现记录，若与当前快照、`AGENTS.md`、`ui规范.selection.json` 或 `docs/app-architecture-governance.md` 冲突，以后四者为准。
 >
-> **当前默认首页**：GO Focus V4（`FocusStackHomeTestView`）。普通用户固定进入 GO Focus；经典 `OverviewView` 仅作内部兼容/回归路径。首页是唯一高频工作台，只回答“今天谁需要照顾 / 现在最该做什么 / 点一下怎么完成”；卡片展开页放当前成员/宠物的快捷操作与轻量详情，FAB 放低频功能入口，深数据进入详情页。
+> **当前默认首页**：竖版实色首页（`FocusHomeV3View(sceneStyle: .verticalSolid)` / `FocusHomeVerticalSolidView`）。Wallet V3 / Wallet V2 仍可在设置里选择作为对照；旧 `FocusStackHomeTestView` 仅保留为兼容/回归代码，不再作为默认路径。首页是唯一高频工作台，只回答“今天谁需要照顾 / 现在最该做什么 / 点一下怎么完成”；卡片展开页把快捷操作嵌入卡片底部，底部导航承载首页 / 日历 / Oasis / 植物与中央添加入口。
 
 ---
 
-## 当前快照（2026-05-18）
+## 当前快照（2026-05-24）
 
 ### 1. 设计系统与 UI 源头
 
@@ -30,11 +30,11 @@
 - **定位合规**：只有 running 遛狗可以持续定位和后台定位；paused、finished、无遛狗进程、普通浏览、首页、记录、喂食、协作、商店都必须停止持续定位。
 - **后台/锁屏**：running 遛狗继续记录路线，但 UI timer、地图重绘、装饰动画停止或降频；时长用 elapsed-time 计算，不依赖后台每秒 timer。
 - **重复动画/Timer**：新增 `Timer.publish`、`TimelineView(.animation)`、`repeatForever`、Canvas/粒子循环、Map live update 必须通过 `scripts/audit-runtime-guardrails.sh`。
-- **构建快速入口**：`scripts/build-debug-fast.sh` 固定 iPhone 17 / iOS 26.4.1 simulator destination，作为日常 Debug build 验证。
+- **构建快速入口**：`scripts/build-debug-fast.sh` 默认使用 `platform=iOS Simulator,name=iPhone 17`，不写 `OS=`；让 Xcode 选择本机已安装的默认 iOS 26.5 simulator runtime，避免为旧 runtime 触发下载/解析。
 
 ### 3. 当前 SwiftData Schema
 
-当前 schema 链到 **ArkSchemaV51**，`SharedModelContainer` 使用 `Schema(ArkSchemaV51.models)`。
+当前 schema 链到 **ArkSchemaV55**，`SharedModelContainer` 使用 `Schema(ArkSchemaV55.models)`。
 
 近期关键迁移：
 
@@ -53,27 +53,43 @@
 | V49 | 电子宠物展示/状态扩展字段 |
 | V50 | 遛狗便便地图标记：`PetPottyLog` 坐标 + `walkLogId` |
 | V51 | 宠物 3D 破框卡片专用主体图：`cardPopoutImageData/cardPopoutSourceRaw` |
+| V52 | `SharedCareSession`：同物种多宠共同照护记录 |
+| V53 | `GachaOwnedItem` / `GachaDrawLog`：系列盲盒扭蛋收藏与抽取记录 |
+| V54 | 扭蛋非收藏结果与即时奖励记录扩展 |
+| V55 | Oasis 电子宠物低压力生命状态扩展 |
 
 备份/恢复已覆盖家庭协作任务、兑换请求、Oasis 电子宠物、喂食结构化字段、余粮字段、破框图等新数据；PIN hash/salt 不应进入备份。
 
 ### 4. 首页与快捷操作
 
-- **首页主文件**：`FocusStackHomeTestView`，并持续拆分到 `FocusWalletCardView`、`ExpandedQuickActionsSection` 等文件以降低编译热区。
-- **卡片堆**：首页首帧优先渲染背景、顶部按钮、卡片堆；头像预热、快捷状态、FAB 复杂状态延后，避免首次点击卡顿。
-- **顶部按钮**：首页显示当前用户椰子数和全局日历；进入具体人类/宠物卡片放大页后，顶部椰子数/日历应切到该实体语义。
-- **快捷操作**：不再依赖隐藏长按。点击快捷操作时，在按钮下方出现类似 FAB 的两个极简图标按钮：`checkmark` 快速打卡/快记/完成，`chart/list` 详情/管理/历史；无快速动作的入口只显示打开/管理按钮。
+- **默认首页**：`FocusHomeV3View(sceneStyle: .verticalSolid)`，由 `FocusHomeVerticalSolidView` 作为默认样式入口。顶部五按钮与底部导航固定，中间区域在首页 / 日历 / Oasis / 植物间横向切换。
+- **卡片区**：竖版实色卡片使用真实 `Pet/Human/Plant` 数据、真实头像/2.5D、主题色、椰子数与状态 badge；卡片展开后快捷操作嵌入卡片底部。
+- **顶部按钮**：顶部不再保留独立日历按钮。任何界面点击椰子数都打开椰子历史；卡片放大页按当前宠物/人类过滤，其他页面默认显示当前用户（人类）数据。
+- **底部导航**：四个 tab：首页、日历、Oasis、植物（待开发）；中央 `+` 集成原首页 FAB 能力，不另放悬浮 FAB。
+- **快捷操作**：不再依赖隐藏长按。点击快捷操作时，在按钮下方出现类似 FAB 的两个极简图标按钮：`+ / checkmark` 快速打卡/快记/完成，`chart/list` 详情/管理/历史；无快速动作的入口只显示打开/管理按钮。
 - **默认快捷操作**：按物种区分。狗：喂食/喂水/遛狗/陪玩/体重/记录/花费；猫：喂食/喂水/铲屎/陪玩/体重/记录/花费。其它低频操作进入 FAB/全部功能。
 - **局部打卡反馈**：打卡成功后当前卡片/快捷 icon 必须播放轻量反馈，数字跳变；椰子正向增加由全局 `CoconutRewardFeedbackCenter` 播放 `+x🥥`。
 
 ### 5. Today Focus
 
-- Today Focus 是“今日任务盘”，展示当前最值得处理的任务/警告/协作/兑换确认/Oasis 建设任务。
+- Today Focus 是“今日任务盘”，在竖版首页顶部以一张张任务卡呈现；卡片区域上下滑动切换，不使用 ScrollView，不显示额外上下按钮。
+- 任务盘可以最小化为页面边缘胶囊，显示任务数 / 紧急提醒；展开时卡片区下移缩小，最小化后卡片区上移放大，两者不能重叠。
+- Today Focus 展示当前最值得处理的任务/警告/协作/兑换确认/Oasis 建设任务。
 - 顶部 `x/x` 状态跟随当前卡片类型和滑动位置，不再固定显示全局总数。
 - 点击任务卡进入相关任务页或总览页；添加记录应使用弹窗，不直接跳系统 sheet。
 - 警告卡用户看过一次后应可关闭，不应每天重复打扰。
 - 分配给当前人类的 `FamilyCollaborationTask` 立即进入 Today Focus；照护快捷打卡完成后，相关 reminder/task 同步消失。
 - 首个人类建档填写初始体重后会写入体重记录，并抑制当天“记录体重”任务。
 - Oasis 建设/生命树升级任务也可进入 Today Focus，以 token/槽位呈现。
+
+### 5A. 全局计划逾期未打卡规则
+
+- **统一入口**：`CarePlanOverdueStatusCalculator` 是宠物、人类、未来植物计划逾期状态的统一计算入口。
+- **宠物覆盖**：喂食、喂水、换水、滤芯、铲屎、陪玩、护理、用药、健康、保险、清笼、放飞、保湿、换垫等，只要对应计划 reminder 处于 pending 且已过时，或被标记 failed，就进入逾期状态。自动猫粮机规则不进入日历/逾期警告。
+- **水族周期覆盖**：换水、滤芯清洗 / 更换等周期型状态即使没有显式 reminder，也会通过同一逾期状态进入首页卡片状态与快捷操作提示。
+- **人类覆盖**：人类计划事件、指派给该人类的任务、人类用药计划未打卡都会进入逾期状态。人类卡片右上角状态按钮和用药快捷操作显示 `逾期 / 逾期x天`。
+- **植物预留**：植物浇水、施肥和植物关联事件已接入同一计算器；未来植物正式进入首页 / Today Focus 后直接复用，不再写一套单独规则。
+- **打卡后恢复**：相关记录完成后，对应 reminder/task 应同步 completed，首页状态、快捷操作、Today Focus、家庭协作里的逾期提示应随 snapshot signature 刷新消失。
 
 ### 6. 喂食、水、便便/铲屎
 
@@ -82,17 +98,17 @@
 - **喂食总览**：聚合三种模式的数据；单一模式详情进入对应历史/日历页。Chart 极简，数据语义正确，有加载/切换动画。
 - **余粮**：补粮区分购买日期与开袋日期；只有开袋日起的同类型主粮记录扣减。余粮管理支持查看、修改、删除、提醒、手动修正。余粮色默认 `goPrimary`，低余粮只在局部状态用警告色。
 - **零食**：Chart 主语义是频率，按每日记录次数统计，未填写克数也计入；支持零食类型 filter，并能看到某类型上次喂食时间。
-- **喂水**：参考喂食，保留手动/提醒计划；已有计划时切换不再反复弹新建计划。水量可选，不填则只记录次数。
-- **便便/铲屎/猫砂**：猫显示便便/铲屎/猫砂；非猫物种需要调整为更通用便便管理，不显示猫砂/铲屎误导入口。点击卡片进 overview，按钮做记录/管理。
+- **喂水**：参考喂食，保留手动/提醒计划；已有计划时切换不再反复弹新建计划。水量可选，不填则只记录次数。逾期未打卡时首页卡片状态、快捷操作和喂水/换水/滤芯页面必须明显警告，完成后恢复普通态。
+- **便便/铲屎/猫砂**：猫显示便便/铲屎/猫砂；非猫物种需要调整为更通用便便管理，不显示猫砂/铲屎误导入口。点击卡片进 overview，按钮做记录/管理。铲屎/换砂计划逾期也走全局逾期规则。
 
 ### 7. 健康、人类、体重、花费、记录
 
 - **宠物健康**：三核心卡：预防护理、用药、异常/就诊。用药任务可在 Today Focus 直接打卡，不强制跳转用药页。
-- **人类模块**：默认快捷操作为体重、花费、用药、运动、备注、全部功能；本人可见私密数据并提示“仅自己可见”，非本人显示锁定占位。
+- **人类模块**：默认快捷操作为体重、花费、用药、运动、备注、全部功能；本人可见私密数据并提示“仅自己可见”，非本人显示锁定占位。人类用药计划逾期时，人类卡片状态按钮和用药快捷操作必须即时提示。
 - **人类 PIN**：设置 > 设备身份 > 切换人类账户 > 人类卡片锁按钮设置/公开/隐私；切换到有 PIN 成员时必须验证。
 - **体重/花费统一页**：宠物/人类从全部功能和快捷操作进入同一套页面。快记使用 V4 inline popup + 内嵌数字键盘；详情页有 chart + 历史，避免重复相似页面。
 - **记录中心**：短按“记录”打开快速记录弹窗，支持文字、拍照、相册、文件、提醒等；长路径进入记录中心。时光页显示用户主动记录和重要成长事件，不混入大量工具流水账。
-- **证件保障**：三入口：证件、疫苗本、保险。新增/编辑走 inline popup；添加证件类型不含保险，保险有独立弹窗与结构。
+- **证件保障**：只保留证件与保险。疫苗完全属于健康模块 / 疫苗本，不在证件保障中展示或新增。新增/编辑证件、保险走 inline popup；添加证件类型不含保险。
 
 ### 8. 家庭协作与任务/事项
 
@@ -284,6 +300,10 @@ Ohana/
 | V49 | 电子宠物展示与状态扩展字段 |
 | V50 | 遛狗便便地图标记：`PetPottyLog` 坐标与 `walkLogId` |
 | V51 | 宠物 3D 破框卡片专用图：`cardPopoutImageData` / `cardPopoutSourceRaw` |
+| V52 | `SharedCareSession`：同物种多宠共同照护记录 |
+| V53 | `GachaOwnedItem` / `GachaDrawLog`：系列盲盒扭蛋收藏与抽取记录 |
+| V54 | 扭蛋非收藏结果与即时奖励记录扩展 |
+| V55 | Oasis 电子宠物低压力生命状态扩展 |
 
 ### 关键模型字段
 **Pet**：`species`、`themeColorHex`、`personalityTagsRaw`、`currentStreak`、`foodTrackingMode`

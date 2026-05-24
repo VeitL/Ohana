@@ -47,7 +47,7 @@ struct WalkTrackingCard: View {
         return false
     }
     private var walkClockInterval: TimeInterval {
-        workloadPolicy.shouldRunTimer(isVisible: isWalking) ? 1 : 60
+        workloadPolicy.refreshInterval(default: 1, throttled: 15, paused: 60, isVisible: isWalking)
     }
     private var liveRouteCoordinates: [CLLocationCoordinate2D] {
         routeCoordinates(from: locationMgr.collectedLocations, maxCount: 320)
@@ -56,7 +56,7 @@ struct WalkTrackingCard: View {
         isActivePet ? mgr.activePoopMarkers : []
     }
     private var shouldAnimateRainbowWalkEffects: Bool {
-        (equipFxRainbowRoute || equipFxRainbowPoop) && workloadPolicy.shouldAnimate(isVisible: true)
+        (equipFxRainbowRoute || equipFxRainbowPoop) && workloadPolicy.ambientMotionBudget(isVisible: true).allowsMotion
     }
 
     var body: some View {
@@ -80,15 +80,22 @@ struct WalkTrackingCard: View {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .strokeBorder(Color.goCardWhite.opacity(0.12), lineWidth: 1)
             )
+            .overlay(alignment: .topTrailing) {
+                if showSummaryBack {
+                    summaryMapToolbar
+                        .padding(.top, 26)
+                        .padding(.trailing, 24)
+                        .zIndex(200)
+                        .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .topTrailing)))
+                }
+            }
             .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
         .clipped()
         .sheet(item: $showWalkDetail) { walk in WalkDetailView(walk: walk, pet: pet) }
         .sheet(isPresented: $showingGoalSetter) {
             walkGoalSetterSheet
-                .presentationDetents([.height(320)])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color.ohanaCardSurface)
+                .ohanaCompactSheetPresentation(detents: [.height(320)])
         }
         .onChange(of: mgr.showSummary) { _, newVal in
             if newVal && mgr.currentPet?.id == pet.id {
@@ -442,7 +449,7 @@ struct WalkTrackingCard: View {
                             .lineLimit(1)
                     }
                     Spacer()
-                    summaryMapToolbar
+                    summaryMapToolbarPlaceholder
                 }
 
                 Spacer(minLength: 14)
@@ -459,6 +466,12 @@ struct WalkTrackingCard: View {
             summaryCloseButton
         }
         .zIndex(40)
+    }
+
+    private var summaryMapToolbarPlaceholder: some View {
+        Color.clear
+            .frame(width: 96, height: 44)
+            .allowsHitTesting(false)
     }
 
     private var summaryCloseButton: some View {

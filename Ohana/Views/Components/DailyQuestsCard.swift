@@ -669,7 +669,6 @@ struct CoconutDropSheet: View {
                             .background(Color.goPrimary, in: Capsule())
                             .padding(.horizontal, 48)
                     }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
 
                 Spacer()
@@ -860,7 +859,6 @@ struct DailyQuestsCard: View {
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .disabled(coconutClaimed)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .padding(20)

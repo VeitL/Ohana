@@ -41,7 +41,7 @@ struct FunctionMenuDestinationRouter: View {
         case .petMoments(let id):
             if let pet = pet(for: id) { PetMomentsHubView(pet: pet) }
         case .petTimeline(let id):
-            if let pet = pet(for: id) { PetUnifiedTimelineSheet(pet: pet) }
+            if let pet = pet(for: id) { PetMomentsHubView(pet: pet) }
         case .petAchievements(let id):
             if let pet = pet(for: id) { AchievementWallView(pet: pet) }
         case .petRetention(let id):

@@ -88,14 +88,13 @@ struct PetHygieneCard: View {
                 .padding(.horizontal, 14).padding(.vertical, 10)
                 .background(Color.arkInk.opacity(0.8), in: Capsule())
                 .padding(.horizontal, 8).padding(.bottom, 4)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             }
             .animation(GoMotion.feedback, value: undoLog != nil)
             .sheet(item: $longPressedType) { type in
                 HygieneTodoSheet(pet: pet, type: type, accent: Color(hex: pet.safeThemeColorHex))
                     .presentationDetents([.height(520)])
-                    .presentationDragIndicator(.visible)
+                    .presentationDragIndicator(.hidden)
             }
     }
 }

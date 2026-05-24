@@ -74,7 +74,6 @@ struct DocumentDetailSheet: View {
 
             if let previewImageData, let ui = UIImage(data: previewImageData) {
                 imagePreview(ui)
-                    .transition(.opacity)
                     .zIndex(20)
             }
         }

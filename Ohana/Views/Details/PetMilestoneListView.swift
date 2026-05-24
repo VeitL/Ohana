@@ -429,9 +429,7 @@ struct PetMilestoneListView: View {
                 .disabled(newTitle.isEmpty)
                 .padding(.horizontal, 24).padding(.bottom, 32).padding(.top, 8)
         }
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        .presentationBackground(Color.ohanaCardSurface)
+        .ohanaSheetPagePresentation() // ui-v4: allow long milestone editor
         .goKeyboardDoneToolbar()
         .sheet(isPresented: $showingLocationPicker) {
             MapLocationPickerSheet(selectedLocation: $newLocation)

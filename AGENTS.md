@@ -8,6 +8,7 @@ This repository contains the Ohana iOS app. Main SwiftUI app code lives in `Ohan
 
 - `open Ohana.xcodeproj` opens the app in Xcode for local development.
 - `xcodebuild -project Ohana.xcodeproj -scheme Ohana -configuration Debug build` builds the app from the command line.
+- `scripts/build-debug-fast.sh` is the default quick Debug build. It intentionally uses `platform=iOS Simulator,name=iPhone 17` without an `OS=` pin so Xcode uses the installed default iOS 26.5 simulator runtime and does not try to download or resolve an older runtime.
 - `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -destination 'platform=iOS Simulator,name=iPhone 16'` runs unit and UI tests on a simulator; adjust the device name to one installed locally.
 - `xcodebuild -list -project Ohana.xcodeproj` lists available targets, schemes, and configurations.
 
@@ -18,6 +19,7 @@ Treat this repository as an existing SwiftUI Xcode project, not a greenfield sca
 Keep the development loop CLI-first. Start with the narrowest trustworthy check for the code touched, then expand only when needed:
 - Use `xcodebuild -list -project Ohana.xcodeproj` when schemes or targets are unclear.
 - Use `xcodebuild -project Ohana.xcodeproj -scheme Ohana -configuration Debug build` for a general app build.
+- Use `scripts/build-debug-fast.sh` for day-to-day validation; do not hardcode older simulator OS versions such as `OS=26.4.1`. Let Xcode select the installed default iOS 26.5 runtime unless a task explicitly requires another destination.
 - Use `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -destination 'platform=iOS Simulator,name=iPhone 16'` for test validation when behavior or persistence changes.
 - For UI changes, prefer a simulator build/run and screenshots after the code compiles; if deeper simulator control is available through XcodeBuildMCP or similar tooling, use it to launch, inspect logs, and capture screenshots.
 
@@ -32,6 +34,10 @@ Only adopt iOS 26 Liquid Glass APIs when a task explicitly asks for that migrati
 ## Coding Style & Naming Conventions
 
 Use Swift and SwiftUI conventions already present in the project: four-space indentation, `PascalCase` for types, `camelCase` for properties/functions, and descriptive service/view names such as `ReminderSchedulingService` or `FocusStackHomeTestView`. Keep views focused and move business logic into `Utilities/`, `ViewModels/`, or domain services. Prefer `MARK:` sections for larger Swift files. Do not introduce broad reformatting in unrelated files.
+
+Avoid oversized Swift files, especially giant SwiftUI view files. When a view grows into a compile/runtime hot spot, split it by responsibility before adding more behavior: pure visual surfaces, state/coordinator objects, route hosts, business executors, data snapshot builders, and reusable subviews should live in separate files. Card stacks, hero animations, Today Focus, FAB menus, sheets, charts, and quick actions should not all be owned by one massive view. This protects incremental build time, SwiftUI diffing cost, first-frame responsiveness, animation smoothness, and energy usage.
+
+Keep high-frequency UI paths lightweight. Taps, hero transitions, sheet presentations, and quick check-ins should update only the minimal state needed to start the interaction; do not decode images, scan large SwiftData collections, build complex route trees, or recompute unrelated dashboards on the same frame. Prefer frozen snapshots and small render-only components during animation, then refresh heavier business state after the visible transition has settled.
 
 ## Architecture, Compliance & Energy Guardrails
 
@@ -61,6 +67,8 @@ Sheets and popups are their own design system. Always read the `sheet*` tokens f
 
 Short record, confirmation, restock, and lightweight management popups must follow the confirmed inline popup spec: `sheetImplementation=inlineOverlay`, `sheetHorizontalInset=6pt`, `sheetCornerRadius=52pt`, `sheetPosition=bottomNearSafeEdge`, `sheetMaxHeight=contentAdaptive`, `sheetGlass=nativeRegular`, `sheetShadow=liftedAlert`, `sheetBackdrop=scrimGradient`, and `sheetAnimation=bottomSpringScaleFade`. Use an in-page overlay inside the current `ZStack` so the glass samples the real screen behind it; reserve system `.sheet` / `.large` for overview pages, history, long lists, and complex editors.
 
+Key animated interactions must use Ohana's stable ZStack motion scene pattern. For hero cards, FAB/menu reveal, inline popups, reward reveals, gacha/Oasis rewards, role creation cards, and chart range switches, keep visual layers mounted, freeze the UI snapshot before animation, and drive transform/mask/opacity/zIndex/hit-testing from one progress value. Do not insert/remove complex views, decode images, scan SwiftData, or run multiple delayed animations during the same transition. Ordinary static forms and long lists can remain `VStack`/`ScrollView`/`List`.
+
 Navigation chrome and settings rows are explicit tokens too. Use `settingIcon` for Settings-style leading icons, `pageBackButton` for non-sheet back controls, `pageCloseButton` for non-sheet close controls, and `sheetChrome` only for popup/sheet close controls.
 
 Cards are reserved for tappable, navigable, expandable, or editable grouped surfaces. Pure information summaries should use unframed layouts, inline metrics, or lightweight separators instead of card chrome.
@@ -81,7 +89,7 @@ Use `ui-ux-pro-max` for broad UX questions, accessibility checks, SwiftUI form/c
 
 Use `docs/open-swiftui-animations-memory.md` and `docs/pow-animation-memory.md` as Ohana's local memory for patterns learned from `amosgyamfi/open-swiftui-animations` and `EmergeTools/Pow`. Treat them as inspiration and implementation guidance, not as vendored source code.
 
-When adding motion, prefer the shared helpers in `Ohana/Views/Components/OhanaMotionEffects.swift` and existing `GoMotion` tokens. Reuse `PhaseAnimator`, `contentTransition(.numericText())`, `symbolEffect`, `dashPhase`, staged spring entrances, ping, shine, shake, and pop-style transitions where they add clear meaning: rewards, attention states, counters, FAB/menu reveal, chart/progress entry, validation errors, pending task review, and success feedback. Respect Reduce Motion and avoid decorative loops on high-frequency screens.
+When adding motion, prefer the shared helpers in `Ohana/Views/Components/OhanaMotionEffects.swift`, `Ohana/Views/Components/OhanaZStackMotionScene.swift`, and existing `GoMotion` tokens. Reuse `PhaseAnimator`, `contentTransition(.numericText())`, `symbolEffect`, `dashPhase`, staged spring entrances, ping, shine, shake, and pop-style transitions where they add clear meaning: rewards, attention states, counters, FAB/menu reveal, chart/progress entry, validation errors, pending task review, and success feedback. Respect Reduce Motion and avoid decorative loops on high-frequency screens.
 
 ## Localization Source of Truth
 

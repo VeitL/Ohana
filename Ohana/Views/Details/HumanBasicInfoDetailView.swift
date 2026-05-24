@@ -117,9 +117,7 @@ struct HumanBasicInfoDetailView: View {
                     deleteHumanAndReturnHome()
                 }
             )
-            .presentationDetents([.height(360), .medium])
-            .presentationDragIndicator(.visible)
-            .presentationBackground(Color.ohanaCardSurface)
+            .ohanaCompactSheetPresentation(detents: [.height(360), .medium])
         }
     }
 

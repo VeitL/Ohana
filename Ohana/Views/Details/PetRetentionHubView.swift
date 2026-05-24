@@ -257,10 +257,10 @@ struct PetRetentionHubView: View {
             HStack(spacing: 10) {
                 compactNavigationAction(
                     icon: "clock.arrow.circlepath",
-                    title: l.tr(zh: "完整时间轴", en: "Timeline", de: "Zeitachse"),
+                    title: l.tr(zh: "记录中心 · 全部", en: "Moments · All", de: "Momente · Alle"),
                     value: "\(timelineCount)",
                     tint: Color(hex: "8B5CF6"),
-                    destination: PetUnifiedTimelineSheet(pet: pet)
+                    destination: PetMomentsHubView(pet: pet)
                 )
 
                 compactNavigationAction(
@@ -441,7 +441,7 @@ struct PetRetentionHubView: View {
         case .weight:
             WeightHistoryView(pet: pet)
         case .retention:
-            PetUnifiedTimelineSheet(pet: pet)
+            PetMomentsHubView(pet: pet)
         }
     }
 

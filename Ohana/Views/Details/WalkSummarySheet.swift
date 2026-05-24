@@ -153,7 +153,7 @@ struct WalkSummarySheet: View {
             HStack(spacing: 10) {
                 ForEach(1...5, id: \.self) { star in
                     Button {
-                        withAnimation(.spring(response: 0.2)) { draftMoodRating = star }
+                        withAnimation(GoMotion.feedback) { draftMoodRating = star }
                     } label: {
                         Image(systemName: star <= draftMoodRating ? "star.fill" : "star")
                             .font(.system(size: 22))
@@ -211,7 +211,7 @@ struct WalkSummarySheet: View {
                         .trim(from: 0, to: pet.weeklyWalkGoalKm > 0 ? weeklyProgress : 0)
                         .stroke(weeklyGoalColor, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                         .rotationEffect(.degrees(-90))
-                        .animation(.spring(duration: 0.6), value: weeklyProgress)
+                        .animation(GoMotion.feedback, value: weeklyProgress)
                     if pet.weeklyWalkGoalKm > 0 {
                         Text("\(Int(weeklyProgress * 100))%")
                             .font(.system(size: 11, weight: .black, design: .rounded))
@@ -260,7 +260,7 @@ struct WalkSummarySheet: View {
                 } label: {
                     Text(pet.weeklyWalkGoalKm > 0 ? "修改" : "设定目标")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 7)
                         .background(Color.goPrimary, in: Capsule())
@@ -272,9 +272,7 @@ struct WalkSummarySheet: View {
         .goTranslucentCard(cornerRadius: 20)
         .sheet(isPresented: $showingGoalSetter) {
             goalSetterSheet
-                .presentationDetents([.height(320)])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color.ohanaCardSurface)
+                .ohanaCompactSheetPresentation(detents: [.height(320)])
         }
     }
 
@@ -289,7 +287,7 @@ struct WalkSummarySheet: View {
                     .font(.system(size: 52, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .contentTransition(.numericText())
-                    .animation(.spring(duration: 0.2), value: goalDraft)
+                    .animation(GoMotion.feedback, value: goalDraft)
                 Text("km / 周")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -332,7 +330,7 @@ struct WalkSummarySheet: View {
             } label: {
                 Text(goalDraft == 0 ? "清除目标" : "保存目标")
                     .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14))
@@ -508,7 +506,7 @@ struct WalkSummarySheet: View {
     }
 
     private var blendedCardSurface: Color {
-        colorScheme == .dark ? Color(hex: "111827") : Color.white
+        colorScheme == .dark ? Color.ohanaCardSurface.opacity(0.86) : Color.ohanaCardSurface
     }
 
     @ViewBuilder
@@ -517,7 +515,7 @@ struct WalkSummarySheet: View {
             Image(uiImage: uiImage)
                 .resizable()
                 .scaledToFill()
-                .overlay(Color.black.opacity(colorScheme == .dark ? 0.08 : 0.02))
+                .overlay(Color.ohanaPrimaryText.opacity(colorScheme == .dark ? 0.08 : 0.02))
                 .clipped()
         } else {
             ZStack {

@@ -14,6 +14,7 @@ import Foundation
 
 struct AddPetWizardView: View {
     let onComplete: () -> Void
+    var onCancel: (() -> Void)? = nil
     var onPetSaved: ((Pet) -> Void)? = nil
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
@@ -74,6 +75,7 @@ struct AddPetWizardView: View {
     /// 裁剪 Sheet 关闭后递增，用于 `.id` 强制重建 `TabView`，避免与顶栏头像动画叠用时停在两页之间。
     @State private var wizardTabViewRemountID: Int = 0
     @State private var showBreedPickerSheet = false
+    @State private var isWizardCarouselDragging = false
     /// 性格标签（最多 3 个，顺序与存储一致）
     @State private var selectedPersonalityTagIds: [String] = []
     @AppStorage("ohana_custom_personality_tags_v1") private var customPersonalityTagsJSON: String = "[]"
@@ -102,6 +104,9 @@ struct AddPetWizardView: View {
     private var totalCards: Int { 5 }
     private var canUseAutomatic2DAvatar: Bool {
         Avatar2DAccess.usesFreeSlot(kind: .pet, existingCount: existingPets.count)
+    }
+    private var isShowingAutomatic2DAvatar: Bool {
+        usesAutomaticAvatarAsset && canUseAutomatic2DAvatar
     }
     private var petMeshBasicAndBio: String {
         wizardL10n.tr(zh: "认识伙伴 · 1/5", en: "MEET YOUR PAL · 1/5", de: "KENNENLERNEN · 1/5")
@@ -390,8 +395,8 @@ struct AddPetWizardView: View {
         }
     }
 
-    /// 创建页使用压缩角色卡，给状态栏和下方卡片轨道留出稳定空间。
-    private var walletDraftCardHeight: CGFloat { min((ScreenCompat.width - 7 * 2) / 1.72, 214) }
+    /// 创建页顶卡与首页卡片堆保持同一尺寸，不再压缩。
+    private var walletDraftCardHeight: CGFloat { K.cardH }
     private let walletCardCorner: CGFloat = 24
 
     private var stickyWalletPreview: some View {
@@ -420,19 +425,26 @@ struct AddPetWizardView: View {
                     systemImage: "sparkles",
                     tint: Color.goPrimary
                 )
-                AddWizardStatusBadge(
-                    title: canUseAutomatic2DAvatar
-                        ? wizardL10n.tr(zh: "推荐 2.5D", en: "2.5D pick", de: "2.5D Tipp")
-                        : wizardL10n.tr(zh: "商店解锁", en: "Shop unlock", de: "Shop-Freischaltung"),
-                    systemImage: canUseAutomatic2DAvatar ? "wand.and.stars" : "lock.fill",
-                    tint: canUseAutomatic2DAvatar ? Color.goTeal : Color.ohanaCardSurfaceElevated
-                )
+                if isShowingAutomatic2DAvatar {
+                    AddWizardStatusBadge(
+                        title: wizardL10n.tr(zh: "2.5D 头像", en: "2.5D avatar", de: "2,5D-Avatar"),
+                        systemImage: "wand.and.stars",
+                        tint: Color.goTeal
+                    )
+                }
             }
             .padding(.leading, 16)
             .padding(.bottom, 14)
         }
+        .overlay(alignment: .topTrailing) {
+            if let onCancel {
+                AddWizardCardCloseButton(action: onCancel)
+                    .padding(.top, 12)
+                    .padding(.trailing, 12)
+            }
+        }
         .padding(.horizontal, 7)   // 与首页卡片堆 K.cardMargin 保持一致
-        .padding(.top, 10)
+        .padding(.top, 6)
         .padding(.bottom, 6)
         // 不在 `name` 上套弹簧动画：每个按键都会触发布局+动画，输入会明显卡顿
         .animation(GoMotion.feedback, value: breed)
@@ -452,6 +464,7 @@ struct AddPetWizardView: View {
         AddWizardPagedCardCarousel(
             pageIndex: $wizardPageIndex,
             pageDirection: $wizardPageDirection,
+            isDragging: $isWizardCarouselDragging,
             pageCount: totalCards
         ) { index in
             AnyView(pagedCard(index: index) {
@@ -485,26 +498,24 @@ struct AddPetWizardView: View {
 
     /// 拆出主列以减轻 `body` 类型推断压力（避免编译器超时）
     private var addPetWizardMainColumn: some View {
-        VStack(spacing: 0) {
+        AddWizardThreePanelLayout(previewPanelHeight: walletDraftCardHeight + 12) {
             stickyWalletPreview
                 .opacity(entranceReady ? 1 : 0)
                 .scaleEffect(entranceReady ? 1 : 0.985, anchor: .top)
                 .offset(y: entranceReady ? 0 : 10)
-
+        } content: {
             wizardPagedContent
                 .padding(.horizontal, 7) // Match the wallet preview card width above.
-                .frame(maxHeight: .infinity)
                 .background(.clear)
                 .opacity(entranceReady ? 1 : 0)
                 .scaleEffect(entranceReady ? 1 : 0.992, anchor: .top)
                 .offset(y: entranceReady ? 0 : 22)
-
+        } footer: {
             wizardPageDotRow
                 .opacity(entranceReady ? 1 : 0)
                 .offset(y: entranceReady ? 0 : 8)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.top, 4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .animation(GoMotion.sheet, value: entranceReady)
         // 阻止键盘弹出时压缩整列布局：TabView 相邻卡片的顶部内容
         // 否则会随键盘一起上移，收起时再滑落。键盘直接覆盖当前卡片下方区域。
@@ -556,6 +567,10 @@ struct AddPetWizardView: View {
             coconutBurstOverlay
             ahaHatchOverlayLayer
             addPetWizardMainColumn
+            if showBreedPickerSheet {
+                breedPickerOverlayLayer
+                    .zIndex(950)
+            }
             if showJoinCelebration {
                 AddWizardJoinCelebrationOverlay(
                     title: wizardL10n.tr(
@@ -721,7 +736,6 @@ struct AddPetWizardView: View {
             }
             .presentationDetents([.large]) // ui-v4: allow image crop editor needs full-screen working space.
         }
-        .sheet(isPresented: $showBreedPickerSheet) { breedPickerSheet }
         .sheet(isPresented: $showThemeColorSheet) {
             GoColorPickerSheet(selectedColor: themeUIColorBinding) { chosen in
                 if let hex = chosen.toHex() {
@@ -1215,17 +1229,17 @@ struct AddPetWizardView: View {
             }
             .padding(.horizontal, 20)
 
-            HStack {
-                AddWizardStatusBadge(
-                    title: canUseAutomatic2DAvatar
-                        ? l.tr(zh: "推荐当前 2.5D", en: "Use this 2.5D", de: "Diesen 2.5D nutzen")
-                        : l.tr(zh: "2.5D 商店解锁", en: "2.5D in shop", de: "2.5D im Shop"),
-                    systemImage: canUseAutomatic2DAvatar ? "sparkles" : "lock.fill",
-                    tint: canUseAutomatic2DAvatar ? Color.goPrimary : Color.ohanaCardSurfaceElevated
-                )
-                Spacer()
+            if isShowingAutomatic2DAvatar {
+                HStack {
+                    AddWizardStatusBadge(
+                        title: l.tr(zh: "2.5D 头像", en: "2.5D avatar", de: "2,5D-Avatar"),
+                        systemImage: "sparkles",
+                        tint: Color.goPrimary
+                    )
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
             }
-            .padding(.horizontal, 20)
 
             if canUseAutomatic2DAvatar && !usesAutomaticAvatarAsset {
                 Button {
@@ -1261,19 +1275,20 @@ struct AddPetWizardView: View {
                     .scaledToFit()
                     .padding(walletDecodedAvatarTransparent ? 10 : 24)
             } else {
-                Image(systemName: Pet.speciesSilhouetteSymbol(forSpecies: effectiveSpeciesForData))
-                    .font(.system(size: 64, weight: .black))
-                    .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(Color(hex: themeColorHex).opacity(0.78))
+                AddWizardPlainAvatarPlaceholder(
+                    kind: .pet(symbol: Pet.speciesSilhouetteSymbol(forSpecies: effectiveSpeciesForData)),
+                    tint: Color(hex: themeColorHex)
+                )
+                .padding(22)
             }
             VStack {
                 HStack {
                     AddWizardStatusBadge(
-                        title: usesAutomaticAvatarAsset
-                            ? wizardL10n.tr(zh: "自动形象", en: "Auto avatar", de: "Auto-Avatar")
-                            : wizardL10n.tr(zh: "手动形象", en: "Custom avatar", de: "Eigenes Bild"),
-                        systemImage: usesAutomaticAvatarAsset ? "wand.and.stars" : "photo.fill",
-                        tint: usesAutomaticAvatarAsset ? Color.goTeal : Color(hex: themeColorHex)
+                        title: isShowingAutomatic2DAvatar
+                            ? wizardL10n.tr(zh: "2.5D 头像", en: "2.5D avatar", de: "2,5D-Avatar")
+                            : wizardL10n.tr(zh: "普通头像", en: "Plain avatar", de: "Einfacher Avatar"),
+                        systemImage: isShowingAutomatic2DAvatar ? "wand.and.stars" : "pawprint.fill",
+                        tint: isShowingAutomatic2DAvatar ? Color.goTeal : Color(hex: themeColorHex)
                     )
                     Spacer()
                 }
@@ -1701,112 +1716,197 @@ struct AddPetWizardView: View {
         }
     }
 
-    // MARK: - Breed Picker Sheet
-    private var breedPickerSheet: some View {
+    // MARK: - Breed Picker Overlay
+    private var breedPickerOverlayLayer: some View {
         let l = wizardL10n
-        return NavigationStack {
-            ScrollView {
-                LazyVStack(spacing: 6) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 13, weight: .semibold))
-                            .symbolRenderingMode(.monochrome)
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
-                        GoDraftTextField(
-                            l.petWizBreedSearchPrompt,
-                            text: $breedSearch,
-                            commitDelayNanoseconds: 220_000_000,
-                            submitLabel: .search,
-                            capitalization: .never
-                        )
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        if !breedSearch.isEmpty {
-                            Button { breedSearch = "" } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .symbolRenderingMode(.monochrome)
-                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
-                            }
-                            .buttonStyle(ScaleButtonStyle())
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .padding(.bottom, 6)
+        return GeometryReader { geo in
+            ZStack(alignment: .bottom) {
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.08), // ui-v4: allow popup scrimGradient token
+                        Color.black.opacity(0.34) // ui-v4: allow popup scrimGradient token
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                .onTapGesture {
+                    closeBreedPicker()
+                }
 
-                    Button {
-                        breed = ""; isCustomBreed = false; customBreedText = ""
-                        showBreedPickerSheet = false
-                    } label: {
-                        HStack {
-                            Text(l.petWizBreedNone)
-                                .font(.system(size: 15, weight: breed.isEmpty && !isCustomBreed ? .bold : .medium, design: .rounded))
-                                .foregroundStyle(Color.primary)
-                            Spacer()
-                            if breed.isEmpty && !isCustomBreed { Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.goPrimary) }
-                        }
-                        .padding(.horizontal, 16).padding(.vertical, 12)
-                        .background(breed.isEmpty && !isCustomBreed ? Color.goPrimary.opacity(0.12) : Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    ForEach(currentBreeds) { b in
-                        let isOther = b.name == "其他"
-                        let isSelected = (isOther && isCustomBreed) || (!isCustomBreed && breed == b.name)
-                        Button {
-                            if isOther { breed = "其他"; isCustomBreed = true }
-                            else { selectBreed(b); showBreedPickerSheet = false }
-                        } label: {
-                            HStack {
-                                Text(b.name)
-                                    .font(.system(size: 15, weight: isSelected ? .bold : .medium, design: .rounded))
-                                    .foregroundStyle(Color.primary)
-                                Spacer()
-                                if isSelected { Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.goPrimary) }
-                            }
-                            .padding(.horizontal, 16).padding(.vertical, 12)
-                            .background(isSelected ? Color.goPrimary.opacity(0.12) : Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
-                        }
-                        .buttonStyle(ScaleButtonStyle())
-                        if isOther && isCustomBreed {
-                            GoDraftTextField(
-                                l.petWizBreedFieldPh,
-                                text: $customBreedText,
-                                commitDelayNanoseconds: 180_000_000,
-                                submitLabel: .done,
-                                capitalization: .words
-                            )
-                                .font(.system(size: 15, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
-                                .padding(12).background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
-                                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.goPrimary.opacity(0.5), lineWidth: 1))
-                                .padding(.horizontal, 16)
-                        }
+                breedPickerPanel(l)
+                    .frame(maxHeight: max(360, geo.size.height * 0.72))
+                    .padding(.horizontal, 6)
+                    .padding(.bottom, max(geo.safeAreaInsets.bottom, 8) + 4)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+            .ignoresSafeArea()
+        }
+    }
+
+    private func breedPickerPanel(_ l: L10n) -> some View {
+        VStack(spacing: 0) {
+            Capsule()
+                .fill(Color.ohanaPrimaryText.opacity(0.24))
+                .frame(width: 44, height: 5)
+                .padding(.top, 9)
+                .padding(.bottom, 10)
+
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(l.petWizBreedSheetTitle)
+                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(l.petWizBreedCollapseSummary(isCustomBreed: isCustomBreed, customBreedText: customBreedText, breed: breed))
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(1)
+                }
+                Spacer()
+                Button {
+                    closeBreedPicker()
+                } label: {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 16, weight: .black, design: .rounded))
+                        .symbolRenderingMode(.monochrome)
+                        .foregroundStyle(Color.arkInk)
+                        .frame(width: 44, height: 44)
+                        .background(Color.goPrimary, in: Circle())
+                }
+                .buttonStyle(ScaleButtonStyle())
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
+
+            breedPickerSearchField(l)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 10)
+
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    breedNoneButton(l)
+                    ForEach(currentBreeds) { breedInfo in
+                        breedPickerRow(breedInfo, l: l)
                     }
                 }
-                .padding(.horizontal, 16).padding(.vertical, 8)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 18)
             }
             .scrollDismissesKeyboard(.interactively)
-            .navigationTitle(l.petWizBreedSheetTitle)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(l.done) {
-                        GoKeyboard.dismiss()
-                        showBreedPickerSheet = false
-                    }
+        }
+        .glassEffect(.regular.interactive(false), in: RoundedRectangle(cornerRadius: 52, style: .continuous)) // ui-v4: allow single-layer native inline popup glass
+        .overlay(
+            RoundedRectangle(cornerRadius: 52, style: .continuous)
+                .strokeBorder(Color.goCardWhite.opacity(0.14), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.28), radius: 28, x: 0, y: 18) // ui-v4: allow liftedAlert popup shadow
+    }
+
+    private func breedPickerSearchField(_ l: L10n) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 13, weight: .semibold))
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
+            GoDraftTextField(
+                l.petWizBreedSearchPrompt,
+                text: $breedSearch,
+                commitDelayNanoseconds: 220_000_000,
+                submitLabel: .search,
+                capitalization: .never
+            )
+            .font(.system(size: 14, weight: .medium, design: .rounded))
+            .foregroundStyle(Color.ohanaPrimaryText)
+            if !breedSearch.isEmpty {
+                Button { breedSearch = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .symbolRenderingMode(.monochrome)
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                 }
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button(l.done) {
-                        GoKeyboard.dismiss()
-                    }
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.goLime)
-                }
+                .buttonStyle(ScaleButtonStyle())
             }
         }
-        .presentationDetents([.large]) // ui-v4: allow breed picker is a long searchable selection sheet.
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func breedNoneButton(_ l: L10n) -> some View {
+        Button {
+            breed = ""
+            isCustomBreed = false
+            customBreedText = ""
+            closeBreedPicker()
+        } label: {
+            breedRowContent(title: l.petWizBreedNone, isSelected: breed.isEmpty && !isCustomBreed)
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+
+    @ViewBuilder
+    private func breedPickerRow(_ breedInfo: BreedInfo, l: L10n) -> some View {
+        let isOther = breedInfo.name == "其他"
+        let isSelected = (isOther && isCustomBreed) || (!isCustomBreed && breed == breedInfo.name)
+        Button {
+            if isOther {
+                breed = "其他"
+                isCustomBreed = true
+            } else {
+                selectBreed(breedInfo)
+                closeBreedPicker()
+            }
+        } label: {
+            breedRowContent(title: breedInfo.name, isSelected: isSelected)
+        }
+        .buttonStyle(ScaleButtonStyle())
+
+        if isOther && isCustomBreed {
+            GoDraftTextField(
+                l.petWizBreedFieldPh,
+                text: $customBreedText,
+                commitDelayNanoseconds: 180_000_000,
+                submitLabel: .done,
+                capitalization: .words
+            )
+            .font(.system(size: 15, weight: .medium, design: .rounded))
+            .foregroundStyle(Color.ohanaPrimaryText)
+            .padding(12)
+            .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.goPrimary.opacity(0.5), lineWidth: 1)
+            )
+            .padding(.horizontal, 16)
+        }
+    }
+
+    private func breedRowContent(title: String, isSelected: Bool) -> some View {
+        HStack(spacing: 10) {
+            Text(title)
+                .font(.system(size: 15, weight: isSelected ? .bold : .medium, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+            Spacer()
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 17, weight: .bold))
+                    .symbolRenderingMode(.monochrome)
+                    .foregroundStyle(Color.goPrimary)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            isSelected ? Color.goPrimary.opacity(0.12) : Color.primary.opacity(0.045),
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
+    }
+
+    private func closeBreedPicker() {
+        GoKeyboard.dismiss()
+        withAnimation(GoMotion.sheetEnter) {
+            showBreedPickerSheet = false
+        }
     }
 
 }

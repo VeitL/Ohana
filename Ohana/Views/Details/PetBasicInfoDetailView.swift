@@ -186,7 +186,7 @@ struct PetBasicInfoDetailView: View {
     private func breedTipsCard(breed: String, tips: [String]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Button {
-                withAnimation(.spring(response: 0.3)) { breedTipsExpanded.toggle() }
+                withAnimation(GoMotion.selection) { breedTipsExpanded.toggle() }
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "lightbulb.fill")
@@ -337,7 +337,7 @@ struct PetBasicInfoDetailView: View {
                             ZStack {
                                 Circle().fill(Color(hex: hex)).frame(width: 38, height: 38)
                                 if eThemeColorHex.uppercased() == hex.uppercased() {
-                                    Circle().strokeBorder(.white, lineWidth: 2.5)
+                                    Circle().strokeBorder(Color.ohanaCardSurface, lineWidth: 2.5)
                                     Image(systemName: "checkmark").font(.system(size: 11, weight: .black)).foregroundStyle(Color.ohanaPrimaryText)
                                 }
                             }
@@ -686,7 +686,7 @@ struct PetBasicInfoDetailView: View {
             VStack(spacing: 10) {
                 HStack(spacing: 8) {
                     Text("🌈").font(.system(size: 14))
-                    Text("岁月史书 · 彩虹桥彼端")
+                    Text("记录中心 · 彩虹桥彼端")
                         .font(.system(size: 11, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                         .tracking(1)
@@ -963,7 +963,7 @@ struct EditableProfileAvatarPicker: View {
                     }
                 }
             }
-            .presentationDetents([.large])
+            .presentationDetents([.large]) // ui-v4: allow photo crop editor needs full-height system sheet
         }
         .alert("无法打开相机", isPresented: $showCameraPermissionAlert) {
             Button("好", role: .cancel) { }
@@ -1122,9 +1122,7 @@ private struct PetBasicInfoDangerZone: View {
                     onDelete()
                 }
             )
-            .presentationDetents([.height(380), .medium])
-            .presentationDragIndicator(.visible)
-            .presentationBackground(Color.ohanaCardSurface)
+            .ohanaCompactSheetPresentation(detents: [.height(380), .medium])
         }
     }
 }
@@ -1206,7 +1204,7 @@ private struct PetDeleteConfirmationSheet: View {
                     Button(action: attemptDelete) {
                         Text("删除")
                             .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(canDelete ? Color.white : Color.primary.opacity(0.32))
+                            .foregroundStyle(canDelete ? Color.ohanaPrimaryActionText : Color.primary.opacity(0.32))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
                             .background(canDelete ? Color.goRed : Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))

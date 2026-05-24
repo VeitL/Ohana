@@ -190,7 +190,7 @@ struct CoconutShopView: View {
         .sheet(item: $equipPopoutPet) { pet in
             EquipPopoutCardSheet(pet: pet)
                 .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+                .presentationDragIndicator(.hidden)
         }
         .onAppear {
             selectedAppIcon = AppIconService.currentDescriptor.itemId
@@ -897,7 +897,7 @@ struct CoconutShopView: View {
 
     private func inlinePopup<Content: View>(@ViewBuilder content: @escaping () -> Content) -> some View {
         GeometryReader { proxy in
-            ZStack(alignment: .bottom) {
+            OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: pendingPurchaseItem != nil || activePicker != nil) {
                 LinearGradient(
                     colors: [Color.black.opacity(colorScheme == .dark ? 0.22 : 0.12), Color.black.opacity(colorScheme == .dark ? 0.46 : 0.24)], // ui-v4: allow modal scrim
                     startPoint: .top,
@@ -934,7 +934,6 @@ struct CoconutShopView: View {
                 .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.42 : 0.22), radius: 34, x: 0, y: -10) // ui-v4: allow lifted overlay shadow
                 .padding(.horizontal, 6)
                 .padding(.bottom, max(8, proxy.safeAreaInsets.bottom + 2))
-                .transition(.move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.98, anchor: .bottom)))
             }
             .animation(GoMotion.page, value: pendingPurchaseItem?.id)
             .animation(GoMotion.page, value: activePicker?.id)

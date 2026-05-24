@@ -40,7 +40,13 @@ struct FocusCard: Identifiable {
     var passedAwayDate: Date? = nil
     var daysTogetherAtPassing: Int = 0
     var isShownOnHome: Bool = true
+    var statusBadgeText: String? = nil
+    var statusBadgeIsWarning: Bool = false
     var isHuman: Bool = false
+    var isElectronicPet: Bool = false
+    var critterCatalogId: String? = nil
+    var critterAppearanceStage: Int = 1
+    var critterLifeStateRaw: String = ""
     var isDummy: Bool = false
     var isReal: Bool = false
     var actions: [Action]
@@ -207,6 +213,51 @@ extension FocusCard {
             actions: [.init(label: "WEIGHT", icon: "scalemass", colorHex: "80FFEA"),
                       .init(label: "WORKOUT", icon: "figure.run", colorHex: "F97316"),
                       .init(label: "NOTE", icon: "note.text", colorHex: "5B6AFF")]
+        )
+    }
+
+    static func from(_ critter: OasisElectronicPet) -> FocusCard {
+        let language = AppLanguage.code
+        let l = L10n(language)
+        let state = critter.lifeState
+        let days = max(0, Calendar.current.dateComponents([.day], from: critter.obtainedAt, to: Date()).day ?? 0)
+        let themeHex: String
+        switch state {
+        case .healthy:
+            themeHex = "9EF06A"
+        case .dead:
+            themeHex = "7C828D"
+        case .needsCare, .atRisk, .sick, .critical:
+            themeHex = "FF4757"
+        }
+        return FocusCard(
+            id: critter.id,
+            name: critter.displayName(l),
+            kind: l.tr(zh: "电子宠物", en: "Critter", de: "Critter"),
+            emoji: critter.emoji,
+            color: Color(hex: themeHex),
+            streak: 0,
+            coconutBalance: 0,
+            createdAt: critter.obtainedAt,
+            daysTogetherText: l.tr(zh: "\(days) 天", en: "\(days) days", de: "\(days) Tage"),
+            ageText: l.tr(zh: "Lv.\(critter.level)", en: "Lv.\(critter.level)", de: "Lv.\(critter.level)"),
+            personalityHint: state.name(l),
+            themeColorHex: themeHex,
+            daysTogether: days,
+            isShownOnHome: critter.isFeaturedOnOasis,
+            isElectronicPet: true,
+            critterCatalogId: critter.catalogId,
+            critterAppearanceStage: max(
+                max(1, min(OasisUpgradeRewardService.maxCritterAppearanceStage, critter.appearanceStage)),
+                OasisUpgradeRewardService.appearanceStage(forLevel: critter.level)
+            ),
+            critterLifeStateRaw: critter.lifeStateRaw,
+            isReal: true,
+            actions: [
+                .init(label: l.tr(zh: "照顾", en: "CARE", de: "PFLEGE"), icon: "cross.case.fill", colorHex: "9EF06A"),
+                .init(label: l.tr(zh: "喂", en: "FEED", de: "FUTTER"), icon: "fork.knife", colorHex: "FFDD44"),
+                .init(label: l.tr(zh: "玩", en: "PLAY", de: "SPIEL"), icon: "sparkles", colorHex: "80FFEA")
+            ]
         )
     }
 

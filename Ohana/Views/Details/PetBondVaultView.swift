@@ -52,7 +52,6 @@ struct PetBondVaultView: View {
                     .padding(.vertical, 10)
                     .background(Color.goPrimary, in: Capsule())
                     .padding(.bottom, 22)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
             if let activePreviewItem {
@@ -63,7 +62,6 @@ struct PetBondVaultView: View {
                     close: { closePreview() }
                 )
                 .zIndex(20)
-                .transition(.opacity)
             }
         }
         .petMemorialTone(isActive: pet.hasPassedAway)
@@ -363,7 +361,7 @@ private struct PetBondVaultPreviewOverlay: View {
     private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
+        OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: true) {
             Color.black.opacity(0.28) // ui-v4: allow modal scrim
                 .ignoresSafeArea()
                 .onTapGesture(perform: close)

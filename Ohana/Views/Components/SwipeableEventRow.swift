@@ -18,7 +18,7 @@ struct SwipeableEventRow: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = true
+    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
 
     @State private var offsetX: CGFloat = 0
     @State private var isTriggerred = false
@@ -139,7 +139,7 @@ struct SwipeableEventRow: View {
         .sheet(isPresented: $showDetail) {
             EventDetailSheet(event: event, occurrenceDate: occurrenceDate, onDelete: onDelete, onComplete: onComplete)
                 .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
+                .presentationDragIndicator(.hidden)
         }
         // F1+F2: 唯一删除确认弹窗，所有逻辑在此处理
         .confirmationDialog(

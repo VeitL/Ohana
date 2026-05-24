@@ -21,6 +21,8 @@ struct TodayFocusQuestCardHost: View {
     let humans: [Human]
     let events: [Event]
     let activePet: Pet?
+    var presentation: TodayFocusCardPresentation = .board
+    var onOpenQuest: (IslandQuest) -> Void
     var onCompleteQuest: (IslandQuest) -> Void
     var onTapNegativeSignal: (IslandNegativeSignal) -> Void
     var onTapOasis: () -> Void
@@ -49,6 +51,8 @@ struct TodayFocusQuestCardHost: View {
             ),
             humans: privacyVisibleHumans,
             activePet: activePet,
+            presentation: presentation,
+            onOpenQuest: onOpenQuest,
             onCompleteQuest: onCompleteQuest,
             onTapNegativeSignal: onTapNegativeSignal,
             onTapOasis: onTapOasis,

@@ -595,9 +595,7 @@ struct HumanWorkoutHistoryView: View {
             }
             .sheet(isPresented: $showAddSheet) {
                 AddWorkoutSheet(human: human)
-                    .presentationBackground(.clear)
-                    .presentationDetents([.large]) // ui-v4: allow complex workout editor uses full-height system sheet
-                    .presentationDragIndicator(.visible)
+                    .ohanaSheetPagePresentation() // ui-v4: allow complex workout editor uses full-height system sheet
             }
         }
     }

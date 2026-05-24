@@ -174,8 +174,7 @@ struct AddReminderFromCheckInSheet: View {
             }
         }
         .background(OhanaAppBackground())
-        .presentationDetents([.large]) // ui-v4: allow long calendar editor uses system sheet
-        .presentationDragIndicator(.hidden)
+        .ohanaSheetPagePresentation() // ui-v4: allow long calendar editor uses system sheet
     }
 
     private func saveReminder() {
@@ -860,7 +859,6 @@ struct SpeciesCheckInGrid: View {
                     // 撤回 toast
                     if let undo = undoItem {
                         undoToast(undo)
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
                             .padding(.horizontal, 4)
                     }
                 }
@@ -886,7 +884,7 @@ struct SpeciesCheckInGrid: View {
         .sheet(isPresented: $showWeightSheet) {
             GenericWeightEntrySheet(target: .pet(pet))
                 .presentationDetents([.height(690), .large]) // ui-v4: allow complex weight editor until inline quick menu migration
-                .presentationDragIndicator(.visible)
+                .presentationDragIndicator(.hidden)
                 .presentationBackground(.clear)
         }
         // 护理添加待办 sheet
@@ -897,7 +895,7 @@ struct SpeciesCheckInGrid: View {
         .sheet(isPresented: $showAddPanel) {
             QAAddPanel(pet: pet, activeCards: $activeCards)
                 .presentationDetents([.medium]) // ui-v4: allow legacy quick-action editor sheet
-                .presentationDragIndicator(.visible)
+                .presentationDragIndicator(.hidden)
         }
     }
 

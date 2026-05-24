@@ -11,6 +11,7 @@ struct FocusHomeHeaderView: View {
     let safeTop: CGFloat
     let streak: Int
     let coconutBalance: Int
+    let coconutDeltaContext: String?
     let activeHumanDisplayName: String
     let activeHumanAvatarImage: UIImage?
     let activeHumanAvatarEmoji: String?
@@ -21,6 +22,36 @@ struct FocusHomeHeaderView: View {
     let onAccountSwitcher: () -> Void
     let onCalendar: () -> Void
     let onSettings: () -> Void
+
+    init(
+        safeTop: CGFloat,
+        streak: Int,
+        coconutBalance: Int,
+        coconutDeltaContext: String? = nil,
+        activeHumanDisplayName: String,
+        activeHumanAvatarImage: UIImage?,
+        activeHumanAvatarEmoji: String?,
+        onStreak: @escaping () -> Void,
+        onCoconut: @escaping () -> Void,
+        onCrew: @escaping () -> Void,
+        onAccountSwitcher: @escaping () -> Void,
+        onCalendar: @escaping () -> Void,
+        onSettings: @escaping () -> Void
+    ) {
+        self.safeTop = safeTop
+        self.streak = streak
+        self.coconutBalance = coconutBalance
+        self.coconutDeltaContext = coconutDeltaContext
+        self.activeHumanDisplayName = activeHumanDisplayName
+        self.activeHumanAvatarImage = activeHumanAvatarImage
+        self.activeHumanAvatarEmoji = activeHumanAvatarEmoji
+        self.onStreak = onStreak
+        self.onCoconut = onCoconut
+        self.onCrew = onCrew
+        self.onAccountSwitcher = onAccountSwitcher
+        self.onCalendar = onCalendar
+        self.onSettings = onSettings
+    }
 
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
@@ -39,40 +70,42 @@ struct FocusHomeHeaderView: View {
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel("连续打卡 \(streak) 天")
 
-                CoconutBalanceCapsule(balance: coconutBalance, onTap: onCoconut)
+                CoconutBalanceCapsule(
+                    balance: coconutBalance,
+                    deltaAnimationContext: coconutDeltaContext,
+                    onTap: onCoconut
+                )
             }
 
             Spacer()
 
             HStack(spacing: 8) {
-                limePill {
-                    Image(systemName: "person.2.fill")
-                        .font(.system(size: 12, weight: .black))
-                        .frame(width: 18)
-                }
-                .contentShape(Capsule())
-                .onTapGesture(perform: onCrew)
-                .onLongPressGesture(minimumDuration: 0.45) {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    onAccountSwitcher()
-                }
-                .accessibilityLabel("家庭协作")
-                .accessibilityHint("点击打开家庭协作，长按切换人类账户")
-
-                Button(action: onCalendar) {
+                Button(action: onCrew) {
                     limePill {
-                        Image(systemName: "calendar")
+                        Image(systemName: "person.2.fill")
                             .font(.system(size: 12, weight: .black))
                             .frame(width: 18)
                     }
                 }
                 .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel("日历")
+                .background(headerHitSlop)
+                .contentShape(Rectangle())
+                .simultaneousGesture(
+                    LongPressGesture(minimumDuration: 0.45)
+                        .onEnded { _ in
+                            OhanaFeedback.medium()
+                            onAccountSwitcher()
+                        }
+                )
+                .accessibilityLabel("家庭协作")
+                .accessibilityHint("点击打开家庭协作，长按切换人类账户")
 
                 Button(action: onSettings) {
                     settingsPill
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .background(headerHitSlop)
+                .contentShape(Rectangle())
                 .accessibilityLabel("设置，当前用户 \(activeHumanDisplayName)")
             }
         }
@@ -138,5 +171,11 @@ struct FocusHomeHeaderView: View {
         .frame(height: 26)
         .fixedSize(horizontal: true, vertical: false)
         .background(Color.goPrimary, in: Capsule())
+    }
+
+    private var headerHitSlop: some View {
+        Color.clear
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
     }
 }

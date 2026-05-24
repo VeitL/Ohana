@@ -50,8 +50,14 @@ struct MilestoneCelebrationOverlay: View {
     @State private var cardScale: CGFloat = 0.6
     @State private var cardOpacity: Double = 0
     @State private var glowPulse: Bool = false
+    @State private var isVisible = false
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     @AppStorage("shop_equip_fx_firework") private var equipFxFirework: Bool = false
+
+    private var shouldRunGlow: Bool {
+        workloadPolicy.shouldRunRepeatingAnimation(isVisible: isVisible)
+    }
     
     private var particleEmojis: [String] {
         equipFxFirework ? ["🎆", "🎇", "✨", "🎊", "🌟"] : ["🎉","✨","🌟","🎊","🥥","💫","🎈","🌈","⭐️"]
@@ -60,7 +66,7 @@ struct MilestoneCelebrationOverlay: View {
     var body: some View {
         ZStack {
             // 全屏暗色底
-            Color.black.opacity(0.82)
+            Color.arkInk.opacity(0.82)
                 .ignoresSafeArea()
                 .onTapGesture { onDismiss() }
 
@@ -91,8 +97,8 @@ struct MilestoneCelebrationOverlay: View {
                             center: .center, startRadius: 0, endRadius: 180
                         ))
                         .frame(width: 360, height: 360)
-                        .scaleEffect(glowPulse ? 1.15 : 0.9)
-                        .animation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true), value: glowPulse)
+                        .scaleEffect(shouldRunGlow && glowPulse ? 1.15 : 1.0)
+                        .animation(shouldRunGlow ? .easeInOut(duration: 1.8).repeatForever(autoreverses: true) : GoMotion.reduced, value: glowPulse)
 
                     VStack(spacing: 20) {
                         // 宠物头像
@@ -148,7 +154,7 @@ struct MilestoneCelebrationOverlay: View {
                                     .strokeBorder(milestone.accentColor.opacity(0.4), lineWidth: 1.5)
                             )
                     )
-                    .shadow(color: milestone.accentColor.opacity(0.5), radius: 40, x: 0, y: 10)
+                    .shadow(color: milestone.accentColor.opacity(0.5), radius: 40, x: 0, y: 10) // ui-v4: allow celebratory reward glow
                 }
 
                 Spacer()
@@ -157,10 +163,10 @@ struct MilestoneCelebrationOverlay: View {
                 Button(action: onDismiss) {
                     Text("太棒了！")
                         .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 48).padding(.vertical, 16)
                         .background(milestone.accentColor, in: Capsule())
-                        .shadow(color: milestone.accentColor.opacity(0.6), radius: 16, x: 0, y: 6)
+                        .shadow(color: milestone.accentColor.opacity(0.6), radius: 16, x: 0, y: 6) // ui-v4: allow celebratory reward CTA lift
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .padding(.bottom, 52)
@@ -169,16 +175,24 @@ struct MilestoneCelebrationOverlay: View {
             .opacity(cardOpacity)
         }
         .onAppear {
+            isVisible = true
             spawnParticles()
-            withAnimation(.spring(response: 0.55, dampingFraction: 0.7)) {
+            withAnimation(GoMotion.hero) {
                 cardScale = 1.0
                 cardOpacity = 1.0
             }
-            glowPulse = true
+            glowPulse = shouldRunGlow
             UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
             }
+        }
+        .onDisappear {
+            isVisible = false
+            glowPulse = false
+        }
+        .onChange(of: shouldRunGlow) { _, canRun in
+            glowPulse = canRun
         }
     }
 
@@ -190,10 +204,10 @@ struct MilestoneCelebrationOverlay: View {
             particleOffsets[p.id] = -40
             particleOpacities[p.id] = 1.0
             DispatchQueue.main.asyncAfter(deadline: .now() + p.delay) {
-                withAnimation(.linear(duration: p.duration)) {
+                withAnimation(.linear(duration: p.duration)) { // ui-v4: allow one-shot particle fall with per-particle duration
                     particleOffsets[p.id] = ScreenCompat.height + 40
                 }
-                withAnimation(.easeIn(duration: p.duration * 0.4).delay(p.duration * 0.6)) {
+                withAnimation(.easeIn(duration: p.duration * 0.4).delay(p.duration * 0.6)) { // ui-v4: allow one-shot particle fade with per-particle duration
                     particleOpacities[p.id] = 0
                 }
             }

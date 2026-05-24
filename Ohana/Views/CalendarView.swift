@@ -24,24 +24,35 @@ private struct CalendarDateTopPreferenceKey: PreferenceKey {
 /// 日历宠物筛选条（与 `CalendarView` 共享 `calendar_filterPetId`，空字符串表示「全部」）
 struct CalendarPetChipFilterBar: View {
     @AppStorage("calendar_filterPetId") private var calendarFilterPetId: String = ""
+    @AppStorage("calendar_filterHumanId") private var calendarFilterHumanId: String = ""
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
+    @Query(sort: \Human.createdAt) private var humans: [Human]
     @Environment(\.colorScheme) private var colorScheme
 
     private var isMaterial: Bool { false }
     private var chipAccent: Color { Color.goPrimary }
     private var chipSelFg: Color { Color.arkInk }
     private var matSurface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
-    private var selectedId: String? { calendarFilterPetId.isEmpty ? nil : calendarFilterPetId }
+    private var selectedPetId: String? { calendarFilterPetId.isEmpty ? nil : calendarFilterPetId }
+    private var selectedHumanId: String? { calendarFilterHumanId.isEmpty ? nil : calendarFilterHumanId }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                chipButton(label: "全部", systemImage: "square.grid.2x2.fill", isSelected: selectedId == nil) {
+                chipButton(label: "全部", systemImage: "square.grid.2x2.fill", isSelected: selectedPetId == nil && selectedHumanId == nil) {
                     calendarFilterPetId = ""
+                    calendarFilterHumanId = ""
                 }
                 ForEach(pets) { pet in
-                    chipButton(label: pet.name, systemImage: pet.speciesSilhouetteSymbol, isSelected: selectedId == pet.id.uuidString) {
+                    chipButton(label: pet.name, systemImage: pet.speciesSilhouetteSymbol, isSelected: selectedPetId == pet.id.uuidString) {
                         calendarFilterPetId = pet.id.uuidString
+                        calendarFilterHumanId = ""
+                    }
+                }
+                ForEach(humans) { human in
+                    chipButton(label: human.name, systemImage: "person.fill", isSelected: selectedHumanId == human.id.uuidString) {
+                        calendarFilterHumanId = human.id.uuidString
+                        calendarFilterPetId = ""
                     }
                 }
             }
@@ -62,7 +73,7 @@ struct CalendarPetChipFilterBar: View {
             .foregroundStyle(chipForeground(isSelected: isSelected))
             .padding(.horizontal, 14).padding(.vertical, 8)
             .background(chipBackground(isSelected: isSelected), in: Capsule())
-            .shadow(color: isSelected && isMaterial ? chipAccent.opacity(0.25) : .clear, radius: 6, x: 0, y: 2)
+            .shadow(color: isSelected && isMaterial ? chipAccent.opacity(0.25) : .clear, radius: 6, x: 0, y: 2) // ui-v4: allow legacy material calendar chip depth
         }
     }
 
@@ -83,12 +94,14 @@ struct CalendarView: View {
     var preselectedPetId: String? = nil
     var preselectedHumanId: String? = nil
     var hideToolbar: Bool = false
-    var addEventTrigger: Bool = false
+    var showsEmbeddedControls: Bool = false
+    var addEventTrigger: Int = 0
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Event.startDate, order: .reverse) private var events: [Event]
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
+    @Query(sort: \Human.createdAt) private var humans: [Human]
     @Query(sort: \Plant.createdAt) private var plants: [Plant]
     @Query(sort: \PetInsurance.createdAt) private var insurances: [PetInsurance]
     @Query(sort: \PetMedication.createdAt) private var petMedications: [PetMedication]
@@ -96,14 +109,15 @@ struct CalendarView: View {
     
     @State private var selectedDate = Date()
     @AppStorage("calendar_filterPetId") private var calendarFilterPetId: String = ""
+    @AppStorage("calendar_filterHumanId") private var calendarFilterHumanId: String = ""
     @State private var showingAddEvent = false
     @State private var showingCoconutLog = false
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @AppStorage("calendar_viewMode") private var viewModeRaw: String = CalendarViewMode.list.rawValue
     private var viewMode: CalendarViewMode { CalendarViewMode(rawValue: viewModeRaw) ?? .list }
     @State private var deletingEvent: Event? = nil
     @State private var showDeleteSeriesAlert = false
     @Environment(\.colorScheme) private var colorScheme
-    @State private var coconutCount: Int = QuestManager.shared.coconutCount
     @State private var listVisibleTopDate = Calendar.current.startOfDay(for: Date())
     @State private var didScrollListToToday = false
     @State private var monthSlideDirection = 1
@@ -122,20 +136,33 @@ struct CalendarView: View {
     private var calendarHeaderDate: Date {
         viewMode == .list ? listVisibleTopDate : selectedDate
     }
+
+    private var activeHuman: Human? {
+        if let id = UUID(uuidString: activeHumanIdStr), let human = humans.first(where: { $0.id == id }) {
+            return human
+        }
+        return humans.first
+    }
+
+    private var calendarCoconutBalance: Int {
+        activeHuman?.coconutBalance ?? QuestManager.shared.coconutCount
+    }
     
     /// 从宠物详情进入时固定为该宠物；否则使用 AppStorage 筛选
     private var effectivePetFilterId: String? {
         if let p = preselectedPetId { return p }
+        if preselectedHumanId != nil || !calendarFilterHumanId.isEmpty { return nil }
         return calendarFilterPetId.isEmpty ? nil : calendarFilterPetId
     }
 
     /// 从人类卡片进入时固定为该成员；首页默认不筛选，继续显示全部日历项目。
     private var effectiveHumanFilterId: String? {
-        preselectedHumanId
+        if let preselectedHumanId { return preselectedHumanId }
+        return calendarFilterHumanId.isEmpty ? nil : calendarFilterHumanId
     }
 
     private var filteredEvents: [Event] {
-        var result = events.filter { $0.eventType != EventType.foodChange.rawValue }
+        var result = events.filter { !CarePlanCalendarSync.isDefaultGeneratedCalendarPlan($0, pets: pets) }
         if let petId = effectivePetFilterId {
             result = result.filter { eventIsRelatedToPet($0, petId: petId) }
         }
@@ -180,7 +207,7 @@ struct CalendarView: View {
     private var overviewCalendarEmbedTopInset: CGFloat { 98 }
 
     private var shouldShowInlinePetChips: Bool {
-        preselectedPetId == nil && preselectedHumanId == nil && (!hideToolbar || isMaterial)
+        preselectedPetId == nil && preselectedHumanId == nil && (!hideToolbar || showsEmbeddedControls || isMaterial)
     }
 
     // D1: 展开重复事件 → 生成虚拟 (Event, occurrenceDate) 对，用于列表视图分组
@@ -315,6 +342,8 @@ struct CalendarView: View {
                     } else if !hideToolbar {
                         // 独立页面时显示顶栏；嵌入首页时由外层 header 负责。
                         classicCalendarHeader
+                    } else if showsEmbeddedControls {
+                        embeddedCalendarHeader
                     } else {
                         // 首页嵌入：为全局顶栏 + 外层宠物筛选条留出空间
                         Spacer().frame(height: overviewCalendarEmbedTopInset)
@@ -338,8 +367,14 @@ struct CalendarView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
-            .sheet(isPresented: $showingAddEvent) { AddEventView() }
-            .sheet(isPresented: $showingCoconutLog) { CoconutLogView() }
+            .sheet(isPresented: $showingAddEvent) {
+                AddEventView()
+                    .ohanaSheetPagePresentation() // ui-v4: allow calendar editor as long sheet
+            }
+            .sheet(isPresented: $showingCoconutLog) {
+                CoconutLogView()
+                    .ohanaSheetPagePresentation() // ui-v4: allow coconut history as long sheet
+            }
             .onChange(of: addEventTrigger) { _, _ in showingAddEvent = true }
             .onChange(of: viewModeRaw) { _, newValue in
                 if CalendarViewMode(rawValue: newValue) == .list {
@@ -348,11 +383,7 @@ struct CalendarView: View {
                 }
             }
             .onAppear {
-                coconutCount = QuestManager.shared.coconutCount
                 reconcileDefaultPlanOverrides()
-            }
-            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("coconutCountChanged"))) { _ in
-                coconutCount = QuestManager.shared.coconutCount
             }
         }
     }
@@ -364,6 +395,28 @@ struct CalendarView: View {
     }
 
     // MARK: - Classic Calendar Header
+    private var embeddedCalendarHeader: some View {
+        HStack(spacing: 10) {
+            Text(calendarHeaderDate, format: .dateTime.year().month(.wide))
+                .font(.system(size: 19, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+
+            Spacer(minLength: 8)
+
+            HStack(spacing: 2) {
+                iconModeBtn(systemName: "calendar", mode: .month)
+                iconModeBtn(systemName: "list.bullet.rectangle.fill", mode: .list)
+            }
+            .padding(3)
+            .background(Color.ohanaControlFill, in: Capsule())
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 6)
+        .padding(.bottom, 4)
+    }
+
     private var classicCalendarHeader: some View {
         HStack(spacing: 12) {
             // 月历标题
@@ -400,7 +453,6 @@ struct CalendarView: View {
     // MARK: - Sticky Calendar Header (Material)
     private var calStickyHeader: some View {
         let bg: Color = colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C")
-        let surface: Color = colorScheme == .light ? .white : Color(hex: "1C1C1E")
         let accent = Color(hex: "FF5A00")
         return HStack(spacing: 10) {
             // Add event
@@ -411,7 +463,7 @@ struct CalendarView: View {
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 40, height: 40)
                     .background(accent, in: Circle())
-                    .shadow(color: accent.opacity(0.35), radius: 8, x: 0, y: 2)
+                    .shadow(color: accent.opacity(0.35), radius: 8, x: 0, y: 2) // ui-v4: allow legacy material calendar floating action depth
             }.buttonStyle(ScaleButtonStyle())
 
             // View toggle pill
@@ -421,27 +473,16 @@ struct CalendarView: View {
             }
             .padding(4)
             .goGlassBackground(Capsule())
-            .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
+            .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2) // ui-v4: allow legacy material calendar segmented depth
 
             Spacer()
 
             // Coconut count (rightmost, matches home)
-            Button { showingCoconutLog = true } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: "circle.hexagongrid.fill")
-                        .font(.system(size: 12, weight: .semibold))
-                        .symbolRenderingMode(.monochrome)
-                        .foregroundStyle(accent)
-                    Text("\(coconutCount)")
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .contentTransition(.numericText())
-                        .animation(.spring(response: 0.4), value: coconutCount)
-                }
-                .padding(.horizontal, 12).padding(.vertical, 10)
-                .background(surface, in: Capsule())
-                .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
-            }.buttonStyle(ScaleButtonStyle())
+            CoconutBalanceCapsule(balance: calendarCoconutBalance) {
+                showingCoconutLog = true
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
@@ -489,7 +530,7 @@ struct CalendarView: View {
                     }()
 
                     Button {
-                        withAnimation(.spring(response: 0.25)) { selectedDate = day }
+                        withAnimation(GoMotion.feedback) { selectedDate = day }
                     } label: {
                         VStack(spacing: 5) {
                             Text(day, format: .dateTime.weekday(.abbreviated))
@@ -557,7 +598,7 @@ struct CalendarView: View {
             return Color.ohanaSecondaryText
         }()
         return Button {
-            withAnimation(.spring(response: 0.28)) { viewModeRaw = mode.rawValue }
+            withAnimation(GoMotion.selection) { viewModeRaw = mode.rawValue }
         } label: {
             Image(systemName: systemName)
                 .font(.system(size: 14, weight: .bold))
@@ -627,7 +668,7 @@ struct CalendarView: View {
                         let hasEvents = filteredEvents.contains { eventOccursOnDate($0, date: date) }
                         
                         Button {
-                            withAnimation(.spring(response: 0.25)) {
+                            withAnimation(GoMotion.feedback) {
                                 selectedDate = date
                             }
                         } label: {
@@ -941,7 +982,7 @@ struct CalendarView: View {
             occurrenceDate: occurrenceDate,
             petThemeColor: relatedPetColor,
             onComplete: {
-                withAnimation(.spring(response: 0.3)) {
+                withAnimation(GoMotion.feedback) {
                     let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
                     event.setOccurrenceMarkedComplete(shouldComplete, on: occurrenceDate)
                     let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")

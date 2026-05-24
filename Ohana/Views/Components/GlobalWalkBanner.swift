@@ -33,7 +33,7 @@ struct GlobalWalkBanner: View {
         isActive && !mgr.isWalkCardExpandedSurfaceVisible
     }
     private var walkClockInterval: TimeInterval {
-        workloadPolicy.shouldRunTimer(isVisible: shouldShowFloatingControl) ? 1 : 60
+        workloadPolicy.refreshInterval(default: 1, throttled: 15, paused: 60, isVisible: shouldShowFloatingControl)
     }
     private var walkPanelFill: Color {
         colorScheme == .dark ? Color(hex: "10180F") : Color(hex: "F7FAEF")
@@ -59,7 +59,6 @@ struct GlobalWalkBanner: View {
                         .padding(.horizontal, 16)
                         .padding(.bottom, safeBottom(geo) + 160)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                        .transition(.opacity)
                         .zIndex(998)
                 }
 

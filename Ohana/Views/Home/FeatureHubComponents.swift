@@ -344,7 +344,6 @@ private struct PetMemorialToneModifier: ViewModifier {
                 if isActive {
                     Color.arkInk.opacity(0.05)
                         .allowsHitTesting(false)
-                        .transition(.opacity)
                 }
             }
             .animation(GoMotion.page, value: isActive)

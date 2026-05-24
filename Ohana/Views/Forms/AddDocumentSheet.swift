@@ -376,9 +376,7 @@ struct AddDocumentSheet: View {
                 }
             }
         }
-        .presentationDetents([.large]) // ui-v4: allow long document editor
-        .presentationDragIndicator(.visible)
-        .presentationBackground(.clear)
+        .ohanaSheetPagePresentation() // ui-v4: allow long document editor
         // B4: 拍照 sheet — onDismiss 后处理 pending image，避免 sheet 嵌套冲突
         .fullScreenCover(isPresented: $showingCamera, onDismiss: {
             if let img = pendingCapturedImage {
@@ -832,9 +830,7 @@ struct EditDocumentSheet: View {
                 }
             }
         }
-        .presentationDetents([.large]) // ui-v4: allow long document editor
-        .presentationDragIndicator(.visible)
-        .presentationBackground(.clear)
+        .ohanaSheetPagePresentation() // ui-v4: allow long document editor
         .fullScreenCover(isPresented: $showingCamera, onDismiss: {
             if let img = pendingCapturedImage { attachmentImage = img; pendingCapturedImage = nil }
         }) {

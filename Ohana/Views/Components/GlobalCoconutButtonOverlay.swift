@@ -7,21 +7,11 @@ struct GlobalCoconutButtonOverlay: View {
         VStack {
             HStack {
                 Spacer()
-                Button { isPresented = true } label: {
-                    HStack(spacing: 5) {
-                        Text("🥥").font(.system(size: 15))
-                        Text("\(QuestManager.shared.coconutCount)")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.goYellow)
-                            .contentTransition(.numericText())
-                            .animation(.spring(response: 0.4), value: QuestManager.shared.coconutCount)
-                    }
-                    .padding(.horizontal, 12).padding(.vertical, 7)
-                    .background(Color.goYellow.opacity(0.12), in: Capsule())
-                    .overlay(Capsule().strokeBorder(Color.goYellow.opacity(0.3), lineWidth: 1))
-                    .shadow(color: Color.goYellow.opacity(0.18), radius: 10, y: 4)
+                CoconutBalanceCapsule {
+                    isPresented = true
                 }
-                .buttonStyle(ScaleButtonStyle())
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
             .padding(.trailing, 16)
             .padding(.top, 8)

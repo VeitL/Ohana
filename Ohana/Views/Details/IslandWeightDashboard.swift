@@ -256,7 +256,6 @@ struct IslandWeightDashboard: View {
                 )
                 .id(activeWeightEntryRoute.id)
                 .zIndex(30)
-                .transition(.opacity)
             }
         }
     }

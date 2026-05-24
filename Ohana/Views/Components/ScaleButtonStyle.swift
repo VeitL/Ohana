@@ -1,22 +1,77 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 struct ScaleButtonStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(pressScale(isPressed: configuration.isPressed))
-            .offset(y: reduceMotion ? 0 : (configuration.isPressed ? 1 : 0))
-            .opacity(isEnabled ? (configuration.isPressed ? 0.96 : 1.0) : 0.55)
-            .brightness(configuration.isPressed ? -0.014 : 0)
-            .animation(reduceMotion ? GoMotion.reduced : GoMotion.tap, value: configuration.isPressed)
+            .modifier(
+                OhanaButtonPressFeedbackModifier(
+                    isPressed: configuration.isPressed,
+                    isEnabled: isEnabled
+                )
+            )
             .animation(GoMotion.reduced, value: isEnabled)
     }
+}
 
-    private func pressScale(isPressed: Bool) -> CGFloat {
+struct OhanaButtonPressFeedbackModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let isPressed: Bool
+    let isEnabled: Bool
+    var pressedScale: CGFloat = 0.972
+    var pressedOffset: CGFloat = 0.7
+    var pressedOpacity: Double = 0.985
+    var addsDepth: Bool = true
+    var triggersHaptic: Bool = true
+    @State private var wasPressed = false
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(pressScale)
+            .offset(y: pressOffset)
+            .opacity(pressOpacity)
+            .brightness(isPressed && isEnabled ? -0.010 : 0)
+            .shadow( // ui-v4: allow semantic press depth for all V4 buttons
+                color: Color.arkInk.opacity(addsDepth && isPressed && isEnabled && !reduceMotion ? 0.10 : 0),
+                radius: addsDepth && isPressed && isEnabled && !reduceMotion ? 5 : 0,
+                x: 0,
+                y: addsDepth && isPressed && isEnabled && !reduceMotion ? 2 : 0
+            )
+            .animation(reduceMotion ? GoMotion.reduced : GoMotion.tap, value: isPressed)
+            .onChange(of: isPressed) { _, newValue in
+                guard newValue, isEnabled, !wasPressed else {
+                    wasPressed = newValue
+                    return
+                }
+                wasPressed = true
+                triggerPressHaptic()
+            }
+    }
+
+    private var pressScale: CGFloat {
         guard !reduceMotion, isEnabled else { return 1 }
-        return isPressed ? 0.955 : 1
+        return isPressed ? pressedScale : 1
+    }
+
+    private var pressOffset: CGFloat {
+        guard !reduceMotion, isEnabled else { return 0 }
+        return isPressed ? pressedOffset : 0
+    }
+
+    private var pressOpacity: Double {
+        guard isEnabled else { return 0.55 }
+        return isPressed ? pressedOpacity : 1
+    }
+
+    private func triggerPressHaptic() {
+        #if os(iOS)
+        guard triggersHaptic else { return }
+        OhanaFeedback.soft()
+        #endif
     }
 }
 
