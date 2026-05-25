@@ -15,6 +15,7 @@ struct HumanDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
 
@@ -27,6 +28,7 @@ struct HumanDetailView: View {
     @State private var showingExpenses = false
     @State private var showingMedication = false
     @State private var showingHealthReport = false
+    @State private var showingHealthMetrics = false
     @State private var showingHomeStackFullAlert = false
 
     @Query private var allPets: [Pet]
@@ -61,7 +63,23 @@ struct HumanDetailView: View {
         return allReports.filter { $0.humanId == human.id.uuidString }
     }
 
+    private var myHealthMetricLogs: [HumanHealthMetricLog] {
+        guard !isAllPrivateForViewer,
+              !human.isPrivate(.weight, viewedBy: activeHumanId) else { return [] }
+        return human.healthMetricLogs
+    }
+
+    private var abnormalHealthMetricLogCount: Int {
+        myHealthMetricLogs.filter { log in
+            guard let metric = HealthMetricCatalog.metric(forKey: log.metricKey),
+                  let unit = metric.unit(for: log.unitCode) else { return false }
+            let status = unit.status(for: log.value)
+            return status == .low || status == .high
+        }.count
+    }
+
     private var themeColor: Color { Color(hex: human.themeColorHex) }
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         ZStack {
@@ -85,6 +103,11 @@ struct HumanDetailView: View {
                             HumanPrivateDataNotice(human: human, field: .weight)
                                 .padding(.horizontal, 16)
                             weightCard
+                        }
+                        if human.isPrivate(.weight, viewedBy: activeHumanId) {
+                            privacyPlaceholderCard(label: l.tr(zh: "体检指标", en: "Checkup Metrics", de: "Check-up-Werte"))
+                        } else {
+                            healthMetricCard
                         }
                         if human.isPrivate(.medication, viewedBy: activeHumanId) {
                             privacyPlaceholderCard(label: "吃药提醒")
@@ -179,6 +202,7 @@ struct HumanDetailView: View {
                 .ohanaSheetPagePresentation() // ui-v4: allow long medication management uses large sheet
         }
         .navigationDestination(isPresented: $showingHealthReport) { HumanHealthReportView(human: human) }
+        .navigationDestination(isPresented: $showingHealthMetrics) { HumanHealthCheckupView(human: human) }
         .alert("确认删除", isPresented: $showingDeleteConfirm) {
             Button("取消", role: .cancel) {}
             Button("删除", role: .destructive) {
@@ -462,6 +486,63 @@ struct HumanDetailView: View {
                         Text("\(myReports.count)")
                             .font(OhanaFont.caption2(.bold))
                             .foregroundStyle(Color.arkInk)
+                    }
+                }
+                Image(systemName: "chevron.right")
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
+            }
+            .padding(.horizontal, 16).padding(.vertical, 14)
+            .goIslandModuleCard(cornerRadius: 24)
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Health Metric Card
+    private var healthMetricCard: some View {
+        let latest = myHealthMetricLogs.sorted {
+            if $0.date == $1.date { return $0.createdAt > $1.createdAt }
+            return $0.date > $1.date
+        }.first
+
+        return Button { showingHealthMetrics = true } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle().fill(Color.goTeal.opacity(0.18)).frame(width: 48, height: 48)
+                    Image(systemName: "waveform.path.ecg.rectangle.fill")
+                        .font(OhanaFont.title3(.bold))
+                        .foregroundStyle(Color.goTeal)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(l.tr(zh: "体检指标", en: "Checkup Metrics", de: "Check-up-Werte"))
+                        .font(OhanaFont.callout(.bold))
+                        .foregroundStyle(Color(hex: "1E3A8A"))
+                    if let latest,
+                       let metric = HealthMetricCatalog.metric(forKey: latest.metricKey),
+                       let unit = metric.unit(for: latest.unitCode) {
+                        Text("\(metric.displayName(l)) · \(unit.formattedValue(latest.value))")
+                            .font(OhanaFont.caption(.semibold))
+                            .foregroundStyle(Color(hex: "6B82C4"))
+                            .lineLimit(1)
+                    } else {
+                        Text(l.tr(zh: "TSH、HbA1c、血压等趋势追踪", en: "Track TSH, HbA1c, blood pressure, and more", de: "TSH, HbA1c, Blutdruck und mehr verfolgen"))
+                            .font(OhanaFont.caption())
+                            .foregroundStyle(Color(hex: "6B82C4"))
+                            .lineLimit(1)
+                    }
+                }
+                Spacer()
+                if !myHealthMetricLogs.isEmpty {
+                    VStack(spacing: 2) {
+                        Text("\(myHealthMetricLogs.count)")
+                            .font(OhanaFont.metric(size: 20))
+                            .foregroundStyle(Color.goTeal)
+                        if abnormalHealthMetricLogCount > 0 {
+                            Text("+\(abnormalHealthMetricLogCount)")
+                                .font(OhanaFont.caption2(.black))
+                                .foregroundStyle(Color.goOrange)
+                        }
                     }
                 }
                 Image(systemName: "chevron.right")
@@ -992,6 +1073,11 @@ struct EditHumanSheet: View {
         human.setPrivate(.wishlist, privateWishlist)
         human.setPrivate(.expense, privateExpense)
         modelContext.safeSave()
+        NotificationCenter.default.post(
+            name: .ohanaMemberProfileDidChange,
+            object: nil,
+            userInfo: ["id": human.id.uuidString, "kind": "human"]
+        )
         dismiss()
     }
 

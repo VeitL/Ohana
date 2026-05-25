@@ -7,17 +7,41 @@
 
 import SwiftUI
 import SwiftData
+import Combine
 
 enum CalendarViewMode: String, CaseIterable {
     case month = "月"
     case list = "列表"
 }
 
-private struct CalendarDateTopPreferenceKey: PreferenceKey {
-    static var defaultValue: [Date: CGFloat] = [:]
+@MainActor
+private final class CalendarVisibleDateCoordinator: ObservableObject {
+    let objectWillChange = ObservableObjectPublisher()
 
-    static func reduce(value: inout [Date: CGFloat], nextValue: () -> [Date: CGFloat]) {
-        value.merge(nextValue(), uniquingKeysWith: { $1 })
+    private var pendingDate: Date?
+    private var updateTask: Task<Void, Never>?
+
+    deinit {
+        updateTask?.cancel()
+    }
+
+    func scheduleUpdate(to date: Date, apply: @escaping @MainActor (Date) -> Void) {
+        let normalized = Calendar.current.startOfDay(for: date)
+        if let pendingDate,
+           Calendar.current.isDate(pendingDate, inSameDayAs: normalized) {
+            return
+        }
+        pendingDate = normalized
+        guard updateTask == nil else { return }
+
+        updateTask = OhanaFrameScheduler.runAfterNextFrame { [weak self] in
+            guard let self else { return }
+            let date = pendingDate
+            pendingDate = nil
+            updateTask = nil
+            guard let date else { return }
+            apply(date)
+        }
     }
 }
 
@@ -118,7 +142,9 @@ struct CalendarView: View {
     @State private var deletingEvent: Event? = nil
     @State private var showDeleteSeriesAlert = false
     @Environment(\.colorScheme) private var colorScheme
+    @StateObject private var visibleDateCoordinator = CalendarVisibleDateCoordinator()
     @State private var listVisibleTopDate = Calendar.current.startOfDay(for: Date())
+    @State private var visibleTimelineDateID: String?
     @State private var didScrollListToToday = false
     @State private var monthSlideDirection = 1
 
@@ -742,28 +768,24 @@ struct CalendarView: View {
                         ForEach(timelineSections) { section in
                             timelineSection(date: section.date, occurrences: section.occurrences)
                                 .id(timelineDateID(section.date))
-                                .background(
-                                    GeometryReader { geo in
-                                        Color.clear.preference(
-                                            key: CalendarDateTopPreferenceKey.self,
-                                            value: [section.date: geo.frame(in: .named("calendarListScroll")).minY]
-                                        )
-                                    }
-                                )
                         }
                     }
+                    .scrollTargetLayout()
                     .padding(.horizontal, 16)
                     .padding(.bottom, 20)
                 }
-                .coordinateSpace(name: "calendarListScroll")
+                .scrollPosition(id: $visibleTimelineDateID, anchor: .top)
                 .onAppear {
                     scrollListToTodayIfNeeded(proxy)
                 }
                 .onChange(of: timelineDates) { _, _ in
                     scrollListToTodayIfNeeded(proxy)
                 }
-                .onPreferenceChange(CalendarDateTopPreferenceKey.self) { positions in
-                    updateVisibleCalendarMonth(from: positions)
+                .task(id: visibleTimelineDateID) {
+                    let dateID = visibleTimelineDateID
+                    await Task.yield()
+                    guard !Task.isCancelled else { return }
+                    scheduleVisibleCalendarMonthUpdate(from: dateID)
                 }
             }
             // F2: 删除 alert 已移至 SwipeableEventRow’s confirmationDialog
@@ -929,24 +951,29 @@ struct CalendarView: View {
         guard !didScrollListToToday, timelineDates.contains(where: { Calendar.current.isDateInToday($0) }) else { return }
         didScrollListToToday = true
         let today = Calendar.current.startOfDay(for: Date())
+        visibleTimelineDateID = timelineDateID(today)
         listVisibleTopDate = today
         DispatchQueue.main.async {
             proxy.scrollTo(timelineDateID(today), anchor: .top)
         }
     }
 
-    private func updateVisibleCalendarMonth(from positions: [Date: CGFloat]) {
-        guard !positions.isEmpty else { return }
-        let threshold: CGFloat = 12
-        let sorted = positions.sorted { lhs, rhs in
-            if lhs.value == rhs.value { return lhs.key < rhs.key }
-            return lhs.value < rhs.value
+    private func scheduleVisibleCalendarMonthUpdate(from dateID: String?) {
+        guard let dateID,
+              let timestamp = TimeInterval(dateID) else { return }
+        let date = Date(timeIntervalSince1970: timestamp)
+        visibleDateCoordinator.scheduleUpdate(to: date) { normalized in
+            updateVisibleCalendarMonth(to: normalized)
         }
-        let candidate = sorted.last(where: { $0.value <= threshold }) ?? sorted.first
-        guard let date = candidate?.key else { return }
-        let normalized = Calendar.current.startOfDay(for: date)
+    }
+
+    private func updateVisibleCalendarMonth(to normalized: Date) {
         guard !Calendar.current.isDate(listVisibleTopDate, inSameDayAs: normalized) else { return }
-        listVisibleTopDate = normalized
+        var transaction = Transaction()
+        transaction.animation = nil
+        withTransaction(transaction) {
+            listVisibleTopDate = normalized
+        }
     }
 
     private func relativeDate(_ date: Date) -> String {

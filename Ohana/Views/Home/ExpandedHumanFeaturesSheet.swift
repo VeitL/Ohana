@@ -15,6 +15,7 @@ struct ExpandedHumanFeaturesSheet: View {
         case basicInfo
         case weight
         case workout
+        case metrics
         case medication
         case report
         case expense
@@ -128,6 +129,20 @@ struct ExpandedHumanFeaturesSheet: View {
                                 }
                             )
                         }
+
+                        featureNavigation(
+                            field: .weight,
+                            route: .metrics,
+                            lockedTitle: "体检指标",
+                            label: {
+                                compactBentoCard(
+                                    icon: "waveform.path.ecg.rectangle.fill",
+                                    color: .goTeal,
+                                    title: "体检指标",
+                                    subtitle: healthMetricSubtitle
+                                )
+                            }
+                        )
 
                         HStack(spacing: 12) {
                             featureNavigation(
@@ -272,6 +287,8 @@ struct ExpandedHumanFeaturesSheet: View {
             HumanWeightHistoryView(human: human)
         case .workout:
             CoHealthDashboardFullView(human: human)
+        case .metrics:
+            HumanHealthCheckupView(human: human)
         case .medication:
             HumanMedicationView(human: human)
         case .report:
@@ -701,6 +718,15 @@ struct ExpandedHumanFeaturesSheet: View {
         guard !human.isPrivate(.weight, viewedBy: activeHumanId) else { return "—" }
         guard let latest = human.weightLogs.sorted(by: { $0.date > $1.date }).first else { return "--" }
         return String(format: "%.1f", latest.weight)
+    }
+
+    private var healthMetricSubtitle: String {
+        guard let latest = human.healthMetricLogs.sorted(by: { $0.date > $1.date }).first,
+              let metric = HealthMetricCatalog.metric(forKey: latest.metricKey),
+              let unit = metric.unit(for: latest.unitCode) else {
+            return "TSH / HbA1c / 血压"
+        }
+        return "\(metric.displayName(L10n(AppLanguage.code))) · \(unit.formattedValue(latest.value))"
     }
 
     private func privateAwareHeroValue(_ field: HumanPrivateField, _ value: String) -> String {

@@ -11,6 +11,7 @@ import MapKit
 
 struct WalkTrackingCard: View {
     let pet: Pet
+    var onCloseSummaryToPetCard: (() -> Void)? = nil
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Household.createdAt) private var households: [Household]
 
@@ -1051,6 +1052,10 @@ struct WalkTrackingCard: View {
         guard showSummaryBack, !isClosingSummaryBack else { return }
         isClosingSummaryBack = true
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        if let onCloseSummaryToPetCard {
+            onCloseSummaryToPetCard()
+            return
+        }
         withAnimation(GoMotion.page) {
             summaryRotation = 0
         }

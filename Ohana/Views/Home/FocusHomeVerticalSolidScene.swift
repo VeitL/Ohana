@@ -15,6 +15,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     let safeBottom: CGFloat
     let selectedCardId: UUID?
     let progress: CGFloat
+    var heroDirection: Int = 0
     let reduceMotion: Bool
     var isVisible: Bool = true
     var embedsQuickActionsInCard: Bool = false
@@ -25,10 +26,14 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     let onCollapse: () -> Void
     let onLongPress: (FocusCard) -> Void
 
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
-    @State private var floatingPhase = false
     @State private var frozenAvatarSources: [UUID: FocusHomeFrozenAvatarSource] = [:]
+    @State private var frozenAvatarClearGeneration = 0
+    @State private var floatingResumeStartTime: TimeInterval?
     @GestureState private var expandedDragY: CGFloat = 0
+
+    private var l: L10n { L10n(appLanguage) }
 
     private var selectedCard: FocusCard? {
         selectedCardId.flatMap { id in cards.first(where: { $0.id == id }) }
@@ -40,36 +45,35 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
 
     var body: some View {
         GeometryReader { geo in
-            let visibleCenterX = visibleCenterX(in: geo)
-            ZStack {
-                if selectedCardId == nil {
-                    collapsedHitLayer(in: geo.size)
-                        .zIndex(100)
-                } else {
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture { onCollapse() }
-                        .zIndex(1)
-                }
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !canFloatCards)) { timeline in
+                let visibleCenterX = visibleCenterX(in: geo)
+                let time = canFloatCards ? timeline.date.timeIntervalSinceReferenceDate : 0
+                ZStack {
+                    if selectedCardId == nil {
+                        collapsedHitLayer(in: geo.size, time: time)
+                            .zIndex(80)
+                    } else {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture { onCollapse() }
+                            .zIndex(1)
+                    }
 
-                if let selectedCard {
-                    if walkTrackingPet(for: selectedCard, isSelected: true) == nil {
-                        quickActionLayer(for: selectedCard, in: geo.size, visibleCenterX: visibleCenterX)
-                            .zIndex(embedsQuickActionsInCard ? 48 : 32)
+                    if let selectedCard, !embedsQuickActionsInCard {
+                        if walkTrackingPet(for: selectedCard, isSelected: true) == nil {
+                            quickActionLayer(for: selectedCard, in: geo.size, visibleCenterX: visibleCenterX)
+                                .zIndex(32)
+                        }
+                    }
+
+                    ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
+                        cardLayer(for: card, index: index, in: geo.size, visibleCenterX: visibleCenterX, time: time)
                     }
                 }
-
-                ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
-                    cardLayer(for: card, index: index, in: geo.size, visibleCenterX: visibleCenterX)
-                }
+                .frame(width: geo.size.width, height: geo.size.height)
             }
-            .frame(width: geo.size.width, height: geo.size.height)
             .onAppear {
-                updateFloatingEffect()
                 syncFrozenAvatarSource(for: selectedCardId)
-            }
-            .onChange(of: canFloatCards) { _, _ in
-                updateFloatingEffect()
             }
             .onChange(of: selectedCardId) { _, newValue in
                 syncFrozenAvatarSource(for: newValue)
@@ -84,38 +88,44 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         geo.size.width / 2
     }
 
-    private func cardLayer(for card: FocusCard, index: Int, in size: CGSize, visibleCenterX: CGFloat) -> some View {
+    private func cardLayer(for card: FocusCard, index: Int, in size: CGSize, visibleCenterX: CGFloat, time: TimeInterval) -> some View {
         let isSelected = card.id == selectedCardId
-        let walkTrackingPet = walkTrackingPet(for: card, isSelected: isSelected)
+        let isCollapsedHandoff = isCollapsedHandoffCard(card)
+        let isLayerSelected = isSelected && !isCollapsedHandoff
+        let isExpandedSurface = isSelected && !isCollapsedHandoff
+        let walkTrackingPet = walkTrackingPet(for: card, isSelected: isExpandedSurface)
         let frame = frame(for: card, index: index, in: size, visibleCenterX: visibleCenterX)
-        let dragY = isSelected ? max(0, expandedDragY) : 0
-        let floating = floatingTransform(index: index, isSelected: isSelected)
-        let rotation = rotation(for: index, isSelected: isSelected) + floating.rotation
-        let scale = isSelected ? max(0.95, 1 - dragY / 1500) : inactiveScale(for: card)
+        let dragY = isExpandedSurface ? max(0, expandedDragY) : 0
+        let floating = floatingTransform(index: index, isSelected: isSelected, time: time)
+        let rotation = rotation(for: index, isSelected: isExpandedSurface) + floating.rotation
+        let scale = isExpandedSurface ? max(0.94, 1 - dragY / 1400) : inactiveScale(for: card)
         let opacity = inactiveOpacity(for: card)
-        let zIndex = isSelected ? Double(40) : Double(index + 2)
-        let cornerRadius = isSelected ? CGFloat(42) : CGFloat(30)
-        let frozenAvatarSource = isSelected
-            ? frozenAvatarSources[card.id] ?? FocusHomeFrozenAvatarSource.make(for: card)
-            : nil
+        let zIndex = isLayerSelected ? Double(20) : collapsedZIndex(index: index)
+        let cornerRadius = isExpandedSurface ? CGFloat(42) : CGFloat(30)
+        let frozenAvatarSource = frozenAvatarSources[card.id]
+            ?? (isSelected ? FocusHomeFrozenAvatarSource.cached(for: card) : nil)
 
-        return ZStack {
-            FocusHomeVerticalSolidCardSurface(
-                card: card,
-                isExpanded: isSelected,
-                progress: isSelected ? progress : 0,
-                reduceMotion: reduceMotion,
-                frozenAvatarSource: frozenAvatarSource
-            )
-            .opacity(walkTrackingPet == nil ? 1 : 0)
+        return FocusHomeWalkCardFlip(
+            walkPet: walkTrackingPet,
+            reduceMotion: reduceMotion,
+            walkCardPadding: 10
+        ) {
+            ZStack(alignment: .bottom) {
+                FocusHomeVerticalSolidCardSurface(
+                    card: card,
+                    progress: isExpandedSurface ? progress : 0,
+                    reduceMotion: reduceMotion,
+                    frozenAvatarSource: frozenAvatarSource
+                )
 
-            if let walkTrackingPet {
-                WalkTrackingCard(pet: walkTrackingPet)
-                    .padding(10)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.96, anchor: .center).combined(with: .opacity),
-                        removal: .opacity
-                    ))
+                if embedsQuickActionsInCard && isExpandedSurface && isExpandedInteractionReady && walkTrackingPet == nil {
+                    embeddedCardCollapseHitLayer(for: card, frame: frame)
+                        .zIndex(10)
+                }
+
+                if embedsQuickActionsInCard && isExpandedSurface && walkTrackingPet == nil {
+                    embeddedQuickActionLayer(for: card, frame: frame)
+                }
             }
         }
         .frame(width: frame.width, height: frame.height)
@@ -127,15 +137,15 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .contextMenu { contextMenu(card) }
         .onTapGesture {
+            guard !embedsQuickActionsInCard else { return }
             guard walkTrackingPet == nil else { return }
-            handleCardTap(isSelected: isSelected)
+            handleCardTap(isSelected: isExpandedSurface)
         }
         .onLongPressGesture {
-            handleCardLongPress(card, isSelected: isSelected)
+            handleCardLongPress(card, isSelected: isExpandedSurface)
         }
-        .simultaneousGesture(collapseDragGesture(isEnabled: isSelected && walkTrackingPet == nil))
-        .allowsHitTesting(isSelected)
-        .animation(HeroAnim.walletSpring, value: walkTrackingPet?.id)
+        .simultaneousGesture(collapseDragGesture(isEnabled: isExpandedSurface && walkTrackingPet == nil))
+        .allowsHitTesting(isExpandedSurface)
     }
 
     private func walkTrackingPet(for card: FocusCard, isSelected: Bool) -> Pet? {
@@ -153,122 +163,189 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     }
 
     private var canFloatCards: Bool {
-        selectedCardId == nil && workloadPolicy.ambientMotionBudget(isVisible: isVisible) == .full
-    }
-
-    private var floatingAnimation: Animation {
-        .easeInOut(duration: 3.6).repeatForever(autoreverses: true)
-    }
-
-    private func updateFloatingEffect() {
-        guard canFloatCards else {
-            var transaction = Transaction(animation: nil)
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                floatingPhase = false
-            }
-            return
-        }
-        guard !floatingPhase else { return }
-        withAnimation(floatingAnimation) {
-            floatingPhase = true
-        }
+        !reduceMotion
+            && selectedCardId == nil
+            && frozenAvatarSources.isEmpty
+            && workloadPolicy.ambientMotionBudget(isVisible: isVisible) == .full
     }
 
     private func syncFrozenAvatarSource(for selectedId: UUID?) {
+        frozenAvatarClearGeneration += 1
         guard let selectedId,
               let card = cards.first(where: { $0.id == selectedId }) else {
-            clearFrozenAvatarSourcesIfIdle()
+            if selectedCardId == nil, progress <= 0.001, frozenAvatarSources.isEmpty {
+                floatingResumeStartTime = Date().timeIntervalSinceReferenceDate
+            }
+            scheduleFrozenAvatarSourceClearIfIdle()
             return
         }
 
         guard frozenAvatarSources[selectedId] == nil else { return }
+        floatingResumeStartTime = nil
+        guard let frozenSource = FocusHomeFrozenAvatarSource.cached(for: card) else { return }
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            frozenAvatarSources = [selectedId: FocusHomeFrozenAvatarSource.make(for: card)]
+            frozenAvatarSources = [selectedId: frozenSource]
         }
     }
 
     private func clearFrozenAvatarSourcesIfIdle() {
+        scheduleFrozenAvatarSourceClearIfIdle()
+    }
+
+    private func scheduleFrozenAvatarSourceClearIfIdle() {
         guard selectedCardId == nil,
               progress <= 0.001,
               !frozenAvatarSources.isEmpty else { return }
-        var transaction = Transaction(animation: nil)
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            frozenAvatarSources.removeAll()
+        frozenAvatarClearGeneration += 1
+        let generation = frozenAvatarClearGeneration
+        OhanaFrameScheduler.runAfterNextFrame {
+            guard generation == frozenAvatarClearGeneration else { return }
+            guard selectedCardId == nil,
+                  progress <= 0.001,
+                  !frozenAvatarSources.isEmpty else { return }
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                frozenAvatarSources.removeAll()
+                floatingResumeStartTime = Date().timeIntervalSinceReferenceDate
+            }
         }
     }
 
     private func quickActionLayer(for card: FocusCard, in size: CGSize, visibleCenterX: CGFloat) -> some View {
         let frame = expandedFrame(for: card, in: size, visibleCenterX: visibleCenterX)
         let reveal = reduceMotion ? 1 : smooth(progress, 0.42, 0.72)
-        let quickHeight = embedsQuickActionsInCard ? CGFloat(238) : CGFloat(132)
-        let width = embedsQuickActionsInCard
-            ? min(size.width - 12, frame.width + 86)
-            : min(size.width - 18, 380)
-        let y = embedsQuickActionsInCard
-            ? frame.maxY - quickHeight / 2 - 18
-            : min(size.height - safeBottom - 122, frame.maxY + 92)
+        let quickHeight = CGFloat(132)
+        let width = min(size.width - 18, 380)
+        let y = min(size.height - safeBottom - 122, frame.maxY + 92)
         return FocusHomeVerticalSolidQuickActionLayer(
             content: quickActions(card),
             width: width,
             height: quickHeight,
             reveal: reveal,
-            isReady: isExpandedInteractionReady,
-            reduceMotion: reduceMotion,
-            isEmbedded: embedsQuickActionsInCard
+            isReady: isExpandedInteractionReady
         )
         .position(x: frame.midX, y: y)
     }
 
-    private func collapsedHitLayer(in size: CGSize) -> some View {
-        Color.clear
-            .contentShape(Rectangle())
-            .gesture(
-                SpatialTapGesture()
-                    .onEnded { value in
-                        guard let card = hitTestCard(at: value.location, in: size) else { return }
-                        onSelect(card)
-                    }
-            )
+    private func embeddedQuickActionLayer(for card: FocusCard, frame: CGRect) -> some View {
+        let reveal = reduceMotion ? 1 : smooth(progress, 0.42, 0.72)
+        let dockWidth = max(0, frame.width - 18)
+        let dockHeight = embeddedQuickActionDockHeight(for: frame)
+        return FocusHomeVerticalSolidQuickActionLayer(
+            content: quickActions(card),
+            width: dockWidth,
+            height: dockHeight,
+            reveal: reveal,
+            isReady: isExpandedInteractionReady
+        )
+        .padding(.horizontal, 11)
+        .padding(.bottom, 18)
+        .offset(y: (1 - reveal) * 18)
+        .zIndex(12)
+    }
+
+    private func embeddedCardCollapseHitLayer(for card: FocusCard, frame: CGRect) -> some View {
+        let protectedBottomHeight = embeddedQuickActionDockHeight(for: frame) + 42
+        let hitHeight = max(44, frame.height - protectedBottomHeight)
+
+        return VStack(spacing: 0) {
+            Rectangle()
+                .fill(Color.ohanaPrimaryText.opacity(0.001)) // ui-v4: allow invisible expanded card collapse hit zone
+                .contentShape(Rectangle())
+                .frame(width: frame.width, height: hitHeight)
+                .onTapGesture {
+                    OhanaFeedback.light()
+                    onCollapse()
+                }
+                .onLongPressGesture(minimumDuration: 0.45) {
+                    OhanaFeedback.medium()
+                    onLongPress(card)
+                }
+                .accessibilityLabel(card.name)
+                .accessibilityHint(l.tr(
+                    zh: "点击返回首页",
+                    en: "Tap to return home",
+                    de: "Tippen, um zur Startseite zurückzukehren"
+                ))
+                .accessibilityAddTraits(.isButton)
+
+            Spacer(minLength: 0)
+        }
+        .frame(width: frame.width, height: frame.height, alignment: .top)
+    }
+
+    private func embeddedQuickActionDockHeight(for frame: CGRect) -> CGFloat {
+        min(max(frame.height * 0.34, 188), 224)
+    }
+
+    private func collapsedHitLayer(in size: CGSize, time: TimeInterval) -> some View {
+        ZStack {
+            ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
+                let frame = collapsedFrame(index: index, count: cards.count, in: size)
+                let floating = floatingTransform(index: index, isSelected: false, time: time)
+                let cornerRadius = CGFloat(30)
+
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(Color.ohanaPrimaryText.opacity(0.001)) // ui-v4: allow invisible vertical home card hit zone
+                    .frame(width: frame.width, height: frame.height)
+                    .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                    .rotationEffect(.degrees(collapsedRotation(index: index) + floating.rotation))
+                    .position(x: frame.midX + floating.x, y: frame.midY + floating.y)
+                    .zIndex(100 + collapsedZIndex(index: index))
+                    .highPriorityGesture(
+                        TapGesture()
+                            .onEnded {
+                                onSelect(card)
+                            }
+                    )
+                    .accessibilityLabel(card.name)
+                    .accessibilityHint(l.tr(
+                        zh: "点击放大卡片",
+                        en: "Tap to expand card",
+                        de: "Tippen, um die Karte zu vergrößern"
+                    ))
+                    .accessibilityAddTraits(.isButton)
+            }
+        }
     }
 
     private func frame(for card: FocusCard, index: Int, in size: CGSize, visibleCenterX: CGFloat) -> CGRect {
         let collapsed = collapsedFrame(index: index, count: cards.count, in: size)
         guard card.id == selectedCardId else {
-            if selectedCardId == nil || reduceMotion { return collapsed }
-            let pushed = collapsed.offsetBy(dx: 0, dy: 24 + CGFloat(index) * 5)
-            return lerpRect(collapsed, pushed, smooth(progress, 0, 0.18))
+            return collapsed
+        }
+        guard !isCollapsedHandoffCard(card) else {
+            return collapsed
         }
         let expanded = expandedFrame(for: card, in: size, visibleCenterX: visibleCenterX)
-        return reduceMotion ? expanded : lerpRect(collapsed, expanded, eased(progress))
+        return reduceMotion ? expanded : WalletHeroTimeline.activeFrame(from: collapsed, to: expanded, progress: progress)
     }
 
     private func collapsedFrame(index: Int, count: Int, in size: CGSize) -> CGRect {
         let availableHeight = max(260, size.height - collapsedTopInset)
-        let width = min(max(size.width * 0.38, 132), 174)
+        let width = min(max(size.width * 0.39, 122), 162)
         let height = width * 1.58
         let center = CGPoint(x: size.width / 2, y: collapsedTopInset + availableHeight / 2)
-        let slot = portraitSlot(index: index)
-        let row = CGFloat(index / 2)
-        let x = center.x + slot.dx * width
-        let y = center.y - height * 0.40 + slot.dy * height + row * min(34, height * 0.15)
+        let offset = collapsedOffset(index: index, cardWidth: width)
+        let x = center.x + offset.width
+        let y = center.y + offset.height
         return CGRect(x: x - width / 2, y: y - height / 2, width: width, height: height)
     }
 
     private func expandedFrame(for card: FocusCard?, in size: CGSize, visibleCenterX: CGFloat) -> CGRect {
-        let aspectRatio: CGFloat = embedsQuickActionsInCard ? 1.72 : 1.58
-        let maxWidth: CGFloat = embedsQuickActionsInCard ? 344 : 374
-        let horizontalInset: CGFloat = embedsQuickActionsInCard ? 46 : 28
-        let topInset = safeTop + (embedsQuickActionsInCard ? 10 : 32)
-        let bottomInset = safeBottom + (embedsQuickActionsInCard ? 20 : 28)
+        let aspectRatio: CGFloat = 1.58
+        let maxWidth: CGFloat = embedsQuickActionsInCard ? 386 : 390
+        let horizontalInset: CGFloat = embedsQuickActionsInCard ? 18 : 22
+        let topInset = safeTop
+        let bottomInset = embedsQuickActionsInCard ? CGFloat(0) : safeBottom + 28
         let availableWidth = max(220, size.width - horizontalInset)
-        let availableHeight = max(360, size.height - topInset - bottomInset)
+        let availableHeight = max(320, size.height - topInset - bottomInset)
         let width = min(availableWidth, maxWidth, availableHeight / aspectRatio)
         let height = width * aspectRatio
-        let targetY = topInset + availableHeight / 2
+        let targetY = topInset + availableHeight / 2 - (embedsQuickActionsInCard ? 2 : 0)
         return CGRect(
             x: visibleCenterX - width / 2,
             y: targetY - height / 2,
@@ -277,21 +354,36 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         )
     }
 
-    private func portraitSlot(index: Int) -> (dx: CGFloat, dy: CGFloat) {
-        let slots: [(CGFloat, CGFloat)] = [
-            (-0.58, -0.34),
-            (0.58, -0.22),
-            (-0.50, 0.46),
-            (0.52, 0.58),
-            (0.02, 0.06),
-            (-0.08, 0.98)
+    private func collapsedOffset(index: Int, cardWidth: CGFloat) -> CGSize {
+        let offsets: [CGSize] = [
+            CGSize(width: -90, height: -112),
+            CGSize(width: 82, height: -96),
+            CGSize(width: -72, height: 118),
+            CGSize(width: 96, height: 98),
+            CGSize(width: 0, height: 8),
+            CGSize(width: -104, height: 218),
+            CGSize(width: 108, height: 210)
         ]
-        return slots[index % slots.count]
+        let scale = cardWidth / 148
+        let offset = offsets[index % offsets.count]
+        return CGSize(width: offset.width * scale, height: offset.height * scale)
     }
 
     private func collapsedRotation(index: Int) -> Double {
-        let rotations: [Double] = [-6, 5, -3.5, 7, 1.5, -5]
+        let rotations: [Double] = [-9, 6, 5, -6, 1.5, -5, 4]
         return rotations[index % rotations.count]
+    }
+
+    private func collapsedZIndex(index: Int) -> Double {
+        let depths: [Double] = [3, 5, 4, 2, 1, 0.5, 0.4]
+        return depths[index % depths.count]
+    }
+
+    private func isCollapsedHandoffCard(_ card: FocusCard) -> Bool {
+        guard card.id == selectedCardId,
+              heroDirection < 0,
+              !reduceMotion else { return false }
+        return progress <= 0.08
     }
 
     private func rotation(for index: Int, isSelected: Bool) -> Double {
@@ -305,17 +397,17 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         return collapsed * Double(1 - eased(progress))
     }
 
-    private func floatingTransform(index: Int, isSelected: Bool) -> (x: CGFloat, y: CGFloat, rotation: Double) {
+    private func floatingTransform(index: Int, isSelected: Bool, time: TimeInterval) -> (x: CGFloat, y: CGFloat, rotation: Double) {
         guard canFloatCards, !isSelected else { return (0, 0, 0) }
-        let phase: CGFloat = floatingPhase ? 1 : -1
-        let direction: CGFloat = index.isMultiple(of: 2) ? 1 : -1
-        let depth = max(0.58, 1 - CGFloat(index) * 0.07)
-        let verticalDirection: CGFloat = index.isMultiple(of: 3) ? -1 : 1
-        return (
-            x: direction * phase * 1.2 * depth,
-            y: verticalDirection * phase * (2.6 + CGFloat(index % 3) * 0.35) * depth,
-            rotation: Double(direction * phase * 0.28 * depth)
-        )
+        let resume = floatingResumeProgress(at: time)
+        let wave = sin(time * 0.72 + Double(index) * 1.27)
+        return (0, CGFloat(wave) * 2.8 * resume, 0)
+    }
+
+    private func floatingResumeProgress(at time: TimeInterval) -> CGFloat {
+        guard let start = floatingResumeStartTime else { return 1 }
+        let progress = CGFloat((time - start) / 0.30)
+        return eased(progress)
     }
 
     private func inactiveOpacity(for card: FocusCard) -> Double {
@@ -326,23 +418,6 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     private func inactiveScale(for card: FocusCard) -> CGFloat {
         guard selectedCardId != nil, card.id != selectedCardId else { return 1 }
         return reduceMotion ? 1 : 1 - smooth(progress, 0, 0.16) * 0.08
-    }
-
-    private func hitTestCard(at point: CGPoint, in size: CGSize) -> FocusCard? {
-        let indexedCards = Array(cards.enumerated()).sorted { $0.offset > $1.offset }
-        for (index, card) in indexedCards {
-            let frame = collapsedFrame(index: index, count: cards.count, in: size)
-            let center = CGPoint(x: frame.midX, y: frame.midY)
-            let radians = -collapsedRotation(index: index) * .pi / 180
-            let dx = point.x - center.x
-            let dy = point.y - center.y
-            let localX = cos(radians) * dx - sin(radians) * dy + frame.width / 2
-            let localY = sin(radians) * dx + cos(radians) * dy + frame.height / 2
-            if CGRect(origin: .zero, size: frame.size).insetBy(dx: 4, dy: 4).contains(CGPoint(x: localX, y: localY)) {
-                return card
-            }
-        }
-        return nil
     }
 
     private func collapseDragGesture(isEnabled: Bool) -> some Gesture {
@@ -357,15 +432,6 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                     onCollapse()
                 }
             }
-    }
-
-    private func lerpRect(_ a: CGRect, _ b: CGRect, _ t: CGFloat) -> CGRect {
-        CGRect(
-            x: lerp(a.minX, b.minX, t),
-            y: lerp(a.minY, b.minY, t),
-            width: lerp(a.width, b.width, t),
-            height: lerp(a.height, b.height, t)
-        )
     }
 
     private func lerp(_ a: CGFloat, _ b: CGFloat, _ t: CGFloat) -> CGFloat {
@@ -389,8 +455,6 @@ private struct FocusHomeVerticalSolidQuickActionLayer<Content: View>: View {
     let height: CGFloat
     let reveal: CGFloat
     let isReady: Bool
-    let reduceMotion: Bool
-    let isEmbedded: Bool
 
     var body: some View {
         let base = content
@@ -415,6 +479,14 @@ private struct FocusHomeFrozenAvatarSource {
     let isTransparent: Bool
 
     @MainActor
+    static func cached(for card: FocusCard) -> FocusHomeFrozenAvatarSource? {
+        guard let entry = FocusWalletAvatarCache.cachedFrozenEntry(for: card.id, data: card.avatarImageData) else {
+            return nil
+        }
+        return FocusHomeFrozenAvatarSource(image: entry.image, isTransparent: entry.isTransparent)
+    }
+
+    @MainActor
     static func make(for card: FocusCard) -> FocusHomeFrozenAvatarSource {
         let entry = FocusWalletAvatarCache.frozenEntry(for: card.id, data: card.avatarImageData)
         return FocusHomeFrozenAvatarSource(image: entry.image, isTransparent: entry.isTransparent)
@@ -423,28 +495,28 @@ private struct FocusHomeFrozenAvatarSource {
     @MainActor
     static func live(for card: FocusCard) -> FocusHomeFrozenAvatarSource {
         let entry = FocusWalletAvatarCache.entry(for: card.id, data: card.avatarImageData)
-        let image = entry.image ?? card.avatarImageData.flatMap(UIImage.init(data:))
-        return FocusHomeFrozenAvatarSource(image: image, isTransparent: entry.isTransparent)
+        return FocusHomeFrozenAvatarSource(image: entry.image, isTransparent: entry.isTransparent)
     }
 }
 
 private struct FocusHomeVerticalSolidCardSurface: View {
     let card: FocusCard
-    let isExpanded: Bool
     let progress: CGFloat
     let reduceMotion: Bool
     let frozenAvatarSource: FocusHomeFrozenAvatarSource?
+
+    private let headlineAccent = Color(hex: "FF5A3D")
 
     private var accent: Color {
         return card.themeColorHex.isEmpty ? card.color : Color(hex: card.themeColorHex)
     }
 
     private var visualProgress: CGFloat {
-        isExpanded ? min(max(progress, 0), 1) : 0
+        min(max(progress, 0), 1)
     }
 
     private var cornerRadius: CGFloat {
-        lerp(30, 42, visualProgress)
+        lerp(30, 44, visualProgress)
     }
 
     var body: some View {
@@ -463,25 +535,31 @@ private struct FocusHomeVerticalSolidCardSurface: View {
                             .strokeBorder(borderGradient, lineWidth: lerp(1, 1.25, p))
                     }
 
+                backgroundHeadlineLayer(width: w, progress: p)
+                    .zIndex(1)
+
                 VStack(alignment: .leading, spacing: 0) {
                     header(progress: p)
-                        .padding(.top, lerp(16, 26, p))
-                        .padding(.horizontal, lerp(16, 24, p))
+                        .padding(.top, lerp(16, 24, p))
+                        .padding(.horizontal, lerp(15, 22, p))
 
                     Spacer(minLength: 0)
 
                     avatar(image: avatarSource.image, transparent: avatarSource.isTransparent, width: w, height: h)
-                        .frame(maxWidth: .infinity, alignment: isExpanded ? .leading : .center)
-                        .frame(height: h * lerp(0.42, 0.50, p))
-                        .padding(.leading, lerp(10, 24, p))
-                        .padding(.trailing, lerp(10, w * 0.30, p))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .offset(x: avatarHorizontalOffset(width: w, progress: p))
+                        .frame(height: h * lerp(0.42, 0.36, p))
+                        .padding(.leading, lerp(10, 18, p))
+                        .padding(.trailing, lerp(10, 18, p))
 
-                    footer(progress: p)
-                        .padding(.horizontal, lerp(16, 24, p))
-                        .padding(.bottom, lerp(16, 218, p))
+                    bottomInfo(progress: p)
+                        .padding(.horizontal, lerp(15, 18, p))
+                        .padding(.bottom, lerp(16, 236, p))
                 }
+                .zIndex(4)
 
-                expandedSideInfo(width: w, height: h, progress: p)
+                rightInfoColumn(width: w, height: h, progress: p)
+                    .zIndex(5)
             }
             .clipShape(shape)
             .saturation(card.hasPassedAway ? 0 : 1)
@@ -491,12 +569,29 @@ private struct FocusHomeVerticalSolidCardSurface: View {
         }
     }
 
+    private func backgroundHeadlineLayer(width: CGFloat, progress p: CGFloat) -> some View {
+        let headlineSize = WalletPetCardTheme.headlinePointSize(cardWidth: width, headlineCount: card.name.count)
+        let reveal = smooth(p, 0.02, 0.20)
+        return Text(card.name.uppercased())
+            .font(.system(size: headlineSize, weight: .black, design: .rounded))
+            .foregroundStyle(headlineAccent.opacity(0.85))
+            .lineLimit(1)
+            .minimumScaleFactor(0.22)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .scaleEffect(lerp(0.24, 1, reveal), anchor: .top)
+            .opacity(Double(smooth(p, 0.02, 0.16)))
+            .padding(.horizontal, 8)
+            .padding(.top, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .allowsHitTesting(false)
+    }
+
     private var cardGradient: LinearGradient {
         LinearGradient(
             colors: [
-                accent.mix(with: .white, by: 0.10),
-                accent.mix(with: .black, by: 0.18),
-                accent.mix(with: .black, by: 0.40)
+                accent.mix(with: .white, by: lerp(0.10, 0.12, visualProgress)),
+                accent,
+                accent.mix(with: .black, by: lerp(0.30, 0.34, visualProgress))
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -506,9 +601,9 @@ private struct FocusHomeVerticalSolidCardSurface: View {
     private var borderGradient: LinearGradient {
         LinearGradient(
             colors: [
-                Color.goCardWhite.opacity(lerp(0.20, 0.30, visualProgress)),
-                accent.mix(with: .white, by: 0.10).opacity(lerp(0.42, 0.55, visualProgress)),
-                Color.arkInk.opacity(0.22)
+                Color.goCardWhite.opacity(lerp(0.20, 0.28, visualProgress)),
+                accent.mix(with: .white, by: 0.12).opacity(lerp(0.42, 0.58, visualProgress)),
+                Color.arkInk.opacity(lerp(0.12, 0.18, visualProgress))
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -519,33 +614,33 @@ private struct FocusHomeVerticalSolidCardSurface: View {
     private func header(progress p: CGFloat) -> some View {
         let reveal = expandedContentProgress(p)
         HStack(alignment: .top, spacing: 10) {
-            VStack(alignment: headerStackAlignment(progress: p), spacing: lerp(2, 4, p)) {
+            VStack(alignment: .leading, spacing: lerp(3, 4, p)) {
                 Text(card.name)
-                    .font(.system(size: lerp(18, 30, p), weight: .black, design: .rounded))
-                    .foregroundStyle(Color.goCardWhite)
+                    .font(.system(size: lerp(17, 28, p), weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.62)
+                    .minimumScaleFactor(0.70)
                     .shadow(color: Color.arkInk.opacity(0.58), radius: 5, x: 0, y: 2) // ui-v4: allow requested legibility shadow on card text
 
-                ZStack(alignment: headerFrameAlignment(progress: p)) {
+                ZStack(alignment: .leading) {
                     Text(card.kind)
                         .opacity(Double(1 - reveal))
                     Text(expandedSubtitle)
                         .opacity(Double(reveal))
                 }
-                .font(.system(size: lerp(10, 13, p), weight: .black, design: .rounded))
-                .foregroundStyle(Color.goCardWhite.opacity(0.72))
+                .font(.system(size: lerp(9, 12, p), weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.70)
                 .shadow(color: Color.arkInk.opacity(0.46), radius: 4, x: 0, y: 1) // ui-v4: allow requested legibility shadow on card text
             }
-            .frame(maxWidth: .infinity, alignment: headerFrameAlignment(progress: p))
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Spacer(minLength: 0)
 
             Text(statusBadge)
                 .font(.system(size: lerp(10, 12, p), weight: .black, design: .rounded))
-                .foregroundStyle(Color.goCardWhite)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .padding(.horizontal, lerp(9, 12, p))
                 .padding(.vertical, lerp(5, 7, p))
                 .background(statusBadgeBackground, in: Capsule())
@@ -560,73 +655,220 @@ private struct FocusHomeVerticalSolidCardSurface: View {
                 .resizable()
                 .scaledToFit()
                 .frame(
-                    width: width * (card.isHuman ? lerp(0.50, 0.64, visualProgress) : lerp(0.62, 0.76, visualProgress)),
-                    height: height * (card.isHuman ? lerp(0.40, 0.48, visualProgress) : lerp(0.42, 0.50, visualProgress)),
+                    width: width * (card.isHuman ? lerp(0.50, 0.60, visualProgress) : lerp(0.62, 0.72, visualProgress)),
+                    height: height * (card.isHuman ? lerp(0.40, 0.42, visualProgress) : lerp(0.42, 0.44, visualProgress)),
                     alignment: .bottom
                 )
-                .offset(y: card.isHuman ? lerp(0, -52, visualProgress) : lerp(0, -92, visualProgress))
+                .offset(y: card.isHuman ? lerp(0, -18, visualProgress) : lerp(0, -24, visualProgress))
                 .shadow(color: Color.arkInk.opacity(transparent ? 0.26 : 0.16), radius: 16, y: 10) // ui-v4: allow intentional avatar depth
         } else {
             Image(systemName: avatarSymbol)
-                .font(.system(size: width * lerp(0.36, 0.42, visualProgress), weight: .black))
+                .font(.system(size: width * lerp(0.43, 0.47, visualProgress), weight: .regular))
                 .symbolRenderingMode(.monochrome)
-                .foregroundStyle(Color.goCardWhite.opacity(0.88))
-                .frame(height: height * 0.38)
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.92))
+                .frame(width: width * 0.78, height: height * 0.36)
+        }
+    }
+
+    private func avatarHorizontalOffset(width: CGFloat, progress p: CGFloat) -> CGFloat {
+        let leadingPadding = lerp(CGFloat(10), CGFloat(18), p)
+        let trailingPadding = lerp(CGFloat(10), CGFloat(18), p)
+        return (trailingPadding - leadingPadding) / 2
+    }
+
+    private func rightInfoColumn(width: CGFloat, height: CGFloat, progress p: CGFloat) -> some View {
+        let reveal = smooth(p, 0.30, 0.64)
+        let sideWidth = max(128, width * 0.46)
+        return VStack(alignment: .trailing, spacing: lerp(3, 5, p)) {
+            Spacer(minLength: 0)
+            if card.isHuman {
+                humanInfoStack(progress: p)
+            } else if card.isElectronicPet {
+                electronicPetInfoStack(progress: p)
+            } else {
+                petInfoStack(progress: p)
+            }
+        }
+        .padding(.trailing, 18)
+        .padding(.bottom, lerp(22, 250, p))
+        .frame(width: sideWidth, height: height, alignment: .bottomTrailing)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        .opacity(Double(reveal))
+        .scaleEffect(lerp(0.96, 1, reveal), anchor: .trailing)
+        .offset(x: lerp(18, 0, reveal))
+        .allowsHitTesting(false)
+    }
+
+    private func humanInfoStack(progress p: CGFloat) -> some View {
+        let details = [card.zodiacText, card.mbtiText]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return VStack(alignment: .trailing, spacing: lerp(3, 5, p)) {
+            Text(details.first ?? "OHANA MEMBER")
+                .font(.system(size: lerp(15, 20, p), weight: .black, design: .rounded))
+                .foregroundStyle(cardPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
+                .shadow(color: Color.arkInk.opacity(0.55), radius: 5, x: 0, y: 2) // ui-v4: allow readability shadow on image card text
+
+            if details.count > 1 {
+                Text(details.dropFirst().joined(separator: " · "))
+                    .font(.system(size: lerp(9, 11, p), weight: .bold, design: .rounded))
+                    .foregroundStyle(cardSecondaryText(opacity: 0.78))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .shadow(color: Color.arkInk.opacity(0.42), radius: 4, x: 0, y: 1) // ui-v4: allow readability shadow on image card text
+            }
+        }
+    }
+
+    private func petInfoStack(progress p: CGFloat) -> some View {
+        let meta = [card.ageText, card.humanEquivalentAgeText, card.zodiacText]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && $0 != "未知" }
+        return VStack(alignment: .trailing, spacing: lerp(3, 5, p)) {
+            Text(petTogetherHeadline)
+                .font(.system(size: lerp(15, 20, p), weight: .black, design: .rounded))
+                .foregroundStyle(cardPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .shadow(color: Color.arkInk.opacity(0.55), radius: 5, x: 0, y: 2) // ui-v4: allow readability shadow on image card text
+
+            if let hint = card.personalityHint?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !hint.isEmpty {
+                Text(hint)
+                    .font(.system(size: lerp(8.5, 10.5, p), weight: .bold, design: .rounded))
+                    .foregroundStyle(cardSecondaryText(opacity: 0.82))
+                    .lineLimit(p > 0.72 ? 2 : 1)
+                    .multilineTextAlignment(.trailing)
+                    .minimumScaleFactor(0.62)
+                    .shadow(color: Color.arkInk.opacity(0.42), radius: 4, x: 0, y: 1) // ui-v4: allow readability shadow on image card text
+            }
+
+            if !meta.isEmpty {
+                Text(meta.joined(separator: " · "))
+                    .font(.system(size: lerp(8.5, 10, p), weight: .bold, design: .rounded))
+                    .foregroundStyle(cardSecondaryText(opacity: 0.76))
+                    .lineLimit(p > 0.72 ? 2 : 1)
+                    .multilineTextAlignment(.trailing)
+                    .minimumScaleFactor(0.62)
+                    .shadow(color: Color.arkInk.opacity(0.42), radius: 4, x: 0, y: 1) // ui-v4: allow readability shadow on image card text
+            }
+        }
+    }
+
+    private func electronicPetInfoStack(progress p: CGFloat) -> some View {
+        let l = L10n(AppLanguage.code)
+        return VStack(alignment: .trailing, spacing: lerp(3, 5, p)) {
+            Text(l.tr(zh: "电子宠物", en: "Critter", de: "Critter"))
+                .font(.system(size: lerp(15, 20, p), weight: .black, design: .rounded))
+                .foregroundStyle(cardPrimaryText)
+                .lineLimit(1)
+                .shadow(color: Color.arkInk.opacity(0.55), radius: 5, x: 0, y: 2) // ui-v4: allow readability shadow on image card text
+
+            if let hint = card.personalityHint?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !hint.isEmpty {
+                Text(hint)
+                    .font(.system(size: lerp(8.5, 10.5, p), weight: .bold, design: .rounded))
+                    .foregroundStyle(cardSecondaryText(opacity: 0.82))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .shadow(color: Color.arkInk.opacity(0.42), radius: 4, x: 0, y: 1) // ui-v4: allow readability shadow on image card text
+            }
+
+            if let ageText = card.ageText {
+                Text(ageText)
+                    .font(.system(size: lerp(8.5, 10, p), weight: .bold, design: .rounded))
+                    .foregroundStyle(cardSecondaryText(opacity: 0.76))
+                    .lineLimit(1)
+                    .shadow(color: Color.arkInk.opacity(0.42), radius: 4, x: 0, y: 1) // ui-v4: allow readability shadow on image card text
+            }
         }
     }
 
     @ViewBuilder
-    private func expandedSideInfo(width: CGFloat, height: CGFloat, progress p: CGFloat) -> some View {
-        let values = expandedInfoValues
+    private func bottomInfo(progress p: CGFloat) -> some View {
         let reveal = expandedContentProgress(p)
-        if !values.isEmpty {
-            VStack(alignment: .trailing, spacing: 8) {
-                ForEach(values.prefix(3), id: \.self) { value in
-                    Text(value)
-                        .font(.system(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.goCardWhite)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                        .padding(.horizontal, 12)
-                        .frame(height: 34)
-                        .shadow(color: Color.arkInk.opacity(0.62), radius: 5, x: 0, y: 2) // ui-v4: allow requested legibility shadow on card text
-                }
-            }
-            .opacity(Double(reveal))
-            .scaleEffect(lerp(0.96, 1, reveal), anchor: .trailing)
-            .position(x: width * 0.74, y: height * 0.34)
-            .allowsHitTesting(false)
+        ZStack(alignment: .bottomLeading) {
+            compactFooter(progress: p)
+                .opacity(Double(1 - reveal))
+            expandedMetrics
+                .opacity(Double(reveal))
+                .scaleEffect(lerp(0.98, 1, reveal), anchor: .bottom)
         }
     }
 
-    private func footer(progress p: CGFloat) -> some View {
+    private var expandedMetrics: some View {
+        let values = expandedInfoValues
+        return HStack(spacing: 8) {
+            metricPill(primaryMetric, metricUnit)
+            if let secondary = values.first {
+                metricPill(secondary, card.kind)
+            }
+        }
+    }
+
+    private func compactFooter(progress p: CGFloat) -> some View {
         HStack(alignment: .lastTextBaseline, spacing: 5) {
             Text(primaryMetric)
-                .font(.system(size: lerp(32, 52, p), weight: .black, design: .rounded))
-                .foregroundStyle(Color.goCardWhite)
+                .font(.system(size: lerp(31, 36, p), weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.62)
                 .contentTransition(.numericText())
                 .shadow(color: Color.arkInk.opacity(0.60), radius: 5, x: 0, y: 2) // ui-v4: allow requested legibility shadow on card text
             Text(metricUnit)
                 .font(.system(size: lerp(11, 15, p), weight: .black, design: .rounded))
-                .foregroundStyle(Color.goCardWhite.opacity(0.66))
+                .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(1)
                 .shadow(color: Color.arkInk.opacity(0.46), radius: 4, x: 0, y: 1) // ui-v4: allow requested legibility shadow on card text
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, alignment: headerFrameAlignment(progress: p))
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func metricPill(_ value: String, _ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(.system(size: 18, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.70)
+                .contentTransition(.numericText())
+            Text(label)
+                .font(.system(size: 9, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func expandedContentProgress(_ progress: CGFloat) -> CGFloat {
         smooth(progress, 0.18, 0.58)
     }
 
-    private func headerStackAlignment(progress: CGFloat) -> HorizontalAlignment {
-        progress > 0.46 ? .trailing : .leading
+    private var petTogetherHeadline: String {
+        let l = L10n(AppLanguage.code)
+        guard card.daysTogetherText != nil else {
+            return l.tr(zh: "新成员", en: "New Family", de: "Neue Familie")
+        }
+        if card.daysTogether < 0 {
+            let days = abs(card.daysTogether)
+            return l.tr(zh: "\(days) 天后到家", en: "\(days) Days Until Home", de: "\(days) Tage bis Zuhause")
+        }
+        return l.tr(zh: "相伴 \(card.daysTogether) 天", en: "\(card.daysTogether) Days Together", de: "\(card.daysTogether) Tage zusammen")
     }
 
-    private func headerFrameAlignment(progress: CGFloat) -> Alignment {
-        progress > 0.46 ? .trailing : .leading
+    private var cardPrimaryText: Color {
+        WalletPetCardTheme.prefersDarkForeground(for: card.themeColorHex) ? Color.arkInk : Color.goCardWhite
+    }
+
+    private func cardSecondaryText(opacity: Double) -> Color {
+        cardPrimaryText.opacity(opacity)
     }
 
     private var expandedSubtitle: String {
@@ -662,7 +904,7 @@ private struct FocusHomeVerticalSolidCardSurface: View {
     }
 
     private var statusBadgeBackground: Color {
-        card.statusBadgeIsWarning ? Color.goRed : Color.clear
+        card.statusBadgeIsWarning ? Color.goRed : accent
     }
 
     private var primaryMetric: String {

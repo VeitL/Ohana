@@ -1,5 +1,7 @@
 # Repository Guidelines
 
+In Ohana, a light interaction must stay light: visual feedback, route mutation, data aggregation, persistence writes, background work, timers, and animation loops are separate systems with explicit handoff points.
+
 ## Project Structure & Module Organization
 
 This repository contains the Ohana iOS app. Main SwiftUI app code lives in `Ohana/`, with `Models/`, `ViewModels/`, `Views/`, `Utilities/`, localized resources in `en.lproj/`, and app assets in `Assets.xcassets/`. Unit tests are in `OhanaTests/`; UI tests are in `OhanaUITests/`. Project-level documentation and design references live at the repository root, while helper automation belongs in `scripts/`. `Ai_Studio_New_UI/` and `ohana-design-system/` are separate design/reference projects; avoid changing them unless the task explicitly targets those folders.
@@ -27,9 +29,19 @@ For iPhone and iPad work, keep the implementation focused on those platforms unl
 
 For simulator-only UI bugs, keep one failure mode per run and own the reproduce-fix-verify loop. Build and launch the app, confirm the starting screen with a screenshot or UI snapshot, drive the reported path with taps, typing, scrolling, or swipes, capture relevant screenshots/logs, make the smallest fix, then rerun the same path. Prefer accessibility labels and identifiers over raw coordinates; if a control can only be reached by coordinates, call that out as a testability gap.
 
-When adding App Intents, start from Ohana's highest-value external actions rather than mirroring the whole app. Good first candidates are quick pet-care logging, opening a specific pet or human profile, viewing today's care focus, and creating or jumping to reminders. Keep `AppEntity` surfaces smaller than the SwiftData model layer, add `AppShortcutsProvider` entries only for discoverable user-facing actions, and route intent-driven app openings into the existing navigation/state model cleanly.
+When adding App Intents, start from Ohana's highest-value external actions rather than mirroring the whole app. Good first candidates are quick pet-care logging, openingep high-frequency UI paths lightweight. Taps, hero transitions, sha specific pet or human profile, viewing today's care focus, and creating or jumping to reminders. Keep `AppEntity` surfaces smaller than the SwiftData model layer, add `AppShortcutsProvider` entries only for discoverable user-facing actions, and route intent-driven app openings into the existing navigation/state model cleanly.
 
 Only adopt iOS 26 Liquid Glass APIs when a task explicitly asks for that migration. Audit one high-traffic flow at a time, preserve older-iOS fallbacks with availability checks, and prefer native glass APIs over custom blur stacks once the deployment target and Xcode toolchain support them.
+
+### Route Contract
+
+Navigation must be typed and data-driven.
+
+- Prefer route enums/structs such as `AppRoute`, `SheetRoute`, `PopupRoute`, or feature-local route types over ad-hoc booleans scattered across views.
+- App Intents, deep links, notifications, widgets, and shortcuts must translate into route values first, then let the route host present the destination.
+- Route state should carry stable identifiers and lightweight parameters, not full SwiftData object graphs or prebuilt destination views.
+- Building a route must not eagerly build all destination trees, scan global data, or refresh unrelated dashboards.
+- Dismissing a route should cancel route-scoped tasks and release frozen animation snapshots.
 
 ## Coding Style & Naming Conventions
 
@@ -37,19 +49,66 @@ Use Swift and SwiftUI conventions already present in the project: four-space ind
 
 Avoid oversized Swift files, especially giant SwiftUI view files. When a view grows into a compile/runtime hot spot, split it by responsibility before adding more behavior: pure visual surfaces, state/coordinator objects, route hosts, business executors, data snapshot builders, and reusable subviews should live in separate files. Card stacks, hero animations, Today Focus, FAB menus, sheets, charts, and quick actions should not all be owned by one massive view. This protects incremental build time, SwiftUI diffing cost, first-frame responsiveness, animation smoothness, and energy usage.
 
-Keep high-frequency UI paths lightweight. Taps, hero transitions, sheet presentations, and quick check-ins should update only the minimal state needed to start the interaction; do not decode images, scan large SwiftData collections, build complex route trees, or recompute unrelated dashboards on the same frame. Prefer frozen snapshots and small render-only components during animation, then refresh heavier business state after the visible transition has settled.
+Keep high-frequency UI paths lightweight and two-phase. Phase 1 is visual: update only local interaction state, typed route state, frozen render snapshots, and token-driven animation state needed to start the visible response. Phase 2 is business/data: after the first frame, route presentation, or animation handoff, run cancellable service or snapshot refresh work. Do not decode images, scan large SwiftData collections, build complex route trees, start timers, synchronize tasks/reminders/rewards, or recompute unrelated dashboards in the same frame as a tap, drag, sheet presentation, hero transition, or quick check-in.
+
+## Interaction Architecture & Isolation
+
+Every user action must be classified before implementation:
+
+- Visual-only interaction: may mutate local `@State`, `@Binding`, `@Bindable`, focus state, pressed/selected state, and token-driven animation state only. It must not fetch SwiftData, decode images, rebuild dashboards, start timers, create routes for unrelated screens, or call cross-page services.
+- Navigation-only interaction: updates a typed route, sheet route, popup route, or `NavigationPath` through the route host/coordinator. Destination data loading must be lazy and scoped to that destination.
+- Business command: calls exactly one domain service entry point that writes one business fact. Cross-feature fan-out, such as task/reminder/reward synchronization, belongs inside domain services after the fact is committed, not in the View.
+- Runtime/ambient work: timers, map refresh, location, repeating animations, particles, Canvas, and background refresh must go through `AppWorkloadPolicy`.
+
+Tap handlers, hero transitions, sheet presentations, quick check-ins, and card expansion must make the visible interaction responsive first. Heavy work should run after the first frame, after animation handoff, or in a cancellable task. Prefer `OhanaFrameScheduler.runAfterNextFrame`, animation completion, or a route-scoped `.task(id:)` instead of doing route mutation, SwiftData scans, image decoding, service fan-out, analytics, timers, and animation state changes in the same frame.
+
+A light interaction must never awaken a heavy system by accident. If a tap visually opens a card, that tap should not also recompute Today Focus, refetch all care events, rebuild all routes, normalize theme colors, refresh widgets, and start repeating animations.
+
+## Layer Ownership Matrix
+
+Keep ownership strict:
+
+- `Views/`: compose UI, own ephemeral visual state, emit typed user intents, and bind to render snapshots. Views do not own cross-page business rules, persistence writes, background policies, or broad data aggregation.
+- Render components: pure visual surfaces that receive value snapshots. They must not import SwiftData, access `ModelContext`, call services, own navigation, start timers, or observe global app state unless explicitly required.
+- Route hosts/coordinators: own `NavigationStack`, `NavigationPath`, sheet routes, popup routes, deep links, notification routes, and App Intent openings. They do not perform domain writes.
+- Snapshot builders/read models: convert SwiftData/service state into small, stable, preferably `Equatable` render state. They do not animate, navigate, or mutate business facts.
+- Domain services: own invariants, persistence writes, privacy filters, task/reminder/reward synchronization, and deletion/memorial edge cases. They must not import SwiftUI.
+- Runtime policy: `AppWorkloadPolicy` is the only source for foreground/background, Low Power Mode, Reduce Motion, app power-saving mode, timer, refresh, and repeating-animation decisions.
+- Motion scenes: own visual progress, frozen snapshots, transform, mask, opacity, zIndex, and hit testing. They do not query SwiftData or execute business commands during animation.
 
 ## Architecture, Compliance & Energy Guardrails
 
 Use `docs/app-architecture-governance.md` as the engineering source of truth for app architecture boundaries, App Store-sensitive background behavior, privacy, energy, runtime observability, and long-term maintainability. UI-specific rules still come from `ui规范.selection.json`.
 
-Cross-page runtime policy belongs in `Ohana/Utilities/AppRuntimePolicy.swift`. Do not create parallel low-power, Reduce Motion, scene phase, performance monitor, or background-work policies inside individual views. Views should consume `AppWorkloadPolicy` and keep foreground visible interactions visually unchanged.
+Cross-page runtime policy belongs in `Ohana/Utilities/AppRuntimePolicy.swift`. Do not create parallel low-power, Reduce Motion, scene phase, performance monitor, or background-work policies inside individual views. Views should consume `AppWorkloadPolicy` and keep foreground visible interactions visually unchanged. Interaction motion and ambient work are separate budgets. Visible taps, selections, card expansion, FAB reveal, and popup presentation use `interactionMotionBudget`; decorative loops, particles, breathing glows, Canvas, and repeating effects use `ambientMotionBudget`; timers, maps, countdowns, polling, and refresh use `refreshBudget`. Do not substitute one budget for another.
+
+### SwiftData, Read Models, and ViewModels
+
+Use SwiftData as the persistence/model layer, not as a render-time aggregation engine.
+
+- Do not place broad `@Query` reads inside reusable cards, rows, animation layers, popups, or hero transition views.
+- Screen containers may query narrowly scoped data, then pass value snapshots into render components.
+- Expensive grouping, sorting, filtering, privacy filtering, task synchronization, and dashboard aggregation should live in services or snapshot builders, not in `body`.
+- ViewModels are allowed only for one screen's complex read-only aggregation or interaction coordination. They must not hide SwiftData write logic or cross-page business rules.
+- Persistence writes go through domain services. A user action writes one business fact once, then services synchronize derived states.
 
 Core Location must stay centralized in `LocationManager` and `PetWalkingManager`. Only a running dog walk may keep background location active; paused, stopped, or non-walk app states must stop location updates. Do not create `CLLocationManager`, set `allowsBackgroundLocationUpdates = true`, or request Always authorization outside that flow.
 
 Repeating work must be visible and intentional. New `Timer.publish`, `TimelineView(.animation)`, `repeatForever`, Canvas loops, particle loops, or Map live updates must be paused or downgraded through `AppWorkloadPolicy` when the page is invisible, app is backgrounded, Low Power Mode is on, Reduce Motion is enabled, or app power-saving mode is enabled. Use elapsed-time calculations instead of background timers for durations.
 
 Before reporting runtime, energy, background-location, or animation-loop work complete, run `scripts/audit-runtime-guardrails.sh`. Fix warnings or add `// runtime-guardrail: allow <reason>` only for deliberate exceptions.
+
+### Interaction Performance Review Checklist
+
+Before reporting an interaction-heavy change complete, verify:
+
+- The tap/drag/selection handler mutates only the minimal state required for immediate feedback.
+- No reusable visual component owns `ModelContext`, broad `@Query`, timers, location, analytics fan-out, or cross-page services.
+- Heavy data refresh is deferred until after first frame, route presentation, or animation handoff.
+- Route-scoped `.task(id:)` work is cancellable when the route disappears.
+- Repeating work uses `AppWorkloadPolicy` and stops or downgrades when invisible, backgrounded, Low Power Mode, Reduce Motion, or app power-saving mode applies.
+- Animation layers use frozen snapshots and do not scan SwiftData, decode images, or insert/remove complex view trees during transition.
+- If business state changes, add or update a SwiftData in-memory test proving the service writes one fact and synchronizes derived task/reminder/reward state.
 
 ## UI Design Source of Truth
 
@@ -68,6 +127,13 @@ Sheets and popups are their own design system. Always read the `sheet*` tokens f
 Short record, confirmation, restock, and lightweight management popups must follow the confirmed inline popup spec: `sheetImplementation=inlineOverlay`, `sheetHorizontalInset=6pt`, `sheetCornerRadius=52pt`, `sheetPosition=bottomNearSafeEdge`, `sheetMaxHeight=contentAdaptive`, `sheetGlass=nativeRegular`, `sheetShadow=liftedAlert`, `sheetBackdrop=scrimGradient`, and `sheetAnimation=bottomSpringScaleFade`. Use an in-page overlay inside the current `ZStack` so the glass samples the real screen behind it; reserve system `.sheet` / `.large` for overview pages, history, long lists, and complex editors.
 
 Key animated interactions must use Ohana's stable ZStack motion scene pattern. For hero cards, FAB/menu reveal, inline popups, reward reveals, gacha/Oasis rewards, role creation cards, and chart range switches, keep visual layers mounted, freeze the UI snapshot before animation, and drive transform/mask/opacity/zIndex/hit-testing from one progress value. Do not insert/remove complex views, decode images, scan SwiftData, or run multiple delayed animations during the same transition. Ordinary static forms and long lists can remain `VStack`/`ScrollView`/`List`.
+
+Motion is a render-layer concern. Business services must not depend on animation state, animation delays, or view lifetimes.
+
+For spatial transitions, freeze the render snapshot before animation starts, mutate only motion-scene state during the transition, and refresh heavier business/read-model state only after visual handoff. Do not fix animation glitches by adding scattered async delays, route rebuilds, service calls, or SwiftData fetches inside the transition.
+
+Use change-driven effects for semantic feedback only: success, reward, attention, validation error, selected state, and confirmation. Decorative loops must be gated by `AppWorkloadPolicy`; Reduce Motion must replace or suppress problematic motion.
+Expandable hero card stacks have an extra geometry rule: one motion scene must own both collapsed and expanded frames plus internal alignment, padding, avatar source, quick-action bounds, zIndex, hit-testing, and ambient floating. Verify both stable end states before tuning spring/progress values. Do not fix off-center cards with scattered `x`, padding, or offset tweaks until you have checked the outer `CGRect.midX`, inner alignment, leading/trailing padding, overlay bounds, avatar crop transparency, and frozen/live source consistency. During collapse, return selected zIndex/hit-testing to the collapsed stack before clearing frozen visual sources; keep the frozen card/avatar source for one extra frame and resume floating only after the live collapsed card has taken over.
 
 Navigation chrome and settings rows are explicit tokens too. Use `settingIcon` for Settings-style leading icons, `pageBackButton` for non-sheet back controls, `pageCloseButton` for non-sheet close controls, and `sheetChrome` only for popup/sheet close controls.
 
@@ -101,6 +167,8 @@ Do not add new direct language ternaries such as `appLanguage == "zh" ? ... : ..
 
 When adding or refactoring pages, include Chinese, English, and German copy at the same time. For dates, numbers, currency, units, and relative labels, use `AppLanguage.effectiveLocale`, `AppLanguage.compactMonthDayFormat`, `AppLanguage.fullMonthYearFormat`, or a localized helper instead of hardcoded Chinese date formats.
 
+
+
 ## Testing Guidelines
 
 Tests use Swift Testing (`import Testing`) with `@Test` functions and `#expect` assertions. Add unit coverage in `OhanaTests/` for service, model, and persistence behavior; add UI flows in `OhanaUITests/` only when validating user-facing navigation or launch behavior. Name tests after the behavior under test, for example `reminderSchedulingServiceDeduplicatesEventAndScheduledMinute`. Use in-memory SwiftData containers for persistence tests to avoid touching real app data.
@@ -113,9 +181,10 @@ Recent history uses concise imperative commits, often Conventional Commit style 
 
 Do not commit personal provisioning profiles, signing secrets, derived data, or local simulator state. Keep bundle identifiers, entitlements, background task identifiers, and SwiftData migration-sensitive changes coordinated with the Xcode project settings.
 
-description: Behavioral guidelines to reduce common LLM coding mistakes. Use when writing, reviewing, or refactoring code to avoid overcomplication, make surgical changes, surface assumptions, and define verifiable success criteria.
-alwaysApply: true
----
+## Agent Behavioral Guidelines
+
+These behavioral rules apply when writing, reviewing, or refactoring code.
+
 
 # Karpathy behavioral guidelines
 

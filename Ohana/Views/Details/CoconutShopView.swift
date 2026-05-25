@@ -1362,6 +1362,11 @@ struct CoconutShopView: View {
         human.avatarImageData = data
         human.avatarEmoji = HumanGenderIdentity.fallbackAvatarEmoji(for: avatarGender)
         modelContext.safeSave()
+        NotificationCenter.default.post(
+            name: .ohanaMemberProfileDidChange,
+            object: nil,
+            userInfo: ["id": human.id.uuidString, "kind": "human"]
+        )
         activePicker = nil
         showToast(l.tr(zh: "\(human.name) 已升级 2.5D 头像", en: "\(human.name) now has a 2.5D avatar", de: "\(human.name) hat jetzt einen 2,5D-Avatar"), icon: "checkmark.circle.fill", tint: Color.goPrimary)
     }
@@ -1383,6 +1388,11 @@ struct CoconutShopView: View {
         }
         pet.avatarImageData = data
         modelContext.safeSave()
+        NotificationCenter.default.post(
+            name: .ohanaMemberProfileDidChange,
+            object: nil,
+            userInfo: ["id": pet.id.uuidString, "kind": "pet"]
+        )
         activePicker = nil
         showToast(l.tr(zh: "\(pet.name) 已升级 2.5D 头像", en: "\(pet.name) now has a 2.5D avatar", de: "\(pet.name) hat jetzt einen 2,5D-Avatar"), icon: "checkmark.circle.fill", tint: Color.goPrimary)
     }

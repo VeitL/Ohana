@@ -333,6 +333,11 @@ struct EquipPopoutCardSheet: View {
         pet.cardPopoutSourceRaw = (previewSource ?? PetPopoutCardSource(rawValue: pet.cardPopoutSourceRaw ?? "") ?? .avatar2d).rawValue
         pet.cardStyleRaw = "popout"
         modelContext.safeSave()
+        NotificationCenter.default.post(
+            name: .ohanaMemberProfileDidChange,
+            object: nil,
+            userInfo: ["id": pet.id.uuidString, "kind": "pet"]
+        )
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         showToast(l.tr(zh: "破框卡片已启用", en: "Popout card enabled", de: "Popout-Karte aktiviert"), icon: "checkmark.circle.fill", tint: Color.goPrimary)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {

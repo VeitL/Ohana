@@ -17,6 +17,8 @@ struct QuickWaterDetailSheet: View {
     @Environment(\.colorScheme) private var colorScheme
     @Query(sort: \Event.startDate) private var allEvents: [Event]
     @Query(sort: \Pet.createdAt) private var allPets: [Pet]
+    @Query(sort: \PetCareLog.date, order: .reverse) private var waterCareLogs: [PetCareLog]
+    @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     @State private var waterIntervalDays: Int = 3
     @State private var waterChangeAnchorDate: Date = Date()
@@ -40,6 +42,9 @@ struct QuickWaterDetailSheet: View {
     @State private var inlineSheetDragOffset: CGFloat = 0
     @State private var adaptiveSheetHeight: CGFloat = 430
     @State private var waterModeStorageTick = 0
+    @State private var displayedWaterMode: WaterOperatingMode
+    @State private var waterModeMaintenanceTask: Task<Void, Never>?
+    @State private var waterPlanMaintenanceTask: Task<Void, Never>?
     @State private var waterFeedbackToken: CheckInFeedbackToken?
     @State private var waterChangeFeedbackToken: CheckInFeedbackToken?
     @State private var filterFeedbackToken: CheckInFeedbackToken?
@@ -83,6 +88,35 @@ struct QuickWaterDetailSheet: View {
         }
     }
 
+    init(pet: Pet, onRemove: @escaping () -> Void) {
+        self.pet = pet
+        self.onRemove = onRemove
+        _displayedWaterMode = State(initialValue: WaterOperatingMode.stored(pet.id) ?? .manual)
+
+        let petID = pet.id
+        let petKey = petID.uuidString
+        let wateringType = CareType.watering.rawValue
+        let waterChangeType = CareType.waterChange.rawValue
+        let filterCleanType = CareType.filterClean.rawValue
+
+        _allEvents = Query(
+            filter: #Predicate<Event> { event in
+                event.relatedEntityId == petKey
+            },
+            sort: \.startDate
+        )
+        _waterCareLogs = Query(
+            filter: #Predicate<PetCareLog> { log in
+                (log.type == wateringType ||
+                 log.type == waterChangeType ||
+                 log.type == filterCleanType) &&
+                log.pet?.id == petID
+            },
+            sort: \.date,
+            order: .reverse
+        )
+    }
+
     private var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
     private var isDark: Bool { colorScheme == .dark }
     private var chromeTint: Color { Color.goPrimary }
@@ -109,7 +143,7 @@ struct QuickWaterDetailSheet: View {
     }
     private var waterMode: WaterOperatingMode {
         _ = waterModeStorageTick
-        return isAquatic ? .manual : waterRuleState.operatingMode
+        return isAquatic ? .manual : displayedWaterMode
     }
     private var systemSheetBinding: Binding<ActiveSheet?> {
         Binding(
@@ -135,38 +169,28 @@ struct QuickWaterDetailSheet: View {
     }
 
     private var todayWaterLogs: [PetCareLog] {
-        pet.careLogs
+        waterCareLogs
             .filter { $0.type == CareType.watering.rawValue && Calendar.current.isDateInToday($0.date) }
-            .sorted { $0.date > $1.date }
     }
 
     private var waterChangeLogs: [PetCareLog] {
-        pet.careLogs
+        waterCareLogs
             .filter { $0.type == CareType.waterChange.rawValue }
-            .sorted { $0.date > $1.date }
     }
 
     private var filterCleanLogs: [PetCareLog] {
-        pet.careLogs
+        waterCareLogs
             .filter { $0.type == CareType.filterClean.rawValue }
-            .sorted { $0.date > $1.date }
     }
 
     private var allWaterLogs: [PetCareLog] {
-        pet.careLogs
-            .filter {
-                $0.type == CareType.watering.rawValue ||
-                $0.type == CareType.waterChange.rawValue ||
-                $0.type == CareType.filterClean.rawValue
-            }
-            .sorted { $0.date > $1.date }
+        waterCareLogs
     }
 
     private var lastWaterLog: PetCareLog? { todayWaterLogs.first ?? waterLogs.first }
     private var waterLogs: [PetCareLog] {
-        pet.careLogs
+        waterCareLogs
             .filter { $0.type == CareType.watering.rawValue }
-            .sorted { $0.date > $1.date }
     }
 
     private var lastWaterChange: PetCareLog? { waterChangeLogs.first }
@@ -259,17 +283,17 @@ struct QuickWaterDetailSheet: View {
         .onAppear {
             loadSettings()
             selectedSharedWaterPetIds = Set(sameSpeciesWaterPets.map(\.id))
-            if !pet.hasPassedAway {
-                ensureUpcomingWaterPlanReminders()
-            }
+            syncDisplayedWaterMode(force: true)
+            scheduleWaterPlanMaintenance(delayMilliseconds: 220)
             if filterReminderOn {
-                syncFilterPlan(showToast: false)
+                OhanaFrameScheduler.runAfterNextFrame(milliseconds: 260) {
+                    syncFilterPlan(showToast: false)
+                }
             }
         }
         .onChange(of: allEvents.count) { _, _ in
-            if !pet.hasPassedAway {
-                ensureUpcomingWaterPlanReminders()
-            }
+            syncDisplayedWaterMode(animated: true)
+            scheduleWaterPlanMaintenance(delayMilliseconds: 260)
         }
         .onChange(of: activeSheet?.id) { _, _ in
             adaptiveSheetHeight = activeSheet?.inlineHeight ?? 430
@@ -293,6 +317,10 @@ struct QuickWaterDetailSheet: View {
             if nestedInlineSheet == nil && activeSheet?.usesInlineOverlay != true {
                 inlineSheetVisible = false
             }
+        }
+        .onDisappear {
+            waterModeMaintenanceTask?.cancel()
+            waterPlanMaintenanceTask?.cancel()
         }
         .interactiveDismissDisabled(activeInlineSheet != nil)
     }
@@ -1305,7 +1333,7 @@ struct QuickWaterDetailSheet: View {
         let today = calendar.startOfDay(for: Date())
         let start = calendar.date(byAdding: .day, value: -(dayCount - 1), to: today) ?? today
         let end = calendar.date(byAdding: .day, value: 1, to: today) ?? today.addingTimeInterval(86_400)
-        let logs = pet.careLogs.filter { log in
+        let logs = waterCareLogs.filter { log in
             log.type == type.rawValue &&
             log.date >= start &&
             log.date < end
@@ -1535,8 +1563,10 @@ struct QuickWaterDetailSheet: View {
     }
 
     private func activateManualWaterMode() {
-        setActiveWaterMode(.manual)
-        showSaveConfirmation("已切换到手动喂水")
+        beginWaterModeVisualTransition(to: .manual) {
+            commitWaterModeSideEffects(.manual)
+            showSaveConfirmation("已切换到手动喂水")
+        }
     }
 
     private func activateExistingWaterPlanMode() {
@@ -1545,26 +1575,118 @@ struct QuickWaterDetailSheet: View {
             openWaterPlanSettings()
             return
         }
-        setActiveWaterMode(.reminder)
-        ensureUpcomingWaterPlanReminders()
-        showSaveConfirmation("已切换到喂水计划")
+        beginWaterModeVisualTransition(to: .reminder) {
+            commitWaterModeSideEffects(.reminder)
+            ensureUpcomingWaterPlanReminders()
+            showSaveConfirmation("已切换到喂水计划")
+        }
     }
 
     private func deleteWaterPlanAndSwitchToManual() {
-        WaterPlanWriter.deletePlan(pet: pet, allEvents: latestAllEvents(), context: modelContext)
-        setActiveWaterMode(.manual)
-        showSaveConfirmation("已删除喂水计划")
+        beginWaterModeVisualTransition(to: .manual, commitWhenUnchanged: true) {
+            WaterPlanWriter.deletePlan(pet: pet, allEvents: latestAllEvents(), context: modelContext)
+            commitWaterModeSideEffects(.manual)
+            showSaveConfirmation("已删除喂水计划")
+        }
     }
 
     private func setActiveWaterMode(_ mode: WaterOperatingMode) {
+        performWaterModeUpdatesWithoutAnimation {
+            displayedWaterMode = isAquatic ? .manual : mode
+            commitWaterModeSideEffects(mode)
+        }
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    private func commitWaterModeSideEffects(_ mode: WaterOperatingMode) {
         WaterOperatingMode.set(pet.id, mode: mode)
         waterModeStorageTick += 1
+    }
+
+    private func syncDisplayedWaterMode(animated: Bool = false, force: Bool = false) {
+        guard force || waterModeMaintenanceTask == nil else { return }
+        let resolvedMode = isAquatic ? WaterOperatingMode.manual : waterRuleState.operatingMode
+        guard displayedWaterMode != resolvedMode else { return }
+        if animated {
+            withAnimation(waterModeTransitionAnimation) {
+                displayedWaterMode = resolvedMode
+            }
+        } else {
+            performWaterModeUpdatesWithoutAnimation {
+                displayedWaterMode = resolvedMode
+            }
+        }
+    }
+
+    private func beginWaterModeVisualTransition(
+        to targetMode: WaterOperatingMode,
+        commitWhenUnchanged: Bool = false,
+        commitAfterAnimation: @escaping @MainActor () -> Void
+    ) {
+        let fromMode = waterMode
+        guard fromMode != targetMode || commitWhenUnchanged else {
+            UISelectionFeedbackGenerator().selectionChanged()
+            return
+        }
+
+        waterModeMaintenanceTask?.cancel()
+        waterPlanMaintenanceTask?.cancel()
+
+        if fromMode != targetMode {
+            withAnimation(waterModeTransitionAnimation) {
+                displayedWaterMode = targetMode
+            }
+        }
+
         UISelectionFeedbackGenerator().selectionChanged()
+        scheduleWaterModeSideEffectsAfterAnimation(commit: commitAfterAnimation)
+    }
+
+    private var waterModeTransitionAnimation: Animation {
+        workloadPolicy.interactionMotionBudget(isVisible: true).allowsMotion ? GoMotion.page : GoMotion.reduced
+    }
+
+    private var waterModeTransitionDelayMilliseconds: UInt64 {
+        workloadPolicy.interactionMotionBudget(isVisible: true).allowsMotion ? 320 : 120
+    }
+
+    private func scheduleWaterModeSideEffectsAfterAnimation(
+        commit: @escaping @MainActor () -> Void
+    ) {
+        waterModeMaintenanceTask = Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: waterModeTransitionDelayMilliseconds)
+            guard !Task.isCancelled else { return }
+            commit()
+
+            await OhanaFrameScheduler.waitAfterNextFrame()
+            guard !Task.isCancelled else { return }
+            syncDisplayedWaterMode(force: true)
+            waterModeMaintenanceTask = nil
+        }
+    }
+
+    private func scheduleWaterPlanMaintenance(delayMilliseconds: UInt64) {
+        guard !pet.hasPassedAway, !isAquatic else { return }
+        waterPlanMaintenanceTask?.cancel()
+        waterPlanMaintenanceTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
+            performWaterModeUpdatesWithoutAnimation {
+                ensureUpcomingWaterPlanReminders()
+            }
+            waterPlanMaintenanceTask = nil
+        }
+    }
+
+    private func performWaterModeUpdatesWithoutAnimation(_ updates: () -> Void) {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            updates()
+        }
     }
 
     private func ensureUpcomingWaterPlanReminders() {
         guard !isAquatic else { return }
-        let reminders = WaterPlanWriter.ensureUpcomingReminders(pet: pet, allEvents: latestAllEvents(), context: modelContext)
+        let reminders = WaterPlanWriter.ensureUpcomingReminders(pet: pet, allEvents: allEvents, context: modelContext)
         scheduleWaterReminders(reminders)
     }
 
@@ -1577,7 +1699,7 @@ struct QuickWaterDetailSheet: View {
     }
 
     private func latestWaterPlanEvents() -> [Event] {
-        WaterPlanWriter.planEvents(pet: pet, allEvents: latestAllEvents())
+        WaterPlanWriter.planEvents(pet: pet, allEvents: allEvents)
     }
 
     private func scheduleWaterReminders(_ reminders: [Reminder]) {
@@ -1589,7 +1711,7 @@ struct QuickWaterDetailSheet: View {
     }
 
     private func scheduleCarePlanReminders(titleContains text: String) {
-        let reminders = latestAllEvents()
+        let reminders = allEvents
             .filter { event in
                 event.relatedEntityId == pet.id.uuidString &&
                 event.title.contains(text)
@@ -1618,7 +1740,7 @@ struct QuickWaterDetailSheet: View {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         triggerWaterFeedback()
         showSaveConfirmation(delta > 0 ? "喂水计划 +\(delta)🥥" : "已完成喂水")
-        ensureUpcomingWaterPlanReminders()
+        scheduleWaterPlanMaintenance(delayMilliseconds: 180)
     }
 
     private func commitWater() {

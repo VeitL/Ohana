@@ -25,11 +25,21 @@ enum FocusHomeCardDataSource {
                 pet.name,
                 pet.species,
                 pet.breed,
+                pet.avatarEmoji,
+                pet.gender,
+                "\(pet.isNeutered)",
+                pet.birthday.map { String(Int($0.timeIntervalSince1970)) } ?? "",
+                pet.homeDate.map { String(Int($0.timeIntervalSince1970)) } ?? "",
+                pet.coatColor,
+                pet.eyeColor,
                 pet.safeThemeColorHex,
                 pet.cardStyleRaw,
                 pet.cardPopoutSourceRaw ?? "",
-                "\(pet.cardPopoutImageData?.count ?? 0)",
+                imageDataSignature(pet.avatarImageData),
+                imageDataSignature(pet.cardPopoutImageData),
                 "\(pet.hasPassedAway)",
+                pet.passedAwayDate.map { String(Int($0.timeIntervalSince1970)) } ?? "",
+                "\(pet.daysTogetherAtPassing)",
                 "\(pet.currentStreak)",
                 "\(pet.coconutBalance)",
                 "\(pet.daysTogether)",
@@ -41,9 +51,17 @@ enum FocusHomeCardDataSource {
             [
                 human.id.uuidString,
                 human.name,
+                human.avatarEmoji,
                 human.roleText,
+                human.genderRaw,
+                human.birthday.map { String(Int($0.timeIntervalSince1970)) } ?? "",
+                human.mbti,
                 human.safeThemeColorHex,
+                imageDataSignature(human.avatarImageData),
                 "\(human.shouldShowOnHome)",
+                "\(human.hasPassedAway)",
+                human.passedAwayDate.map { String(Int($0.timeIntervalSince1970)) } ?? "",
+                "\(human.daysTogetherAtPassing)",
                 "\(human.coconutBalance)"
             ].joined(separator: "|")
         }.joined(separator: ";")
@@ -74,6 +92,13 @@ enum FocusHomeCardDataSource {
             "\(showDummyCards)",
             appLanguage
         ].joined(separator: "||")
+    }
+
+    private static func imageDataSignature(_ data: Data?) -> String {
+        guard let data, !data.isEmpty else { return "nil" }
+        let head = data.prefix(12).map { String(format: "%02x", $0) }.joined()
+        let tail = data.suffix(12).map { String(format: "%02x", $0) }.joined()
+        return "\(data.count)-\(head)-\(tail)"
     }
 
     static func buildSnapshot(
@@ -175,9 +200,13 @@ enum FocusHomeCardDataSource {
         for id in targetIds {
             if let data = avatarDataForHomeCard(id: id, pets: pets, humans: humans), !data.isEmpty {
                 avatarData[id] = data
+            } else {
+                avatarData.removeValue(forKey: id)
             }
             if let popout = popoutDataForHomeCard(id: id, pets: pets, equipFxPopoutCard: equipFxPopoutCard), !popout.isEmpty {
                 popoutData[id] = popout
+            } else {
+                popoutData.removeValue(forKey: id)
             }
         }
 

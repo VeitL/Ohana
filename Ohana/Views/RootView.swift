@@ -33,7 +33,7 @@ struct RootView: View {
         .onAppear {
             queueStartupMaintenance()
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("OhanaReminderAction"))) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .ohanaReminderAction)) { notification in
             handleReminderAction(notification.userInfo)
         }
         .alert("数据异常", isPresented: $showDBFallbackAlert) {
@@ -92,17 +92,17 @@ struct RootView: View {
 
         Task { @MainActor in
             await Task.yield()
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
             guard !Task.isCancelled else { return }
             InputLatencyWarmupService.warmUpOnce()
 
-            try? await Task.sleep(nanoseconds: 9_000_000_000)
+            try? await Task.sleep(nanoseconds: 16_000_000_000)
             guard !Task.isCancelled else { return }
             MemberThemeColorMaintenanceService.normalizeReservedColors(context: modelContext)
             FamilyWeeklyReportService.shared.scheduleWeeklyReminder()
             materializeAutoFeederLogsIfNeeded()
 
-            try? await Task.sleep(nanoseconds: 17_000_000_000)
+            try? await Task.sleep(nanoseconds: 25_000_000_000)
             guard !Task.isCancelled else { return }
             if shouldRunStartupReminderMaintenance() {
                 let allReminders = (try? modelContext.fetch(FetchDescriptor<Reminder>())) ?? []
@@ -111,11 +111,11 @@ struct RootView: View {
                 startupMaintenanceLastRunAt = Date().timeIntervalSince1970
             }
 
-            try? await Task.sleep(nanoseconds: 25_000_000_000)
+            try? await Task.sleep(nanoseconds: 45_000_000_000)
             guard !Task.isCancelled else { return }
             runCareLedgerBackfillIfNeeded()
 
-            try? await Task.sleep(nanoseconds: 15_000_000_000)
+            try? await Task.sleep(nanoseconds: 90_000_000_000)
             guard !Task.isCancelled else { return }
             await compactAvatarAssetsIfNeeded()
         }

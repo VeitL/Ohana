@@ -1,14 +1,14 @@
 # Ohana iOS App 项目文档
 
-> 最后更新: 2026-05-24（竖版实色默认首页 / 全局计划逾期警告 / V4 UI / 任务协作 / Oasis 电子宠物 / 能耗治理）| Build: ✅ `scripts/build-debug-fast.sh`（默认 iPhone 17 / Xcode installed default iOS 26.5 simulator runtime）| Schema: ArkSchemaV55
+> 最后更新: 2026-05-25（竖版实色默认首页 / 全局计划逾期警告 / V4 UI / 任务协作 / Oasis 电子宠物 / 能耗治理 / 合规安全性能功耗 audit 待实施计划）| Build: ✅ `scripts/build-debug-fast.sh`（默认 iPhone 17 / Xcode installed default iOS 26.5 simulator runtime）| Schema: ArkSchemaV56
 >
-> **当前事实优先级**：本文件顶部“当前快照”代表 2026-05-24 的实现状态；下方早期长章节保留为历史实现记录，若与当前快照、`AGENTS.md`、`ui规范.selection.json` 或 `docs/app-architecture-governance.md` 冲突，以后四者为准。
+> **当前事实优先级**：本文件顶部“当前快照”代表 2026-05-25 的实现状态；下方早期长章节保留为历史实现记录，若与当前快照、`AGENTS.md`、`ui规范.selection.json` 或 `docs/app-architecture-governance.md` 冲突，以后四者为准。
 >
 > **当前默认首页**：竖版实色首页（`FocusHomeV3View(sceneStyle: .verticalSolid)` / `FocusHomeVerticalSolidView`）。Wallet V3 / Wallet V2 仍可在设置里选择作为对照；旧 `FocusStackHomeTestView` 仅保留为兼容/回归代码，不再作为默认路径。首页是唯一高频工作台，只回答“今天谁需要照顾 / 现在最该做什么 / 点一下怎么完成”；卡片展开页把快捷操作嵌入卡片底部，底部导航承载首页 / 日历 / Oasis / 植物与中央添加入口。
 
 ---
 
-## 当前快照（2026-05-24）
+## 当前快照（2026-05-25）
 
 ### 1. 设计系统与 UI 源头
 
@@ -32,9 +32,24 @@
 - **重复动画/Timer**：新增 `Timer.publish`、`TimelineView(.animation)`、`repeatForever`、Canvas/粒子循环、Map live update 必须通过 `scripts/audit-runtime-guardrails.sh`。
 - **构建快速入口**：`scripts/build-debug-fast.sh` 默认使用 `platform=iOS Simulator,name=iPhone 17`，不写 `OS=`；让 Xcode 选择本机已安装的默认 iOS 26.5 simulator runtime，避免为旧 runtime 触发下载/解析。
 
+### 2A. 合规、安全、性能与功耗 Audit 待实施计划（2026-05-25）
+
+> 本节是未来实施计划，不表示下列风险已经修复。实施时仍以 `docs/app-architecture-governance.md`、`AGENTS.md`、`ui规范.selection.json` 和实际代码为准。
+
+- **本轮验证状态**：已基于当前工作树完成静态审计，并运行 `scripts/audit-runtime-guardrails.sh`、`scripts/audit-ui-v4.sh --changed`、`scripts/build-debug-fast.sh`；最终 Debug build 在默认 iPhone 17 / iOS 26.5 simulator runtime 通过。首次增量构建曾在 `QuickFeedDetailSheet.swift` 出现瞬时 type-check / 作用域异常，复跑通过，但仍作为大 SwiftUI 文件性能债务跟踪。
+- **P0 隐私清单**：新增 app 级 `PrivacyInfo.xcprivacy`。至少声明大量 `UserDefaults` 使用对应的 required-reason API（`NSPrivacyAccessedAPICategoryUserDefaults` / `CA92.1`），并复核是否还有文件时间戳、磁盘空间等 required-reason API。
+- **P0 权限声明一致性**：当前构建产物声明 HealthKit / Photo Library 文案，但代码仍是 HealthKit mock 且没有 HealthKit entitlement；英文/德文 `InfoPlist.strings` 也未覆盖 Health / Photo。先决定移除未使用权限声明，或正式接入 HealthKit capability、授权流和三语权限文案。
+- **P1 备份安全**：`DataBackupManager.exportJSON` 导出明文全量敏感 JSON，包含健康、用药、保险、证件、照片、位置等数据。先加文件保护 / atomic write / 导出敏感提示，再评估用户密码加密；导出临时文件应有清理策略。
+- **P1 导入去重**：备份恢复 UI 写“自动去重”，但部分日志类当前直接插入，可能污染统计、提醒和账本。后续按 UUID 对全模型 upsert/skip，并给导入前加 schema、大小和来源预检。
+- **P1 后台任务与定位透明度**：`BGAppRefreshTask` 需要 expiration/cancel/failure 路径，避免后台任务超时仍占资源。后台定位总体集中在 `LocationManager` / `PetWalkingManager` 是正确方向，但 running walk 进入后台时应加强用户透明度，优先显示系统后台定位指示，并做真机锁屏路线验证。
+- **P2 包体与资源策略**：Debug app 包体约 432 MB，`PetAvatarAssets` 约 197 MB 作为 folder resource 整包复制。发布前压缩/重采样头像，评估 asset catalog、按需资源或下载型资源，并做 Release archive size audit。
+- **P2 SwiftUI 热点拆分**：`QuickFeedDetailSheet.swift` 超 5k 行，是编译、type-check 和 SwiftUI diff 热点。继续拆分 presenter、data loader、sheet section、chart/row 子视图，保留当前 snapshot / lazy-load 思路。
+- **P3 发布完整性**：设置里的隐私政策、联系开发者等入口需要真实 action；通知 action/title 需要三语本地化；App Group entitlement 若没有真实共享容器使用，应移除或补齐用途说明。
+- **实施顺序**：先修 `PrivacyInfo.xcprivacy` 和权限声明一致性；再修备份安全与导入去重；随后修后台任务和定位透明度；最后处理包体优化与大 SwiftUI 文件拆分。
+
 ### 3. 当前 SwiftData Schema
 
-当前 schema 链到 **ArkSchemaV55**，`SharedModelContainer` 使用 `Schema(ArkSchemaV55.models)`。
+当前 schema 链到 **ArkSchemaV56**，`SharedModelContainer` 使用 `Schema(ArkSchemaV56.models)`。
 
 近期关键迁移：
 
@@ -57,6 +72,7 @@
 | V53 | `GachaOwnedItem` / `GachaDrawLog`：系列盲盒扭蛋收藏与抽取记录 |
 | V54 | 扭蛋非收藏结果与即时奖励记录扩展 |
 | V55 | Oasis 电子宠物低压力生命状态扩展 |
+| V56 | `HumanHealthMetricLog`：人类体检指标单项数值时间序列 |
 
 备份/恢复已覆盖家庭协作任务、兑换请求、Oasis 电子宠物、喂食结构化字段、余粮字段、破框图等新数据；PIN hash/salt 不应进入备份。
 

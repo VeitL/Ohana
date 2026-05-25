@@ -422,6 +422,11 @@ struct InventoryView: View {
         human.avatarImageData = data
         human.avatarEmoji = HumanGenderIdentity.fallbackAvatarEmoji(for: avatarGender)
         modelContext.safeSave()
+        NotificationCenter.default.post(
+            name: .ohanaMemberProfileDidChange,
+            object: nil,
+            userInfo: ["id": human.id.uuidString, "kind": "human"]
+        )
         showAvatarTargetPicker = false
     }
 
@@ -435,6 +440,11 @@ struct InventoryView: View {
         ), Avatar2DAccess.consumeExtraPass() else { return }
         pet.avatarImageData = data
         modelContext.safeSave()
+        NotificationCenter.default.post(
+            name: .ohanaMemberProfileDidChange,
+            object: nil,
+            userInfo: ["id": pet.id.uuidString, "kind": "pet"]
+        )
         showAvatarTargetPicker = false
     }
 }

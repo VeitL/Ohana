@@ -74,6 +74,24 @@ enum ActiveFeedSheet: Identifiable, Equatable {
         }
     }
 
+    var needsFullCareLogs: Bool {
+        switch self {
+        case .manage, .history, .feedingOverview, .feedModeHistory, .treatOverview, .stockOverview, .stockManage, .stockRecords, .editLog:
+            return true
+        case .manual, .treat, .plan, .stock:
+            return false
+        }
+    }
+
+    var needsFullFoodRecords: Bool {
+        switch self {
+        case .manage, .stock, .stockManage, .stockRecords, .stockOverview:
+            return true
+        case .manual, .treat, .plan, .history, .editLog, .feedingOverview, .feedModeHistory, .treatOverview:
+            return false
+        }
+    }
+
     var inlineOverlayMinHeight: CGFloat {
         switch self {
         case .manual, .manage, .editLog:

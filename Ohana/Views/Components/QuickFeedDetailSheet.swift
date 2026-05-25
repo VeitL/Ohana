@@ -92,17 +92,17 @@ struct QuickFeedDetailSheet: View {
     @State private var inlineSheetScrollTopOffset: CGFloat = 0
     @State private var inlineSheetTopPullDismissArmed = false
     @State private var inlineSheetDismissGestureShield = false
+    @StateObject private var feedHomeController: FeedHomeController
     @State private var loadedCareLogs: [PetCareLog] = []
     @State private var loadedFoodRecords: [PetFoodRecord] = []
-    @State private var hasLoadedFeedSnapshots = false
-    @State private var feedHomeSnapshot: QuickFeedHomeSnapshot?
+    @State private var hasLoadedFullCareLogs = false
+    @State private var hasLoadedFullFoodRecords = false
+    @State private var feedDetailDataTask: Task<Void, Never>?
     @State private var didApplyInitialSheet = false
     @State private var didScheduleBootstrapMaintenance = false
     @State private var overviewChartProgress: Double = 1
-    @State private var displayedFeedMode: FeedOperatingMode
-    @State private var feedModeStorageTick = 0
+    @State private var feedModeMaintenanceTask: Task<Void, Never>?
     @State private var clockTick = Date()
-    @State private var feedHomeAuxiliaryReady = false
     @State private var feedFeedbackToken: CheckInFeedbackToken?
     @State private var feedFeedbackMetricId: String?
     @State private var stockFeedbackToken: CheckInFeedbackToken?
@@ -125,13 +125,19 @@ struct QuickFeedDetailSheet: View {
         self.showsRemoveQuickActionFooter = showsRemoveQuickActionFooter
         self.showsCloseButton = showsCloseButton
         self.opensManualSheetOnAppear = opensManualSheetOnAppear
-        _displayedFeedMode = State(initialValue: FeedOperatingMode.stored(for: pet.id) ?? .manual)
+        let initialFeedMode = FeedOperatingMode.stored(for: pet.id) ?? .manual
+        _feedHomeController = StateObject(wrappedValue: FeedHomeController(initialMode: initialFeedMode))
 
         let petID = pet.id
         let petKey = petID.uuidString
         let dryStockKey = "\(petKey):\(FeedFoodKind.dry.rawValue)"
         let wetStockKey = "\(petKey):\(FeedFoodKind.wet.rawValue)"
         let feedingType = CareType.feeding.rawValue
+        let homeLogStartDate = Calendar.current.date(
+            byAdding: .day,
+            value: -6,
+            to: Calendar.current.startOfDay(for: Date())
+        ) ?? Date().addingTimeInterval(-6 * 86_400)
 
         _allEvents = Query(
             filter: #Predicate<Event> { event in
@@ -143,7 +149,9 @@ struct QuickFeedDetailSheet: View {
         )
         _allCareLogs = Query(
             filter: #Predicate<PetCareLog> { log in
-                log.type == feedingType && log.pet?.id == petID
+                log.type == feedingType &&
+                log.pet?.id == petID &&
+                log.date >= homeLogStartDate
             },
             sort: \.date,
             order: .reverse
@@ -175,11 +183,17 @@ struct QuickFeedDetailSheet: View {
     private var feedScheduleEvents: [Event] { dashboard.manualPlanEvents }
     private var autoFeederEvents: [Event] { dashboard.autoFeederEvents }
     private var activeFeedingMode: FeedOperatingMode {
-        _ = feedModeStorageTick
-        return displayedFeedMode
+        feedHomeController.displayedMode
     }
-    private var feedHomeRenderSnapshot: QuickFeedHomeSnapshot {
-        feedHomeSnapshot ?? makeFeedHomeSnapshot()
+    private var feedHomeSnapshotInput: FeedHomeSnapshotInput {
+        FeedHomeSnapshotInput(
+            pet: pet,
+            allEvents: allEvents,
+            careLogs: allCareLogs,
+            foodRecords: allFoodRecords,
+            now: clockTick,
+            todayLabel: l.tr(zh: "今", en: "T", de: "H")
+        )
     }
     private var currentUserId: String? {
         UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
@@ -198,16 +212,16 @@ struct QuickFeedDetailSheet: View {
         foodKind == .dry ? dryFoodTint : wetFoodTint
     }
     private var observedCareLogs: [PetCareLog] {
-        if hasLoadedFeedSnapshots {
+        if hasLoadedFullCareLogs {
             return loadedCareLogs
         }
-        return allCareLogs.filter { $0.pet?.id == pet.id && $0.careType == .feeding }
+        return allCareLogs
     }
     private var observedFoodRecords: [PetFoodRecord] {
-        if hasLoadedFeedSnapshots {
+        if hasLoadedFullFoodRecords {
             return loadedFoodRecords
         }
-        return allFoodRecords.filter { $0.pet?.id == pet.id }
+        return allFoodRecords
     }
     private var sameSpeciesFeedPets: [Pet] {
         let species = normalizedSpecies(pet.species)
@@ -316,6 +330,11 @@ struct QuickFeedDetailSheet: View {
             }
         }
         .onAppear(perform: bootstrap)
+        .onDisappear {
+            feedModeMaintenanceTask?.cancel()
+            feedDetailDataTask?.cancel()
+            feedHomeController.cancel()
+        }
         .onChange(of: activeSheet?.id) { _, _ in
             adaptiveSheetHeight = activeSheet?.defaultAdaptiveHeight ?? ActiveFeedSheet.defaultAdaptiveHeight
             inlineSheetDragOffset = 0
@@ -354,13 +373,19 @@ struct QuickFeedDetailSheet: View {
             ensureUpcomingPlanReminders()
         }
         .onChange(of: allCareLogs.count) { _, _ in
+            if hasLoadedFullCareLogs {
+                loadFullCareLogs(force: true)
+            }
             reloadFeedSnapshots()
         }
         .onChange(of: allFoodRecords.count) { _, _ in
+            if hasLoadedFullFoodRecords {
+                loadFullFoodRecords(force: true)
+            }
             reloadFeedSnapshots()
         }
         .onChange(of: appLanguage) { _, _ in
-            refreshFeedHomeSnapshot()
+            refreshFeedHomeSnapshot(force: true)
         }
         .sheet(item: systemSheetBinding) { sheet in
             NavigationStack {
@@ -640,6 +665,7 @@ struct QuickFeedDetailSheet: View {
         nestedInlineReturnStack.removeAll()
         feedSheetReturnStack.removeAll()
         activeSheet = sheet
+        scheduleDetailDataLoad(for: sheet)
     }
 
     private func openFeedSheet(_ sheet: ActiveFeedSheet) {
@@ -648,10 +674,12 @@ struct QuickFeedDetailSheet: View {
                 nestedInlineReturnStack.append(currentNested)
             }
             nestedInlineSheet = sheet
+            scheduleDetailDataLoad(for: sheet)
             return
         }
         if activeSheet?.usesInlineOverlay == false, sheet.usesInlineOverlay {
             nestedInlineSheet = sheet
+            scheduleDetailDataLoad(for: sheet)
             return
         }
         if let current = activeSheet, current.id != sheet.id {
@@ -660,6 +688,7 @@ struct QuickFeedDetailSheet: View {
             feedSheetReturnStack.removeAll()
         }
         activeSheet = sheet
+        scheduleDetailDataLoad(for: sheet)
     }
 
     private func closeActiveFeedSheet() {
@@ -711,6 +740,55 @@ struct QuickFeedDetailSheet: View {
         }
     }
 
+    private func scheduleDetailDataLoad(for sheet: ActiveFeedSheet) {
+        let needsCareLogs = sheet.needsFullCareLogs
+        let needsFoodRecords = sheet.needsFullFoodRecords
+        guard (needsCareLogs && !hasLoadedFullCareLogs) ||
+              (needsFoodRecords && !hasLoadedFullFoodRecords)
+        else { return }
+
+        feedDetailDataTask?.cancel()
+        feedDetailDataTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: sheet.usesInlineOverlay ? 70 : 120) {
+            FeedHomePerformance.measure("detail.lazyLoad") {
+                if needsCareLogs {
+                    loadFullCareLogs()
+                }
+                if needsFoodRecords {
+                    loadFullFoodRecords()
+                }
+            }
+            reloadFeedSnapshots()
+            feedDetailDataTask = nil
+        }
+    }
+
+    private func loadFullCareLogs(force: Bool = false) {
+        guard force || !hasLoadedFullCareLogs else { return }
+        let petID = pet.id
+        let feedingType = CareType.feeding.rawValue
+        let descriptor = FetchDescriptor<PetCareLog>(
+            predicate: #Predicate<PetCareLog> { log in
+                log.type == feedingType && log.pet?.id == petID
+            },
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
+        loadedCareLogs = (try? modelContext.fetch(descriptor)) ?? allCareLogs
+        hasLoadedFullCareLogs = true
+    }
+
+    private func loadFullFoodRecords(force: Bool = false) {
+        guard force || !hasLoadedFullFoodRecords else { return }
+        let petID = pet.id
+        let descriptor = FetchDescriptor<PetFoodRecord>(
+            predicate: #Predicate<PetFoodRecord> { record in
+                record.pet?.id == petID
+            },
+            sortBy: [SortDescriptor(\.startDate, order: .reverse)]
+        )
+        loadedFoodRecords = (try? modelContext.fetch(descriptor)) ?? allFoodRecords
+        hasLoadedFullFoodRecords = true
+    }
+
     // MARK: - Main
 
     private var petHeader: some View {
@@ -742,396 +820,31 @@ struct QuickFeedDetailSheet: View {
     }
 
     private var guidedFeedHome: some View {
-        let snapshot = feedHomeRenderSnapshot
-        return GuidedFeedHomeView(
-            task: guidedFeedTask(snapshot),
-            modeTitle: l.tr(zh: "喂食模式", en: "Feeding mode", de: "Fütterungsmodus"),
-            modeOptions: guidedFeedModeOptions,
-            chart: feedHomeAuxiliaryReady ? guidedFeedChart(snapshot) : nil,
-            dockItems: feedHomeAuxiliaryReady ? guidedFeedDockItems(snapshot) : lightweightGuidedFeedDockItems,
-            primaryAction: handleGuidedFeedPrimaryTap
+        QuickFeedHomePresenter(
+            pet: pet,
+            localization: l,
+            viewState: feedHomeController.viewState,
+            modeTransition: feedHomeController.modeTransition,
+            isAuxiliaryReady: feedHomeController.isAuxiliaryReady,
+            overviewChartProgress: overviewChartProgress,
+            feedFeedbackToken: feedFeedbackToken,
+            feedFeedbackMetricId: feedFeedbackMetricId,
+            stockFeedbackToken: stockFeedbackToken,
+            dryFoodTint: dryFoodTint,
+            wetFoodTint: wetFoodTint,
+            stockTint: stockTint,
+            treatTint: treatTint,
+            mainFoodOverviewTint: mainFoodOverviewTint,
+            onModeTap: handleFeedModeChipTap,
+            onPrimaryAction: handleGuidedFeedPrimaryTap,
+            onOpenFeedingOverview: openFeedingOverview,
+            onOpenStockOverview: { openRootFeedSheet(.stockOverview) },
+            onOpenTreatOverview: { openRootFeedSheet(.treatOverview) },
+            onOpenManualHistory: { openRootFeedSheet(.history) },
+            onOpenModeHistory: { openRootFeedSheet(.feedModeHistory) },
+            onOpenManage: { openFeedSheet(.manage) }
         )
-    }
-
-    private func guidedFeedTask(_ snapshot: QuickFeedHomeSnapshot) -> FeedGuidedTaskState {
-        let mode = activeFeedingMode
-        let todayMainFoodGrams = snapshot.todayMainFoodGrams
-        let title: String
-        let metricTitle: String
-        let metricValue: String
-        let detail: String
-        let primaryTitle: String
-        let primaryIcon: String
-        let isPrimaryEnabled: Bool
-
-        if pet.hasPassedAway {
-            title = l.tr(zh: "纪念饮食记录", en: "Memorial food log", de: "Futter im Gedenken")
-            metricTitle = l.tr(zh: "今日", en: "Today", de: "Heute")
-            metricValue = todayMainFoodGrams > 0 ? formattedFoodCardWeight(todayMainFoodGrams) : "--"
-            detail = l.tr(zh: "只保留历史查看。", en: "History only.", de: "Nur Verlauf.")
-            primaryTitle = l.tr(zh: "查看", en: "View", de: "Ansehen")
-            primaryIcon = "clock.arrow.circlepath"
-            isPrimaryEnabled = true
-        } else {
-            switch mode {
-            case .manual where pet.dailyPortionGrams <= 0:
-                title = l.tr(zh: "先设置喂食量", en: "Set feeding amount", de: "Futtermenge festlegen")
-                metricTitle = FeedFoodKind.dry.title(l) + " / " + FeedFoodKind.wet.title(l)
-                metricValue = "50g"
-                detail = l.tr(zh: "保存一次默认克数后，就能一键打卡。", en: "Save a default amount for one-tap logging.", de: "Standardmenge speichern.")
-                primaryTitle = l.tr(zh: "设置", en: "Set", de: "Festlegen")
-                primaryIcon = "slider.horizontal.3"
-                isPrimaryEnabled = true
-            case .manual:
-                title = l.tr(zh: "现在可以喂食", en: "Ready to feed", de: "Bereit zum Füttern")
-                metricTitle = l.tr(zh: "默认", en: "Default", de: "Standard")
-                metricValue = formattedFoodCardWeight(pet.dailyPortionGrams)
-                detail = l.tr(
-                    zh: "\(pet.mainFoodKind.title(l)) · 今天 \(formattedFoodCardWeight(todayMainFoodGrams))",
-                    en: "\(pet.mainFoodKind.title(l)) · today \(formattedFoodCardWeight(todayMainFoodGrams))",
-                    de: "\(pet.mainFoodKind.title(l)) · heute \(formattedFoodCardWeight(todayMainFoodGrams))"
-                )
-                primaryTitle = l.tr(zh: "喂食", en: "Feed", de: "Füttern")
-                primaryIcon = "checkmark"
-                isPrimaryEnabled = true
-            case .manualReminder:
-                let hasPending = snapshot.hasNextManualReminder
-                let hasMissedPlan = snapshot.hasMissedManualPlan
-                let completionText = snapshot.todayManualPlanCompletionText
-                title = hasMissedPlan
-                    ? l.tr(zh: "有计划餐待补", en: "Meal missed", de: "Mahlzeit verpasst")
-                    : (hasPending ? l.tr(zh: "有计划餐待打卡", en: "Planned meal ready", de: "Planmahlzeit bereit") : l.tr(zh: "下一餐已安排", en: "Next meal is set", de: "Nächste Mahlzeit steht"))
-                metricTitle = l.tr(zh: "今日计划", en: "Today plan", de: "Heute Plan")
-                metricValue = completionText
-                detail = nextFeedDetailText(
-                    events: snapshot.manualPlanEvents,
-                    fallback: l.tr(zh: "今天 \(completionText)", en: "Today \(completionText)", de: "Heute \(completionText)")
-                )
-                primaryTitle = hasPending ? l.tr(zh: "完成", en: "Complete", de: "Erledigen") : l.tr(zh: "查看", en: "View", de: "Ansehen")
-                primaryIcon = hasPending ? "checkmark" : "calendar"
-                isPrimaryEnabled = true
-            case .autoFeeder:
-                title = l.tr(zh: "自动记录中", en: "Auto logging", de: "Auto-Aufzeichnung")
-                metricTitle = l.tr(zh: "今日自动", en: "Auto today", de: "Heute Auto")
-                metricValue = "\(snapshot.todayAutoFeedCount)x"
-                detail = nextFeedDetailText(events: snapshot.autoFeederEvents, fallback: autoFeederStatusText(snapshot))
-                primaryTitle = l.tr(zh: "历史", en: "History", de: "Verlauf")
-                primaryIcon = "chart.line.uptrend.xyaxis"
-                isPrimaryEnabled = true
-            }
-        }
-
-        return FeedGuidedTaskState(
-            modeTitle: feedModeShortTitle(mode),
-            modeIcon: feedModeIcon(mode),
-            modeTint: feedModeTint(mode),
-            title: title,
-            metricTitle: metricTitle,
-            metricValue: metricValue,
-            detail: detail,
-            primaryTitle: primaryTitle,
-            primaryIcon: primaryIcon,
-            isPrimaryEnabled: isPrimaryEnabled,
-            metrics: guidedFeedMetrics(snapshot),
-            feedbackToken: feedFeedbackToken,
-            stockFeedbackToken: stockFeedbackToken
-        )
-    }
-
-    private func guidedFeedMetrics(_ snapshot: QuickFeedHomeSnapshot) -> [FeedGuidedMetric] {
-        feedingCardMetricLines(snapshot).map { line in
-            FeedGuidedMetric(
-                id: line.id,
-                title: line.title,
-                value: line.value,
-                tint: line.tint,
-                isHighlighted: line.isCurrent || line.id == feedFeedbackMetricId
-            )
-        }
-    }
-
-    private var guidedFeedModeOptions: [FeedGuidedModeOption] {
-        let currentMode = activeFeedingMode
-        return FeedOperatingMode.allCases.map { mode in
-            FeedGuidedModeOption(
-                id: mode.rawValue,
-                title: feedModeShortTitle(mode),
-                icon: feedModeIcon(mode),
-                tint: feedModeTint(mode),
-                isSelected: currentMode == mode
-            ) {
-                handleFeedModeChipTap(mode)
-            }
-        }
-    }
-
-    private func guidedFeedChart(_ snapshot: QuickFeedHomeSnapshot) -> FeedGuidedChartState {
-        let points = snapshot.guidedSevenDayMainFoodPoints
-        let total = points.reduce(0) { $0 + $1.value }
-        return FeedGuidedChartState(
-            title: l.tr(zh: "7日进食", en: "7-day food", de: "7 Tage Futter"),
-            value: total > 0 ? formattedFoodCardWeight(total) : "--",
-            subtitle: l.tr(zh: "只看趋势，详情进总览。", en: "A quiet trend. Details in overview.", de: "Ruhiger Trend. Details im Überblick."),
-            points: points,
-            tint: mainFoodOverviewTint,
-            progress: overviewChartProgress,
-            emptyText: l.tr(zh: "打卡后会出现趋势", en: "Log meals to see the trend", de: "Nach Einträgen erscheint ein Trend"),
-            action: openFeedingOverview
-        )
-    }
-
-    private func guidedFeedDockItems(_ snapshot: QuickFeedHomeSnapshot) -> [FeedDiscoveryDockItem] {
-        [
-            FeedDiscoveryDockItem(
-                id: "stock",
-                icon: "shippingbox.fill",
-                title: l.tr(zh: "粮仓", en: "Stock", de: "Vorrat"),
-                value: stockCardValue(snapshot),
-                tint: stockTint
-            ) {
-                openRootFeedSheet(.stockOverview)
-            },
-            FeedDiscoveryDockItem(
-                id: "treat",
-                icon: "birthday.cake.fill",
-                title: l.tr(zh: "零食", en: "Treats", de: "Snacks"),
-                value: snapshot.todayTreatCount > 0 ? "\(snapshot.todayTreatCount)x" : "--",
-                tint: treatTint
-            ) {
-                openRootFeedSheet(.treatOverview)
-            },
-            FeedDiscoveryDockItem(
-                id: "history",
-                icon: "clock.arrow.circlepath",
-                title: l.tr(zh: "历史", en: "History", de: "Verlauf"),
-                value: feedModeShortTitle(activeFeedingMode),
-                tint: feedingModeTint
-            ) {
-                if activeFeedingMode == .manual {
-                    openRootFeedSheet(.history)
-                } else {
-                    openRootFeedSheet(.feedModeHistory)
-                }
-            },
-            FeedDiscoveryDockItem(
-                id: "manage",
-                icon: "slider.horizontal.3",
-                title: l.tr(zh: "管理", en: "Manage", de: "Verwalten"),
-                value: feedModeShortTitle(activeFeedingMode),
-                tint: Color.goPrimary
-            ) {
-                openFeedSheet(.manage)
-            }
-        ]
-    }
-
-    private var lightweightGuidedFeedDockItems: [FeedDiscoveryDockItem] {
-        [
-            FeedDiscoveryDockItem(
-                id: "stock",
-                icon: "shippingbox.fill",
-                title: l.tr(zh: "粮仓", en: "Stock", de: "Vorrat"),
-                value: "--",
-                tint: stockTint
-            ) {
-                openRootFeedSheet(.stockOverview)
-            },
-            FeedDiscoveryDockItem(
-                id: "treat",
-                icon: "birthday.cake.fill",
-                title: l.tr(zh: "零食", en: "Treats", de: "Snacks"),
-                value: "--",
-                tint: treatTint
-            ) {
-                openRootFeedSheet(.treatOverview)
-            },
-            FeedDiscoveryDockItem(
-                id: "history",
-                icon: "clock.arrow.circlepath",
-                title: l.tr(zh: "历史", en: "History", de: "Verlauf"),
-                value: feedModeShortTitle(activeFeedingMode),
-                tint: feedingModeTint
-            ) {
-                if activeFeedingMode == .manual {
-                    openRootFeedSheet(.history)
-                } else {
-                    openRootFeedSheet(.feedModeHistory)
-                }
-            },
-            FeedDiscoveryDockItem(
-                id: "manage",
-                icon: "slider.horizontal.3",
-                title: l.tr(zh: "管理", en: "Manage", de: "Verwalten"),
-                value: feedModeShortTitle(activeFeedingMode),
-                tint: Color.goPrimary
-            ) {
-                openFeedSheet(.manage)
-            }
-        ]
-    }
-
-    private var feedingHeroCard: some View {
-        let today = dashboard.today
-        return HStack(spacing: 16) {
-            FeedingBowlIllustration(
-                progress: today.progress,
-                tint: mainFoodTint,
-                secondaryTint: pet.mainFoodKind == .dry ? wetFoodTint : dryFoodTint,
-                isComplete: today.isComplete
-            )
-            .frame(width: 122, height: 112)
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text(heroTitle)
-                    .font(.system(size: 23, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.82)
-
-                HStack(spacing: 8) {
-                    FeedingMetricPill(
-                        title: l.tr(zh: "干粮", en: "Dry", de: "Trocken"),
-                        value: dashboard.todayDryFoodGrams > 0 ? formattedFoodWeight(dashboard.todayDryFoodGrams) : "--",
-                        tint: dryFoodTint
-                    )
-                    FeedingMetricPill(
-                        title: l.tr(zh: "湿粮", en: "Wet", de: "Nass"),
-                        value: dashboard.todayWetFoodGrams > 0 ? formattedFoodWeight(dashboard.todayWetFoodGrams) : "--",
-                        tint: wetFoodTint
-                    )
-                    FeedingMetricPill(
-                        title: l.tr(zh: "零食", en: "Treat", de: "Snack"),
-                        value: dashboard.todayTreatGrams > 0 ? formattedFoodWeight(dashboard.todayTreatGrams) : "--",
-                        tint: treatTint
-                    )
-                }
-
-                feedModeSelector
-
-                Text(heroSubtitle)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(16)
-    }
-
-    private var coreCards: some View {
-        VStack(spacing: 12) {
-            CoreFoodCard(
-                title: l.tr(zh: "喂食", en: "Feed", de: "Füttern"),
-                value: feedingCardValue,
-                subtitle: feedingCardSubtitle,
-                icon: "fork.knife.circle.fill",
-                tint: feedingModeTint,
-                metricLines: feedingCardMetricLines,
-                primaryTitle: feedingPrimaryTitle,
-                primaryIcon: feedingPrimaryIcon,
-                secondaryTitle: feedingSecondaryTitle,
-                secondaryIcon: feedingSecondaryIcon,
-                cardAction: openFeedingOverview,
-                primaryLongPressAction: feedPrimaryLongPressAction,
-                feedbackToken: feedFeedbackToken,
-                highlightMetricId: feedFeedbackMetricId
-            ) {
-                handleFeedPrimaryTap()
-            } secondaryAction: {
-                handleFeedSettingsTap()
-            }
-
-            StockFoodCard(
-                title: l.tr(zh: "余粮", en: "Stock", de: "Vorrat"),
-                drySnapshot: dashboard.stock(foodKind: .dry),
-                wetSnapshot: dashboard.stock(foodKind: .wet),
-                dryTitle: FeedFoodKind.dry.title(l),
-                wetTitle: FeedFoodKind.wet.title(l),
-                emptyText: l.tr(zh: "先添加购买记录", en: "Add a restock", de: "Nachfüllung hinzufügen"),
-                primaryTitle: l.tr(zh: "补粮", en: "Restock", de: "Nachfüllen"),
-                primaryIcon: "plus",
-                secondaryTitle: l.tr(zh: "管理", en: "Manage", de: "Verwalten"),
-                secondaryIcon: "slider.horizontal.3",
-                cardAction: { openRootFeedSheet(.stockOverview) },
-                stockPulseKind: stockFeedbackKind,
-                stockFeedbackToken: stockFeedbackToken
-            ) {
-                guard !pet.hasPassedAway else {
-                    openRootFeedSheet(.stockOverview)
-                    return
-                }
-                prepareStockSheet()
-                openFeedSheet(.stock)
-            } secondaryAction: {
-                guard !pet.hasPassedAway else {
-                    openRootFeedSheet(.stockOverview)
-                    return
-                }
-                prepareStockManageSheet()
-                openFeedSheet(.stockManage)
-            }
-
-            CoreFoodCard(
-                title: l.tr(zh: "零食", en: "Treats", de: "Snacks"),
-                value: dashboard.todayTreatGrams > 0 ? formattedFoodWeight(dashboard.todayTreatGrams) : "--",
-                subtitle: l.tr(zh: "不扣主粮库存", en: "Does not reduce stock", de: "Zieht keinen Vorrat ab"),
-                icon: "birthday.cake.fill",
-                tint: treatTint,
-                primaryTitle: l.tr(zh: "记录", en: "Log", de: "Loggen"),
-                primaryIcon: "plus",
-                secondaryTitle: l.tr(zh: "总览", en: "Overview", de: "Übersicht"),
-                secondaryIcon: "chart.pie.fill",
-                cardAction: { openRootFeedSheet(.treatOverview) },
-                feedbackToken: treatFeedbackToken
-            ) {
-                guard !pet.hasPassedAway else {
-                    openRootFeedSheet(.treatOverview)
-                    return
-                }
-                openTreatFeedSheet()
-            } secondaryAction: {
-                openRootFeedSheet(.treatOverview)
-            }
-        }
-    }
-
-    private var recentRecordsCard: some View {
-        let logs = Array(dashboard.recentFeedLogs.prefix(4))
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(l.tr(zh: "今天", en: "Today", de: "Heute"))
-                    .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Spacer()
-                Button {
-                    openRootFeedSheet(.history)
-                } label: {
-                    Text(l.tr(zh: "全部", en: "All", de: "Alle"))
-                        .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.goPrimary)
-                }
-                .buttonStyle(ScaleButtonStyle())
-            }
-
-            if logs.isEmpty {
-                HStack(spacing: 10) {
-                    Image(systemName: "fork.knife")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Color.goPrimary)
-                    Text(l.tr(zh: "还没有记录", en: "No logs yet", de: "Noch keine Einträge"))
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                    Spacer()
-                }
-                .padding(.vertical, 8)
-            } else {
-                ForEach(logs) { log in
-                    feedLogRow(log, compact: true)
-                }
-            }
-        }
-        .padding(16)
-        .feedFlatBlockSurface(cornerRadius: 22)
+        .body
     }
 
     private var toastView: some View {
@@ -1976,7 +1689,7 @@ struct QuickFeedDetailSheet: View {
             manageRow(
                 icon: "shippingbox.fill",
                 title: l.tr(zh: "余粮记录", en: "Stock records", de: "Vorratseinträge"),
-                value: "\(pet.foodRecords.count)",
+                value: "\(observedFoodRecords.count)",
                 tint: stockTint
             ) {
                 openFeedSheet(.stockRecords)
@@ -1984,7 +1697,7 @@ struct QuickFeedDetailSheet: View {
             manageRow(
                 icon: "clock.arrow.circlepath",
                 title: l.tr(zh: "完整历史", en: "Full history", de: "Historie"),
-                value: "\(pet.careLogs.filter { $0.careType == .feeding }.count)",
+                value: "\(observedCareLogs.count)",
                 tint: Color.goPrimary
             ) {
                 openFeedSheet(.history)
@@ -2002,9 +1715,7 @@ struct QuickFeedDetailSheet: View {
     }
 
     private var historySheet: some View {
-        let logs = pet.careLogs
-            .filter { $0.careType == .feeding }
-            .sorted { $0.date > $1.date }
+        let logs = observedCareLogs.sorted { $0.date > $1.date }
         return ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if logs.isEmpty {
@@ -2078,7 +1789,7 @@ struct QuickFeedDetailSheet: View {
     }
 
     private var stockRecordsSheet: some View {
-        let records = pet.foodRecords.sorted { $0.startDate > $1.startDate }
+        let records = observedFoodRecords.sorted { $0.startDate > $1.startDate }
         return ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if records.isEmpty {
@@ -2619,35 +2330,11 @@ struct QuickFeedDetailSheet: View {
     }
 
     private var feedModeSelector: some View {
-        HStack(spacing: 8) {
-            feedModeChip(.manual)
-            feedModeChip(.manualReminder)
-            feedModeChip(.autoFeeder)
-        }
-        .padding(4)
-        .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
-    }
-
-    private func feedModeChip(_ mode: FeedOperatingMode) -> some View {
-        let selected = activeFeedingMode == mode
-        let tint = feedModeTint(mode)
-        return Button {
-            handleFeedModeChipTap(mode)
-        } label: {
-            HStack(spacing: 5) {
-                Image(systemName: feedModeIcon(mode))
-                    .font(.system(size: 10, weight: .black))
-                Text(feedModeShortTitle(mode))
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
-            }
-            .foregroundStyle(selected ? Color.arkInk : tint)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background(selected ? tint : Color.clear, in: Capsule())
-        }
-        .buttonStyle(ScaleButtonStyle())
+        QuickFeedModeSelector(
+            localization: l,
+            selectedMode: activeFeedingMode,
+            onSelect: handleFeedModeChipTap
+        )
     }
 
     private func handleFeedModeChipTap(_ mode: FeedOperatingMode) {
@@ -4308,7 +3995,7 @@ struct QuickFeedDetailSheet: View {
                 openManualFeedSheet(settingsOnly: true)
             }
         case .manualReminder:
-            if dashboard.nextManualReminder != nil {
+            if feedHomeController.viewState.primaryActionState == .completeManualPlan {
                 completeNextPlannedFeed()
             } else {
                 openFeedModeHistory()
@@ -4335,36 +4022,18 @@ struct QuickFeedDetailSheet: View {
         }
     }
 
-    private func syncDisplayedFeedMode(animated: Bool = false) {
+    private func syncDisplayedFeedMode(animated: Bool = false, force: Bool = false) {
+        guard force || feedHomeController.modeTransition == nil else { return }
         let resolvedMode = FeedOperatingMode.resolved(pet: pet, allEvents: allEvents, now: clockTick)
-        guard displayedFeedMode != resolvedMode else { return }
-        if animated {
-            withAnimation(GoMotion.quick) {
-                displayedFeedMode = resolvedMode
-            }
-        } else {
-            displayedFeedMode = resolvedMode
-        }
-        feedModeStorageTick += 1
+        feedHomeController.syncDisplayedMode(resolvedMode, pet: pet, animated: animated, force: force)
     }
 
-    private func makeFeedHomeSnapshot() -> QuickFeedHomeSnapshot {
-        QuickFeedHomeSnapshot.make(
-            pet: pet,
-            allEvents: allEvents,
-            careLogs: observedCareLogs,
-            foodRecords: observedFoodRecords,
-            now: clockTick,
-            todayLabel: l.tr(zh: "今", en: "T", de: "H")
-        )
-    }
-
-    private func refreshFeedHomeSnapshot() {
-        feedHomeSnapshot = makeFeedHomeSnapshot()
+    private func refreshFeedHomeSnapshot(force: Bool = false) {
+        feedHomeController.rebuild(input: feedHomeSnapshotInput, force: force)
     }
 
     private func bootstrap() {
-        feedHomeAuxiliaryReady = false
+        feedHomeController.setAuxiliaryReady(false)
         if manualGramsText.isEmpty, let grams = currentPortionAmount {
             manualGramsText = String(format: "%.0f", grams)
         }
@@ -4382,9 +4051,7 @@ struct QuickFeedDetailSheet: View {
 
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 90_000_000)
-            withAnimation(GoMotion.quick) {
-                feedHomeAuxiliaryReady = true
-            }
+            feedHomeController.setAuxiliaryReady(true, animated: true)
         }
 
         if !didScheduleBootstrapMaintenance {
@@ -4512,10 +4179,13 @@ struct QuickFeedDetailSheet: View {
             return
         }
         inputError = nil
-        pet.mainFoodKind = manualFoodKindDraft
-        pet.dailyPortionGrams = grams
+        ManualFeedCommand.saveSettings(
+            pet: pet,
+            foodKind: manualFoodKindDraft,
+            grams: grams,
+            context: modelContext
+        )
         defaultFeedGrams = grams
-        modelContext.safeSave()
         reloadFeedSnapshots()
         dismissInlineFeedSheet()
         triggerToast(
@@ -4527,40 +4197,26 @@ struct QuickFeedDetailSheet: View {
     private func commitManualFeed(grams: Double, saveAsDefault: Bool, foodKind selectedFoodKind: FeedFoodKind? = nil) {
         inputError = nil
         let foodKind = selectedFoodKind ?? manualFoodKindDraft
-        let hadStock = dashboard.stock(foodKind: foodKind).totalGrams > 0
-        let quality = QuestManager.QualityBonus.compose(precise: true, hasNote: false, hasPhoto: false)
         let action = {
-            pet.mainFoodKind = foodKind
             if saveAsDefault {
-                pet.dailyPortionGrams = grams
                 defaultFeedGrams = grams
             }
-            let targets = selectedFeedTargets
-            if targets.count > 1 {
-                _ = CareEventService.recordSharedManualFeed(
-                    sourcePet: pet,
-                    targets: targets,
-                    totalGrams: grams,
-                    foodKind: foodKind,
-                    context: modelContext,
-                    executorId: currentUserId,
-                    quality: quality
-                )
-            } else {
-                _ = CareEventService.recordManualFeed(
-                    pet: pet,
-                    amountGrams: grams,
-                    context: modelContext,
-                    executorId: currentUserId,
-                    quality: quality,
-                    foodKind: foodKind
-                )
-            }
-            triggerFeedCheckInFeedback(foodKind: foodKind, grams: grams, affectsStock: hadStock)
-            let message = targets.count > 1
-                ? l.tr(zh: "共同喂食 · \(targets.count)只", en: "Shared feeding · \(targets.count)", de: "Gemeinsam gefüttert · \(targets.count)")
-                : l.tr(zh: "已记录\(foodKind.title(l))", en: "\(foodKind.title(l)) saved", de: "\(foodKind.title(l)) gespeichert")
-            afterFoodLogSaved(message: message, tint: mainFoodTint)
+            let result = ManualFeedCommand.recordManual(
+                pet: pet,
+                targets: selectedFeedTargets,
+                grams: grams,
+                foodKind: foodKind,
+                saveAsDefault: saveAsDefault,
+                foodRecords: observedFoodRecords,
+                allEvents: allEvents,
+                context: modelContext,
+                executorId: currentUserId
+            )
+            triggerFeedCheckInFeedback(foodKind: result.foodKind, grams: result.grams, affectsStock: result.affectsStock)
+            let message = result.targetCount > 1
+                ? l.tr(zh: "共同喂食 · \(result.targetCount)只", en: "Shared feeding · \(result.targetCount)", de: "Gemeinsam gefüttert · \(result.targetCount)")
+                : l.tr(zh: "已记录\(result.foodKind.title(l))", en: "\(result.foodKind.title(l)) saved", de: "\(result.foodKind.title(l)) gespeichert")
+            afterFoodLogSaved(message: message, tint: mainFoodTint, stockReminders: result.stockReminders)
         }
         performWithAntiRepeat(action)
     }
@@ -4576,20 +4232,21 @@ struct QuickFeedDetailSheet: View {
     }
 
     private func completePlannedFeed(_ reminder: Reminder) {
-        let event = reminder.event
-        let foodKind = event?.foodKind ?? pet.mainFoodKind
-        let grams = event.map { FeedRuleMetadata.amountGrams(from: $0, fallback: pet.dailyPortionGrams) } ?? pet.dailyPortionGrams
-        let hadStock = dashboard.stock(foodKind: foodKind).totalGrams > 0
         let action = {
-            _ = CareEventService.completePlannedFeed(
+            let result = ManualFeedCommand.completePlanned(
                 pet: pet,
                 reminder: reminder,
+                foodRecords: observedFoodRecords,
+                allEvents: allEvents,
                 context: modelContext,
-                quality: .precise,
                 executorId: currentUserId
             )
-            triggerFeedCheckInFeedback(foodKind: foodKind, grams: grams, affectsStock: hadStock)
-            afterFoodLogSaved(message: l.tr(zh: "计划餐已完成", en: "Planned meal done", de: "Planmahlzeit erledigt"), tint: Color.goPurple)
+            triggerFeedCheckInFeedback(foodKind: result.foodKind, grams: result.grams, affectsStock: result.affectsStock)
+            afterFoodLogSaved(
+                message: l.tr(zh: "计划餐已完成", en: "Planned meal done", de: "Planmahlzeit erledigt"),
+                tint: Color.goPurple,
+                stockReminders: result.stockReminders
+            )
         }
         performWithAntiRepeat(action)
     }
@@ -4599,10 +4256,12 @@ struct QuickFeedDetailSheet: View {
         if let existingReminder = occurrence.reminder {
             reminder = existingReminder
         } else {
-            let created = Reminder(event: occurrence.event, scheduledAt: occurrence.date)
-            modelContext.insert(created)
-            modelContext.safeSave()
-            reminder = created
+            reminder = FeedMaintenanceCommand.reminder(
+                for: occurrence.event,
+                scheduledAt: occurrence.date,
+                existing: nil,
+                context: modelContext
+            )
         }
         completePlannedFeed(reminder)
     }
@@ -4614,16 +4273,16 @@ struct QuickFeedDetailSheet: View {
             inputError = l.tr(zh: "请输入有效克数，或留空。", en: "Enter valid grams or leave it empty.", de: "Gültige Gramm oder leer lassen.")
             return
         }
-        _ = CareEventService.recordTreatFeed(
+        let result = TreatFeedCommand.record(
             pet: pet,
-            amountGrams: grams,
+            grams: grams,
+            treatKind: selectedTreatKind,
             context: modelContext,
-            executorId: currentUserId,
-            treatKind: selectedTreatKind
+            executorId: currentUserId
         )
         showTreatSavedCelebration()
-        triggerTreatCheckInFeedback(grams: grams)
-        afterFoodLogSaved(message: l.tr(zh: "已记录零食", en: "Treat saved", de: "Snack gespeichert"), tint: treatTint, rebuildStock: false)
+        triggerTreatCheckInFeedback(grams: result.grams)
+        afterFoodLogSaved(message: l.tr(zh: "已记录零食", en: "Treat saved", de: "Snack gespeichert"), tint: treatTint)
     }
 
     private func savePlan(_ kind: FeedRuleKind) {
@@ -4635,52 +4294,30 @@ struct QuickFeedDetailSheet: View {
         }
         let draft = FeedPlanDraft(kind: kind, meals: normalizedMeals)
         let targets = selectedPlanTargets
-        var createdReminders: [Reminder] = []
-        var latestEvents = targets.count > 1 ? latestAllEvents() : allEvents
-
-        for target in targets {
-            let result = FeedingPlanWriter.replacePlan(
-                pet: target,
-                draft: draft,
-                allEvents: latestEvents,
-                context: modelContext
-            )
-            latestEvents = latestEvents
-                .filter { existing in
-                    switch kind {
-                    case .manualReminder:
-                        return !FeedRuleMetadata.isManualReminderEvent(existing, pet: target)
-                    case .autoFeeder:
-                        return !FeedRuleMetadata.isAutoFeederEvent(existing, pet: target)
-                    }
-                } + result.events
-            FeedOperatingMode.set(target.id, mode: kind == .manualReminder ? .manualReminder : .autoFeeder)
-            HomeFeedRecordMode.set(target.id, mode: .planned)
-
-            if kind == .manualReminder {
-                createdReminders.append(contentsOf: result.reminders)
-            } else {
-                FeedingPlanWriter.deactivateManualReminderOperations(
-                    pet: target,
-                    allEvents: latestEvents,
-                    context: modelContext
-                )
-                _ = FeedAutoLogMaterializer.materializeDueLogs(pet: target, allEvents: latestEvents, context: modelContext)
-            }
-            scheduleStockReminders(FeedingPlanWriter.rebuildFoodStockReminders(pet: target, allEvents: latestEvents, context: modelContext))
-        }
+        let result = SaveFeedPlanCommand.run(
+            pet: pet,
+            targets: targets,
+            kind: kind,
+            draft: draft,
+            allEvents: targets.count > 1 ? latestAllEvents() : allEvents,
+            context: modelContext
+        )
 
         if kind == .manualReminder {
-            scheduleReminders(createdReminders)
+            scheduleReminders(result.planReminders)
         }
+        scheduleStockReminders(result.stockReminders)
         reloadFeedSnapshots()
         closeActiveFeedSheet()
-        setActiveFeedMode(kind == .manualReminder ? .manualReminder : .autoFeeder)
+        performFeedModeUpdatesWithoutAnimation {
+            feedHomeController.setModeImmediately(result.mode, pet: pet)
+        }
+        UISelectionFeedbackGenerator().selectionChanged()
         triggerToast(
-            targets.count > 1
+            result.targetCount > 1
                 ? (kind == .manualReminder
-                   ? l.tr(zh: "共同计划已保存 · \(targets.count)只", en: "Shared plan saved · \(targets.count)", de: "Gemeinsamer Plan · \(targets.count)")
-                   : l.tr(zh: "共同自动记录已保存 · \(targets.count)只", en: "Shared auto saved · \(targets.count)", de: "Gemeinsame Auto-Regel · \(targets.count)"))
+                   ? l.tr(zh: "共同计划已保存 · \(result.targetCount)只", en: "Shared plan saved · \(result.targetCount)", de: "Gemeinsamer Plan · \(result.targetCount)")
+                   : l.tr(zh: "共同自动记录已保存 · \(result.targetCount)只", en: "Shared auto saved · \(result.targetCount)", de: "Gemeinsame Auto-Regel · \(result.targetCount)"))
                 : (kind == .manualReminder
                    ? l.tr(zh: "喂食计划已保存", en: "Plan saved", de: "Plan gespeichert")
                    : l.tr(zh: "自动记录已保存", en: "Auto feeder saved", de: "Automat gespeichert")),
@@ -4693,18 +4330,15 @@ struct QuickFeedDetailSheet: View {
             closeActiveFeedSheet()
             return
         }
-        withAnimation(GoMotion.page) {
-            setActiveFeedMode(.manual)
-        }
-        closeActiveFeedSheet()
-        runDeferredFeedModeMaintenance {
-            FeedingPlanWriter.deactivateManualReminderOperations(
+        beginFeedModeVisualTransition(to: .manual) {
+            SwitchFeedModeCommand.switchToManual(
                 pet: pet,
                 allEvents: latestAllEvents(),
                 context: modelContext
             )
-            reloadFeedSnapshots()
+            reloadFeedSnapshots(forceSnapshot: true)
         }
+        closeActiveFeedSheet()
     }
 
     private func activateExistingFeedRuleMode(_ kind: FeedRuleKind) {
@@ -4714,42 +4348,29 @@ struct QuickFeedDetailSheet: View {
             return
         }
 
-        withAnimation(GoMotion.page) {
-            setActiveFeedMode(targetMode)
-        }
-        closeActiveFeedSheet()
-
-        runDeferredFeedModeMaintenance {
+        beginFeedModeVisualTransition(to: targetMode) {
             let currentEvents = latestAllEvents()
-            let targetEvents = FeedingPlanWriter.planEvents(pet: pet, kind: kind, allEvents: currentEvents)
-            guard !targetEvents.isEmpty else {
-                syncDisplayedFeedMode(animated: true)
+            let result = SwitchFeedModeCommand.activateExistingRule(
+                pet: pet,
+                kind: kind,
+                allEvents: currentEvents,
+                context: modelContext
+            )
+
+            switch result {
+            case .missingPlan:
+                performFeedModeUpdatesWithoutAnimation {
+                    feedHomeController.cancelModeTransition()
+                }
+                syncDisplayedFeedMode(force: true)
                 openPlanEditor(kind)
                 return
+            case .switched(let reminders):
+                scheduleReminders(reminders)
             }
-
-            if kind == .manualReminder {
-                scheduleReminders(
-                    FeedingPlanWriter.ensureUpcomingManualReminders(
-                        pet: pet,
-                        allEvents: targetEvents,
-                        context: modelContext
-                    )
-                )
-            } else {
-                FeedingPlanWriter.deactivateManualReminderOperations(
-                    pet: pet,
-                    allEvents: currentEvents,
-                    context: modelContext
-                )
-                _ = FeedAutoLogMaterializer.materializeDueLogs(
-                    pet: pet,
-                    allEvents: targetEvents,
-                    context: modelContext
-                )
-            }
-            reloadFeedSnapshots()
+            reloadFeedSnapshots(forceSnapshot: true)
         }
+        closeActiveFeedSheet()
     }
 
     private func eventsReplacingFeedRules(kind: FeedRuleKind, with replacement: [Event]) -> [Event] {
@@ -4764,16 +4385,78 @@ struct QuickFeedDetailSheet: View {
     }
 
     private func setActiveFeedMode(_ mode: FeedOperatingMode) {
-        displayedFeedMode = mode
-        FeedOperatingMode.set(pet.id, mode: mode)
-        feedModeStorageTick += 1
-        switch mode {
-        case .manual:
-            HomeFeedRecordMode.set(pet.id, mode: .manual)
-        case .manualReminder, .autoFeeder:
-            HomeFeedRecordMode.set(pet.id, mode: .planned)
+        performFeedModeUpdatesWithoutAnimation {
+            feedHomeController.setModeImmediately(mode, pet: pet)
+            commitFeedModeSideEffects(mode)
         }
         UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    private func commitFeedModeSideEffects(_ mode: FeedOperatingMode) {
+        SetFeedModeCommand.run(mode, pet: pet)
+    }
+
+    private func beginFeedModeVisualTransition(
+        to targetMode: FeedOperatingMode,
+        commitAfterAnimation: @escaping @MainActor () -> Void
+    ) {
+        let fromMode = activeFeedingMode
+        guard fromMode != targetMode else {
+            UISelectionFeedbackGenerator().selectionChanged()
+            return
+        }
+
+        feedModeMaintenanceTask?.cancel()
+        guard let transitionID = feedHomeController.beginOptimisticModeTransition(to: targetMode, pet: pet) else { return }
+
+        UISelectionFeedbackGenerator().selectionChanged()
+        withAnimation(feedModeTransitionAnimation) {
+            feedHomeController.updateModeTransition(id: transitionID, progress: 1)
+        }
+
+        scheduleFeedModeSideEffectsAfterAnimation(transitionID: transitionID, commit: commitAfterAnimation)
+    }
+
+    private var feedModeTransitionAnimation: Animation {
+        workloadPolicy.interactionMotionBudget(isVisible: true).allowsMotion ? GoMotion.page : GoMotion.reduced
+    }
+
+    private var feedModeTransitionDelayMilliseconds: UInt64 {
+        workloadPolicy.interactionMotionBudget(isVisible: true).allowsMotion ? 340 : 130
+    }
+
+    private func scheduleFeedModeSideEffectsAfterAnimation(
+        transitionID: UUID,
+        commit: @escaping @MainActor () -> Void
+    ) {
+        feedModeMaintenanceTask = Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: feedModeTransitionDelayMilliseconds)
+            guard !Task.isCancelled,
+                  feedHomeController.modeTransition?.id == transitionID else { return }
+
+            performFeedModeUpdatesWithoutAnimation {
+                FeedHomePerformance.measure("mode.sideEffects") {
+                    commit()
+                }
+            }
+
+            await OhanaFrameScheduler.waitAfterNextFrame()
+            guard !Task.isCancelled,
+                  feedHomeController.modeTransition?.id == transitionID else { return }
+
+            performFeedModeUpdatesWithoutAnimation {
+                feedHomeController.finishModeTransition(id: transitionID)
+            }
+            feedModeMaintenanceTask = nil
+        }
+    }
+
+    private func performFeedModeUpdatesWithoutAnimation(_ updates: () -> Void) {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            updates()
+        }
     }
 
     private func latestAllEvents() -> [Event] {
@@ -4788,18 +4471,16 @@ struct QuickFeedDetailSheet: View {
         FeedingPlanWriter.planEvents(pet: pet, kind: kind, allEvents: allEvents)
     }
 
-    private func runDeferredFeedModeMaintenance(_ operation: @escaping @MainActor () -> Void) {
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 180_000_000)
-            operation()
-        }
-    }
-
     private func deletePlan(_ kind: FeedRuleKind) {
-        FeedingPlanWriter.deletePlan(pet: pet, kind: kind, allEvents: allEvents, context: modelContext)
-        scheduleStockReminders(FeedingPlanWriter.rebuildFoodStockReminders(pet: pet, allEvents: latestAllEvents(), context: modelContext))
-        if (kind == .manualReminder && activeFeedingMode == .manualReminder) ||
-            (kind == .autoFeeder && activeFeedingMode == .autoFeeder) {
+        let result = DeleteFeedPlanCommand.run(
+            pet: pet,
+            kind: kind,
+            activeMode: activeFeedingMode,
+            allEvents: allEvents,
+            context: modelContext
+        )
+        scheduleStockReminders(result.stockReminders)
+        if result.shouldSwitchToManual {
             setActiveFeedMode(.manual)
         }
         closeActiveFeedSheet()
@@ -4812,14 +4493,14 @@ struct QuickFeedDetailSheet: View {
             inputError = l.tr(zh: "请输入购买重量。", en: "Enter stock weight.", de: "Vorratsgewicht eingeben.")
             return
         }
-        let previousExpenseId = editingFoodRecord.flatMap { stockExpenseId(from: $0.notes) }
+        let previousExpenseId = editingFoodRecord.flatMap { FeedStockExpenseLink.expenseId(from: $0.notes) }
         let expenseAmountText = stockExpenseAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
         let expenseAmount = expenseAmountText.isEmpty ? nil : parsePositiveDouble(expenseAmountText)
         if !expenseAmountText.isEmpty, (expenseAmount ?? 0) <= 0 {
             inputError = l.tr(zh: "请输入有效金额，或留空。", en: "Enter a valid amount or leave it blank.", de: "Gültigen Betrag eingeben oder leer lassen.")
             return
         }
-        let savedRecord = FeedingPlanWriter.saveFoodPurchase(
+        let result = SaveFoodStockCommand.run(
             pet: pet,
             brand: stockBrandText,
             totalGrams: totalGrams,
@@ -4832,17 +4513,15 @@ struct QuickFeedDetailSheet: View {
             executorId: currentUserId,
             allEvents: allEvents,
             context: modelContext,
-            recordToUpdate: editingFoodRecord
-        )
-        syncStockExpenseIfNeeded(
-            record: savedRecord,
+            recordToUpdate: editingFoodRecord,
             previousExpenseId: previousExpenseId,
-            amount: expenseAmount,
-            payerId: stockExpensePayerId,
-            date: stockHasPurchaseDate ? stockPurchaseDate : Date()
+            expenseAmount: expenseAmount,
+            expensePayerId: stockExpensePayerId,
+            expenseDate: stockHasPurchaseDate ? stockPurchaseDate : Date(),
+            expenseNote: stockExpenseNote()
         )
         reloadFeedSnapshots()
-        scheduleStockReminders(FeedingPlanWriter.rebuildFoodStockReminders(pet: pet, allEvents: allEvents, context: modelContext))
+        scheduleStockReminders(result.stockReminders)
         editingFoodRecord = nil
         dismissInlineFeedSheet()
         triggerToast(l.tr(zh: "余粮已更新", en: "Stock updated", de: "Vorrat aktualisiert"), tint: stockTint)
@@ -4853,109 +4532,31 @@ struct QuickFeedDetailSheet: View {
         stockExpenseAmountText = ""
         stockExpenseAmountKeypadVisible = false
         guard let record,
-              let expenseId = stockExpenseId(from: record.notes),
-              let expense = fetchExpense(id: expenseId)
+              let expenseId = FeedStockExpenseLink.expenseId(from: record.notes),
+              let expense = FeedStockExpenseLink.fetchExpense(id: expenseId, context: modelContext)
         else { return }
         stockExpensePayerId = expense.executorId
         stockExpenseAmountText = String(format: "%.2f", expense.amount)
     }
 
-    private func syncStockExpenseIfNeeded(
-        record: PetFoodRecord,
-        previousExpenseId: UUID?,
-        amount: Double?,
-        payerId: String?,
-        date: Date
-    ) {
-        let cleanBrand = record.brand.trimmingCharacters(in: .whitespacesAndNewlines)
-        let kindTitle = record.foodKind.title(l)
+    private func stockExpenseNote() -> String {
+        let cleanBrand = stockBrandText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let kindTitle = selectedStockFoodKind.title(l)
         let note = cleanBrand.isEmpty
             ? l.tr(zh: "\(pet.name) \(kindTitle)补粮", en: "\(pet.name) \(kindTitle) restock", de: "\(pet.name) \(kindTitle) Nachfüllung")
             : l.tr(zh: "\(pet.name) \(kindTitle)补粮 · \(cleanBrand)", en: "\(pet.name) \(kindTitle) restock · \(cleanBrand)", de: "\(pet.name) \(kindTitle) Nachfüllung · \(cleanBrand)")
-
-        if let amount, amount > 0 {
-            let existingExpense = previousExpenseId.flatMap(fetchExpense(id:))
-            let createdExpense = existingExpense == nil
-            let expense = existingExpense ?? PetExpenseLog(
-                date: date,
-                amount: amount,
-                category: .food,
-                note: note,
-                pet: pet,
-                executorId: payerId
-            )
-            if createdExpense {
-                modelContext.insert(expense)
-            }
-            expense.date = date
-            expense.amount = amount
-            expense.category = ExpenseCategory.food.rawValue
-            expense.note = note
-            expense.executorId = payerId
-            expense.pet = pet
-            record.notes = notesWithStockExpenseLink(record.notes, expenseId: expense.id)
-            modelContext.safeSave()
-            if createdExpense {
-                CareLedgerService.record(
-                    occurredAt: expense.date,
-                    actorKind: payerId == nil ? .unknown : .human,
-                    actorId: payerId,
-                    subjectKind: .pet,
-                    subjectId: pet.id.uuidString,
-                    eventKind: .expense,
-                    actionType: ExpenseCategory.food.rawValue,
-                    amountValue: amount,
-                    amountUnit: "currency",
-                    note: note,
-                    source: .detail,
-                    legacyModelName: "PetExpenseLog",
-                    legacyModelId: expense.id.uuidString,
-                    context: modelContext,
-                    save: true
-                )
-            }
-        } else if let previousExpenseId {
-            record.notes = notesWithStockExpenseLink(record.notes, expenseId: previousExpenseId)
-            modelContext.safeSave()
-        }
-    }
-
-    private func fetchExpense(id: UUID) -> PetExpenseLog? {
-        var descriptor = FetchDescriptor<PetExpenseLog>(
-            predicate: #Predicate<PetExpenseLog> { expense in
-                expense.id == id
-            }
-        )
-        descriptor.fetchLimit = 1
-        return try? modelContext.fetch(descriptor).first
-    }
-
-    private func stockExpenseId(from notes: String) -> UUID? {
-        let prefix = "stockExpense:"
-        return notes
-            .components(separatedBy: "\n")
-            .compactMap { line -> UUID? in
-                guard line.hasPrefix(prefix) else { return nil }
-                return UUID(uuidString: String(line.dropFirst(prefix.count)))
-            }
-            .first
-    }
-
-    private func notesWithStockExpenseLink(_ notes: String, expenseId: UUID) -> String {
-        let visible = notes
-            .components(separatedBy: "\n")
-            .filter { !$0.hasPrefix("stockExpense:") }
-            .joined(separator: "\n")
-        return [visible, "stockExpense:\(expenseId.uuidString)"]
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n")
+        return note
     }
 
     private func saveStockReminderSettings() {
-        pet.foodReminderEnabled = stockReminderEnabled
-        pet.foodReminderAdvanceDays = stockReminderAdvanceDays
-        modelContext.safeSave()
-        scheduleStockReminders(FeedingPlanWriter.rebuildFoodStockReminders(pet: pet, allEvents: allEvents, context: modelContext))
+        let result = StockReminderSettingsCommand.run(
+            pet: pet,
+            enabled: stockReminderEnabled,
+            advanceDays: stockReminderAdvanceDays,
+            allEvents: allEvents,
+            context: modelContext
+        )
+        scheduleStockReminders(result.stockReminders)
         triggerToast(l.tr(zh: "余粮提醒已更新", en: "Stock reminder updated", de: "Vorratserinnerung aktualisiert"), tint: stockTint)
     }
 
@@ -4965,7 +4566,8 @@ struct QuickFeedDetailSheet: View {
             inputError = l.tr(zh: "请输入有效余量。", en: "Enter valid remaining stock.", de: "Gültigen Restbestand eingeben.")
             return
         }
-        _ = FeedingPlanWriter.correctFoodStock(
+        let result = CorrectStockCommand.run(
+            pet: pet,
             record: record,
             remainingGrams: grams,
             allEvents: allEvents,
@@ -4973,7 +4575,7 @@ struct QuickFeedDetailSheet: View {
         )
         reloadFeedSnapshots()
         prepareStockCorrectionText()
-        scheduleStockReminders(FeedingPlanWriter.rebuildFoodStockReminders(pet: pet, allEvents: allEvents, context: modelContext))
+        scheduleStockReminders(result.stockReminders)
         triggerToast(l.tr(zh: "余量已修正", en: "Stock corrected", de: "Vorrat korrigiert"), tint: stockTint)
     }
 
@@ -4995,39 +4597,50 @@ struct QuickFeedDetailSheet: View {
             inputError = l.tr(zh: "请输入有效克数。", en: "Enter valid grams.", de: "Bitte gültige Gramm eingeben.")
             return
         }
-        log.amountGrams = grams
-        log.date = editFeedLogDate
-        modelContext.safeSave()
+        let result = FeedRecordCommand.updateLog(
+            log,
+            grams: grams,
+            date: editFeedLogDate,
+            pet: pet,
+            allEvents: allEvents,
+            context: modelContext
+        )
         reloadFeedSnapshots()
-        scheduleStockReminders(FeedingPlanWriter.rebuildFoodStockReminders(pet: pet, allEvents: allEvents, context: modelContext))
+        scheduleStockReminders(result.stockReminders)
         closeActiveFeedSheet()
         triggerToast(l.tr(zh: "记录已更新", en: "Log updated", de: "Eintrag aktualisiert"), tint: mainFoodTint)
     }
 
     private func deleteFeedLog(_ log: PetCareLog) {
         if editingFeedLog?.id == log.id { editingFeedLog = nil }
-        modelContext.delete(log)
-        modelContext.safeSave()
+        let result = FeedRecordCommand.deleteLog(
+            log,
+            pet: pet,
+            allEvents: allEvents,
+            context: modelContext
+        )
         reloadFeedSnapshots()
-        scheduleStockReminders(FeedingPlanWriter.rebuildFoodStockReminders(pet: pet, allEvents: allEvents, context: modelContext))
+        scheduleStockReminders(result.stockReminders)
         triggerToast(l.tr(zh: "记录已删除", en: "Log deleted", de: "Eintrag gelöscht"), tint: Color.goRed)
     }
 
     private func deleteFoodRecord(_ record: PetFoodRecord) {
         if editingFoodRecord?.id == record.id { editingFoodRecord = nil }
-        modelContext.delete(record)
-        modelContext.safeSave()
+        let result = FeedRecordCommand.deleteFoodRecord(
+            record,
+            pet: pet,
+            allEvents: allEvents,
+            context: modelContext
+        )
         reloadFeedSnapshots()
         prepareStockCorrectionText()
-        scheduleStockReminders(FeedingPlanWriter.rebuildFoodStockReminders(pet: pet, allEvents: allEvents, context: modelContext))
+        scheduleStockReminders(result.stockReminders)
         triggerToast(l.tr(zh: "补粮记录已删除", en: "Stock record deleted", de: "Vorratseintrag gelöscht"), tint: Color.goRed)
     }
 
-    private func afterFoodLogSaved(message: String, tint: Color, rebuildStock: Bool = true) {
+    private func afterFoodLogSaved(message: String, tint: Color, stockReminders: [Reminder] = []) {
         reloadFeedSnapshots()
-        if rebuildStock {
-            scheduleStockReminders(FeedingPlanWriter.rebuildFoodStockReminders(pet: pet, allEvents: allEvents, context: modelContext))
-        }
+        scheduleStockReminders(stockReminders)
         closeActiveFeedSheet()
         triggerToast(message, tint: tint)
         checkDailyTargetToast()
@@ -5082,39 +4695,36 @@ struct QuickFeedDetailSheet: View {
 
     private func materializeAutoFeedLogs() {
         let currentEvents = latestAllEvents()
-        guard FeedOperatingMode.resolved(pet: pet, allEvents: currentEvents) == .autoFeeder else { return }
-        let inserted = FeedAutoLogMaterializer.materializeDueLogs(pet: pet, allEvents: currentEvents, context: modelContext)
-        if inserted > 0 {
+        let result = FeedMaintenanceCommand.materializeDueAutoLogs(
+            pet: pet,
+            allEvents: currentEvents,
+            context: modelContext
+        )
+        if result.insertedCount > 0 {
             reloadFeedSnapshots()
-            scheduleStockReminders(FeedingPlanWriter.rebuildFoodStockReminders(pet: pet, allEvents: allEvents, context: modelContext))
+            scheduleStockReminders(result.stockReminders)
         }
     }
 
-    private func reloadFeedSnapshots() {
-        let petID = pet.id
-        let feedingType = CareType.feeding.rawValue
-        let careDescriptor = FetchDescriptor<PetCareLog>(
-            predicate: #Predicate<PetCareLog> { log in
-                log.type == feedingType && log.pet?.id == petID
-            },
-            sortBy: [SortDescriptor(\.date, order: .reverse)]
-        )
-        let foodDescriptor = FetchDescriptor<PetFoodRecord>(
-            predicate: #Predicate<PetFoodRecord> { record in
-                record.pet?.id == petID
-            },
-            sortBy: [SortDescriptor(\.startDate, order: .reverse)]
-        )
-        loadedCareLogs = (try? modelContext.fetch(careDescriptor)) ?? allCareLogs.filter { $0.pet?.id == petID && $0.careType == .feeding }
-        loadedFoodRecords = (try? modelContext.fetch(foodDescriptor)) ?? allFoodRecords.filter { $0.pet?.id == petID }
-        hasLoadedFeedSnapshots = true
-        refreshFeedHomeSnapshot()
+    private func reloadFeedSnapshots(forceSnapshot: Bool = false) {
+        if let visibleSheet = activeInlineSheet ?? activeSheet {
+            if visibleSheet.needsFullCareLogs, hasLoadedFullCareLogs {
+                loadFullCareLogs(force: true)
+            }
+            if visibleSheet.needsFullFoodRecords, hasLoadedFullFoodRecords {
+                loadFullFoodRecords(force: true)
+            }
+        }
+        refreshFeedHomeSnapshot(force: forceSnapshot)
     }
 
     private func ensureUpcomingPlanReminders() {
         let currentEvents = latestAllEvents()
-        guard FeedOperatingMode.resolved(pet: pet, allEvents: currentEvents) == .manualReminder else { return }
-        let reminders = FeedingPlanWriter.ensureUpcomingManualReminders(pet: pet, allEvents: currentEvents, context: modelContext)
+        let reminders = FeedMaintenanceCommand.ensureUpcomingPlanReminders(
+            pet: pet,
+            allEvents: currentEvents,
+            context: modelContext
+        )
         scheduleReminders(reminders)
     }
 
@@ -5197,105 +4807,6 @@ struct QuickFeedDetailSheet: View {
 
     // MARK: - Helpers
 
-    private var heroTitle: String {
-        if activeFeedingMode == .autoFeeder {
-            return l.tr(zh: "自动喂食中", en: "Auto feeding is on", de: "Automat aktiv")
-        }
-        if dashboard.today.isComplete {
-            return l.tr(zh: "今天吃好啦", en: "Fed for today", de: "Heute versorgt")
-        }
-        if dashboard.today.hasOverduePlan {
-            return l.tr(zh: "有一餐待确认", en: "Meal waiting", de: "Mahlzeit wartet")
-        }
-        return l.tr(zh: "今天吃了多少？", en: "Food today", de: "Futter heute")
-    }
-
-    private var heroSubtitle: String {
-        if activeFeedingMode == .autoFeeder {
-            return autoFeederStatusText
-        }
-        if activeFeedingMode == .manualReminder, !feedScheduleEvents.isEmpty {
-            if dashboard.hasMissedManualPlan {
-                return l.tr(
-                    zh: "\(dashboard.todayManualPlanMissedCount) 餐未打卡 · 可在历史中补记。",
-                    en: "\(dashboard.todayManualPlanMissedCount) missed · log from history.",
-                    de: "\(dashboard.todayManualPlanMissedCount) verpasst · im Verlauf nachtragen."
-                )
-            }
-            return nextFeedDetailText(
-                events: feedScheduleEvents,
-                fallback: l.tr(zh: "今日计划正在进行。", en: "Today's plan is in progress.", de: "Der Tagesplan läuft.")
-            )
-        }
-        if feedScheduleEvents.isEmpty {
-            return l.tr(zh: "手动打卡，或设置一个计划。", en: "Log manually or add a plan.", de: "Manuell eintragen oder Plan erstellen.")
-        }
-        return l.tr(zh: "今日计划正在进行。", en: "Today's plan is in progress.", de: "Der Tagesplan läuft.")
-    }
-
-    private var feedingCardValue: String {
-        switch activeFeedingMode {
-        case .manual:
-            if dashboard.todayMainFoodGrams > 0 { return formattedFoodCardWeight(dashboard.todayMainFoodGrams) }
-            if pet.dailyPortionGrams > 0 { return formattedFoodCardWeight(pet.dailyPortionGrams) }
-            return "--"
-        case .manualReminder:
-            return dashboard.todayManualPlanCompletionText
-        case .autoFeeder:
-            return "\(dashboard.todayAutoFeedCount)x"
-        }
-    }
-
-    private var feedingCardMetricLines: [FoodCardMetricLine] {
-        feedingCardMetricLines(feedHomeRenderSnapshot)
-    }
-
-    private func feedingCardMetricLines(_ snapshot: QuickFeedHomeSnapshot) -> [FoodCardMetricLine] {
-        [
-            FoodCardMetricLine(
-                title: FeedFoodKind.dry.title(l),
-                value: snapshot.todayDryFoodGrams > 0 ? formattedFoodCardWeight(snapshot.todayDryFoodGrams) : "--",
-                tint: dryFoodTint,
-                isCurrent: pet.mainFoodKind == .dry
-            ),
-            FoodCardMetricLine(
-                title: FeedFoodKind.wet.title(l),
-                value: snapshot.todayWetFoodGrams > 0 ? formattedFoodCardWeight(snapshot.todayWetFoodGrams) : "--",
-                tint: wetFoodTint,
-                isCurrent: pet.mainFoodKind == .wet
-            )
-        ]
-    }
-
-    private var feedingCardSubtitle: String {
-        switch activeFeedingMode {
-        case .manual:
-            if pet.dailyPortionGrams > 0 {
-                return l.tr(
-                    zh: "\(pet.mainFoodKind.title(l)) · 默认 \(formattedFoodCardWeight(pet.dailyPortionGrams))",
-                    en: "\(pet.mainFoodKind.title(l)) · default \(formattedFoodCardWeight(pet.dailyPortionGrams))",
-                    de: "\(pet.mainFoodKind.title(l)) · Standard \(formattedFoodCardWeight(pet.dailyPortionGrams))"
-                )
-            }
-            return l.tr(
-                zh: "\(pet.mainFoodKind.title(l)) · 待设置默认克数",
-                en: "\(pet.mainFoodKind.title(l)) · default not set",
-                de: "\(pet.mainFoodKind.title(l)) · Standard fehlt"
-            )
-        case .manualReminder:
-            if dashboard.hasMissedManualPlan {
-                return l.tr(
-                    zh: "未打卡 \(dashboard.todayManualPlanMissedCount) 餐 · 点历史补记",
-                    en: "\(dashboard.todayManualPlanMissedCount) missed · open history",
-                    de: "\(dashboard.todayManualPlanMissedCount) verpasst · Verlauf öffnen"
-                )
-            }
-            return nextFeedDetailText(events: feedScheduleEvents, fallback: l.tr(zh: "今日 \(dashboard.todayManualPlanCompletionText)", en: "Today \(dashboard.todayManualPlanCompletionText)", de: "Heute \(dashboard.todayManualPlanCompletionText)"))
-        case .autoFeeder:
-            return nextFeedDetailText(events: autoFeederEvents, fallback: autoFeederStatusText)
-        }
-    }
-
     private var feedingOverviewModeValue: String {
         switch activeFeedingMode {
         case .manual:
@@ -5349,47 +4860,15 @@ struct QuickFeedDetailSheet: View {
     }
 
     private func feedModeTint(_ mode: FeedOperatingMode) -> Color {
-        switch mode {
-        case .manual:
-            return Color.goOrange
-        case .manualReminder:
-            return Color.goPurple
-        case .autoFeeder:
-            return Color.goTeal
-        }
+        mode.feedTint
     }
 
     private func feedModeIcon(_ mode: FeedOperatingMode) -> String {
-        switch mode {
-        case .manual:
-            return "hand.tap.fill"
-        case .manualReminder:
-            return FeedRuleKind.manualReminder.iconName
-        case .autoFeeder:
-            return FeedRuleKind.autoFeeder.iconName
-        }
+        mode.feedIconName
     }
 
     private func feedModeShortTitle(_ mode: FeedOperatingMode) -> String {
-        switch mode {
-        case .manual:
-            return l.tr(zh: "手动", en: "Manual", de: "Manuell")
-        case .manualReminder:
-            return l.tr(zh: "计划", en: "Plan", de: "Plan")
-        case .autoFeeder:
-            return l.tr(zh: "自动", en: "Auto", de: "Auto")
-        }
-    }
-
-    private func feedModeTitle(_ mode: FeedOperatingMode) -> String {
-        switch mode {
-        case .manual:
-            return l.tr(zh: "手动打卡", en: "Manual logging", de: "Manuell")
-        case .manualReminder:
-            return l.tr(zh: "喂食计划", en: "Reminder plan", de: "Fütterungsplan")
-        case .autoFeeder:
-            return l.tr(zh: "自动猫粮机", en: "Auto feeder", de: "Futterautomat")
-        }
+        mode.feedShortTitle(l)
     }
 
     private var feedModeHistoryTitle: String {
@@ -5414,50 +4893,6 @@ struct QuickFeedDetailSheet: View {
         }
     }
 
-    private var feedingPrimaryTitle: String {
-        switch activeFeedingMode {
-        case .autoFeeder:
-            return l.tr(zh: "历史", en: "History", de: "Verlauf")
-        case .manualReminder:
-            return l.tr(zh: "历史", en: "History", de: "Verlauf")
-        case .manual:
-            return l.tr(zh: "打卡", en: "Log", de: "Loggen")
-        }
-    }
-
-    private var feedingPrimaryIcon: String {
-        switch activeFeedingMode {
-        case .autoFeeder:
-            return "chart.line.uptrend.xyaxis"
-        case .manualReminder:
-            return "chart.line.uptrend.xyaxis"
-        case .manual:
-            return "plus"
-        }
-    }
-
-    private var feedingSecondaryTitle: String {
-        switch activeFeedingMode {
-        case .manual:
-            return l.tr(zh: "历史", en: "History", de: "Verlauf")
-        case .manualReminder, .autoFeeder:
-            return l.tr(zh: "设置", en: "Set", de: "Setup")
-        }
-    }
-
-    private var feedingSecondaryIcon: String {
-        switch activeFeedingMode {
-        case .manual:
-            return "clock.arrow.circlepath"
-        case .manualReminder, .autoFeeder:
-            return "gearshape.fill"
-        }
-    }
-
-    private var feedPrimaryLongPressAction: (() -> Void)? {
-        activeFeedingMode == .manualReminder ? nil : { openManualFeedSheet() }
-    }
-
     private var autoFeederStatusText: String {
         let daily = formattedFoodWeight(dashboard.autoDailyTotalGrams)
         if let latest = latestAutoFeedLog {
@@ -5468,25 +4903,6 @@ struct QuickFeedDetailSheet: View {
             )
         }
         if let next = nextAutoFeedDate {
-            return l.tr(
-                zh: "\(daily)/天 · 下次 \(next.formatted(date: .omitted, time: .shortened))",
-                en: "\(daily)/day · next \(next.formatted(date: .omitted, time: .shortened))",
-                de: "\(daily)/Tag · nächste \(next.formatted(date: .omitted, time: .shortened))"
-            )
-        }
-        return l.tr(zh: "\(daily)/天 · 自动补记", en: "\(daily)/day · auto logging", de: "\(daily)/Tag · Auto")
-    }
-
-    private func autoFeederStatusText(_ snapshot: QuickFeedHomeSnapshot) -> String {
-        let daily = formattedFoodWeight(snapshot.autoDailyTotalGrams)
-        if let latest = snapshot.latestAutoFeedDate {
-            return l.tr(
-                zh: "\(daily)/天 · 上次 \(latest.formatted(date: .omitted, time: .shortened))",
-                en: "\(daily)/day · last \(latest.formatted(date: .omitted, time: .shortened))",
-                de: "\(daily)/Tag · zuletzt \(latest.formatted(date: .omitted, time: .shortened))"
-            )
-        }
-        if let next = snapshot.nextAutoFeedDate {
             return l.tr(
                 zh: "\(daily)/天 · 下次 \(next.formatted(date: .omitted, time: .shortened))",
                 en: "\(daily)/day · next \(next.formatted(date: .omitted, time: .shortened))",
@@ -5542,32 +4958,6 @@ struct QuickFeedDetailSheet: View {
             zh: "下次 \(time) · \(kind) · \(grams)",
             en: "Next \(time) · \(kind) · \(grams)",
             de: "Nächste \(time) · \(kind) · \(grams)"
-        )
-    }
-
-    private var stockCardValue: String {
-        let dry = dashboard.stock(foodKind: .dry)
-        let wet = dashboard.stock(foodKind: .wet)
-        let days = [dry, wet].filter { $0.totalGrams > 0 && $0.remainingDays > 0 }.map(\.remainingDays).min()
-        guard let days else { return "--" }
-        return "\(days) \(l.tr(zh: "天", en: "days", de: "Tage"))"
-    }
-
-    private func stockCardValue(_ snapshot: QuickFeedHomeSnapshot) -> String {
-        guard let days = snapshot.stockCardRemainingDays else { return "--" }
-        return "\(days) \(l.tr(zh: "天", en: "days", de: "Tage"))"
-    }
-
-    private var stockCardSubtitle: String {
-        let dry = dashboard.stock(foodKind: .dry)
-        let wet = dashboard.stock(foodKind: .wet)
-        guard dry.totalGrams > 0 || wet.totalGrams > 0 else {
-            return l.tr(zh: "先添加购买记录", en: "Add a restock", de: "Nachfüllung hinzufügen")
-        }
-        return l.tr(
-            zh: "干 \(formattedStockWeight(dry.remainingGrams)) · 湿 \(formattedStockWeight(wet.remainingGrams))",
-            en: "Dry \(formattedStockWeight(dry.remainingGrams)) · wet \(formattedStockWeight(wet.remainingGrams))",
-            de: "Trocken \(formattedStockWeight(dry.remainingGrams)) · nass \(formattedStockWeight(wet.remainingGrams))"
         )
     }
 
@@ -6016,8 +5406,8 @@ struct QuickFeedDetailSheet: View {
         append(defaultFeedGrams)
         feedScheduleEvents.forEach { append(FeedRuleMetadata.amountGrams(from: $0)) }
         autoFeederEvents.forEach { append(FeedRuleMetadata.amountGrams(from: $0)) }
-        pet.careLogs
-            .filter { $0.careType == .feeding && FeedLogMetadata.isMainFoodLog($0) && $0.amountGrams > 0 }
+        observedCareLogs
+            .filter { FeedLogMetadata.isMainFoodLog($0) && $0.amountGrams > 0 }
             .sorted { $0.date > $1.date }
             .prefix(8)
             .forEach { append($0.amountGrams) }
@@ -6027,8 +5417,7 @@ struct QuickFeedDetailSheet: View {
 
     private func setMainFoodKind(_ foodKind: FeedFoodKind) {
         guard pet.mainFoodKind != foodKind else { return }
-        pet.mainFoodKind = foodKind
-        modelContext.safeSave()
+        SetMainFoodKindCommand.run(pet: pet, foodKind: foodKind, context: modelContext)
         UISelectionFeedbackGenerator().selectionChanged()
     }
 

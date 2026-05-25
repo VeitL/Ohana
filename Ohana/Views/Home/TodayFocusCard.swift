@@ -260,9 +260,11 @@ struct TodayFocusCard: View {
                             .font(.system(size: 10, weight: .black, design: .rounded))
                             .tracking(2.2)
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.36))
+                            .todayFocusReadableShadow(strength: 0.8)
                         Text(l.tr(zh: "任务盘", en: "Task board", de: "Aufgabenbrett"))
                             .font(.system(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.9))
+                            .todayFocusReadableShadow()
                     }
                     Spacer()
                     Text(focusStatusText)
@@ -273,6 +275,7 @@ struct TodayFocusCard: View {
                         .background(Color.ohanaControlFill, in: Capsule())
                         .contentTransition(.numericText())
                         .animation(GoMotion.feedback, value: focusStatusText)
+                        .todayFocusReadableShadow(strength: 0.75)
                     if case .quest(let q) = content {
                         rewardChip(IslandQuestEngine.coconutReward(forQuestId: q.id))
                     }
@@ -469,6 +472,7 @@ struct TodayFocusCard: View {
                             .font(.system(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(2)
+                            .todayFocusReadableShadow(strength: 1.08)
                         questMetaRow(q)
                     }
 
@@ -522,10 +526,12 @@ struct TodayFocusCard: View {
                             .font(.system(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(2)
+                            .todayFocusReadableShadow(strength: 1.08)
                         Text(taskStatusLine(task, performer: performer, rewardText: rewardText))
                             .font(.system(size: 11, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                             .lineLimit(1)
+                            .todayFocusReadableShadow(strength: 0.82)
                     }
 
                     Spacer(minLength: 0)
@@ -572,10 +578,12 @@ struct TodayFocusCard: View {
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
+                    .todayFocusReadableShadow(strength: 1.08)
                 Text("\(request.senderName) → \(amount) · \(request.coconutCost)🥥")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                     .lineLimit(2)
+                    .todayFocusReadableShadow(strength: 0.82)
             }
 
             Spacer(minLength: 6)
@@ -633,9 +641,11 @@ struct TodayFocusCard: View {
         HStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.system(size: 9, weight: .black))
+
             Text(text)
                 .font(.system(size: 10, weight: .black, design: .rounded))
                 .lineLimit(1)
+                .todayFocusReadableShadow(strength: 0.55)
         }
         .foregroundStyle(tint)
         .padding(.horizontal, 8)
@@ -691,10 +701,12 @@ struct TodayFocusCard: View {
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
+                    .todayFocusReadableShadow(strength: 1.08)
                 Text(negativeStatusText(for: s))
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(accent)
                     .lineLimit(1)
+                    .todayFocusReadableShadow(strength: 0.82)
             }
 
             Spacer(minLength: 6)
@@ -751,10 +763,12 @@ struct TodayFocusCard: View {
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
+                    .todayFocusReadableShadow(strength: 1.08)
                 Text(m.subline)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                     .lineLimit(2)
+                    .todayFocusReadableShadow(strength: 0.82)
             }
 
             Spacer(minLength: 6)
@@ -794,6 +808,7 @@ struct TodayFocusCard: View {
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
+                    .todayFocusReadableShadow(strength: 1.08)
             }
 
             Spacer(minLength: 6)
@@ -829,6 +844,7 @@ struct TodayFocusCard: View {
                 Text(l.tr(zh: "岛屿欢迎你", en: "Welcome home", de: "Willkommen"))
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
+                    .todayFocusReadableShadow(strength: 1.08)
             }
             Spacer()
         }
@@ -858,6 +874,7 @@ struct TodayFocusCard: View {
                 .foregroundStyle(Color.goYellow)
                 .contentTransition(.numericText())
                 .animation(GoMotion.feedback, value: amount)
+                .todayFocusReadableShadow(strength: 0.9)
             Text("🥥")
                 .font(.system(size: 10))
                 .ohanaSymbolPulse(trigger: amount)
@@ -1040,5 +1057,13 @@ struct TodayFocusCard: View {
             .clipShape(shape)
             .compositingGroup()
         }
+    }
+}
+
+private extension View {
+    func todayFocusReadableShadow(strength: Double = 1) -> some View {
+        self
+            .shadow(color: Color.arkInk.opacity(0.32 * strength), radius: 2.4 * strength, x: 0, y: 1.2) // ui-v4: allow requested Today Focus text readability shadow
+            .shadow(color: Color.arkInk.opacity(0.16 * strength), radius: 8 * strength, x: 0, y: 3) // ui-v4: allow requested Today Focus text readability shadow
     }
 }

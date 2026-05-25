@@ -12,6 +12,7 @@ enum HumanAllFeatureDestination: Hashable {
     case basicInfo
     case weight
     case workout
+    case metrics
     case medication
     case report
     case expense
@@ -25,6 +26,7 @@ extension HumanAllFeatureDestination: Identifiable {
         case .basicInfo: return "basicInfo"
         case .weight: return "weight"
         case .workout: return "workout"
+        case .metrics: return "metrics"
         case .medication: return "medication"
         case .report: return "report"
         case .expense: return "expense"
@@ -37,7 +39,7 @@ extension HumanAllFeatureDestination: Identifiable {
         switch self {
         case .basicInfo:
             return nil
-        case .weight, .report:
+        case .weight, .metrics, .report:
             return .weight
         case .workout:
             return .workout
@@ -143,6 +145,8 @@ struct HumanAllFeaturesSheet: View {
             HumanWeightHistoryView(human: human)
         case .workout:
             CoHealthDashboardFullView(human: human)
+        case .metrics:
+            HumanHealthCheckupView(human: human)
         case .medication:
             HumanMedicationView(human: human)
         case .report:
@@ -158,7 +162,7 @@ struct HumanAllFeaturesSheet: View {
 
     private func destinationNeedsHostClose(_ destination: HumanAllFeatureDestination) -> Bool {
         switch destination {
-        case .basicInfo, .workout, .report, .wishlist:
+        case .basicInfo, .workout, .metrics, .report, .wishlist:
             return true
         case .weight, .medication, .expense, .notes:
             return false
@@ -223,7 +227,7 @@ struct HumanAllFeaturesSheet: View {
             FeatureHubSectionData(
                 id: "body",
                 title: l.tr(zh: "身体状态", en: "Body", de: "Körper"),
-                subtitle: l.tr(zh: "趋势、运动和报告", en: "Trends, movement, reports", de: "Trends, Bewegung, Berichte"),
+                subtitle: l.tr(zh: "趋势、指标和报告", en: "Trends, metrics, reports", de: "Trends, Werte, Berichte"),
                 items: bodyItems
             ),
             FeatureHubSectionData(
@@ -257,6 +261,15 @@ struct HumanAllFeaturesSheet: View {
                 icon: "scalemass.fill",
                 tint: Color(hex: "16A34A"),
                 destination: .weight
+            ),
+            item(
+                id: "metrics",
+                title: l.tr(zh: "体检指标", en: "Checkup Metrics", de: "Check-up-Werte"),
+                value: lockedValue(.weight, visible: healthMetricMetric),
+                subtitle: lockedSubtitle(.weight, visible: healthMetricSubtitle),
+                icon: "waveform.path.ecg.rectangle.fill",
+                tint: Color.goTeal,
+                destination: .metrics
             ),
             item(
                 id: "workout",
@@ -448,6 +461,21 @@ struct HumanAllFeaturesSheet: View {
             en: "Last \(relativeDayText(latest.reportDate))",
             de: "Zuletzt \(relativeDayText(latest.reportDate))"
         )
+    }
+
+    private var healthMetricMetric: String {
+        let count = Set(human.healthMetricLogs.map(\.metricKey)).count
+        guard count > 0 else { return l.tr(zh: "未追踪", en: "None", de: "Keine") }
+        return "\(count)"
+    }
+
+    private var healthMetricSubtitle: String {
+        guard let latest = human.healthMetricLogs.max(by: { $0.date < $1.date }),
+              let metric = HealthMetricCatalog.metric(forKey: latest.metricKey),
+              let unit = metric.unit(for: latest.unitCode) else {
+            return l.tr(zh: "TSH、HbA1c、血压等", en: "TSH, HbA1c, BP, and more", de: "TSH, HbA1c, Blutdruck")
+        }
+        return "\(metric.displayName(l)) · \(unit.formattedValue(latest.value))"
     }
 
     private var monthlyExpenseText: String {

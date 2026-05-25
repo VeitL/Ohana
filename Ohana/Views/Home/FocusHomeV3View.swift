@@ -49,6 +49,7 @@ struct FocusHomeV3View: View {
 
     @Namespace private var ns
     @StateObject private var wallet = FocusHomeWalletController()
+    @StateObject private var verticalSolidMotion = VerticalSolidHomeMotionCoordinator()
     @StateObject private var snapshotController = FocusHomeSnapshotController()
     @StateObject private var homeReorder = FocusHomeReorderController()
     @StateObject private var expandedQuickEdit = ExpandedQuickActionEditController()
@@ -57,6 +58,8 @@ struct FocusHomeV3View: View {
 
     @State private var headerStreak = 0
     @State private var didRecordHomeFirstFrame = false
+    @State private var lastAppliedCardSourceSignature = ""
+    @State private var snapshotRefreshGeneration = 0
     @State private var walletHeroCardsSnapshot: [FocusCard]? = nil
     @State private var pressedExpandedActionId: String? = nil
 
@@ -122,8 +125,14 @@ struct FocusHomeV3View: View {
     private var shouldReduceWork: Bool {
         reduceMotion || workloadPolicy.interactionMotionBudget(isVisible: true) != .full
     }
-    private var walletExpandAnimation: Animation { shouldReduceWork ? HeroAnim.walletReduced : HeroAnim.walletSpring }
-    private var walletCollapseAnimation: Animation { shouldReduceWork ? HeroAnim.walletReduced : HeroAnim.walletCollapseSpring }
+    private var walletExpandAnimation: Animation {
+        if shouldReduceWork { return HeroAnim.walletReduced }
+        return sceneStyle == .verticalSolid ? GoMotion.zStackHero : HeroAnim.walletSpring
+    }
+    private var walletCollapseAnimation: Animation {
+        if shouldReduceWork { return HeroAnim.walletReduced }
+        return sceneStyle == .verticalSolid ? GoMotion.zStackHero : HeroAnim.walletCollapseSpring
+    }
     private var routeAnimation: Animation { shouldReduceWork ? GoMotion.reduced : GoMotion.page }
 
     private var activeHuman: Human? {
@@ -160,7 +169,9 @@ struct FocusHomeV3View: View {
     }
 
     private var sourceCards: [FocusCard] {
-        FocusHomeCardDataSource.buildSnapshot(
+        let statusEvents = homeStatusEvents
+        let medicationLogs = recentHumanMedicationLogs
+        return FocusHomeCardDataSource.buildSnapshot(
             pets: pets,
             humans: humans,
             electronicPets: electronicPets,
@@ -168,10 +179,35 @@ struct FocusHomeV3View: View {
             homeCardOrderRaw: homeCardOrderRaw,
             showDummyCards: showDummyCards
         )
-        .map(decoratedHomeStatusCard)
+        .map { decoratedHomeStatusCard($0, events: statusEvents, medicationLogs: medicationLogs) }
     }
 
-    private func decoratedHomeStatusCard(_ card: FocusCard) -> FocusCard {
+    private var homeStatusEvents: [Event] {
+        let now = Date()
+        return allEvents.filter { event in
+            guard event.isActionableTask else { return false }
+            return event.reminders.contains { reminder in
+                reminder.isFailed || (reminder.isPending && reminder.scheduledAt < now)
+            }
+        }
+    }
+
+    private var recentHumanMedicationLogs: [HumanMedicationLog] {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -8, to: Date()) ?? .distantPast
+        return humanMedicationLogs.filter { $0.scheduledTime >= cutoff }
+    }
+
+    private var activeHumanAvatarImage: UIImage? {
+        guard let human = activeHuman else { return nil }
+        let avatarData = snapshotController.avatarData(for: human.id) ?? human.avatarImageData
+        return FocusWalletAvatarCache.entry(for: human.id, data: avatarData).image
+    }
+
+    private func decoratedHomeStatusCard(
+        _ card: FocusCard,
+        events: [Event],
+        medicationLogs: [HumanMedicationLog]
+    ) -> FocusCard {
         guard !card.isElectronicPet else {
             return card
         }
@@ -180,12 +216,12 @@ struct FocusHomeV3View: View {
         if card.isHuman, let human = humans.first(where: { $0.id == card.id }) {
             warning = CarePlanOverdueStatusCalculator.humanWarning(
                 for: human,
-                events: allEvents,
+                events: events,
                 medications: humanMedications,
-                logs: humanMedicationLogs
+                logs: medicationLogs
             )
         } else if let pet = pets.first(where: { $0.id == card.id }) {
-            warning = CarePlanOverdueStatusCalculator.petWarning(for: pet, events: allEvents)
+            warning = CarePlanOverdueStatusCalculator.petWarning(for: pet, events: events)
         } else {
             warning = nil
         }
@@ -208,7 +244,10 @@ struct FocusHomeV3View: View {
     }
 
     private var displayCards: [FocusCard] {
-        walletHeroCardsSnapshot ?? homeReorder.displayCards(from: visibleCards)
+        if sceneStyle == .verticalSolid, let frozenCards = verticalSolidMotion.cards {
+            return frozenCards
+        }
+        return walletHeroCardsSnapshot ?? homeReorder.displayCards(from: visibleCards)
     }
 
     private var heroSelectedCardId: UUID? {
@@ -225,6 +264,10 @@ struct FocusHomeV3View: View {
         wallet.isExpanded && wallet.heroProgress > 0.985 && activeCard != nil
     }
 
+    private var isWalletHeroTransitioning: Bool {
+        wallet.transitionCardId != nil || (wallet.heroProgress > 0.001 && wallet.heroProgress < 0.999)
+    }
+
     private var activePetForFocus: Pet? {
         if let id = wallet.activeCardId,
            let pet = activePets.first(where: { $0.id == id }) {
@@ -233,36 +276,13 @@ struct FocusHomeV3View: View {
         return activePets.first
     }
 
+    private var verticalSolidPageRenderSnapshot: VerticalSolidHomeRenderSnapshot {
+        verticalSolidMotion.renderSnapshot ?? makeVerticalSolidRenderSnapshot(cards: displayCards)
+    }
+
     var body: some View {
         GeometryReader { geo in
-            Group {
-                if sceneStyle == .verticalSolid {
-                    verticalSolidRoot(geo: geo)
-                } else {
-                    walletRoot(geo: geo)
-                }
-            }
-            .onAppear {
-                refreshSnapshot()
-                homeReorder.setEnabled(true)
-                syncWalkCardSurfaceVisibility()
-                headerStreak = FocusHomeFirstFrameMaintenance.currentStreak(activeHumanId: activeHumanIdStr)
-                wallet.prepareTapFeedback()
-                if !didRecordHomeFirstFrame {
-                    didRecordHomeFirstFrame = true
-                    DispatchQueue.main.async {
-                        AppPerformanceMonitor.shared.record("HomeV2 首帧", startedAt: ohanaProcessStartTime)
-                    }
-                }
-            }
-            .onChange(of: cardSourceSignature) { _, _ in refreshSnapshot() }
-            .onChange(of: wallet.isExpanded) { _, _ in syncWalkCardSurfaceVisibility() }
-            .onChange(of: wallet.activeCardId) { _, _ in syncWalkCardSurfaceVisibility() }
-            .onChange(of: PetWalkingManager.shared.phase) { _, _ in syncWalkCardSurfaceVisibility() }
-            .onChange(of: PetWalkingManager.shared.currentPet?.id) { _, _ in syncWalkCardSurfaceVisibility() }
-            .onChange(of: activeHumanIdStr) { _, _ in
-                headerStreak = FocusHomeFirstFrameMaintenance.currentStreak(activeHumanId: activeHumanIdStr)
-            }
+            rootSceneWithLifecycle(geo: geo)
         }
         .ignoresSafeArea(.all)
         .toolbar(.hidden, for: .navigationBar)
@@ -321,13 +341,62 @@ struct FocusHomeV3View: View {
             singleUseNoticeMessage: $singleUseNoticeMessage,
             showingQuickActionLimitAlert: $showingQuickActionLimitAlert,
             showingHumanPrivacyAlert: $showingHumanPrivacyAlert,
-            onAddEntityDismissed: refreshSnapshot,
+            onAddEntityDismissed: { refreshSnapshot(force: true) },
             onPetSavedFromAddEntity: handlePetSaved,
             onCrewPetSelected: { pet in openCard(FocusCard.from(pet, includeAvatarData: true)) },
             onCrewHumanSelected: { human in openCard(FocusCard.from(human, includeAvatarData: true)) },
             onFirstSuccessMomentCompleted: { _ in },
             onHumanDoseTaken: { humanId in showReward(amount: 2, label: "用药 +2🥥", cardId: humanId) }
         )
+    }
+
+    private func handleHomeAppear() {
+        refreshSnapshot(force: true)
+        homeReorder.setEnabled(true)
+        syncWalkCardSurfaceVisibility()
+        headerStreak = FocusHomeFirstFrameMaintenance.currentStreak(activeHumanId: activeHumanIdStr)
+        wallet.prepareTapFeedback()
+        if !didRecordHomeFirstFrame {
+            didRecordHomeFirstFrame = true
+            DispatchQueue.main.async {
+                AppPerformanceMonitor.shared.record("HomeV2 首帧", startedAt: ohanaProcessStartTime)
+            }
+        }
+        routePendingReminderNotificationIfNeeded()
+    }
+
+    private func handleActiveHumanChanged() {
+        headerStreak = FocusHomeFirstFrameMaintenance.currentStreak(activeHumanId: activeHumanIdStr)
+    }
+
+    private func rootSceneWithLifecycle(geo: GeometryProxy) -> some View {
+        rootScene(geo: geo)
+            .onAppear(perform: handleHomeAppear)
+            .task(id: cardSourceInvalidationKey) {
+                await Task.yield()
+                guard !Task.isCancelled else { return }
+                requestSnapshotRefresh()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .ohanaMemberProfileDidChange)) { notification in
+                handleMemberProfileDidChange(notification)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .ohanaReminderRouteRequested)) { notification in
+                handleReminderRouteRequest(notification.userInfo)
+            }
+            .onChange(of: wallet.isExpanded) { _, _ in syncWalkCardSurfaceVisibility() }
+            .onChange(of: wallet.activeCardId) { _, _ in syncWalkCardSurfaceVisibility() }
+            .onChange(of: PetWalkingManager.shared.phase) { _, _ in syncWalkCardSurfaceVisibility() }
+            .onChange(of: PetWalkingManager.shared.currentPet?.id) { _, _ in syncWalkCardSurfaceVisibility() }
+            .onChange(of: activeHumanIdStr) { _, _ in handleActiveHumanChanged() }
+    }
+
+    @ViewBuilder
+    private func rootScene(geo: GeometryProxy) -> some View {
+        if sceneStyle == .verticalSolid {
+            verticalSolidRoot(geo: geo)
+        } else {
+            walletRoot(geo: geo)
+        }
     }
 
     @ViewBuilder
@@ -450,7 +519,6 @@ struct FocusHomeV3View: View {
             }
             .frame(width: geo.size.width, height: contentHeight)
             .position(x: geo.size.width / 2, y: headerHeight + contentHeight / 2)
-            .animation(GoMotion.zStackHero, value: selectedVerticalTab)
 
             header(safeTop: safeTop)
                 .contentShape(Rectangle())
@@ -474,11 +542,7 @@ struct FocusHomeV3View: View {
                 expandedShortcuts: activeCard.map(expandedFabShortcuts(for:)) ?? [],
                 safeBottom: safeBottom,
                 onTabSelected: { tab in
-                    if wallet.isExpanded {
-                        collapseWalletToHome()
-                    }
-                    selectedVerticalTab = tab
-                    closeVerticalFabMenu()
+                    selectVerticalTab(tab)
                 },
                 onShortcut: { shortcut in
                     guard shortcut.isAvailable else {
@@ -524,6 +588,8 @@ struct FocusHomeV3View: View {
     }
 
     private var cardSourceSignature: String {
+        let statusEvents = homeStatusEvents
+        let medicationLogs = recentHumanMedicationLogs
         let base = FocusHomeCardDataSource.sourceSignature(
             pets: pets,
             humans: humans,
@@ -535,23 +601,100 @@ struct FocusHomeV3View: View {
         )
         let overdue = pets
             .filter { !$0.hasPassedAway }
-            .map { "\($0.id.uuidString):\(CarePlanOverdueStatusCalculator.homeSignature(for: $0, events: allEvents))" }
+            .map { "\($0.id.uuidString):\(CarePlanOverdueStatusCalculator.homeSignature(for: $0, events: statusEvents))" }
             .joined(separator: "|")
         let humanOverdue = humans
             .map { human in
                 let signature = CarePlanOverdueStatusCalculator.homeSignature(
                     for: human,
-                    events: allEvents,
+                    events: statusEvents,
                     medications: humanMedications,
-                    logs: humanMedicationLogs
+                    logs: medicationLogs
                 )
                 return "\(human.id.uuidString):\(signature)"
             }
             .joined(separator: "|")
         let plantOverdue = plants
-            .map { "\($0.id.uuidString):\(CarePlanOverdueStatusCalculator.homeSignature(for: $0, events: allEvents))" }
+            .map { "\($0.id.uuidString):\(CarePlanOverdueStatusCalculator.homeSignature(for: $0, events: statusEvents))" }
             .joined(separator: "|")
         return "\(base)||overdue:\(overdue)||humanOverdue:\(humanOverdue)||plantOverdue:\(plantOverdue)"
+    }
+
+    private var cardSourceInvalidationKey: String {
+        let petKey = pets.map { pet in
+            [
+                pet.id.uuidString,
+                pet.name,
+                pet.species,
+                pet.avatarEmoji,
+                pet.safeThemeColorHex,
+                pet.cardStyleRaw,
+                pet.cardPopoutSourceRaw ?? "",
+                "\(pet.hasPassedAway)",
+                "\(HomeCardVisibility.isPetVisible(pet, raw: hiddenHomePetIDsRaw))",
+                "\(pet.avatarImageData?.count ?? 0)",
+                "\(pet.cardPopoutImageData?.count ?? 0)",
+                "\(pet.currentStreak)",
+                "\(pet.coconutBalance)"
+            ].joined(separator: ":")
+        }.joined(separator: ";")
+        let humanKey = humans.map { human in
+            [
+                human.id.uuidString,
+                human.name,
+                human.avatarEmoji,
+                human.roleText,
+                human.safeThemeColorHex,
+                "\(human.shouldShowOnHome)",
+                "\(human.hasPassedAway)",
+                "\(human.avatarImageData?.count ?? 0)",
+                "\(human.coconutBalance)"
+            ].joined(separator: ":")
+        }.joined(separator: ";")
+        let oasisKey = electronicPets.map { critter in
+            [
+                critter.id.uuidString,
+                critter.catalogId,
+                "\(critter.isFeaturedOnOasis)",
+                critter.lifeStateRaw,
+                "\(critter.isArchived)",
+                "\(critter.level)",
+                "\(critter.appearanceStage)"
+            ].joined(separator: ":")
+        }.joined(separator: ";")
+        let reminderKey = pendingReminders.map { reminder in
+            [
+                reminder.id.uuidString,
+                reminder.status,
+                "\(Int(reminder.scheduledAt.timeIntervalSince1970))",
+                reminder.event?.id.uuidString ?? "",
+                reminder.event?.relatedEntityId ?? "",
+                reminder.event?.eventType ?? ""
+            ].joined(separator: ":")
+        }.joined(separator: ";")
+        let medicationLogKey = humanMedicationLogs.prefix(24).map { log in
+            [
+                log.id.uuidString,
+                log.statusRaw,
+                "\(Int(log.scheduledTime.timeIntervalSince1970))"
+            ].joined(separator: ":")
+        }.joined(separator: ";")
+        let minuteBucket = Int(Date().timeIntervalSince1970 / 60)
+        return [
+            petKey,
+            humanKey,
+            oasisKey,
+            "plants:\(plants.count)",
+            "events:\(allEvents.count)",
+            reminderKey,
+            "meds:\(humanMedications.count)",
+            medicationLogKey,
+            hiddenHomePetIDsRaw,
+            homeCardOrderRaw,
+            "\(showDummyCards)",
+            appLanguage,
+            "minute:\(minuteBucket)"
+        ].joined(separator: "||")
     }
 
     private func header(safeTop: CGFloat) -> some View {
@@ -561,7 +704,7 @@ struct FocusHomeV3View: View {
             coconutBalance: headerCoconutBalance,
             coconutDeltaContext: headerCoconutDeltaContext,
             activeHumanDisplayName: activeHuman?.name ?? l.tr(zh: "本人", en: "Me", de: "Ich"),
-            activeHumanAvatarImage: activeHuman?.avatarImageData.flatMap(UIImage.init(data:)),
+            activeHumanAvatarImage: activeHumanAvatarImage,
             activeHumanAvatarEmoji: activeHuman?.avatarEmoji,
             onStreak: { showStreakDetail = true },
             onCoconut: openHeaderCoconutDestination,
@@ -661,8 +804,10 @@ struct FocusHomeV3View: View {
                 safeBottom: homeSafeBottom(geo),
                 selectedCardId: heroSelectedCardId,
                 progress: wallet.heroProgress,
+                heroDirection: wallet.heroDirection,
                 reduceMotion: shouldReduceWork,
-                quickActions: { card in quickModules(for: card) },
+                embedsQuickActionsInCard: true,
+                quickActions: { card in verticalEmbeddedQuickModules(for: card) },
                 contextMenu: { card in contextMenu(for: card) },
                 onSelect: { card in handleWalletCardTap(card: card, count: displayCards.count, isHero: false) },
                 onCollapse: collapseWalletToHome,
@@ -731,76 +876,64 @@ struct FocusHomeV3View: View {
         max(geo.safeAreaInsets.bottom, 22)
     }
 
-    private func verticalTransitionSmooth(_ value: CGFloat, _ start: CGFloat, _ end: CGFloat) -> CGFloat {
-        guard end > start else { return value >= end ? 1 : 0 }
-        let x = min(max((value - start) / (end - start), 0), 1)
-        return x * x * (3 - 2 * x)
+    private func makeVerticalSolidRenderSnapshot(cards: [FocusCard]) -> VerticalSolidHomeRenderSnapshot {
+        VerticalSolidHomeRenderSnapshot(
+            cards: cards,
+            pets: pets,
+            activePets: activePets,
+            plants: plants,
+            reminders: pendingReminders,
+            humans: humans,
+            events: allEvents,
+            activePetId: activePetForFocus?.id,
+            selectedTab: selectedVerticalTab
+        )
     }
 
     private func verticalSolidHomePage(size: CGSize, safeBottom: CGFloat) -> some View {
-        let focusHeight = min(136, max(130, size.height * 0.16))
-        let gap = CGFloat(12)
-        let collapsedTopInset = focusHeight + gap
-        let focusReveal = heroSelectedCardId == nil
-            ? CGFloat(1)
-            : 1 - verticalTransitionSmooth(wallet.heroProgress, 0.10, 0.42)
-
-        return ZStack(alignment: .top) {
-            if displayCards.isEmpty {
-                EmptyStateWelcomeCard(
-                    onAddPet: { activeAddEntityType = .pet },
-                    onAddHuman: { activeAddEntityType = .human }
+        let renderSnapshot = verticalSolidPageRenderSnapshot
+        return VerticalSolidHomePage(
+            size: size,
+            safeBottom: safeBottom,
+            displayCards: renderSnapshot.cards,
+            pets: renderSnapshot.pets,
+            activePets: renderSnapshot.activePets,
+            plants: renderSnapshot.plants,
+            reminders: renderSnapshot.reminders,
+            humans: renderSnapshot.humans,
+            events: renderSnapshot.events,
+            activePet: renderSnapshot.activePet,
+            selectedCardId: heroSelectedCardId,
+            heroProgress: wallet.heroProgress,
+            heroDirection: wallet.heroDirection,
+            reduceMotion: shouldReduceWork,
+            isVisible: renderSnapshot.selectedTab == .home,
+            showFirstSuccessCard: showFirstSuccessCard,
+            firstQuickCheckInCompleted: firstQuickCheckInCompleted,
+            isTodayFocusCollapsed: $isVerticalTodayFocusCollapsed,
+            quickActions: { card in
+                verticalEmbeddedQuickModules(
+                    for: card,
+                    pets: renderSnapshot.pets,
+                    humans: renderSnapshot.humans,
+                    events: renderSnapshot.events
                 )
-                .padding(.horizontal, K.cardMargin)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                FocusHomeVerticalSolidScene(
-                    cards: displayCards,
-                    pets: pets,
-                    safeTop: 0,
-                    safeBottom: safeBottom,
-                    selectedCardId: heroSelectedCardId,
-                    progress: wallet.heroProgress,
-                    reduceMotion: shouldReduceWork,
-                    isVisible: selectedVerticalTab == .home,
-                    embedsQuickActionsInCard: true,
-                    collapsedTopInset: collapsedTopInset,
-                    quickActions: { card in quickModules(for: card) },
-                    contextMenu: { card in contextMenu(for: card) },
-                    onSelect: { card in handleWalletCardTap(card: card, count: displayCards.count, isHero: false) },
-                    onCollapse: collapseWalletToHome,
-                    onLongPress: openCardBasicInfo
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-
-            VerticalHomeTaskDeck(
-                isCollapsed: $isVerticalTodayFocusCollapsed,
-                pendingCount: pendingReminders.count,
-                height: focusHeight,
-                activePets: activePets,
-                plants: plants,
-                reminders: pendingReminders,
-                humans: humans,
-                events: allEvents,
-                activePet: activePetForFocus,
-                showFirstSuccessCard: showFirstSuccessCard,
-                firstQuickCheckInCompleted: firstQuickCheckInCompleted,
-                onOpenQuest: openTodayFocusQuestDetail,
-                onCompleteQuest: completeTodayFocusQuest,
-                onTapNegativeSignal: handleTodayFocusNegativeSignal,
-                onTapOasis: { showingOasisReward = true },
-                onTapFamilyTask: openFamilyTaskFromTodayFocus,
-                onFirstSuccessFeed: { expandedQuickFeedDetailPet = $0 },
-                onFirstSuccessPlay: { expandedQuickPlayDetailPet = $0 },
-                onFirstSuccessMoment: { expandedQuickMomentPet = $0 }
-            )
-            .padding(.horizontal, 8)
-            .opacity(Double(focusReveal))
-            .scaleEffect(0.985 + 0.015 * focusReveal, anchor: .top)
-            .allowsHitTesting(focusReveal > 0.96 && heroSelectedCardId == nil)
-        }
-        .frame(width: size.width, height: size.height, alignment: .top)
+            },
+            contextMenu: { card in contextMenu(for: card) },
+            onSelect: { card in handleWalletCardTap(card: card, count: displayCards.count, isHero: false) },
+            onCollapse: collapseWalletToHome,
+            onLongPress: openCardBasicInfo,
+            onAddPet: { activeAddEntityType = .pet },
+            onAddHuman: { activeAddEntityType = .human },
+            onOpenQuest: openTodayFocusQuestDetail,
+            onCompleteQuest: completeTodayFocusQuest,
+            onTapNegativeSignal: handleTodayFocusNegativeSignal,
+            onTapOasis: { showingOasisReward = true },
+            onTapFamilyTask: openFamilyTaskFromTodayFocus,
+            onFirstSuccessFeed: { expandedQuickFeedDetailPet = $0 },
+            onFirstSuccessPlay: { expandedQuickPlayDetailPet = $0 },
+            onFirstSuccessMoment: { expandedQuickMomentPet = $0 }
+        )
     }
 
     @ViewBuilder
@@ -821,10 +954,18 @@ struct FocusHomeV3View: View {
     }
 
     @ViewBuilder
-    private func verticalEmbeddedQuickModules(for card: FocusCard) -> some View {
+    private func verticalEmbeddedQuickModules(
+        for card: FocusCard,
+        pets sourcePets: [Pet]? = nil,
+        humans sourceHumans: [Human]? = nil,
+        events sourceEvents: [Event]? = nil
+    ) -> some View {
+        let quickPets = sourcePets ?? pets
+        let quickHumans = sourceHumans ?? humans
+        let quickEvents = sourceEvents ?? allEvents
         if card.isReal,
            !card.isHuman,
-           let pet = pets.first(where: { $0.id == card.id && !$0.hasPassedAway }) {
+           let pet = quickPets.first(where: { $0.id == card.id && !$0.hasPassedAway }) {
             let items = Array(expandedQuickActionItems(for: pet).prefix(6))
             VerticalHomeEmbeddedQuickActions(
                 title: l.tr(zh: "快捷", en: "Quick", de: "Schnell"),
@@ -833,7 +974,11 @@ struct FocusHomeV3View: View {
                         id: item.id,
                         title: item.label,
                         icon: item.icon,
-                        isCompleted: ExpandedQuickActionLogic.isCompleted(item: item, pet: pet, allEvents: allEvents, allFeedCareLogs: pet.careLogs, now: Date()),
+                        isCompleted: ExpandedQuickActionLogic.isCompleted(item: item, pet: pet, allEvents: quickEvents, allFeedCareLogs: pet.careLogs, now: Date()),
+                        detailIcon: verticalEmbeddedDetailIcon(for: item.actionType, isHuman: false),
+                        quickAccessibilityLabel: l.tr(zh: "快速操作", en: "Quick action", de: "Schnellaktion"),
+                        detailAccessibilityLabel: l.tr(zh: "查看详情", en: "View details", de: "Details anzeigen"),
+                        detailAction: { handlePetQuickDetail(item, pet: pet) },
                         action: { handlePetQuickPrimary(item, pet: pet) }
                     )
                 },
@@ -841,7 +986,7 @@ struct FocusHomeV3View: View {
             )
         } else if card.isReal,
                   card.isHuman,
-                  let human = humans.first(where: { $0.id == card.id }) {
+                  let human = quickHumans.first(where: { $0.id == card.id }) {
             let items = Array(expandedHumanQuickActionItems(for: human).prefix(6))
             VerticalHomeEmbeddedQuickActions(
                 title: l.tr(zh: "快捷", en: "Quick", de: "Schnell"),
@@ -851,6 +996,10 @@ struct FocusHomeV3View: View {
                         title: item.label,
                         icon: item.icon,
                         isCompleted: false,
+                        detailIcon: verticalEmbeddedDetailIcon(for: item.actionType, isHuman: true),
+                        quickAccessibilityLabel: l.tr(zh: "快速操作", en: "Quick action", de: "Schnellaktion"),
+                        detailAccessibilityLabel: l.tr(zh: "查看详情", en: "View details", de: "Details anzeigen"),
+                        detailAction: { handleHumanQuickDetail(item, human: human) },
                         action: { handleHumanQuickPrimary(item, human: human) }
                     )
                 },
@@ -860,13 +1009,46 @@ struct FocusHomeV3View: View {
             VerticalHomeEmbeddedQuickActions(
                 title: l.tr(zh: "快捷", en: "Quick", de: "Schnell"),
                 items: [
-                    VerticalHomeEmbeddedAction(id: "primary", title: card.isHuman ? l.homeQAWeight : l.homeQAFeed, icon: card.isHuman ? "scalemass.fill" : "fork.knife", isCompleted: false) { openQuickModule(.primary, for: card) },
-                    VerticalHomeEmbeddedAction(id: "secondary", title: card.isHuman ? l.expense : l.homeQAWater, icon: card.isHuman ? "creditcard.fill" : "drop.fill", isCompleted: false) { openQuickModule(.secondary, for: card) },
-                    VerticalHomeEmbeddedAction(id: "tertiary", title: card.isHuman ? l.homeQAMeds : l.tr(zh: "健康", en: "Health", de: "Gesundheit"), icon: card.isHuman ? "pill.fill" : "cross.fill", isCompleted: false) { openQuickModule(.tertiary, for: card) }
+                    VerticalHomeEmbeddedAction(
+                        id: "primary",
+                        title: card.isHuman ? l.homeQAWeight : l.homeQAFeed,
+                        icon: card.isHuman ? "scalemass.fill" : "fork.knife",
+                        isCompleted: false,
+                        quickAccessibilityLabel: l.tr(zh: "快速操作", en: "Quick action", de: "Schnellaktion"),
+                        detailAccessibilityLabel: l.tr(zh: "查看详情", en: "View details", de: "Details anzeigen"),
+                        detailAction: { openQuickModule(.all, for: card) }
+                    ) { openQuickModule(.primary, for: card) },
+                    VerticalHomeEmbeddedAction(
+                        id: "secondary",
+                        title: card.isHuman ? l.expense : l.homeQAWater,
+                        icon: card.isHuman ? "creditcard.fill" : "drop.fill",
+                        isCompleted: false,
+                        quickAccessibilityLabel: l.tr(zh: "快速操作", en: "Quick action", de: "Schnellaktion"),
+                        detailAccessibilityLabel: l.tr(zh: "查看详情", en: "View details", de: "Details anzeigen"),
+                        detailAction: { openQuickModule(.all, for: card) }
+                    ) { openQuickModule(.secondary, for: card) },
+                    VerticalHomeEmbeddedAction(
+                        id: "tertiary",
+                        title: card.isHuman ? l.homeQAMeds : l.tr(zh: "健康", en: "Health", de: "Gesundheit"),
+                        icon: card.isHuman ? "pill.fill" : "cross.fill",
+                        isCompleted: false,
+                        quickAccessibilityLabel: l.tr(zh: "快速操作", en: "Quick action", de: "Schnellaktion"),
+                        detailAccessibilityLabel: l.tr(zh: "查看详情", en: "View details", de: "Details anzeigen"),
+                        detailAction: { openQuickModule(.all, for: card) }
+                    ) { openQuickModule(.tertiary, for: card) }
                 ],
                 onAll: { openQuickModule(.all, for: card) }
             )
         }
+    }
+
+    private func verticalEmbeddedDetailIcon(for actionType: String, isHuman: Bool) -> String {
+        if actionType.contains("medication") { return "list.bullet.rectangle.fill" }
+        if actionType.contains("note") || actionType == "moment" { return "sparkles" }
+        if actionType.contains("expense") { return "creditcard.fill" }
+        if actionType.contains("weight") { return "chart.line.uptrend.xyaxis" }
+        if isHuman { return "rectangle.stack.fill" }
+        return "chart.line.uptrend.xyaxis"
     }
 
     private func expandedPetQuickActions(pet: Pet) -> some View {
@@ -1159,19 +1341,19 @@ struct FocusHomeV3View: View {
             router: quickRecordRouter,
             preselectedPayerId: activeHumanIdStr,
             onPetWeightRewarded: { petId, delta in
-                refreshSnapshot()
+                requestSnapshotRefresh()
                 if delta > 0 {
                     showReward(amount: delta, label: "体重 +\(delta)🥥", cardId: petId)
                 }
             },
             onPetExpenseRewarded: { petId, delta in
-                refreshSnapshot()
+                requestSnapshotRefresh()
                 if delta > 0 {
                     showReward(amount: delta, label: "花费 +\(delta)🥥", cardId: petId)
                 }
             },
             onHumanSaved: { humanId, actionKey in
-                refreshSnapshot()
+                requestSnapshotRefresh()
                 showReward(amount: 2, label: rewardLabel(for: actionKey), cardId: humanId)
             },
             onManageHumanMedication: { human in
@@ -1179,7 +1361,7 @@ struct FocusHomeV3View: View {
             },
             onPetMedicationSaved: { pet in
                 MedicationReminderService.shared.scheduleMedicationReminders(for: pet, context: modelContext)
-                refreshSnapshot()
+                requestSnapshotRefresh()
             }
         )
     }
@@ -1450,7 +1632,7 @@ struct FocusHomeV3View: View {
     }
 
     private func applyTodayFocusExecutorFeedback(_ feedback: ExpandedQuickActionExecutor.Feedback) {
-        refreshSnapshot()
+        requestSnapshotRefresh()
         if feedback.coconutDelta > 0 {
             showReward(amount: feedback.coconutDelta, label: feedback.label, cardId: feedback.cardId)
         }
@@ -1547,7 +1729,12 @@ struct FocusHomeV3View: View {
         if homeReorder.hasActiveInteraction {
             resetHomeCardReorderState()
         }
-        walletHeroCardsSnapshot = displayCards
+        let frozenCards = displayCards
+        if sceneStyle == .verticalSolid {
+            verticalSolidMotion.freeze(makeVerticalSolidRenderSnapshot(cards: frozenCards))
+        } else {
+            walletHeroCardsSnapshot = frozenCards
+        }
         wallet.expandToCard(
             id: id,
             animation: walletExpandAnimation,
@@ -1562,7 +1749,15 @@ struct FocusHomeV3View: View {
         )
         OhanaFrameScheduler.runAfterNextFrame(milliseconds: shouldReduceWork ? 220 : 680) {
             guard wallet.isExpanded, wallet.activeCardId == id else { return }
-            walletHeroCardsSnapshot = nil
+            if sceneStyle == .verticalSolid {
+                verticalSolidMotion.unlockStableExpandedState()
+            } else {
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    walletHeroCardsSnapshot = nil
+                }
+            }
         }
     }
 
@@ -1586,23 +1781,41 @@ struct FocusHomeV3View: View {
     }
 
     private func startWalkInExpandedCard(_ pet: Pet) {
-        if case .idle = PetWalkingManager.shared.phase {
-            PetWalkingManager.shared.start(pet: pet)
+        let isAlreadyExpandedPetCard = wallet.isExpanded && wallet.activeCardId == pet.id
+        let startIfIdle = {
+            if case .idle = PetWalkingManager.shared.phase {
+                PetWalkingManager.shared.start(pet: pet)
+            }
+            syncWalkCardSurfaceVisibility()
         }
+
+        if isAlreadyExpandedPetCard {
+            startIfIdle()
+            return
+        }
+
         walkTransform.trigger(
             for: pet,
             expand: expandWalletToCard(id:),
             pulse: { _ in }
         )
         syncWalkCardSurfaceVisibility()
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: shouldReduceWork ? 140 : 540) {
+            guard wallet.activeCardId == pet.id else { return }
+            startIfIdle()
+        }
     }
 
     private func collapseWalletToHome() {
         if homeReorder.hasActiveInteraction {
             resetHomeCardReorderState()
         }
-        refreshSnapshot()
-        walletHeroCardsSnapshot = displayCards
+        let frozenCards = displayCards
+        if sceneStyle == .verticalSolid {
+            verticalSolidMotion.freeze(makeVerticalSolidRenderSnapshot(cards: frozenCards))
+        } else {
+            walletHeroCardsSnapshot = frozenCards
+        }
         wallet.collapseToHome(
             animation: walletCollapseAnimation,
             shouldReduceWork: shouldReduceWork,
@@ -1618,11 +1831,53 @@ struct FocusHomeV3View: View {
         )
         OhanaFrameScheduler.runAfterNextFrame(milliseconds: shouldReduceWork ? 220 : 580) {
             guard !wallet.isExpanded, wallet.heroProgress <= 0.001 else { return }
-            walletHeroCardsSnapshot = nil
+            refreshSnapshot(force: true)
+            if sceneStyle == .verticalSolid {
+                verticalSolidMotion.thawAfterCollapse()
+            } else {
+                OhanaFrameScheduler.runAfterNextFrame {
+                    guard !wallet.isExpanded, wallet.heroProgress <= 0.001 else { return }
+                    var transaction = Transaction(animation: nil)
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
+                        walletHeroCardsSnapshot = nil
+                    }
+                }
+            }
         }
     }
 
-    private func refreshSnapshot() {
+    private var isHomeMotionBusy: Bool {
+        isWalletHeroTransitioning || verticalSolidMotion.isHeroMotionActive || verticalSolidMotion.isTabMotionLocked
+    }
+
+    private func requestSnapshotRefresh(force: Bool = false) {
+        snapshotRefreshGeneration &+= 1
+        let generation = snapshotRefreshGeneration
+        guard isHomeMotionBusy else {
+            refreshSnapshot(force: force)
+            return
+        }
+
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: shouldReduceWork ? 180 : 620) {
+            guard generation == snapshotRefreshGeneration else { return }
+            if isHomeMotionBusy {
+                requestSnapshotRefresh(force: force)
+            } else {
+                refreshSnapshot(force: force)
+            }
+        }
+    }
+
+    private func refreshSnapshot(force: Bool = false) {
+        let nextSignature = cardSourceSignature
+        guard force || !snapshotController.snapshotInitialized || nextSignature != lastAppliedCardSourceSignature else {
+            if let human = activeHuman {
+                snapshotController.seedAvatarData(cardId: human.id, data: human.avatarImageData)
+            }
+            return
+        }
+        lastAppliedCardSourceSignature = nextSignature
         snapshotController.refresh(
             snapshot: sourceCards,
             pets: pets,
@@ -1631,6 +1886,134 @@ struct FocusHomeV3View: View {
             isExpanded: wallet.isExpanded,
             walletTransitionCardId: wallet.transitionCardId
         )
+        if let human = activeHuman {
+            snapshotController.seedAvatarData(cardId: human.id, data: human.avatarImageData)
+        }
+    }
+
+    private func handleMemberProfileDidChange(_ notification: Notification) {
+        let id = (notification.userInfo?["id"] as? String).flatMap(UUID.init(uuidString:))
+        snapshotController.invalidateMemberAppearance(cardId: id)
+        requestSnapshotRefresh(force: true)
+        if let id {
+            snapshotController.seedAvatarData(
+                cardId: id,
+                data: FocusHomeCardDataSource.avatarDataForHomeCard(id: id, pets: pets, humans: humans)
+            )
+            snapshotController.seedPopoutData(
+                cardId: id,
+                data: FocusHomeCardDataSource.popoutDataForHomeCard(
+                    id: id,
+                    pets: pets,
+                    equipFxPopoutCard: equipFxPopoutCard
+                )
+            )
+        }
+    }
+
+    private func routePendingReminderNotificationIfNeeded() {
+        guard let userInfo = OhanaNotificationRouteCenter.shared.pendingRoute() else { return }
+        _ = routeReminderNotification(userInfo)
+    }
+
+    private func handleReminderRouteRequest(_ userInfo: [AnyHashable: Any]?) {
+        _ = routeReminderNotification(userInfo)
+    }
+
+    @discardableResult
+    private func routeReminderNotification(_ userInfo: [AnyHashable: Any]?) -> Bool {
+        guard let payload = OhanaReminderRoutePayload(userInfo: userInfo) else { return false }
+        return routeReminderNotification(payload)
+    }
+
+    @discardableResult
+    private func routeReminderNotification(_ userInfo: [String: Any]?) -> Bool {
+        guard let payload = OhanaReminderRoutePayload(userInfo: userInfo) else { return false }
+        return routeReminderNotification(payload)
+    }
+
+    @discardableResult
+    private func routeReminderNotification(_ payload: OhanaReminderRoutePayload) -> Bool {
+        guard let destination = FocusHomeReminderDeepLinkRouter.destination(
+            for: payload,
+            reminders: pendingReminders,
+            events: allEvents,
+            pets: pets,
+            humans: humans,
+            plants: plants,
+            humanMedications: humanMedications
+        ) else {
+            return false
+        }
+
+        closeReminderNotificationSurfaces()
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: shouldReduceWork ? 40 : 90) {
+            openReminderNotificationDestination(destination)
+        }
+        OhanaNotificationRouteCenter.shared.clearPendingRoute(reminderId: payload.reminderId?.uuidString)
+        return true
+    }
+
+    private func closeReminderNotificationSurfaces() {
+        selectedPet = nil
+        selectedHuman = nil
+        selectedPlant = nil
+        selectedPetTab = .overview
+        functionMenuPresentation = nil
+        showingCalendar = false
+        calendarEntityFilterId = nil
+        calendarHumanFilterId = nil
+        expandedAllFeaturesPet = nil
+        expandedAllFeaturesHuman = nil
+        expandedBasicInfoPet = nil
+        expandedBasicInfoHuman = nil
+        expandedQuickWeightDetailPet = nil
+        expandedQuickExpenseDetailPet = nil
+        expandedQuickFeedDetailPet = nil
+        expandedQuickFeedOpensManualSheet = false
+        expandedQuickWaterDetailPet = nil
+        expandedQuickPottyDetailPet = nil
+        expandedQuickLitterDetailPet = nil
+        expandedQuickPlayDetailPet = nil
+        expandedQuickHygienePet = nil
+        expandedQuickWalkPet = nil
+        todayFocusWalkPet = nil
+        expandedQuickHealthPet = nil
+        expandedQuickHealthInitialSection = nil
+        expandedQuickPetMedicationPet = nil
+        expandedQuickMomentPet = nil
+        expandedMomentHistoryPet = nil
+        expandedQuickHumanMedication = nil
+        expandedHumanWeightDetail = nil
+        expandedHumanWorkoutDetail = nil
+        expandedHumanExpenseDetail = nil
+        expandedHumanNoteDetail = nil
+        fabExpanded = false
+        fabMenuItemsVisible = false
+    }
+
+    private func openReminderNotificationDestination(_ destination: FocusHomeReminderDestination) {
+        switch destination {
+        case .petQuick(let key, let pet):
+            openPetQuickKey(key, card: FocusCard.from(pet, includeAvatarData: true))
+        case .petFeature(let feature, let pet):
+            openPetFeature(feature, card: FocusCard.from(pet, includeAvatarData: true))
+        case .petHealth(let pet, let section):
+            expandedQuickHealthInitialSection = section
+            expandedQuickHealthPet = pet
+        case .humanQuick(let key, let human):
+            openHumanQuickKey(key, card: FocusCard.from(human, includeAvatarData: true))
+        case .humanDetail(let human):
+            selectedHuman = human
+        case .plant(let plant):
+            selectedPlant = plant
+        case .functionMenu(let destination):
+            functionMenuPresentation = FunctionMenuPresentation(destination: destination)
+        case .calendar(let entityId, let humanId):
+            calendarEntityFilterId = entityId
+            calendarHumanFilterId = humanId
+            showingCalendar = true
+        }
     }
 
     private func updateHomeCardReorder(
@@ -1654,7 +2037,7 @@ struct FocusHomeV3View: View {
     private func commitHomeCardReorder() {
         guard let reorderedCards = homeReorder.reorderedCardsForCommit() else { return }
         homeCardOrderRaw = FocusHomeCardDataSource.encodedOrder(for: reorderedCards)
-        refreshSnapshot()
+        refreshSnapshot(force: true)
     }
 
     private func resetHomeCardReorderState() {
@@ -1681,7 +2064,7 @@ struct FocusHomeV3View: View {
     }
 
     private func handlePetSaved(_ pet: Pet) {
-        refreshSnapshot()
+        refreshSnapshot(force: true)
         OhanaFrameScheduler.runAfterNextFrame(milliseconds: 140) {
             openCard(FocusCard.from(pet, includeAvatarData: true))
         }
@@ -1693,7 +2076,7 @@ struct FocusHomeV3View: View {
         showingCrewRoster = false
         if !displayCards.contains(where: { $0.id == card.id }) {
             homeCardOrderRaw = FocusHomeCardDataSource.promotedOrderRaw(id: card.id, currentRaw: homeCardOrderRaw)
-            refreshSnapshot()
+            refreshSnapshot(force: true)
         }
         OhanaFrameScheduler.runAfterNextFrame(milliseconds: 80) {
             expandWalletToCard(id: card.id)
@@ -1754,6 +2137,35 @@ struct FocusHomeV3View: View {
     private func openHomeFabShortcut(_ shortcut: HomeFabFunctionShortcut) {
         guard shortcut.isAvailable else { return }
         functionMenuPresentation = FunctionMenuPresentation(destination: shortcut.destination)
+    }
+
+    private func selectVerticalTab(_ tab: VerticalHomeTab) {
+        guard selectedVerticalTab != tab else {
+            closeVerticalFabMenu()
+            return
+        }
+        guard !verticalSolidMotion.isTabMotionLocked, !isWalletHeroTransitioning else {
+            OhanaFeedback.light()
+            return
+        }
+        if wallet.isExpanded {
+            collapseWalletToHome()
+            OhanaFrameScheduler.runAfterNextFrame(milliseconds: shouldReduceWork ? 240 : 620) {
+                guard !wallet.isExpanded, wallet.heroProgress <= 0.001 else { return }
+                applyVerticalTabSelection(tab)
+            }
+            return
+        }
+        applyVerticalTabSelection(tab)
+    }
+
+    private func applyVerticalTabSelection(_ tab: VerticalHomeTab) {
+        closeVerticalFabMenuForNavigation()
+        verticalSolidMotion.lockForTabMotion()
+        withAnimation(shouldReduceWork ? GoMotion.reduced : GoMotion.selection) {
+            selectedVerticalTab = tab
+        }
+        verticalSolidMotion.unlockAfterTabMotion(milliseconds: shouldReduceWork ? 160 : 360)
     }
 
     private func closeVerticalFabMenu() {

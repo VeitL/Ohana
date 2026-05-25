@@ -846,6 +846,11 @@ struct PetBasicInfoDetailView: View {
         pet.avatarImageData = eAvatarImageData
         CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: modelContext)
         modelContext.safeSave()
+        NotificationCenter.default.post(
+            name: .ohanaMemberProfileDidChange,
+            object: nil,
+            userInfo: ["id": pet.id.uuidString, "kind": "pet"]
+        )
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 }

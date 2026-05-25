@@ -186,6 +186,8 @@ final class Human {
     // Relationships
     @Relationship(deleteRule: .cascade) var weightLogs: [HumanWeightLog]
     @Relationship(deleteRule: .cascade) var workoutLogs: [HumanWorkoutLog]
+    // ArkSchemaV56：人类体检指标追踪（TSH/HbA1c/血压等单项数值时间序列）
+    @Relationship(deleteRule: .cascade) var healthMetricLogs: [HumanHealthMetricLog] = []
 
     init(
         name: String = "",

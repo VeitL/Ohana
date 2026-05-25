@@ -230,9 +230,50 @@ final class NotificationManager: NSObject, @unchecked Sendable {
         content.userInfo = [
             "reminderId": reminder.id.uuidString,
             "notificationId": reminder.notificationId,
-            "reminderCreatedAt": reminder.createdAt.timeIntervalSince1970
+            "reminderCreatedAt": reminder.createdAt.timeIntervalSince1970,
+            "eventId": event.id.uuidString,
+            "eventType": event.eventType,
+            "relatedEntityType": event.relatedEntityType,
+            "relatedEntityId": event.relatedEntityId
         ]
         return content
+    }
+}
+
+extension Notification.Name {
+    static let ohanaReminderAction = Notification.Name("OhanaReminderAction")
+    static let ohanaReminderRouteRequested = Notification.Name("ohanaReminderRouteRequested")
+}
+
+@MainActor
+final class OhanaNotificationRouteCenter {
+    static let shared = OhanaNotificationRouteCenter()
+
+    private var pendingReminderRoute: [String: Any]?
+
+    private init() {}
+
+    func requestReminderRoute(_ payload: [String: Any]) {
+        pendingReminderRoute = payload
+        NotificationCenter.default.post(
+            name: .ohanaReminderRouteRequested,
+            object: nil,
+            userInfo: payload
+        )
+    }
+
+    func pendingRoute() -> [String: Any]? {
+        pendingReminderRoute
+    }
+
+    func clearPendingRoute(reminderId: String?) {
+        guard let reminderId else {
+            pendingReminderRoute = nil
+            return
+        }
+        if pendingReminderRoute?["reminderId"] as? String == reminderId {
+            pendingReminderRoute = nil
+        }
     }
 }
 
@@ -246,7 +287,6 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         let userInfo = response.notification.request.content.userInfo
         let action = response.actionIdentifier
         // F8: 记录用户操作，通过 NotificationCenter 广播到 App 层处理 ModelContext
-        let notifName = Notification.Name("OhanaReminderAction")
         var payload: [String: Any] = ["action": action]
         if let reminderId = userInfo["reminderId"] as? String {
             payload["reminderId"] = reminderId
@@ -257,11 +297,27 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         if let createdAt = userInfo["reminderCreatedAt"] as? TimeInterval {
             payload["reminderCreatedAt"] = createdAt
         }
+        if let eventId = userInfo["eventId"] as? String {
+            payload["eventId"] = eventId
+        }
+        if let eventType = userInfo["eventType"] as? String {
+            payload["eventType"] = eventType
+        }
+        if let relatedEntityType = userInfo["relatedEntityType"] as? String {
+            payload["relatedEntityType"] = relatedEntityType
+        }
+        if let relatedEntityId = userInfo["relatedEntityId"] as? String {
+            payload["relatedEntityId"] = relatedEntityId
+        }
         
         switch action {
+        case UNNotificationDefaultActionIdentifier:
+            DispatchQueue.main.async {
+                OhanaNotificationRouteCenter.shared.requestReminderRoute(payload)
+            }
         case "COMPLETE", "SKIP", "SNOOZE":
             DispatchQueue.main.async {
-                NotificationCenter.default.post(name: notifName, object: nil, userInfo: payload)
+                NotificationCenter.default.post(name: .ohanaReminderAction, object: nil, userInfo: payload)
             }
         default:
             break

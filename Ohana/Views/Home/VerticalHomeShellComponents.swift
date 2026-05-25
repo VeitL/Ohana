@@ -41,17 +41,28 @@ struct VerticalHomePagedContent<Home: View, Calendar: View, Oasis: View, Plants:
     @ViewBuilder var oasis: () -> Oasis
     @ViewBuilder var plants: () -> Plants
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @State private var pagePosition: CGFloat = 0
+    @State private var didSyncInitialPosition = false
+
     var body: some View {
         GeometryReader { geo in
+            let position = didSyncInitialPosition ? pagePosition : CGFloat(selectedIndex)
             HStack(spacing: 0) {
-                page(home(), tab: .home, size: geo.size)
-                page(calendar(), tab: .calendar, size: geo.size)
-                page(oasis(), tab: .oasis, size: geo.size)
-                page(plants(), tab: .plants, size: geo.size)
+                page(home(), tab: .home, size: geo.size, pagePosition: position)
+                page(calendar(), tab: .calendar, size: geo.size, pagePosition: position)
+                page(oasis(), tab: .oasis, size: geo.size, pagePosition: position)
+                page(plants(), tab: .plants, size: geo.size, pagePosition: position)
             }
             .frame(width: geo.size.width * CGFloat(VerticalHomeTab.allCases.count), alignment: .leading)
-            .offset(x: -geo.size.width * CGFloat(selectedIndex))
-            .animation(pageSwitchAnimation, value: selectedTab)
+            .offset(x: -geo.size.width * position)
+            .onAppear {
+                syncPagePosition(animated: false)
+            }
+            .onChange(of: selectedTab) { _, _ in
+                syncPagePosition(animated: true)
+            }
         }
         .clipped()
     }
@@ -61,12 +72,35 @@ struct VerticalHomePagedContent<Home: View, Calendar: View, Oasis: View, Plants:
     }
 
     private var pageSwitchAnimation: Animation {
-        .interactiveSpring(response: 0.72, dampingFraction: 0.78, blendDuration: 0.18)
+        .interactiveSpring(response: 0.48, dampingFraction: 0.88, blendDuration: 0.16)
     }
 
-    private func page(_ content: some View, tab: VerticalHomeTab, size: CGSize) -> some View {
-        let relative = relativeIndex(for: tab)
-        return content
+    private var canAnimatePages: Bool {
+        !reduceMotion && workloadPolicy.shouldRunInteractionAnimation(isVisible: true)
+    }
+
+    private func syncPagePosition(animated: Bool) {
+        let target = CGFloat(selectedIndex)
+        guard didSyncInitialPosition else {
+            didSyncInitialPosition = true
+            pagePosition = target
+            return
+        }
+        guard abs(pagePosition - target) > 0.001 else { return }
+        let animation = canAnimatePages ? pageSwitchAnimation : GoMotion.reduced
+        if animated {
+            withAnimation(animation) {
+                pagePosition = target
+            }
+        } else {
+            pagePosition = target
+        }
+    }
+
+    @ViewBuilder
+    private func page(_ content: some View, tab: VerticalHomeTab, size: CGSize, pagePosition: CGFloat) -> some View {
+        let relative = relativePosition(for: tab, pagePosition: pagePosition)
+        let pageContent = content
             .frame(width: size.width, height: size.height)
             .scaleEffect(pageScale(relative), anchor: .center)
             .rotation3DEffect(
@@ -77,30 +111,37 @@ struct VerticalHomePagedContent<Home: View, Calendar: View, Oasis: View, Plants:
             )
             .offset(y: pageLift(relative))
             .opacity(pageOpacity(relative))
-            .zIndex(relative == 0 ? 3 : 1)
-            .compositingGroup()
+            .zIndex(Double(3 - min(abs(relative), 2)))
+            .allowsHitTesting(abs(relative) < 0.5)
+
+        if abs(relative) < 0.001 {
+            pageContent
+        } else {
+            pageContent.compositingGroup()
+        }
     }
 
-    private func relativeIndex(for tab: VerticalHomeTab) -> Int {
+    private func relativePosition(for tab: VerticalHomeTab, pagePosition: CGFloat) -> CGFloat {
         let index = VerticalHomeTab.allCases.firstIndex(of: tab) ?? 0
-        return index - selectedIndex
+        return CGFloat(index) - pagePosition
     }
 
-    private func pageScale(_ relative: Int) -> CGFloat {
-        relative == 0 ? 1 : 0.88
+    private func pageScale(_ relative: CGFloat) -> CGFloat {
+        1 - min(abs(relative), 1) * 0.10
     }
 
-    private func pageRotation(_ relative: Int) -> Double {
-        guard relative != 0 else { return 0 }
-        return relative < 0 ? 13 : -13
+    private func pageRotation(_ relative: CGFloat) -> Double {
+        Double(-min(max(relative, -1), 1) * 10)
     }
 
-    private func pageLift(_ relative: Int) -> CGFloat {
-        relative == 0 ? 0 : 18
+    private func pageLift(_ relative: CGFloat) -> CGFloat {
+        min(abs(relative), 1) * 14
     }
 
-    private func pageOpacity(_ relative: Int) -> Double {
-        abs(relative) <= 1 ? 1 : 0.18
+    private func pageOpacity(_ relative: CGFloat) -> Double {
+        let distance = abs(relative)
+        guard distance > 1 else { return 1 }
+        return max(0.18, 1 - Double(min(distance - 1, 1)) * 0.82)
     }
 }
 
@@ -339,11 +380,13 @@ struct VerticalHomeBottomBar: View {
                     .lineLimit(1)
             }
             .foregroundStyle(selectedTab == tab ? Color.goPrimary : Color.ohanaSecondaryText)
+            .scaleEffect(selectedTab == tab ? 1.04 : 1)
             .frame(maxWidth: .infinity)
             .frame(height: 48)
             .contentShape(Rectangle())
         }
         .buttonStyle(ScaleButtonStyle())
+        .animation(canAnimate ? GoMotion.selection : GoMotion.reduced, value: selectedTab)
     }
 
     private func toggleFab() {
@@ -457,16 +500,43 @@ struct VerticalHomeEmbeddedAction: Identifiable {
     let title: String
     let icon: String
     let isCompleted: Bool
+    let detailIcon: String
+    let quickAccessibilityLabel: String
+    let detailAccessibilityLabel: String
+    let detailAction: (() -> Void)?
     let action: () -> Void
+
+    init(
+        id: String,
+        title: String,
+        icon: String,
+        isCompleted: Bool,
+        detailIcon: String = "chart.line.uptrend.xyaxis",
+        quickAccessibilityLabel: String = "Quick action",
+        detailAccessibilityLabel: String = "Details",
+        detailAction: (() -> Void)? = nil,
+        action: @escaping () -> Void
+    ) {
+        self.id = id
+        self.title = title
+        self.icon = icon
+        self.isCompleted = isCompleted
+        self.detailIcon = detailIcon
+        self.quickAccessibilityLabel = quickAccessibilityLabel
+        self.detailAccessibilityLabel = detailAccessibilityLabel
+        self.detailAction = detailAction
+        self.action = action
+    }
 }
 
 struct VerticalHomeEmbeddedQuickActions: View {
     let title: String
     let items: [VerticalHomeEmbeddedAction]
     let onAll: () -> Void
+    @State private var openActionId: String? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(title)
                     .font(.system(size: 12, weight: .black, design: .rounded))
@@ -486,32 +556,112 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 .buttonStyle(ScaleButtonStyle())
             }
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                ForEach(items) { item in
-                    Button {
-                        OhanaFeedback.light()
-                        item.action()
-                    } label: {
-                        VStack(spacing: 4) {
-                            Image(systemName: item.isCompleted ? "checkmark" : item.icon)
-                                .font(.system(size: 15, weight: .black))
-                                .symbolRenderingMode(.monochrome)
-                            Text(item.title)
-                                .font(.system(size: 9, weight: .black, design: .rounded))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.68)
-                        }
-                        .foregroundStyle(Color.goCardWhite)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                        .background(Color.goCardWhite.opacity(item.isCompleted ? 0.22 : 0.13), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    }
-                    .buttonStyle(ScaleButtonStyle())
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 9), count: 3), spacing: 10) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    actionCell(item, index: index)
+                        .zIndex(openActionId == item.id ? 40 : Double(items.count - index))
                 }
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
         .background(Color.arkInk.opacity(0.18), in: RoundedRectangle(cornerRadius: 24, style: .continuous)) // ui-v4: allow embedded card action dock contrast
+        .onChange(of: items.map(\.id).joined(separator: "|")) { _, _ in
+            openActionId = nil
+        }
+    }
+
+    private func actionCell(_ item: VerticalHomeEmbeddedAction, index: Int) -> some View {
+        ZStack {
+            Button {
+                OhanaFeedback.light()
+                if item.detailAction == nil {
+                    item.action()
+                } else {
+                    withAnimation(GoMotion.feedback) {
+                        openActionId = openActionId == item.id ? nil : item.id
+                    }
+                }
+            } label: {
+                VStack(spacing: 5) {
+                    Image(systemName: item.isCompleted ? "checkmark" : item.icon)
+                        .font(.system(size: 16, weight: .black))
+                        .symbolRenderingMode(.monochrome)
+                    Text(item.title)
+                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.64)
+                }
+                .foregroundStyle(Color.goCardWhite)
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)
+                .background(Color.goCardWhite.opacity(item.isCompleted ? 0.22 : 0.13), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+            }
+            .buttonStyle(ScaleButtonStyle())
+
+            if openActionId == item.id, let detailAction = item.detailAction {
+                verticalEmbeddedInlineMenu(
+                    item: item,
+                    detailAction: detailAction,
+                    index: index
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .center)))
+                .zIndex(80)
+            }
+        }
+    }
+
+    private func verticalEmbeddedInlineMenu(
+        item: VerticalHomeEmbeddedAction,
+        detailAction: @escaping () -> Void,
+        index: Int
+    ) -> some View {
+        HStack(spacing: 8) {
+            inlineMenuButton(
+                icon: item.isCompleted ? "checkmark" : "plus",
+                accessibility: item.quickAccessibilityLabel,
+                action: item.action
+            )
+            inlineMenuButton(
+                icon: item.detailIcon,
+                accessibility: item.detailAccessibilityLabel,
+                action: detailAction
+            )
+        }
+        .padding(6)
+        .background(Color.ohanaCardSurfaceElevated, in: Capsule())
+        .shadow(color: Color.arkInk.opacity(0.24), radius: 14, x: 0, y: 8) // ui-v4: allow embedded quick action submenu lift
+        .offset(x: menuOffsetX(index: index), y: menuOffsetY(index: index))
+    }
+
+    private func inlineMenuButton(icon: String, accessibility: String, action: @escaping () -> Void) -> some View {
+        Button {
+            OhanaFeedback.light()
+            withAnimation(GoMotion.feedback) {
+                openActionId = nil
+            }
+            action()
+        } label: {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .black))
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .frame(width: 38, height: 34)
+                .background(Color.ohanaControlFill, in: Capsule())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(accessibility)
+    }
+
+    private func menuOffsetY(index: Int) -> CGFloat {
+        index >= 3 ? -54 : 54
+    }
+
+    private func menuOffsetX(index: Int) -> CGFloat {
+        switch index % 3 {
+        case 0: return 16
+        case 2: return -16
+        default: return 0
+        }
     }
 }

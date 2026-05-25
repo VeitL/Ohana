@@ -13,6 +13,7 @@ struct AchievementWallView: View {
     var allPets: [Pet] = []
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @AppStorage("achievement_claimedRewardIDs") private var claimedRewardRaw: String = ""
     @AppStorage("appLanguage") private var appLanguageRaw: String = AppLanguage.fallbackCode
     @Query(sort: \OasisElectronicPet.obtainedAt, order: .reverse) private var electronicPets: [OasisElectronicPet]
@@ -110,6 +111,17 @@ struct AchievementWallView: View {
         activeHuman?.name ?? activePet.name
     }
 
+    private var activeCoconutBalance: Int {
+        activeHuman?.coconutBalance ?? activePet.coconutBalance
+    }
+
+    private var activeCoconutLogSubject: CoconutLogSubject {
+        if let human = activeHuman {
+            return .human(human.id)
+        }
+        return .pet(activePet.id)
+    }
+
     private var achievementContext: AchievementComputationContext {
         AchievementComputationContext(
             allPets: pets,
@@ -201,7 +213,7 @@ struct AchievementWallView: View {
             label: rewardAnimationLabel
         )
         .fullScreenCover(isPresented: $showingCoconutLog) {
-            CoconutLogView()
+            CoconutLogView(subject: activeCoconutLogSubject)
         }
         .animation(GoMotion.sheet, value: selectedAchievement?.id)
         .animation(GoMotion.sheet, value: pendingClaimAchievement?.id)
@@ -219,8 +231,9 @@ struct AchievementWallView: View {
             }
             Spacer()
             CoconutBalanceCapsule(
+                balance: activeCoconutBalance,
                 showsDeltaAnimation: true,
-                deltaAnimationContext: "achievementWall"
+                deltaAnimationContext: "achievementWall:\(activeSubject.id)"
             ) {
                 showingCoconutLog = true
             }
@@ -529,16 +542,40 @@ struct AchievementWallView: View {
         }
     }
 
-    private func progressBar(_ value: Double, tint: Color, track: Color = Color.ohanaControlFill) -> some View {
-        GeometryReader { proxy in
+    private var achievementProgressFill: LinearGradient {
+        LinearGradient(
+            colors: [Color.goPrimaryLight, Color.goPrimary, Color.goPrimaryDark],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
+
+    private func progressBar(_ value: Double, tint _: Color, track: Color = Color.ohanaControlFill) -> some View {
+        let progress = min(max(value, 0), 1)
+
+        return GeometryReader { proxy in
             ZStack(alignment: .leading) {
                 Capsule().fill(track)
-                Capsule()
-                    .fill(tint)
-                    .frame(width: max(6, proxy.size.width * min(max(value, 0), 1)))
+                if progress > 0 {
+                    Capsule()
+                        .fill(achievementProgressFill)
+                        .frame(width: max(6, proxy.size.width * progress))
+                        .overlay {
+                            Capsule()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.ohanaPrimaryActionText.opacity(0.24), Color.ohanaPrimaryActionText.opacity(0.0)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                                .allowsHitTesting(false)
+                        }
+                }
             }
         }
         .frame(height: 8)
+        .animation(GoMotion.stateChange, value: progress)
     }
 
     private func achievementPopup(_ badge: Achievement) -> some View {
@@ -1157,21 +1194,23 @@ struct AchievementWallView: View {
     @discardableResult
     private func claimReward(for badge: Achievement, playFeedback: Bool = true) -> Int {
         guard badge.isUnlocked, !isRewardClaimed(badge) else { return 0 }
-        let balanceBefore = QuestManager.shared.coconutCount
         var ids = claimedRewardIDs
         ids.insert(rewardKey(for: badge))
         claimedRewardRaw = ids.sorted().joined(separator: ",")
-        QuestManager.shared.addCoconuts(
+
+        let actor = creditActiveAccount(amount: rewardPerAchievement)
+        QuestManager.shared.recordCoconutDelta(
             rewardPerAchievement,
             emoji: badge.emoji,
             title: l.tr(zh: "成就奖励 · \(badge.title)", en: "Badge reward · \(badge.title)", de: "Abzeichen-Belohnung · \(badge.title)"),
-            actorId: rewardActor(for: badge).id,
-            actorName: rewardActor(for: badge).name
+            actorId: actor.id,
+            actorName: actor.name
         )
-        let delta = max(0, QuestManager.shared.coconutCount - balanceBefore)
+        modelContext.safeSave()
+
         if playFeedback {
             showReward(
-                delta,
+                rewardPerAchievement,
                 label: l.tr(
                     zh: "成就奖励",
                     en: "Badge reward",
@@ -1180,7 +1219,7 @@ struct AchievementWallView: View {
             )
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
-        return delta
+        return rewardPerAchievement
     }
 
     private func claimAllRewards() {
@@ -1209,13 +1248,12 @@ struct AchievementWallView: View {
         }
     }
 
-    private func rewardActor(for badge: Achievement) -> (id: String, name: String) {
-        if AchievementManager.isGlobalAchievement(badge) {
-            return ("ohana", "Ohana")
-        }
+    private func creditActiveAccount(amount: Int) -> (id: String, name: String) {
         if let human = activeHuman {
+            human.coconutBalance += amount
             return (human.id.uuidString, human.name)
         }
+        activePet.coconutBalance += amount
         return (activePet.id.uuidString, activePet.name)
     }
 }

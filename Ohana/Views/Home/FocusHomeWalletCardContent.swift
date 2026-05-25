@@ -17,9 +17,14 @@ struct FocusHomeWalletCardContent: View {
     let avatarCacheRevision: Int
     let walkTrackingPet: Pet?
     var usesMatchedGeometry: Bool = true
+    var reduceMotion: Bool = false
 
     var body: some View {
-        ZStack {
+        FocusHomeWalkCardFlip(
+            walkPet: walkTrackingPet,
+            reduceMotion: reduceMotion,
+            walkCardPadding: 10
+        ) {
             FocusWalletCardView(
                 card: card,
                 namespace: namespace,
@@ -30,18 +35,7 @@ struct FocusHomeWalletCardContent: View {
                 avatarCacheRevision: avatarCacheRevision,
                 usesMatchedGeometry: usesMatchedGeometry
             )
-            .opacity(walkTrackingPet == nil ? 1 : 0)
-
-            if let walkTrackingPet {
-                WalkTrackingCard(pet: walkTrackingPet)
-                    .padding(10)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.92, anchor: .center).combined(with: .opacity),
-                        removal: .opacity
-                    ))
-            }
         }
-        .animation(HeroAnim.walletSpring, value: walkTrackingPet?.id)
     }
 
     static func walkTrackingPet(for card: FocusCard, isHero: Bool, pets: [Pet]) -> Pet? {

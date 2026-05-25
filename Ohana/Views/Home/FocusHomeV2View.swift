@@ -27,6 +27,7 @@ struct FocusHomeV2View: View {
     @Query(sort: \Plant.createdAt) private var plants: [Plant]
     @Query(sort: \OasisElectronicPet.obtainedAt, order: .reverse) private var electronicPets: [OasisElectronicPet]
     @Query(sort: \Event.startDate) private var allEvents: [Event]
+    @Query(sort: \HumanMedication.createdAt, order: .reverse) private var humanMedications: [HumanMedication]
     @Query(filter: #Predicate<Reminder> { $0.status == "pending" || $0.status == "failed" }, sort: \Reminder.scheduledAt) private var pendingReminders: [Reminder]
 
     @AppStorage("appLanguage") private var appLanguage = "zh"
@@ -142,6 +143,12 @@ struct FocusHomeV2View: View {
 
     private var waterManagementLabel: String {
         l.tr(zh: "管理", en: "Manage", de: "Verwalten")
+    }
+
+    private var activeHumanAvatarImage: UIImage? {
+        guard let human = activeHuman else { return nil }
+        let avatarData = snapshotController.avatarData(for: human.id) ?? human.avatarImageData
+        return FocusWalletAvatarCache.entry(for: human.id, data: avatarData).image
     }
 
     private var sourceCards: [FocusCard] {
@@ -265,8 +272,15 @@ struct FocusHomeV2View: View {
                         AppPerformanceMonitor.shared.record("HomeV2 首帧", startedAt: ohanaProcessStartTime)
                     }
                 }
+                routePendingReminderNotificationIfNeeded()
             }
             .onChange(of: cardSourceSignature) { _, _ in refreshSnapshot() }
+            .onReceive(NotificationCenter.default.publisher(for: .ohanaMemberProfileDidChange)) { notification in
+                handleMemberProfileDidChange(notification)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .ohanaReminderRouteRequested)) { notification in
+                handleReminderRouteRequest(notification.userInfo)
+            }
             .onChange(of: activeHumanIdStr) { _, _ in
                 headerStreak = FocusHomeFirstFrameMaintenance.currentStreak(activeHumanId: activeHumanIdStr)
             }
@@ -356,7 +370,7 @@ struct FocusHomeV2View: View {
             coconutBalance: headerCoconutBalance,
             coconutDeltaContext: headerCoconutDeltaContext,
             activeHumanDisplayName: activeHuman?.name ?? l.tr(zh: "本人", en: "Me", de: "Ich"),
-            activeHumanAvatarImage: activeHuman?.avatarImageData.flatMap(UIImage.init(data:)),
+            activeHumanAvatarImage: activeHumanAvatarImage,
             activeHumanAvatarEmoji: activeHuman?.avatarEmoji,
             onStreak: { showStreakDetail = true },
             onCoconut: openHeaderCoconutDestination,
@@ -745,6 +759,120 @@ struct FocusHomeV2View: View {
             isExpanded: wallet.isExpanded,
             walletTransitionCardId: wallet.transitionCardId
         )
+        if let human = activeHuman {
+            snapshotController.seedAvatarData(cardId: human.id, data: human.avatarImageData)
+        }
+    }
+
+    private func handleMemberProfileDidChange(_ notification: Notification) {
+        let id = (notification.userInfo?["id"] as? String).flatMap(UUID.init(uuidString:))
+        snapshotController.invalidateMemberAppearance(cardId: id)
+        refreshSnapshot()
+    }
+
+    private func routePendingReminderNotificationIfNeeded() {
+        guard let userInfo = OhanaNotificationRouteCenter.shared.pendingRoute() else { return }
+        _ = routeReminderNotification(userInfo)
+    }
+
+    private func handleReminderRouteRequest(_ userInfo: [AnyHashable: Any]?) {
+        _ = routeReminderNotification(userInfo)
+    }
+
+    @discardableResult
+    private func routeReminderNotification(_ userInfo: [AnyHashable: Any]?) -> Bool {
+        guard let payload = OhanaReminderRoutePayload(userInfo: userInfo) else { return false }
+        return routeReminderNotification(payload)
+    }
+
+    @discardableResult
+    private func routeReminderNotification(_ userInfo: [String: Any]?) -> Bool {
+        guard let payload = OhanaReminderRoutePayload(userInfo: userInfo) else { return false }
+        return routeReminderNotification(payload)
+    }
+
+    @discardableResult
+    private func routeReminderNotification(_ payload: OhanaReminderRoutePayload) -> Bool {
+        guard let destination = FocusHomeReminderDeepLinkRouter.destination(
+            for: payload,
+            reminders: pendingReminders,
+            events: allEvents,
+            pets: pets,
+            humans: humans,
+            plants: plants,
+            humanMedications: humanMedications
+        ) else {
+            return false
+        }
+
+        closeReminderNotificationSurfaces()
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: shouldReduceWork ? 40 : 90) {
+            openReminderNotificationDestination(destination)
+        }
+        OhanaNotificationRouteCenter.shared.clearPendingRoute(reminderId: payload.reminderId?.uuidString)
+        return true
+    }
+
+    private func closeReminderNotificationSurfaces() {
+        selectedPet = nil
+        selectedHuman = nil
+        selectedPlant = nil
+        selectedPetTab = .overview
+        functionMenuPresentation = nil
+        showingCalendar = false
+        calendarEntityFilterId = nil
+        calendarHumanFilterId = nil
+        expandedAllFeaturesPet = nil
+        expandedAllFeaturesHuman = nil
+        expandedBasicInfoPet = nil
+        expandedBasicInfoHuman = nil
+        expandedQuickWeightDetailPet = nil
+        expandedQuickExpenseDetailPet = nil
+        expandedQuickFeedDetailPet = nil
+        expandedQuickFeedOpensManualSheet = false
+        expandedQuickWaterDetailPet = nil
+        expandedQuickPottyDetailPet = nil
+        expandedQuickLitterDetailPet = nil
+        expandedQuickPlayDetailPet = nil
+        expandedQuickHygienePet = nil
+        expandedQuickWalkPet = nil
+        todayFocusWalkPet = nil
+        expandedQuickHealthPet = nil
+        expandedQuickHealthInitialSection = nil
+        expandedQuickPetMedicationPet = nil
+        expandedQuickMomentPet = nil
+        expandedMomentHistoryPet = nil
+        expandedQuickHumanMedication = nil
+        expandedHumanWeightDetail = nil
+        expandedHumanWorkoutDetail = nil
+        expandedHumanExpenseDetail = nil
+        expandedHumanNoteDetail = nil
+        fabExpanded = false
+        fabMenuItemsVisible = false
+    }
+
+    private func openReminderNotificationDestination(_ destination: FocusHomeReminderDestination) {
+        switch destination {
+        case .petQuick(let key, let pet):
+            openPetQuickKey(key, card: FocusCard.from(pet, includeAvatarData: true))
+        case .petFeature(let feature, let pet):
+            openPetFeature(feature, card: FocusCard.from(pet, includeAvatarData: true))
+        case .petHealth(let pet, let section):
+            expandedQuickHealthInitialSection = section
+            expandedQuickHealthPet = pet
+        case .humanQuick(let key, let human):
+            openHumanQuickKey(key, card: FocusCard.from(human, includeAvatarData: true))
+        case .humanDetail(let human):
+            selectedHuman = human
+        case .plant(let plant):
+            selectedPlant = plant
+        case .functionMenu(let destination):
+            functionMenuPresentation = FunctionMenuPresentation(destination: destination)
+        case .calendar(let entityId, let humanId):
+            calendarEntityFilterId = entityId
+            calendarHumanFilterId = humanId
+            showingCalendar = true
+        }
     }
 
     private func handlePetSaved(_ pet: Pet) {

@@ -31,6 +31,28 @@ struct FeedGuidedTaskState {
     let stockFeedbackToken: CheckInFeedbackToken?
 }
 
+struct FeedModeTransitionRenderState {
+    let id: UUID
+    let fromMode: FeedOperatingMode
+    let toMode: FeedOperatingMode
+    var progress: CGFloat
+    let viewState: FeedHomeViewState
+
+    var isAnimating: Bool {
+        progress < 0.999
+    }
+}
+
+struct FeedGuidedTaskTransition {
+    let fromTask: FeedGuidedTaskState
+    let toTask: FeedGuidedTaskState
+    let progress: CGFloat
+
+    var clampedProgress: CGFloat {
+        min(max(progress, 0), 1)
+    }
+}
+
 struct FeedGuidedModeOption: Identifiable {
     let id: String
     let title: String
@@ -62,6 +84,7 @@ struct FeedDiscoveryDockItem: Identifiable {
 
 struct GuidedFeedHomeView: View {
     let task: FeedGuidedTaskState
+    let taskTransition: FeedGuidedTaskTransition?
     let modeTitle: String
     let modeOptions: [FeedGuidedModeOption]
     let chart: FeedGuidedChartState?
@@ -72,7 +95,7 @@ struct GuidedFeedHomeView: View {
         VStack(spacing: 14) {
             FeedGuidedModeStrip(title: modeTitle, options: modeOptions)
 
-            FeedPrimaryTaskCard(task: task, primaryAction: primaryAction)
+            FeedPrimaryTaskCard(task: task, taskTransition: taskTransition, primaryAction: primaryAction)
 
             if let chart {
                 FeedGuidedMiniChartCard(chart: chart)
@@ -87,6 +110,12 @@ private struct FeedGuidedModeStrip: View {
     let title: String
     let options: [FeedGuidedModeOption]
 
+    @Namespace private var selectionNamespace
+
+    private var selectedOptionID: String {
+        options.first(where: \.isSelected)?.id ?? ""
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack {
@@ -98,6 +127,7 @@ private struct FeedGuidedModeStrip: View {
                     Text(selected.title)
                         .font(.system(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(selected.tint)
+                        .contentTransition(.opacity)
                 }
             }
 
@@ -115,15 +145,30 @@ private struct FeedGuidedModeStrip: View {
                         .foregroundStyle(option.isSelected ? Color.arkInk : option.tint)
                         .frame(maxWidth: .infinity)
                         .frame(height: 42)
-                        .background(option.isSelected ? option.tint : option.tint.opacity(0.12), in: Capsule())
+                        .background {
+                            ZStack {
+                                Capsule()
+                                    .fill(option.tint.opacity(0.12))
+
+                                if option.isSelected {
+                                    Capsule()
+                                        .fill(option.tint)
+                                        .matchedGeometryEffect(id: "feedModeSelection", in: selectionNamespace)
+                                }
+                            }
+                        }
                         .overlay {
                             Capsule()
                                 .stroke(option.isSelected ? option.tint.opacity(0.35) : Color.clear, lineWidth: 2)
                         }
+                        .contentShape(Capsule())
+                        .scaleEffect(option.isSelected ? 1.015 : 1)
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .zIndex(option.isSelected ? 1 : 0)
                 }
             }
+            .animation(GoMotion.page, value: selectedOptionID)
         }
         .padding(12)
         .feedFlatBlockSurface(cornerRadius: 22)
@@ -131,6 +176,37 @@ private struct FeedGuidedModeStrip: View {
 }
 
 private struct FeedPrimaryTaskCard: View {
+    let task: FeedGuidedTaskState
+    let taskTransition: FeedGuidedTaskTransition?
+    let primaryAction: () -> Void
+
+    var body: some View {
+        ZStack {
+            if let taskTransition {
+                let p = taskTransition.clampedProgress
+                FeedPrimaryTaskSurface(task: taskTransition.fromTask, primaryAction: primaryAction)
+                    .opacity(Double(1 - p))
+                    .scaleEffect(1 - p * 0.025, anchor: .center)
+                    .offset(x: -18 * p)
+                    .zIndex(p < 0.5 ? 2 : 1)
+                    .allowsHitTesting(false)
+
+                FeedPrimaryTaskSurface(task: taskTransition.toTask, primaryAction: primaryAction)
+                    .opacity(Double(p))
+                    .scaleEffect(0.985 + p * 0.015, anchor: .center)
+                    .offset(x: 18 * (1 - p))
+                    .zIndex(p >= 0.5 ? 2 : 1)
+                    .allowsHitTesting(p > 0.98)
+            } else {
+                FeedPrimaryTaskSurface(task: task, primaryAction: primaryAction)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .checkInPulse((taskTransition?.toTask ?? task).feedbackToken)
+    }
+}
+
+private struct FeedPrimaryTaskSurface: View {
     let task: FeedGuidedTaskState
     let primaryAction: () -> Void
 
@@ -145,12 +221,14 @@ private struct FeedPrimaryTaskCard: View {
                         .padding(.horizontal, 11)
                         .padding(.vertical, 7)
                         .background(task.modeTint, in: Capsule())
+                        .contentTransition(.opacity)
 
                     Spacer()
 
                     Text(task.metricTitle)
                         .font(.system(size: 11, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
+                        .contentTransition(.opacity)
                 }
 
                 HStack(alignment: .bottom, spacing: 14) {
@@ -160,12 +238,14 @@ private struct FeedPrimaryTaskCard: View {
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(2)
                             .minimumScaleFactor(0.82)
+                            .contentTransition(.opacity)
 
                         Text(task.detail)
                             .font(.system(size: 12, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .lineLimit(2)
                             .minimumScaleFactor(0.82)
+                            .contentTransition(.opacity)
                     }
 
                     Spacer(minLength: 8)
@@ -194,6 +274,7 @@ private struct FeedPrimaryTaskCard: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
                         .background(task.isPrimaryEnabled ? task.modeTint : Color.ohanaControlFill, in: Capsule())
+                        .contentTransition(.opacity)
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .disabled(!task.isPrimaryEnabled)
@@ -212,8 +293,9 @@ private struct FeedPrimaryTaskCard: View {
             .padding(.top, 54)
             .padding(.trailing, 16)
         }
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 224)
         .feedFlatBlockSurface(cornerRadius: 26)
-        .checkInPulse(task.feedbackToken)
     }
 }
 

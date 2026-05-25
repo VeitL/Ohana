@@ -643,6 +643,11 @@ struct HumanBasicInfoDetailView: View {
         human.setPrivate(.expense, ePrivateExpense)
         human.setPrivate(.note, ePrivateNote)
         modelContext.safeSave()
+        NotificationCenter.default.post(
+            name: .ohanaMemberProfileDidChange,
+            object: nil,
+            userInfo: ["id": human.id.uuidString, "kind": "human"]
+        )
     }
 
     private func deleteHumanAndReturnHome() {

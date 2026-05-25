@@ -9,6 +9,10 @@ import Combine
 import Foundation
 import SwiftUI
 
+extension Notification.Name {
+    static let ohanaMemberProfileDidChange = Notification.Name("ohanaMemberProfileDidChange")
+}
+
 @MainActor
 final class FocusHomeSnapshotController: ObservableObject {
     @Published private(set) var snapshot: [FocusCard] = []
@@ -23,8 +27,8 @@ final class FocusHomeSnapshotController: ObservableObject {
         avatarLoadTask?.cancel()
     }
 
-    func cards(fallback: [FocusCard]) -> [FocusCard] {
-        snapshotInitialized ? snapshot : fallback
+    func cards(fallback: @autoclosure () -> [FocusCard]) -> [FocusCard] {
+        snapshotInitialized ? snapshot : fallback()
     }
 
     func refresh(
@@ -87,28 +91,30 @@ final class FocusHomeSnapshotController: ObservableObject {
             guard !Task.isCancelled else { return }
 
             var payloads: [FocusWalletAvatarCache.Payload] = []
-            for id in targetIds where avatarDataById[id] == nil {
+            for id in targetIds {
                 guard !Task.isCancelled else { return }
-                guard let data = FocusHomeCardDataSource.avatarDataForHomeCard(id: id, pets: pets, humans: humans) else {
-                    if let popout = FocusHomeCardDataSource.popoutDataForHomeCard(
-                        id: id,
-                        pets: pets,
-                        equipFxPopoutCard: equipFxPopoutCard
-                    ) {
-                        popoutDataById[id] = popout
+                let data = FocusHomeCardDataSource.avatarDataForHomeCard(id: id, pets: pets, humans: humans)
+                if let data, !data.isEmpty {
+                    if avatarDataById[id] != data {
+                        avatarDataById[id] = data
                     }
-                    await Task.yield()
-                    continue
+                    payloads.append(FocusWalletAvatarCache.Payload(id: id, data: data))
+                } else {
+                    avatarDataById.removeValue(forKey: id)
+                    payloads.append(FocusWalletAvatarCache.Payload(id: id, data: nil))
                 }
-                avatarDataById[id] = data
-                if let popout = FocusHomeCardDataSource.popoutDataForHomeCard(
+
+                let popout = FocusHomeCardDataSource.popoutDataForHomeCard(
                     id: id,
                     pets: pets,
                     equipFxPopoutCard: equipFxPopoutCard
-                ) {
+                )
+                if let popout, !popout.isEmpty {
                     popoutDataById[id] = popout
+                } else {
+                    popoutDataById.removeValue(forKey: id)
                 }
-                payloads.append(FocusWalletAvatarCache.Payload(id: id, data: data))
+                await Task.yield()
             }
 
             if payloads.isEmpty {
@@ -164,7 +170,18 @@ final class FocusHomeSnapshotController: ObservableObject {
     }
 
     func seedAvatarData(cardId: UUID, data: Data?) {
-        guard let data, !data.isEmpty else { return }
+        guard let data, !data.isEmpty else {
+            avatarDataById.removeValue(forKey: cardId)
+            Task { @MainActor in
+                let didRefresh = await FocusWalletAvatarCache.preload(payloads: [
+                    FocusWalletAvatarCache.Payload(id: cardId, data: nil)
+                ])
+                if didRefresh {
+                    avatarCacheRevision &+= 1
+                }
+            }
+            return
+        }
         avatarDataById[cardId] = data
         Task { @MainActor in
             let didRefresh = await FocusWalletAvatarCache.preload(payloads: [
@@ -177,8 +194,24 @@ final class FocusHomeSnapshotController: ObservableObject {
     }
 
     func seedPopoutData(cardId: UUID, data: Data?) {
-        guard let data, !data.isEmpty else { return }
-        popoutDataById[cardId] = data
+        if let data, !data.isEmpty {
+            popoutDataById[cardId] = data
+        } else {
+            popoutDataById.removeValue(forKey: cardId)
+        }
+    }
+
+    func invalidateMemberAppearance(cardId: UUID?) {
+        cancelAvatarLoad()
+        if let cardId {
+            avatarDataById.removeValue(forKey: cardId)
+            popoutDataById.removeValue(forKey: cardId)
+            avatarCacheRevision &+= 1
+        } else {
+            avatarDataById.removeAll()
+            popoutDataById.removeAll()
+            avatarCacheRevision &+= 1
+        }
     }
 
     private func seedVisibleAvatarData(

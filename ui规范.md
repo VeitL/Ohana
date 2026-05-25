@@ -114,6 +114,9 @@
 - **适用范围**：首页卡片 hero、FAB/菜单 reveal、inline popup、快捷操作菜单、奖励反馈、扭蛋/Oasis 奖励、添加人类/宠物角色卡、图表范围切换和其他空间过渡。长表单、静态设置列表、普通长详情页可继续使用 `VStack/ScrollView/List`，除非其中有空间转场。
 - **遮挡优先于淡入淡出**：Apple Wallet 式过渡应让元素“被移开的主物体自然露出”，优先用 transform/mask/reveal，不要让目标模块在主动画结束后再单独 fade in。
 - **状态冻结与解冻**：开始动画前把卡片、头像、快捷操作和关键数字冻结成 snapshot；动画结束后再同步真实业务状态，避免内容在运动中途跳变。
+- **空间卡片几何唯一真相**：可展开卡片堆必须由一个 motion scene 同时拥有折叠态 frame、展开态 frame、内部 alignment、padding、头像 source、快捷操作边界、zIndex、hit-testing 和浮动。先验收 collapsed / expanded 两个稳定端点，再调 spring 或 progress。
+- **层级与冻结分离**：卡片收回接近卡片堆时，selected zIndex / hit-testing 应先回到折叠堆层级；frozen card/avatar source 多保留一帧，等普通折叠卡稳定接管后再清掉；这段时间不要恢复 ambient floating。
+- **禁止散点修偏**：卡片偏左/偏右时，不要先随机改 `x`、padding 或 offset。必须同时检查外层 `CGRect.midX`、内部 alignment、leading/trailing padding、overlay/quick action 视觉边界、头像裁切透明区和 frozen/live source 是否一致。
 - **控件切换**：chip、segment、tab、filter、picker 行切换应使用 spring 或 matched transition；选中态要滑动/扩散/淡入，不能直接跳到新位置。
 - **Toggle**：轨道高度只比内部圆钮略高；圆钮必须滑动到另一侧，icon/文字可同步 crossfade 或 bounce。
 - **卡片与列表**：展开/收起、插入/删除、排序变化应使用 `GoMotion.page` 或 `GoMotion.feedback`，配合 opacity/scale/offset，避免列表瞬间重排。

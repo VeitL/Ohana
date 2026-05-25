@@ -97,6 +97,12 @@ struct ContentView: View {
                 reconcileHumanProfileRequirement()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .ohanaReminderRouteRequested)) { _ in
+            selectedPet = nil
+            selectedHuman = nil
+            selectedPlant = nil
+            selectedPetTab = .overview
+        }
         .fullScreenCover(isPresented: $showingRequiredHumanProfile) {
             RequiredHumanProfileView { human in
                 currentActiveHumanId = human.id.uuidString

@@ -28,6 +28,7 @@ struct OhanaApp: App {
         let initStartedAt = CFAbsoluteTimeGetCurrent()
         AppCountry.ensureInitialized()
         OhanaApp.registerBGTasks()
+        _ = NotificationManager.shared
         let containerStartedAt = CFAbsoluteTimeGetCurrent()
         modelContainer = SharedModelContainer.make()
         let initDurationMS = (CFAbsoluteTimeGetCurrent() - initStartedAt) * 1_000
