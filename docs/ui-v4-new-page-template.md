@@ -90,7 +90,7 @@ struct ExampleV4Page: View {
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(14)
-        .goTranslucentCard(cornerRadius: 22)
+        .goSolidCardSurface(cornerRadius: 22)
     }
 
     private var stateSection: some View {
@@ -104,7 +104,7 @@ struct ExampleV4Page: View {
         }
         .frame(minHeight: 44)
         .padding(.horizontal, 14)
-        .goTranslucentCard(cornerRadius: 18)
+        .goSolidCardSurface(cornerRadius: 18)
     }
 }
 ```
@@ -113,17 +113,7 @@ struct ExampleV4Page: View {
 
 Short record, confirm, restock, and lightweight management popups should be implemented as an in-page overlay inside the current `ZStack` so the glass samples the real screen behind it. Reserve system `.sheet` for overview pages, history, long lists, and complex editors.
 
-Use the authoritative short-popup parameters from `ui规范.selection.json`:
-
-- `sheetImplementation=inlineOverlay`
-- `sheetHorizontalInset=6pt`
-- `sheetPosition=bottomNearSafeEdge`
-- `sheetCornerRadius=52pt`
-- `sheetMaxHeight=contentAdaptive`
-- `sheetGlass=nativeRegular`
-- `sheetShadow=liftedAlert`
-- `sheetBackdrop=scrimGradient`
-- `sheetAnimation=bottomSpringScaleFade`
+Use the authoritative `sheet*` tokens from `ui规范.selection.json`. The example below mirrors the current token values; if the JSON changes, update the example from the JSON instead of treating this file as a second source of truth.
 
 ```swift
 @State private var activePopup: PopupKind?
@@ -206,9 +196,9 @@ Rules:
 - Check dark and light mode together. Glass must remain visibly refractive while preserving text and icon contrast.
 - Use `OhanaAppBackground()` for full-screen pages.
 - Use `Color.ohanaPrimaryText`, `Color.ohanaSecondaryText`, and `Color.ohanaTertiaryText`; avoid system `.primary` / `.secondary` in custom surfaces.
-- Use `goTranslucentCard`, `goIslandModuleCard`, `goGlassBackground`, or a local token-based surface; avoid ad hoc card stacks.
+- Use `goSolidCardSurface`, `goIslandModuleCard`, `goGlassBackground`, or a local token-based surface; avoid ad hoc card stacks. `goTranslucentCard` is a legacy alias for a solid V4 card surface.
 - Do not wrap pure information summaries in card chrome; reserve card surfaces for tappable, navigable, expandable, or editable grouped surfaces.
-- Use `Color.foodDry` for dry food and `Color.foodWet` for wet food; keep stock/remaining-food status on its own inventory status colors.
+- Use `Color.foodDry` for dry food and `Color.foodWet` for wet food; stock, remaining food, and treats follow the current JSON token policy, with warning/error colors only for local low-stock or abnormal states.
 - Keep compact density, but preserve a 44pt hit target for buttons, toggles, rows, chips, and icon actions.
 - Use `ScaleButtonStyle()` for tappable controls unless there is a specific reason not to.
 - Use `GoMotion.page`, `GoMotion.feedback`, `GoMotion.fab`, `GoMotion.quick`, or `GoMotion.reduced`; do not invent one-off spring values.

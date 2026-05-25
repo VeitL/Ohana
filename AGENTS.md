@@ -120,24 +120,13 @@ The in-app UI guidelines console under `设置 > 开发者工具 > UI/UX 规范�
 
 Implementation files such as `Ohana/Utilities/ColorExtensions.swift`, `Ohana/Views/OhanaDesignSystem.swift`, and `Ohana/Views/Details/DesignSpecTypesV4.swift` are consumers or mirrors of the design source. Do not treat hardcoded defaults in Swift as a separate design source; update them only to reflect `ui规范.selection.json`.
 
-Color semantics are reserved. `goPrimary` resolves to `goLime` in dark mode and `goBlue` in light mode; these colors are for global brand/system primary actions only. Pet/human theme colors and domain-specific colors such as feeding modes, food kinds, stock, chart series, and status groups must not reuse `goLime`, `goBlue`, or their primary aliases.
+Keep this file as workflow guidance, not a second UI spec. The detailed token values for primary colors, member/domain colors, card usage, navigation chrome, sheet/popup geometry, chart style, and motion behavior belong in `ui规范.selection.json` and are explained in `ui规范.md`.
 
-Sheets and popups are their own design system. Always read the `sheet*` tokens from `ui规范.selection.json` and keep popup background, popup card, popup input, popup button, and popup chrome independent from global card/input/button tokens.
-
-Short record, confirmation, restock, and lightweight management popups must follow the confirmed inline popup spec: `sheetImplementation=inlineOverlay`, `sheetHorizontalInset=6pt`, `sheetCornerRadius=52pt`, `sheetPosition=bottomNearSafeEdge`, `sheetMaxHeight=contentAdaptive`, `sheetGlass=nativeRegular`, `sheetShadow=liftedAlert`, `sheetBackdrop=scrimGradient`, and `sheetAnimation=bottomSpringScaleFade`. Use an in-page overlay inside the current `ZStack` so the glass samples the real screen behind it; reserve system `.sheet` / `.large` for overview pages, history, long lists, and complex editors.
-
-Key animated interactions must use Ohana's stable ZStack motion scene pattern. For hero cards, FAB/menu reveal, inline popups, reward reveals, gacha/Oasis rewards, role creation cards, and chart range switches, keep visual layers mounted, freeze the UI snapshot before animation, and drive transform/mask/opacity/zIndex/hit-testing from one progress value. Do not insert/remove complex views, decode images, scan SwiftData, or run multiple delayed animations during the same transition. Ordinary static forms and long lists can remain `VStack`/`ScrollView`/`List`.
-
-Motion is a render-layer concern. Business services must not depend on animation state, animation delays, or view lifetimes.
-
-For spatial transitions, freeze the render snapshot before animation starts, mutate only motion-scene state during the transition, and refresh heavier business/read-model state only after visual handoff. Do not fix animation glitches by adding scattered async delays, route rebuilds, service calls, or SwiftData fetches inside the transition.
-
-Use change-driven effects for semantic feedback only: success, reward, attention, validation error, selected state, and confirmation. Decorative loops must be gated by `AppWorkloadPolicy`; Reduce Motion must replace or suppress problematic motion.
-Expandable hero card stacks have an extra geometry rule: one motion scene must own both collapsed and expanded frames plus internal alignment, padding, avatar source, quick-action bounds, zIndex, hit-testing, and ambient floating. Verify both stable end states before tuning spring/progress values. Do not fix off-center cards with scattered `x`, padding, or offset tweaks until you have checked the outer `CGRect.midX`, inner alignment, leading/trailing padding, overlay bounds, avatar crop transparency, and frozen/live source consistency. During collapse, return selected zIndex/hit-testing to the collapsed stack before clearing frozen visual sources; keep the frozen card/avatar source for one extra frame and resume floating only after the live collapsed card has taken over.
-
-Navigation chrome and settings rows are explicit tokens too. Use `settingIcon` for Settings-style leading icons, `pageBackButton` for non-sheet back controls, `pageCloseButton` for non-sheet close controls, and `sheetChrome` only for popup/sheet close controls.
-
-Cards are reserved for tappable, navigable, expandable, or editable grouped surfaces. Pure information summaries should use unframed layouts, inline metrics, or lightweight separators instead of card chrome.
+High-risk reminders for agents:
+- Color semantics are reserved; do not reuse `goPrimary`, `goLime`, `goBlue`, or their aliases outside the roles allowed by the JSON tokens.
+- Sheets and popups use independent `sheet*` tokens; do not infer popup styling from normal card/input/button tokens.
+- Key spatial interactions use the stable ZStack motion scene pattern; motion is a render-layer concern and must not trigger SwiftData scans, image decoding, service fan-out, or route rebuilds during the visible transition.
+- Navigation chrome, settings rows, card usage, and short popup behavior must follow their explicit token families instead of local one-off styling.
 
 For new pages or major view refactors, start from `docs/ui-v4-new-page-template.md`. New SwiftUI views should use `OhanaAppBackground()`, semantic Ohana text colors, shared card/button/sheet helpers, `ScaleButtonStyle()`, and `GoMotion` tokens by default.
 

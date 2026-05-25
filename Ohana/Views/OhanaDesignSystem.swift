@@ -527,6 +527,11 @@ extension View {
     func goBlueCard(cornerRadius: CGFloat = 24) -> some View {
         modifier(GoBlueCardModifier(cornerRadius: cornerRadius))
     }
+
+    /// Preferred V4 name for the solid flat business-card surface.
+    func goSolidCardSurface(cornerRadius: CGFloat = 20) -> some View {
+        modifier(GoTranslucentCardModifier(cornerRadius: cornerRadius))
+    }
     
     func goTranslucentCard(cornerRadius: CGFloat = 20) -> some View {
         modifier(GoTranslucentCardModifier(cornerRadius: cornerRadius))

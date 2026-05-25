@@ -4,7 +4,17 @@
 
 `设置 > 开发者工具 > UI/UX 规范查看` 中的 V4 交互式设计控制台只是编辑、预览和导出工具。控制台里的 AppStorage 状态不自动成为正式规范；只有导出的 V4 JSON 同步到 `ui规范.selection.json` 后，才算新的设计源头。
 
-## 0. V4 设计控制台使用规则
+## 0. 规范分层
+
+- `ui规范.selection.json`：唯一机器源头，保存 token、选项值、规则 ID 和当前正式选择。
+- `ui规范.md`：解释同一选择的意图、适用场景、例外和人工检查方式；不另起 token。
+- `docs/ui-v4-new-page-template.md`：新页面和重构页面的代码起点，只演示最小可执行结构。
+- `AGENTS.md`：代理工作流提示，只保留源头、验证命令和高风险提醒。
+- `docs/ui-ux-pro-max-ohana-adaptation.md`：外部 UI/UX 建议如何翻译进 Ohana；不得覆盖 V4 token。
+
+更新规范时，先改 `ui规范.selection.json`，再同步本文档。只有需要试验或导出新组合时才进入 V4 控制台；实现页面时不要把控制台 AppStorage 状态当作正式规范。
+
+## 0.1 V4 设计控制台使用规则
 
 - 入口：`设置 > 开发者工具 > UI/UX 规范查看`。
 - 控制台只使用 fixture 假数据，不读取真实 SwiftData，不修改全 app 主题。
@@ -17,9 +27,9 @@
 - 所有可见状态切换都必须有顺滑过渡：按钮按压、chip/segment 选中、toggle 滑动、卡片展开、sheet 出入场、toast/banner、列表更新、图表数据变化、日历切换都不能硬切。
 - 每次确定设计方向后，复制 V4 JSON/Markdown，并同步到 `ui规范.selection.json` 与本文档。
 - 新建页面或大改页面时，从 `docs/ui-v4-new-page-template.md` 开始；完成前运行 `scripts/audit-ui-v4.sh --changed` 或指定文件扫描。
-- 后续 UI 修改必须先检查 V4 控制台中的设计检查面板：文字对比、44pt 触控区域、玻璃可读性、动效强度、状态可见性、深浅色安全。
+- 后续正式规范调整应检查 V4 控制台中的设计检查面板：文字对比、44pt 触控区域、玻璃可读性、动效强度、状态可见性、深浅色安全。
 
-## 0.1 当前正式设计选择
+## 0.2 当前正式设计选择
 
 以 `ui规范.selection.json` 为准，当前已确认的 V4 token：
 
@@ -37,7 +47,7 @@
 - **双模式省电**：省电模式默认关闭。普通模式与省电模式都必须保持当前可见核心交互动效顺滑；省电模式只减少后台刷新、动态背景、粒子、彩虹流动、环境光等装饰/重复工作。
 - **已接受的风险约束**：`compact` 密度仍必须保留 44pt 实际触控区；`clear` 玻璃必须有足够遮罩和描边，避免文字浮在复杂背景上。
 
-## 0.2 页面生成质量硬规则
+## 0.3 页面生成质量硬规则
 
 这些规则是之后生成或重构页面前的硬性门槛，用来避免内容显示不全、颜色错误、排版怪异、按钮互相覆盖等低级问题。
 
@@ -146,8 +156,8 @@
 - 业务卡片必须使用实色填充：优先 `Color.ohanaCardSurface`、`Color.ohanaCardSurfaceElevated` 或明确的实色语义色。避免 `tint.opacity(...)`、厚磨砂、低透明 material 作为主卡片背景。
 - 大面积内容使用 `sectionCard`，但仍保持实色 surface，不做半透明磨砂卡片。
 - 卡片内子区域使用 `cardSurface`。
-- 原生 `.glassEffect()` 和自定义磨砂只用于明确的 Liquid Glass 展示、底部导航或弹窗背景；普通业务卡片、成就卡、列表行、快捷操作容器不使用玻璃/磨砂主背景。
-- `.glassEffect()` 只允许保留在 `iOS26UITestView` 这类内部 UI 测试页中，避免设置页、首页和详情页真机卡顿。
+- 原生 `.glassEffect()` 和自定义磨砂只用于明确的 Liquid Glass 展示、底部导航、系统级 chrome 或弹窗/短 popup 背景；普通业务卡片、成就卡、列表行、快捷操作容器不使用玻璃/磨砂主背景。
+- 普通页面和业务详情页不要新增长驻 `.glassEffect()` 卡片。短 popup / sheet 背景允许一层 `nativeRegular` 玻璃，并按 `sheet*` token 加遮罩、描边和可读性承托；内部表单块仍使用 flat 实色 surface。
 - 状态提示使用 `tint.opacity(0.10)` 背景 + `tint.opacity(0.25-0.30)` 描边。
 - 卡片圆角默认 22；内嵌格圆角 12-14；列表行圆角 14。
 
@@ -342,9 +352,10 @@
 - 场景预览：`DesignSpecPreviewCanvasV4`
 - 导出器：`DesignSpecExporterV4`
 - 背景和卡片基础：`goFocusBackdrop`、`sectionCard`
-- 通用业务表面：`goTranslucentCard`、`goGlassBackground`、`goSelectableSurface`
+- 通用业务表面：`goSolidCardSurface`、`goIslandModuleCard`、`goSelectableSurface`
+- 旧名兼容：`goTranslucentCard` 当前实现为实色 surface，不是半透明卡；新代码优先使用 `goSolidCardSurface`
 - 文字颜色：`primaryText`、`secondaryText`、`tertiaryText`
 - 表面色：`cardSurface`、`sectionCardFill`、`sectionCardStroke`
 - V4 控制台组件：背景、卡片、按钮、输入、控件、文字、导航、弹窗、图表、反馈、动效
 
-修改 UI 时，先在 V4 控制台中确认规范与状态矩阵，再应用到业务页面。
+修改 UI 时，先读 `ui规范.selection.json` 与本文档；只有需要调整正式设计选择时，才在 V4 控制台中试验、导出并同步回来。
