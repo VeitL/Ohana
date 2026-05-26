@@ -24,6 +24,7 @@ struct VerticalSolidHomePage<QuickActions: View, ContextMenuContent: View>: View
     let reduceMotion: Bool
     let isVisible: Bool
     let isLive: Bool
+    let arrivingCardId: UUID?
     let showFirstSuccessCard: Bool
     let firstQuickCheckInCompleted: Bool
     @Binding var isTodayFocusCollapsed: Bool
@@ -51,6 +52,7 @@ struct VerticalSolidHomePage<QuickActions: View, ContextMenuContent: View>: View
         let focusReveal = selectedCardId == nil
             ? CGFloat(1)
             : 1 - transitionSmooth(heroProgress, 0.10, 0.42)
+        let shouldRenderFocusDeck = selectedCardId == nil || focusReveal > 0.001
 
         return ZStack(alignment: .top) {
             if displayCards.isEmpty {
@@ -70,6 +72,7 @@ struct VerticalSolidHomePage<QuickActions: View, ContextMenuContent: View>: View
                     heroSnapshot: heroSnapshot,
                     progress: heroProgress,
                     heroDirection: heroDirection,
+                    arrivingCardId: arrivingCardId,
                     reduceMotion: reduceMotion,
                     isVisible: isVisible,
                     embedsQuickActionsInCard: true,
@@ -83,33 +86,35 @@ struct VerticalSolidHomePage<QuickActions: View, ContextMenuContent: View>: View
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 
-            VerticalHomeTaskDeck(
-                isCollapsed: $isTodayFocusCollapsed,
-                isVisible: isVisible,
-                isLive: selectedCardId == nil && isVisible,
-                pendingCount: reminders.count,
-                height: focusHeight,
-                activePets: activePets,
-                plants: plants,
-                reminders: reminders,
-                humans: humans,
-                events: events,
-                activePet: activePet,
-                showFirstSuccessCard: showFirstSuccessCard,
-                firstQuickCheckInCompleted: firstQuickCheckInCompleted,
-                onOpenQuest: onOpenQuest,
-                onCompleteQuest: onCompleteQuest,
-                onTapNegativeSignal: onTapNegativeSignal,
-                onTapOasis: onTapOasis,
-                onTapFamilyTask: onTapFamilyTask,
-                onConfirmExchange: onConfirmExchange,
-                onFirstSuccessFeed: onFirstSuccessFeed,
-                onFirstSuccessPlay: onFirstSuccessPlay,
-                onFirstSuccessMoment: onFirstSuccessMoment
-            )
-            .padding(.horizontal, 8)
-            .opacity(Double(focusReveal))
-            .allowsHitTesting(focusReveal > 0.96 && selectedCardId == nil)
+            if shouldRenderFocusDeck {
+                VerticalHomeTaskDeck(
+                    isCollapsed: $isTodayFocusCollapsed,
+                    isVisible: isVisible,
+                    isLive: selectedCardId == nil && isVisible && focusReveal > 0.96,
+                    pendingCount: reminders.count,
+                    height: focusHeight,
+                    activePets: activePets,
+                    plants: plants,
+                    reminders: reminders,
+                    humans: humans,
+                    events: events,
+                    activePet: activePet,
+                    showFirstSuccessCard: showFirstSuccessCard,
+                    firstQuickCheckInCompleted: firstQuickCheckInCompleted,
+                    onOpenQuest: onOpenQuest,
+                    onCompleteQuest: onCompleteQuest,
+                    onTapNegativeSignal: onTapNegativeSignal,
+                    onTapOasis: onTapOasis,
+                    onTapFamilyTask: onTapFamilyTask,
+                    onConfirmExchange: onConfirmExchange,
+                    onFirstSuccessFeed: onFirstSuccessFeed,
+                    onFirstSuccessPlay: onFirstSuccessPlay,
+                    onFirstSuccessMoment: onFirstSuccessMoment
+                )
+                .padding(.horizontal, 8)
+                .opacity(Double(focusReveal))
+                .allowsHitTesting(focusReveal > 0.96 && selectedCardId == nil)
+            }
         }
         .frame(width: size.width, height: size.height, alignment: .top)
     }

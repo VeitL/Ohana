@@ -1078,33 +1078,36 @@ private struct ExpandedQuickAddInlinePanel: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 46)
             } else {
-                LazyVGrid(columns: columns, spacing: 8) {
-                    ForEach(Array(items.prefix(8))) { item in
-                        Button {
-                            onAdd(item)
-                        } label: {
-                            VStack(spacing: 5) {
-                                OhanaQuickActionIcon(
-                                    actionType: item.actionType,
-                                    fallbackSystemName: item.icon,
-                                    size: 22,
-                                    color: Color.ohanaFunctionalIcon
-                                )
-                                .frame(width: 30, height: 30)
-                                .background(Color.ohanaControlFill, in: Circle())
-                                Text(item.label)
-                                    .font(OhanaFont.caption2(.bold))
-                                    .foregroundStyle(Color.ohanaPrimaryText)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.65)
+                ScrollView(.vertical, showsIndicators: items.count > 8) {
+                    LazyVGrid(columns: columns, spacing: 8) {
+                        ForEach(items) { item in
+                            Button {
+                                onAdd(item)
+                            } label: {
+                                VStack(spacing: 5) {
+                                    OhanaQuickActionIcon(
+                                        actionType: item.actionType,
+                                        fallbackSystemName: item.icon,
+                                        size: 22,
+                                        color: Color.ohanaFunctionalIcon
+                                    )
+                                    .frame(width: 30, height: 30)
+                                    .background(Color.ohanaControlFill, in: Circle())
+                                    Text(item.label)
+                                        .font(OhanaFont.caption2(.bold))
+                                        .foregroundStyle(Color.ohanaPrimaryText)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.65)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 54)
+                                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                             }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 54)
-                            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .buttonStyle(ScaleButtonStyle())
                         }
-                        .buttonStyle(ScaleButtonStyle())
                     }
                 }
+                .frame(maxHeight: 178)
             }
         }
         .padding(10)

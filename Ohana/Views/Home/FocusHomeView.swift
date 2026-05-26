@@ -65,6 +65,9 @@ struct FocusHomeView: View {
     @State var isVerticalTodayFocusCollapsed = false
     @State var verticalCalendarAddEventTrigger = 0
     @State var verticalOasisInjectEnergyTrigger = 0
+    @State var pendingHomeArrivalCardId: UUID?
+    @State var arrivingHomeCardId: UUID?
+    @State var arrivalClearTask: Task<Void, Never>?
 
     var l: L10n { L10n(appLanguage) }
     var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
@@ -172,6 +175,21 @@ struct FocusHomeView: View {
         return displayCards.first(where: { $0.id == id })
     }
 
+    var expandedBottomBarCard: FocusCard? {
+        guard verticalTabVisualState.selectedTab == .home,
+              let id = heroSelectedCardId else { return nil }
+        if let card = activeCard, card.id == id {
+            return card
+        }
+        if let snapshot = activeVerticalHeroSnapshot, snapshot.card.id == id {
+            return snapshot.card
+        }
+        if let card = displayCards.first(where: { $0.id == id }) {
+            return card
+        }
+        return visibleCards.first(where: { $0.id == id })
+    }
+
     var shouldShowExpandedWalletCardRootHitZone: Bool {
         wallet.isExpanded && wallet.heroProgress > 0.985 && activeCard != nil
     }
@@ -211,8 +229,9 @@ struct FocusHomeView: View {
             l: l,
             routes: routeCoordinator,
             activeHumanIdStr: $activeHumanIdStr,
-            onAddEntityDismissed: { refreshSnapshot(force: true) },
+            onAddEntityDismissed: completePendingHomeArrival,
             onPetSavedFromAddEntity: handlePetSaved,
+            onHumanSavedFromAddEntity: handleHumanSaved,
             onCrewPetSelected: { pet in openCard(FocusCard.from(pet, includeAvatarData: true)) },
             onCrewHumanSelected: { human in openCard(FocusCard.from(human, includeAvatarData: true)) },
             onFirstSuccessMomentCompleted: { _ in },
@@ -255,15 +274,11 @@ struct FocusHomeView: View {
     func rootSceneWithLifecycle(geo: GeometryProxy) -> some View {
         rootScene(geo: geo)
             .onAppear(perform: handleHomeAppear)
-            .task(id: cardSourceDependencyKey) {
-                await OhanaFrameScheduler.waitAfterNextFrame()
-                guard !Task.isCancelled else { return }
-                requestSnapshotRefresh()
-            }
-            .task(id: firstFrameCardDependencyKey) {
+            .task(id: cardPresentationDependencyKey) {
                 await OhanaFrameScheduler.waitAfterNextFrame()
                 guard !Task.isCancelled else { return }
                 primeFirstFrameCardsIfNeeded()
+                requestSnapshotRefresh()
             }
             .onReceive(NotificationCenter.default.publisher(for: .ohanaMemberProfileDidChange)) { notification in
                 handleMemberProfileDidChange(notification)
@@ -273,6 +288,8 @@ struct FocusHomeView: View {
             }
             .onDisappear {
                 verticalTabVisualState.cancelCommit()
+                arrivalClearTask?.cancel()
+                arrivalClearTask = nil
             }
             .onChange(of: wallet.isExpanded) { _, _ in syncWalkCardSurfaceVisibility() }
             .onChange(of: wallet.activeCardId) { _, _ in syncWalkCardSurfaceVisibility() }
@@ -345,13 +362,14 @@ struct FocusHomeView: View {
                     .zIndex(900)
             }
 
+            let bottomBarActiveCard = expandedBottomBarCard
             VerticalHomeBottomBar(
                 tabState: verticalTabVisualState,
                 isFabExpanded: $fabExpanded,
                 itemsVisible: $fabMenuItemsVisible,
-                activeCard: wallet.isExpanded && verticalTabVisualState.selectedTab == .home ? activeCard : nil,
+                activeCard: bottomBarActiveCard,
                 homeShortcuts: HomeFabShortcutCatalog.primaryShortcuts,
-                expandedShortcuts: activeCard.map(expandedFabShortcuts(for:)) ?? [],
+                expandedShortcuts: bottomBarActiveCard.map(expandedFabShortcuts(for:)) ?? [],
                 safeBottom: safeBottom,
                 onTabSelected: { tab in
                     selectVerticalTab(tab)
@@ -472,6 +490,47 @@ struct FocusHomeView: View {
             "\(showDummyCards)",
             appLanguage,
             "minute:\(minuteBucket)",
+        ].joined(separator: "||")
+    }
+
+    var cardPresentationDependencyKey: String {
+        let petKey = pets.map { pet in
+            [
+                pet.id.uuidString,
+                "\(Int(pet.createdAt.timeIntervalSince1970))",
+                "\(pet.hasPassedAway)",
+                "\(HomeCardVisibility.isPetVisible(pet, raw: hiddenHomePetIDsRaw))",
+            ].joined(separator: ":")
+        }.joined(separator: ";")
+        let humanKey = humans.map { human in
+            [
+                human.id.uuidString,
+                "\(Int(human.createdAt.timeIntervalSince1970))",
+                "\(human.shouldShowOnHome)",
+                "\(human.hasPassedAway)",
+            ].joined(separator: ":")
+        }.joined(separator: ";")
+        let oasisKey = electronicPets.map { critter in
+            [
+                critter.id.uuidString,
+                "\(critter.isFeaturedOnOasis)",
+                critter.lifeStateRaw,
+                "\(critter.isArchived)",
+            ].joined(separator: ":")
+        }.joined(separator: ";")
+        return [
+            petKey,
+            humanKey,
+            oasisKey,
+            "plants:\(plants.count)",
+            "events:\(allEvents.count)",
+            "pendingReminders:\(pendingReminders.count)",
+            "meds:\(humanMedications.count):\(humanMedicationLogs.count)",
+            hiddenHomePetIDsRaw,
+            homeCardOrderRaw,
+            "\(showDummyCards)",
+            "\(equipFxPopoutCard)",
+            appLanguage,
         ].joined(separator: "||")
     }
 
@@ -750,6 +809,7 @@ struct FocusHomeView: View {
             reduceMotion: shouldReduceWork,
             isVisible: isPageVisible,
             isLive: isPageLive,
+            arrivingCardId: arrivingHomeCardId,
             showFirstSuccessCard: showFirstSuccessCard,
             firstQuickCheckInCompleted: firstQuickCheckInCompleted,
             isTodayFocusCollapsed: $isVerticalTodayFocusCollapsed,

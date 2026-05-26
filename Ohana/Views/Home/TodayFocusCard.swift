@@ -31,12 +31,15 @@ struct TodayFocusCard: View {
     var onTapFamilyTask: (FamilyCollaborationTask) -> Void = { _ in }
     var onConfirmExchange: (CoconutExchangeRequest) -> Void = { _ in }
     var freezesToFrontCard: Bool = false
+    var allowsAmbientMotion: Bool = false
 
     @State private var bounceEmoji = false
     @State private var pulse: CGFloat = 0
     @State private var selectedFocusIndex = 0
-    @State private var skippedFocusKeys: Set<String> = TodayFocusCard.loadSkippedFocusKeys()
-    @State private var closedNegativeKeys: Set<String> = TodayFocusCard.loadClosedNegativeKeys()
+    @State private var skippedFocusKeys: Set<String>
+    @State private var closedNegativeKeys: Set<String>
+    @State private var hiddenFocusVersion = 0
+    @State private var renderDeck: TodayFocusRenderDeck
     @State private var frozenFrontContent: TodayFocusService.Content?
     @GestureState private var focusDragX: CGFloat = 0
 
@@ -44,6 +47,7 @@ struct TodayFocusCard: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @AppStorage("today_focus_enable_ambient_motion") private var enablesAmbientMotion = false
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -57,8 +61,11 @@ struct TodayFocusCard: View {
         onTapOasis: @escaping () -> Void = {},
         onTapFamilyTask: @escaping (FamilyCollaborationTask) -> Void = { _ in },
         onConfirmExchange: @escaping (CoconutExchangeRequest) -> Void = { _ in },
-        freezesToFrontCard: Bool = false
+        freezesToFrontCard: Bool = false,
+        allowsAmbientMotion: Bool = false
     ) {
+        let skippedFocusKeys = TodayFocusCard.loadSkippedFocusKeys()
+        let closedNegativeKeys = TodayFocusCard.loadClosedNegativeKeys()
         self.snapshot = snapshot
         self.presentation = presentation
         self.onOpenQuest = onOpenQuest
@@ -69,10 +76,22 @@ struct TodayFocusCard: View {
         self.onTapFamilyTask = onTapFamilyTask
         self.onConfirmExchange = onConfirmExchange
         self.freezesToFrontCard = freezesToFrontCard
+        self.allowsAmbientMotion = allowsAmbientMotion
+        _skippedFocusKeys = State(initialValue: skippedFocusKeys)
+        _closedNegativeKeys = State(initialValue: closedNegativeKeys)
+        _renderDeck = State(initialValue: TodayFocusRenderDeck.make(
+            snapshot: snapshot,
+            skippedFocusKeys: skippedFocusKeys,
+            closedNegativeKeys: closedNegativeKeys
+        ))
     }
 
     private var shouldReduceWork: Bool {
-        reduceMotion || workloadPolicy.ambientMotionBudget(isVisible: true) == .static
+        !allowsAmbientMotion ||
+        !enablesAmbientMotion ||
+        freezesToFrontCard ||
+        reduceMotion ||
+        workloadPolicy.ambientMotionBudget(isVisible: allowsAmbientMotion && !freezesToFrontCard) == .static
     }
 
     private var refreshedQuests: [IslandQuest] {
@@ -80,47 +99,27 @@ struct TodayFocusCard: View {
     }
 
     private var pendingQuests: [IslandQuest] {
-        refreshedQuests.filter { !$0.isCompleted && !skippedFocusKeys.contains(questSkipKey($0)) }
+        renderDeck.pendingQuests
     }
 
     private var assignedFamilyTasks: [FamilyCollaborationTask] {
-        snapshot.assignedFamilyTasks.filter { !skippedFocusKeys.contains(familyTaskSkipKey($0)) }
+        renderDeck.assignedFamilyTasks
     }
 
     private var pendingExchangeRequests: [CoconutExchangeRequest] {
-        snapshot.pendingExchangeRequests.filter { !skippedFocusKeys.contains(exchangeSkipKey($0)) }
+        renderDeck.pendingExchangeRequests
     }
 
     private var negativeSignals: [IslandNegativeSignal] {
-        snapshot.negativeSignals.filter { !closedNegativeKeys.contains(negativeSkipKey($0)) }
+        renderDeck.negativeSignals
     }
 
     private var focusCards: [TodayFocusService.Content] {
-        if !negativeSignals.isEmpty {
-                return negativeSignals.prefix(2).map { .negative($0) } +
-                assignedFamilyTasks.map { .familyTask($0) } +
-                pendingExchangeRequests.map { .coconutExchange($0) } +
-                pendingQuests.map { .quest($0) }
-        }
-        if !assignedFamilyTasks.isEmpty {
-            return assignedFamilyTasks.map { .familyTask($0) } +
-                pendingExchangeRequests.map { .coconutExchange($0) } +
-                pendingQuests.map { .quest($0) }
-        }
-        if !pendingExchangeRequests.isEmpty {
-            return pendingExchangeRequests.map { .coconutExchange($0) } + pendingQuests.map { .quest($0) }
-        }
-        if !pendingQuests.isEmpty {
-            return pendingQuests.map { .quest($0) }
-        }
-        if !refreshedQuests.isEmpty || !snapshot.pets.isEmpty || !snapshot.plants.isEmpty || !snapshot.humans.isEmpty {
-            return [.celebrate(pets: snapshot.pets)]
-        }
-        return [.welcome]
+        renderDeck.cards
     }
 
     private var content: TodayFocusService.Content {
-        let cards = focusCards
+        let cards = renderDeck.cards
         guard !cards.isEmpty else { return .welcome }
         return cards[min(selectedFocusIndex, cards.count - 1)]
     }
@@ -168,6 +167,7 @@ struct TodayFocusCard: View {
             }
         }
         .onAppear {
+            rebuildRenderDeck(disablesAnimations: true)
             if freezesToFrontCard {
                 frozenFrontContent = content
             } else {
@@ -191,6 +191,9 @@ struct TodayFocusCard: View {
             } else {
                 startAmbientPulseIfNeeded()
             }
+        }
+        .onChange(of: renderDeckDependencyKey) { _, _ in
+            rebuildRenderDeck(disablesAnimations: true)
         }
         .onChange(of: focusCardCountChangeKey) { _, count in
             guard count >= 0 else { return }
@@ -261,11 +264,69 @@ struct TodayFocusCard: View {
 
     private func startAmbientPulseIfNeeded() {
         guard !shouldReduceWork, !freezesToFrontCard else { return }
-        withAnimation(.easeInOut(duration: 2.6).repeatForever(autoreverses: true)) { pulse = 1 } // ui-v4: allow Today Focus ambient pulse micro-motion
-        withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { bounceEmoji = true } // ui-v4: allow Today Focus celebration bounce micro-motion
+        withAnimation(.easeInOut(duration: 2.6).repeatForever(autoreverses: true)) { pulse = 1 } // ui-v4: allow Today Focus ambient pulse micro-motion; runtime-guardrail: allow gated by Today Focus live state, explicit user opt-in, and AppWorkloadPolicy.
+        withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { bounceEmoji = true } // ui-v4: allow Today Focus celebration bounce micro-motion; runtime-guardrail: allow gated by Today Focus live state, explicit user opt-in, and AppWorkloadPolicy.
     }
 
     // MARK: - Card switcher
+
+    private struct TodayFocusRenderDeck {
+        let pendingQuests: [IslandQuest]
+        let assignedFamilyTasks: [FamilyCollaborationTask]
+        let pendingExchangeRequests: [CoconutExchangeRequest]
+        let negativeSignals: [IslandNegativeSignal]
+        let cards: [TodayFocusService.Content]
+        let identity: String
+
+        static func make(
+            snapshot: TodayFocusSnapshot,
+            skippedFocusKeys: Set<String>,
+            closedNegativeKeys: Set<String>
+        ) -> TodayFocusRenderDeck {
+            let pendingQuests = snapshot.refreshedQuests.filter {
+                !$0.isCompleted && !skippedFocusKeys.contains(TodayFocusCard.questSkipKey(for: $0))
+            }
+            let assignedFamilyTasks = snapshot.assignedFamilyTasks.filter {
+                !skippedFocusKeys.contains(TodayFocusCard.familyTaskSkipKey(for: $0))
+            }
+            let pendingExchangeRequests = snapshot.pendingExchangeRequests.filter {
+                !skippedFocusKeys.contains(TodayFocusCard.exchangeSkipKey(for: $0))
+            }
+            let negativeSignals = snapshot.negativeSignals.filter {
+                !closedNegativeKeys.contains(TodayFocusCard.negativeSkipKey(for: $0))
+            }
+
+            let cards: [TodayFocusService.Content]
+            if !negativeSignals.isEmpty {
+                cards = negativeSignals.prefix(2).map { .negative($0) } +
+                    assignedFamilyTasks.map { .familyTask($0) } +
+                    pendingExchangeRequests.map { .coconutExchange($0) } +
+                    pendingQuests.map { .quest($0) }
+            } else if !assignedFamilyTasks.isEmpty {
+                cards = assignedFamilyTasks.map { .familyTask($0) } +
+                    pendingExchangeRequests.map { .coconutExchange($0) } +
+                    pendingQuests.map { .quest($0) }
+            } else if !pendingExchangeRequests.isEmpty {
+                cards = pendingExchangeRequests.map { .coconutExchange($0) } +
+                    pendingQuests.map { .quest($0) }
+            } else if !pendingQuests.isEmpty {
+                cards = pendingQuests.map { .quest($0) }
+            } else if !snapshot.refreshedQuests.isEmpty || !snapshot.pets.isEmpty || !snapshot.plants.isEmpty || !snapshot.humans.isEmpty {
+                cards = [.celebrate(pets: snapshot.pets)]
+            } else {
+                cards = [.welcome]
+            }
+
+            return TodayFocusRenderDeck(
+                pendingQuests: pendingQuests,
+                assignedFamilyTasks: assignedFamilyTasks,
+                pendingExchangeRequests: pendingExchangeRequests,
+                negativeSignals: negativeSignals,
+                cards: cards,
+                identity: cards.map { TodayFocusCard.contentKey(for: $0) }.joined(separator: "|")
+            )
+        }
+    }
 
     private struct FocusDeckCard: Identifiable {
         let id: String
@@ -906,12 +967,28 @@ struct TodayFocusCard: View {
         )
     }
 
-    private var contentIdentity: String {
+    private var renderDeckDependencyKey: String {
         [
-            focusCards.map(contentKey).joined(separator: "|"),
-            "skipped:\(skippedFocusKeys.sorted().joined(separator: ","))",
-            "closed:\(closedNegativeKeys.sorted().joined(separator: ","))"
-        ].joined(separator: "|")
+            Self.snapshotDeckDependencyKey(snapshot),
+            "hidden:\(hiddenFocusVersion)"
+        ].joined(separator: "#")
+    }
+
+    private func rebuildRenderDeck(disablesAnimations: Bool) {
+        let next = TodayFocusRenderDeck.make(
+            snapshot: snapshot,
+            skippedFocusKeys: skippedFocusKeys,
+            closedNegativeKeys: closedNegativeKeys
+        )
+        var transaction = Transaction(animation: disablesAnimations ? nil : GoMotion.hero)
+        transaction.disablesAnimations = disablesAnimations
+        withTransaction(transaction) {
+            renderDeck = next
+        }
+    }
+
+    private var contentIdentity: String {
+        renderDeck.identity
     }
 
     private var animationIdentity: String {
@@ -938,11 +1015,15 @@ struct TodayFocusCard: View {
     }
 
     private func contentKey(_ content: TodayFocusService.Content) -> String {
+        Self.contentKey(for: content)
+    }
+
+    private static func contentKey(for content: TodayFocusService.Content) -> String {
         switch content {
-        case .quest(let q): return questSkipKey(q)
-        case .familyTask(let task): return familyTaskSkipKey(task)
-        case .coconutExchange(let request): return exchangeSkipKey(request)
-        case .negative(let s): return negativeSkipKey(s)
+        case .quest(let q): return questSkipKey(for: q)
+        case .familyTask(let task): return familyTaskSkipKey(for: task)
+        case .coconutExchange(let request): return exchangeSkipKey(for: request)
+        case .negative(let s): return negativeSkipKey(for: s)
         case .memory(let m): return "memory:\(m.headline)"
         case .celebrate: return "celebrate"
         case .welcome: return "welcome"
@@ -950,22 +1031,54 @@ struct TodayFocusCard: View {
     }
 
     private func questSkipKey(_ quest: IslandQuest) -> String {
+        Self.questSkipKey(for: quest)
+    }
+
+    private static func questSkipKey(for quest: IslandQuest) -> String {
         "quest:\(quest.id)"
     }
 
     private func familyTaskSkipKey(_ task: FamilyCollaborationTask) -> String {
+        Self.familyTaskSkipKey(for: task)
+    }
+
+    private static func familyTaskSkipKey(for task: FamilyCollaborationTask) -> String {
         "familyTask:\(task.id.uuidString)"
     }
 
     private func exchangeSkipKey(_ request: CoconutExchangeRequest) -> String {
+        Self.exchangeSkipKey(for: request)
+    }
+
+    private static func exchangeSkipKey(for request: CoconutExchangeRequest) -> String {
         "coconutExchange:\(request.id.uuidString)"
     }
 
     private func negativeSkipKey(_ signal: IslandNegativeSignal) -> String {
+        Self.negativeSkipKey(for: signal)
+    }
+
+    private static func negativeSkipKey(for signal: IslandNegativeSignal) -> String {
         if let petId = signal.petId, let alertType = signal.healthAlertType {
             return "negative:health:\(petId.uuidString):\(alertType.rawValue)"
         }
         return "negative:\(signal.title)|\(signal.detail)"
+    }
+
+    private static func snapshotDeckDependencyKey(_ snapshot: TodayFocusSnapshot) -> String {
+        [
+            snapshot.refreshedQuests.map { "\($0.id):\($0.isCompleted)" }.joined(separator: "|"),
+            snapshot.assignedFamilyTasks.map { "\($0.id.uuidString):\($0.statusRaw):\(timestamp($0.updatedAt))" }.joined(separator: "|"),
+            snapshot.pendingExchangeRequests.map { "\($0.id.uuidString):\($0.statusRaw):\(timestamp($0.updatedAt))" }.joined(separator: "|"),
+            snapshot.negativeSignals.map { negativeSkipKey(for: $0) }.joined(separator: "|"),
+            "pets:\(snapshot.pets.count)",
+            "plants:\(snapshot.plants.count)",
+            "humans:\(snapshot.humans.count)"
+        ].joined(separator: "#")
+    }
+
+    private static func timestamp(_ date: Date) -> String {
+        String(Int(date.timeIntervalSince1970))
     }
 
     private func skipButton(for content: TodayFocusService.Content, accent: Color) -> some View {
@@ -998,7 +1111,9 @@ struct TodayFocusCard: View {
             default:
                 _ = skippedFocusKeys.insert(key)
             }
+            hiddenFocusVersion += 1
         }
+        rebuildRenderDeck(disablesAnimations: false)
         persistHiddenFocusKeys()
         let nextCount = focusCards.count
         if selectedFocusIndex >= nextCount {
@@ -1010,7 +1125,9 @@ struct TodayFocusCard: View {
         withAnimation(GoMotion.hero) {
             skippedFocusKeys.removeAll()
             selectedFocusIndex = 0
+            hiddenFocusVersion += 1
         }
+        rebuildRenderDeck(disablesAnimations: false)
         UserDefaults.standard.removeObject(forKey: Self.skippedStorageKey())
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }

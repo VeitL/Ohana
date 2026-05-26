@@ -25,6 +25,8 @@ enum QuickActionPickerCatalog {
         Option(id: "water", label: "喂水", icon: "drop.fill", colorHex: "00D4AA"),
         Option(id: "potty", label: "便便", icon: "allergens", colorHex: "FF8C42"),
         Option(id: "litter", label: "铲屎", icon: "trash.fill", colorHex: "5B6AFF"),
+        Option(id: "waterChange", label: "换水", icon: "arrow.2.circlepath", colorHex: "4ECDC4"),
+        Option(id: "filterClean", label: "清滤材", icon: "sparkles", colorHex: "A78BFA"),
         Option(id: "groom", label: "护理", icon: "scissors", colorHex: "FF8C42"),
         Option(id: "health", label: "健康", icon: "heart.fill", colorHex: "FF4757"),
         Option(id: "medication", label: "用药", icon: "pill.fill", colorHex: "A855F7"),
@@ -59,9 +61,23 @@ enum QuickActionPickerCatalog {
         return allowed
     }
 
-    static func available(for pet: Pet, existingActionTypes: Set<String>) -> [Option] {
+    static func options(for pet: Pet) -> [Option] {
         let allowed = allowedActionTypeIds(forSpecies: pet.species)
-        return all.filter { allowed.contains($0.id) && !existingActionTypes.contains($0.id) }
+        return all.filter { allowed.contains($0.id) }
+    }
+
+    static func available(for pet: Pet, existingActionTypes: Set<String>) -> [Option] {
+        let existing = normalizedExistingActionTypes(existingActionTypes)
+        return options(for: pet).filter { !existing.contains($0.id) }
+    }
+
+    private static func normalizedExistingActionTypes(_ actionTypes: Set<String>) -> Set<String> {
+        var result = actionTypes
+        if result.contains("water") || !result.isDisjoint(with: WaterQuickActionPolicy.foldedActionTypes) {
+            result.insert("water")
+            result.formUnion(WaterQuickActionPolicy.foldedActionTypes)
+        }
+        return result
     }
 }
 

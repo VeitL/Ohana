@@ -103,9 +103,48 @@ extension FocusHomeView {
     }
 
     func handlePetSaved(_ pet: Pet) {
+        handleHomeMemberSaved(
+            FocusCard.from(pet, includeAvatarData: true),
+            shouldArriveInHomeStack: HomeCardVisibility.isPetVisible(pet)
+        )
+    }
+
+    func handleHumanSaved(_ human: Human) {
+        handleHomeMemberSaved(
+            FocusCard.from(human, includeAvatarData: true),
+            shouldArriveInHomeStack: human.shouldShowOnHome
+        )
+    }
+
+    private func handleHomeMemberSaved(_ card: FocusCard, shouldArriveInHomeStack: Bool) {
+        snapshotController.seedAvatarData(cardId: card.id, data: card.avatarImageData)
+        snapshotController.seedPopoutData(cardId: card.id, data: card.cardPopoutImageData)
+        if shouldArriveInHomeStack {
+            homeCardOrderRaw = FocusHomeCardDataSource.promotedOrderRaw(id: card.id, currentRaw: homeCardOrderRaw)
+            pendingHomeArrivalCardId = card.id
+        } else {
+            pendingHomeArrivalCardId = nil
+        }
         refreshSnapshot(force: true)
-        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 140) {
-            openCard(FocusCard.from(pet, includeAvatarData: true))
+    }
+
+    func completePendingHomeArrival() {
+        refreshSnapshot(force: true)
+        guard let id = pendingHomeArrivalCardId else { return }
+        pendingHomeArrivalCardId = nil
+        beginHomeCardArrival(id: id)
+    }
+
+    private func beginHomeCardArrival(id: UUID) {
+        arrivalClearTask?.cancel()
+        let startDelay: UInt64 = shouldReduceWork ? 40 : 110
+        arrivalClearTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: startDelay) {
+            arrivingHomeCardId = id
+            arrivalClearTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: shouldReduceWork ? 620 : 1_500) {
+                guard arrivingHomeCardId == id else { return }
+                arrivingHomeCardId = nil
+                arrivalClearTask = nil
+            }
         }
     }
 
@@ -300,7 +339,7 @@ extension FocusHomeView {
         guard let pet = pets.first(where: { $0.id == card.id }) else { return }
         switch key {
         case "feed": routeCoordinator.openSheet(.petFeed(pet.id, opensManualSheet: false))
-        case "water": routeCoordinator.openSheet(.petWater(pet.id))
+        case "water", "waterChange", "filterClean": routeCoordinator.openSheet(.petWater(pet.id))
         case "potty": routeCoordinator.openSheet(.petPotty(pet.id))
         case "litter": routeCoordinator.openSheet(.petLitter(pet.id))
         case "walk": routeCoordinator.openSheet(.petWalkSummary(pet.id))

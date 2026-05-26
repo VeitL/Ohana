@@ -359,7 +359,8 @@ struct VerticalSolidHomeTodayFocusChrome: View {
             onTapOasis: onOpenOasis,
             onTapFamilyTask: { _ in },
             onConfirmExchange: { _ in },
-            freezesToFrontCard: false
+            freezesToFrontCard: !isLive,
+            allowsAmbientMotion: false
         )
         .transaction { transaction in
             if !isLive {
@@ -368,7 +369,7 @@ struct VerticalSolidHomeTodayFocusChrome: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .allowsHitTesting(true)
+        .allowsHitTesting(isLive)
     }
 }
 

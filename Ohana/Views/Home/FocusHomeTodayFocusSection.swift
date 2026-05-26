@@ -42,6 +42,7 @@ struct FocusHomeTodayFocusSection: View {
                     humans: humans,
                     events: events,
                     activePet: activePet,
+                    isLive: !isExpanded,
                     onOpenQuest: onOpenQuest,
                     onCompleteQuest: onCompleteQuest,
                     onTapNegativeSignal: onTapNegativeSignal,

@@ -19,6 +19,7 @@ struct CrewRosterOverlay: View {
     var addMemberTrigger: Bool = false
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @Query(sort: \Plant.createdAt) private var plants: [Plant]
@@ -35,12 +36,15 @@ struct CrewRosterOverlay: View {
     @State private var pendingInlineSavedPet: Pet? = nil
     @State private var pendingInlineSavedHuman: Human? = nil
     @State private var expandedRosterCardId: UUID? = nil
+    @State private var showHomeStackFullAlert = false
+    @State private var homeStackFullMemberName = ""
     @State private var rosterHeroProgress: CGFloat = 0
     @State private var rosterHeroDirection: Int = 1
     @Namespace private var rosterWalletNamespace
     @Namespace private var rosterHeroNamespace
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
     @Environment(\.colorScheme) private var colorScheme
 
     private var isMaterial: Bool { false }
@@ -146,6 +150,11 @@ struct CrewRosterOverlay: View {
                 collaborationEditorPresented = false
                 memberAddMenuItemsVisible = false
                 memberAddMenuExpanded = false
+            }
+            .alert(homeVisibilityLimitTitle, isPresented: $showHomeStackFullAlert) {
+                Button(l.tr(zh: "知道了", en: "Got it", de: "Verstanden"), role: .cancel) {}
+            } message: {
+                Text(homeVisibilityLimitMessage)
             }
             .interactiveDismissDisabled(collaborationEditorPresented)
         }
@@ -472,11 +481,93 @@ struct CrewRosterOverlay: View {
             expandedInfo: { card in
                 CrewRosterWalletInfoOverlay(card: card)
             },
+            cardOverlay: { card in
+                rosterHomeVisibilityOverlay(for: card)
+            },
             onSelect: openRosterWalletCard,
             onCollapse: closeRosterWalletCard
         )
         .padding(.top, 2)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private func rosterHomeVisibilityOverlay(for card: FocusCard) -> some View {
+        if let pet = filteredPets.first(where: { $0.id == card.id && !$0.hasPassedAway }) {
+            RosterHomeVisibilityToggle(
+                isOn: HomeCardVisibility.isPetVisible(pet, raw: hiddenHomePetIDsRaw),
+                label: l.tr(zh: "首页", en: "Home", de: "Start")
+            ) {
+                setPetHomeVisibility(pet, visible: $0)
+            }
+        } else if let human = filteredHumans.first(where: { $0.id == card.id }) {
+            RosterHomeVisibilityToggle(
+                isOn: human.shouldShowOnHome,
+                label: l.tr(zh: "首页", en: "Home", de: "Start")
+            ) {
+                setHumanHomeVisibility(human, visible: $0)
+            }
+        }
+    }
+
+    private var homeVisibilityLimitTitle: String {
+        l.tr(zh: "首页卡片堆已满", en: "Home card stack is full", de: "Startkartenstapel ist voll")
+    }
+
+    private var homeVisibilityLimitMessage: String {
+        let name = homeStackFullMemberName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let displayName = name.isEmpty ? l.tr(zh: "该成员", en: "this member", de: "dieses Mitglied") : name
+        return l.tr(
+            zh: "首页最多显示 \(HomeCardVisibility.maxVisibleCards) 张卡片。请先关闭一个成员的首页开关，再开启 \(displayName)。",
+            en: "Home can show up to \(HomeCardVisibility.maxVisibleCards) cards. Turn off another member first, then enable \(displayName).",
+            de: "Auf Start sind bis zu \(HomeCardVisibility.maxVisibleCards) Karten moglich. Schalte zuerst ein anderes Mitglied aus, dann \(displayName) ein."
+        )
+    }
+
+    private func setPetHomeVisibility(_ pet: Pet, visible: Bool) {
+        let currentlyVisible = HomeCardVisibility.isPetVisible(pet, raw: hiddenHomePetIDsRaw)
+        guard currentlyVisible != visible else { return }
+        OhanaFeedback.light()
+        if visible,
+           !HomeCardVisibility.canShowPet(pet, pets: pets, humans: humans, raw: hiddenHomePetIDsRaw) {
+            showHomeVisibilityLimit(for: pet.name)
+            return
+        }
+        withAnimation(GoMotion.feedback) {
+            hiddenHomePetIDsRaw = HomeCardVisibility.rawBySettingPet(pet, visible: visible, raw: hiddenHomePetIDsRaw)
+        }
+        postHomeVisibilityChanged(id: pet.id, kind: "pet")
+    }
+
+    private func setHumanHomeVisibility(_ human: Human, visible: Bool) {
+        guard human.shouldShowOnHome != visible else { return }
+        OhanaFeedback.light()
+        if visible,
+           !HomeCardVisibility.canShowHuman(human, pets: pets, humans: humans, raw: hiddenHomePetIDsRaw) {
+            showHomeVisibilityLimit(for: human.name)
+            return
+        }
+        withAnimation(GoMotion.feedback) {
+            human.shouldShowOnHome = visible
+        }
+        OhanaFrameScheduler.runAfterNextFrame {
+            modelContext.safeSave()
+            postHomeVisibilityChanged(id: human.id, kind: "human")
+        }
+    }
+
+    private func showHomeVisibilityLimit(for name: String) {
+        homeStackFullMemberName = name
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        showHomeStackFullAlert = true
+    }
+
+    private func postHomeVisibilityChanged(id: UUID, kind: String) {
+        NotificationCenter.default.post(
+            name: .ohanaMemberProfileDidChange,
+            object: nil,
+            userInfo: ["id": id.uuidString, "kind": kind]
+        )
     }
 
     private func plantFocusCard(_ plant: Plant) -> FocusCard {
@@ -638,6 +729,45 @@ struct CrewRosterOverlay: View {
         withAnimation(GoMotion.sheet) {
             expandedRosterCardId = nil
         }
+    }
+}
+
+private struct RosterHomeVisibilityToggle: View {
+    let isOn: Bool
+    let label: String
+    let onChange: (Bool) -> Void
+
+    var body: some View {
+        Button {
+            onChange(!isOn)
+        } label: {
+            HStack(spacing: 6) {
+                Text(label)
+                    .font(OhanaFont.caption2(.black))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+
+                ZStack(alignment: isOn ? .trailing : .leading) {
+                    Capsule()
+                        .fill(isOn ? Color.arkInk.opacity(0.18) : Color.goCardWhite.opacity(0.20))
+                        .frame(width: 28, height: 16)
+                    Circle()
+                        .fill(isOn ? Color.arkInk : Color.goCardWhite.opacity(0.90))
+                        .frame(width: 12, height: 12)
+                        .padding(.horizontal, 2)
+                }
+            }
+            .foregroundStyle(isOn ? Color.arkInk : Color.goCardWhite)
+            .padding(.horizontal, 10)
+            .frame(height: 34)
+            .background(isOn ? Color.goPrimary : Color.arkInk.opacity(0.52), in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.goCardWhite.opacity(isOn ? 0.0 : 0.16), lineWidth: 0.75))
+            .shadow(color: Color.arkInk.opacity(0.24), radius: 10, x: 0, y: 5) // ui-v4: allow card-top home visibility control lift
+            .contentShape(Capsule())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel("首页显示")
+        .accessibilityValue(isOn ? "开启" : "关闭")
     }
 }
 

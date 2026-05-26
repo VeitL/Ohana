@@ -120,7 +120,7 @@ struct TodayFocusQuestCardHost: View {
     @Query(sort: \FamilyCollaborationTask.updatedAt, order: .reverse) private var familyTasks: [FamilyCollaborationTask]
     @Query(sort: \CoconutExchangeRequest.createdAt, order: .reverse) private var exchangeRequests: [CoconutExchangeRequest]
     @State private var renderSnapshot = TodayFocusSnapshot.empty
-    @State private var renderSnapshotSignature = ""
+    @State private var renderSnapshotRefreshKey: SnapshotRefreshKey?
 
     init(
         pets: [Pet],
@@ -210,156 +210,161 @@ struct TodayFocusQuestCardHost: View {
             onTapOasis: onTapOasis,
             onTapFamilyTask: onTapFamilyTask,
             onConfirmExchange: onConfirmExchange,
-            freezesToFrontCard: !isLive
+            freezesToFrontCard: !isLive,
+            allowsAmbientMotion: isLive && presentation == .board
         )
         .task(id: snapshotTaskKey) {
-            guard isLive else { return }
+            guard case .live(let key) = snapshotTaskKey else { return }
             await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 96)
             guard !Task.isCancelled else { return }
-            refreshSnapshotIfNeeded()
+            refreshSnapshotIfNeeded(for: key)
         }
     }
 
-    private var snapshotTaskKey: String {
-        isLive ? "live|\(snapshotDependencyKey)" : "frozen"
+    private enum SnapshotTaskKey: Equatable, Sendable {
+        case live(SnapshotRefreshKey)
+        case frozen
     }
 
-    private var snapshotDependencyKey: String {
-        [
-            AppLanguage.code,
-            activeHumanIdStr,
-            petSignature,
-            plantSignature,
-            reminderSignature,
-            eventSignature,
-            liveCareSignature,
-            liveWalkSignature,
-            livePottySignature,
-            liveHumanWeightSignature,
-            familyTaskSignature,
-            exchangeRequestSignature
-        ].joined(separator: "||")
+    private struct SnapshotRefreshKey: Equatable, Sendable {
+        let language: String
+        let activeHumanId: String
+        let pets: Int
+        let plants: Int
+        let reminders: Int
+        let events: Int
+        let humans: Int
+        let careLogs: Int
+        let walkLogs: Int
+        let pottyLogs: Int
+        let humanWeightLogs: Int
+        let familyTasks: Int
+        let exchangeRequests: Int
     }
 
-    private var petSignature: String {
-        pets.map(petDependencyKey).joined(separator: "|")
+    private var snapshotTaskKey: SnapshotTaskKey {
+        isLive ? .live(snapshotRefreshKey) : .frozen
     }
 
-    private var plantSignature: String {
-        plants.map(plantDependencyKey).joined(separator: "|")
+    private var snapshotRefreshKey: SnapshotRefreshKey {
+        SnapshotRefreshKey(
+            language: AppLanguage.code,
+            activeHumanId: activeHumanIdStr,
+            pets: petRefreshToken,
+            plants: plantRefreshToken,
+            reminders: reminderRefreshToken,
+            events: eventRefreshToken,
+            humans: humanRefreshToken,
+            careLogs: logRefreshToken(liveCare.prefix(16)) { log in
+                combine(log.id.hashValue, timestampValue(log.date))
+            },
+            walkLogs: logRefreshToken(liveWalks.prefix(16)) { log in
+                combine(log.id.hashValue, timestampValue(log.startDate))
+            },
+            pottyLogs: logRefreshToken(livePotty.prefix(16)) { log in
+                combine(log.id.hashValue, timestampValue(log.date))
+            },
+            humanWeightLogs: logRefreshToken(liveHumanWeights.prefix(12)) { log in
+                combine(log.id.hashValue, timestampValue(log.date))
+            },
+            familyTasks: logRefreshToken(familyTasks.prefix(12)) { task in
+                combine(
+                    task.id.hashValue,
+                    task.statusRaw.hashValue,
+                    (task.assignedToId ?? "").hashValue,
+                    (task.claimedById ?? "").hashValue,
+                    timestampValue(task.updatedAt)
+                )
+            },
+            exchangeRequests: logRefreshToken(exchangeRequests.prefix(12)) { request in
+                combine(
+                    request.id.hashValue,
+                    request.statusRaw.hashValue,
+                    request.receiverId.hashValue,
+                    timestampValue(request.updatedAt)
+                )
+            }
+        )
     }
 
-    private var reminderSignature: String {
-        reminders.prefix(8).map(reminderDependencyKey).joined(separator: "|")
+    private var petRefreshToken: Int {
+        logRefreshToken(pets.prefix(12)) { pet in
+            combine(
+                pet.id.hashValue,
+                pet.name.hashValue,
+                pet.currentStreak,
+                pet.coconutBalance,
+                pet.hasPassedAway ? 1 : 0
+            )
+        }
     }
 
-    private var eventSignature: String {
-        events.prefix(16).map(eventDependencyKey).joined(separator: "|")
+    private var plantRefreshToken: Int {
+        logRefreshToken(plants.prefix(12)) { plant in
+            combine(
+                plant.id.hashValue,
+                plant.name.hashValue,
+                plant.wateringIntervalDays,
+                plant.fertilizingIntervalDays,
+                timestampValue(plant.lastWateredDate),
+                timestampValue(plant.lastFertilizedDate)
+            )
+        }
     }
 
-    private var liveCareSignature: String {
-        liveCare.prefix(16).map(careDependencyKey).joined(separator: "|")
+    private var reminderRefreshToken: Int {
+        logRefreshToken(reminders.prefix(8)) { reminder in
+            combine(
+                reminder.id.hashValue,
+                timestampValue(reminder.scheduledAt),
+                reminder.status.hashValue
+            )
+        }
     }
 
-    private var liveWalkSignature: String {
-        liveWalks.prefix(16).map(walkDependencyKey).joined(separator: "|")
+    private var eventRefreshToken: Int {
+        logRefreshToken(events.prefix(16)) { event in
+            combine(
+                event.id.hashValue,
+                timestampValue(event.startDate),
+                event.isCompleted ? 1 : 0
+            )
+        }
     }
 
-    private var livePottySignature: String {
-        livePotty.prefix(16).map(pottyDependencyKey).joined(separator: "|")
+    private var humanRefreshToken: Int {
+        logRefreshToken(humans.prefix(12)) { human in
+            combine(
+                human.id.hashValue,
+                human.name.hashValue,
+                human.coconutBalance
+            )
+        }
     }
 
-    private var liveHumanWeightSignature: String {
-        liveHumanWeights.prefix(16).map(humanWeightDependencyKey).joined(separator: "|")
+    private func logRefreshToken<S: Sequence>(_ items: S, token: (S.Element) -> Int) -> Int {
+        items.reduce(0) { partial, item in
+            combine(partial, token(item))
+        }
     }
 
-    private var familyTaskSignature: String {
-        familyTasks.prefix(12).map(familyTaskDependencyKey).joined(separator: "|")
+    private func combine(_ values: Int...) -> Int {
+        values.reduce(17) { partial, value in
+            partial &* 31 &+ value
+        }
     }
 
-    private var exchangeRequestSignature: String {
-        exchangeRequests.prefix(12).map(exchangeRequestDependencyKey).joined(separator: "|")
+    private func timestampValue(_ date: Date) -> Int {
+        Int(date.timeIntervalSince1970)
     }
 
-    private func petDependencyKey(_ pet: Pet) -> String {
-        [
-            pet.id.uuidString,
-            pet.name,
-            String(pet.currentStreak),
-            String(pet.coconutBalance)
-        ].joined(separator: ":")
+    private func timestampValue(_ date: Date?) -> Int {
+        guard let date else { return 0 }
+        return timestampValue(date)
     }
 
-    private func plantDependencyKey(_ plant: Plant) -> String {
-        [
-            plant.id.uuidString,
-            plant.name,
-            timestamp(plant.lastWateredDate),
-            timestamp(plant.lastFertilizedDate)
-        ].joined(separator: ":")
-    }
-
-    private func reminderDependencyKey(_ reminder: Reminder) -> String {
-        [
-            reminder.id.uuidString,
-            timestamp(reminder.scheduledAt),
-            reminder.status
-        ].joined(separator: ":")
-    }
-
-    private func eventDependencyKey(_ event: Event) -> String {
-        [
-            event.id.uuidString,
-            timestamp(event.startDate),
-            String(event.isCompleted)
-        ].joined(separator: ":")
-    }
-
-    private func careDependencyKey(_ log: PetCareLog) -> String {
-        [log.id.uuidString, timestamp(log.date)].joined(separator: ":")
-    }
-
-    private func walkDependencyKey(_ log: PetWalkLog) -> String {
-        [log.id.uuidString, timestamp(log.startDate)].joined(separator: ":")
-    }
-
-    private func pottyDependencyKey(_ log: PetPottyLog) -> String {
-        [log.id.uuidString, timestamp(log.date)].joined(separator: ":")
-    }
-
-    private func humanWeightDependencyKey(_ log: HumanWeightLog) -> String {
-        [log.id.uuidString, timestamp(log.date)].joined(separator: ":")
-    }
-
-    private func familyTaskDependencyKey(_ task: FamilyCollaborationTask) -> String {
-        [
-            task.id.uuidString,
-            task.statusRaw,
-            task.assignedToId ?? "",
-            task.claimedById ?? ""
-        ].joined(separator: ":")
-    }
-
-    private func exchangeRequestDependencyKey(_ request: CoconutExchangeRequest) -> String {
-        [
-            request.id.uuidString,
-            request.statusRaw,
-            request.receiverId
-        ].joined(separator: ":")
-    }
-
-    private func timestamp(_ date: Date) -> String {
-        String(Int(date.timeIntervalSince1970))
-    }
-
-    private func timestamp(_ date: Date?) -> String {
-        guard let date else { return "0" }
-        return timestamp(date)
-    }
-
-    private func refreshSnapshotIfNeeded() {
-        let signature = snapshotDependencyKey
-        guard signature != renderSnapshotSignature else { return }
+    private func refreshSnapshotIfNeeded(for key: SnapshotRefreshKey) {
+        guard key != renderSnapshotRefreshKey else { return }
         let next = TodayFocusSnapshot.make(
             pets: pets,
             plants: plants,
@@ -378,7 +383,7 @@ struct TodayFocusQuestCardHost: View {
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             renderSnapshot = next
-            renderSnapshotSignature = signature
+            renderSnapshotRefreshKey = key
         }
     }
 }

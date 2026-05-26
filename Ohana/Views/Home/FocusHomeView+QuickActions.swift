@@ -42,7 +42,7 @@ extension FocusHomeView {
                         action: { handlePetQuickPrimary(item, pet: pet) }
                     )
                 },
-                addItems: expandedPetQuickAddItems(for: pet).map { embeddedAddAction(for: $0) },
+                addItems: embeddedPetAddActions(for: pet),
                 isEditMode: expandedQuickEdit.isEditMode,
                 jiggle: expandedQuickEdit.jiggle,
                 shouldReduceWork: shouldReduceWork,
@@ -79,7 +79,7 @@ extension FocusHomeView {
                         action: { handleHumanQuickPrimary(item, human: human) }
                     )
                 },
-                addItems: expandedHumanQuickAddItems(for: human).map { embeddedAddAction(for: $0) },
+                addItems: embeddedHumanAddActions(for: human),
                 isEditMode: expandedQuickEdit.isEditMode,
                 jiggle: expandedQuickEdit.jiggle,
                 shouldReduceWork: shouldReduceWork,
@@ -267,8 +267,13 @@ extension FocusHomeView {
     }
 
     func expandedPetQuickAddItems(for pet: Pet) -> [QuickActionItem] {
-        let existing = Set(expandedQuickEdit.items.filter { $0.petId == pet.id && $0.entityKind != .human }.map(\.actionType))
-        return QuickActionPickerCatalog.available(for: pet, existingActionTypes: existing).map { option in
+        let existing = expandedPetExistingActionTypes(for: pet)
+        return expandedPetQuickCandidateItems(for: pet)
+            .filter { !existing.contains($0.actionType) }
+    }
+
+    func expandedPetQuickCandidateItems(for pet: Pet) -> [QuickActionItem] {
+        QuickActionPickerCatalog.options(for: pet).map { option in
             QuickActionItem(
                 label: option.label,
                 icon: option.icon,
@@ -282,17 +287,48 @@ extension FocusHomeView {
     }
 
     func expandedHumanQuickAddItems(for human: Human) -> [QuickActionItem] {
-        let existing = Set(expandedQuickEdit.items.map(\.actionType))
-        return ExpandedQuickActionDefaults.humanItems(for: human, localization: l)
+        let existing = expandedHumanExistingActionTypes(for: human)
+        return expandedHumanQuickCandidateItems(for: human)
             .filter { !existing.contains($0.actionType) }
     }
 
-    func embeddedAddAction(for item: QuickActionItem) -> VerticalHomeEmbeddedAction {
+    func expandedHumanQuickCandidateItems(for human: Human) -> [QuickActionItem] {
+        ExpandedQuickActionDefaults.humanItems(for: human, localization: l)
+    }
+
+    func embeddedPetAddActions(for pet: Pet) -> [VerticalHomeEmbeddedAction] {
+        let existing = expandedPetExistingActionTypes(for: pet)
+        return expandedPetQuickCandidateItems(for: pet).map { item in
+            embeddedAddAction(for: item, isAlreadyAdded: existing.contains(item.actionType))
+        }
+    }
+
+    func embeddedHumanAddActions(for human: Human) -> [VerticalHomeEmbeddedAction] {
+        let existing = expandedHumanExistingActionTypes(for: human)
+        return expandedHumanQuickCandidateItems(for: human).map { item in
+            embeddedAddAction(for: item, isAlreadyAdded: existing.contains(item.actionType))
+        }
+    }
+
+    func expandedPetExistingActionTypes(for pet: Pet) -> Set<String> {
+        Set(expandedQuickEdit.items
+            .filter { $0.petId == pet.id && $0.entityKind != .human }
+            .map(\.actionType))
+    }
+
+    func expandedHumanExistingActionTypes(for human: Human) -> Set<String> {
+        Set(expandedQuickEdit.items
+            .filter { ($0.entityId ?? $0.petId) == human.id && $0.entityKind == .human }
+            .map(\.actionType))
+    }
+
+    func embeddedAddAction(for item: QuickActionItem, isAlreadyAdded: Bool = false) -> VerticalHomeEmbeddedAction {
         VerticalHomeEmbeddedAction(
             id: item.actionType,
             title: item.label,
             icon: item.icon,
             isCompleted: false,
+            isAddDisabled: isAlreadyAdded,
             quickAccessibilityLabel: l.tr(zh: "添加快捷操作", en: "Add quick action", de: "Schnellaktion hinzufügen"),
             detailAccessibilityLabel: l.tr(zh: "添加快捷操作", en: "Add quick action", de: "Schnellaktion hinzufügen")
         ) {}
@@ -332,7 +368,8 @@ extension FocusHomeView {
 
     func moveExpandedQuickEditItem(fromId: String, toId: String) {
         guard let fromIndex = expandedQuickEdit.items.firstIndex(where: { $0.id == fromId }),
-              let toIndex = expandedQuickEdit.items.firstIndex(where: { $0.id == toId })
+              let toIndex = expandedQuickEdit.items.firstIndex(where: { $0.id == toId }),
+              fromIndex != toIndex
         else { return }
         withAnimation(GoMotion.selection) {
             expandedQuickEdit.items.move(
@@ -349,22 +386,24 @@ extension FocusHomeView {
     }
 
     func addExpandedPetQuickEditItem(actionType: String, pet: Pet) {
+        guard !expandedPetExistingActionTypes(for: pet).contains(actionType) else { return }
         guard expandedQuickEdit.items.count < QuickActionLimit.maxItemsPerEntity else {
             routeCoordinator.showQuickActionLimit()
             return
         }
-        guard let item = expandedPetQuickAddItems(for: pet).first(where: { $0.actionType == actionType }) else { return }
+        guard let item = expandedPetQuickCandidateItems(for: pet).first(where: { $0.actionType == actionType }) else { return }
         withAnimation(HeroAnim.buttonSpring) {
             expandedQuickEdit.items.append(item)
         }
     }
 
     func addExpandedHumanQuickEditItem(actionType: String, human: Human) {
+        guard !expandedHumanExistingActionTypes(for: human).contains(actionType) else { return }
         guard expandedQuickEdit.items.count < QuickActionLimit.maxItemsPerEntity else {
             routeCoordinator.showQuickActionLimit()
             return
         }
-        guard let item = expandedHumanQuickAddItems(for: human).first(where: { $0.actionType == actionType }) else { return }
+        guard let item = expandedHumanQuickCandidateItems(for: human).first(where: { $0.actionType == actionType }) else { return }
         withAnimation(HeroAnim.buttonSpring) {
             expandedQuickEdit.items.append(item)
         }

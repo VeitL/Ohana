@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct CrewRosterWalletScene<ExpandedInfo: View>: View {
+struct CrewRosterWalletScene<ExpandedInfo: View, CardOverlay: View>: View {
     private let sceneCoordinateSpace = "CrewRosterWalletSceneSpace"
 
     let cards: [FocusCard]
@@ -22,6 +22,7 @@ struct CrewRosterWalletScene<ExpandedInfo: View>: View {
     let heroNamespace: Namespace.ID
     let avatarCacheRevision: Int
     let expandedInfo: (FocusCard) -> ExpandedInfo
+    @ViewBuilder let cardOverlay: (FocusCard) -> CardOverlay
     let onSelect: (FocusCard) -> Void
     let onCollapse: () -> Void
 
@@ -109,10 +110,32 @@ struct CrewRosterWalletScene<ExpandedInfo: View>: View {
                     expandedCardHitZone(layout: layout)
                         .zIndex(80)
                 }
+
+                if selectedCardId == nil {
+                    collapsedCardOverlays(layout: layout)
+                        .zIndex(100)
+                } else if isExpandedInteractionReady, let activeCard {
+                    cardOverlayLayer(for: activeCard, frame: layout.expandedFrame)
+                        .zIndex(100)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .coordinateSpace(name: sceneCoordinateSpace)
         }
+    }
+
+    private func collapsedCardOverlays(layout: WalletHeroLayout) -> some View {
+        ZStack {
+            ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
+                cardOverlayLayer(for: card, frame: layout.collapsedFrame(index: index, count: cards.count))
+            }
+        }
+    }
+
+    private func cardOverlayLayer(for card: FocusCard, frame: CGRect) -> some View {
+        cardOverlay(card)
+            .frame(width: 104, height: 54, alignment: .topTrailing)
+            .position(x: frame.maxX - 52, y: frame.minY + 27)
     }
 
     private func frame(for card: FocusCard, index: Int, layout: WalletHeroLayout) -> CGRect {

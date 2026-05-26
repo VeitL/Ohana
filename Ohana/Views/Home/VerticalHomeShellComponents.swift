@@ -467,7 +467,13 @@ struct VerticalHomeTaskDeck: View {
     private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
-        expandedDeck
+        Group {
+            if isVisible || isLive {
+                expandedDeck
+            } else {
+                Color.clear
+            }
+        }
             .opacity(isVisible ? 1 : 0)
             .allowsHitTesting(isLive)
             .accessibilityHidden(!isVisible)
@@ -554,6 +560,10 @@ struct VerticalHomeBottomBar: View {
 
             Button {
                 OhanaFeedback.medium()
+                if activeCard != nil {
+                    toggleFab()
+                    return
+                }
                 if onAddTapped() {
                     return
                 }
@@ -811,6 +821,7 @@ struct VerticalHomeEmbeddedAction: Identifiable {
     let title: String
     let icon: String
     let isCompleted: Bool
+    let isAddDisabled: Bool
     let detailIcon: String
     let quickAccessibilityLabel: String
     let detailAccessibilityLabel: String
@@ -822,6 +833,7 @@ struct VerticalHomeEmbeddedAction: Identifiable {
         title: String,
         icon: String,
         isCompleted: Bool,
+        isAddDisabled: Bool = false,
         detailIcon: String = "chart.line.uptrend.xyaxis",
         quickAccessibilityLabel: String = "Quick action",
         detailAccessibilityLabel: String = "Details",
@@ -832,6 +844,7 @@ struct VerticalHomeEmbeddedAction: Identifiable {
         self.title = title
         self.icon = icon
         self.isCompleted = isCompleted
+        self.isAddDisabled = isAddDisabled
         self.detailIcon = detailIcon
         self.quickAccessibilityLabel = quickAccessibilityLabel
         self.detailAccessibilityLabel = detailAccessibilityLabel
@@ -874,6 +887,15 @@ struct VerticalHomeEmbeddedQuickActions: View {
 
     private var showsAddLauncher: Bool {
         isEditMode && visibleItems.count < maxItems && !availableAddItems.isEmpty
+    }
+
+    private var activeDraggingItemId: String? {
+        guard let draggingItemId else { return nil }
+        return draggingItemId.wrappedValue
+    }
+
+    private var isDraggingAnyItem: Bool {
+        activeDraggingItemId != nil
     }
 
     private var submenuAnimation: Animation {
@@ -923,6 +945,14 @@ struct VerticalHomeEmbeddedQuickActions: View {
             }
             .animation(GoMotion.selection, value: visibleItems.map(\.id).joined(separator: "|"))
             .animation(GoMotion.selection, value: availableAddItems.map(\.id).joined(separator: "|"))
+            .onDrop(
+                of: [.plainText, .utf8PlainText],
+                delegate: VerticalHomeEmbeddedActionDropResetDelegate(
+                    isEnabled: isEditMode,
+                    draggingItemId: draggingItemId,
+                    lastDropTargetId: $lastDropTargetId
+                )
+            )
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -954,6 +984,11 @@ struct VerticalHomeEmbeddedQuickActions: View {
             openActionId = nil
             lastDropTargetId = nil
             showingAddPanel = false
+        }
+        .onChange(of: activeDraggingItemId) { _, newValue in
+            if newValue == nil {
+                lastDropTargetId = nil
+            }
         }
     }
 
@@ -1020,7 +1055,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
         .opacity(isDragging(item) ? 0.72 : 1)
         .rotationEffect(.degrees(editJiggleAngle(for: item)))
         .animation(editJiggleAnimation, value: jiggle)
-        .animation(GoMotion.selection, value: draggingItemId?.wrappedValue)
+        .animation(GoMotion.selection, value: activeDraggingItemId)
         .animation(submenuAnimation, value: openActionId)
         .overlay(alignment: .topLeading) {
             if isEditMode {
@@ -1142,35 +1177,51 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 .buttonStyle(ScaleButtonStyle())
             }
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 7), count: 4), spacing: 7) {
-                ForEach(availableAddItems) { item in
-                    Button {
-                        OhanaFeedback.medium()
-                        withAnimation(submenuAnimation) {
-                            showingAddPanel = false
+            ScrollView(.vertical, showsIndicators: availableAddItems.count > 8) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 7), count: 4), spacing: 7) {
+                    ForEach(availableAddItems) { item in
+                        Button {
+                            guard !item.isAddDisabled else { return }
+                            OhanaFeedback.medium()
+                            withAnimation(submenuAnimation) {
+                                showingAddPanel = false
+                            }
+                            onAdd(item.id)
+                        } label: {
+                            ZStack(alignment: .topTrailing) {
+                                VStack(spacing: 5) {
+                                    OhanaQuickActionIcon(
+                                        actionType: item.id,
+                                        fallbackSystemName: item.icon,
+                                        size: 23,
+                                        color: item.isAddDisabled ? Color.ohanaSecondaryText : Color.ohanaFunctionalIcon
+                                    )
+                                    Text(item.title)
+                                        .font(.system(size: 9.5, weight: .black, design: .rounded))
+                                        .foregroundStyle(item.isAddDisabled ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.58)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 55)
+
+                                if item.isAddDisabled {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 13, weight: .black))
+                                        .symbolRenderingMode(.monochrome)
+                                        .foregroundStyle(Color.goPrimary)
+                                        .padding(6)
+                                }
+                            }
+                            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                            .opacity(item.isAddDisabled ? 0.62 : 1)
                         }
-                        onAdd(item.id)
-                    } label: {
-                        VStack(spacing: 5) {
-                            OhanaQuickActionIcon(
-                                actionType: item.id,
-                                fallbackSystemName: item.icon,
-                                size: 23,
-                                color: Color.ohanaFunctionalIcon
-                            )
-                            Text(item.title)
-                                .font(.system(size: 9.5, weight: .black, design: .rounded))
-                                .foregroundStyle(Color.ohanaPrimaryText)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.58)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 55)
-                        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                        .buttonStyle(ScaleButtonStyle())
+                        .disabled(item.isAddDisabled)
                     }
-                    .buttonStyle(ScaleButtonStyle())
                 }
             }
+            .frame(maxHeight: 179)
         }
         .padding(10)
         .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -1188,6 +1239,9 @@ struct VerticalHomeEmbeddedQuickActions: View {
             .frame(height: cellHeight)
             .onDrag {
                 OhanaFeedback.light()
+                showingAddPanel = false
+                openActionId = nil
+                lastDropTargetId = nil
                 withAnimation(GoMotion.selection) {
                     draggingItemId?.wrappedValue = item.id
                 }
@@ -1232,16 +1286,16 @@ struct VerticalHomeEmbeddedQuickActions: View {
     }
 
     private func isDragging(_ item: VerticalHomeEmbeddedAction) -> Bool {
-        draggingItemId?.wrappedValue == item.id
+        activeDraggingItemId == item.id
     }
 
     private func editJiggleAngle(for item: VerticalHomeEmbeddedAction) -> Double {
-        guard isEditMode, !isDragging(item) else { return 0 }
+        guard isEditMode, !isDraggingAnyItem, !isDragging(item) else { return 0 }
         return jiggle ? -1.05 : 1.05
     }
 
     private var editJiggleAnimation: Animation? {
-        guard isEditMode, !shouldReduceWork else { return nil }
+        guard isEditMode, !shouldReduceWork, !isDraggingAnyItem else { return nil }
         return GoMotion.quick.repeatForever(autoreverses: true)
     }
 
@@ -1258,6 +1312,30 @@ struct VerticalHomeEmbeddedQuickActions: View {
         case 3: return -18
         default: return 0
         }
+    }
+}
+
+private struct VerticalHomeEmbeddedActionDropResetDelegate: DropDelegate {
+    let isEnabled: Bool
+    let draggingItemId: Binding<String?>?
+    @Binding var lastDropTargetId: String?
+
+    func validateDrop(info _: DropInfo) -> Bool {
+        isEnabled
+    }
+
+    func performDrop(info _: DropInfo) -> Bool {
+        draggingItemId?.wrappedValue = nil
+        lastDropTargetId = nil
+        return isEnabled
+    }
+
+    func dropUpdated(info _: DropInfo) -> DropProposal? {
+        isEnabled ? DropProposal(operation: .move) : nil
+    }
+
+    func dropExited(info _: DropInfo) {
+        lastDropTargetId = nil
     }
 }
 

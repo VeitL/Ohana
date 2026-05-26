@@ -82,6 +82,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     let onLongPress: (FocusCard) -> Void
 
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @AppStorage("home_cards_enable_ambient_float") private var enablesAmbientFloat = false
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var floatingResumeStartTime: TimeInterval?
     @State private var animatedArrivalCardId: UUID?
@@ -140,32 +141,14 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
 
     var body: some View {
         GeometryReader { geo in
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !canFloatCards)) { timeline in
-                let visibleCenterX = visibleCenterX(in: geo)
-                let time = canFloatCards ? timeline.date.timeIntervalSinceReferenceDate : 0
-                ZStack {
-                    if canHitCollapsedCards {
-                        collapsedHitLayer(in: geo.size, time: time)
-                            .zIndex(80)
-                    } else {
-                        Color.clear
-                            .contentShape(Rectangle())
-                            .onTapGesture { onCollapse() }
-                            .zIndex(1)
+            Group {
+                if canFloatCards {
+                    TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+                        sceneContent(in: geo, time: timeline.date.timeIntervalSinceReferenceDate)
                     }
-
-                    if let selectedCard, !embedsQuickActionsInCard {
-                        if walkTrackingPet(for: selectedCard, isSelected: true) == nil {
-                            quickActionLayer(for: selectedCard, in: geo.size, visibleCenterX: visibleCenterX)
-                                .zIndex(32)
-                        }
-                    }
-
-                    ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
-                        cardLayer(for: card, index: index, in: geo.size, visibleCenterX: visibleCenterX, time: time)
-                    }
+                } else {
+                    sceneContent(in: geo, time: 0)
                 }
-                .frame(width: geo.size.width, height: geo.size.height)
             }
             .onAppear {
                 primeFloatingMotionIfVisible()
@@ -189,6 +172,33 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                 arrivalCleanupTask = nil
             }
         }
+    }
+
+    private func sceneContent(in geo: GeometryProxy, time: TimeInterval) -> some View {
+        let visibleCenterX = visibleCenterX(in: geo)
+        return ZStack {
+            if canHitCollapsedCards {
+                collapsedHitLayer(in: geo.size, time: time)
+                    .zIndex(80)
+            } else {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { onCollapse() }
+                    .zIndex(1)
+            }
+
+            if let selectedCard, !embedsQuickActionsInCard {
+                if walkTrackingPet(for: selectedCard, isSelected: true) == nil {
+                    quickActionLayer(for: selectedCard, in: geo.size, visibleCenterX: visibleCenterX)
+                        .zIndex(32)
+                }
+            }
+
+            ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
+                cardLayer(for: card, index: index, in: geo.size, visibleCenterX: visibleCenterX, time: time)
+            }
+        }
+        .frame(width: geo.size.width, height: geo.size.height)
     }
 
     private var arrivalKey: String {
@@ -232,11 +242,11 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         }
         let p = eased(arrivalProgress)
         return (
-            scale: lerp(1.34, 1, p),
-            rotation: Double(lerp(-8, 0, p)),
-            flip: Double(lerp(78, 0, p)),
-            y: lerp(-56, 0, p),
-            opacity: Double(lerp(0.10, 1, p))
+            scale: lerp(0.64, 1, p),
+            rotation: Double(lerp(7, 0, p)),
+            flip: Double(lerp(-76, 0, p)),
+            y: lerp(42, 0, p),
+            opacity: Double(lerp(0.18, 1, p))
         )
     }
 
@@ -267,6 +277,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         let visualProgress = isExpandedSurface ? progress : 0
         let cornerRadius = lerp(30, 42, eased(visualProgress))
         let frozenAvatarSource = motionSnapshot?.avatarSource ?? preparedHeroSnapshots[card.id]?.avatarSource
+            ?? (selectedCardId == nil ? nil : FocusHomeFrozenAvatarSource.cached(for: renderCard))
         let walkTrackingPet = isExpandedInteractionReady ? walkTrackingPet(for: renderCard, isSelected: isExpandedSurface) : nil
         let embeddedQuickActionReveal = reduceMotion ? (visualProgress > 0.5 ? CGFloat(1) : CGFloat(0)) : smooth(visualProgress, 0.42, 0.72)
         let showsEmbeddedQuickActions = embedsQuickActionsInCard
@@ -286,7 +297,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                     progress: visualProgress,
                     reduceMotion: reduceMotion,
                     frozenAvatarSource: frozenAvatarSource,
-                    allowsLiveAvatarFallback: motionSnapshot == nil
+                    allowsLiveAvatarFallback: selectedCardId == nil && motionSnapshot == nil
                 )
 
                 if embedsQuickActionsInCard && isExpandedSurface && isExpandedCollapseReady && walkTrackingPet == nil {
@@ -335,7 +346,8 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     }
 
     private var canFloatCards: Bool {
-        !reduceMotion
+        enablesAmbientFloat
+            && !reduceMotion
             && selectedCardId == nil
             && isVisible
             && workloadPolicy.ambientMotionBudget(isVisible: isVisible) == .full

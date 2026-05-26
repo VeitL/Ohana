@@ -21,7 +21,9 @@ enum FocusHomeFabShortcutPolicy {
         let hiddenQuickItems = ExpandedQuickActionDefaults
             .humanItems(for: human, localization: l)
             .filter { !displayedActionTypes.contains($0.actionType) }
-            .map(humanShortcut(from:))
+            .map { item in
+                ExpandedCardFabShortcut(label: item.label, icon: item.icon, action: .humanQuick(item.actionType))
+            }
 
         return hiddenQuickItems + [
             allHumanFeaturesShortcut(localization: l),
@@ -37,10 +39,6 @@ enum FocusHomeFabShortcutPolicy {
             ExpandedCardFabShortcut(label: l.homeQANote, icon: "note.text", action: .humanQuick("humanNote")),
             allHumanFeaturesShortcut(localization: l),
         ]
-    }
-
-    static func humanShortcut(from item: QuickActionItem) -> ExpandedCardFabShortcut {
-        ExpandedCardFabShortcut(label: item.label, icon: item.icon, action: .humanQuick(item.actionType))
     }
 
     static func petShortcut(from option: QuickActionPickerCatalog.Option) -> ExpandedCardFabShortcut {
@@ -67,7 +65,8 @@ enum FocusHomeFabShortcutPolicy {
                 .map(\.actionType)
         )
         let hiddenQuickItems = QuickActionPickerCatalog
-            .available(for: pet, existingActionTypes: displayedActionTypes)
+            .options(for: pet)
+            .filter { !displayedActionTypes.contains($0.id) }
             .map { petShortcut(from: $0) }
 
         return hiddenQuickItems + [

@@ -904,6 +904,7 @@ struct MemberCardCreationView: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
     @AppStorage(Avatar2DAccess.extraPassInventoryKey) private var avatarPassCount = 0
+    @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
     @Query(sort: \Pet.createdAt) private var existingPets: [Pet]
     @Query(sort: \Human.createdAt) private var existingHumans: [Human]
 
@@ -927,6 +928,9 @@ struct MemberCardCreationView: View {
     @State private var mbtiDecision = ""
     @State private var mbtiLifestyle = ""
     @State private var usesCustomResidenceCity = false
+    @State private var isJoinHandoffRunning = false
+    @State private var joinHandoffProgress: CGFloat = 0
+    @State private var joinSaveTask: Task<Void, Never>?
 
     init(
         kind: MemberCreationKind,
@@ -959,18 +963,26 @@ struct MemberCardCreationView: View {
     }
 
     private var canSave: Bool {
-        !isSaving && !draft.trimmedName.isEmpty && !duplicateName
+        !isSaving && !isJoinHandoffRunning && !draft.trimmedName.isEmpty && !duplicateName
     }
 
     private var creationSteps: [MemberCreationStep] { MemberCreationStep.steps(for: kind) }
     private var currentStepIndex: Int { creationSteps.firstIndex(of: currentStep) ?? 0 }
     private var isLastStep: Bool { currentStepIndex == creationSteps.count - 1 }
     private var canAdvanceStep: Bool {
-        guard !isSaving else { return false }
+        guard !isSaving, !isJoinHandoffRunning else { return false }
         if currentStep == .basicInfo {
             return !draft.trimmedName.isEmpty && !duplicateName
         }
         return true
+    }
+
+    private var canRunHomeJoinHandoff: Bool {
+        HomeCardVisibility.visibleCardCount(
+            pets: existingPets,
+            humans: existingHumans,
+            raw: hiddenHomePetIDsRaw
+        ) < HomeCardVisibility.maxVisibleCards
     }
 
     private var mbtiSignature: String {
@@ -1035,12 +1047,20 @@ struct MemberCardCreationView: View {
             OhanaAppBackground()
             VStack(spacing: 12) {
                 topChrome
+                    .opacity(isJoinHandoffRunning ? 0.28 : 1)
                 MemberPortraitDraftCardSurface(snapshot: snapshot) {
                     cardControls
                 }
                 .frame(maxWidth: 390)
                 .frame(maxHeight: .infinity)
+                .modifier(MemberCreationJoinHandoffModifier(
+                    progress: joinHandoffProgress,
+                    reduceMotion: reduceMotion
+                ))
+                .allowsHitTesting(!isJoinHandoffRunning)
                 bottomCTA
+                    .opacity(isJoinHandoffRunning ? 0 : 1)
+                    .allowsHitTesting(!isJoinHandoffRunning)
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
@@ -1068,6 +1088,7 @@ struct MemberCardCreationView: View {
         .onDisappear {
             MemberCreationPerformance.event("Member Creation Disappeared")
             decodeTask?.cancel()
+            joinSaveTask?.cancel()
         }
         .onChange(of: draft.name) { _, _ in
             MemberCreationPerformance.event("Draft Name Changed")
@@ -1273,6 +1294,7 @@ struct MemberCardCreationView: View {
                         .background(Color.ohanaControlFill, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .disabled(isJoinHandoffRunning)
                 }
 
                 Button {
@@ -1307,9 +1329,7 @@ struct MemberCardCreationView: View {
     }
 
     private var creationCTA: String {
-        kind == .pet
-            ? l.tr(zh: "创建宠物", en: "Create Pet", de: "Tier erstellen")
-            : l.tr(zh: "创建家人", en: "Create Member", de: "Mitglied erstellen")
+        l.tr(zh: "加入岛屿", en: "Join Island", de: "Insel beitreten")
     }
 
     private var humanBasicInfoStep: some View {
@@ -1950,7 +1970,29 @@ struct MemberCardCreationView: View {
 
     private func save() {
         guard canSave else { return }
+        joinSaveTask?.cancel()
+        if canRunHomeJoinHandoff {
+            startHomeJoinHandoff()
+        } else {
+            isSaving = true
+            performSave(showsHomeJoinHandoff: false)
+        }
+    }
+
+    private func startHomeJoinHandoff() {
         isSaving = true
+        isJoinHandoffRunning = true
+        joinHandoffProgress = 0
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.zStackHero) {
+            joinHandoffProgress = 1
+        }
+        joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: reduceMotion ? 90 : 340) {
+            performSave(showsHomeJoinHandoff: true)
+        }
+    }
+
+    private func performSave(showsHomeJoinHandoff: Bool) {
         do {
             let result = try MemberCreationService.save(
                 draft: draft,
@@ -1966,23 +2008,44 @@ struct MemberCardCreationView: View {
                 onHumanSaved?(human)
             }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
+            if showsHomeJoinHandoff {
+                joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: reduceMotion ? 70 : 160) {
+                    isSaving = false
+                    onComplete()
+                }
+                return
+            }
             withAnimation(GoMotion.sheet) {
                 didShowSuccess = true
             }
-            OhanaFrameScheduler.runAfterNextFrame(milliseconds: 780) {
+            joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 780) {
                 didShowSuccess = false
                 isSaving = false
                 onComplete()
             }
         } catch MemberCreationService.ServiceError.duplicateName {
-            isSaving = false
-            showInlineError(l.tr(zh: "这个名字已经被使用。", en: "This name is already in use.", de: "Dieser Name wird bereits verwendet."))
+            handleSaveFailure(l.tr(zh: "这个名字已经被使用。", en: "This name is already in use.", de: "Dieser Name wird bereits verwendet."))
         } catch MemberCreationService.ServiceError.emptyName {
-            isSaving = false
-            showInlineError(l.tr(zh: "请先输入名字。", en: "Enter a name first.", de: "Gib zuerst einen Namen ein."))
+            handleSaveFailure(l.tr(zh: "请先输入名字。", en: "Enter a name first.", de: "Gib zuerst einen Namen ein."))
         } catch {
+            handleSaveFailure(error.localizedDescription)
+        }
+    }
+
+    private func handleSaveFailure(_ message: String) {
+        isSaving = false
+        restoreHomeJoinHandoffAfterFailure()
+        showInlineError(message)
+    }
+
+    private func restoreHomeJoinHandoffAfterFailure() {
+        guard isJoinHandoffRunning else { return }
+        withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.sheet) {
+            joinHandoffProgress = 0
+        }
+        joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: reduceMotion ? 90 : 240) {
             isSaving = false
-            showInlineError(error.localizedDescription)
+            isJoinHandoffRunning = false
         }
     }
 
@@ -2923,6 +2986,43 @@ struct MemberCityPicker: View {
 
     private func localizedCity(_ value: String) -> String {
         value == "其他" ? l.tr(zh: "其他", en: "Other", de: "Andere") : value
+    }
+}
+
+private struct MemberCreationJoinHandoffModifier: ViewModifier {
+    let progress: CGFloat
+    let reduceMotion: Bool
+
+    private var clampedProgress: CGFloat {
+        min(max(progress, 0), 1)
+    }
+
+    private var easedProgress: CGFloat {
+        let p = clampedProgress
+        return p * p * (3 - 2 * p)
+    }
+
+    func body(content: Content) -> some View {
+        let p = easedProgress
+        let scale = reduceMotion ? mix(1, 0.92, p) : mix(1, 0.58, p)
+        let flip = reduceMotion ? 0 : Double(mix(0, -78, p))
+        let turn = reduceMotion ? 0 : Double(mix(0, -4, p))
+        let x = reduceMotion ? CGFloat(0) : mix(0, 18, p)
+        let y = reduceMotion ? mix(0, -8, p) : mix(0, -34, p)
+        let opacity = reduceMotion ? Double(mix(1, 0.78, p)) : Double(mix(1, 0.90, p))
+
+        content
+            .compositingGroup()
+            .scaleEffect(scale, anchor: .center)
+            .rotation3DEffect(.degrees(flip), axis: (x: 0.06, y: 1, z: 0), perspective: 0.78)
+            .rotationEffect(.degrees(turn))
+            .offset(x: x, y: y)
+            .opacity(opacity)
+            .zIndex(progress > 0 ? 20 : 0)
+    }
+
+    private func mix(_ start: CGFloat, _ end: CGFloat, _ progress: CGFloat) -> CGFloat {
+        start + (end - start) * progress
     }
 }
 
