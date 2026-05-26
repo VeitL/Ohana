@@ -91,9 +91,70 @@ struct HomeRouteCoordinatorTests {
 
         coordinator.openSheet(.petWater(pet.id))
         coordinator.openPetExpense(pet)
+        coordinator.openCalendar(entityID: pet.id.uuidString)
+        coordinator.openOasisReward()
+        coordinator.openQuickMoment(pet)
+        coordinator.showQuickActionLimit()
         coordinator.resetAllRoutes()
 
         #expect(coordinator.sheet == nil)
         #expect(coordinator.popup == nil)
+        #expect(coordinator.modal == nil)
+        #expect(coordinator.fullScreen == nil)
+        #expect(coordinator.overlay == nil)
+        #expect(coordinator.alert == nil)
+    }
+
+    @Test func homePresentationRoutesCarryLightweightValues() {
+        let pet = Pet(name: "Momo", species: "猫")
+        let coordinator = HomeRouteCoordinator()
+
+        coordinator.openCalendar(entityID: pet.id.uuidString, humanID: nil)
+
+        guard case let .calendar(entityID, humanID) = coordinator.modal else {
+            Issue.record("Expected calendar modal route")
+            return
+        }
+        #expect(entityID == pet.id.uuidString)
+        #expect(humanID == nil)
+
+        coordinator.openWalk(pet)
+
+        guard case let .walk(petID) = coordinator.fullScreen else {
+            Issue.record("Expected walk full-screen route")
+            return
+        }
+        #expect(petID == pet.id)
+
+        coordinator.openQuickMoment(pet)
+
+        guard case let .quickMoment(_, petID) = coordinator.overlay else {
+            Issue.record("Expected quick moment overlay route")
+            return
+        }
+        #expect(petID == pet.id)
+    }
+
+    @Test func antiRepeatAlertOwnsPendingActionUntilConfirmedOrDismissed() {
+        let coordinator = HomeRouteCoordinator()
+        var didRun = false
+
+        coordinator.showAntiRepeat(title: "Again?", message: "Confirm") {
+            didRun = true
+        }
+
+        guard case let .antiRepeat(_, title, message) = coordinator.alert else {
+            Issue.record("Expected anti-repeat alert")
+            return
+        }
+        #expect(title == "Again?")
+        #expect(message == "Confirm")
+        #expect(!didRun)
+
+        coordinator.confirmAntiRepeatAction()
+
+        #expect(didRun)
+        #expect(coordinator.alert == nil)
+        #expect(coordinator.pendingRepeatAction == nil)
     }
 }

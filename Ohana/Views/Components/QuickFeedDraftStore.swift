@@ -23,6 +23,7 @@ final class QuickFeedDraftStore: ObservableObject {
     @Published var manualFeedSheetMode: ManualFeedSheetMode = .log
     @Published var manualFoodKindDraft: FeedFoodKind = .dry
     @Published var manualGramsText = ""
+    @Published var manualDefaultEnabled = true
     @Published var saveManualAsDefault = true
     @Published var selectedSharedFeedPetIds: Set<UUID> = []
     @Published var selectedSharedPlanPetIds: Set<UUID> = []

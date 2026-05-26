@@ -15,32 +15,12 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
 
     @ObservedObject var routes: HomeRouteCoordinator
 
-    @Binding var functionMenuPresentation: FunctionMenuPresentation?
-    @Binding var showStreakDetail: Bool
-    @Binding var showingSettings: Bool
-    @Binding var activeAddEntityType: EntityType?
     @Binding var activeHumanIdStr: String
-    @Binding var showingCrewRoster: Bool
-    @Binding var showingAccountSwitcher: Bool
-    @Binding var showingCalendar: Bool
-    @Binding var calendarEntityFilterId: String?
-    @Binding var calendarHumanFilterId: String?
-    @Binding var todayFocusWalkPet: Pet?
-    @Binding var expandedQuickMomentPet: Pet?
-    @Binding var showingOasisReward: Bool
-    @Binding var activeCoconutLogSubject: CoconutLogSubject?
-    @Binding var showingAntiRepeatAlert: Bool
-    @Binding var pendingRepeatAction: (() -> Void)?
-    @Binding var antiRepeatTitle: String
-    @Binding var antiRepeatMessage: String
-    @Binding var showingSingleUseNotice: Bool
-    @Binding var singleUseNoticeTitle: String
-    @Binding var singleUseNoticeMessage: String
-    @Binding var showingQuickActionLimitAlert: Bool
-    @Binding var showingHumanPrivacyAlert: Bool
+    @State private var lastModalRoute: HomeModalRoute?
 
     let onAddEntityDismissed: () -> Void
     let onPetSavedFromAddEntity: (Pet) -> Void
+    let onHumanSavedFromAddEntity: (Human) -> Void
     let onCrewPetSelected: (Pet) -> Void
     let onCrewHumanSelected: (Human) -> Void
     let onFirstSuccessMomentCompleted: (Pet) -> Void
@@ -48,65 +28,132 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .sheet(item: $functionMenuPresentation) { presentation in
-                FunctionMenuSheet(initialDestination: presentation.destination)
-                    .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
-            }
-            .sheet(isPresented: $showStreakDetail) {
-                DailyStreakDetailView(pets: pets, onClose: { showStreakDetail = false })
-                    .ohanaSheetPagePresentation() // ui-v4: allow long streak overview
-            }
-            .fullScreenCover(isPresented: $showingSettings) { SettingsView() }
-            .sheet(item: $activeAddEntityType, onDismiss: onAddEntityDismissed) { type in
-                AddEntityDestinationView(
-                    type: type,
-                    onComplete: { activeAddEntityType = nil },
-                    onPetSaved: onPetSavedFromAddEntity,
-                    onHumanSaved: { human in
-                        activeHumanIdStr = human.id.uuidString
+            .sheet(item: $routes.modal, onDismiss: handleModalDismissed) { route in
+                homeModalDestination(for: route)
+                    .onAppear {
+                        lastModalRoute = route
                     }
-                )
-                .ohanaSheetPagePresentation() // ui-v4: allow role creation flow as long sheet
-            }
-            .sheet(isPresented: $showingCrewRoster) {
-                NavigationStack {
-                    CrewRosterOverlay(
-                        onSelectPet: onCrewPetSelected,
-                        onSelectHuman: onCrewHumanSelected
-                    )
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button { showingCrewRoster = false } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(Color.ohanaSecondaryText)
-                            }
-                        }
-                    }
-                }
-                .ohanaSheetPagePresentation() // ui-v4: allow family collaboration/member hub
-            }
-            .sheet(isPresented: $showingAccountSwitcher) {
-                HumanAccountSwitcherSheet()
-                    .ohanaCompactSheetPresentation(detents: [.medium, .large])
-            }
-            .sheet(isPresented: $showingCalendar, onDismiss: {
-                calendarEntityFilterId = nil
-                calendarHumanFilterId = nil
-            }) {
-                CalendarView(
-                    preselectedPetId: calendarEntityFilterId,
-                    preselectedHumanId: calendarHumanFilterId
-                )
-                .ohanaSheetPagePresentation() // ui-v4: allow calendar as long sheet
             }
             .sheet(item: $routes.sheet) { route in
                 homeSheetDestination(for: route)
             }
-            .fullScreenCover(item: $todayFocusWalkPet) { pet in
-                WalkTrackingFullScreen(pet: pet)
+            .fullScreenCover(item: $routes.fullScreen) { route in
+                homeFullScreenDestination(for: route)
             }
             .overlay {
-                if let pet = expandedQuickMomentPet {
+                homeOverlayDestination()
+            }
+            .alert(antiRepeatTitleText, isPresented: antiRepeatAlertBinding) {
+                Button(l.homeConfirmCheckIn, role: .destructive) {
+                    routes.confirmAntiRepeatAction()
+                }
+                Button(l.cancel, role: .cancel) {
+                    routes.dismissAlert()
+                }
+            } message: {
+                Text(antiRepeatMessageText)
+            }
+            .alert(singleUseNoticeTitleText, isPresented: singleUseNoticeAlertBinding) {
+                Button(acknowledgeText, role: .cancel) {
+                    routes.dismissAlert()
+                }
+            } message: {
+                Text(singleUseNoticeMessageText)
+            }
+            .alert(quickActionLimitTitle, isPresented: quickActionLimitAlertBinding) {
+                Button(acknowledgeText, role: .cancel) {
+                    routes.dismissAlert()
+                }
+            } message: {
+                Text(quickActionLimitMessage)
+            }
+            .alert(humanPrivacyTitle, isPresented: humanPrivacyAlertBinding) {
+                Button(acknowledgeText, role: .cancel) {
+                    routes.dismissAlert()
+                }
+            } message: {
+                Text(humanPrivacyMessage)
+            }
+    }
+
+    @ViewBuilder
+    private func homeModalDestination(for route: HomeModalRoute) -> some View {
+        switch route {
+        case let .functionMenu(destination):
+            FunctionMenuSheet(initialDestination: destination)
+                .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
+        case .streakDetail:
+            DailyStreakDetailView(pets: pets, onClose: { routes.dismissModal() })
+                .ohanaSheetPagePresentation() // ui-v4: allow long streak overview
+        case let .addEntity(type):
+            AddEntityDestinationView(
+                type: type,
+                onComplete: { routes.dismissModal() },
+                onPetSaved: onPetSavedFromAddEntity,
+                onHumanSaved: { human in
+                    activeHumanIdStr = human.id.uuidString
+                    onHumanSavedFromAddEntity(human)
+                }
+            )
+            .ohanaSheetPagePresentation() // ui-v4: allow role creation flow as long sheet
+        case .crewRoster:
+            NavigationStack {
+                CrewRosterOverlay(
+                    onSelectPet: { pet in
+                        routes.dismissModal()
+                        onCrewPetSelected(pet)
+                    },
+                    onSelectHuman: { human in
+                        routes.dismissModal()
+                        onCrewHumanSelected(human)
+                    }
+                )
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button { routes.dismissModal() } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(Color.ohanaSecondaryText)
+                        }
+                    }
+                }
+            }
+            .ohanaSheetPagePresentation() // ui-v4: allow family collaboration/member hub
+        case .accountSwitcher:
+            HumanAccountSwitcherSheet()
+                .ohanaCompactSheetPresentation(detents: [.medium, .large])
+        case let .calendar(entityID, humanID):
+            CalendarView(
+                preselectedPetId: entityID,
+                preselectedHumanId: humanID
+            )
+            .ohanaSheetPagePresentation() // ui-v4: allow calendar as long sheet
+        }
+    }
+
+    @ViewBuilder
+    private func homeFullScreenDestination(for route: HomeFullScreenRoute) -> some View {
+        switch route {
+        case .settings:
+            SettingsView()
+        case let .walk(id):
+            if let pet = pet(id) {
+                WalkTrackingFullScreen(pet: pet)
+            } else {
+                missingFullScreenDismissView()
+            }
+        case .oasisReward:
+            OasisRewardView()
+        case let .coconutLog(subject):
+            CoconutLogView(subject: subject)
+        }
+    }
+
+    @ViewBuilder
+    private func homeOverlayDestination() -> some View {
+        if let route = routes.overlay {
+            switch route {
+            case let .quickMoment(routeID, petID):
+                if let pet = pet(petID) {
                     QuickMomentSheet(
                         pet: pet,
                         onRemove: nil,
@@ -114,45 +161,126 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                             onFirstSuccessMomentCompleted(pet)
                         },
                         onClose: {
-                            expandedQuickMomentPet = nil
+                            routes.dismissOverlay(routeID: routeID)
                         }
                     )
                     .ignoresSafeArea()
                     .zIndex(100)
+                } else {
+                    Color.clear
+                        .onAppear {
+                            routes.dismissOverlay(routeID: routeID)
+                        }
                 }
             }
-            .fullScreenCover(isPresented: $showingOasisReward) {
-                OasisRewardView()
+        }
+    }
+
+    private func handleModalDismissed() {
+        defer { lastModalRoute = nil }
+        if case .addEntity = lastModalRoute {
+            onAddEntityDismissed()
+        }
+    }
+
+    private var antiRepeatAlertBinding: Binding<Bool> {
+        Binding(
+            get: {
+                if case .antiRepeat = routes.alert { return true }
+                return false
+            },
+            set: { isPresented in
+                if !isPresented { routes.dismissAlert() }
             }
-            .fullScreenCover(item: $activeCoconutLogSubject) { subject in
-                CoconutLogView(subject: subject)
+        )
+    }
+
+    private var singleUseNoticeAlertBinding: Binding<Bool> {
+        Binding(
+            get: {
+                if case .singleUseNotice = routes.alert { return true }
+                return false
+            },
+            set: { isPresented in
+                if !isPresented { routes.dismissAlert() }
             }
-            .alert(antiRepeatTitle, isPresented: $showingAntiRepeatAlert) {
-                Button(l.homeConfirmCheckIn, role: .destructive) {
-                    pendingRepeatAction?()
-                    pendingRepeatAction = nil
-                }
-                Button(l.cancel, role: .cancel) {
-                    pendingRepeatAction = nil
-                }
-            } message: {
-                Text(antiRepeatMessage)
+        )
+    }
+
+    private var quickActionLimitAlertBinding: Binding<Bool> {
+        Binding(
+            get: {
+                if case .quickActionLimit = routes.alert { return true }
+                return false
+            },
+            set: { isPresented in
+                if !isPresented { routes.dismissAlert() }
             }
-            .alert(singleUseNoticeTitle, isPresented: $showingSingleUseNotice) {
-                Button("知道了", role: .cancel) {}
-            } message: {
-                Text(singleUseNoticeMessage)
+        )
+    }
+
+    private var humanPrivacyAlertBinding: Binding<Bool> {
+        Binding(
+            get: {
+                if case .humanPrivacy = routes.alert { return true }
+                return false
+            },
+            set: { isPresented in
+                if !isPresented { routes.dismissAlert() }
             }
-            .alert(QuickActionLimit.title, isPresented: $showingQuickActionLimitAlert) {
-                Button("知道了", role: .cancel) {}
-            } message: {
-                Text(QuickActionLimit.message)
-            }
-            .alert("仅本人可见", isPresented: $showingHumanPrivacyAlert) {
-                Button("知道了", role: .cancel) {}
-            } message: {
-                Text("该成员已将此功能设为仅自己可见。")
-            }
+        )
+    }
+
+    private var antiRepeatTitleText: String {
+        if case let .antiRepeat(_, title, _) = routes.alert { return title }
+        return ""
+    }
+
+    private var antiRepeatMessageText: String {
+        if case let .antiRepeat(_, _, message) = routes.alert { return message }
+        return ""
+    }
+
+    private var singleUseNoticeTitleText: String {
+        if case let .singleUseNotice(_, title, _) = routes.alert { return title }
+        return ""
+    }
+
+    private var singleUseNoticeMessageText: String {
+        if case let .singleUseNotice(_, _, message) = routes.alert { return message }
+        return ""
+    }
+
+    private var acknowledgeText: String {
+        l.tr(zh: "知道了", en: "Got it", de: "Verstanden")
+    }
+
+    private var quickActionLimitTitle: String {
+        l.tr(
+            zh: QuickActionLimit.title,
+            en: "Quick actions are full",
+            de: "Schnellaktionen sind voll"
+        )
+    }
+
+    private var quickActionLimitMessage: String {
+        l.tr(
+            zh: QuickActionLimit.message,
+            en: "You can add up to 8 quick actions here. More features are available in All Features.",
+            de: "Hier sind bis zu 8 Schnellaktionen moglich. Weitere Funktionen findest du unter Alle Funktionen."
+        )
+    }
+
+    private var humanPrivacyTitle: String {
+        l.tr(zh: "仅本人可见", en: "Private to this member", de: "Nur fur dieses Mitglied")
+    }
+
+    private var humanPrivacyMessage: String {
+        l.tr(
+            zh: "该成员已将此功能设为仅自己可见。",
+            en: "This member has made this feature visible only to themselves.",
+            de: "Dieses Mitglied hat diese Funktion nur fur sich selbst sichtbar gemacht."
+        )
     }
 
     @ViewBuilder
@@ -342,6 +470,13 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 routes.dismissSheet()
             }
     }
+
+    private func missingFullScreenDismissView() -> some View {
+        Color.clear
+            .onAppear {
+                routes.dismissFullScreen()
+            }
+    }
 }
 
 extension View {
@@ -350,31 +485,10 @@ extension View {
         humans: [Human],
         l: L10n,
         routes: HomeRouteCoordinator,
-        functionMenuPresentation: Binding<FunctionMenuPresentation?>,
-        showStreakDetail: Binding<Bool>,
-        showingSettings: Binding<Bool>,
-        activeAddEntityType: Binding<EntityType?>,
         activeHumanIdStr: Binding<String>,
-        showingCrewRoster: Binding<Bool>,
-        showingAccountSwitcher: Binding<Bool>,
-        showingCalendar: Binding<Bool>,
-        calendarEntityFilterId: Binding<String?>,
-        calendarHumanFilterId: Binding<String?>,
-        todayFocusWalkPet: Binding<Pet?>,
-        expandedQuickMomentPet: Binding<Pet?>,
-        showingOasisReward: Binding<Bool>,
-        activeCoconutLogSubject: Binding<CoconutLogSubject?>,
-        showingAntiRepeatAlert: Binding<Bool>,
-        pendingRepeatAction: Binding<(() -> Void)?>,
-        antiRepeatTitle: Binding<String>,
-        antiRepeatMessage: Binding<String>,
-        showingSingleUseNotice: Binding<Bool>,
-        singleUseNoticeTitle: Binding<String>,
-        singleUseNoticeMessage: Binding<String>,
-        showingQuickActionLimitAlert: Binding<Bool>,
-        showingHumanPrivacyAlert: Binding<Bool>,
         onAddEntityDismissed: @escaping () -> Void,
         onPetSavedFromAddEntity: @escaping (Pet) -> Void,
+        onHumanSavedFromAddEntity: @escaping (Human) -> Void = { _ in },
         onCrewPetSelected: @escaping (Pet) -> Void,
         onCrewHumanSelected: @escaping (Human) -> Void,
         onFirstSuccessMomentCompleted: @escaping (Pet) -> Void,
@@ -385,31 +499,10 @@ extension View {
             humans: humans,
             l: l,
             routes: routes,
-            functionMenuPresentation: functionMenuPresentation,
-            showStreakDetail: showStreakDetail,
-            showingSettings: showingSettings,
-            activeAddEntityType: activeAddEntityType,
             activeHumanIdStr: activeHumanIdStr,
-            showingCrewRoster: showingCrewRoster,
-            showingAccountSwitcher: showingAccountSwitcher,
-            showingCalendar: showingCalendar,
-            calendarEntityFilterId: calendarEntityFilterId,
-            calendarHumanFilterId: calendarHumanFilterId,
-            todayFocusWalkPet: todayFocusWalkPet,
-            expandedQuickMomentPet: expandedQuickMomentPet,
-            showingOasisReward: showingOasisReward,
-            activeCoconutLogSubject: activeCoconutLogSubject,
-            showingAntiRepeatAlert: showingAntiRepeatAlert,
-            pendingRepeatAction: pendingRepeatAction,
-            antiRepeatTitle: antiRepeatTitle,
-            antiRepeatMessage: antiRepeatMessage,
-            showingSingleUseNotice: showingSingleUseNotice,
-            singleUseNoticeTitle: singleUseNoticeTitle,
-            singleUseNoticeMessage: singleUseNoticeMessage,
-            showingQuickActionLimitAlert: showingQuickActionLimitAlert,
-            showingHumanPrivacyAlert: showingHumanPrivacyAlert,
             onAddEntityDismissed: onAddEntityDismissed,
             onPetSavedFromAddEntity: onPetSavedFromAddEntity,
+            onHumanSavedFromAddEntity: onHumanSavedFromAddEntity,
             onCrewPetSelected: onCrewPetSelected,
             onCrewHumanSelected: onCrewHumanSelected,
             onFirstSuccessMomentCompleted: onFirstSuccessMomentCompleted,

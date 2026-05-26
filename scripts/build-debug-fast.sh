@@ -6,6 +6,8 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 cd "${REPO_ROOT}"
 
+export COPYFILE_DISABLE="${COPYFILE_DISABLE:-1}"
+
 SCHEME="${SCHEME:-Ohana}"
 CONFIGURATION="${CONFIGURATION:-Debug}"
 SDK="${SDK:-iphonesimulator}"

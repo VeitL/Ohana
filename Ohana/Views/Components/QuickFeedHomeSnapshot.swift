@@ -24,6 +24,10 @@ struct QuickFeedHomeSnapshot {
     let latestAutoFeedDate: Date?
     let nextAutoFeedDate: Date?
     let stockCardRemainingDays: Int?
+    let dryStockRemainingGrams: Double?
+    let dryStockRemainingDays: Int?
+    let wetStockRemainingGrams: Double?
+    let wetStockRemainingDays: Int?
     let guidedSevenDayMainFoodPoints: [OhanaMinimalChartPoint]
 
     static func make(

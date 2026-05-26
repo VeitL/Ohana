@@ -91,9 +91,13 @@ enum FeedHomeSnapshotBuilder {
             calendar: calendar
         )
         let stockCardRemainingDays = [dryStock, wetStock]
-            .filter { $0.totalGrams > 0 && $0.remainingDays > 0 }
+            .filter { $0.totalGrams > 0 }
             .map(\.remainingDays)
             .min()
+        let dryStockRemainingGrams = dryStock.totalGrams > 0 ? dryStock.remainingGrams : nil
+        let dryStockRemainingDays = dryStock.totalGrams > 0 ? dryStock.remainingDays : nil
+        let wetStockRemainingGrams = wetStock.totalGrams > 0 ? wetStock.remainingGrams : nil
+        let wetStockRemainingDays = wetStock.totalGrams > 0 ? wetStock.remainingDays : nil
 
         let latestAutoFeedDate = careLogs
             .filter { FeedLogMetadata.source(for: $0) == .autoMain }
@@ -128,6 +132,10 @@ enum FeedHomeSnapshotBuilder {
             latestAutoFeedDate: latestAutoFeedDate,
             nextAutoFeedDate: nextAutoFeedDate,
             stockCardRemainingDays: stockCardRemainingDays,
+            dryStockRemainingGrams: dryStockRemainingGrams,
+            dryStockRemainingDays: dryStockRemainingDays,
+            wetStockRemainingGrams: wetStockRemainingGrams,
+            wetStockRemainingDays: wetStockRemainingDays,
             guidedSevenDayMainFoodPoints: sevenDayPoints
         )
     }

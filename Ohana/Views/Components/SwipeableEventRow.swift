@@ -30,9 +30,8 @@ struct SwipeableEventRow: View {
     @State private var showSkipReason = false
     @State private var activeDragAxis: DragAxis? = nil
 
-    // Overdue gravitational pull — driven by native SwiftUI animation (no TimelineView polling)
+    // Overdue emphasis stays static in list geometry; rows must not drift while the user scans.
     @State private var overdueBreath: Bool = false
-    @State private var overdueFloat: CGFloat = 0
 
     private let triggerThreshold: CGFloat = 100
     private let dampFactor: CGFloat = 0.4
@@ -162,14 +161,10 @@ struct SwipeableEventRow: View {
         .onAppear {
             guard rowState == .overdue, !shouldReduceWork else {
                 overdueBreath = false
-                overdueFloat = 0
                 return
             }
             withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) { // ui-v4: allow overdue warning breath, gated by reduce-work policy.
                 overdueBreath = true
-            }
-            withAnimation(.easeInOut(duration: 0.83).repeatForever(autoreverses: true)) { // ui-v4: allow overdue warning float, gated by reduce-work policy.
-                overdueFloat = 2.0
             }
         }
         .overlay(alignment: .top) {
@@ -224,7 +219,6 @@ struct SwipeableEventRow: View {
                             .opacity(1 - Double(leftProgress / 0.3))
                     }
                 }
-                .offset(y: overdueFloat)
             } else if rowState == .completed {
                 ZStack {
                     Circle()

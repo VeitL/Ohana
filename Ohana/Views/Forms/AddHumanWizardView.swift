@@ -5,10 +5,10 @@
 //  Lightweight RPG-style human creation wizard.
 //
 
-import SwiftUI
-import SwiftData
-import PhotosUI
 import Foundation
+import PhotosUI
+import SwiftData
+import SwiftUI
 
 // MARK: - AddHumanWizardView
 
@@ -23,18 +23,19 @@ struct AddHumanWizardView: View {
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
     @AppStorage(AppMeasurementSystem.storageKey) private var appMeasurementSystem = AppMeasurementSystem.fallbackCode
     @AppStorage(AppCurrency.storageKey) private var appCurrency = AppCurrency.fallbackCode
-    @Query(sort: \Pet.createdAt)   private var existingPets:   [Pet]
+    @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
+    @Query(sort: \Pet.createdAt) private var existingPets: [Pet]
     @Query(sort: \Human.createdAt) private var existingHumans: [Human]
 
     private var l: L10n { L10n(appLanguage) }
 
     // ── Identity
-    @State private var name            = ""
+    @State private var name = ""
     @State private var avatarImageData: Data? = nil
     @State private var usesAutomaticAvatarAsset = true
     @State private var showingPhotoPicker = false
     @State private var photosPickerItem: PhotosPickerItem? = nil
-    @State private var showingCamera   = false
+    @State private var showingCamera = false
     @State private var showCameraPermissionAlert = false
     @State private var pendingCapturedAvatarImage: UIImage? = nil
     @State private var cropImageItem: IdentifiableCropImage? = nil
@@ -43,36 +44,36 @@ struct AddHumanWizardView: View {
     @State private var avatarMediaReturnPageIndex: Int? = nil
 
     // ── Profile
-    @State private var gender      = ""
+    @State private var gender = ""
     @State private var hasBirthday = true
-    @State private var birthday    = Date()
-    @State private var bloodType   = ""
-    @State private var mbti        = ""
+    @State private var birthday = Date()
+    @State private var bloodType = ""
+    @State private var mbti = ""
 
     // ── Family（权限 / 性别身份 / 国籍 / 现居地：写入 role / notes / Human.nationality / Human.city）
-    @State private var nationalityCountry   = ""
-    @State private var residenceCountry     = ""
-    @State private var residenceCity        = ""
+    @State private var nationalityCountry = ""
+    @State private var residenceCountry = ""
+    @State private var residenceCity = ""
     @State private var isCustomResidenceCity = false
-    @State private var notes                = ""
+    @State private var notes = ""
 
     // ── Body data
-    @State private var heightText      = ""
-    @State private var weightText      = ""
+    @State private var heightText = ""
+    @State private var weightText = ""
     @State private var activeBodyMetric: BodyMetricField? = nil
-    @State private var privateWeight   = false
-    @State private var privateWorkout  = false
+    @State private var privateWeight = false
+    @State private var privateWorkout = false
     @State private var privateMedication = false
     @State private var privateWishlist = false
-    @State private var privateExpense  = false
+    @State private var privateExpense = false
 
     // ── Theme + Role
     @State private var themeColorHex = OhanaThemeColorPolicy.humanFallbackHex
-    @State private var role          = "owner"
+    @State private var role = "owner"
 
     // ── Wizard navigation
-    @State private var wizardPageIndex      = 0
-    @State private var wizardPageDirection  = 1
+    @State private var wizardPageIndex = 0
+    @State private var wizardPageDirection = 1
     @Namespace private var themeSelectionNamespace
 
     // ── Alerts
@@ -81,7 +82,7 @@ struct AddHumanWizardView: View {
     @State private var joinedHumanName = ""
 
     // ── Avatar decoded cache (avoid re-decoding on each keystroke)
-    @State private var decodedAvatar:           UIImage? = nil
+    @State private var decodedAvatar: UIImage? = nil
     @State private var decodedAvatarTransparent = false
     @State private var avatarAssetLoadTask: Task<Void, Never>? = nil
 
@@ -92,16 +93,17 @@ struct AddHumanWizardView: View {
         case weight
     }
 
-    private let bloodTypes     = ["A", "B", "AB", "O"]
+    private let bloodTypes = ["A", "B", "AB", "O"]
     private let mbtiOptions: [String] = [
         "INTJ", "INTP", "ENTJ", "ENTP", "INFJ", "INFP", "ENFJ", "ENFP",
-        "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP"
+        "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP",
     ]
     private var genderOptions: [(key: String, icon: String)] {
         HumanProfileOptions.genderOptions.filter {
             HumanProfileOptions.normalizedGender($0.key) != "不透露"
         }
     }
+
     private let themeColorOptions = AddWizardThemePalette.memberOptions
 
     // MARK: - Computed
@@ -112,6 +114,7 @@ struct AddHumanWizardView: View {
     private var selectedMeasurementSystem: AppMeasurementSystem.Option {
         AppMeasurementSystem.option(for: appMeasurementSystem)
     }
+
     private var selectedCurrency: AppCurrency.Option {
         AppCurrency.supported.first { $0.code == AppCurrency.normalize(appCurrency) } ?? AppCurrency.supported[0]
     }
@@ -126,7 +129,7 @@ struct AddHumanWizardView: View {
             AddWizardStageItem(id: 1, title: l.tr(zh: "形象", en: "Avatar", de: "Avatar"), systemImage: "sparkles"),
             AddWizardStageItem(id: 2, title: l.tr(zh: "权限", en: "Role", de: "Rolle"), systemImage: "crown.fill"),
             AddWizardStageItem(id: 3, title: l.tr(zh: "身体档案", en: "Body", de: "Körper"), systemImage: "heart.text.square.fill"),
-            AddWizardStageItem(id: 4, title: l.tr(zh: "加入 Ohana", en: "Join", de: "Beitreten"), systemImage: "checkmark.seal.fill")
+            AddWizardStageItem(id: 4, title: l.tr(zh: "加入 Ohana", en: "Join", de: "Beitreten"), systemImage: "checkmark.seal.fill"),
         ]
     }
 
@@ -172,12 +175,12 @@ struct AddHumanWizardView: View {
     private var birthdaySelectableRange: ClosedRange<Date> {
         let cal = Calendar.current
         let end = Date()
-        guard let start = cal.date(byAdding: .year, value: -120, to: end) else { return end...end }
-        return start...end
+        guard let start = cal.date(byAdding: .year, value: -120, to: end) else { return end ... end }
+        return start ... end
     }
 
     private var residenceTagText: String? {
-        if residenceCountry.isEmpty && residenceCity.isEmpty { return nil }
+        if residenceCountry.isEmpty, residenceCity.isEmpty { return nil }
         if l.isEn {
             if residenceCity.isEmpty { return "Nest: \(residenceCountry)" }
             if residenceCountry.isEmpty { return "Nest: \(residenceCity)" }
@@ -202,6 +205,7 @@ struct AddHumanWizardView: View {
     private var canUseAutomatic2DAvatar: Bool {
         Avatar2DAccess.usesFreeSlot(kind: .human, existingCount: existingHumans.count)
     }
+
     private var isShowingAutomatic2DAvatar: Bool {
         usesAutomaticAvatarAsset && canUseAutomatic2DAvatar
     }
@@ -209,156 +213,12 @@ struct AddHumanWizardView: View {
     // MARK: - Body
 
     var body: some View {
-        ZStack {
-            OhanaAppBackground()
-            wizardMainColumn
-            if showJoinCelebration {
-                AddWizardJoinCelebrationOverlay(
-                    title: l.tr(
-                        zh: "\(joinedHumanName) 已加入 Ohana",
-                        en: "\(joinedHumanName) joined Ohana",
-                        de: "\(joinedHumanName) ist bei Ohana"
-                    ),
-                    subtitle: l.tr(
-                        zh: "成员卡已准备好",
-                        en: "The member card is ready",
-                        de: "Die Mitgliedskarte ist bereit"
-                    ),
-                    systemImage: "person.crop.circle.badge.checkmark",
-                    accent: Color.goPrimary
-                )
-                .zIndex(40)
-            }
-        }
-            .onAppear {
-                refreshAutomaticAvatarAssetDataAsync()
-                scheduleAvatarDecode()
-            }
-            .onDisappear {
-                if !isAvatarMediaTransitioning {
-                    avatarAssetLoadTask?.cancel()
-                    cropPresentationTask?.cancel()
-                    cropPresentationTask = nil
-                    isAvatarMediaTransitioning = false
-                    avatarMediaReturnPageIndex = nil
-                }
-            }
-            .onChange(of: avatarImageData)    { _, _ in scheduleAvatarDecode() }
-            .onChange(of: photosPickerItem)   { _, item in handlePhotosPicker(item) }
-            .onChange(of: gender)             { _, _ in refreshAutomaticAvatarAssetDataAsync() }
-            .onChange(of: birthday)           { _, _ in refreshAutomaticAvatarAssetDataAsync() }
-            .onChange(of: hasBirthday)        { _, _ in refreshAutomaticAvatarAssetDataAsync() }
-            .onChange(of: cropImageItem)      { _, new in
-                guard new == nil else { return }
-                cropPresentationTask?.cancel()
-                cropPresentationTask = nil
-                finishAvatarMediaPresentation()
-            }
-            .onChange(of: showingPhotoPicker) { _, isShowing in
-                guard !isShowing else { return }
-                OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
-                    guard !showingPhotoPicker,
-                          photosPickerItem == nil,
-                          cropImageItem == nil,
-                          cropPresentationTask == nil,
-                          !showingCamera else { return }
-                    finishAvatarMediaPresentation()
-                }
-            }
-            .onChange(of: wizardPageIndex) { _, new in
-                let clamped = min(max(new, 0), totalCards - 1)
-                if clamped != new { navigateToWizardPage(clamped) }
-            }
-            .onChange(of: residenceCountry) { _, newCountry in
-                let cities = PetBreedDatabase.cities(for: newCountry)
-                if !residenceCity.isEmpty, !cities.contains(residenceCity) {
-                    residenceCity = ""
-                    isCustomResidenceCity = false
-                }
-            }
-            .photosPicker(isPresented: $showingPhotoPicker, selection: $photosPickerItem, matching: .images)
-            .fullScreenCover(isPresented: $showingCamera, onDismiss: {
-                if let img = pendingCapturedAvatarImage {
-                    pendingCapturedAvatarImage = nil
-                    prepareCapturedAvatarForCrop(img)
-                } else {
-                    finishAvatarMediaPresentation()
-                }
-            }) {
-                PetCameraPickerView(maxPixel: 1_600) { img in
-                    AppPerformanceMonitor.shared.markStart("avatar.camera.to.crop")
-                    pendingCapturedAvatarImage = img
-                    showingCamera = false
-                } onCancel: {
-                    showingCamera = false
-                }
-            }
-            .sheet(item: $cropImageItem) { item in
-                NavigationStack {
-                    PetImageCropView(
-                        image: item.image,
-                        species: "",
-                        silhouetteSystemName: "person.fill"
-                    ) { cropped in
-                        var tx = Transaction()
-                        tx.disablesAnimations = true
-                        withTransaction(tx) {
-                            if let cropped {
-                                let hasAlpha = ImageCutoutService.imageHasTransparentPixels(cropped)
-                                let optimized = AddPetWizardView.optimizedAvatarAsset(cropped, preserveAlpha: hasAlpha)
-                                usesAutomaticAvatarAsset = false
-                                avatarImageData = hasAlpha
-                                    ? optimized.pngData()
-                                    : optimized.jpegData(compressionQuality: 0.88)
-                            }
-                            cropImageItem = nil
-                            photosPickerItem = nil
-                        }
-                    }
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button(l.cancel) {
-                                var tx = Transaction()
-                                tx.disablesAnimations = true
-                                withTransaction(tx) {
-                                    cropImageItem = nil
-                                    photosPickerItem = nil
-                                }
-                            }
-                        }
-                    }
-                    .navigationBarTitleDisplayMode(.inline)
-                }
-                .presentationDetents([.large]) // ui-v4: allow avatar crop editor needs full-height system sheet
-            }
-            .alert(l.humanWizDupAlertTitle, isPresented: $showDuplicateNameAlert) {
-                Button(l.humanWizDupAlertOk, role: .cancel) { }
-            } message: {
-                Text(l.humanWizDupAlertMsg(name.trimmingCharacters(in: .whitespaces)))
-            }
-            .alert("无法打开相机", isPresented: $showCameraPermissionAlert) {
-                Button(l.done, role: .cancel) { }
-            } message: {
-                Text("请在系统设置中允许 Ohana 访问相机。")
-            }
-            .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button {
-                        GoKeyboard.dismiss()
-                    } label: {
-                        Label(
-                            l.tr(
-                                zh: "隐藏键盘",
-                                en: "Hide keyboard",
-                                de: "Tastatur ausblenden"
-                            ),
-                            systemImage: "keyboard.chevron.compact.down"
-                        )
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                    }
-                }
-            }
+        MemberCardCreationView(
+            kind: .human,
+            onComplete: onComplete,
+            onCancel: onCancel,
+            onHumanSaved: onHumanSaved
+        )
     }
 
     // MARK: - Layout
@@ -415,7 +275,7 @@ struct AddHumanWizardView: View {
                     .padding(.trailing, 12)
             }
         }
-        .padding(.horizontal, 7)   // 与首页卡片堆 K.cardMargin 保持一致
+        .padding(.horizontal, 7) // 与首页卡片堆 K.cardMargin 保持一致
         .padding(.top, 6)
         .padding(.bottom, 6)
         .animation(GoMotion.feedback, value: name)
@@ -543,22 +403,22 @@ struct AddHumanWizardView: View {
                 submitLabel: .done,
                 capitalization: .words
             )
-                .font(.system(size: 27, weight: .black, design: .rounded))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .padding(.vertical, 15).padding(.horizontal, 14)
-                .background(Color.primary.opacity(0.08),
-                            in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .strokeBorder(
-                            name.isEmpty         ? Color.red.opacity(0.4) :
-                            isNameDuplicate      ? Color.orange.opacity(0.7)
-                                                 : Color.goPrimary.opacity(colorScheme == .dark ? 0.55 : 0.4),
-                            lineWidth: 1.5
-                        )
-                )
-                .transaction { $0.animation = nil }
+            .font(.system(size: 27, weight: .black, design: .rounded))
+            .multilineTextAlignment(.center)
+            .foregroundStyle(Color.ohanaPrimaryText)
+            .padding(.vertical, 15).padding(.horizontal, 14)
+            .background(Color.primary.opacity(0.08),
+                        in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(
+                        name.isEmpty ? Color.red.opacity(0.4) :
+                            isNameDuplicate ? Color.orange.opacity(0.7)
+                            : Color.goPrimary.opacity(colorScheme == .dark ? 0.55 : 0.4),
+                        lineWidth: 1.5
+                    )
+            )
+            .transaction { $0.animation = nil }
             if isNameDuplicate {
                 Text(l.humanWizDupNameInline)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
@@ -876,11 +736,11 @@ struct AddHumanWizardView: View {
                                 submitLabel: .done,
                                 capitalization: .words
                             )
-                                .font(.system(size: 15, weight: .medium, design: .rounded))
-                                .foregroundStyle(Color.ohanaPrimaryText)
-                                .padding(12)
-                                .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                .transaction { $0.animation = nil }
+                            .font(.system(size: 15, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .padding(12)
+                            .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .transaction { $0.animation = nil }
                         }
                     }
                 }
@@ -900,10 +760,10 @@ struct AddHumanWizardView: View {
                             commitDelayNanoseconds: 220_000_000,
                             submitLabel: .done
                         )
-                            .font(.system(size: 15, weight: .medium, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .lineLimit(2...3)
-                            .transaction { $0.animation = nil }
+                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .lineLimit(2 ... 3)
+                        .transaction { $0.animation = nil }
                     }
                     .padding(12)
                     .background(Color.primary.opacity(0.07),
@@ -1177,7 +1037,7 @@ struct AddHumanWizardView: View {
                             LinearGradient(
                                 colors: [
                                     memberThemeColor.opacity(colorScheme == .dark ? 0.95 : 0.82),
-                                    memberThemeColor.opacity(colorScheme == .dark ? 0.42 : 0.28)
+                                    memberThemeColor.opacity(colorScheme == .dark ? 0.42 : 0.28),
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -1608,7 +1468,7 @@ struct AddHumanWizardView: View {
                 return
             }
             let ui = await Task.detached(priority: .userInitiated) {
-                AddPetWizardView.cropReadyImage(from: data, maxPixel: 1_600)
+                AddPetWizardView.cropReadyImage(from: data, maxPixel: 1600)
             }.value
             await MainActor.run {
                 photosPickerItem = nil
@@ -1642,7 +1502,7 @@ struct AddHumanWizardView: View {
         let startedAt = CFAbsoluteTimeGetCurrent()
         Task {
             let prepared = await Task.detached(priority: .userInitiated) {
-                AddPetWizardView.preparedCropImage(image, maxPixel: 1_600)
+                AddPetWizardView.preparedCropImage(image, maxPixel: 1600)
             }.value
             cropImageItem = IdentifiableCropImage(image: prepared)
             AppPerformanceMonitor.shared.record("粘贴到裁剪页", startedAt: startedAt, note: "人类头像")
@@ -1652,7 +1512,7 @@ struct AddHumanWizardView: View {
     private func prepareCapturedAvatarForCrop(_ image: UIImage) {
         Task {
             let prepared = await Task.detached(priority: .userInitiated) {
-                AddPetWizardView.preparedCropImage(image, maxPixel: 1_600)
+                AddPetWizardView.preparedCropImage(image, maxPixel: 1600)
             }.value
             await MainActor.run {
                 presentAvatarCropAfterMediaDismissal(prepared, delayMilliseconds: 320) {
@@ -1759,7 +1619,7 @@ struct AddHumanWizardView: View {
         if !notes.isEmpty { parts.append(notes) }
         human.notes = parts.joined(separator: "｜")
         human.nationality = nationalityCountry
-        if residenceCountry.isEmpty && residenceCity.isEmpty {
+        if residenceCountry.isEmpty, residenceCity.isEmpty {
             human.city = ""
         } else if !residenceCountry.isEmpty, !residenceCity.isEmpty {
             human.city = "\(residenceCountry)·\(residenceCity)"
@@ -1775,7 +1635,11 @@ struct AddHumanWizardView: View {
             themeColorHex,
             fallback: OhanaThemeColorPolicy.humanFallbackHex
         )
-        human.shouldShowOnHome = true
+        human.shouldShowOnHome = HomeCardVisibility.visibleCardCount(
+            pets: existingPets,
+            humans: existingHumans,
+            raw: hiddenHomePetIDsRaw
+        ) < HomeCardVisibility.maxVisibleCards
         human.mbti = mbti.trimmingCharacters(in: .whitespaces).uppercased()
         if let h = decimalValue(from: heightText), h > 0 { human.heightCm = h }
 
@@ -1877,7 +1741,7 @@ private struct HumanGenderAvatarPreview: View {
 private struct FlowTagRow: View {
     let tags: [String]
     var emptyHint: String
-    var accent: Color = Color(hex: OhanaThemeColorPolicy.humanFallbackHex)
+    var accent: Color = .init(hex: OhanaThemeColorPolicy.humanFallbackHex)
     var body: some View {
         if tags.isEmpty {
             Text(emptyHint)

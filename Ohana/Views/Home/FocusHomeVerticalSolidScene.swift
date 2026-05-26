@@ -8,39 +8,134 @@
 import SwiftUI
 import UIKit
 
+struct FocusHomeVerticalSolidHeroSnapshot {
+    let card: FocusCard
+    let index: Int
+    let avatarSource: FocusHomeFrozenAvatarSource
+    let collapsedFrame: CGRect?
+    let collapsedRotation: Double?
+
+    init(
+        card: FocusCard,
+        index: Int,
+        avatarSource: FocusHomeFrozenAvatarSource,
+        collapsedFrame: CGRect? = nil,
+        collapsedRotation: Double? = nil
+    ) {
+        self.card = card
+        self.index = index
+        self.avatarSource = avatarSource
+        self.collapsedFrame = collapsedFrame
+        self.collapsedRotation = collapsedRotation
+    }
+
+    func freezingCollapsedGeometry(frame: CGRect, rotation: Double) -> FocusHomeVerticalSolidHeroSnapshot {
+        FocusHomeVerticalSolidHeroSnapshot(
+            card: card,
+            index: index,
+            avatarSource: avatarSource,
+            collapsedFrame: frame,
+            collapsedRotation: rotation
+        )
+    }
+
+    func preservingCollapsedGeometry(from snapshot: FocusHomeVerticalSolidHeroSnapshot?) -> FocusHomeVerticalSolidHeroSnapshot {
+        FocusHomeVerticalSolidHeroSnapshot(
+            card: card,
+            index: index,
+            avatarSource: avatarSource,
+            collapsedFrame: snapshot?.collapsedFrame ?? collapsedFrame,
+            collapsedRotation: snapshot?.collapsedRotation ?? collapsedRotation
+        )
+    }
+
+    func updatingCard(_ nextCard: FocusCard) -> FocusHomeVerticalSolidHeroSnapshot {
+        FocusHomeVerticalSolidHeroSnapshot(
+            card: nextCard,
+            index: index,
+            avatarSource: avatarSource,
+            collapsedFrame: collapsedFrame,
+            collapsedRotation: collapsedRotation
+        )
+    }
+}
+
 struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>: View {
     let cards: [FocusCard]
     let pets: [Pet]
     let safeTop: CGFloat
     let safeBottom: CGFloat
     let selectedCardId: UUID?
+    var preparedHeroSnapshots: [UUID: FocusHomeVerticalSolidHeroSnapshot] = [:]
+    var heroSnapshot: FocusHomeVerticalSolidHeroSnapshot? = nil
     let progress: CGFloat
     var heroDirection: Int = 0
+    var arrivingCardId: UUID? = nil
     let reduceMotion: Bool
     var isVisible: Bool = true
     var embedsQuickActionsInCard: Bool = false
     var collapsedTopInset: CGFloat = 0
     let quickActions: (FocusCard) -> QuickActions
     let contextMenu: (FocusCard) -> ContextMenuContent
-    let onSelect: (FocusCard) -> Void
+    let onSelect: (FocusHomeVerticalSolidHeroSnapshot) -> Void
     let onCollapse: () -> Void
     let onLongPress: (FocusCard) -> Void
 
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
-    @State private var frozenAvatarSources: [UUID: FocusHomeFrozenAvatarSource] = [:]
-    @State private var frozenAvatarClearGeneration = 0
     @State private var floatingResumeStartTime: TimeInterval?
+    @State private var animatedArrivalCardId: UUID?
+    @State private var arrivalProgress: CGFloat = 1
+    @State private var arrivalCleanupTask: Task<Void, Never>?
     @GestureState private var expandedDragY: CGFloat = 0
 
     private var l: L10n { L10n(appLanguage) }
 
     private var selectedCard: FocusCard? {
-        selectedCardId.flatMap { id in cards.first(where: { $0.id == id }) }
+        if let activeHeroSnapshot {
+            return activeHeroSnapshot.card
+        }
+
+        return selectedCardId.flatMap { id in cards.first(where: { $0.id == id }) }
+    }
+
+    private var activeHeroSnapshot: FocusHomeVerticalSolidHeroSnapshot? {
+        guard let selectedCardId else {
+            return nil
+        }
+
+        if let heroSnapshot,
+           heroSnapshot.card.id == selectedCardId
+        {
+            return heroSnapshot
+        }
+
+        if let prepared = preparedHeroSnapshots[selectedCardId] {
+            return prepared
+        }
+
+        guard let index = cards.firstIndex(where: { $0.id == selectedCardId }) else {
+            return nil
+        }
+
+        let card = cards[index]
+        return FocusHomeVerticalSolidHeroSnapshot(
+            card: card,
+            index: index,
+            avatarSource: FocusHomeFrozenAvatarSource.cached(for: card) ?? .placeholder
+        )
     }
 
     private var isExpandedInteractionReady: Bool {
-        selectedCardId != nil && progress > 0.985
+        selectedCardId != nil && heroDirection == 0 && progress > 0.985
+    }
+
+    private var isExpandedCollapseReady: Bool {
+        selectedCardId != nil && progress > 0.92
+    }
+
+    private var canHitCollapsedCards: Bool {
+        selectedCardId == nil || (heroDirection <= 0 && progress <= 0.06)
     }
 
     var body: some View {
@@ -49,7 +144,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                 let visibleCenterX = visibleCenterX(in: geo)
                 let time = canFloatCards ? timeline.date.timeIntervalSinceReferenceDate : 0
                 ZStack {
-                    if selectedCardId == nil {
+                    if canHitCollapsedCards {
                         collapsedHitLayer(in: geo.size, time: time)
                             .zIndex(80)
                     } else {
@@ -73,19 +168,76 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                 .frame(width: geo.size.width, height: geo.size.height)
             }
             .onAppear {
-                syncFrozenAvatarSource(for: selectedCardId)
                 primeFloatingMotionIfVisible()
+                prepareArrivalIfNeeded()
             }
             .onChange(of: selectedCardId) { _, newValue in
-                syncFrozenAvatarSource(for: newValue)
-            }
-            .onChange(of: progress) { _, _ in
-                clearFrozenAvatarSourcesIfIdle()
+                if newValue == nil {
+                    primeFloatingMotionIfVisible()
+                } else {
+                    floatingResumeStartTime = nil
+                }
             }
             .onChange(of: isVisible) { _, _ in
                 primeFloatingMotionIfVisible()
             }
+            .onChange(of: arrivalKey) { _, _ in
+                prepareArrivalIfNeeded()
+            }
+            .onDisappear {
+                arrivalCleanupTask?.cancel()
+                arrivalCleanupTask = nil
+            }
         }
+    }
+
+    private var arrivalKey: String {
+        [
+            arrivingCardId?.uuidString ?? "",
+            cards.map(\.id.uuidString).joined(separator: "|"),
+            isVisible ? "visible" : "hidden",
+        ].joined(separator: "#")
+    }
+
+    private func prepareArrivalIfNeeded() {
+        guard isVisible,
+              selectedCardId == nil,
+              let arrivingCardId,
+              cards.contains(where: { $0.id == arrivingCardId }),
+              animatedArrivalCardId != arrivingCardId else { return }
+        arrivalCleanupTask?.cancel()
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            animatedArrivalCardId = arrivingCardId
+            arrivalProgress = 0
+        }
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 40) {
+            guard animatedArrivalCardId == arrivingCardId else { return }
+            withAnimation(reduceMotion ? HeroAnim.walletReduced : GoMotion.zStackHero) {
+                arrivalProgress = 1
+            }
+        }
+        arrivalCleanupTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 980) {
+            guard animatedArrivalCardId == arrivingCardId else { return }
+            animatedArrivalCardId = nil
+            arrivalProgress = 1
+            arrivalCleanupTask = nil
+        }
+    }
+
+    private func arrivalTransform(for card: FocusCard) -> (scale: CGFloat, rotation: Double, flip: Double, y: CGFloat, opacity: Double) {
+        guard card.id == animatedArrivalCardId, selectedCardId == nil, !reduceMotion else {
+            return (1, 0, 0, 0, 1)
+        }
+        let p = eased(arrivalProgress)
+        return (
+            scale: lerp(1.34, 1, p),
+            rotation: Double(lerp(-8, 0, p)),
+            flip: Double(lerp(78, 0, p)),
+            y: lerp(-56, 0, p),
+            opacity: Double(lerp(0.10, 1, p))
+        )
     }
 
     private func visibleCenterX(in geo: GeometryProxy) -> CGFloat {
@@ -94,61 +246,77 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
 
     private func cardLayer(for card: FocusCard, index: Int, in size: CGSize, visibleCenterX: CGFloat, time: TimeInterval) -> some View {
         let isSelected = card.id == selectedCardId
-        let isCollapsedHandoff = isCollapsedHandoffCard(card)
-        let isLayerSelected = isSelected && !isCollapsedHandoff
-        let isExpandedSurface = isSelected && !isCollapsedHandoff
-        let walkTrackingPet = walkTrackingPet(for: card, isSelected: isExpandedSurface)
-        let frame = frame(for: card, index: index, in: size, visibleCenterX: visibleCenterX)
+        let motionSnapshot = isSelected ? activeHeroSnapshot : nil
+        let renderCard = motionSnapshot?.card ?? card
+        let renderIndex = motionSnapshot?.index ?? index
+        let isExpandedSurface = isSelected
+        let frame = frame(
+            for: renderCard,
+            index: renderIndex,
+            snapshot: motionSnapshot,
+            in: size,
+            visibleCenterX: visibleCenterX
+        )
+        let arrival = arrivalTransform(for: renderCard)
         let dragY = isExpandedSurface ? max(0, expandedDragY) : 0
-        let floating = floatingTransform(index: index, isSelected: isSelected, time: time)
-        let rotation = rotation(for: index, isSelected: isExpandedSurface) + floating.rotation
-        let scale = isExpandedSurface ? max(0.94, 1 - dragY / 1400) : inactiveScale(for: card)
-        let opacity = inactiveOpacity(for: card)
-        let zIndex = isLayerSelected ? Double(20) : collapsedZIndex(index: index)
-        let cornerRadius = isExpandedSurface ? CGFloat(42) : CGFloat(30)
-        let frozenAvatarSource = frozenAvatarSources[card.id]
-            ?? (isSelected ? FocusHomeFrozenAvatarSource.cached(for: card) : nil)
+        let floating = floatingTransform(index: renderIndex, isSelected: isSelected, time: time)
+        let rotation = rotation(for: renderIndex, snapshot: motionSnapshot, isSelected: isExpandedSurface) + floating.rotation + arrival.rotation
+        let scale = (isExpandedSurface ? max(0.94, 1 - dragY / 1400) : inactiveScale(for: renderCard)) * arrival.scale
+        let opacity = inactiveOpacity(for: renderCard) * arrival.opacity
+        let zIndex = zIndex(for: renderIndex, isSelected: isSelected)
+        let visualProgress = isExpandedSurface ? progress : 0
+        let cornerRadius = lerp(30, 42, eased(visualProgress))
+        let frozenAvatarSource = motionSnapshot?.avatarSource ?? preparedHeroSnapshots[card.id]?.avatarSource
+        let walkTrackingPet = isExpandedInteractionReady ? walkTrackingPet(for: renderCard, isSelected: isExpandedSurface) : nil
+        let embeddedQuickActionReveal = reduceMotion ? (visualProgress > 0.5 ? CGFloat(1) : CGFloat(0)) : smooth(visualProgress, 0.42, 0.72)
+        let showsEmbeddedQuickActions = embedsQuickActionsInCard
+            && isExpandedSurface
+            && walkTrackingPet == nil
+            && embeddedQuickActionReveal > 0.001
 
         return FocusHomeWalkCardFlip(
             walkPet: walkTrackingPet,
             reduceMotion: reduceMotion,
-            walkCardPadding: 10
+            walkCardPadding: 10,
+            retainsWalkPetDuringClose: isExpandedInteractionReady
         ) {
             ZStack(alignment: .bottom) {
                 FocusHomeVerticalSolidCardSurface(
-                    card: card,
-                    progress: isExpandedSurface ? progress : 0,
+                    card: renderCard,
+                    progress: visualProgress,
                     reduceMotion: reduceMotion,
-                    frozenAvatarSource: frozenAvatarSource
+                    frozenAvatarSource: frozenAvatarSource,
+                    allowsLiveAvatarFallback: motionSnapshot == nil
                 )
 
-                if embedsQuickActionsInCard && isExpandedSurface && isExpandedInteractionReady && walkTrackingPet == nil {
-                    embeddedCardCollapseHitLayer(for: card, frame: frame)
+                if embedsQuickActionsInCard && isExpandedSurface && isExpandedCollapseReady && walkTrackingPet == nil {
+                    embeddedCardCollapseHitLayer(for: renderCard, frame: frame)
                         .zIndex(10)
                 }
 
-                if embedsQuickActionsInCard && isExpandedSurface && walkTrackingPet == nil {
-                    embeddedQuickActionLayer(for: card, frame: frame)
+                if showsEmbeddedQuickActions {
+                    embeddedQuickActionLayer(for: renderCard, frame: frame, reveal: embeddedQuickActionReveal)
                 }
             }
         }
         .frame(width: frame.width, height: frame.height)
         .rotationEffect(.degrees(rotation))
+        .rotation3DEffect(.degrees(arrival.flip), axis: (x: 0, y: 1, z: 0), perspective: 0.72)
         .scaleEffect(scale)
         .opacity(opacity)
-        .position(x: frame.midX + floating.x, y: frame.midY + dragY + floating.y)
+        .position(x: frame.midX + floating.x, y: frame.midY + dragY + floating.y + arrival.y)
         .zIndex(zIndex)
         .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .contextMenu { contextMenu(card) }
+        .contextMenu { contextMenu(renderCard) }
         .onTapGesture {
             guard !embedsQuickActionsInCard else { return }
             guard walkTrackingPet == nil else { return }
             handleCardTap(isSelected: isExpandedSurface)
         }
         .onLongPressGesture {
-            handleCardLongPress(card, isSelected: isExpandedSurface)
+            handleCardLongPress(renderCard, isSelected: isExpandedSurface)
         }
-        .simultaneousGesture(collapseDragGesture(isEnabled: isExpandedSurface && walkTrackingPet == nil))
+        .simultaneousGesture(collapseDragGesture(isEnabled: isExpandedSurface && isExpandedCollapseReady && walkTrackingPet == nil))
         .allowsHitTesting(isExpandedSurface)
     }
 
@@ -169,67 +337,16 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     private var canFloatCards: Bool {
         !reduceMotion
             && selectedCardId == nil
-            && frozenAvatarSources.isEmpty
+            && isVisible
             && workloadPolicy.ambientMotionBudget(isVisible: isVisible) == .full
     }
 
     private func primeFloatingMotionIfVisible() {
         guard isVisible, selectedCardId == nil, progress <= 0.001 else { return }
-        frozenAvatarClearGeneration += 1
-        if frozenAvatarSources.isEmpty {
-            floatingResumeStartTime = nil
-        } else {
-            var transaction = Transaction(animation: nil)
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                frozenAvatarSources.removeAll()
-                floatingResumeStartTime = nil
-            }
-        }
-    }
-
-    private func syncFrozenAvatarSource(for selectedId: UUID?) {
-        frozenAvatarClearGeneration += 1
-        guard let selectedId,
-              let card = cards.first(where: { $0.id == selectedId }) else {
-            if selectedCardId == nil, progress <= 0.001, frozenAvatarSources.isEmpty {
-                floatingResumeStartTime = Date().timeIntervalSinceReferenceDate
-            }
-            scheduleFrozenAvatarSourceClearIfIdle()
-            return
-        }
-
-        guard frozenAvatarSources[selectedId] == nil else { return }
-        floatingResumeStartTime = nil
-        guard let frozenSource = FocusHomeFrozenAvatarSource.cached(for: card) else { return }
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            frozenAvatarSources = [selectedId: frozenSource]
-        }
-    }
-
-    private func clearFrozenAvatarSourcesIfIdle() {
-        scheduleFrozenAvatarSourceClearIfIdle()
-    }
-
-    private func scheduleFrozenAvatarSourceClearIfIdle() {
-        guard selectedCardId == nil,
-              progress <= 0.001,
-              !frozenAvatarSources.isEmpty else { return }
-        frozenAvatarClearGeneration += 1
-        let generation = frozenAvatarClearGeneration
-        OhanaFrameScheduler.runAfterNextFrame {
-            guard generation == frozenAvatarClearGeneration else { return }
-            guard selectedCardId == nil,
-                  progress <= 0.001,
-                  !frozenAvatarSources.isEmpty else { return }
-            var transaction = Transaction(animation: nil)
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                frozenAvatarSources.removeAll()
-                floatingResumeStartTime = Date().timeIntervalSinceReferenceDate
-            }
+            floatingResumeStartTime = Date().timeIntervalSinceReferenceDate
         }
     }
 
@@ -249,8 +366,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         .position(x: frame.midX, y: y)
     }
 
-    private func embeddedQuickActionLayer(for card: FocusCard, frame: CGRect) -> some View {
-        let reveal = reduceMotion ? 1 : smooth(progress, 0.42, 0.72)
+    private func embeddedQuickActionLayer(for card: FocusCard, frame: CGRect, reveal: CGFloat) -> some View {
         let dockWidth = max(0, frame.width - 18)
         let dockHeight = embeddedQuickActionDockHeight(for: frame)
         return FocusHomeVerticalSolidQuickActionLayer(
@@ -317,7 +433,13 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                     .highPriorityGesture(
                         TapGesture()
                             .onEnded {
-                                onSelect(card)
+                                onSelect(
+                                    preparedHeroSnapshot(for: card, index: index)
+                                        .freezingCollapsedGeometry(
+                                            frame: frame.offsetBy(dx: floating.x, dy: floating.y),
+                                            rotation: collapsedRotation(index: index) + floating.rotation
+                                        )
+                                )
                             }
                     )
                     .accessibilityLabel(card.name)
@@ -331,30 +453,102 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         }
     }
 
-    private func frame(for card: FocusCard, index: Int, in size: CGSize, visibleCenterX: CGFloat) -> CGRect {
-        let collapsed = collapsedFrame(index: index, count: cards.count, in: size)
+    private func frame(
+        for card: FocusCard,
+        index: Int,
+        snapshot: FocusHomeVerticalSolidHeroSnapshot?,
+        in size: CGSize,
+        visibleCenterX: CGFloat
+    ) -> CGRect {
+        let stableCollapsed = collapsedFrame(index: index, count: cards.count, in: size)
         guard card.id == selectedCardId else {
-            return collapsed
+            return stableCollapsed
         }
-        guard !isCollapsedHandoffCard(card) else {
-            return collapsed
+
+        let collapsed = collapsedFrame(for: snapshot, stableFrame: stableCollapsed)
+        if reduceMotion {
+            return progress > 0.5 ? expandedFrame(for: card, in: size, visibleCenterX: visibleCenterX) : collapsed
         }
+
         let expanded = expandedFrame(for: card, in: size, visibleCenterX: visibleCenterX)
-        return reduceMotion ? expanded : WalletHeroTimeline.activeFrame(from: collapsed, to: expanded, progress: progress)
+        return WalletHeroTimeline.activeFrame(from: collapsed, to: expanded, progress: progress)
+    }
+
+    private func collapsedFrame(
+        for snapshot: FocusHomeVerticalSolidHeroSnapshot?,
+        stableFrame: CGRect
+    ) -> CGRect {
+        return snapshot?.collapsedFrame ?? stableFrame
+    }
+
+    private func zIndex(for index: Int, isSelected: Bool) -> Double {
+        guard isSelected else {
+            return collapsedZIndex(index: index)
+        }
+
+        if progress <= 0.001 {
+            return collapsedZIndex(index: index)
+        }
+
+        if heroDirection < 0, progress < 0.035 {
+            return collapsedZIndex(index: index)
+        }
+
+        return 24
+    }
+
+    private func rotation(
+        for index: Int,
+        snapshot: FocusHomeVerticalSolidHeroSnapshot?,
+        isSelected: Bool
+    ) -> Double {
+        let stableCollapsed = collapsedRotation(index: index)
+        guard isSelected, selectedCardId != nil else {
+            return stableCollapsed
+        }
+
+        let collapsed = heroDirection > 0 ? (snapshot?.collapsedRotation ?? stableCollapsed) : stableCollapsed
+        if reduceMotion {
+            return progress > 0.5 ? 0 : collapsed
+        }
+
+        return collapsed * Double(1 - eased(progress))
+    }
+
+    private func preparedHeroSnapshot(for card: FocusCard, index: Int) -> FocusHomeVerticalSolidHeroSnapshot {
+        preparedHeroSnapshots[card.id] ?? FocusHomeVerticalSolidHeroSnapshot(
+            card: card,
+            index: index,
+            avatarSource: FocusHomeFrozenAvatarSource.cached(for: card) ?? .placeholder
+        )
     }
 
     private func collapsedFrame(index: Int, count: Int, in size: CGSize) -> CGRect {
         let availableHeight = max(260, size.height - collapsedTopInset)
-        let width = min(max(size.width * 0.39, 122), 162)
+        let offsets = collapsedOffsets(count: count)
+        let safeIndex = min(max(index, 0), max(offsets.count - 1, 0))
+        let offset = offsets[safeIndex]
+        let xValues = offsets.map(\.width)
+        let yValues = offsets.map(\.height)
+        let horizontalSpan = max(1.0, (xValues.max() ?? 0) - (xValues.min() ?? 0) + 1.0)
+        let verticalSpan = max(1.58, (yValues.max() ?? 0) - (yValues.min() ?? 0) + 1.58)
+        let preferredWidth = min(max(size.width * (count <= 1 ? 0.43 : 0.37), 112), count >= 5 ? 144 : 166)
+        let width = max(
+            104,
+            min(
+                preferredWidth,
+                max(104, (size.width - 24) / horizontalSpan),
+                max(104, (availableHeight - 18) / verticalSpan)
+            )
+        )
         let height = width * 1.58
         let center = CGPoint(x: size.width / 2, y: collapsedTopInset + availableHeight / 2)
-        let offset = collapsedOffset(index: index, cardWidth: width)
-        let x = center.x + offset.width
-        let y = center.y + offset.height
+        let x = center.x + offset.width * width
+        let y = center.y + offset.height * width
         return CGRect(x: x - width / 2, y: y - height / 2, width: width, height: height)
     }
 
-    private func expandedFrame(for card: FocusCard?, in size: CGSize, visibleCenterX: CGFloat) -> CGRect {
+    private func expandedFrame(for _: FocusCard?, in size: CGSize, visibleCenterX: CGFloat) -> CGRect {
         let aspectRatio: CGFloat = 1.58
         let maxWidth: CGFloat = embedsQuickActionsInCard ? 386 : 390
         let horizontalInset: CGFloat = embedsQuickActionsInCard ? 18 : 22
@@ -373,47 +567,56 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         )
     }
 
-    private func collapsedOffset(index: Int, cardWidth: CGFloat) -> CGSize {
-        let offsets: [CGSize] = [
-            CGSize(width: -90, height: -112),
-            CGSize(width: 82, height: -96),
-            CGSize(width: -72, height: 118),
-            CGSize(width: 96, height: 98),
-            CGSize(width: 0, height: 8),
-            CGSize(width: -104, height: 218),
-            CGSize(width: 108, height: 210)
-        ]
-        let scale = cardWidth / 148
-        let offset = offsets[index % offsets.count]
-        return CGSize(width: offset.width * scale, height: offset.height * scale)
+    private func collapsedOffsets(count: Int) -> [CGSize] {
+        switch min(max(count, 1), 6) {
+        case 1:
+            return [CGSize(width: 0, height: 0)]
+        case 2:
+            return [
+                CGSize(width: -0.58, height: -0.05),
+                CGSize(width: 0.58, height: 0.05),
+            ]
+        case 3:
+            return [
+                CGSize(width: -0.62, height: -0.58),
+                CGSize(width: 0.62, height: -0.54),
+                CGSize(width: 0, height: 0.62),
+            ]
+        case 4:
+            return [
+                CGSize(width: -0.62, height: -0.62),
+                CGSize(width: 0.62, height: -0.62),
+                CGSize(width: -0.62, height: 0.62),
+                CGSize(width: 0.62, height: 0.62),
+            ]
+        case 5:
+            return [
+                CGSize(width: -0.66, height: -0.84),
+                CGSize(width: 0.66, height: -0.82),
+                CGSize(width: -0.66, height: 0.84),
+                CGSize(width: 0.66, height: 0.82),
+                CGSize(width: 0, height: 0),
+            ]
+        default:
+            return [
+                CGSize(width: -0.62, height: -1.05),
+                CGSize(width: 0.62, height: -1.05),
+                CGSize(width: -0.62, height: 0),
+                CGSize(width: 0.62, height: 0),
+                CGSize(width: -0.62, height: 1.05),
+                CGSize(width: 0.62, height: 1.05),
+            ]
+        }
     }
 
     private func collapsedRotation(index: Int) -> Double {
-        let rotations: [Double] = [-9, 6, 5, -6, 1.5, -5, 4]
+        let rotations: [Double] = [-7, 6, 4, -5, 1.5, -3]
         return rotations[index % rotations.count]
     }
 
     private func collapsedZIndex(index: Int) -> Double {
-        let depths: [Double] = [3, 5, 4, 2, 1, 0.5, 0.4]
+        let depths: [Double] = [6, 5, 4, 3, 2, 1]
         return depths[index % depths.count]
-    }
-
-    private func isCollapsedHandoffCard(_ card: FocusCard) -> Bool {
-        guard card.id == selectedCardId,
-              heroDirection < 0,
-              !reduceMotion else { return false }
-        return progress <= 0.08
-    }
-
-    private func rotation(for index: Int, isSelected: Bool) -> Double {
-        let collapsed = collapsedRotation(index: index)
-        guard isSelected, selectedCardId != nil else {
-            return collapsed
-        }
-        if reduceMotion {
-            return progress > 0.5 ? 0 : collapsed
-        }
-        return collapsed * Double(1 - eased(progress))
     }
 
     private func floatingTransform(index: Int, isSelected: Bool, time: TimeInterval) -> (x: CGFloat, y: CGFloat, rotation: Double) {
@@ -493,9 +696,11 @@ private struct FocusHomeVerticalSolidQuickActionLayer<Content: View>: View {
     }
 }
 
-private struct FocusHomeFrozenAvatarSource {
+struct FocusHomeFrozenAvatarSource {
     let image: UIImage?
     let isTransparent: Bool
+
+    static let placeholder = FocusHomeFrozenAvatarSource(image: nil, isTransparent: true)
 
     @MainActor
     static func cached(for card: FocusCard) -> FocusHomeFrozenAvatarSource? {
@@ -523,8 +728,7 @@ private struct FocusHomeVerticalSolidCardSurface: View {
     let progress: CGFloat
     let reduceMotion: Bool
     let frozenAvatarSource: FocusHomeFrozenAvatarSource?
-
-    private let headlineAccent = Color(hex: "FF5A3D")
+    var allowsLiveAvatarFallback: Bool = true
 
     private var accent: Color {
         return card.themeColorHex.isEmpty ? card.color : Color(hex: card.themeColorHex)
@@ -544,7 +748,8 @@ private struct FocusHomeVerticalSolidCardSurface: View {
             let h = geo.size.height
             let p = visualProgress
             let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            let avatarSource = frozenAvatarSource ?? FocusHomeFrozenAvatarSource.live(for: card)
+            let avatarSource = frozenAvatarSource
+                ?? (allowsLiveAvatarFallback ? FocusHomeFrozenAvatarSource.live(for: card) : .placeholder)
 
             ZStack(alignment: .topLeading) {
                 shape
@@ -553,9 +758,6 @@ private struct FocusHomeVerticalSolidCardSurface: View {
                         shape
                             .strokeBorder(borderGradient, lineWidth: lerp(1, 1.25, p))
                     }
-
-                backgroundHeadlineLayer(width: w, progress: p)
-                    .zIndex(1)
 
                 bottomQuickActionGradient(height: h, progress: p)
                     .zIndex(2)
@@ -591,29 +793,12 @@ private struct FocusHomeVerticalSolidCardSurface: View {
         }
     }
 
-    private func backgroundHeadlineLayer(width: CGFloat, progress p: CGFloat) -> some View {
-        let headlineSize = WalletPetCardTheme.headlinePointSize(cardWidth: width, headlineCount: card.name.count)
-        let reveal = smooth(p, 0.02, 0.20)
-        return Text(card.name.uppercased())
-            .font(.system(size: headlineSize, weight: .black, design: .rounded))
-            .foregroundStyle(headlineAccent.opacity(0.85))
-            .lineLimit(1)
-            .minimumScaleFactor(0.22)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .scaleEffect(lerp(0.24, 1, reveal), anchor: .top)
-            .opacity(Double(smooth(p, 0.02, 0.16)))
-            .padding(.horizontal, 8)
-            .padding(.top, lerp(8, 34, p))
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .allowsHitTesting(false)
-    }
-
     private var cardGradient: LinearGradient {
         LinearGradient(
             colors: [
                 accent.mix(with: .white, by: lerp(0.10, 0.12, visualProgress)),
                 accent,
-                accent.mix(with: .black, by: lerp(0.30, 0.34, visualProgress))
+                accent.mix(with: .black, by: lerp(0.30, 0.34, visualProgress)),
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -625,7 +810,7 @@ private struct FocusHomeVerticalSolidCardSurface: View {
             colors: [
                 Color.goCardWhite.opacity(lerp(0.20, 0.28, visualProgress)),
                 accent.mix(with: .white, by: 0.12).opacity(lerp(0.42, 0.58, visualProgress)),
-                Color.arkInk.opacity(lerp(0.12, 0.18, visualProgress))
+                Color.arkInk.opacity(lerp(0.12, 0.18, visualProgress)),
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -715,8 +900,8 @@ private struct FocusHomeVerticalSolidCardSurface: View {
         .frame(width: sideWidth, height: height, alignment: .bottomTrailing)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         .opacity(Double(reveal))
-        .scaleEffect(lerp(0.96, 1, reveal), anchor: .trailing)
-        .offset(x: lerp(18, 0, reveal))
+        .scaleEffect(lerp(0.985, 1, reveal), anchor: .bottomTrailing)
+        .offset(y: lerp(8, 0, reveal))
         .allowsHitTesting(false)
     }
 
@@ -758,7 +943,8 @@ private struct FocusHomeVerticalSolidCardSurface: View {
                 .shadow(color: Color.arkInk.opacity(0.55), radius: 5, x: 0, y: 2) // ui-v4: allow readability shadow on image card text
 
             if let hint = card.personalityHint?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !hint.isEmpty {
+               !hint.isEmpty
+            {
                 Text(hint)
                     .font(.system(size: lerp(8.5, 10.5, p), weight: .bold, design: .rounded))
                     .foregroundStyle(cardSecondaryText(opacity: 0.82))
@@ -802,7 +988,8 @@ private struct FocusHomeVerticalSolidCardSurface: View {
 
     private var expandedAgeParts: (number: String, unit: String)? {
         guard let rawAge = card.ageText?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !rawAge.isEmpty else {
+              !rawAge.isEmpty
+        else {
             return nil
         }
         let numberPrefix = rawAge.prefix { character in
@@ -831,7 +1018,8 @@ private struct FocusHomeVerticalSolidCardSurface: View {
                 .shadow(color: Color.arkInk.opacity(0.55), radius: 5, x: 0, y: 2) // ui-v4: allow readability shadow on image card text
 
             if let hint = card.personalityHint?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !hint.isEmpty {
+               !hint.isEmpty
+            {
                 Text(hint)
                     .font(.system(size: lerp(8.5, 10.5, p), weight: .bold, design: .rounded))
                     .foregroundStyle(cardSecondaryText(opacity: 0.82))
@@ -886,7 +1074,7 @@ private struct FocusHomeVerticalSolidCardSurface: View {
             colors: [
                 Color.arkInk.opacity(0),
                 Color.arkInk.opacity(0.36 * Double(reveal)),
-                Color.arkInk.opacity(0.78 * Double(reveal))
+                Color.arkInk.opacity(0.78 * Double(reveal)),
             ],
             startPoint: .top,
             endPoint: .bottom

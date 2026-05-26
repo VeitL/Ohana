@@ -8,54 +8,6 @@
 import SwiftUI
 import SwiftData
 
-private struct OasisRewardPresentationModifier: ViewModifier {
-    @Binding var showingCoconutLog: Bool
-    @Binding var showCoconutRules: Bool
-    @Binding var showAchievements: Bool
-    @Binding var showInventory: Bool
-    @Binding var showCoconutShop: Bool
-    @Binding var showGacha: Bool
-    @Binding var showCheckInSheet: Bool
-    @Binding var showCritterCodex: Bool
-    let pets: [Pet]
-    let coconutShopInitialCategory: ShopItem.ShopCategory
-
-    func body(content: Content) -> some View {
-        content
-            .fullScreenCover(isPresented: $showingCoconutLog) { CoconutLogView() }
-            .sheet(isPresented: $showCoconutRules) {
-                CoconutRulesSheet()
-                    .ohanaSheetPagePresentation() // ui-v4: allow rules reference sheet
-            }
-            .sheet(isPresented: $showAchievements) {
-                if let pet = pets.first {
-                    AchievementWallView(pet: pet, allPets: pets)
-                        .ohanaSheetPagePresentation() // ui-v4: allow long achievement overview
-                }
-            }
-            .sheet(isPresented: $showInventory) {
-                InventoryView()
-                    .ohanaSheetPagePresentation() // ui-v4: allow long inventory overview
-            }
-            .sheet(isPresented: $showCoconutShop) {
-                CoconutShopView(initialCategory: coconutShopInitialCategory)
-                    .ohanaSheetPagePresentation() // ui-v4: allow long shop overview
-            }
-            .sheet(isPresented: $showGacha) {
-                GachaView()
-                    .ohanaSheetPagePresentation() // ui-v4: allow long blind-box overview
-            }
-            .sheet(isPresented: $showCheckInSheet) {
-                DailyStreakDetailView(pets: pets, onClose: { showCheckInSheet = false })
-                    .ohanaSheetPagePresentation() // ui-v4: allow long streak overview
-            }
-            .sheet(isPresented: $showCritterCodex) {
-                OasisCritterCodexView(mode: .codex)
-                    .ohanaSheetPagePresentation() // ui-v4: allow long critter codex overview
-            }
-    }
-}
-
 private struct OasisRewardRuntimeModifier: ViewModifier {
     let shouldRunAmbientMotion: Bool
     let currentActiveHumanId: String
@@ -72,10 +24,10 @@ private struct OasisRewardRuntimeModifier: ViewModifier {
     let isEmbeddedVisible: Bool
     let isEmbeddedActive: Bool
     let makeupConfirmationTitle: String
+    let makeupConfirmationConfirmTitle: String
+    let makeupConfirmationCancelTitle: String
     let makeupConfirmationBinding: Binding<Bool>
-    @Binding var showMakeupConfirm: String?
-    @Binding var showCoconutRules: Bool
-    @Binding var showInventory: Bool
+    @Binding var confirmationRoute: OasisConfirmationRoute?
     let onAppearAction: () -> Void
     let onDisappearAction: () -> Void
     let onAmbientMotionChanged: (Bool) -> Void
@@ -88,6 +40,7 @@ private struct OasisRewardRuntimeModifier: ViewModifier {
     let onEmbeddedVisibleChanged: (Bool) -> Void
     let onEmbeddedActiveChanged: (Bool) -> Void
     let onApplyMakeup: (String) -> Void
+    let onOpenSheet: (OasisSheetRoute) -> Void
 
     func body(content: Content) -> some View {
         content
@@ -106,8 +59,8 @@ private struct OasisRewardRuntimeModifier: ViewModifier {
             .onChange(of: electronicPetsCount) { _, _ in onRefreshFeaturedCritterLifecycle() }
             .onChange(of: critterFragmentsCount) { _, _ in onRefreshRenderSnapshots() }
             .onChange(of: activeHumanCoconutBalance) { _, _ in onRefreshRenderSnapshots() }
-            .onChange(of: rulesTrigger) { _, _ in showCoconutRules = true }
-            .onChange(of: inventoryTrigger) { _, _ in showInventory = true }
+            .onChange(of: rulesTrigger) { _, _ in onOpenSheet(.coconutRules) }
+            .onChange(of: inventoryTrigger) { _, _ in onOpenSheet(.inventory) }
             .onChange(of: injectEnergyTrigger) { _, _ in onInjectTreeEnergy() }
             .onChange(of: isEmbeddedPrepared) { _, isPrepared in onEmbeddedPreparedChanged(isPrepared) }
             .onChange(of: isEmbeddedVisible) { _, isVisible in onEmbeddedVisibleChanged(isVisible) }
@@ -117,8 +70,10 @@ private struct OasisRewardRuntimeModifier: ViewModifier {
     private var makeupConfirmationModifier: some ViewModifier {
         OasisRewardMakeupConfirmationModifier(
             makeupConfirmationTitle: makeupConfirmationTitle,
+            confirmTitle: makeupConfirmationConfirmTitle,
+            cancelTitle: makeupConfirmationCancelTitle,
             makeupConfirmationBinding: makeupConfirmationBinding,
-            showMakeupConfirm: $showMakeupConfirm,
+            confirmationRoute: $confirmationRoute,
             onApplyMakeup: onApplyMakeup
         )
     }
@@ -126,8 +81,10 @@ private struct OasisRewardRuntimeModifier: ViewModifier {
 
 private struct OasisRewardMakeupConfirmationModifier: ViewModifier {
     let makeupConfirmationTitle: String
+    let confirmTitle: String
+    let cancelTitle: String
     let makeupConfirmationBinding: Binding<Bool>
-    @Binding var showMakeupConfirm: String?
+    @Binding var confirmationRoute: OasisConfirmationRoute?
     let onApplyMakeup: (String) -> Void
 
     func body(content: Content) -> some View {
@@ -137,14 +94,14 @@ private struct OasisRewardMakeupConfirmationModifier: ViewModifier {
                 isPresented: makeupConfirmationBinding,
                 titleVisibility: .visible
             ) {
-                Button("消耗1个补签包确认补签") {
-                    if let date = showMakeupConfirm {
+                Button(confirmTitle) {
+                    if let date = confirmationRoute?.makeupDate {
                         onApplyMakeup(date)
                     }
-                    showMakeupConfirm = nil
+                    confirmationRoute = nil
                 }
-                Button("取消", role: .cancel) {
-                    showMakeupConfirm = nil
+                Button(cancelTitle, role: .cancel) {
+                    confirmationRoute = nil
                 }
             }
     }
@@ -175,23 +132,16 @@ struct OasisRewardView: View {
 
     @State private var treeScale: CGFloat   = 1.0
     @State private var treeGlow: CGFloat    = 0.4
-    @State private var showAchievements     = false
-    @State private var showingCoconutLog    = false
-    @State private var showCoconutShop      = false
-    @State private var coconutShopInitialCategory: ShopItem.ShopCategory = .effect
-    @State private var showGacha            = false
-    @State private var showInventory        = false
-    @State private var showCoconutRules     = false
-    @State private var showCheckInCalendar  = false
-    @State private var showCheckInSheet     = false
+    @State private var activeSheetRoute: OasisSheetRoute?
+    @State private var activeFullScreenRoute: OasisFullScreenRoute?
+    @State private var activeOverlayRoute: OasisOverlayRoute?
+    @State private var confirmationRoute: OasisConfirmationRoute?
     @State private var showCritterNest      = false
     @State private var critterNestPopupProgress: CGFloat = 0
-    @State private var showCritterCodex     = false
     @State private var energyParticles: [EnergyParticle] = []
     // 模块六：打卡日历
     @State private var checkedInDates: Set<String> = []   // "yyyy-MM-dd" 格式
     @State private var makeupPackCount: Int = 0            // 补签包数量
-    @State private var showMakeupConfirm: String? = nil    // 待确认补签的日期
     @State private var makeupDates: Set<String> = []       // 补签过的日期集合
     @State private var lastClaimedMilestone: Int = 0
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
@@ -204,12 +154,12 @@ struct OasisRewardView: View {
     private var matAccent:  Color { Color(hex: "FF5A00") }
     @State private var lastLevel: TreeLevel = .lv1
     @State private var isInjecting: Bool = false
+    @State private var treeInjectionScale: CGFloat = 1.0
     @State private var injectionPulseToken = 0
     @State private var levelUpPulse         = false
     @State private var levelUpBadgeVisible  = false
     @State private var harvestBubbleBounce  = false
     @State private var justHarvested        = false
-    @State private var openedUpgradeReward: OasisOpenedUpgradeReward?
     @State private var openingUpgradeCoconutId: UUID?
     @State private var critterActionPulseId: UUID?
     @State private var lastCritterInteractionOutcome: OasisCritterInteractionOutcome?
@@ -250,6 +200,26 @@ struct OasisRewardView: View {
     private var l: L10n { L10n(appLanguage) }
     private var commandExecutor: OasisRewardCommandExecutor {
         OasisRewardCommandExecutor(context: modelContext)
+    }
+
+    private var openedUpgradeReward: OasisOpenedUpgradeReward? {
+        activeOverlayRoute?.upgradeReward
+    }
+
+    private func openSheet(_ route: OasisSheetRoute) {
+        activeSheetRoute = route
+    }
+
+    private func openFullScreen(_ route: OasisFullScreenRoute) {
+        activeFullScreenRoute = route
+    }
+
+    private func presentUpgradeReward(_ reward: OasisOpenedUpgradeReward) {
+        activeOverlayRoute = .upgradeReward(reward: reward)
+    }
+
+    private func dismissUpgradeReward() {
+        activeOverlayRoute = nil
     }
 
     private var treeVisualTotalEnergy: Int {
@@ -303,6 +273,12 @@ struct OasisRewardView: View {
         workloadPolicy.shouldAnimate(isVisible: isVisible && isVisibleStatePrepared)
     }
 
+    private var interactionMotionBudget: OhanaMotionBudget {
+        workloadPolicy.interactionMotionBudget(
+            isVisible: (isVisible || shouldTreatEmbeddedAsVisible) && isOasisPrepared
+        )
+    }
+
     private var isOasisPrepared: Bool {
         isEmbeddedPrepared || isEmbeddedVisible || isEmbeddedActive
     }
@@ -312,15 +288,29 @@ struct OasisRewardView: View {
     }
 
     private var makeupConfirmationTitle: String {
-        showMakeupConfirm.map { "补签 \($0)？" } ?? ""
+        confirmationRoute?.makeupDate.map {
+            l.tr(zh: "补签 \($0)？", en: "Make up \($0)?", de: "\($0) nachtragen?")
+        } ?? ""
+    }
+
+    private var makeupConfirmationConfirmTitle: String {
+        l.tr(
+            zh: "消耗 1 个补签包确认补签",
+            en: "Use 1 makeup pack",
+            de: "1 Nachtragspaket nutzen"
+        )
+    }
+
+    private var makeupConfirmationCancelTitle: String {
+        l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")
     }
 
     private var makeupConfirmationBinding: Binding<Bool> {
         Binding(
-            get: { showMakeupConfirm != nil },
+            get: { confirmationRoute != nil },
             set: { newValue in
                 if !newValue {
-                    showMakeupConfirm = nil
+                    confirmationRoute = nil
                 }
             }
         )
@@ -383,10 +373,10 @@ struct OasisRewardView: View {
                         isEmbeddedVisible: isEmbeddedVisible,
                         isEmbeddedActive: isEmbeddedActive,
                         makeupConfirmationTitle: makeupConfirmationTitle,
+                        makeupConfirmationConfirmTitle: makeupConfirmationConfirmTitle,
+                        makeupConfirmationCancelTitle: makeupConfirmationCancelTitle,
                         makeupConfirmationBinding: makeupConfirmationBinding,
-                        showMakeupConfirm: $showMakeupConfirm,
-                        showCoconutRules: $showCoconutRules,
-                        showInventory: $showInventory,
+                        confirmationRoute: $confirmationRoute,
                         onAppearAction: handleOasisAppear,
                         onDisappearAction: deactivateVisibleWork,
                         onAmbientMotionChanged: handleAmbientMotionChanged,
@@ -398,7 +388,8 @@ struct OasisRewardView: View {
                         onEmbeddedPreparedChanged: handleEmbeddedPreparedChanged,
                         onEmbeddedVisibleChanged: handleEmbeddedVisibleChanged,
                         onEmbeddedActiveChanged: handleEmbeddedActiveChanged,
-                        onApplyMakeup: applyMakeup
+                        onApplyMakeup: applyMakeup,
+                        onOpenSheet: openSheet
                     )
                 )
         )
@@ -409,16 +400,9 @@ struct OasisRewardView: View {
             oasisRootContent
                 .modifier(
                     OasisRewardPresentationModifier(
-                        showingCoconutLog: $showingCoconutLog,
-                        showCoconutRules: $showCoconutRules,
-                        showAchievements: $showAchievements,
-                        showInventory: $showInventory,
-                        showCoconutShop: $showCoconutShop,
-                        showGacha: $showGacha,
-                        showCheckInSheet: $showCheckInSheet,
-                        showCritterCodex: $showCritterCodex,
-                        pets: pets,
-                        coconutShopInitialCategory: coconutShopInitialCategory
+                        sheetRoute: $activeSheetRoute,
+                        fullScreenRoute: $activeFullScreenRoute,
+                        pets: pets
                     )
                 )
         )
@@ -446,8 +430,9 @@ struct OasisRewardView: View {
 
     private var energyParticleLayer: some View {
         ForEach(energyParticles) { p in
-            Text("✨")
-                .font(.system(size: 22))
+            Image(systemName: "sparkles")
+                .font(.system(size: 18, weight: .black))
+                .foregroundStyle(Color.goPrimary)
                 .offset(x: p.offsetX, y: p.offsetY)
                 .opacity(p.opacity)
                 .allowsHitTesting(false)
@@ -581,6 +566,8 @@ struct OasisRewardView: View {
         isVisibleStatePrepared = false
         treeVisualEnergyOverride = nil
         coconutBalanceVisualOverride = nil
+        isInjecting = false
+        treeInjectionScale = 1.0
         preparedWorkTask?.cancel()
         preparedWorkTask = nil
         visibleWorkTask?.cancel()
@@ -705,7 +692,10 @@ struct OasisRewardView: View {
             electronicPets: electronicPets,
             activeCoconutBalance: nextActionSnapshot.activeCoconutBalance
         )
-        critterRenderSnapshots = commandExecutor.makeCritterSnapshots(electronicPets: electronicPets)
+        critterRenderSnapshots = commandExecutor.makeCritterSnapshots(
+            electronicPets: electronicPets,
+            fragments: critterFragments
+        )
     }
 
     private func refreshTreeHarvestSnapshot() {
@@ -753,29 +743,29 @@ struct OasisRewardView: View {
             oasisToolbarButton(systemName: "xmark") {
                 dismiss()
             }
-            .accessibilityLabel("关闭")
+            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
 
             Spacer()
 
             oasisToolbarButton(systemName: "info.circle") {
-                showCoconutRules = true
+                openSheet(.coconutRules)
             }
-            .accessibilityLabel("椰子规则")
+            .accessibilityLabel(l.tr(zh: "椰子规则", en: "Coconut rules", de: "Kokosnuss-Regeln"))
             oasisToolbarButton(systemName: "shippingbox.fill") {
-                showInventory = true
+                openSheet(.inventory)
             }
-            .accessibilityLabel("库存")
+            .accessibilityLabel(l.tr(zh: "库存", en: "Inventory", de: "Inventar"))
         }
     }
 
     private var oasisHeader: some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("OASIS · 绿洲")
+                Text(l.tr(zh: "OASIS · 绿洲", en: "OASIS", de: "OASE"))
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .kerning(1.2)
                     .foregroundStyle(Color.ohanaSecondaryText)
-                Text("生命之树")
+                Text(l.tr(zh: "生命之树", en: "Life Tree", de: "Lebensbaum"))
                     .font(.system(size: 28, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
@@ -790,10 +780,14 @@ struct OasisRewardView: View {
             showsDeltaAnimation: true,
             deltaAnimationContext: "oasis-\(currentActiveHumanId.isEmpty ? "global" : currentActiveHumanId)"
         ) {
-            showingCoconutLog = true
+            openFullScreen(.coconutLog)
         }
-        .accessibilityLabel("椰子资产 \(activeHumanCoconutBalance)")
-        .accessibilityHint("打开椰子历史")
+        .accessibilityLabel(l.tr(
+            zh: "椰子资产 \(activeHumanCoconutBalance)",
+            en: "Coconut balance \(activeHumanCoconutBalance)",
+            de: "Kokosnuss-Guthaben \(activeHumanCoconutBalance)"
+        ))
+        .accessibilityHint(l.tr(zh: "打开椰子历史", en: "Open coconut history", de: "Kokosnuss-Verlauf öffnen"))
     }
 
     // MARK: - Life Tree Stage
@@ -838,9 +832,10 @@ struct OasisRewardView: View {
                         onHarvest: { harvestTreeCoconut($0) }
                     )
                     .shadow(color: Color.goPrimary.opacity(glowBreathing ? 0.42 : 0.16), radius: glowBreathing ? 22 : 10, x: 0, y: 0) // ui-v4: allow Oasis tree focus glow
-                    .scaleEffect(levelUpPulse ? 1.18 : treeScale)
+                    .scaleEffect((levelUpPulse ? 1.18 : treeScale) * treeInjectionScale)
                     .animation(GoMotion.fab, value: levelUpPulse)
                     .animation(GoMotion.hero, value: treeScale)
+                    .animation(GoMotion.stateChange, value: treeInjectionScale)
                     .frame(height: 300)
                     .padding(.bottom, 16)
 
@@ -870,7 +865,15 @@ struct OasisRewardView: View {
             }
 
             if let reward = openedUpgradeReward {
-                stageOpenedRewardCard(reward)
+                OasisStageOpenedRewardCard(
+                    reward: reward,
+                    localization: l,
+                    onClose: {
+                        withAnimation(GoMotion.feedback) {
+                            dismissUpgradeReward()
+                        }
+                    }
+                )
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                     .padding(.horizontal, 22)
                     .transition(.scale(scale: 0.94).combined(with: .opacity))
@@ -1018,7 +1021,10 @@ struct OasisRewardView: View {
                 .blur(radius: isInjecting ? 5 : 10)
                 .opacity(isInjecting ? 0.9 : 0)
                 .offset(y: isInjecting ? -138 : -18)
-                .animation(GoMotion.quick, value: injectionPulseToken)
+                .animation(
+                    interactionMotionBudget.allowsMotion ? GoMotion.stateChange : GoMotion.reduced,
+                    value: isInjecting
+                )
         }
         .allowsHitTesting(false)
     }
@@ -1161,7 +1167,7 @@ struct OasisRewardView: View {
         HStack(spacing: 10) {
             if let reward = openedUpgradeReward {
                 HStack(spacing: 6) {
-                    Text(reward.emoji)
+                    OasisRewardKindIcon(reward: reward, size: 13)
                     Text(reward.title(l))
                         .lineLimit(1)
                 }
@@ -1303,64 +1309,6 @@ struct OasisRewardView: View {
         .onAppear { updateHarvestBubbleMotion() }
     }
 
-    @ViewBuilder
-    private func stageOpenedRewardCard(_ reward: OasisOpenedUpgradeReward) -> some View {
-        if reward.isMilestoneCritter,
-           let catalogId = reward.critterCatalogId,
-           let entry = OasisUpgradeRewardCatalog.critter(id: catalogId) {
-            OasisCritterUnlockRewardCard(
-                catalogId: catalogId,
-                newLabel: l.tr(zh: "新伙伴", en: "NEW", de: "NEU"),
-                rarityText: l.tr(zh: entry.rarity.zh, en: entry.rarity.en, de: entry.rarity.de),
-                title: entry.name(l),
-                detail: reward.detail(l),
-                confirmTitle: l.tr(zh: "收下", en: "Keep", de: "Behalten"),
-                accent: critterRarityColor(entry.rarity),
-                onClose: {
-                    withAnimation(GoMotion.feedback) {
-                        openedUpgradeReward = nil
-                    }
-                }
-            )
-        } else {
-            HStack(spacing: 12) {
-                Text(reward.emoji)
-                    .font(.system(size: 34))
-                    .frame(width: 54, height: 54)
-                    .background(Color.goYellow.opacity(0.18), in: Circle())
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(reward.title(l))
-                        .font(OhanaFont.callout(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(1)
-                    Text(reward.detail(l))
-                        .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .lineLimit(2)
-                }
-                Spacer(minLength: 0)
-                Button {
-                    withAnimation(GoMotion.feedback) {
-                        openedUpgradeReward = nil
-                    }
-                } label: {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 13, weight: .black))
-                        .foregroundStyle(Color.ohanaPrimaryActionText)
-                        .frame(width: 38, height: 38)
-                        .background(Color.goPrimary, in: Circle())
-                }
-                .buttonStyle(ScaleButtonStyle())
-            }
-            .padding(12)
-            .background(Color.ohanaCardSurface.opacity(0.94), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(Color.goPrimary.opacity(0.12), lineWidth: 1)
-            )
-        }
-    }
-
     private var stageLevelUpBadge: some View {
         HStack(spacing: 6) {
             Image(systemName: "sparkles")
@@ -1398,13 +1346,17 @@ struct OasisRewardView: View {
     private func harvestTreeCoconut(_ idx: Int) {
         guard !harvestedCoconutIndices.contains(idx) else { return }
         OhanaFeedback.medium()
+        withAnimation(GoMotion.feedback) {
+            _ = harvestedCoconutIndices.insert(idx)
+        }
+        applyCoconutBalanceVisualDelta(1)
         treeHarvestBuffer.pendingCount += 1
         treeHarvestBuffer.commitTask?.cancel()
         treeHarvestBuffer.commitTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 760) {
             let amount = treeHarvestBuffer.pendingCount
             treeHarvestBuffer.pendingCount = 0
             commandExecutor.awardHarvestedTreeCoconuts(amount)
-            rebuildOasisRenderSnapshots()
+            reconcileCoconutBalanceAfterCommand()
             treeHarvestBuffer.commitTask = nil
         }
     }
@@ -1418,21 +1370,43 @@ struct OasisRewardView: View {
             justHarvested = true
             canHarvestTreeToday = false
         }
-        spawnEnergyParticles(count: 10)
+        applyCoconutBalanceVisualDelta(amount)
         flyCoconut = false
-        flyOpacity = 1
-        withAnimation(GoMotion.fab.delay(0.05)) {
-            flyCoconut = true
-        }
-        withAnimation(GoMotion.quick.delay(0.6)) {
-            flyOpacity = 0
-        }
+        flyOpacity = 0
         treeCommandTask?.cancel()
         treeCommandTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 80) {
             if commandExecutor.harvestDailyTreeCoconuts(treeManager: treeMgr) {
+                reconcileCoconutBalanceAfterCommand()
+            } else {
+                OhanaFeedback.error()
+                withAnimation(GoMotion.feedback) {
+                    justHarvested = false
+                    canHarvestTreeToday = true
+                    coconutBalanceVisualOverride = nil
+                }
                 rebuildOasisRenderSnapshots()
             }
             treeCommandTask = nil
+        }
+    }
+
+    private func applyCoconutBalanceVisualDelta(_ amount: Int) {
+        guard amount != 0 else { return }
+        let targetBalance = max(0, activeHumanCoconutBalance + amount)
+        withAnimation(GoMotion.feedback) {
+            coconutBalanceVisualOverride = targetBalance
+            actionSnapshot.activeCoconutBalance = targetBalance
+            actionSnapshot.canInjectCoconuts = targetBalance >= 10
+            bentoSnapshot.shopMetric = "\(targetBalance)"
+        }
+    }
+
+    private func reconcileCoconutBalanceAfterCommand() {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            rebuildOasisRenderSnapshots()
+            coconutBalanceVisualOverride = nil
         }
     }
 
@@ -1459,6 +1433,11 @@ struct OasisRewardView: View {
         }
         guard !isInjecting else { return }
 
+        let motionBudget = interactionMotionBudget
+        let visualAnimation = motionBudget.allowsMotion ? GoMotion.stateChange : GoMotion.reduced
+        let commandDelay: UInt64 = motionBudget.usesFullMotion ? 420 : 140
+        let resetDelay: UInt64 = motionBudget.usesFullMotion ? 560 : 180
+        let pulseScale: CGFloat = motionBudget.usesFullMotion ? 1.055 : 1.015
         let beforeLevel = treeVisualLevel
         let beforeBalance = activeHumanCoconutBalance
         let targetBalance = max(0, beforeBalance - 10)
@@ -1471,18 +1450,18 @@ struct OasisRewardView: View {
             coconutBalanceVisualOverride = targetBalance
             actionSnapshot.activeCoconutBalance = targetBalance
             actionSnapshot.canInjectCoconuts = targetBalance >= 10
-            bentoSnapshot.shopMetric = "🥥 \(targetBalance)"
+            bentoSnapshot.shopMetric = "\(targetBalance)"
         }
         withAnimation(GoMotion.hero) {
             treeVisualEnergyOverride = targetEnergy
         }
-        withAnimation(GoMotion.tap) {
+        withAnimation(visualAnimation) {
             isInjecting = true
+            treeInjectionScale = pulseScale
         }
-        spawnEnergyParticles(count: 8)
 
         treeCommandTask?.cancel()
-        treeCommandTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 80) {
+        treeCommandTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: commandDelay) {
             let didInject = commandExecutor.injectTreeEnergy(treeManager: treeMgr)
             if didInject {
                 if targetLevel != beforeLevel, treeVisualLevel == beforeLevel {
@@ -1496,27 +1475,29 @@ struct OasisRewardView: View {
                     coconutBalanceVisualOverride = nil
                 }
             } else {
-                withAnimation(GoMotion.hero) {
+                injectionResetTask?.cancel()
+                injectionResetTask = nil
+                withAnimation(visualAnimation) {
+                    isInjecting = false
+                    treeInjectionScale = 1.0
                     treeVisualEnergyOverride = nil
                     coconutBalanceVisualOverride = nil
-                    rebuildOasisRenderSnapshots()
                 }
-                withAnimation(GoMotion.tap) {
-                    isInjecting = false
-                }
+                rebuildOasisRenderSnapshots()
                 OhanaFeedback.error()
             }
             treeCommandTask = nil
         }
 
         injectionResetTask?.cancel()
-        injectionResetTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 220) {
+        injectionResetTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: resetDelay) {
             guard injectionPulseToken == pulseToken else {
                 injectionResetTask = nil
                 return
             }
-            withAnimation(GoMotion.tap) {
+            withAnimation(visualAnimation) {
                 isInjecting = false
+                treeInjectionScale = 1.0
             }
             injectionResetTask = nil
         }
@@ -1550,7 +1531,7 @@ struct OasisRewardView: View {
                                 critterQuickMetric(icon: "fork.knife", value: "\(critter.hunger)")
                                 critterQuickMetric(icon: "face.smiling", value: "\(critter.mood)")
                                 critterQuickMetric(icon: "cross.case.fill", value: "\(critter.health)")
-                                critterQuickMetric(icon: "heart.fill", value: "B\(OasisUpgradeRewardService.bondLevel(for: critter))")
+                                critterQuickMetric(icon: "heart.fill", value: "B\(critterRenderSnapshot(for: critter).bondLevel)")
                                 critterQuickMetric(icon: "star.fill", value: "\(critter.starLevel)")
                             }
                         }
@@ -1643,7 +1624,7 @@ struct OasisRewardView: View {
         .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .onTapGesture {
             OhanaFeedback.light()
-            showCritterCodex = true
+            openSheet(.critterCodex)
         }
         .accessibilityLabel(l.tr(zh: "电子宠物图鉴", en: "Critter Codex", de: "Critter-Album"))
     }
@@ -1749,7 +1730,7 @@ struct OasisRewardView: View {
                     .font(.system(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
-                Text(OasisUpgradeRewardService.gentlePrompt(for: critter, snapshot: snapshot, l: l))
+                Text(l.text(critterRenderSnapshot(for: critter).prompt))
                     .font(.system(size: 10, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(2)
@@ -1887,7 +1868,15 @@ struct OasisRewardView: View {
     private var oasisUpgradeRewardDock: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let reward = openedUpgradeReward {
-                openedUpgradeRewardCard(reward)
+                OasisOpenedUpgradeRewardDockCard(
+                    reward: reward,
+                    localization: l,
+                    onClose: {
+                        withAnimation(GoMotion.feedback) {
+                            dismissUpgradeReward()
+                        }
+                    }
+                )
                     .transition(.scale(scale: 0.96).combined(with: .opacity))
             }
 
@@ -1971,42 +1960,6 @@ struct OasisRewardView: View {
         .accessibilityLabel("\(coconut.title(l)) \(l.tr(zh: "敲开", en: "Open", de: "Öffnen"))")
     }
 
-    private func openedUpgradeRewardCard(_ reward: OasisOpenedUpgradeReward) -> some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(reward.isMilestoneCritter ? Color.goPrimary.opacity(0.22) : Color.goYellow.opacity(0.18))
-                    .frame(width: 56, height: 56)
-                Text(reward.emoji)
-                    .font(.system(size: 30))
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                Text(reward.title(l))
-                    .font(.system(size: 17, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(reward.detail(l))
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(2)
-            }
-            Spacer()
-            Button {
-                withAnimation(GoMotion.feedback) {
-                    openedUpgradeReward = nil
-                }
-            } label: {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 13, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryActionText)
-                    .frame(width: 38, height: 38)
-                    .background(Color.goPrimary, in: Circle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-        }
-        .padding(12)
-        .background(Color.goPrimary.opacity(reward.isMilestoneCritter ? 0.16 : 0.08), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-    }
-
     private var critterCompanionStrip: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
@@ -2061,7 +2014,7 @@ struct OasisRewardView: View {
                     critterMeter(value: critter.hunger, icon: "fork.knife")
                     critterMeter(value: critter.mood, icon: "face.smiling")
                     critterMeter(value: critter.health, icon: "cross.case.fill")
-                    critterMeter(value: OasisUpgradeRewardService.bondProgress(for: critter), icon: "heart.fill")
+                    critterMeter(value: snapshot.bondProgress, icon: "heart.fill")
                 }
                 Text(lifecycle.state.name(l))
                     .font(.system(size: 10, weight: .black, design: .rounded))
@@ -2138,7 +2091,7 @@ struct OasisRewardView: View {
         openingUpgradeCoconutId = coconut.id
         OhanaFeedback.medium()
         withAnimation(GoMotion.feedback) {
-            openedUpgradeReward = nil
+            dismissUpgradeReward()
         }
         upgradeRewardTask?.cancel()
         upgradeRewardTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 220) {
@@ -2146,7 +2099,7 @@ struct OasisRewardView: View {
                 let result = try commandExecutor.openUpgradeCoconut(coconut)
                 result.isMilestoneCritter ? OhanaFeedback.success() : OhanaFeedback.warning()
                 withAnimation(GoMotion.fab) {
-                    openedUpgradeReward = result
+                    presentUpgradeReward(result)
                     openingUpgradeCoconutId = nil
                 }
                 if result.isMilestoneCritter {
@@ -2296,77 +2249,14 @@ struct OasisRewardView: View {
     // MARK: - Progress Card
 
     private var progressCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            // Title row
-            HStack {
-                Text("成长进度")
-                    .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Spacer()
-                Text("能量 \(treeVisualTotalEnergy) · 下一级 \(treeVisualNextLevelThreshold)")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
-
-            // Progress bar
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.ohanaControlFill)
-                        .frame(height: 8)
-                    Capsule()
-                        .fill(LinearGradient(
-                            colors: [Color.goPrimary, Color.goTeal],
-                            startPoint: .leading, endPoint: .trailing
-                        ))
-                        .frame(width: geo.size.width * treeVisualProgressToNextLevel, height: 8)
-                        .shadow(color: Color.goPrimary.opacity(0.5), radius: 6, x: 0, y: 0) // ui-v4: allow Oasis progress shine
-                        .animation(GoMotion.page, value: treeVisualProgressToNextLevel)
-                }
-            }
-            .frame(height: 8)
-
-            // Stats row
-            HStack(spacing: 0) {
-                progressStatCell(
-                    value: treePassiveIncomeAmount > 0
-                        ? "+\(treePassiveIncomeAmount)🥥/日"
-                        : "Lv.5 解锁",
-                    label: "被动收入",
-                    color: treePassiveIncomeAmount > 0
-                        ? Color.goPrimary
-                        : Color.ohanaSecondaryText.opacity(0.6)
-                )
-                progressStatCell(
-                    value: "\(humans.count + pets.count)成员",
-                    label: "家庭贡献",
-                    color: Color(hex: "5B6AFF")
-                )
-                progressStatCell(
-                    value: "\(treeVisualTotalEnergy)",
-                    label: "岛屿能量",
-                    color: Color(hex: "A855F7")
-                )
-            }
-        }
-        .padding(18)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
+        OasisProgressCard(
+            totalEnergy: treeVisualTotalEnergy,
+            nextLevelThreshold: treeVisualNextLevelThreshold,
+            progressToNextLevel: CGFloat(treeVisualProgressToNextLevel),
+            passiveIncomeAmount: treePassiveIncomeAmount,
+            memberCount: humans.count + pets.count,
+            localization: l
         )
-    }
-
-    private func progressStatCell(value: String, label: String, color: Color) -> some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(color)
-            Text(label)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-        }
-        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Inject Energy Button
@@ -2377,8 +2267,8 @@ struct OasisRewardView: View {
             injectTreeEnergy()
         } label: {
             HStack(spacing: 8) {
-                Text("⚡")
-                Text("注入能量")
+                Image(systemName: "bolt.fill")
+                Text(l.tr(zh: "注入能量", en: "Inject energy", de: "Energie geben"))
                     .font(.system(size: 16, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                 Text("(-10🥥)")
@@ -2402,75 +2292,8 @@ struct OasisRewardView: View {
 
     // MARK: - Milestone Card
 
-    /// Passive income per day for each TreeLevel (lv1–lv10)
-    private func passiveIncomeForLevel(_ lv: TreeLevel) -> Int {
-        switch lv {
-        case .lv1:  return 1
-        case .lv2:  return 2
-        case .lv3:  return 3
-        case .lv4:  return 5
-        case .lv5:  return 7
-        case .lv6:  return 10
-        case .lv7:  return 14
-        case .lv8:  return 18
-        case .lv9:  return 24
-        case .lv10: return 30
-        }
-    }
-
     private var milestoneCard: some View {
-        let currentLv = treeVisualLevel.rawValue
-        let isMaxLevel = currentLv >= 10
-        let nextLv = min(currentLv + 1, 10)
-        let nextLevel = TreeLevel(rawValue: nextLv) ?? .lv10
-
-        return Button {
-            // No-op tap (informational)
-        } label: {
-            HStack(spacing: 14) {
-                // Icon square
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.goPrimary.opacity(0.15))
-                        .frame(width: 48, height: 48)
-                    Text("🏆")
-                        .font(.system(size: 22))
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    if isMaxLevel {
-                        Text("已达最高境界")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                        Text("生命之树已至巅峰，繁荣永续")
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                    } else {
-                        Text("Lv.\(nextLv) · \(nextLevel.displayName)")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                        Text("解锁被动收益 +\(passiveIncomeForLevel(nextLevel))🥥/日")
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundStyle(Color.goPrimary.opacity(0.8))
-                    }
-                }
-
-                Spacer()
-
-                if !isMaxLevel {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                }
-            }
-            .padding(16)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
-            )
-        }
-        .buttonStyle(ScaleButtonStyle())
+        OasisMilestoneCard(treeLevel: treeVisualLevel, localization: l)
     }
 
     // MARK: - 模块六：打卡日历（完整月视图）
@@ -2478,305 +2301,24 @@ struct OasisRewardView: View {
     @State private var calendarDisplayMonth: Date = Date()
 
     private var checkInCalendarCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // ── 标题 + 连胜
-            HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "calendar.badge.checkmark")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Color.goPrimary)
-                    Text("打卡日历")
-                        .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                }
-                Spacer()
-                HStack(spacing: 4) {
-                    Text("🔥")
-                    Text("\(currentStreak) 天连胜")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.goYellow)
-                }
-                .padding(.horizontal, 10).padding(.vertical, 5)
-                .background(Color.goYellow.opacity(0.12), in: Capsule())
-            }
-
-            // ── 统计面板
-            checkInStatsRow
-
-            OhanaDashedDivider(color: .white.opacity(0.1))
-
-            // ── 月份导航
-            HStack {
-                Button {
-                    withAnimation(GoMotion.quick) {
-                        calendarDisplayMonth = Calendar.current.date(byAdding: .month, value: -1, to: calendarDisplayMonth) ?? calendarDisplayMonth
-                    }
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
-                }
-                Spacer()
-                Text(monthYearString(calendarDisplayMonth))
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Spacer()
-                Button {
-                    let next = Calendar.current.date(byAdding: .month, value: 1, to: calendarDisplayMonth) ?? calendarDisplayMonth
-                    if next <= Date() {
-                        withAnimation(GoMotion.quick) { calendarDisplayMonth = next }
-                    }
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(
-                            Calendar.current.isDate(calendarDisplayMonth, equalTo: Date(), toGranularity: .month)
-                                ? Color.primary.opacity(0.15) : Color.primary.opacity(0.5)
-                        )
-                }
-                .disabled(Calendar.current.isDate(calendarDisplayMonth, equalTo: Date(), toGranularity: .month))
-            }
-            .padding(.horizontal, 4)
-
-            // ── 星期标题行
-            HStack(spacing: 0) {
-                ForEach(["日","一","二","三","四","五","六"], id: \.self) { d in
-                    Text(d)
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
-                        .frame(maxWidth: .infinity)
-                }
-            }
-
-            // ── 月视图网格（按星期正确对齐）
-            let cells = monthCalendarCells(for: calendarDisplayMonth)
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 4) {
-                ForEach(Array(cells.enumerated()), id: \.offset) { _, cell in
-                    calendarDayCell(cell)
-                }
-            }
-
-            OhanaDashedDivider(color: .white.opacity(0.1))
-
-            // ── 补签包区域
-            HStack(spacing: 12) {
-                HStack(spacing: 4) {
-                    Text("📦").font(.system(size: 14))
-                    Text("补签包")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
-                    Text("×\(makeupPackCount)")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(makeupPackCount > 0 ? Color.goPrimary : .white.opacity(0.3))
-                }
-                Spacer()
-                if makeupPackCount > 0 {
-                    Text("点击灰色日期补签")
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.goPrimary.opacity(0.6))
-                } else {
-                    Button {
-                        coconutShopInitialCategory = .boost
-                        showCoconutShop = true
-                    } label: {
-                        Text("去商店购买 →")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.goYellow.opacity(0.8))
-                    }
-                }
-            }
-
-            // ── 里程碑奖励提示
-            if currentStreak > 0 {
-                checkInMilestoneRow
-            }
-        }
-        .padding(16)
-        .background {
-            ZStack {
-                Color.goDeepNavy
-                Color.goPrimary.opacity(0.1)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        }
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
-            .strokeBorder(Color.goPrimary.opacity(0.15), lineWidth: 1))
-    }
-
-    // MARK: - 统计面板
-    private var checkInStatsRow: some View {
-        HStack(spacing: 0) {
-            checkInStatCell(value: "\(checkedInDates.count)", label: "总打卡", icon: "checkmark.circle.fill", color: Color.goPrimary)
-            checkInStatCell(value: "\(currentStreak)", label: "当前连胜", icon: "flame.fill", color: Color.goYellow)
-            checkInStatCell(value: "\(longestStreak)", label: "最长连胜", icon: "trophy.fill", color: Color.goOrange)
-            checkInStatCell(value: "\(monthCheckInRate)%", label: "本月", icon: "chart.bar.fill", color: Color.goCardCyan)
-        }
-    }
-
-    private func checkInStatCell(value: String, label: String, icon: String, color: Color) -> some View {
-        VStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(color)
-            Text(value)
-                .font(.system(size: 16, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Text(label)
-                .font(.system(size: 9, weight: .medium, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    // MARK: - 里程碑奖励行
-    private var checkInMilestoneRow: some View {
-        let milestones: [(days: Int, reward: Int, emoji: String)] = [
-            (7, 10, "⭐️"), (14, 25, "🌟"), (30, 60, "💎"), (60, 150, "👑"), (100, 300, "🏆")
-        ]
-        let nextMilestone = milestones.first(where: { $0.days > currentStreak })
-        let lastClaimed = lastClaimedMilestone
-
-        return VStack(spacing: 6) {
-            OhanaDashedDivider(color: .white.opacity(0.1))
-            if let next = nextMilestone {
-                HStack(spacing: 6) {
-                    Text(next.emoji)
-                    Text("再连续 \(next.days - currentStreak) 天即可领取 +\(next.reward)🥥")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.goPrimary.opacity(0.7))
-                    Spacer()
-                }
-            }
-
-            // 可领取的里程碑
-            let claimable = milestones.filter { $0.days <= currentStreak && $0.days > lastClaimed }
-            if !claimable.isEmpty {
-                ForEach(claimable, id: \.days) { m in
-                    Button {
-                        claimMilestone(m.days, reward: m.reward, emoji: m.emoji)
-                    } label: {
-                        HStack(spacing: 8) {
-                            Text(m.emoji).font(.system(size: 16))
-                            Text("\(m.days) 天连胜达成！")
-                                .font(.system(size: 13, weight: .black, design: .rounded))
-                                .foregroundStyle(Color.ohanaPrimaryActionText)
-                            Spacer()
-                            Text("+\(m.reward)🥥 领取")
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
-                        }
-                        .padding(.horizontal, 14).padding(.vertical, 10)
-                        .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                }
-            }
-        }
-    }
-
-    // MARK: - 月历单元格模型
-    private struct CalendarCell {
-        let dateStr: String  // "" = 占位空格
-        let day: Int
-        let isToday: Bool
-        let isChecked: Bool
-        let isMakeup: Bool   // 补签的日期
-        let isFuture: Bool
-    }
-
-    private func monthCalendarCells(for month: Date) -> [CalendarCell] {
-        let cal = Calendar.current
-        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
-        let todayString = fmt.string(from: Date())
-
-        let comps = cal.dateComponents([.year, .month], from: month)
-        guard let firstOfMonth = cal.date(from: comps) else { return [] }
-        let weekdayOfFirst = cal.component(.weekday, from: firstOfMonth) - 1 // 0=Sun
-        let daysInMonth = cal.range(of: .day, in: .month, for: firstOfMonth)?.count ?? 30
-
-        var cells: [CalendarCell] = []
-
-        // 前置空位
-        for _ in 0..<weekdayOfFirst {
-            cells.append(CalendarCell(dateStr: "", day: 0, isToday: false, isChecked: false, isMakeup: false, isFuture: false))
-        }
-
-        // 每天
-        for d in 1...daysInMonth {
-            var dc = DateComponents(); dc.year = comps.year; dc.month = comps.month; dc.day = d
-            let date = cal.date(from: dc) ?? firstOfMonth
-            let dateStr = fmt.string(from: date)
-            let isToday = dateStr == todayString
-            let isChecked = checkedInDates.contains(dateStr)
-            let isMakeup = makeupDates.contains(dateStr)
-            let isFuture = date > Date() && !isToday
-            cells.append(CalendarCell(dateStr: dateStr, day: d, isToday: isToday, isChecked: isChecked, isMakeup: isMakeup, isFuture: isFuture))
-        }
-
-        return cells
-    }
-
-    @ViewBuilder
-    private func calendarDayCell(_ cell: CalendarCell) -> some View {
-        if cell.dateStr.isEmpty {
-            Color.clear.frame(width: 34, height: 34)
-        } else {
-            Button {
-                if !cell.isChecked && !cell.isToday && !cell.isFuture && makeupPackCount > 0 {
-                    showMakeupConfirm = cell.dateStr
-                }
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(cellFillColor(cell))
-                        .frame(width: 34, height: 34)
-                        .overlay(
-                            Circle().strokeBorder(
-                                cell.isToday ? Color.goPrimary : .clear, lineWidth: 1.5
-                            )
-                        )
-                    if cell.isChecked {
-                        if cell.isMakeup {
-                            Image(systemName: "arrow.uturn.backward")
-                                .font(.system(size: 9, weight: .black))
-                                .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
-                        } else {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 10, weight: .black))
-                                .foregroundStyle(Color.ohanaPrimaryActionText)
-                        }
-                    } else {
-                        Text("\(cell.day)")
-                            .font(.system(size: 11, weight: cell.isToday ? .black : .medium, design: .rounded))
-                            .foregroundStyle(
-                                cell.isFuture ? Color.ohanaSecondaryText.opacity(0.35) :
-                                cell.isToday ? Color.goPrimary : Color.ohanaSecondaryText
-                            )
-                    }
-                }
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .disabled(cell.isChecked || cell.isToday || cell.isFuture || makeupPackCount == 0)
-        }
-    }
-
-    private func cellFillColor(_ cell: CalendarCell) -> Color {
-        if cell.isChecked && cell.isMakeup {
-            return Color.goYellow.opacity(0.85)
-        } else if cell.isChecked {
-            return Color.goPrimary
-        } else if cell.isToday {
-            return Color.goPrimary.opacity(0.22)
-        } else {
-            return Color.ohanaControlFill
-        }
-    }
-
-    private func monthYearString(_ date: Date) -> String {
-        let cal = Calendar.current
-        let y = cal.component(.year, from: date)
-        let m = cal.component(.month, from: date)
-        return "\(y) 年 \(m) 月"
+        OasisCheckInCalendarCard(
+            displayMonth: $calendarDisplayMonth,
+            checkedInDates: checkedInDates,
+            makeupDates: makeupDates,
+            makeupPackCount: makeupPackCount,
+            currentStreak: currentStreak,
+            longestStreak: longestStreak,
+            monthCheckInRate: monthCheckInRate,
+            lastClaimedMilestone: lastClaimedMilestone,
+            localization: l,
+            onRequestMakeup: { date in
+                confirmationRoute = .makeup(date: date)
+            },
+            onOpenMakeupShop: {
+                openSheet(.coconutShop(.boost))
+            },
+            onClaimMilestone: claimMilestone
+        )
     }
 
     // MARK: - 打卡工具函数
@@ -2878,17 +2420,16 @@ struct OasisRewardView: View {
             snapshot: bentoSnapshot,
             localization: l,
             onOpenShop: {
-                coconutShopInitialCategory = .effect
-                showCoconutShop = true
+                openSheet(.coconutShop(.effect))
             },
             onOpenAchievements: {
-                showAchievements = true
+                openSheet(.achievements)
             },
             onOpenCritters: {
-                showCritterCodex = true
+                openSheet(.critterCodex)
             },
             onOpenGacha: {
-                showGacha = true
+                openSheet(.gacha)
             }
         )
     }
@@ -2963,302 +2504,6 @@ struct OasisRewardView: View {
             energyParticles.removeAll()
             particleCleanupTask = nil
         }
-    }
-}
-
-// MARK: - 椰子获取与消耗指南（Bento 卡片风格）
-private struct CoconutRulesSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var appeared = false
-
-    private struct RuleCard: Identifiable {
-        let id = UUID()
-        let emoji: String
-        let title: String
-        let desc: String
-        let glowColor: Color
-        let reward: String
-    }
-
-    private let earnCards: [RuleCard] = [
-        RuleCard(emoji: "🦮", title: "遛狗", desc: "带毛孩子出门溜达", glowColor: Color(hex: "14B8A6"), reward: "每100m得1🥥"),
-        RuleCard(emoji: "🍗", title: "喂食·喂水", desc: "按时投喂，爱意满满", glowColor: Color(hex: "FF8C42"), reward: "每次2~3🥥"),
-        RuleCard(emoji: "🧹", title: "铲屎官在线", desc: "勤劳铲屎，功德无量", glowColor: Color(hex: "A8E6CF"), reward: "每次5~8🥥"),
-        RuleCard(emoji: "🪮", title: "护理·梳毛", desc: "精心打理，美美的", glowColor: Color(hex: "DDA0DD"), reward: "5~10🥥，洗澡15🥥"),
-        RuleCard(emoji: "💉", title: "健康打卡", desc: "关注健康，守护生命", glowColor: Color(hex: "FF6B6B"), reward: "每次20🥥"),
-        RuleCard(emoji: "💰", title: "记一笔账", desc: "精打细算，爱的花销", glowColor: Color(hex: "FFD93D"), reward: "每次10🥥"),
-        RuleCard(emoji: "🎾", title: "逗玩互动", desc: "玩耍时光最快乐", glowColor: Color(hex: "6BCB77"), reward: "每次10~12🥥"),
-        RuleCard(emoji: "🌳", title: "每日掉落", desc: "生命之树被动收益", glowColor: Color(hex: "84CC16"), reward: "定时领取"),
-        RuleCard(emoji: "🎲", title: "暴击加成", desc: "幸运降临！", glowColor: Color(hex: "FFCC00"), reward: "10%双倍·1%五倍🔥"),
-    ]
-
-    private let spendCards: [RuleCard] = [
-        RuleCard(emoji: "✨", title: "注入生命之树", desc: "让生命之树更旺盛", glowColor: Color(hex: "F59E0B"), reward: "每次10🥥"),
-        RuleCard(emoji: "🛍️", title: "椰子商店", desc: "兑换特效/称号/加成", glowColor: Color(hex: "667eea"), reward: "各种道具"),
-        RuleCard(emoji: "🎁", title: "盲盒", desc: "系列盲盒收藏", glowColor: Color(hex: "FF6B9D"), reward: "80🥥/次"),
-        RuleCard(emoji: "🎯", title: "悬赏任务", desc: "发布·接单·奖励", glowColor: Color(hex: "FF8C42"), reward: "转给完成者"),
-    ]
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                OhanaAppBackground().ignoresSafeArea()
-
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 24) {
-                        // ── 收入区
-                        bentoCategoryHeader(emoji: "🥥", title: "赚取椰子", subtitle: "打卡越多，岛屿越繁荣！")
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                            ForEach(Array(earnCards.enumerated()), id: \.element.id) { idx, card in
-                                bentoCard(card, delay: Double(idx) * 0.05)
-                            }
-                        }
-
-                        // ── 支出区
-                        bentoCategoryHeader(emoji: "💸", title: "花费椰子", subtitle: "用来升级岛屿，感受不同体验")
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                            ForEach(Array(spendCards.enumerated()), id: \.element.id) { idx, card in
-                                bentoCard(card, delay: Double(earnCards.count + idx) * 0.05)
-                            }
-                        }
-
-                        // ── 双账本说明
-                        bentoCategoryHeader(emoji: "👥", title: "双账本系统", subtitle: "人宠各有账户，共同建设岛屿")
-                        VStack(spacing: 10) {
-                            doubleAccountRow(emoji: "🐾", title: "宠物账户", desc: "记录宠物自己赚取的椰子")
-                            doubleAccountRow(emoji: "🧑", title: "主人账户", desc: "记录协助打卡的人类获得的椰子")
-                            doubleAccountRow(emoji: "🏝️", title: "全岛总库", desc: "统计全家椰子流动")
-                        }
-                        .padding(14)
-                        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1))
-
-                        // ── 底部口号
-                        HStack {
-                            Spacer()
-                            VStack(spacing: 6) {
-                                Text("💡")
-                                    .font(.system(size: 28))
-                                Text("打卡次数越多，椰子越多，生命之树越旺！")
-                                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
-                                    .multilineTextAlignment(.center)
-                            }
-                            Spacer()
-                        }
-                        .padding(.vertical, 16)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-                    .padding(.bottom, 40)
-                }
-            }
-            .navigationTitle("椰子指南 🥥")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 17, weight: .black))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .accessibilityLabel("关闭")
-                }
-            }
-        }
-        .ohanaSheetPagePresentation() // ui-v4: allow rules reference sheet
-        .onAppear {
-            withAnimation(GoMotion.page) { appeared = true }
-        }
-    }
-
-    @ViewBuilder
-    private func bentoCategoryHeader(emoji: String, title: String, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 6) {
-                Text(emoji).font(.system(size: 18))
-                Text(title)
-                    .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-            }
-            Text(subtitle)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-        }
-    }
-
-    @ViewBuilder
-    private func bentoCard(_ card: RuleCard, delay: Double) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(card.emoji)
-                .font(.system(size: 28))
-            Text(card.title)
-                .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            Text(card.desc)
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
-                .lineLimit(2)
-            Spacer(minLength: 0)
-            Text(card.reward)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(card.glowColor)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .padding(.horizontal, 8).padding(.vertical, 3)
-                .background(card.glowColor.opacity(0.15), in: Capsule())
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
-        .background(
-            Color.ohanaCardSurface,
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
-        )
-        .scaleEffect(appeared ? 1 : 0.88)
-        .opacity(appeared ? 1 : 0)
-        .animation(GoMotion.page.delay(delay), value: appeared)
-    }
-
-    @ViewBuilder
-    private func doubleAccountRow(emoji: String, title: String, desc: String) -> some View {
-        HStack(spacing: 12) {
-            Text(emoji).font(.system(size: 20)).frame(width: 32)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(desc)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-            }
-            Spacer()
-        }
-    }
-}
-
-private struct OasisCritterUnlockRewardCard: View {
-    let catalogId: String
-    let newLabel: String
-    let rarityText: String
-    let title: String
-    let detail: String
-    let confirmTitle: String
-    let accent: Color
-    let onClose: () -> Void
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var appeared = false
-
-    var body: some View {
-        VStack(spacing: 13) {
-            Text(newLabel)
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.ohanaPrimaryActionText)
-                .padding(.horizontal, 13)
-                .padding(.vertical, 6)
-                .background(accent, in: Capsule())
-                .scaleEffect(appeared && !reduceMotion ? 1 : 0.82)
-
-            ZStack {
-                unlockRing(size: 214, delay: 0)
-                unlockRing(size: 174, delay: 0.06)
-                unlockSparkles
-
-                Circle()
-                    .fill(accent.opacity(0.18))
-                    .frame(width: 150, height: 150)
-                    .blur(radius: 8)
-                    .scaleEffect(appeared ? 1.08 : 0.72)
-
-                OasisCritterIllustration(catalogId: catalogId, locked: false, size: 176)
-                    .scaleEffect(appeared && !reduceMotion ? 1 : 0.72)
-                    .offset(y: appeared ? 0 : 12)
-            }
-            .frame(height: 220)
-
-            VStack(spacing: 5) {
-                Text(title)
-                    .font(OhanaFont.title2(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-
-                Text(rarityText)
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(accent)
-
-                Text(detail)
-                    .font(OhanaFont.caption(.bold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .padding(.horizontal, 10)
-            }
-
-            Button(action: onClose) {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.seal.fill")
-                    Text(confirmTitle)
-                }
-                .font(OhanaFont.callout(.black))
-                .foregroundStyle(Color.ohanaPrimaryActionText)
-                .frame(maxWidth: .infinity)
-                .frame(height: 46)
-                .background(Color.goPrimary, in: Capsule())
-            }
-            .buttonStyle(ScaleButtonStyle())
-        }
-        .padding(16)
-        .frame(maxWidth: 344)
-        .background(Color.ohanaCardSurface.opacity(0.96), in: RoundedRectangle(cornerRadius: 30, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .strokeBorder(accent.opacity(0.32), lineWidth: 1.2)
-        }
-        .shadow(color: accent.opacity(0.26), radius: 28, x: 0, y: 12) // ui-v4: allow transient electronic-pet unlock focus
-        .scaleEffect(appeared && !reduceMotion ? 1 : 0.9)
-        .opacity(appeared ? 1 : 0)
-        .onAppear {
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.fab) {
-                appeared = true
-            }
-        }
-    }
-
-    private func unlockRing(size: CGFloat, delay: Double) -> some View {
-        Circle()
-            .stroke(accent.opacity(appeared ? 0 : 0.62), lineWidth: 2)
-            .frame(width: size, height: size)
-            .scaleEffect(appeared && !reduceMotion ? 1.12 : 0.68)
-            .animation((reduceMotion ? GoMotion.reduced : GoMotion.hero).delay(delay), value: appeared)
-    }
-
-    private var unlockSparkles: some View {
-        ZStack {
-            ForEach(0..<10, id: \.self) { index in
-                let angle = Angle.degrees(Double(index) * 36)
-                Image(systemName: index.isMultiple(of: 2) ? "sparkle" : "star.fill")
-                    .font(.system(size: index.isMultiple(of: 2) ? 13 : 8, weight: .black))
-                    .foregroundStyle(index.isMultiple(of: 2) ? Color.goYellow : accent)
-                    .offset(
-                        x: appeared && !reduceMotion ? cos(angle.radians) * 104 : cos(angle.radians) * 58,
-                        y: appeared && !reduceMotion ? sin(angle.radians) * 92 : sin(angle.radians) * 44
-                    )
-                    .opacity(appeared ? 1 : 0)
-                    .animation((reduceMotion ? GoMotion.reduced : GoMotion.fab).delay(0.02 * Double(index)), value: appeared)
-            }
-        }
-        .allowsHitTesting(false)
     }
 }
 

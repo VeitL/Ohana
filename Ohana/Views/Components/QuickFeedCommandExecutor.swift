@@ -47,11 +47,12 @@ struct QuickFeedCommandExecutor {
         FeedStockExpenseLink.fetchExpense(id: id, context: context)
     }
 
-    func saveManualSettings(pet: Pet, foodKind: FeedFoodKind, grams: Double) {
+    func saveManualSettings(pet: Pet, foodKind: FeedFoodKind, grams: Double, defaultEnabled: Bool = true) {
         ManualFeedCommand.saveSettings(
             pet: pet,
             foodKind: foodKind,
             grams: grams,
+            defaultEnabled: defaultEnabled,
             context: context
         )
     }
@@ -304,18 +305,13 @@ struct QuickFeedCommandExecutor {
         SetMainFoodKindCommand.run(pet: pet, foodKind: foodKind, context: context)
     }
 
-    func schedulePlanReminders(_ reminders: [Reminder]) {
-        guard !reminders.isEmpty else { return }
-        Task { @MainActor in
-            guard await NotificationManager.shared.requestPermission() else { return }
-            await ReminderSchedulingService.scheduleManyIfNeeded(reminders: reminders, context: context, source: .detail)
-        }
+    func schedulePlanReminders(_ reminders: [Reminder]) async {
+        guard !reminders.isEmpty, !Task.isCancelled else { return }
+        await ReminderSchedulingService.scheduleManyIfNeeded(reminders: reminders, context: context, source: .detail)
     }
 
-    func scheduleStockReminders(_ reminders: [Reminder]) {
-        guard !reminders.isEmpty else { return }
-        Task { @MainActor in
-            await ReminderSchedulingService.scheduleManyIfNeeded(reminders: reminders, context: context, source: .detail)
-        }
+    func scheduleStockReminders(_ reminders: [Reminder]) async {
+        guard !reminders.isEmpty, !Task.isCancelled else { return }
+        await ReminderSchedulingService.scheduleManyIfNeeded(reminders: reminders, context: context, source: .detail)
     }
 }

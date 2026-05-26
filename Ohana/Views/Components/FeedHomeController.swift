@@ -28,6 +28,10 @@ struct FeedHomeMetricsViewState {
     let todayWetFoodGrams: Double
     let todayTreatGrams: Double
     let todayTreatCount: Int
+    let dryStockRemainingGrams: Double?
+    let dryStockRemainingDays: Int?
+    let wetStockRemainingGrams: Double?
+    let wetStockRemainingDays: Int?
 }
 
 struct FeedHomeStockBadgeViewState {
@@ -70,7 +74,11 @@ struct FeedHomeViewState {
                 todayDryFoodGrams: 0,
                 todayWetFoodGrams: 0,
                 todayTreatGrams: 0,
-                todayTreatCount: 0
+                todayTreatCount: 0,
+                dryStockRemainingGrams: nil,
+                dryStockRemainingDays: nil,
+                wetStockRemainingGrams: nil,
+                wetStockRemainingDays: nil
             ),
             chartPoints: [],
             stockBadge: FeedHomeStockBadgeViewState(remainingDays: nil),
@@ -101,7 +109,11 @@ struct FeedHomeViewState {
             todayDryFoodGrams: snapshot.todayDryFoodGrams,
             todayWetFoodGrams: snapshot.todayWetFoodGrams,
             todayTreatGrams: snapshot.todayTreatGrams,
-            todayTreatCount: snapshot.todayTreatCount
+            todayTreatCount: snapshot.todayTreatCount,
+            dryStockRemainingGrams: snapshot.dryStockRemainingGrams,
+            dryStockRemainingDays: snapshot.dryStockRemainingDays,
+            wetStockRemainingGrams: snapshot.wetStockRemainingGrams,
+            wetStockRemainingDays: snapshot.wetStockRemainingDays
         )
         return FeedHomeViewState(
             mode: mode,

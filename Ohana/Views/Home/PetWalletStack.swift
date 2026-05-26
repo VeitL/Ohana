@@ -6,11 +6,12 @@
 //  使用 matchedTransitionSource + navigationTransition(.zoom) 实现原生英雄过渡
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UIKit
 
 // MARK: - 钱包宠物卡共享视觉（向导草稿卡 + 首页持久化卡保持一致）
+
 enum WalletPetCardTheme {
     /// 与 `WalletPetCardDraftFront` 一致：由 `themeColorHex` 推导顶/底渐变
     static func gradientPair(for hex: String) -> (Color, Color) {
@@ -86,12 +87,12 @@ enum WalletPetCardTheme {
             return Array(repeating: top, count: 9)
         }
         let lighter = Color(UIColor(hue: h, saturation: max(0, s * 0.68), brightness: min(1.0, b * 1.22), alpha: a))
-        let light   = Color(UIColor(hue: h, saturation: s, brightness: min(1.0, b * 1.06), alpha: a))
-        let darker  = Color(UIColor(hue: h, saturation: min(1.0, s * 1.12), brightness: max(0.08, b * 0.22), alpha: a))
+        let light = Color(UIColor(hue: h, saturation: s, brightness: min(1.0, b * 1.06), alpha: a))
+        let darker = Color(UIColor(hue: h, saturation: min(1.0, s * 1.12), brightness: max(0.08, b * 0.22), alpha: a))
         return [
-            lighter, light,  top,
-            light,   top,    bottom,
-            top,     bottom, darker
+            lighter, light, top,
+            light, top, bottom,
+            top, bottom, darker,
         ]
     }
 
@@ -101,7 +102,8 @@ enum WalletPetCardTheme {
         guard sourceHex.count == 6,
               let r = Int(sourceHex.prefix(2), radix: 16),
               let g = Int(sourceHex.dropFirst(2).prefix(2), radix: 16),
-              let b = Int(sourceHex.dropFirst(4).prefix(2), radix: 16) else {
+              let b = Int(sourceHex.dropFirst(4).prefix(2), radix: 16)
+        else {
             return false
         }
         func channel(_ value: Int) -> Double {
@@ -121,7 +123,7 @@ enum WalletPetCardTheme {
 
 enum HomeCardVisibility {
     static let hiddenPetIDsKey = "hiddenHomePetIDs.v1"
-    static let maxVisibleCards = 7
+    static let maxVisibleCards = FocusHomeCardDataSource.maxCardsPerPage
 
     static func isPetIDVisible(_ id: UUID, raw: String? = nil) -> Bool {
         !hiddenPetIDs(from: raw ?? UserDefaults.standard.string(forKey: hiddenPetIDsKey) ?? "")
@@ -169,6 +171,7 @@ enum HomeCardVisibility {
 }
 
 // MARK: - Wallet Stack Container
+
 struct PetWalletStack: View {
     let pets: [Pet]
     let humans: [Human]
@@ -232,7 +235,6 @@ struct PetWalletStack: View {
             )
             .contentShape(Rectangle())
             .highPriorityGesture(stackDragGesture)
-
         }
         .padding(.horizontal, 24)
         .onAppear {
@@ -263,6 +265,7 @@ struct PetWalletStack: View {
     }
 
     // MARK: - Single Wallet Card
+
     //
     // 布局：下边的卡片在最前面（zIndex 最高），上边在最后面
     // depth=0 (active) → 最下方 (y最大), zIndex最高, 可交互
@@ -282,7 +285,7 @@ struct PetWalletStack: View {
 
         Group {
             switch item {
-            case .pet(let pet):
+            case let .pet(pet):
                 WalletPetCardFront(pet: pet, cornerRadius: cardCorner)
                     .frame(height: stackCardHeight)
                     .onTapGesture {
@@ -294,7 +297,7 @@ struct PetWalletStack: View {
                         cfg.clipShape(RoundedRectangle(cornerRadius: cardCorner, style: .continuous))
                     }
 
-            case .human(let human):
+            case let .human(human):
                 Button {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     onSelectHuman?(human)
@@ -318,6 +321,7 @@ struct PetWalletStack: View {
     }
 
     // MARK: - Drag to Cycle (highPriorityGesture 避免与页面 ScrollView 冲突)
+
     private var stackDragGesture: some Gesture {
         DragGesture(minimumDistance: 12)
             .onChanged { value in
@@ -351,6 +355,7 @@ struct PetWalletStack: View {
 }
 
 // MARK: - 钱包卡右侧可读性叠层（材质模糊 + 压暗；全幅绘制 + 软 mask，避免中间竖向硬分界）
+
 struct WalletCardTrailingReadabilityOverlay: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
@@ -365,7 +370,7 @@ struct WalletCardTrailingReadabilityOverlay: View {
                 .init(color: .white.opacity(0.06), location: 0.34),
                 .init(color: .white.opacity(0.42), location: 0.48),
                 .init(color: .white.opacity(0.88), location: 0.66),
-                .init(color: .white, location: 1)
+                .init(color: .white, location: 1),
             ],
             startPoint: .leading,
             endPoint: .trailing
@@ -379,7 +384,7 @@ struct WalletCardTrailingReadabilityOverlay: View {
                 .init(color: .black.opacity(0), location: 0),
                 .init(color: .black.opacity(reduceTransparency ? 0.12 : 0.06), location: 0.38),
                 .init(color: .black.opacity(reduceTransparency ? 0.52 : 0.28), location: 0.72),
-                .init(color: .black.opacity(reduceTransparency ? 0.82 : 0.58), location: 1)
+                .init(color: .black.opacity(reduceTransparency ? 0.82 : 0.58), location: 1),
             ],
             startPoint: .leading,
             endPoint: .trailing
@@ -459,7 +464,7 @@ private struct WalletCardCompactPhotoMask: View {
                 .init(color: .white, location: 0.46),
                 .init(color: .white.opacity(0.72), location: 0.60),
                 .init(color: .white.opacity(0.18), location: 0.76),
-                .init(color: .clear, location: 0.92)
+                .init(color: .clear, location: 0.92),
             ],
             startPoint: .leading,
             endPoint: .trailing
@@ -480,7 +485,7 @@ private struct WalletCardBottomRightTextShadow: View {
                     .init(color: .clear, location: 0.0),
                     .init(color: .black.opacity(isExpanded ? 0.18 : 0.10), location: 0.38),
                     .init(color: .black.opacity(isExpanded ? 0.44 : 0.32), location: 0.76),
-                    .init(color: .black.opacity(isExpanded ? 0.62 : 0.46), location: 1.0)
+                    .init(color: .black.opacity(isExpanded ? 0.62 : 0.46), location: 1.0),
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -489,7 +494,7 @@ private struct WalletCardBottomRightTextShadow: View {
                 colors: [
                     .black.opacity(isExpanded ? 0.56 : 0.42),
                     .black.opacity(isExpanded ? 0.28 : 0.20),
-                    .clear
+                    .clear,
                 ],
                 center: .bottomTrailing,
                 startRadius: 8,
@@ -502,6 +507,7 @@ private struct WalletCardBottomRightTextShadow: View {
 }
 
 // MARK: - Pet Card Front（与 `WalletPetCardDraftFront` 同构：主题渐变 + 全名大字 + 剪影配色/图案）
+
 struct WalletPetCardFront: View {
     let pet: Pet
     let cornerRadius: CGFloat
@@ -553,16 +559,16 @@ struct WalletPetCardFront: View {
                                 .clear,
                                 useDarkText
                                     ? Color.goCardWhite.opacity(0.20)
-                                    : Color.arkInk.opacity(usesFullBleedPhoto ? 0.12 : 0.22)
+                                    : Color.arkInk.opacity(usesFullBleedPhoto ? 0.12 : 0.22),
                             ],
                             startPoint: .top,
                             endPoint: .bottom
                         )
-                )
+                    )
 
                 if let img = avatarImage, !isTransparent {
                     WalletCardAdaptivePhotoLayer(image: img, width: w, height: h, mode: .compact)
-                    .allowsHitTesting(false)
+                        .allowsHitTesting(false)
                 }
 
                 Text(headlineText)
@@ -662,8 +668,9 @@ struct WalletPetCardFront: View {
     }
 
     // MARK: - Avatar Layer
+
     @ViewBuilder
-    private func avatarLayer(avatarImage: UIImage?, isTransparent: Bool, w: CGFloat, h: CGFloat, cardTop: Color) -> some View {
+    private func avatarLayer(avatarImage: UIImage?, isTransparent: Bool, w: CGFloat, h: CGFloat, cardTop _: Color) -> some View {
         if let img = avatarImage {
             if isTransparent {
                 // Render at full card dimensions so the subject appears at the same
@@ -685,7 +692,7 @@ struct WalletPetCardFront: View {
         } else {
             let species = pet.species.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             let silSpecies = (species == "dog" || pet.species == "狗") ? "狗" :
-                             (species == "cat" || pet.species == "猫") ? "猫" : pet.species
+                (species == "cat" || pet.species == "猫") ? "猫" : pet.species
             ZStack {
                 Ellipse()
                     .fill(Color.arkInk.opacity(0.16))
@@ -707,6 +714,7 @@ struct WalletPetCardFront: View {
     }
 
     // MARK: - Barcode
+
     private func barcode(foreground: Color = .white) -> some View {
         let pattern: [CGFloat] = [18, 6, 10, 14, 5, 12, 8, 16, 7, 10, 13, 6]
         return VStack(alignment: .leading, spacing: 5) {
@@ -726,6 +734,7 @@ struct WalletPetCardFront: View {
 }
 
 // MARK: - Pet Card Front (Wizard Draft — 与首页 WalletPetCardFront 视觉一致)
+
 /// 添加宠物向导顶部固定预览：数据随表单逐步填充，不依赖 SwiftData `Pet`。
 struct WalletPetCardDraftFront: View {
     var name: String
@@ -796,7 +805,7 @@ struct WalletPetCardDraftFront: View {
                     points: [
                         SIMD2(0.0, 0.0), SIMD2(0.5, 0.0), SIMD2(1.0, 0.0),
                         SIMD2(0.0, 0.5), SIMD2(0.52, 0.38), SIMD2(1.0, 0.5),
-                        SIMD2(0.0, 1.0), SIMD2(0.5,  1.0), SIMD2(1.0, 1.0)
+                        SIMD2(0.0, 1.0), SIMD2(0.5, 1.0), SIMD2(1.0, 1.0),
                     ],
                     colors: WalletPetCardTheme.meshColors(for: themeColorHex)
                 )
@@ -808,16 +817,16 @@ struct WalletPetCardDraftFront: View {
                                 .clear,
                                 useDarkText
                                     ? Color.goCardWhite.opacity(0.20)
-                                    : Color.arkInk.opacity(usesFullBleedPhoto ? 0.12 : 0.22)
+                                    : Color.arkInk.opacity(usesFullBleedPhoto ? 0.12 : 0.22),
                             ],
                             startPoint: .top,
                             endPoint: .bottom
                         )
-                )
+                    )
 
                 if let img = avatarImage, !isTransparent {
                     WalletCardAdaptivePhotoLayer(image: img, width: w, height: h, mode: .compact)
-                    .allowsHitTesting(false)
+                        .allowsHitTesting(false)
                 }
 
                 Text(headlineText)
@@ -1026,6 +1035,7 @@ struct HumanSilhouetteView: View {
 }
 
 // MARK: - Human Card Front
+
 struct WalletHumanCardFront: View {
     let human: Human
     let cornerRadius: CGFloat
@@ -1064,7 +1074,7 @@ struct WalletHumanCardFront: View {
                 // Layer 3 — 非透明头像：全幅铺满，右侧材质保证文案可读
                 if usesFullBleedPhoto, let img = avatarImage {
                     WalletCardAdaptivePhotoLayer(image: img, width: w, height: h, mode: .compact)
-                    .allowsHitTesting(false)
+                        .allowsHitTesting(false)
                 }
 
                 // Layer 4 — 大字背景（与宠物卡一致：在全幅照片之上、抠图主体之下）
@@ -1190,6 +1200,7 @@ struct WalletHumanCardFront: View {
 }
 
 // MARK: - Human Card Front (Wizard Draft — 与 `WalletHumanCardFront` 同构)
+
 /// 添加家庭成员向导顶部固定预览：与宠物 `WalletPetCardDraftFront` 相同比例与层次。
 struct WalletHumanCardDraftFront: View {
     var name: String
@@ -1252,7 +1263,7 @@ struct WalletHumanCardDraftFront: View {
 
                 if let img = avatarImage, usesFullBleedPhoto {
                     WalletCardAdaptivePhotoLayer(image: img, width: w, height: h, mode: .compact)
-                    .allowsHitTesting(false)
+                        .allowsHitTesting(false)
                 }
 
                 if avatarImage == nil || hasPopout {

@@ -198,7 +198,7 @@ struct TodayFocusCard: View {
                 selectedFocusIndex = max(0, count - 1)
             }
         }
-        .animation(freezesToFrontCard ? nil : GoMotion.hero, value: animationIdentity)
+        .animation(cardContentAnimation, value: animationIdentity)
     }
 
     private var boardBody: some View {
@@ -251,7 +251,12 @@ struct TodayFocusCard: View {
         card(showsPageIndicator: false)
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
-            .id(contentIdentity)
+            .transaction { transaction in
+                if freezesToFrontCard {
+                    transaction.animation = nil
+                    transaction.disablesAnimations = true
+                }
+            }
     }
 
     private func startAmbientPulseIfNeeded() {
@@ -270,11 +275,18 @@ struct TodayFocusCard: View {
     @ViewBuilder
     private func card(showsPageIndicator: Bool) -> some View {
         if freezesToFrontCard {
-            cardContent(frozenFrontContent ?? content)
-                .transaction { transaction in
-                    transaction.animation = nil
-                    transaction.disablesAnimations = true
-                }
+            if presentation == .compactStack {
+                frozenCompactStackCard(
+                    content: frozenFrontContent ?? content,
+                    backCardCount: min(3, max(focusCards.count - 1, 0))
+                )
+            } else {
+                cardContent(frozenFrontContent ?? content)
+                    .transaction { transaction in
+                        transaction.animation = nil
+                        transaction.disablesAnimations = true
+                    }
+            }
         } else {
             let cards = focusCards
             if presentation == .compactStack {
@@ -285,6 +297,39 @@ struct TodayFocusCard: View {
                 cardContent(cards.first ?? .welcome)
             }
         }
+    }
+
+    private func frozenCompactStackCard(content frontContent: TodayFocusService.Content, backCardCount: Int) -> some View {
+        GeometryReader { geo in
+            let width = max(298, min(geo.size.width, 390))
+            let cardHeight: CGFloat = 92
+            let backSpacing: CGFloat = 9
+            let topPeekInset: CGFloat = backSpacing
+            ZStack {
+                if backCardCount > 0 {
+                    ForEach(Array((1...backCardCount).reversed()), id: \.self) { depth in
+                        TodayFocusFrozenBackPlate(
+                            depth: depth,
+                            width: width,
+                            height: cardHeight,
+                            topInset: topPeekInset,
+                            spacing: backSpacing
+                        )
+                    }
+                }
+
+                cardContent(frontContent)
+                    .frame(width: width, height: cardHeight)
+                    .offset(y: topPeekInset)
+                    .zIndex(20)
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .transaction { transaction in
+                transaction.animation = nil
+                transaction.disablesAnimations = true
+            }
+        }
+        .frame(height: 128)
     }
 
     @ViewBuilder
@@ -877,6 +922,13 @@ struct TodayFocusCard: View {
         return contentIdentity
     }
 
+    private var cardContentAnimation: Animation? {
+        if freezesToFrontCard || presentation == .compactStack {
+            return nil
+        }
+        return GoMotion.hero
+    }
+
     private var focusCardCountChangeKey: Int {
         freezesToFrontCard ? -1 : focusCards.count
     }
@@ -1017,6 +1069,41 @@ struct TodayFocusCard: View {
             .clipShape(shape)
             .compositingGroup()
         }
+    }
+}
+
+private struct TodayFocusFrozenBackPlate: View {
+    let depth: Int
+    let width: CGFloat
+    let height: CGFloat
+    let topInset: CGFloat
+    let spacing: CGFloat
+
+    private var depthValue: CGFloat {
+        CGFloat(depth)
+    }
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 20, style: .continuous)
+    }
+
+    var body: some View {
+        shape
+            .fill(Color.ohanaControlFill.opacity(0.58 - min(Double(depth) * 0.08, 0.24)))
+            .overlay {
+                shape.strokeBorder(Color.goCardWhite.opacity(0.10), lineWidth: 1)
+            }
+            .frame(width: width, height: height)
+            .scaleEffect(max(0.86, 1 - depthValue * 0.045))
+            .offset(y: topInset + depthValue * spacing)
+            .brightness(-depthValue * 0.055)
+            .shadow( // ui-v4: allow Today Focus frozen deck to preserve stack depth during hero handoff
+                color: Color.arkInk.opacity(max(0.06, 0.18 - Double(depth) * 0.025)),
+                radius: max(8, 20 - depthValue * 2),
+                x: 0,
+                y: max(6, 14 - depthValue)
+            )
+            .zIndex(10 - Double(depth))
     }
 }
 

@@ -5,8 +5,8 @@
 //  Rendering-only shell pieces for the real-data portrait solid home style.
 //
 
-import SwiftUI
 import Combine
+import SwiftUI
 import UniformTypeIdentifiers
 
 enum VerticalHomeTab: String, CaseIterable, Identifiable, Hashable {
@@ -242,7 +242,7 @@ struct VerticalHomePagedContent<Home: View, Calendar: View, Oasis: View, Plants:
         for tab: VerticalHomeTab,
         size: CGSize,
         relative: CGFloat,
-        isActive: Bool,
+        isActive _: Bool,
         lifecycle: VerticalHomePageLifecycle,
         isVisiblePage: Bool
     ) -> some View {
@@ -585,7 +585,7 @@ struct VerticalHomeBottomBar: View {
             return "xmark"
         }
         if activeCard != nil {
-            return "square.grid.2x2.fill"
+            return "plus"
         }
         switch selectedTab {
         case .home:
@@ -604,7 +604,7 @@ struct VerticalHomeBottomBar: View {
             return l.tr(zh: "收起菜单", en: "Close menu", de: "Menü schließen")
         }
         if activeCard != nil {
-            return l.tr(zh: "打开快捷菜单", en: "Open quick menu", de: "Schnellmenü öffnen")
+            return l.tr(zh: "显示该成员剩余功能", en: "Show remaining member features", de: "Weitere Funktionen anzeigen")
         }
         switch selectedTab {
         case .home:
@@ -843,19 +843,42 @@ struct VerticalHomeEmbeddedAction: Identifiable {
 struct VerticalHomeEmbeddedQuickActions: View {
     let title: String
     let items: [VerticalHomeEmbeddedAction]
+    var addItems: [VerticalHomeEmbeddedAction] = []
     var isEditMode: Bool = false
     var jiggle: Bool = false
     var shouldReduceWork: Bool = false
-    var forcesSubmenusBelow: Bool = false
+    var forcesSubmenusBelow: Bool = true
     var draggingItemId: Binding<String?>?
     var onToggleEdit: (() -> Void)?
     var onMove: (_ fromId: String, _ toId: String) -> Void = { _, _ in }
     var onRemove: (_ id: String) -> Void = { _ in }
+    var onAdd: (_ id: String) -> Void = { _ in }
     @AppStorage("appLanguage") private var appLanguage = "zh"
     @State private var openActionId: String? = nil
     @State private var lastDropTargetId: String? = nil
+    @State private var showingAddPanel = false
 
     private var l: L10n { L10n(appLanguage) }
+    private let cellHeight: CGFloat = 66
+    private let iconSize: CGFloat = 30
+    private let maxItems = QuickActionLimit.maxItemsPerEntity
+
+    private var visibleItems: [VerticalHomeEmbeddedAction] {
+        Array(items.prefix(maxItems))
+    }
+
+    private var availableAddItems: [VerticalHomeEmbeddedAction] {
+        guard isEditMode, visibleItems.count < maxItems else { return [] }
+        return addItems
+    }
+
+    private var showsAddLauncher: Bool {
+        isEditMode && visibleItems.count < maxItems && !availableAddItems.isEmpty
+    }
+
+    private var submenuAnimation: Animation {
+        shouldReduceWork ? GoMotion.reduced : GoMotion.fab
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -881,26 +904,56 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .accessibilityLabel(isEditMode
-                                        ? l.tr(zh: "完成编辑快捷操作", en: "Done editing quick actions", de: "Schnellaktionen fertig bearbeiten")
-                                        : l.tr(zh: "编辑快捷操作", en: "Edit quick actions", de: "Schnellaktionen bearbeiten"))
+                        ? l.tr(zh: "完成编辑快捷操作", en: "Done editing quick actions", de: "Schnellaktionen fertig bearbeiten")
+                        : l.tr(zh: "编辑快捷操作", en: "Edit quick actions", de: "Schnellaktionen bearbeiten"))
                 }
             }
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 4), spacing: 8) {
-                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
                     actionCell(item, index: index)
-                        .zIndex(openActionId == item.id ? 40 : Double(items.count - index))
+                        .zIndex(openActionId == item.id ? 40 : Double(visibleItems.count - index))
+                }
+
+                if showsAddLauncher {
+                    addLauncherCell
+                        .transition(.opacity.combined(with: .scale(scale: 0.88, anchor: .center)))
+                        .zIndex(35)
                 }
             }
+            .animation(GoMotion.selection, value: visibleItems.map(\.id).joined(separator: "|"))
+            .animation(GoMotion.selection, value: availableAddItems.map(\.id).joined(separator: "|"))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
+        .overlay(alignment: .bottom) {
+            if isEditMode && showingAddPanel {
+                addOptionsPanel
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 2)
+                    .transition(
+                        .asymmetric(
+                            insertion: .opacity
+                                .combined(with: .scale(scale: 0.84, anchor: .bottom))
+                                .combined(with: .offset(y: 18)),
+                            removal: .opacity
+                                .combined(with: .scale(scale: 0.94, anchor: .bottom))
+                                .combined(with: .offset(y: 10))
+                        )
+                    )
+                    .zIndex(120)
+            }
+        }
         .onChange(of: items.map(\.id).joined(separator: "|")) { _, _ in
             openActionId = nil
+            if visibleItems.count >= maxItems || availableAddItems.isEmpty {
+                showingAddPanel = false
+            }
         }
         .onChange(of: isEditMode) { _, _ in
             openActionId = nil
             lastDropTargetId = nil
+            showingAddPanel = false
         }
     }
 
@@ -912,29 +965,29 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 if item.detailAction == nil {
                     item.action()
                 } else {
-                    withAnimation(GoMotion.feedback) {
+                    withAnimation(submenuAnimation) {
                         openActionId = openActionId == item.id ? nil : item.id
                     }
                 }
             } label: {
                 let showsCompleted = item.isCompleted && !isEditMode
-                VStack(spacing: 5) {
+                VStack(spacing: 6) {
                     OhanaQuickActionIcon(
                         actionType: item.id,
                         fallbackSystemName: item.icon,
-                        size: 25,
+                        size: iconSize,
                         color: showsCompleted ? Color.goPrimary : Color.goCardWhite,
                         isCompleted: showsCompleted,
                         showsCompletionBadge: showsCompleted
                     )
                     Text(item.title)
-                        .font(.system(size: 9.5, weight: .black, design: .rounded))
+                        .font(.system(size: 10.5, weight: .black, design: .rounded))
                         .foregroundStyle(showsCompleted ? Color.goPrimary : Color.goCardWhite)
                         .lineLimit(1)
                         .minimumScaleFactor(0.55)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 54)
+                .frame(height: cellHeight)
                 .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(ScaleButtonStyle())
@@ -946,7 +999,16 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     detailAction: detailAction,
                     index: index
                 )
-                .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .center)))
+                .transition(
+                    .asymmetric(
+                        insertion: .opacity
+                            .combined(with: .scale(scale: 0.82, anchor: .top))
+                            .combined(with: .offset(y: -10)),
+                        removal: .opacity
+                            .combined(with: .scale(scale: 0.92, anchor: .top))
+                            .combined(with: .offset(y: -4))
+                    )
+                )
                 .zIndex(80)
             }
 
@@ -959,6 +1021,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
         .rotationEffect(.degrees(editJiggleAngle(for: item)))
         .animation(editJiggleAnimation, value: jiggle)
         .animation(GoMotion.selection, value: draggingItemId?.wrappedValue)
+        .animation(submenuAnimation, value: openActionId)
         .overlay(alignment: .topLeading) {
             if isEditMode {
                 removeButton(for: item)
@@ -1002,7 +1065,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
     private func inlineMenuButton(icon: String, accessibility: String, action: @escaping () -> Void) -> some View {
         Button {
             OhanaFeedback.light()
-            withAnimation(GoMotion.feedback) {
+            withAnimation(submenuAnimation) {
                 openActionId = nil
             }
             action()
@@ -1018,9 +1081,111 @@ struct VerticalHomeEmbeddedQuickActions: View {
         .accessibilityLabel(accessibility)
     }
 
+    private var addLauncherCell: some View {
+        Button {
+            OhanaFeedback.light()
+            withAnimation(submenuAnimation) {
+                openActionId = nil
+                showingAddPanel.toggle()
+            }
+        } label: {
+            VStack(spacing: 5) {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 20, weight: .black))
+                        .symbolRenderingMode(.monochrome)
+                        .foregroundStyle(Color.goPrimary)
+                        .frame(width: 38, height: 38)
+                        .background(Color.goCardWhite.opacity(0.12), in: Circle())
+                }
+
+                Text(l.tr(zh: "添加", en: "Add", de: "Hinzufügen"))
+                    .font(.system(size: 10.5, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.74))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.55)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: cellHeight)
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(
+                        Color.goCardWhite.opacity(0.24),
+                        style: StrokeStyle(lineWidth: 1, dash: [4, 4])
+                    )
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(l.tr(zh: "添加快捷操作", en: "Add quick action", de: "Schnellaktion hinzufügen"))
+    }
+
+    private var addOptionsPanel: some View {
+        VStack(spacing: 9) {
+            HStack(spacing: 8) {
+                Text(l.tr(zh: "添加快捷操作", en: "Add quick action", de: "Schnellaktion hinzufügen"))
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Spacer(minLength: 0)
+                Button {
+                    OhanaFeedback.light()
+                    withAnimation(submenuAnimation) {
+                        showingAddPanel = false
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .frame(width: 28, height: 28)
+                        .background(Color.ohanaControlFill, in: Circle())
+                }
+                .buttonStyle(ScaleButtonStyle())
+            }
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 7), count: 4), spacing: 7) {
+                ForEach(availableAddItems) { item in
+                    Button {
+                        OhanaFeedback.medium()
+                        withAnimation(submenuAnimation) {
+                            showingAddPanel = false
+                        }
+                        onAdd(item.id)
+                    } label: {
+                        VStack(spacing: 5) {
+                            OhanaQuickActionIcon(
+                                actionType: item.id,
+                                fallbackSystemName: item.icon,
+                                size: 23,
+                                color: Color.ohanaFunctionalIcon
+                            )
+                            Text(item.title)
+                                .font(.system(size: 9.5, weight: .black, design: .rounded))
+                                .foregroundStyle(Color.ohanaPrimaryText)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.58)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 55)
+                        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
+            }
+        }
+        .padding(10)
+        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+        }
+        .shadow(color: Color.arkInk.opacity(0.22), radius: 20, x: 0, y: 12) // ui-v4: allow floating quick-action add panel
+    }
+
     private func editDragLayer(for item: VerticalHomeEmbeddedAction) -> some View {
         Color.clear
             .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .frame(maxWidth: .infinity)
+            .frame(height: cellHeight)
             .onDrag {
                 OhanaFeedback.light()
                 withAnimation(GoMotion.selection) {
@@ -1103,7 +1268,7 @@ private struct VerticalHomeEmbeddedActionDropDelegate: DropDelegate {
     @Binding var lastDropTargetId: String?
     let onMove: (_ fromId: String, _ toId: String) -> Void
 
-    func performDrop(info: DropInfo) -> Bool {
+    func performDrop(info _: DropInfo) -> Bool {
         draggingItemId?.wrappedValue = nil
         lastDropTargetId = nil
         return isEnabled
@@ -1127,11 +1292,11 @@ private struct VerticalHomeEmbeddedActionDropDelegate: DropDelegate {
         }
     }
 
-    func dropUpdated(info: DropInfo) -> DropProposal? {
+    func dropUpdated(info _: DropInfo) -> DropProposal? {
         isEnabled ? DropProposal(operation: .move) : nil
     }
 
-    func dropExited(info: DropInfo) {
+    func dropExited(info _: DropInfo) {
         if lastDropTargetId == targetId {
             lastDropTargetId = nil
         }

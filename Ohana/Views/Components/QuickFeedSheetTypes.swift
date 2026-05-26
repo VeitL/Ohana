@@ -148,6 +148,11 @@ enum ActiveFeedSheet: Identifiable, Equatable {
     }
 }
 
+enum ActiveFeedEmbeddedPanel: Equatable {
+    case modeSettings(FeedOperatingMode)
+    case treat
+}
+
 enum FeedOverviewRange: String, CaseIterable, Identifiable {
     case days7
     case days30

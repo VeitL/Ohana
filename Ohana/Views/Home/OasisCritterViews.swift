@@ -249,8 +249,19 @@ struct OasisCritterCodexView: View {
     @State private var rescuingCritterId: UUID?
     @State private var showingCoconutLog = false
     @State private var treeMgr = OasisTreeManager.shared
+    @State private var renderSnapshots: [UUID: OasisCritterRenderSnapshot] = [:]
+    @State private var featuredDisplayOverrides: [UUID: Bool] = [:]
+    @State private var lifecycleRefreshTask: Task<Void, Never>?
+    @State private var renderSnapshotTask: Task<Void, Never>?
+    @State private var critterCommandTasks: [UUID: Task<Void, Never>] = [:]
+    @State private var pulseCleanupTask: Task<Void, Never>?
+    @State private var rescueBusyCleanupTask: Task<Void, Never>?
+    @State private var outcomeCleanupTask: Task<Void, Never>?
 
     private var l: L10n { L10n(appLanguage) }
+    private var commandExecutor: OasisRewardCommandExecutor {
+        OasisRewardCommandExecutor(context: modelContext)
+    }
     private var activeHuman: Human? {
         humans.first { $0.id.uuidString == currentActiveHumanId }
     }
@@ -267,12 +278,25 @@ struct OasisCritterCodexView: View {
             }
         }
         .onAppear {
-            refreshLifecycleSnapshots()
             if let initialCatalogId {
                 selectedCatalogId = initialCatalogId
             } else if let featured = electronicPets.first(where: { $0.isFeaturedOnOasis && !$0.isArchived }) ?? electronicPets.first(where: { !$0.isArchived }) {
                 selectedCatalogId = featured.catalogId
             }
+            scheduleRenderSnapshotRefresh(milliseconds: 30)
+            scheduleLifecycleRefresh(milliseconds: 110)
+        }
+        .onDisappear {
+            cancelDeferredWork()
+        }
+        .onChange(of: electronicPets.count) { _, _ in
+            scheduleRenderSnapshotRefresh(milliseconds: 60)
+        }
+        .onChange(of: fragments.count) { _, _ in
+            scheduleRenderSnapshotRefresh(milliseconds: 60)
+        }
+        .onChange(of: currentCoconutBalance) { _, _ in
+            scheduleRenderSnapshotRefresh(milliseconds: 60)
         }
         .sheet(isPresented: $showingCoconutLog) {
             coconutLogSheet
@@ -487,6 +511,7 @@ struct OasisCritterCodexView: View {
         let critter = ownedCritter(entry.id)
         let fragmentCount = fragments.first(where: { $0.catalogId == entry.id })?.amount ?? 0
         let awakeningCost = OasisUpgradeRewardService.awakeningCost(for: entry.rarity)
+        let snapshot = critter.map { renderSnapshot(for: $0) }
         return VStack(alignment: .leading, spacing: 16) {
             if critter == nil {
                 VStack(spacing: 12) {
@@ -540,8 +565,8 @@ struct OasisCritterCodexView: View {
                         if let critter {
                             codexMetric(value: "Lv.\(critter.level)", label: l.tr(zh: "等级", en: "Level", de: "Level"))
                             codexMetric(value: "\(critter.starLevel)★", label: l.tr(zh: "星级", en: "Stars", de: "Sterne"))
-                            codexMetric(value: "B\(OasisUpgradeRewardService.bondLevel(for: critter))", label: l.tr(zh: "羁绊", en: "Bond", de: "Bindung"))
-                            codexMetric(value: "\(OasisUpgradeRewardService.todayInteractionCount(for: critter, context: modelContext))/3", label: l.tr(zh: "今日", en: "Today", de: "Heute"))
+                            codexMetric(value: "B\(snapshot?.bondLevel ?? 1)", label: l.tr(zh: "羁绊", en: "Bond", de: "Bindung"))
+                            codexMetric(value: "\(snapshot?.todayInteractionCount ?? 0)/3", label: l.tr(zh: "今日", en: "Today", de: "Heute"))
                         }
                     }
                     .frame(maxWidth: .infinity)
@@ -550,11 +575,11 @@ struct OasisCritterCodexView: View {
             }
 
             if let critter {
-                critterToySurface(entry: entry, critter: critter, fragmentCount: fragmentCount)
+                critterToySurface(entry: entry, critter: critter, snapshot: snapshot ?? renderSnapshot(for: critter), fragmentCount: fragmentCount)
                 if let lastInteractionOutcome, lastInteractionOutcome.success {
                     interactionOutcomeBanner(lastInteractionOutcome)
                 }
-                upgradeLevelButton(critter)
+                upgradeLevelButton(critter, snapshot: snapshot ?? renderSnapshot(for: critter))
             } else {
                 lockedRoadmap(entry, fragmentCount: fragmentCount)
             }
@@ -571,14 +596,13 @@ struct OasisCritterCodexView: View {
         )
     }
 
-    private func critterToySurface(entry: OasisElectronicPetCatalogEntry, critter: OasisElectronicPet, fragmentCount: Int) -> some View {
-        let snapshot = OasisUpgradeRewardService.lifecycleSnapshot(for: critter, context: modelContext)
-        let wish = OasisUpgradeRewardService.displayDailyWish(for: critter, snapshot: snapshot)
-        let wishCompleted = OasisUpgradeRewardService.isDailyWishCompleted(for: critter, wish: wish, context: modelContext)
-        let isDead = snapshot.state == .dead
-        let canFeed = !isDead && OasisUpgradeRewardService.canInteract(with: critter, action: .feed, context: modelContext)
-        let canPlay = !isDead && OasisUpgradeRewardService.canInteract(with: critter, action: .play, context: modelContext)
-        let canRest = !isDead && OasisUpgradeRewardService.canInteract(with: critter, action: .rest, context: modelContext)
+    private func critterToySurface(
+        entry: OasisElectronicPetCatalogEntry,
+        critter: OasisElectronicPet,
+        snapshot: OasisCritterRenderSnapshot,
+        fragmentCount: Int
+    ) -> some View {
+        let wish = snapshot.dailyWish
 
         return VStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 10) {
@@ -588,7 +612,7 @@ struct OasisCritterCodexView: View {
                             .font(.system(size: 20, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
-                        Text(lifecycleShortText(snapshot))
+                        Text(lifecycleShortText(snapshot.lifecycle))
                             .font(.system(size: 11, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .lineLimit(1)
@@ -600,8 +624,8 @@ struct OasisCritterCodexView: View {
                 }
 
                 HStack(spacing: 7) {
-                    toyInfoPill("Lv.\(min(OasisUpgradeRewardService.maxCritterLevel, max(1, critter.level)))")
-                    toyInfoPill(l.tr(zh: "形态 \(OasisUpgradeRewardService.appearanceStage(forLevel: critter.level))", en: "Form \(OasisUpgradeRewardService.appearanceStage(forLevel: critter.level))", de: "Form \(OasisUpgradeRewardService.appearanceStage(forLevel: critter.level))"))
+                    toyInfoPill("Lv.\(snapshot.displayLevel)")
+                    toyInfoPill(l.tr(zh: "形态 \(snapshot.appearanceStage)", en: "Form \(snapshot.appearanceStage)", de: "Form \(snapshot.appearanceStage)"))
                     toyInfoPill(l.tr(zh: entry.rarity.zh, en: entry.rarity.en, de: entry.rarity.de))
                     toyInfoPill("\(fragmentCount)◇")
                 }
@@ -611,9 +635,9 @@ struct OasisCritterCodexView: View {
 
             GeometryReader { proxy in
                 let width = proxy.size.width
-                let auraTint = critterAuraTint(for: snapshot.state)
+                let auraTint = critterAuraTint(for: snapshot.lifecycle.state)
                 ZStack {
-                    critterAura(tint: auraTint, state: snapshot.state)
+                    critterAura(tint: auraTint, state: snapshot.lifecycle.state)
                         .frame(width: min(width * 0.94, 360), height: 350)
                         .position(x: width * 0.50, y: 218)
 
@@ -628,9 +652,9 @@ struct OasisCritterCodexView: View {
                     toyActionButton(
                         icon: "fork.knife",
                         title: l.tr(zh: "喂", en: "Feed", de: "Füttern"),
-                        cost: critterInteractionCostText(critter, action: .feed),
-                        enabled: canFeed,
-                        highlighted: !wishCompleted && wish.action == .feed
+                        cost: critterInteractionCostText(snapshot.feedCost),
+                        enabled: snapshot.canFeed,
+                        highlighted: !snapshot.isDailyWishCompleted && wish?.action == .feed
                     ) {
                         perform(.feed, critter: critter)
                     }
@@ -639,9 +663,9 @@ struct OasisCritterCodexView: View {
                     toyActionButton(
                         icon: "sparkles",
                         title: l.tr(zh: "玩", en: "Play", de: "Spiel"),
-                        cost: critterInteractionCostText(critter, action: .play),
-                        enabled: canPlay,
-                        highlighted: !wishCompleted && wish.action == .play
+                        cost: critterInteractionCostText(snapshot.playCost),
+                        enabled: snapshot.canPlay,
+                        highlighted: !snapshot.isDailyWishCompleted && wish?.action == .play
                     ) {
                         perform(.play, critter: critter)
                     }
@@ -650,9 +674,9 @@ struct OasisCritterCodexView: View {
                     toyActionButton(
                         icon: "moon.fill",
                         title: l.tr(zh: "睡", en: "Rest", de: "Ruhen"),
-                        cost: critterInteractionCostText(critter, action: .rest),
-                        enabled: canRest,
-                        highlighted: !wishCompleted && wish.action == .rest
+                        cost: critterInteractionCostText(snapshot.restCost),
+                        enabled: snapshot.canRest,
+                        highlighted: !snapshot.isDailyWishCompleted && wish?.action == .rest
                     ) {
                         perform(.rest, critter: critter)
                     }
@@ -662,8 +686,8 @@ struct OasisCritterCodexView: View {
                         icon: "cross.case.fill",
                         title: l.tr(zh: "照顾", en: "Care", de: "Pflege"),
                         cost: l.tr(zh: "免费", en: "Free", de: "Gratis"),
-                        enabled: snapshot.isRescuable && rescuingCritterId != critter.id,
-                        highlighted: snapshot.isRescuable
+                        enabled: snapshot.lifecycle.isRescuable && rescuingCritterId != critter.id,
+                        highlighted: snapshot.lifecycle.isRescuable
                     ) {
                         rescue(critter)
                     }
@@ -672,7 +696,7 @@ struct OasisCritterCodexView: View {
             }
             .frame(height: 440)
 
-            critterToyCharts(critter)
+            critterToyCharts(critter, snapshot: snapshot)
         }
     }
 
@@ -731,17 +755,18 @@ struct OasisCritterCodexView: View {
     }
 
     private func homeDisplayToggle(_ critter: OasisElectronicPet) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: critter.isFeaturedOnOasis ? "house.fill" : "house.slash.fill")
+        let isFeatured = featuredDisplayOverrides[critter.id] ?? critter.isFeaturedOnOasis
+        return HStack(spacing: 6) {
+            Image(systemName: isFeatured ? "house.fill" : "house.slash.fill")
                 .font(.system(size: 11, weight: .black))
-                .foregroundStyle(critter.isFeaturedOnOasis ? Color.goPrimary : Color.ohanaTertiaryText)
+                .foregroundStyle(isFeatured ? Color.goPrimary : Color.ohanaTertiaryText)
                 .frame(width: 16)
 
-            Text(critter.isFeaturedOnOasis
+            Text(isFeatured
                 ? l.tr(zh: "首页显示", en: "Home", de: "Start")
                 : l.tr(zh: "已隐藏", en: "Hidden", de: "Verborgen"))
                 .font(.system(size: 10, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(critter.isFeaturedOnOasis ? 0.86 : 0.52))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(isFeatured ? 0.86 : 0.52))
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
 
@@ -759,17 +784,18 @@ struct OasisCritterCodexView: View {
         .fixedSize(horizontal: true, vertical: false)
         .disabled(critter.lifeState == .dead)
         .opacity(critter.lifeState == .dead ? 0.42 : 1)
-        .accessibilityLabel(critter.isFeaturedOnOasis
+        .accessibilityLabel(isFeatured
             ? l.tr(zh: "关闭首页显示", en: "Hide from home", de: "Von Startseite ausblenden")
             : l.tr(zh: "显示在首页", en: "Show on home", de: "Auf Startseite zeigen"))
     }
 
     private func homeDisplayBinding(for critter: OasisElectronicPet) -> Binding<Bool> {
         Binding(
-            get: { critter.isFeaturedOnOasis },
+            get: { featuredDisplayOverrides[critter.id] ?? critter.isFeaturedOnOasis },
             set: { newValue in
-                guard newValue != critter.isFeaturedOnOasis else { return }
-                toggleHomeDisplay(critter)
+                let visibleValue = featuredDisplayOverrides[critter.id] ?? critter.isFeaturedOnOasis
+                guard newValue != visibleValue else { return }
+                toggleHomeDisplay(critter, desired: newValue)
             }
         )
     }
@@ -815,17 +841,13 @@ struct OasisCritterCodexView: View {
         .disabled(!enabled)
     }
 
-    private func critterToyCharts(_ critter: OasisElectronicPet) -> some View {
-        let bondLevel = OasisUpgradeRewardService.bondLevel(for: critter)
-        let xp = OasisUpgradeRewardService.xpProgress(for: critter)
-        let xpPercent = Int(Double(xp) / Double(OasisUpgradeRewardService.critterXPPerLevel) * 100)
-
-        return VStack(spacing: 10) {
+    private func critterToyCharts(_ critter: OasisElectronicPet, snapshot: OasisCritterRenderSnapshot) -> some View {
+        VStack(spacing: 10) {
             toyStatusRow(icon: "fork.knife", value: critter.hunger, label: l.tr(zh: "饱腹", en: "Fullness", de: "Satt"), tint: Color.goOrange)
             toyStatusRow(icon: "face.smiling", value: critter.mood, label: l.tr(zh: "心情", en: "Mood", de: "Laune"), tint: Color.goTeal)
             toyStatusRow(icon: "cross.case.fill", value: critter.health, label: l.tr(zh: "健康", en: "Health", de: "Gesund"), tint: Color.goPurple)
-            toyStatusRow(icon: "heart.fill", value: OasisUpgradeRewardService.bondProgress(for: critter), label: l.tr(zh: "羁绊 B\(bondLevel)", en: "Bond B\(bondLevel)", de: "Bindung B\(bondLevel)"), tint: Color(hex: "FF6AA6"))
-            toyProgressRow(icon: "bolt.fill", value: xpPercent, label: l.tr(zh: "成长 XP", en: "Growth XP", de: "Wachstum XP"), detail: "\(xp)/\(OasisUpgradeRewardService.critterXPPerLevel)", tint: Color.goPrimary)
+            toyStatusRow(icon: "heart.fill", value: snapshot.bondProgress, label: l.tr(zh: "羁绊 B\(snapshot.bondLevel)", en: "Bond B\(snapshot.bondLevel)", de: "Bindung B\(snapshot.bondLevel)"), tint: Color(hex: "FF6AA6"))
+            toyProgressRow(icon: "bolt.fill", value: snapshot.xpPercent, label: l.tr(zh: "成长 XP", en: "Growth XP", de: "Wachstum XP"), detail: "\(snapshot.xpProgress)/\(snapshot.xpTarget)", tint: Color.goPrimary)
         }
         .padding(12)
         .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -905,9 +927,9 @@ struct OasisCritterCodexView: View {
         .frame(height: height)
     }
 
-    private func upgradeLevelButton(_ critter: OasisElectronicPet) -> some View {
-        let isMax = critter.level >= OasisUpgradeRewardService.maxCritterLevel
-        let canUpgrade = OasisUpgradeRewardService.canUpgradeLevel(for: critter)
+    private func upgradeLevelButton(_ critter: OasisElectronicPet, snapshot: OasisCritterRenderSnapshot) -> some View {
+        let isMax = critter.level >= snapshot.maxLevel
+        let canUpgrade = snapshot.canUpgradeLevel
         return Button {
             upgrade(critter)
         } label: {
@@ -919,12 +941,12 @@ struct OasisCritterCodexView: View {
                         .font(.system(size: 15, weight: .black, design: .rounded))
                     Text(isMax
                         ? l.tr(zh: "Lumo 已经是最终形态", en: "Lumo is fully evolved", de: "Lumo ist voll entwickelt")
-                        : l.tr(zh: "需要 \(OasisUpgradeRewardService.critterXPPerLevel - OasisUpgradeRewardService.xpProgress(for: critter)) XP", en: "\(OasisUpgradeRewardService.critterXPPerLevel - OasisUpgradeRewardService.xpProgress(for: critter)) XP needed", de: "\(OasisUpgradeRewardService.critterXPPerLevel - OasisUpgradeRewardService.xpProgress(for: critter)) XP nötig"))
+                        : l.tr(zh: "需要 \(snapshot.xpNeededForNextLevel) XP", en: "\(snapshot.xpNeededForNextLevel) XP needed", de: "\(snapshot.xpNeededForNextLevel) XP nötig"))
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .opacity(0.82)
                 }
                 Spacer()
-                Text(isMax ? "Lv.\(OasisUpgradeRewardService.maxCritterLevel)" : "\(OasisUpgradeRewardService.xpProgress(for: critter))/\(OasisUpgradeRewardService.critterXPPerLevel)")
+                Text(isMax ? "Lv.\(snapshot.maxLevel)" : "\(snapshot.xpProgress)/\(snapshot.xpTarget)")
                     .font(.system(size: 12, weight: .black, design: .rounded))
                     .monospacedDigit()
             }
@@ -949,79 +971,13 @@ struct OasisCritterCodexView: View {
         }
     }
 
-    private func critterStateRows(_ critter: OasisElectronicPet) -> some View {
-        VStack(spacing: 10) {
-            codexBar(icon: "fork.knife", value: critter.hunger, tint: Color.goOrange)
-            codexBar(icon: "face.smiling", value: critter.mood, tint: Color.goTeal)
-            codexBar(icon: "cross.case.fill", value: critter.health, tint: Color.goPurple)
-            critterBondBar(critter)
-        }
-    }
-
-    private func critterLifecycleStatusCard(_ critter: OasisElectronicPet, snapshot: OasisCritterLifecycleSnapshot) -> some View {
-        HStack(alignment: .top, spacing: 11) {
-            Image(systemName: lifecycleIcon(for: snapshot.state))
-                .font(.system(size: 15, weight: .black))
-                .foregroundStyle(snapshot.state == .critical ? Color.arkInk : Color.ohanaPrimaryActionText)
-                .frame(width: 40, height: 40)
-                .background(lifecycleTint(for: snapshot.state), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(snapshot.state.name(l))
-                    .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(OasisUpgradeRewardService.gentlePrompt(for: critter, snapshot: snapshot, l: l))
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(3)
-                if snapshot.state == .dead, let diedAt = critter.diedAt {
-                    Text(relative(diedAt))
-                        .font(.system(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaTertiaryText)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(12)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-    }
-
-    private func dailyWishCard(_ wish: OasisCritterDailyWish, critter: OasisElectronicPet, isCompleted: Bool) -> some View {
-        HStack(spacing: 11) {
-            Image(systemName: isCompleted ? "checkmark.seal.fill" : wish.icon)
-                .font(.system(size: 15, weight: .black))
-                .foregroundStyle(isCompleted ? Color.arkInk : Color.ohanaPrimaryActionText)
-                .frame(width: 40, height: 40)
-                .background(isCompleted ? Color.goPrimary : rarityColor(critter.rarity), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(isCompleted ? l.tr(zh: "今日小愿望完成", en: "Tiny wish complete", de: "Kleiner Wunsch erfüllt") : wish.title(l))
-                    .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(isCompleted ? l.tr(zh: "明天它还会带来新的小心愿。", en: "Tomorrow brings a new little wish.", de: "Morgen kommt ein neuer kleiner Wunsch.") : wish.detail(l))
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(2)
-                Text(wish.rewardText(l))
-                    .font(.system(size: 10, weight: .black, design: .rounded))
-                    .foregroundStyle(isCompleted ? Color.goPrimary : Color.ohanaTertiaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(12)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .animation(GoMotion.feedback, value: isCompleted)
-    }
-
     private func lockedRoadmap(_ entry: OasisElectronicPetCatalogEntry, fragmentCount: Int) -> some View {
         let level = entry.sourceLevel
         let cost = OasisUpgradeRewardService.awakeningCost(for: entry.rarity)
         let isLevelUnlocked = treeMgr.treeLevel.rawValue >= level
         let canAwaken = fragmentCount >= cost.fragments &&
             isLevelUnlocked &&
-            OasisCritterEconomyService.canSpendCurrentHumanCoconuts(cost.coconuts, context: modelContext)
+            currentCoconutBalance >= cost.coconuts
         return VStack(spacing: 12) {
             HStack(spacing: 10) {
                 Image(systemName: "lock.fill")
@@ -1072,6 +1028,48 @@ struct OasisCritterCodexView: View {
         electronicPets.first { $0.catalogId == catalogId && !$0.isArchived }
     }
 
+    private func renderSnapshot(for critter: OasisElectronicPet) -> OasisCritterRenderSnapshot {
+        renderSnapshots[critter.id] ?? OasisCritterRenderSnapshot.lightweight(for: critter)
+    }
+
+    private func scheduleRenderSnapshotRefresh(milliseconds: UInt64 = 80) {
+        renderSnapshotTask?.cancel()
+        renderSnapshotTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: milliseconds) {
+            renderSnapshots = commandExecutor.makeCritterSnapshots(
+                electronicPets: electronicPets,
+                fragments: fragments
+            )
+            renderSnapshotTask = nil
+        }
+    }
+
+    private func scheduleLifecycleRefresh(milliseconds: UInt64 = 120) {
+        lifecycleRefreshTask?.cancel()
+        lifecycleRefreshTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: milliseconds) {
+            commandExecutor.refreshFeaturedCritterLifecycle(electronicPets)
+            scheduleRenderSnapshotRefresh(milliseconds: 30)
+            lifecycleRefreshTask = nil
+        }
+    }
+
+    private func scheduleCritterCommand(milliseconds: UInt64 = 60, _ operation: @escaping @MainActor () -> Void) {
+        let taskId = UUID()
+        critterCommandTasks[taskId] = OhanaFrameScheduler.runAfterNextFrame(milliseconds: milliseconds) {
+            operation()
+            critterCommandTasks[taskId] = nil
+        }
+    }
+
+    private func cancelDeferredWork() {
+        lifecycleRefreshTask?.cancel()
+        renderSnapshotTask?.cancel()
+        pulseCleanupTask?.cancel()
+        rescueBusyCleanupTask?.cancel()
+        outcomeCleanupTask?.cancel()
+        critterCommandTasks.values.forEach { $0.cancel() }
+        critterCommandTasks.removeAll()
+    }
+
     private func collectionStatus(for entry: OasisElectronicPetCatalogEntry, owned: Bool) -> String {
         if owned { return l.tr(zh: "已唤醒", en: "Awake", de: "Wach") }
         let fragmentCount = fragments.first(where: { $0.catalogId == entry.id })?.amount ?? 0
@@ -1095,86 +1093,6 @@ struct OasisCritterCodexView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
         .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    private func codexBar(icon: String, value: Int, tint: Color) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .black))
-                .foregroundStyle(tint)
-                .frame(width: 24)
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.ohanaControlFill)
-                    Capsule()
-                        .fill(tint)
-                        .frame(width: proxy.size.width * CGFloat(max(0, min(100, value))) / 100)
-                        .animation(GoMotion.feedback, value: value)
-                }
-            }
-            .frame(height: 8)
-            Text("\(max(0, min(100, value)))")
-                .font(.system(size: 11, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .monospacedDigit()
-                .contentTransition(.numericText())
-        }
-    }
-
-    private func critterBondBar(_ critter: OasisElectronicPet) -> some View {
-        let progress = OasisUpgradeRewardService.bondProgress(for: critter)
-        let level = OasisUpgradeRewardService.bondLevel(for: critter)
-        return HStack(spacing: 8) {
-            Image(systemName: "heart.fill")
-                .font(.system(size: 12, weight: .black))
-                .foregroundStyle(Color(hex: "FF6AA6"))
-                .frame(width: 24)
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.ohanaControlFill)
-                    Capsule()
-                        .fill(Color(hex: "FF6AA6"))
-                        .frame(width: proxy.size.width * CGFloat(progress) / 100)
-                        .animation(GoMotion.feedback, value: progress)
-                }
-            }
-            .frame(height: 8)
-            Text("B\(level) \(progress)/100")
-                .font(.system(size: 11, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .monospacedDigit()
-                .contentTransition(.numericText())
-        }
-    }
-
-    private func critterGrowthRows(_ critter: OasisElectronicPet) -> some View {
-        VStack(spacing: 9) {
-            HStack(spacing: 8) {
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: 12, weight: .black))
-                    .foregroundStyle(Color.goPrimary)
-                    .frame(width: 24)
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.ohanaControlFill)
-                        Capsule()
-                            .fill(Color.goPrimary)
-                            .frame(width: proxy.size.width * CGFloat(max(0, min(100, critter.xp))) / 100)
-                            .animation(GoMotion.feedback, value: critter.xp)
-                    }
-                }
-                .frame(height: 8)
-                Text("\(max(0, min(100, critter.xp)))/100")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-            }
-            Text(careHint(for: critter))
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
     }
 
     private func interactionOutcomeBanner(_ outcome: OasisCritterInteractionOutcome) -> some View {
@@ -1228,104 +1146,141 @@ struct OasisCritterCodexView: View {
     }
 
     private func perform(_ action: OasisCritterAction, critter: OasisElectronicPet) {
-        do {
-            let outcome = try OasisUpgradeRewardService.interactWithOutcome(with: critter, action: action, context: modelContext)
-            withAnimation(GoMotion.feedback) {
-                lastInteractionOutcome = outcome.success ? outcome : nil
+        OhanaFeedback.light()
+        pulse(catalogId: critter.catalogId)
+        scheduleCritterCommand {
+            do {
+                let outcome = try commandExecutor.interact(with: critter, action: action)
+                withAnimation(GoMotion.feedback) {
+                    lastInteractionOutcome = outcome.success ? outcome : nil
+                }
+                feedback(for: critter.catalogId, success: outcome.success)
+                if outcome.success {
+                    clearInteractionOutcomeLater(outcome)
+                    scheduleRenderSnapshotRefresh(milliseconds: 30)
+                }
+            } catch {
+                feedback(for: critter.catalogId, success: false)
             }
-            feedback(for: critter.catalogId, success: outcome.success)
-            if outcome.success {
-                clearInteractionOutcomeLater(outcome)
-            }
-        } catch {
-            feedback(for: critter.catalogId, success: false)
         }
     }
 
     private func rescue(_ critter: OasisElectronicPet) {
         guard rescuingCritterId == nil else { return }
-        rescuingCritterId = critter.id
-        defer { clearRescueBusyState(for: critter.id) }
-
-        do {
-            let outcome = try OasisUpgradeRewardService.rescueIfNeeded(for: critter, context: modelContext)
-            withAnimation(GoMotion.feedback) {
-                lastInteractionOutcome = outcome.success ? outcome : nil
+        withAnimation(GoMotion.tap) {
+            rescuingCritterId = critter.id
+        }
+        OhanaFeedback.light()
+        scheduleCritterCommand {
+            defer { clearRescueBusyState(for: critter.id) }
+            do {
+                let outcome = try commandExecutor.rescue(critter)
+                withAnimation(GoMotion.feedback) {
+                    lastInteractionOutcome = outcome.success ? outcome : nil
+                }
+                feedback(for: critter.catalogId, success: outcome.success)
+                if outcome.success {
+                    clearInteractionOutcomeLater(outcome)
+                    scheduleRenderSnapshotRefresh(milliseconds: 30)
+                }
+            } catch {
+                feedback(for: critter.catalogId, success: false)
             }
-            feedback(for: critter.catalogId, success: outcome.success)
-            if outcome.success {
-                clearInteractionOutcomeLater(outcome)
-            }
-        } catch {
-            feedback(for: critter.catalogId, success: false)
         }
     }
 
     private func clearRescueBusyState(for critterId: UUID) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+        rescueBusyCleanupTask?.cancel()
+        rescueBusyCleanupTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 450) {
             guard rescuingCritterId == critterId else { return }
-            rescuingCritterId = nil
+            withAnimation(GoMotion.tap) {
+                rescuingCritterId = nil
+            }
+            rescueBusyCleanupTask = nil
         }
     }
 
     private func upgrade(_ critter: OasisElectronicPet) {
-        do {
-            feedback(for: critter.catalogId, success: try OasisUpgradeRewardService.upgradeLevel(for: critter, context: modelContext))
-        } catch {
-            feedback(for: critter.catalogId, success: false)
+        OhanaFeedback.light()
+        pulse(catalogId: critter.catalogId)
+        scheduleCritterCommand {
+            do {
+                feedback(for: critter.catalogId, success: try commandExecutor.upgradeLevel(critter))
+                scheduleRenderSnapshotRefresh(milliseconds: 30)
+            } catch {
+                feedback(for: critter.catalogId, success: false)
+            }
         }
     }
 
     private func awaken(_ entry: OasisElectronicPetCatalogEntry) {
-        do {
-            if let critter = try OasisUpgradeRewardService.awakenWithFragments(catalogId: entry.id, context: modelContext) {
-                withAnimation(GoMotion.fab) {
-                    selectedCatalogId = critter.catalogId
+        OhanaFeedback.light()
+        pulse(catalogId: entry.id)
+        scheduleCritterCommand {
+            do {
+                if let critter = try commandExecutor.awakenWithFragments(catalogId: entry.id) {
+                    withAnimation(GoMotion.fab) {
+                        selectedCatalogId = critter.catalogId
+                    }
+                    feedback(for: entry.id, success: true)
+                    scheduleRenderSnapshotRefresh(milliseconds: 30)
+                } else {
+                    feedback(for: entry.id, success: false)
                 }
-                feedback(for: entry.id, success: true)
-            } else {
+            } catch {
                 feedback(for: entry.id, success: false)
             }
-        } catch {
-            feedback(for: entry.id, success: false)
         }
     }
 
-    private func toggleHomeDisplay(_ critter: OasisElectronicPet) {
+    private func toggleHomeDisplay(_ critter: OasisElectronicPet, desired: Bool) {
         guard critter.lifeState != .dead else {
             feedback(for: critter.catalogId, success: false)
             return
         }
-        do {
-            if critter.isFeaturedOnOasis {
-                try OasisUpgradeRewardService.clearFeatured(critter, context: modelContext)
-            } else {
-                try OasisUpgradeRewardService.setFeatured(critter, context: modelContext)
+        withAnimation(GoMotion.tap) {
+            featuredDisplayOverrides[critter.id] = desired
+        }
+        OhanaFeedback.light()
+        scheduleCritterCommand {
+            do {
+                try commandExecutor.setFeatured(critter, desired: desired)
+                featuredDisplayOverrides[critter.id] = nil
+                feedback(for: critter.catalogId, success: true)
+                scheduleRenderSnapshotRefresh(milliseconds: 30)
+            } catch {
+                featuredDisplayOverrides[critter.id] = nil
+                feedback(for: critter.catalogId, success: false)
             }
-            feedback(for: critter.catalogId, success: true)
-        } catch {
-            feedback(for: critter.catalogId, success: false)
         }
     }
 
     private func feedback(for catalogId: String, success: Bool) {
         if success {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            withAnimation(GoMotion.feedback) { pulseCatalogId = catalogId }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.34) {
-                withAnimation(GoMotion.feedback) { pulseCatalogId = nil }
-            }
+            OhanaFeedback.light()
+            pulse(catalogId: catalogId)
         } else {
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
         }
     }
 
+    private func pulse(catalogId: String) {
+        withAnimation(GoMotion.feedback) { pulseCatalogId = catalogId }
+        pulseCleanupTask?.cancel()
+        pulseCleanupTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 340) {
+            withAnimation(GoMotion.feedback) { pulseCatalogId = nil }
+            pulseCleanupTask = nil
+        }
+    }
+
     private func clearInteractionOutcomeLater(_ outcome: OasisCritterInteractionOutcome) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.4) {
+        outcomeCleanupTask?.cancel()
+        outcomeCleanupTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 3_400) {
             guard lastInteractionOutcome == outcome else { return }
             withAnimation(GoMotion.reduced) {
                 lastInteractionOutcome = nil
             }
+            outcomeCleanupTask = nil
         }
     }
 
@@ -1354,28 +1309,6 @@ struct OasisCritterCodexView: View {
         }
     }
 
-    private func lifecycleIcon(for state: OasisCritterLifeState) -> String {
-        switch state {
-        case .healthy: return "heart.fill"
-        case .needsCare: return "hand.raised.fill"
-        case .atRisk: return "exclamationmark.circle.fill"
-        case .sick: return "cross.case.fill"
-        case .critical: return "hourglass"
-        case .dead: return "leaf.fill"
-        }
-    }
-
-    private func lifecycleTint(for state: OasisCritterLifeState) -> Color {
-        switch state {
-        case .healthy: return Color.goPrimary
-        case .needsCare: return Color.goTeal
-        case .atRisk: return Color.goOrange
-        case .sick: return Color.goPurple
-        case .critical: return Color.goYellow
-        case .dead: return Color.ohanaCardSurface
-        }
-    }
-
     private func critterAuraTint(for state: OasisCritterLifeState) -> Color {
         switch state {
         case .healthy:
@@ -1387,39 +1320,7 @@ struct OasisCritterCodexView: View {
         }
     }
 
-    private func starCostText(for critter: OasisElectronicPet) -> String {
-        let cost = OasisUpgradeRewardService.starUpgradeCost(for: critter)
-        return "\(cost.fragments)◇ \(cost.coconuts)🥥"
-    }
-
-    private func critterInteractionCostText(_ critter: OasisElectronicPet, action: OasisCritterAction) -> String {
-        let cost = OasisUpgradeRewardService.interactionCost(for: critter, action: action, context: modelContext)
+    private func critterInteractionCostText(_ cost: Int) -> String {
         return cost == 0 ? l.tr(zh: "免费", en: "Free", de: "Gratis") : "\(cost)🥥"
-    }
-
-    private func canUpgradeStar(_ critter: OasisElectronicPet) -> Bool {
-        guard critter.lifeState != .dead else { return false }
-        let cost = OasisUpgradeRewardService.starUpgradeCost(for: critter)
-        let fragmentCount = fragments.first(where: { $0.catalogId == critter.catalogId })?.amount ?? 0
-        return fragmentCount >= cost.fragments &&
-            OasisCritterEconomyService.canSpendCurrentHumanCoconuts(cost.coconuts, context: modelContext)
-    }
-
-    private func careHint(for critter: OasisElectronicPet) -> String {
-        let snapshot = OasisUpgradeRewardService.lifecycleSnapshot(for: critter, context: modelContext)
-        return OasisUpgradeRewardService.gentlePrompt(for: critter, snapshot: snapshot, l: l)
-    }
-
-    private func refreshLifecycleSnapshots() {
-        for critter in electronicPets where !critter.isArchived {
-            OasisUpgradeRewardService.normalizeLifecycle(for: critter, context: modelContext)
-        }
-    }
-
-    private func relative(_ date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.locale = AppLanguage.effectiveLocale
-        formatter.unitsStyle = .short
-        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }

@@ -9,72 +9,6 @@
 import SwiftUI
 import SwiftData
 
-@MainActor
-struct FamilyCollaborationCommandExecutor {
-    let modelContext: ModelContext
-
-    func migrateLegacyBountiesIfNeeded() {
-        FamilyTaskService.migrateLegacyBountiesIfNeeded(context: modelContext)
-    }
-
-    func assignReminder(_ reminder: Reminder, to human: Human, by creator: Human?, rewardCoconuts: Int, note: String) {
-        _ = FamilyTaskService.assignReminder(
-            reminder,
-            to: human,
-            by: creator,
-            rewardCoconuts: rewardCoconuts,
-            note: note,
-            context: modelContext
-        )
-    }
-
-    func createTask(title: String, note: String, assignedTo human: Human?, by creator: Human?, rewardCoconuts: Int, dueAt: Date?, emoji: String) {
-        _ = FamilyTaskService.createHouseholdTask(
-            title: title,
-            note: note,
-            assignedTo: human,
-            by: creator,
-            rewardCoconuts: rewardCoconuts,
-            dueAt: dueAt,
-            emoji: emoji,
-            context: modelContext
-        )
-    }
-
-    func updateTask(_ task: FamilyCollaborationTask, title: String, note: String, assignedTo human: Human?, rewardCoconuts: Int, dueAt: Date?, emoji: String) {
-        FamilyTaskService.updateTask(
-            task,
-            title: title,
-            note: note,
-            assignedTo: human,
-            rewardCoconuts: rewardCoconuts,
-            dueAt: dueAt,
-            emoji: emoji,
-            context: modelContext
-        )
-    }
-
-    func deleteTask(_ task: FamilyCollaborationTask) {
-        FamilyTaskService.delete(task, context: modelContext)
-    }
-
-    func rejectCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?) {
-        FamilyTaskService.rejectCompletion(task, by: reviewer, context: modelContext)
-    }
-
-    func confirmCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?) {
-        FamilyTaskService.confirmCompletion(task, by: reviewer, context: modelContext)
-    }
-
-    func complete(_ task: FamilyCollaborationTask, by human: Human?) {
-        FamilyTaskService.complete(task, by: human, context: modelContext)
-    }
-
-    func claim(_ task: FamilyCollaborationTask, by human: Human) {
-        FamilyTaskService.claim(task, by: human, context: modelContext)
-    }
-}
-
 struct FamilyCollaborationDashboardHost: View {
     let pets: [Pet]
     let humans: [Human]
@@ -119,10 +53,10 @@ struct FamilyCollaborationDashboardView: View {
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage("currentActiveHumanId") private var activeHumanId = ""
-    @State private var showingMoreCollaboration = false
     @State private var selectedPetId: UUID?
     @State private var selectedTaskScope: TaskScope = .mine
-    @State private var activeEditor: TaskEditorRoute?
+    @State private var activeSheetRoute: FamilyCollaborationSheetRoute?
+    @State private var activeEditor: FamilyCollaborationEditorRoute?
     @State private var inlineEditorVisible = false
     @State private var inlineEditorDragOffset: CGFloat = 0
     @State private var isVisible = false
@@ -134,20 +68,6 @@ struct FamilyCollaborationDashboardView: View {
         case mine
         case pet
         case bounty
-    }
-
-    enum TaskEditorRoute: Identifiable {
-        case assign(Reminder)
-        case edit(FamilyCollaborationTask)
-        case create
-
-        var id: String {
-            switch self {
-            case .assign(let reminder): return "assign-\(reminder.id.uuidString)"
-            case .edit(let task): return "edit-\(task.id.uuidString)"
-            case .create: return "create"
-            }
-        }
     }
 
     private var l: L10n { L10n(appLanguage) }
@@ -303,27 +223,12 @@ struct FamilyCollaborationDashboardView: View {
             guard newValue != 0 else { return }
             presentEditor(.create)
         }
-        .sheet(isPresented: $showingMoreCollaboration) {
-            NavigationStack {
-                ScrollView(showsIndicators: false) {
-                    moreCollaborationContent
-                        .padding(20)
-                        .padding(.bottom, 24)
-                }
-                .background(OhanaAppBackground().ignoresSafeArea())
-                .navigationTitle(l.tr(zh: "更多协作", en: "More collaboration", de: "Mehr Zusammenarbeit"))
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
-                            showingMoreCollaboration = false
-                        }
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(Color.goPrimary)
-                    }
-                }
-            }
-            .ohanaSheetPagePresentation() // ui-v4: allow more collaboration is a long overview
+        .familyCollaborationPresentations(
+            sheetRoute: $activeSheetRoute,
+            title: l.tr(zh: "更多协作", en: "More collaboration", de: "Mehr Zusammenarbeit"),
+            doneTitle: l.tr(zh: "完成", en: "Done", de: "Fertig")
+        ) {
+            moreCollaborationContent
         }
         .interactiveDismissDisabled(activeEditor != nil)
     }
@@ -556,7 +461,7 @@ struct FamilyCollaborationDashboardView: View {
         }
     }
 
-    private func presentEditor(_ route: TaskEditorRoute) {
+    private func presentEditor(_ route: FamilyCollaborationEditorRoute) {
         inlineEditorVisible = false
         inlineEditorDragOffset = 0
         activeEditor = route
@@ -575,7 +480,7 @@ struct FamilyCollaborationDashboardView: View {
         }
     }
 
-    private func inlineTaskEditorOverlay(_ route: TaskEditorRoute) -> some View {
+    private func inlineTaskEditorOverlay(_ route: FamilyCollaborationEditorRoute) -> some View {
         GeometryReader { proxy in
             let horizontalInset: CGFloat = 6
             let bottomInset = max(proxy.safeAreaInsets.bottom, CGFloat(8))
@@ -583,6 +488,11 @@ struct FamilyCollaborationDashboardView: View {
             let hiddenOffset = maxHeight + bottomInset + 64
             let cornerRadius: CGFloat = 52
             let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            let editorContext = FamilyCollaborationEditorContext.resolve(
+                route: route,
+                reminders: pendingReminders,
+                tasks: familyTasks
+            )
 
             ZStack(alignment: .bottom) {
                 collaborationInlineBackdrop
@@ -591,49 +501,51 @@ struct FamilyCollaborationDashboardView: View {
 
                 ZStack(alignment: .top) {
                     ScrollView(.vertical, showsIndicators: false) {
-                        FamilyTaskEditorPanel(
-                            route: route,
-                            humans: humans,
-                            currentHuman: currentHuman,
-                            pets: pets,
-                            onClose: dismissEditor,
-                            onAssignReminder: { reminder, human, reward, note in
-                                commandExecutor.assignReminder(
-                                    reminder,
-                                    to: human,
-                                    by: currentHuman,
-                                    rewardCoconuts: reward,
-                                    note: note
-                                )
-                            },
-                            onCreateTask: { title, note, human, reward, dueAt, emoji in
-                                commandExecutor.createTask(
-                                    title: title,
-                                    note: note,
-                                    assignedTo: human,
-                                    by: currentHuman,
-                                    rewardCoconuts: reward,
-                                    dueAt: dueAt,
-                                    emoji: emoji
-                                )
-                            },
-                            onUpdateTask: { task, title, note, human, reward, dueAt, emoji in
-                                commandExecutor.updateTask(
-                                    task,
-                                    title: title,
-                                    note: note,
-                                    assignedTo: human,
-                                    rewardCoconuts: reward,
-                                    dueAt: dueAt,
-                                    emoji: emoji
-                                )
-                            },
-                            onDeleteTask: { task in
-                                commandExecutor.deleteTask(task)
-                            }
-                        )
-                        .padding(.top, 32)
-                        .padding(.bottom, 16)
+                        if let editorContext {
+                            FamilyTaskEditorPanel(
+                                context: editorContext,
+                                humans: humans,
+                                currentHuman: currentHuman,
+                                pets: pets,
+                                onClose: dismissEditor,
+                                onAssignReminder: { reminder, human, reward, note in
+                                    commandExecutor.assignReminder(
+                                        reminder,
+                                        to: human,
+                                        by: currentHuman,
+                                        rewardCoconuts: reward,
+                                        note: note
+                                    )
+                                },
+                                onCreateTask: { title, note, human, reward, dueAt, emoji in
+                                    commandExecutor.createTask(
+                                        title: title,
+                                        note: note,
+                                        assignedTo: human,
+                                        by: currentHuman,
+                                        rewardCoconuts: reward,
+                                        dueAt: dueAt,
+                                        emoji: emoji
+                                    )
+                                },
+                                onUpdateTask: { task, title, note, human, reward, dueAt, emoji in
+                                    commandExecutor.updateTask(
+                                        task,
+                                        title: title,
+                                        note: note,
+                                        assignedTo: human,
+                                        rewardCoconuts: reward,
+                                        dueAt: dueAt,
+                                        emoji: emoji
+                                    )
+                                },
+                                onDeleteTask: { task in
+                                    commandExecutor.deleteTask(task)
+                                }
+                            )
+                            .padding(.top, 32)
+                            .padding(.bottom, 16)
+                        }
                     }
                     .frame(maxHeight: maxHeight)
                     .clipShape(shape)
@@ -668,6 +580,10 @@ struct FamilyCollaborationDashboardView: View {
             }
             .ignoresSafeArea(edges: .bottom)
             .onAppear {
+                guard editorContext != nil else {
+                    dismissEditor()
+                    return
+                }
                 inlineEditorVisible = false
                 inlineEditorDragOffset = 0
                 DispatchQueue.main.async {
@@ -735,7 +651,7 @@ struct FamilyCollaborationDashboardView: View {
             }
 
             Button {
-                showingMoreCollaboration = true
+                openMoreCollaboration()
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "ellipsis.circle.fill")
@@ -847,7 +763,7 @@ struct FamilyCollaborationDashboardView: View {
             Spacer(minLength: 8)
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                presentEditor(.assign(reminder))
+                presentEditor(.assignReminder(reminder.id))
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "person.crop.circle.badge.plus")
@@ -867,7 +783,7 @@ struct FamilyCollaborationDashboardView: View {
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .onTapGesture {
-            presentEditor(.assign(reminder))
+            presentEditor(.assignReminder(reminder.id))
         }
     }
 
@@ -907,7 +823,7 @@ struct FamilyCollaborationDashboardView: View {
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .onTapGesture {
-            presentEditor(.edit(task))
+            presentEditor(.editTask(task.id))
         }
     }
 
@@ -977,6 +893,16 @@ struct FamilyCollaborationDashboardView: View {
         }
     }
 
+    private func openMoreCollaboration() {
+        activeSheetRoute = .moreCollaboration
+    }
+
+    private func dismissMoreCollaboration() {
+        if activeSheetRoute == .moreCollaboration {
+            activeSheetRoute = nil
+        }
+    }
+
     private func familyTasks(for pet: Pet) -> [FamilyCollaborationTask] {
         activeFamilyTasks.filter { $0.relatedPetId == pet.id.uuidString }
     }
@@ -1042,7 +968,7 @@ struct FamilyCollaborationDashboardView: View {
                 actionTitle: todayAssignedReminders.isEmpty
                     ? l.tr(zh: "稳", en: "Clear", de: "Frei")
                     : l.tr(zh: "查看", en: "View", de: "Ansehen"),
-                action: { showingMoreCollaboration = true }
+                action: { openMoreCollaboration() }
             )
 
             taskSlot(
@@ -1058,7 +984,7 @@ struct FamilyCollaborationDashboardView: View {
                     if let pet = careGapPets.first {
                         onOpenPetActivity(pet)
                     } else {
-                        showingMoreCollaboration = true
+                        openMoreCollaboration()
                     }
                 }
             )
@@ -1176,9 +1102,9 @@ struct FamilyCollaborationDashboardView: View {
                 commandExecutor.confirmCompletion(task, by: currentHuman)
             }
         } else if task.createdById == activeHumanId {
-            showingMoreCollaboration = true
+            openMoreCollaboration()
         } else if task.status == .pendingReview {
-            showingMoreCollaboration = true
+            openMoreCollaboration()
         } else if task.assignedToId == activeHumanId || task.claimedById == activeHumanId {
             runFamilyTaskCommand {
                 commandExecutor.complete(task, by: currentHuman)
@@ -1188,7 +1114,7 @@ struct FamilyCollaborationDashboardView: View {
                 commandExecutor.claim(task, by: human)
             }
         } else {
-            showingMoreCollaboration = true
+            openMoreCollaboration()
         }
     }
 
@@ -1270,7 +1196,7 @@ struct FamilyCollaborationDashboardView: View {
 
     private var moreCollaborationEntry: some View {
         Button {
-            showingMoreCollaboration = true
+            openMoreCollaboration()
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "ellipsis.circle.fill")
@@ -1299,7 +1225,7 @@ struct FamilyCollaborationDashboardView: View {
     private var moreCollaborationContent: some View {
         VStack(alignment: .leading, spacing: 18) {
             Button {
-                showingMoreCollaboration = false
+                dismissMoreCollaboration()
                 onOpenWeeklyReport()
             } label: {
                 HStack(spacing: 12) {
@@ -1345,7 +1271,7 @@ struct FamilyCollaborationDashboardView: View {
                 count: bountyFamilyTasks.count,
                 trailing: {
                     Button {
-                        showingMoreCollaboration = false
+                        dismissMoreCollaboration()
                         presentEditor(.create)
                     } label: {
                         Label(l.tr(zh: "发布", en: "Post", de: "Erstellen"), systemImage: "plus")
@@ -1724,7 +1650,7 @@ struct FamilyCollaborationDashboardView: View {
 }
 
 private struct FamilyTaskEditorPanel: View {
-    let route: FamilyCollaborationDashboardView.TaskEditorRoute
+    let context: FamilyCollaborationEditorContext
     let humans: [Human]
     let currentHuman: Human?
     let pets: [Pet]
@@ -1746,9 +1672,10 @@ private struct FamilyTaskEditorPanel: View {
     private var l: L10n { L10n(appLanguage) }
     private let rewardOptions = [0, 20, 50, 100, 200, 500]
     private let emojiOptions = ["🎯", "🧹", "🌱", "🐾", "🛒", "💊", "🧺", "🔧"]
+    private var route: FamilyCollaborationEditorRoute { context.route }
 
     init(
-        route: FamilyCollaborationDashboardView.TaskEditorRoute,
+        context: FamilyCollaborationEditorContext,
         humans: [Human],
         currentHuman: Human?,
         pets: [Pet],
@@ -1758,7 +1685,7 @@ private struct FamilyTaskEditorPanel: View {
         onUpdateTask: @escaping (FamilyCollaborationTask, String, String, Human?, Int, Date?, String) -> Void,
         onDeleteTask: @escaping (FamilyCollaborationTask) -> Void
     ) {
-        self.route = route
+        self.context = context
         self.humans = humans
         self.currentHuman = currentHuman
         self.pets = pets
@@ -1768,31 +1695,33 @@ private struct FamilyTaskEditorPanel: View {
         self.onUpdateTask = onUpdateTask
         self.onDeleteTask = onDeleteTask
 
-        switch route {
-        case .assign(let reminder):
+        switch context.route {
+        case .assignReminder:
+            let reminder = context.reminder
             let currentHumanId = currentHuman?.id.uuidString
             let firstAssignableId = humans.first { $0.id.uuidString != currentHumanId }?.id.uuidString ?? ""
-            _title = State(initialValue: reminder.event?.title ?? "")
+            _title = State(initialValue: reminder?.event?.title ?? "")
             _note = State(initialValue: "")
             _selectedHumanId = State(initialValue: firstAssignableId)
             _reward = State(initialValue: 0)
             _hasDueDate = State(initialValue: true)
-            _dueAt = State(initialValue: reminder.scheduledAt)
-            _emoji = State(initialValue: reminder.event?.emoji ?? "🐾")
-        case .edit(let task):
+            _dueAt = State(initialValue: reminder?.scheduledAt ?? Date())
+            _emoji = State(initialValue: reminder?.event?.emoji ?? "🐾")
+        case .editTask:
+            let task = context.task
             let currentHumanId = currentHuman?.id.uuidString
             let firstAssignableId = humans.first { $0.id.uuidString != currentHumanId }?.id.uuidString ?? ""
-            let existingAssigneeId = task.assignedToId ?? task.claimedById ?? ""
+            let existingAssigneeId = task?.assignedToId ?? task?.claimedById ?? ""
             let isExistingAssignable = humans.contains { human in
                 human.id.uuidString == existingAssigneeId && human.id.uuidString != currentHumanId
             }
-            _title = State(initialValue: task.title)
-            _note = State(initialValue: task.note)
+            _title = State(initialValue: task?.title ?? "")
+            _note = State(initialValue: task?.note ?? "")
             _selectedHumanId = State(initialValue: isExistingAssignable ? existingAssigneeId : firstAssignableId)
-            _reward = State(initialValue: task.rewardCoconuts)
-            _hasDueDate = State(initialValue: task.dueAt != nil)
-            _dueAt = State(initialValue: task.dueAt ?? Date())
-            _emoji = State(initialValue: task.emoji)
+            _reward = State(initialValue: task?.rewardCoconuts ?? 0)
+            _hasDueDate = State(initialValue: task?.dueAt != nil)
+            _dueAt = State(initialValue: task?.dueAt ?? Date())
+            _emoji = State(initialValue: task?.emoji ?? "🎯")
         case .create:
             let currentHumanId = currentHuman?.id.uuidString
             let firstAssignableId = humans.first { $0.id.uuidString != currentHumanId }?.id.uuidString ?? ""
@@ -1809,7 +1738,7 @@ private struct FamilyTaskEditorPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             header
-            if case .assign(let reminder) = route {
+            if case .assignReminder = route, let reminder = context.reminder {
                 reminderSummary(reminder)
             } else {
                 textFieldBlock(
@@ -1828,11 +1757,11 @@ private struct FamilyTaskEditorPanel: View {
             dueDateBlock
             if case .create = route {
                 emojiPicker
-            } else if case .edit = route {
+            } else if case .editTask = route {
                 emojiPicker
             }
             saveButton
-            if case .edit(let task) = route {
+            if case .editTask = route, let task = context.task {
                 deleteButton(task)
             }
         }
@@ -1841,8 +1770,8 @@ private struct FamilyTaskEditorPanel: View {
 
     private var navigationTitle: String {
         switch route {
-        case .assign: return l.tr(zh: "分配待办", en: "Assign task", de: "Aufgabe zuweisen")
-        case .edit: return l.tr(zh: "任务详情", en: "Task details", de: "Aufgabendetails")
+        case .assignReminder: return l.tr(zh: "分配待办", en: "Assign task", de: "Aufgabe zuweisen")
+        case .editTask: return l.tr(zh: "任务详情", en: "Task details", de: "Aufgabendetails")
         case .create: return l.tr(zh: "发布任务", en: "Post task", de: "Aufgabe erstellen")
         }
     }
@@ -2052,9 +1981,9 @@ private struct FamilyTaskEditorPanel: View {
 
     private var canSave: Bool {
         switch route {
-        case .assign:
+        case .assignReminder:
             return selectedHuman != nil
-        case .create, .edit:
+        case .create, .editTask:
             return !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && selectedHuman != nil
         }
     }
@@ -2062,12 +1991,14 @@ private struct FamilyTaskEditorPanel: View {
     private func save() {
         let due = hasDueDate ? dueAt : nil
         switch route {
-        case .assign(let reminder):
+        case .assignReminder:
+            guard let reminder = context.reminder else { return }
             guard let selectedHuman else { return }
             onAssignReminder(reminder, selectedHuman, reward, note)
         case .create:
             onCreateTask(title, note, selectedHuman, reward, due, emoji)
-        case .edit(let task):
+        case .editTask:
+            guard let task = context.task else { return }
             onUpdateTask(task, title, note, selectedHuman, reward, due, emoji)
         }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()

@@ -176,7 +176,6 @@ struct CalendarView: View {
     @State private var listVisibleTopDate = Calendar.current.startOfDay(for: Date())
     @State private var visibleTimelineDateID: String? = CalendarView.todayTimelineDateID
     @State private var didScrollListToToday = false
-    @State private var monthSlideDirection = 1
     @State private var viewModeCommitTask: Task<Void, Never>?
     @State private var filterApplyTask: Task<Void, Never>?
     @State private var filterStorageCommitTask: Task<Void, Never>?
@@ -490,8 +489,9 @@ struct CalendarView: View {
                 }
                 .ohanaContextHandoff(
                     contentHandoffState,
-                    direction: viewMode == .list ? .fromTrailing : .neutral,
-                    isVisible: isEmbeddedVisible || !hideToolbar
+                    direction: .neutral,
+                    isVisible: isEmbeddedVisible || !hideToolbar,
+                    initialScale: 0.996
                 )
             }
 
@@ -1027,10 +1027,7 @@ struct CalendarView: View {
             }
             .padding(.horizontal, 12)
             .id(calendarMonthKey)
-            .transition(.asymmetric(
-                insertion: .move(edge: monthSlideDirection > 0 ? .trailing : .leading).combined(with: .opacity),
-                removal: .move(edge: monthSlideDirection > 0 ? .leading : .trailing).combined(with: .opacity)
-            ))
+            .transition(.opacity.combined(with: .scale(scale: 0.996, anchor: .center)))
             
             GoDashedDivider()
                 .padding(.horizontal, 20)
@@ -1440,8 +1437,7 @@ struct CalendarView: View {
             ? today
             : interval.start
 
-        monthSlideDirection = delta >= 0 ? 1 : -1
-        withAnimation(GoMotion.page) {
+        withAnimation(GoMotion.stateChange) {
             selectedDate = targetDate
         }
     }

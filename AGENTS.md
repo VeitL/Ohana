@@ -118,6 +118,36 @@ These laws apply to every page, sheet, card, dashboard, and route. A mature Ohan
 - Enforce runtime budgets. Animations, timers, maps, particles, Canvas, TimelineView, and repeatForever loops must be visible, intentional, and governed by `AppWorkloadPolicy`. Run them while visible, downgrade or pause them when hidden, and be stricter in Low Power Mode, Reduce Motion, background, or app power-saving mode.
 - Keep the architecture split explicit. Finger path: `tap -> local visual state -> route/snapshot handoff -> first frame`. Background path: `data load -> service sync -> snapshot refresh -> next idle frame`.
 
+### Strict Smoothness Compliance Mode
+
+When the user asks to strictly follow rules, avoid compromise, fully comply with Mature App Smoothness Laws, make an interaction truly smooth, or rebuild a high-traffic interaction such as home card expansion, Tab switching, sheets, dashboards, Today Focus, quick actions, calendar agenda changes, Oasis animations, or other motion-heavy flows, treat compliance as a hard acceptance gate rather than an optimization preference.
+
+Before implementing in this mode:
+
+- State the applicable interaction class, such as `interaction-heavy`, `motion scene`, `snapshot handoff`, `route transition`, `runtime`, `persistence`, or `design-system`.
+- Write the non-negotiable invariants for the change. Examples: finger frame 0 mutates only local visual state; animation uses frozen render snapshots; live data, SwiftData, image decoding, service fan-out, dashboard refresh, timers, and route tree construction are not allowed in the visible interaction path; thaw happens only after animation completion.
+- Define the intended compliance structure before editing code, for example `PreparedSnapshot -> HeroMotionScene -> ThawCoordinator -> RouteScopedRefresh`, or explain why a different structure is required by the existing system.
+- If strict compliance conflicts with preserving an existing visual flourish, do not make a hidden compromise. Either rebuild the flourish inside the compliant render/motion layer or explicitly report the tradeoff and the remaining non-compliance.
+
+During implementation in this mode:
+
+- Do not call a partial improvement "compliant" if any live tree, broad query, image decode, service call, timer start, dashboard refresh, route construction, or uncancellable background task remains in the user-triggered first frame or visible hero/transition path.
+- Motion scenes should be mechanically isolated where practical: they receive frozen value snapshots, precomputed geometry, and prepared assets, and animate only transform, frame, scale, opacity, mask, zIndex, and hit testing. They must not import SwiftData, access `ModelContext`, execute commands, decode images, or rebuild unrelated view trees.
+- Keep old micro-motion quality only if it can live inside the compliant layer. Premium details such as numeric motion, restrained scale pulses, quick-action reveal, and Today Focus fades should start in the same interaction frame, but they must be driven by frozen snapshots or lightweight local progress, not by thawing live business state.
+- Prefer making incorrect architecture difficult to express: use typed snapshots, read models, command executors, thaw coordinators, route-scoped tasks, and explicit `isAnimating`/`isFrozen` gates instead of ad-hoc booleans scattered through views.
+
+Before reporting completion in this mode, include a short compliance matrix with `Compliant`, `Partial`, or `Not compliant` for:
+
+- Finger-first frame.
+- Frozen render or snapshot handoff.
+- Heavy work deferred and cancellable.
+- Visual/business separation.
+- Runtime budget and visibility gating.
+- Thaw timing.
+- Validation performed.
+
+If any row is `Partial` or `Not compliant`, do not present the task as complete. Describe the remaining gap, the reason it remains, and the next concrete step needed to reach full compliance.
+
 ## Interaction Architecture & Isolation
 
 Every user action must be classified before implementation:

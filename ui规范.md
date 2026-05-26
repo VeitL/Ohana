@@ -112,6 +112,7 @@
 
 默认实现规则：
 
+- 全局 motion 配方：默认采用 **Capsule** 体系，数字、进度、选中/切换、Sheet 和常规反馈都走克制轻弹；**Chart 是例外**，采用 **Flow** 体系，线条用约 `0.72s` 的 `trim` 慢慢延长，面积只轻淡入，点位轻显，不做点位弹跳主导。
 - 点击：使用 `ScaleButtonStyle()`，只做 `0.965` 左右的短促按压、轻微暗化和 soft haptic；不要给普通按钮加夸张 bounce。
 - 选中：使用共享 selection motion 或 matched transition，选中块应“滑过去/长出来”，不要瞬移。
 - 数字：余额、次数、克数、完成率、排行榜数字使用 `contentTransition(.numericText())` 或 `ohanaNumericMotion`。
@@ -131,7 +132,7 @@
 - **Toggle**：轨道高度只比内部圆钮略高；圆钮必须滑动到另一侧，icon/文字可同步 crossfade 或 bounce。
 - **卡片与列表**：展开/收起、插入/删除、排序变化应使用 `GoMotion.page` 或 `GoMotion.feedback`，配合 opacity/scale/offset，避免列表瞬间重排。
 - **Sheet / 弹窗**：出入场使用 slide/scale/fade 组合；背景遮罩和玻璃透明度也要同步动画。
-- **图表 / 日历**：数据范围、日期、选中点变化要 animate value；空状态和有数据状态之间使用 crossfade。
+- **图表 / 日历**：数据范围、日期、选中点变化要 animate value；空状态和有数据状态之间使用 crossfade。图表主线采用 Flow slow line draw：线条从左到右慢慢延长，面积轻淡入，点位随后轻显；不要把 chart 做成 Capsule 弹跳或奖励 pop。
 - **深浅色切换**：颜色 token 变化也应使用短过渡，避免整屏闪一下。
 - **减弱动态模式**：可以降低位移和弹性，但仍使用短 fade/ease 过渡，不做硬切。
 

@@ -11,6 +11,7 @@ struct FeedGuidedMetric: Identifiable {
     let id: String
     let title: String
     let value: String
+    var detail: String?
     let tint: Color
     var isHighlighted: Bool = false
 }
@@ -79,7 +80,10 @@ struct FeedDiscoveryDockItem: Identifiable {
     let title: String
     let value: String
     let tint: Color
+    var secondaryIcon: String?
+    var secondaryAccessibilityLabel: String?
     let action: () -> Void
+    var secondaryAction: (() -> Void)?
 }
 
 struct GuidedFeedHomeView: View {
@@ -90,18 +94,27 @@ struct GuidedFeedHomeView: View {
     let chart: FeedGuidedChartState?
     let dockItems: [FeedDiscoveryDockItem]
     let primaryAction: () -> Void
+    let taskSettingsAction: () -> Void
+    let inlineTaskPanel: AnyView?
+    let inlineTreatPanel: AnyView?
 
     var body: some View {
         VStack(spacing: 14) {
             FeedGuidedModeStrip(title: modeTitle, options: modeOptions)
 
-            FeedPrimaryTaskCard(task: task, taskTransition: taskTransition, primaryAction: primaryAction)
+            FeedPrimaryTaskCard(
+                task: task,
+                taskTransition: taskTransition,
+                primaryAction: primaryAction,
+                settingsAction: taskSettingsAction,
+                inlinePanel: inlineTaskPanel
+            )
 
             if let chart {
                 FeedGuidedMiniChartCard(chart: chart)
             }
 
-            FeedDiscoveryDock(items: dockItems)
+            FeedDiscoveryDock(items: dockItems, inlineTreatPanel: inlineTreatPanel)
         }
     }
 }
@@ -179,36 +192,60 @@ private struct FeedPrimaryTaskCard: View {
     let task: FeedGuidedTaskState
     let taskTransition: FeedGuidedTaskTransition?
     let primaryAction: () -> Void
+    let settingsAction: () -> Void
+    let inlinePanel: AnyView?
 
     var body: some View {
-        ZStack {
-            if let taskTransition {
-                let p = taskTransition.clampedProgress
-                FeedPrimaryTaskSurface(task: taskTransition.fromTask, primaryAction: primaryAction)
-                    .opacity(Double(1 - p))
-                    .scaleEffect(1 - p * 0.025, anchor: .center)
-                    .offset(x: -18 * p)
-                    .zIndex(p < 0.5 ? 2 : 1)
-                    .allowsHitTesting(false)
+        VStack(spacing: 0) {
+            ZStack {
+                if let taskTransition {
+                    let p = taskTransition.clampedProgress
+                    FeedPrimaryTaskSurface(task: taskTransition.fromTask, primaryAction: primaryAction, settingsAction: settingsAction)
+                        .opacity(Double(1 - p))
+                        .scaleEffect(1 - p * 0.025, anchor: .center)
+                        .offset(x: -18 * p)
+                        .zIndex(p < 0.5 ? 2 : 1)
+                        .allowsHitTesting(false)
 
-                FeedPrimaryTaskSurface(task: taskTransition.toTask, primaryAction: primaryAction)
-                    .opacity(Double(p))
-                    .scaleEffect(0.985 + p * 0.015, anchor: .center)
-                    .offset(x: 18 * (1 - p))
-                    .zIndex(p >= 0.5 ? 2 : 1)
-                    .allowsHitTesting(p > 0.98)
-            } else {
-                FeedPrimaryTaskSurface(task: task, primaryAction: primaryAction)
+                    FeedPrimaryTaskSurface(task: taskTransition.toTask, primaryAction: primaryAction, settingsAction: settingsAction)
+                        .opacity(Double(p))
+                        .scaleEffect(0.985 + p * 0.015, anchor: .center)
+                        .offset(x: 18 * (1 - p))
+                        .zIndex(p >= 0.5 ? 2 : 1)
+                        .allowsHitTesting(p > 0.98)
+                } else {
+                    FeedPrimaryTaskSurface(task: task, primaryAction: primaryAction, settingsAction: settingsAction)
+                }
+            }
+            .zIndex(2)
+            .frame(maxWidth: .infinity)
+            .checkInPulse((taskTransition?.toTask ?? task).feedbackToken)
+
+            if let inlinePanel {
+                inlinePanel
+                    .padding(.top, -6)
+                    .modifier(FeedBottomEdgeDrawerReveal())
+                    .zIndex(1)
             }
         }
         .frame(maxWidth: .infinity)
-        .checkInPulse((taskTransition?.toTask ?? task).feedbackToken)
+    }
+}
+
+private struct FeedBottomEdgeDrawerReveal: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .transition(.asymmetric(
+                insertion: .move(edge: .top).combined(with: .opacity),
+                removal: .move(edge: .top).combined(with: .opacity)
+            ))
     }
 }
 
 private struct FeedPrimaryTaskSurface: View {
     let task: FeedGuidedTaskState
     let primaryAction: () -> Void
+    let settingsAction: () -> Void
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -225,10 +262,16 @@ private struct FeedPrimaryTaskSurface: View {
 
                     Spacer()
 
-                    Text(task.metricTitle)
-                        .font(.system(size: 11, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .contentTransition(.opacity)
+                    Button(action: settingsAction) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 14, weight: .black))
+                            .foregroundStyle(task.modeTint)
+                            .frame(width: 44, height: 44)
+                            .background(Color.ohanaControlFill, in: Circle())
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .accessibilityLabel(Text("Settings"))
                 }
 
                 HStack(alignment: .bottom, spacing: 14) {
@@ -361,6 +404,14 @@ private struct FeedGuidedMetricPill: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .contentTransition(.numericText())
+            if let detail = metric.detail {
+                Text(detail)
+                    .font(.system(size: 9, weight: .black, design: .rounded))
+                    .foregroundStyle(metric.isHighlighted ? Color.arkInk.opacity(0.72) : Color.ohanaSecondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .contentTransition(.numericText())
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 10)
@@ -372,36 +423,125 @@ private struct FeedGuidedMetricPill: View {
 
 private struct FeedDiscoveryDock: View {
     let items: [FeedDiscoveryDockItem]
+    let inlineTreatPanel: AnyView?
 
     var body: some View {
-        HStack(spacing: 9) {
-            ForEach(items) { item in
+        VStack(spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                ForEach(Array(items.prefix(2))) { item in
+                    if item.id == "treat" {
+                        FeedDiscoveryLargeDockCard(item: item, inlinePanel: inlineTreatPanel)
+                    } else {
+                        FeedDiscoveryLargeDockCard(item: item, inlinePanel: nil)
+                    }
+                }
+            }
+
+            ForEach(Array(items.dropFirst(2))) { item in
+                FeedDiscoveryCompactDockCard(item: item)
+            }
+        }
+    }
+}
+
+private struct FeedDiscoveryLargeDockCard: View {
+    let item: FeedDiscoveryDockItem
+    let inlinePanel: AnyView?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ZStack(alignment: .topTrailing) {
                 Button {
                     OhanaFeedback.light()
                     item.action()
                 } label: {
-                    VStack(spacing: 7) {
+                    VStack(alignment: .leading, spacing: 9) {
                         Image(systemName: item.icon)
-                            .font(.system(size: 17, weight: .black))
+                            .font(.system(size: 21, weight: .black))
                             .foregroundStyle(item.tint)
+                            .frame(width: 42, height: 42)
+                            .background(item.tint.opacity(0.13), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                        Spacer(minLength: 0)
                         Text(item.title)
-                            .font(.system(size: 11, weight: .black, design: .rounded))
+                            .font(.system(size: 14, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
                         Text(item.value)
-                            .font(.system(size: 9, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.ohanaSecondaryText)
+                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .foregroundStyle(item.tint)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.62)
+                            .minimumScaleFactor(0.58)
+                            .contentTransition(.numericText())
                     }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 78)
-                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                    .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(height: 118)
+                    .padding(14)
+                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
+
+                if let secondaryIcon = item.secondaryIcon, let secondaryAction = item.secondaryAction {
+                    Button {
+                        OhanaFeedback.light()
+                        secondaryAction()
+                    } label: {
+                        Image(systemName: secondaryIcon)
+                            .font(.system(size: 14, weight: .black))
+                            .foregroundStyle(Color.arkInk)
+                            .frame(width: 44, height: 44)
+                            .background(item.tint, in: Circle())
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .accessibilityLabel(Text(item.secondaryAccessibilityLabel ?? item.title))
+                    .padding(8)
+                    .zIndex(2)
+                }
+            }
+            .zIndex(2)
+
+            if let inlinePanel {
+                inlinePanel
+                    .padding(.top, -6)
+                    .modifier(FeedBottomEdgeDrawerReveal())
+                    .zIndex(1)
             }
         }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private struct FeedDiscoveryCompactDockCard: View {
+    let item: FeedDiscoveryDockItem
+
+    var body: some View {
+        Button {
+            OhanaFeedback.light()
+            item.action()
+        } label: {
+            HStack(spacing: 11) {
+                Image(systemName: item.icon)
+                    .font(.system(size: 15, weight: .black))
+                    .foregroundStyle(item.tint)
+                    .frame(width: 36, height: 36)
+                    .background(item.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                Text(item.title)
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Spacer()
+                Text(item.value)
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .black))
+                    .foregroundStyle(Color.ohanaTertiaryText)
+            }
+            .padding(12)
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+        .buttonStyle(ScaleButtonStyle())
     }
 }

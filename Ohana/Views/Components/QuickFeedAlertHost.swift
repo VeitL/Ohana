@@ -8,8 +8,6 @@
 import SwiftUI
 
 struct QuickFeedAlertHost: ViewModifier {
-    let antiRepeatTitle: String
-    let antiRepeatMessage: String
     let logAnywayTitle: String
     let cancelTitle: String
     let deleteFeedLogTitle: String
@@ -18,49 +16,89 @@ struct QuickFeedAlertHost: ViewModifier {
     let deleteFoodRecordTitle: String
     let deleteFoodRecordConfirmTitle: String
     let deleteFoodRecordMessage: String
-    @Binding var showingAntiRepeatAlert: Bool
+    @Binding var activeAlert: QuickFeedAlertRoute?
     @Binding var pendingRepeatAction: (() -> Void)?
-    @Binding var showingDeleteFeedLogConfirm: Bool
-    @Binding var feedLogPendingDelete: PetCareLog?
-    @Binding var showingDeleteFoodRecordConfirm: Bool
-    @Binding var foodRecordPendingDelete: PetFoodRecord?
     let onDeleteFeedLog: (PetCareLog) -> Void
     let onDeleteFoodRecord: (PetFoodRecord) -> Void
 
     func body(content: Content) -> some View {
         content
-            .alert(antiRepeatTitle, isPresented: $showingAntiRepeatAlert) {
+            .alert(antiRepeatText?.title ?? "", isPresented: antiRepeatBinding) {
                 Button(logAnywayTitle) {
                     pendingRepeatAction?()
                     pendingRepeatAction = nil
+                    activeAlert = nil
                 }
                 Button(cancelTitle, role: .cancel) {
                     pendingRepeatAction = nil
+                    activeAlert = nil
                 }
             } message: {
-                Text(antiRepeatMessage)
+                Text(antiRepeatText?.message ?? "")
             }
-            .alert(deleteFeedLogTitle, isPresented: $showingDeleteFeedLogConfirm) {
+            .alert(deleteFeedLogTitle, isPresented: deleteFeedLogBinding) {
                 Button(deleteFeedLogConfirmTitle, role: .destructive) {
-                    if let log = feedLogPendingDelete { onDeleteFeedLog(log) }
-                    feedLogPendingDelete = nil
+                    if let log = activeAlert?.feedLogPendingDelete {
+                        onDeleteFeedLog(log)
+                    }
+                    activeAlert = nil
                 }
                 Button(cancelTitle, role: .cancel) {
-                    feedLogPendingDelete = nil
+                    activeAlert = nil
                 }
             } message: {
                 Text(deleteFeedLogMessage)
             }
-            .alert(deleteFoodRecordTitle, isPresented: $showingDeleteFoodRecordConfirm) {
+            .alert(deleteFoodRecordTitle, isPresented: deleteFoodRecordBinding) {
                 Button(deleteFoodRecordConfirmTitle, role: .destructive) {
-                    if let record = foodRecordPendingDelete { onDeleteFoodRecord(record) }
-                    foodRecordPendingDelete = nil
+                    if let record = activeAlert?.foodRecordPendingDelete {
+                        onDeleteFoodRecord(record)
+                    }
+                    activeAlert = nil
                 }
                 Button(cancelTitle, role: .cancel) {
-                    foodRecordPendingDelete = nil
+                    activeAlert = nil
                 }
             } message: {
                 Text(deleteFoodRecordMessage)
             }
+    }
+
+    private var antiRepeatText: (title: String, message: String)? {
+        activeAlert?.antiRepeatText
+    }
+
+    private var antiRepeatBinding: Binding<Bool> {
+        Binding(
+            get: { activeAlert?.isAntiRepeat == true },
+            set: { isPresented in
+                if !isPresented, activeAlert?.isAntiRepeat == true {
+                    pendingRepeatAction = nil
+                    activeAlert = nil
+                }
+            }
+        )
+    }
+
+    private var deleteFeedLogBinding: Binding<Bool> {
+        Binding(
+            get: { activeAlert?.feedLogPendingDelete != nil },
+            set: { isPresented in
+                if !isPresented, activeAlert?.feedLogPendingDelete != nil {
+                    activeAlert = nil
+                }
+            }
+        )
+    }
+
+    private var deleteFoodRecordBinding: Binding<Bool> {
+        Binding(
+            get: { activeAlert?.foodRecordPendingDelete != nil },
+            set: { isPresented in
+                if !isPresented, activeAlert?.foodRecordPendingDelete != nil {
+                    activeAlert = nil
+                }
+            }
+        )
     }
 }

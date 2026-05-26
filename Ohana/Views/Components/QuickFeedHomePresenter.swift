@@ -28,9 +28,12 @@ struct QuickFeedHomePresenter {
     let onOpenFeedingOverview: () -> Void
     let onOpenStockOverview: () -> Void
     let onOpenTreatOverview: () -> Void
+    let onOpenTaskSettings: () -> Void
+    let onQuickAddTreat: () -> Void
     let onOpenManualHistory: () -> Void
     let onOpenModeHistory: () -> Void
-    let onOpenManage: () -> Void
+    let inlineTaskPanel: AnyView?
+    let inlineTreatPanel: AnyView?
 
     var body: some View {
         GuidedFeedHomeView(
@@ -40,7 +43,10 @@ struct QuickFeedHomePresenter {
             modeOptions: modeOptions,
             chart: isAuxiliaryReady ? chart : nil,
             dockItems: isAuxiliaryReady ? dockItems : lightweightDockItems,
-            primaryAction: onPrimaryAction
+            primaryAction: onPrimaryAction,
+            taskSettingsAction: onOpenTaskSettings,
+            inlineTaskPanel: inlineTaskPanel,
+            inlineTreatPanel: inlineTreatPanel
         )
     }
 
@@ -146,14 +152,16 @@ struct QuickFeedHomePresenter {
             FeedGuidedMetric(
                 id: FeedFoodKind.dry.rawValue,
                 title: FeedFoodKind.dry.title(localization),
-                value: renderState.metrics.todayDryFoodGrams > 0 ? formattedFoodCardWeight(renderState.metrics.todayDryFoodGrams) : "--",
+                value: stockMetricValue(grams: renderState.metrics.dryStockRemainingGrams),
+                detail: stockMetricDetail(days: renderState.metrics.dryStockRemainingDays),
                 tint: dryFoodTint,
                 isHighlighted: pet.mainFoodKind == .dry || FeedFoodKind.dry.rawValue == feedFeedbackMetricId
             ),
             FeedGuidedMetric(
                 id: FeedFoodKind.wet.rawValue,
                 title: FeedFoodKind.wet.title(localization),
-                value: renderState.metrics.todayWetFoodGrams > 0 ? formattedFoodCardWeight(renderState.metrics.todayWetFoodGrams) : "--",
+                value: stockMetricValue(grams: renderState.metrics.wetStockRemainingGrams),
+                detail: stockMetricDetail(days: renderState.metrics.wetStockRemainingDays),
                 tint: wetFoodTint,
                 isHighlighted: pet.mainFoodKind == .wet || FeedFoodKind.wet.rawValue == feedFeedbackMetricId
             )
@@ -192,22 +200,40 @@ struct QuickFeedHomePresenter {
     private var dockItems: [FeedDiscoveryDockItem] {
         [
             dockItem(id: "stock", icon: "shippingbox.fill", title: localization.tr(zh: "粮仓", en: "Stock", de: "Vorrat"), value: stockCardValue, tint: stockTint, action: onOpenStockOverview),
-            dockItem(id: "treat", icon: "birthday.cake.fill", title: localization.tr(zh: "零食", en: "Treats", de: "Snacks"), value: viewState.metrics.todayTreatCount > 0 ? "\(viewState.metrics.todayTreatCount)x" : "--", tint: treatTint, action: onOpenTreatOverview),
-            dockItem(id: "history", icon: "clock.arrow.circlepath", title: localization.tr(zh: "历史", en: "History", de: "Verlauf"), value: viewState.mode.feedShortTitle(localization), tint: viewState.mode.feedTint) {
+            dockItem(
+                id: "treat",
+                icon: "birthday.cake.fill",
+                title: localization.tr(zh: "零食", en: "Treats", de: "Snacks"),
+                value: treatCardValue,
+                tint: treatTint,
+                secondaryIcon: "plus",
+                secondaryAccessibilityLabel: localization.tr(zh: "快速添加零食", en: "Quick add treat", de: "Snack schnell hinzufügen"),
+                action: onOpenTreatOverview,
+                secondaryAction: onQuickAddTreat
+            ),
+            dockItem(id: "history", icon: "clock.arrow.circlepath", title: localization.tr(zh: "历史", en: "History", de: "Verlauf"), value: viewState.mode.feedShortTitle(localization), tint: viewState.mode.feedTint, action: {
                 viewState.mode == .manual ? onOpenManualHistory() : onOpenModeHistory()
-            },
-            dockItem(id: "manage", icon: "slider.horizontal.3", title: localization.tr(zh: "管理", en: "Manage", de: "Verwalten"), value: viewState.mode.feedShortTitle(localization), tint: Color.goPrimary, action: onOpenManage)
+            })
         ]
     }
 
     private var lightweightDockItems: [FeedDiscoveryDockItem] {
         [
             dockItem(id: "stock", icon: "shippingbox.fill", title: localization.tr(zh: "粮仓", en: "Stock", de: "Vorrat"), value: "--", tint: stockTint, action: onOpenStockOverview),
-            dockItem(id: "treat", icon: "birthday.cake.fill", title: localization.tr(zh: "零食", en: "Treats", de: "Snacks"), value: "--", tint: treatTint, action: onOpenTreatOverview),
-            dockItem(id: "history", icon: "clock.arrow.circlepath", title: localization.tr(zh: "历史", en: "History", de: "Verlauf"), value: viewState.mode.feedShortTitle(localization), tint: viewState.mode.feedTint) {
+            dockItem(
+                id: "treat",
+                icon: "birthday.cake.fill",
+                title: localization.tr(zh: "零食", en: "Treats", de: "Snacks"),
+                value: "--",
+                tint: treatTint,
+                secondaryIcon: "plus",
+                secondaryAccessibilityLabel: localization.tr(zh: "快速添加零食", en: "Quick add treat", de: "Snack schnell hinzufügen"),
+                action: onOpenTreatOverview,
+                secondaryAction: onQuickAddTreat
+            ),
+            dockItem(id: "history", icon: "clock.arrow.circlepath", title: localization.tr(zh: "历史", en: "History", de: "Verlauf"), value: viewState.mode.feedShortTitle(localization), tint: viewState.mode.feedTint, action: {
                 viewState.mode == .manual ? onOpenManualHistory() : onOpenModeHistory()
-            },
-            dockItem(id: "manage", icon: "slider.horizontal.3", title: localization.tr(zh: "管理", en: "Manage", de: "Verwalten"), value: viewState.mode.feedShortTitle(localization), tint: Color.goPrimary, action: onOpenManage)
+            })
         ]
     }
 
@@ -217,9 +243,22 @@ struct QuickFeedHomePresenter {
         title: String,
         value: String,
         tint: Color,
-        action: @escaping () -> Void
+        secondaryIcon: String? = nil,
+        secondaryAccessibilityLabel: String? = nil,
+        action: @escaping () -> Void,
+        secondaryAction: (() -> Void)? = nil
     ) -> FeedDiscoveryDockItem {
-        FeedDiscoveryDockItem(id: id, icon: icon, title: title, value: value, tint: tint, action: action)
+        FeedDiscoveryDockItem(
+            id: id,
+            icon: icon,
+            title: title,
+            value: value,
+            tint: tint,
+            secondaryIcon: secondaryIcon,
+            secondaryAccessibilityLabel: secondaryAccessibilityLabel,
+            action: action,
+            secondaryAction: secondaryAction
+        )
     }
 
     private func autoFeederStatusText(state renderState: FeedHomeViewState) -> String {
@@ -242,8 +281,34 @@ struct QuickFeedHomePresenter {
     }
 
     private var stockCardValue: String {
+        let grams = [viewState.metrics.dryStockRemainingGrams, viewState.metrics.wetStockRemainingGrams]
+            .compactMap { $0 }
+            .reduce(0, +)
+        if grams > 0, let days = viewState.stockBadge.remainingDays {
+            return "\(formattedFoodCardWeight(grams)) · \(days)\(localization.tr(zh: "天", en: "d", de: "T"))"
+        }
         guard let days = viewState.stockBadge.remainingDays else { return "--" }
         return "\(days) \(localization.tr(zh: "天", en: "days", de: "Tage"))"
+    }
+
+    private var treatCardValue: String {
+        if viewState.metrics.todayTreatCount > 0, viewState.metrics.todayTreatGrams > 0 {
+            return "\(viewState.metrics.todayTreatCount)x · \(formattedFoodCardWeight(viewState.metrics.todayTreatGrams))"
+        }
+        if viewState.metrics.todayTreatCount > 0 {
+            return "\(viewState.metrics.todayTreatCount)x"
+        }
+        return "--"
+    }
+
+    private func stockMetricValue(grams: Double?) -> String {
+        guard let grams, grams > 0 else { return "--" }
+        return formattedFoodCardWeight(grams)
+    }
+
+    private func stockMetricDetail(days: Int?) -> String? {
+        guard let days else { return nil }
+        return "\(days)\(localization.tr(zh: "天", en: "d", de: "T"))"
     }
 
     private func nextFeedDetailText(events: [Event], fallback: String) -> String {

@@ -36,7 +36,7 @@ struct OasisRewardCommandExecutor {
         let activeCritterCount = electronicPets.filter { !$0.isArchived }.count
 
         return OasisBentoSnapshot(
-            shopMetric: "🥥 \(activeCoconutBalance)",
+            shopMetric: "\(activeCoconutBalance)",
             achievementMetric: pets.isEmpty ? "—" : "\(unlockedCount)/\(totalCount)",
             achievementsLocked: pets.isEmpty,
             critterMetric: electronicPets.isEmpty
@@ -46,7 +46,8 @@ struct OasisRewardCommandExecutor {
     }
 
     func makeCritterSnapshots(
-        electronicPets: [OasisElectronicPet]
+        electronicPets: [OasisElectronicPet],
+        fragments: [OasisCritterFragmentBalance] = []
     ) -> [UUID: OasisCritterRenderSnapshot] {
         var snapshots: [UUID: OasisCritterRenderSnapshot] = [:]
         for critter in electronicPets where !critter.isArchived {
@@ -57,6 +58,8 @@ struct OasisRewardCommandExecutor {
             let playCost = OasisUpgradeRewardService.interactionCost(for: critter, action: .play, context: context)
             let restCost = OasisUpgradeRewardService.interactionCost(for: critter, action: .rest, context: context)
             let activeBalance = OasisCritterEconomyService.currentHumanBalance(context: context)
+            let fragmentCount = fragments.first(where: { $0.catalogId == critter.catalogId })?.amount ?? 0
+            let xpProgress = OasisUpgradeRewardService.xpProgress(for: critter)
             let canUseActions = lifecycle.state != .dead
             snapshots[critter.id] = OasisCritterRenderSnapshot(
                 lifecycle: lifecycle,
@@ -66,6 +69,18 @@ struct OasisRewardCommandExecutor {
                     wish: wish,
                     context: context
                 ),
+                prompt: OasisCritterRenderSnapshot.prompt(for: critter, lifecycle: lifecycle),
+                displayLevel: min(OasisUpgradeRewardService.maxCritterLevel, max(1, critter.level)),
+                appearanceStage: OasisUpgradeRewardService.appearanceStage(forLevel: critter.level),
+                maxLevel: OasisUpgradeRewardService.maxCritterLevel,
+                bondLevel: OasisUpgradeRewardService.bondLevel(for: critter),
+                bondProgress: OasisUpgradeRewardService.bondProgress(for: critter),
+                xpProgress: xpProgress,
+                xpPercent: Int(Double(xpProgress) / Double(OasisUpgradeRewardService.critterXPPerLevel) * 100),
+                xpTarget: OasisUpgradeRewardService.critterXPPerLevel,
+                todayInteractionCount: OasisUpgradeRewardService.todayInteractionCount(for: critter, context: context),
+                canUpgradeLevel: OasisUpgradeRewardService.canUpgradeLevel(for: critter),
+                xpNeededForNextLevel: max(0, OasisUpgradeRewardService.critterXPPerLevel - xpProgress),
                 canFeed: canUseActions && activeBalance >= feedCost,
                 canPlay: canUseActions && activeBalance >= playCost,
                 canRest: canUseActions && activeBalance >= restCost,
@@ -73,7 +88,8 @@ struct OasisRewardCommandExecutor {
                 playCost: playCost,
                 restCost: restCost,
                 starFragmentsCost: starCost.fragments,
-                canUpgradeStar: canUseActions && activeBalance >= starCost.coconuts
+                starCoconutsCost: starCost.coconuts,
+                canUpgradeStar: canUseActions && fragmentCount >= starCost.fragments && activeBalance >= starCost.coconuts
             )
         }
         return snapshots
@@ -144,6 +160,22 @@ struct OasisRewardCommandExecutor {
 
     func upgradeStar(_ critter: OasisElectronicPet) throws -> Bool {
         try OasisUpgradeRewardService.upgradeStar(for: critter, context: context)
+    }
+
+    func upgradeLevel(_ critter: OasisElectronicPet) throws -> Bool {
+        try OasisUpgradeRewardService.upgradeLevel(for: critter, context: context)
+    }
+
+    func awakenWithFragments(catalogId: String) throws -> OasisElectronicPet? {
+        try OasisUpgradeRewardService.awakenWithFragments(catalogId: catalogId, context: context)
+    }
+
+    func setFeatured(_ critter: OasisElectronicPet, desired: Bool) throws {
+        if desired {
+            try OasisUpgradeRewardService.setFeatured(critter, context: context)
+        } else {
+            try OasisUpgradeRewardService.clearFeatured(critter, context: context)
+        }
     }
 
     func refreshFeaturedCritterLifecycle(_ electronicPets: [OasisElectronicPet]) {

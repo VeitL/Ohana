@@ -22,10 +22,11 @@ enum ManualFeedCommand {
         pet: Pet,
         foodKind: FeedFoodKind,
         grams: Double,
+        defaultEnabled: Bool = true,
         context: ModelContext
     ) {
         pet.mainFoodKind = foodKind
-        pet.dailyPortionGrams = grams
+        pet.dailyPortionGrams = defaultEnabled ? grams : 0
         context.safeSave()
     }
 

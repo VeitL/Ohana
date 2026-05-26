@@ -11,11 +11,6 @@ import SwiftData
 // MARK: - Ohana 图鉴主视图
 
 struct CrewRosterOverlay: View {
-    private enum RosterMode: String {
-        case collaboration
-        case members
-    }
-
     let onSelectPet: (Pet) -> Void
     let onSelectHuman: (Human) -> Void
     var onAddEntity: ((EntityType) -> Void)? = nil
@@ -30,19 +25,15 @@ struct CrewRosterOverlay: View {
     @Query(filter: #Predicate<Reminder> { $0.status == "pending" },
            sort: \Reminder.scheduledAt) private var pendingReminders: [Reminder]
 
-    @State private var activeAddEntityType: EntityType? = nil
+    @State private var activeFullScreenRoute: CrewRosterFullScreenRoute?
+    @State private var activeSheetRoute: CrewRosterSheetRoute?
     @State private var memberAddMenuExpanded = false
     @State private var memberAddMenuItemsVisible = false
-    @State private var showingCoconutLog = false
-    @State private var familyActivityPet: Pet? = nil
-    @State private var showingFamilyWeeklyReport = false
-    @State private var selectedRosterMode: RosterMode = .members
+    @State private var selectedRosterMode: CrewRosterMode = .members
     @State private var collaborationCreateTaskTrigger = 0
     @State private var collaborationEditorPresented = false
     @State private var pendingInlineSavedPet: Pet? = nil
     @State private var pendingInlineSavedHuman: Human? = nil
-    @State private var expandedRosterPet: Pet? = nil
-    @State private var expandedRosterHuman: Human? = nil
     @State private var expandedRosterCardId: UUID? = nil
     @State private var rosterHeroProgress: CGFloat = 0
     @State private var rosterHeroDirection: Int = 1
@@ -98,8 +89,8 @@ struct CrewRosterOverlay: View {
                                     collaborationEditorPresented = isPresented
                                 }
                             },
-                            onOpenPetActivity: { familyActivityPet = $0 },
-                            onOpenWeeklyReport: { showingFamilyWeeklyReport = true }
+                            onOpenPetActivity: { activeSheetRoute = .familyActivity($0.id) },
+                            onOpenWeeklyReport: { activeSheetRoute = .familyWeeklyReport }
                         )
                         .padding(.top, 4)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -129,50 +120,16 @@ struct CrewRosterOverlay: View {
 
             }
             .toolbar(.hidden, for: .navigationBar)
-            .fullScreenCover(isPresented: $showingCoconutLog) { CoconutLogView() }
-            .fullScreenCover(item: $activeAddEntityType, onDismiss: {
-                pendingInlineSavedPet = nil
-                pendingInlineSavedHuman = nil
-            }) { type in
-                addEntityCover(type)
-            }
-            .sheet(item: $familyActivityPet) { pet in
-                NavigationStack {
-                    ScrollView {
-                        FamilyActivityStripView(pet: pet, style: .full)
-                            .padding(.vertical, 20)
-                    }
-                    .navigationTitle(
-                        l.tr(
-                            zh: "谁在照顾 \(pet.name)",
-                            en: "Who's caring for \(pet.name)",
-                            de: "Wer kümmert sich um \(pet.name)?"
-                        )
-                    )
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
-                                familyActivityPet = nil
-                            }
-                            .foregroundStyle(Color.goPrimary)
-                        }
-                    }
-                }
-            }
-            .sheet(isPresented: $showingFamilyWeeklyReport) {
-                NavigationStack {
-                    FamilyWeeklyReportDashboardView()
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
-                                    showingFamilyWeeklyReport = false
-                                }
-                                .foregroundStyle(Color.goPrimary)
-                            }
-                        }
-                }
-            }
+            .crewRosterPresentations(
+                pets: pets,
+                l: l,
+                fullScreenRoute: $activeFullScreenRoute,
+                sheetRoute: $activeSheetRoute,
+                onAddEntityDismissed: resetPendingInlineAddEntity,
+                onAddEntityComplete: completeInlineAddEntity,
+                onPetSaved: { pendingInlineSavedPet = $0 },
+                onHumanSaved: { pendingInlineSavedHuman = $0 }
+            )
             .onChange(of: addMemberTrigger) { _, _ in
                 memberAddMenuItemsVisible = false
                 memberAddMenuExpanded = false
@@ -232,7 +189,7 @@ struct CrewRosterOverlay: View {
 
     private var rosterCoconutButton: some View {
         CoconutBalanceCapsule(balance: activeHumanCoconutBalance) {
-            showingCoconutLog = true
+            activeFullScreenRoute = .coconutLog
         }
         .frame(minHeight: 44)
         .contentShape(Rectangle())
@@ -311,29 +268,17 @@ struct CrewRosterOverlay: View {
     }
 
     private var shouldShowRosterFab: Bool {
-        guard activeAddEntityType == nil else { return false }
-        guard expandedRosterPet == nil && expandedRosterHuman == nil && expandedRosterCardId == nil else { return false }
+        guard !isPresentingAddEntity else { return false }
+        guard expandedRosterCardId == nil else { return false }
         if showsFamilyCollaboration && selectedRosterMode == .collaboration {
             return !collaborationEditorPresented
         }
         return selectedRosterMode == .members || isEmpty
     }
 
-    @ViewBuilder
-    private func addEntityCover(_ type: EntityType) -> some View {
-        AddEntityDestinationView(
-            type: type,
-            onComplete: { completeInlineAddEntity() },
-            onPetSaved: { pet in
-                pendingInlineSavedPet = pet
-            },
-            onHumanSaved: { human in
-                pendingInlineSavedHuman = human
-            }
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .ignoresSafeArea()
-        .background(OhanaAppBackground())
+    private var isPresentingAddEntity: Bool {
+        if case .addEntity = activeFullScreenRoute { return true }
+        return false
     }
 
     private func presentInlineAddEntity(_ type: EntityType) {
@@ -342,8 +287,8 @@ struct CrewRosterOverlay: View {
             memberAddMenuExpanded = false
         }
         OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
-            guard activeAddEntityType == nil else { return }
-            activeAddEntityType = type
+            guard activeFullScreenRoute == nil else { return }
+            activeFullScreenRoute = .addEntity(type)
         }
     }
 
@@ -354,7 +299,7 @@ struct CrewRosterOverlay: View {
         pendingInlineSavedHuman = nil
 
         withAnimation(GoMotion.sheet) {
-            activeAddEntityType = nil
+            activeFullScreenRoute = nil
         }
 
         OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
@@ -364,6 +309,11 @@ struct CrewRosterOverlay: View {
                 onSelectHuman(savedHuman)
             }
         }
+    }
+
+    private func resetPendingInlineAddEntity() {
+        pendingInlineSavedPet = nil
+        pendingInlineSavedHuman = nil
     }
 
     private var rosterFloatingActionOverlay: some View {
@@ -669,27 +619,24 @@ struct CrewRosterOverlay: View {
     private func openRosterPetDetail(_ pet: Pet) {
         OhanaFeedback.light()
         withAnimation(GoMotion.page) {
-            expandedRosterHuman = nil
-            expandedRosterPet = pet
             memberAddMenuItemsVisible = false
             memberAddMenuExpanded = false
+            expandedRosterCardId = pet.id
         }
     }
 
     private func openRosterHumanDetail(_ human: Human) {
         OhanaFeedback.light()
         withAnimation(GoMotion.page) {
-            expandedRosterPet = nil
-            expandedRosterHuman = human
             memberAddMenuItemsVisible = false
             memberAddMenuExpanded = false
+            expandedRosterCardId = human.id
         }
     }
 
     private func closeRosterMemberDetail() {
         withAnimation(GoMotion.sheet) {
-            expandedRosterPet = nil
-            expandedRosterHuman = nil
+            expandedRosterCardId = nil
         }
     }
 }

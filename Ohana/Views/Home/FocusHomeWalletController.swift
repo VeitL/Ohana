@@ -57,7 +57,8 @@ final class FocusHomeWalletController: ObservableObject {
         animation: Animation,
         shouldReduceWork: Bool,
         cancelAvatarLoad: () -> Void,
-        resetSurfaces: () -> Void
+        resetSurfaces: () -> Void,
+        completion: @escaping @MainActor () -> Void = {}
     ) {
         cancelAvatarLoad()
         resetSurfaces()
@@ -79,9 +80,14 @@ final class FocusHomeWalletController: ObservableObject {
             lastExpandStartedAt = CFAbsoluteTimeGetCurrent()
         }
 
-        withAnimation(animation) {
+        withAnimation(animation, completionCriteria: .removed) {
             isExpanded = true
             heroProgress = 1
+        } completion: {
+            guard self.isCurrentTransition(session) else { return }
+            self.transitionCardId = nil
+            self.heroDirection = 0
+            completion()
         }
 
         if let pending {
@@ -92,12 +98,7 @@ final class FocusHomeWalletController: ObservableObject {
             }
         }
 
-        Task { @MainActor in
-            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: shouldReduceWork ? 180 : 660)
-            guard isCurrentTransition(session) else { return }
-            transitionCardId = nil
-            heroDirection = 0
-        }
+        _ = shouldReduceWork
     }
 
     func handleCardTap(
@@ -148,7 +149,8 @@ final class FocusHomeWalletController: ObservableObject {
         returningPreviewId: UUID?,
         visibleCards: @escaping @MainActor () -> [FocusCard],
         resetSurfaces: () -> Void,
-        clearRosterPreview: @escaping @MainActor () -> Void
+        clearRosterPreview: @escaping @MainActor () -> Void,
+        completion: @escaping @MainActor () -> Void = {}
     ) {
         let session = nextTransitionSession()
         transitionCardId = activeCardId
@@ -163,10 +165,22 @@ final class FocusHomeWalletController: ObservableObject {
             AppPerformanceMonitor.shared.record("home.cardCollapseStateSubmitted", startedAt: pending.startedAt, note: pending.cardName)
         }
 
-        withAnimation(animation) {
+        withAnimation(animation, completionCriteria: .removed) {
             isExpanded = false
             heroProgress = 0
             resetSurfaces()
+        } completion: {
+            guard self.isCurrentTransition(session) else { return }
+            self.transitionCardId = nil
+            self.heroDirection = 0
+
+            if let returningPreviewId {
+                self.selectActiveCardWithoutAnimation(visibleCards().first { $0.id != returningPreviewId }?.id)
+                clearRosterPreview()
+            } else {
+                clearRosterPreview()
+            }
+            completion()
         }
 
         if let pending {
@@ -177,19 +191,7 @@ final class FocusHomeWalletController: ObservableObject {
             }
         }
 
-        Task { @MainActor in
-            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: shouldReduceWork ? 180 : 560)
-            guard isCurrentTransition(session) else { return }
-            transitionCardId = nil
-            heroDirection = 0
-
-            if let returningPreviewId {
-                selectActiveCardWithoutAnimation(visibleCards().first { $0.id != returningPreviewId }?.id)
-                clearRosterPreview()
-            } else {
-                clearRosterPreview()
-            }
-        }
+        _ = shouldReduceWork
     }
 
     func collapseHiddenHomeWithoutAnimation(resetSurfaces: () -> Void, clearRosterPreview: () -> Void) {

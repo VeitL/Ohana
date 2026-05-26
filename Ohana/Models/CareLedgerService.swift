@@ -132,7 +132,8 @@ enum CareLedgerService {
         actionType: String,
         actorId: String?,
         source: CareLedgerSource,
-        context: ModelContext
+        context: ModelContext,
+        save: Bool = true
     ) {
         let subject = subjectInfo(from: reminder.event)
         record(
@@ -149,7 +150,8 @@ enum CareLedgerService {
             sourceReminderId: reminder.id.uuidString,
             legacyModelName: "Reminder",
             legacyModelId: reminder.id.uuidString,
-            context: context
+            context: context,
+            save: save
         )
     }
 

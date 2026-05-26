@@ -448,6 +448,30 @@ struct SettingsView: View {
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
 
                             NavigationLink {
+                                MotionPreviewLabView()
+                            } label: {
+                                HStack(spacing: 12) {
+                                    settingsIcon("sparkles", color: Color.goPrimary)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(l.tr(zh: "全局动效预览", en: "Global motion preview", de: "Globale Bewegungs-Vorschau"))
+                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                            .foregroundStyle(primaryText)
+                                        Text(l.tr(zh: "Capsule 默认、Chart Flow、5 个原色", en: "Capsule default, Flow charts, 5 colors", de: "Capsule als Standard, Flow-Charts, 5 Farben"))
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(tertiaryText)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(tertiaryText.opacity(0.6))
+                                }
+                                .frame(minHeight: 44)
+                            }
+                            .buttonStyle(ScaleButtonStyle())
+
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+
+                            NavigationLink {
                                 VerticalGlassHomeLabView()
                             } label: {
                                 HStack(spacing: 12) {

@@ -29,7 +29,8 @@ struct VerticalSolidHomePage<QuickActions: View, ContextMenuContent: View>: View
     @Binding var isTodayFocusCollapsed: Bool
     let quickActions: (FocusCard) -> QuickActions
     let contextMenu: (FocusCard) -> ContextMenuContent
-    let onSelect: (FocusCard) -> Void
+    let heroSnapshot: FocusHomeVerticalSolidHeroSnapshot?
+    let onSelect: (FocusHomeVerticalSolidHeroSnapshot) -> Void
     let onCollapse: () -> Void
     let onLongPress: (FocusCard) -> Void
     let onAddPet: () -> Void
@@ -66,6 +67,7 @@ struct VerticalSolidHomePage<QuickActions: View, ContextMenuContent: View>: View
                     safeTop: 0,
                     safeBottom: safeBottom,
                     selectedCardId: selectedCardId,
+                    heroSnapshot: heroSnapshot,
                     progress: heroProgress,
                     heroDirection: heroDirection,
                     reduceMotion: reduceMotion,
@@ -107,7 +109,6 @@ struct VerticalSolidHomePage<QuickActions: View, ContextMenuContent: View>: View
             )
             .padding(.horizontal, 8)
             .opacity(Double(focusReveal))
-            .scaleEffect(0.985 + 0.015 * focusReveal, anchor: .top)
             .allowsHitTesting(focusReveal > 0.96 && selectedCardId == nil)
         }
         .frame(width: size.width, height: size.height, alignment: .top)

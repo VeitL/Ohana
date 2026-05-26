@@ -18,16 +18,17 @@ enum ReminderSchedulingService {
         context: ModelContext,
         source: CareLedgerSource = .service,
         existingNotificationIds: Set<String>? = nil,
-        operation: String = "schedule"
+        operation: String = "schedule",
+        saveLedger: Bool = true
     ) async -> ReminderNotificationScheduleResult {
         if reminder.event == nil {
             let result = ReminderNotificationScheduleResult.missingEvent
-            recordScheduleResult(result, reminder: reminder, source: source, operation: operation, context: context)
+            recordScheduleResult(result, reminder: reminder, source: source, operation: operation, context: context, save: saveLedger)
             return result
         }
         if reminder.scheduledAt <= Date() {
             let result = ReminderNotificationScheduleResult.skippedPastDue
-            recordScheduleResult(result, reminder: reminder, source: source, operation: operation, context: context)
+            recordScheduleResult(result, reminder: reminder, source: source, operation: operation, context: context, save: saveLedger)
             return result
         }
         let existingIds: Set<String>
@@ -44,7 +45,7 @@ enum ReminderSchedulingService {
                 continuation.resume(returning: result)
             }
         }
-        recordScheduleResult(result, reminder: reminder, source: source, operation: operation, context: context)
+        recordScheduleResult(result, reminder: reminder, source: source, operation: operation, context: context, save: saveLedger)
         return result
     }
 
@@ -54,11 +55,7 @@ enum ReminderSchedulingService {
         context: ModelContext,
         source: CareLedgerSource = .service
     ) async {
-        let remindersToKeep = deduplicate(reminders: reminders, context: context)
-        let existingIds = await NotificationManager.shared.pendingNotificationIds()
-        for reminder in remindersToKeep {
-            await scheduleIfNeeded(reminder: reminder, context: context, source: source, existingNotificationIds: existingIds)
-        }
+        await scheduleBatch(reminders: reminders, context: context, source: source, operation: "schedule")
     }
 
     @MainActor
@@ -77,17 +74,7 @@ enum ReminderSchedulingService {
         let windowReminders = reminders.filter { reminder in
             reminder.isPending && reminder.scheduledAt > now && reminder.scheduledAt <= windowEnd
         }
-        let remindersToKeep = deduplicate(reminders: windowReminders, context: context)
-        let existingIds = await NotificationManager.shared.pendingNotificationIds()
-        for reminder in remindersToKeep {
-            await scheduleIfNeeded(
-                reminder: reminder,
-                context: context,
-                source: .service,
-                existingNotificationIds: existingIds,
-                operation: "refill"
-            )
-        }
+        await scheduleBatch(reminders: windowReminders, context: context, source: .service, operation: "refill")
     }
 
     @MainActor
@@ -120,6 +107,7 @@ enum ReminderSchedulingService {
     static func deduplicate(reminders: [Reminder], context: ModelContext) -> [Reminder] {
         var seen: Set<String> = []
         var kept: [Reminder] = []
+        var didChange = false
         for reminder in reminders.sorted(by: { $0.createdAt < $1.createdAt }) {
             let key = dedupeKey(for: reminder)
             if seen.contains(key) {
@@ -129,15 +117,19 @@ enum ReminderSchedulingService {
                     actionType: "dedupeRemoved",
                     actorId: nil,
                     source: .service,
-                    context: context
+                    context: context,
+                    save: false
                 )
                 context.delete(reminder)
+                didChange = true
             } else {
                 seen.insert(key)
                 kept.append(reminder)
             }
         }
-        context.safeSave()
+        if didChange {
+            context.safeSave()
+        }
         return kept
     }
 
@@ -147,7 +139,8 @@ enum ReminderSchedulingService {
         reminder: Reminder,
         source: CareLedgerSource,
         operation: String,
-        context: ModelContext
+        context: ModelContext,
+        save: Bool = true
     ) {
         let subject = CareLedgerService.subjectInfo(from: reminder.event)
         CareLedgerService.record(
@@ -163,8 +156,43 @@ enum ReminderSchedulingService {
             legacyModelName: "Reminder",
             legacyModelId: reminder.id.uuidString,
             metadataJSON: result.metadataJSON,
-            context: context
+            context: context,
+            save: save
         )
+    }
+
+    @MainActor
+    private static func scheduleBatch(
+        reminders: [Reminder],
+        context: ModelContext,
+        source: CareLedgerSource,
+        operation: String
+    ) async {
+        let remindersToKeep = deduplicate(reminders: reminders, context: context)
+        guard !remindersToKeep.isEmpty else { return }
+
+        var knownNotificationIds = await NotificationManager.shared.pendingNotificationIds()
+        for (index, reminder) in remindersToKeep.enumerated() {
+            guard !Task.isCancelled else {
+                context.safeSave()
+                return
+            }
+            let result = await scheduleIfNeeded(
+                reminder: reminder,
+                context: context,
+                source: source,
+                existingNotificationIds: knownNotificationIds,
+                operation: operation,
+                saveLedger: false
+            )
+            if result == .scheduled {
+                knownNotificationIds.insert(reminder.notificationId)
+            }
+            if index > 0, index.isMultiple(of: 8) {
+                await Task.yield()
+            }
+        }
+        context.safeSave()
     }
 
     private static func dedupeKey(for reminder: Reminder) -> String {

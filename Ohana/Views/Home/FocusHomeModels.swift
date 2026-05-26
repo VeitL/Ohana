@@ -155,11 +155,6 @@ struct ExpandedCardFabShortcut: Identifiable {
     var id: String { "\(label)-\(String(describing: action))" }
 }
 
-struct FunctionMenuPresentation: Identifiable {
-    let id = UUID()
-    let destination: FMDest?
-}
-
 extension FocusCard {
     static func from(
         _ pet: Pet,
@@ -259,7 +254,7 @@ extension FocusCard {
         return FocusCard(
             id: human.id,
             name: human.name.isEmpty ? l.tr(zh: "成员", en: "Human", de: "Mitglied") : human.name,
-            kind: human.hasPassedAway ? l.tr(zh: "纪念", en: "Memorial", de: "Gedenken") : (human.roleText.isEmpty ? "HUMAN" : human.roleText),
+            kind: human.hasPassedAway ? l.tr(zh: "纪念", en: "Memorial", de: "Gedenken") : l.tr(zh: "家人", en: "Member", de: "Mitglied"),
             emoji: human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji,
             color: Color(hex: hex),
             streak: 0,

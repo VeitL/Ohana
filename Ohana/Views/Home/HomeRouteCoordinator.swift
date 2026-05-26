@@ -106,13 +106,194 @@ enum HomePopupRoute: Equatable, Identifiable {
     }
 }
 
+enum HomeModalRoute: Identifiable {
+    case functionMenu(destination: FMDest?)
+    case streakDetail
+    case addEntity(EntityType)
+    case crewRoster
+    case accountSwitcher
+    case calendar(entityID: String?, humanID: String?)
+
+    var id: String {
+        switch self {
+        case let .functionMenu(destination):
+            return "function-menu-\(String(describing: destination))"
+        case .streakDetail:
+            return "streak-detail"
+        case let .addEntity(type):
+            return "add-entity-\(type.id)"
+        case .crewRoster:
+            return "crew-roster"
+        case .accountSwitcher:
+            return "account-switcher"
+        case let .calendar(entityID, humanID):
+            return "calendar-\(entityID ?? "all")-\(humanID ?? "all")"
+        }
+    }
+}
+
+enum HomeFullScreenRoute: Identifiable {
+    case settings
+    case walk(UUID)
+    case oasisReward
+    case coconutLog(CoconutLogSubject)
+
+    var id: String {
+        switch self {
+        case .settings:
+            return "settings"
+        case let .walk(id):
+            return "walk-\(id.uuidString)"
+        case .oasisReward:
+            return "oasis-reward"
+        case let .coconutLog(subject):
+            return "coconut-log-\(subject.id)"
+        }
+    }
+}
+
+enum HomeOverlayRoute: Identifiable {
+    case quickMoment(routeID: UUID = UUID(), petID: UUID)
+
+    var id: UUID {
+        switch self {
+        case let .quickMoment(routeID, _):
+            return routeID
+        }
+    }
+
+    var petID: UUID? {
+        switch self {
+        case let .quickMoment(_, petID):
+            return petID
+        }
+    }
+}
+
+enum HomeAlertRoute: Identifiable {
+    case antiRepeat(routeID: UUID = UUID(), title: String, message: String)
+    case singleUseNotice(routeID: UUID = UUID(), title: String, message: String)
+    case quickActionLimit(routeID: UUID = UUID())
+    case humanPrivacy(routeID: UUID = UUID())
+
+    var id: UUID {
+        switch self {
+        case let .antiRepeat(routeID, _, _),
+             let .singleUseNotice(routeID, _, _),
+             let .quickActionLimit(routeID),
+             let .humanPrivacy(routeID):
+            return routeID
+        }
+    }
+}
+
 @MainActor
 final class HomeRouteCoordinator: ObservableObject {
+    @Published var modal: HomeModalRoute?
+    @Published var fullScreen: HomeFullScreenRoute?
+    @Published var overlay: HomeOverlayRoute?
+    @Published var alert: HomeAlertRoute?
     @Published var sheet: HomeSheetRoute?
     @Published var popup: HomePopupRoute?
 
+    var pendingRepeatAction: (() -> Void)?
+
     var hasActiveOverlay: Bool {
         popup != nil
+    }
+
+    func openModal(_ route: HomeModalRoute) {
+        modal = route
+    }
+
+    func dismissModal() {
+        modal = nil
+    }
+
+    func openFunctionMenu(destination: FMDest?) {
+        modal = .functionMenu(destination: destination)
+    }
+
+    func openStreakDetail() {
+        modal = .streakDetail
+    }
+
+    func openAddEntity(_ type: EntityType) {
+        modal = .addEntity(type)
+    }
+
+    func openCrewRoster() {
+        modal = .crewRoster
+    }
+
+    func openAccountSwitcher() {
+        modal = .accountSwitcher
+    }
+
+    func openCalendar(entityID: String? = nil, humanID: String? = nil) {
+        modal = .calendar(entityID: entityID, humanID: humanID)
+    }
+
+    func openFullScreen(_ route: HomeFullScreenRoute) {
+        fullScreen = route
+    }
+
+    func dismissFullScreen() {
+        fullScreen = nil
+    }
+
+    func openSettings() {
+        fullScreen = .settings
+    }
+
+    func openWalk(_ pet: Pet) {
+        fullScreen = .walk(pet.id)
+    }
+
+    func openOasisReward() {
+        fullScreen = .oasisReward
+    }
+
+    func openCoconutLog(_ subject: CoconutLogSubject) {
+        fullScreen = .coconutLog(subject)
+    }
+
+    func openQuickMoment(_ pet: Pet) {
+        overlay = .quickMoment(petID: pet.id)
+    }
+
+    func dismissOverlay(routeID: UUID) {
+        guard overlay?.id == routeID else { return }
+        overlay = nil
+    }
+
+    func showAntiRepeat(title: String, message: String, pendingAction: @escaping () -> Void) {
+        pendingRepeatAction = pendingAction
+        alert = .antiRepeat(title: title, message: message)
+    }
+
+    func confirmAntiRepeatAction() {
+        let action = pendingRepeatAction
+        pendingRepeatAction = nil
+        alert = nil
+        action?()
+    }
+
+    func showSingleUseNotice(title: String, message: String) {
+        alert = .singleUseNotice(title: title, message: message)
+    }
+
+    func showQuickActionLimit() {
+        alert = .quickActionLimit()
+    }
+
+    func showHumanPrivacy() {
+        alert = .humanPrivacy()
+    }
+
+    func dismissAlert() {
+        pendingRepeatAction = nil
+        alert = nil
     }
 
     func openSheet(_ route: HomeSheetRoute) {
@@ -161,6 +342,11 @@ final class HomeRouteCoordinator: ObservableObject {
     }
 
     func resetAllRoutes() {
+        modal = nil
+        fullScreen = nil
+        overlay = nil
+        alert = nil
+        pendingRepeatAction = nil
         sheet = nil
         popup = nil
     }

@@ -39,7 +39,7 @@ enum QuickActionPickerCatalog {
         ]
     }
 
-    /// 当前物种可出现的 actionType 集合（与 ArkCrewIDCardView.QACardType.available 一致）
+    /// 当前物种可出现的 actionType 集合（与 QACardType.available 物种规则一致）
     static func allowedActionTypeIds(forSpecies species: String) -> Set<String> {
         var allowed = Set(QACardType.available(for: species).map(\.rawValue))
         if allowed.contains("care") { allowed.insert("groom") }

@@ -11,6 +11,7 @@ struct FocusHomeWalkCardFlip<Front: View>: View {
     let walkPet: Pet?
     var reduceMotion: Bool = false
     var walkCardPadding: CGFloat = 10
+    var retainsWalkPetDuringClose: Bool = true
     private let front: () -> Front
 
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
@@ -22,11 +23,13 @@ struct FocusHomeWalkCardFlip<Front: View>: View {
         walkPet: Pet?,
         reduceMotion: Bool = false,
         walkCardPadding: CGFloat = 10,
+        retainsWalkPetDuringClose: Bool = true,
         @ViewBuilder front: @escaping () -> Front
     ) {
         self.walkPet = walkPet
         self.reduceMotion = reduceMotion
         self.walkCardPadding = walkCardPadding
+        self.retainsWalkPetDuringClose = retainsWalkPetDuringClose
         self.front = front
     }
 
@@ -60,10 +63,13 @@ struct FocusHomeWalkCardFlip<Front: View>: View {
         .onChange(of: walkPet?.id) { _, _ in
             syncWalkPet(animated: true)
         }
+        .onChange(of: retainsWalkPetDuringClose) { _, _ in
+            syncWalkPet(animated: false)
+        }
     }
 
     private var currentWalkPet: Pet? {
-        walkPet ?? retainedWalkPet
+        retainsWalkPetDuringClose ? (walkPet ?? retainedWalkPet) : walkPet
     }
 
     private var effectiveReduceMotion: Bool {
@@ -83,6 +89,12 @@ struct FocusHomeWalkCardFlip<Front: View>: View {
         if let walkPet {
             retainedWalkPet = walkPet
             setRotation(180, animated: animated)
+            return
+        }
+
+        if !retainsWalkPetDuringClose {
+            retainedWalkPet = nil
+            setRotation(0, animated: false)
             return
         }
 

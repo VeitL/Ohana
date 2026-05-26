@@ -126,7 +126,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private var selectedHomeView: some View {
-        HomeV2DataContainer(
+        VerticalSolidHomeDataContainer(
             selectedPet: $selectedPet,
             selectedHuman: $selectedHuman,
             selectedPlant: $selectedPlant,

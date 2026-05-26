@@ -24,6 +24,18 @@ struct OasisCritterRenderSnapshot: Equatable {
     var lifecycle: OasisCritterLifecycleSnapshot
     var dailyWish: OasisCritterDailyWish?
     var isDailyWishCompleted: Bool
+    var prompt: AppLocalizedText
+    var displayLevel: Int
+    var appearanceStage: Int
+    var maxLevel: Int
+    var bondLevel: Int
+    var bondProgress: Int
+    var xpProgress: Int
+    var xpPercent: Int
+    var xpTarget: Int
+    var todayInteractionCount: Int
+    var canUpgradeLevel: Bool
+    var xpNeededForNextLevel: Int
     var canFeed: Bool
     var canPlay: Bool
     var canRest: Bool
@@ -31,29 +43,57 @@ struct OasisCritterRenderSnapshot: Equatable {
     var playCost: Int
     var restCost: Int
     var starFragmentsCost: Int
+    var starCoconutsCost: Int
     var canUpgradeStar: Bool
 
     static func lightweight(for critter: OasisElectronicPet) -> OasisCritterRenderSnapshot {
-        OasisCritterRenderSnapshot(
-            lifecycle: OasisCritterLifecycleSnapshot(
-                state: critter.lifeState,
-                deathReason: critter.deathReason,
-                recommendedAction: nil,
-                isRescuable: critter.lifeState == .critical || critter.lifeState == .sick,
-                hoursUntilDeath: nil,
-                ageDays: max(0, Calendar.current.dateComponents([.day], from: critter.obtainedAt, to: Date()).day ?? 0),
-                urgencyScore: 0
-            ),
+        let lifecycle = OasisCritterLifecycleSnapshot(
+            state: critter.lifeState,
+            deathReason: critter.deathReason,
+            recommendedAction: nil,
+            isRescuable: critter.lifeState == .critical || critter.lifeState == .sick,
+            hoursUntilDeath: nil,
+            ageDays: max(0, Calendar.current.dateComponents([.day], from: critter.obtainedAt, to: Date()).day ?? 0),
+            urgencyScore: 0
+        )
+        let xpProgress = OasisUpgradeRewardService.xpProgress(for: critter)
+        let starCost = OasisUpgradeRewardService.starUpgradeCost(for: critter)
+        return OasisCritterRenderSnapshot(
+            lifecycle: lifecycle,
             dailyWish: nil,
             isDailyWishCompleted: false,
+            prompt: Self.prompt(for: critter, lifecycle: lifecycle),
+            displayLevel: min(OasisUpgradeRewardService.maxCritterLevel, max(1, critter.level)),
+            appearanceStage: OasisUpgradeRewardService.appearanceStage(forLevel: critter.level),
+            maxLevel: OasisUpgradeRewardService.maxCritterLevel,
+            bondLevel: OasisUpgradeRewardService.bondLevel(for: critter),
+            bondProgress: OasisUpgradeRewardService.bondProgress(for: critter),
+            xpProgress: xpProgress,
+            xpPercent: Int(Double(xpProgress) / Double(OasisUpgradeRewardService.critterXPPerLevel) * 100),
+            xpTarget: OasisUpgradeRewardService.critterXPPerLevel,
+            todayInteractionCount: 0,
+            canUpgradeLevel: OasisUpgradeRewardService.canUpgradeLevel(for: critter),
+            xpNeededForNextLevel: max(0, OasisUpgradeRewardService.critterXPPerLevel - xpProgress),
             canFeed: false,
             canPlay: false,
             canRest: false,
             feedCost: 0,
             playCost: 0,
             restCost: 0,
-            starFragmentsCost: OasisUpgradeRewardService.starUpgradeCost(for: critter).fragments,
+            starFragmentsCost: starCost.fragments,
+            starCoconutsCost: starCost.coconuts,
             canUpgradeStar: false
+        )
+    }
+
+    static func prompt(
+        for critter: OasisElectronicPet,
+        lifecycle: OasisCritterLifecycleSnapshot
+    ) -> AppLocalizedText {
+        AppLocalizedText(
+            zh: OasisUpgradeRewardService.gentlePrompt(for: critter, snapshot: lifecycle, l: L10n("zh")),
+            en: OasisUpgradeRewardService.gentlePrompt(for: critter, snapshot: lifecycle, l: L10n("en")),
+            de: OasisUpgradeRewardService.gentlePrompt(for: critter, snapshot: lifecycle, l: L10n("de"))
         )
     }
 }
