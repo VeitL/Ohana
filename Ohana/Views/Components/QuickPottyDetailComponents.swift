@@ -51,13 +51,7 @@ struct PoopInlineSheetGlassSurface: View {
     let cornerRadius: CGFloat
 
     var body: some View {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .fill(Color.ohanaCardSurface)
-            .glassEffect(.regular.interactive(false), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(Color.ohanaCardStroke, lineWidth: 1.1)
-            }
+        OhanaPopupGlassSurface(cornerRadius: cornerRadius)
     }
 }
 

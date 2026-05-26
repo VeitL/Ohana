@@ -192,6 +192,21 @@ final class FocusHomeWalletController: ObservableObject {
         }
     }
 
+    func collapseHiddenHomeWithoutAnimation(resetSurfaces: () -> Void, clearRosterPreview: () -> Void) {
+        _ = nextTransitionSession()
+        pendingTap = nil
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            isExpanded = false
+            transitionCardId = nil
+            heroProgress = 0
+            heroDirection = 0
+            resetSurfaces()
+            clearRosterPreview()
+        }
+    }
+
     private func consumePendingTap(action: String) -> PendingTap? {
         guard pendingTap?.action == action else { return nil }
         defer { pendingTap = nil }

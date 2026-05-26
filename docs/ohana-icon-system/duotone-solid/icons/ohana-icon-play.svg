@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Play / 玩耍" class="ohana-duotone-icon">
+  <title>Play / 玩耍</title>
+  <g>
+
+      <path style="fill:#ff755f" d="M10.1 11.9h11.8c2.8 0 5 2.2 5 5v3.5a3.5 3.5 0 0 1-6.3 2.1l-1.2-1.6h-6.8l-1.2 1.6a3.5 3.5 0 0 1-6.3-2.1v-3.5c0-2.8 2.2-5 5-5Z"/>
+      <rect style="fill:#7be4d4" x="9.3" y="16.1" width="6.2" height="2.1" rx="1.05"/>
+      <rect style="fill:#7be4d4" x="11.3" y="14.1" width="2.1" height="6.2" rx="1.05"/>
+      <circle style="fill:#7be4d4" cx="21" cy="16.4" r="1.55"/>
+      <circle style="fill:#7be4d4;opacity:.28" cx="23.9" cy="19" r="1.55"/>
+  </g>
+</svg>

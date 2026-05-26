@@ -88,7 +88,7 @@ struct CrewRosterOverlay: View {
                             .padding(.top, 4)
                         }
                     } else if showsFamilyCollaboration && selectedRosterMode == .collaboration {
-                        FamilyCollaborationDashboardView(
+                        FamilyCollaborationDashboardHost(
                             pets: activePets,
                             humans: humans,
                             pendingReminders: pendingReminders,

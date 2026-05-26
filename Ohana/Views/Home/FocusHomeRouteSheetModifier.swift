@@ -10,7 +10,10 @@ import SwiftUI
 
 struct FocusHomeRouteSheetModifier: ViewModifier {
     let pets: [Pet]
+    let humans: [Human]
     let l: L10n
+
+    @ObservedObject var routes: HomeRouteCoordinator
 
     @Binding var functionMenuPresentation: FunctionMenuPresentation?
     @Binding var showStreakDetail: Bool
@@ -22,31 +25,8 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     @Binding var showingCalendar: Bool
     @Binding var calendarEntityFilterId: String?
     @Binding var calendarHumanFilterId: String?
-    @Binding var expandedAllFeaturesPet: Pet?
-    @Binding var expandedAllFeaturesHuman: Human?
-    @Binding var expandedBasicInfoPet: Pet?
-    @Binding var expandedBasicInfoHuman: Human?
-    @Binding var expandedQuickWeightDetailPet: Pet?
-    @Binding var expandedQuickExpenseDetailPet: Pet?
-    @Binding var expandedQuickFeedDetailPet: Pet?
-    @Binding var expandedQuickFeedOpensManualSheet: Bool
-    @Binding var expandedQuickWaterDetailPet: Pet?
-    @Binding var expandedQuickPottyDetailPet: Pet?
-    @Binding var expandedQuickLitterDetailPet: Pet?
-    @Binding var expandedQuickPlayDetailPet: Pet?
-    @Binding var expandedQuickHygienePet: Pet?
-    @Binding var expandedQuickWalkPet: Pet?
     @Binding var todayFocusWalkPet: Pet?
-    @Binding var expandedQuickHealthPet: Pet?
-    @Binding var expandedQuickHealthInitialSection: PetHealthInitialSection?
-    @Binding var expandedQuickPetMedicationPet: Pet?
     @Binding var expandedQuickMomentPet: Pet?
-    @Binding var expandedMomentHistoryPet: Pet?
-    @Binding var expandedQuickHumanMedication: Human?
-    @Binding var expandedHumanWeightDetail: Human?
-    @Binding var expandedHumanWorkoutDetail: Human?
-    @Binding var expandedHumanExpenseDetail: Human?
-    @Binding var expandedHumanNoteDetail: Human?
     @Binding var showingOasisReward: Bool
     @Binding var activeCoconutLogSubject: CoconutLogSubject?
     @Binding var showingAntiRepeatAlert: Bool
@@ -119,83 +99,11 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 )
                 .ohanaSheetPagePresentation() // ui-v4: allow calendar as long sheet
             }
-            .sheet(item: $expandedAllFeaturesPet) { pet in
-                PetAllFeaturesSheet(pet: pet)
-                    .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
-            }
-            .sheet(item: $expandedAllFeaturesHuman) { human in
-                HumanAllFeaturesSheet(human: human)
-                    .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
-            }
-            .sheet(item: $expandedBasicInfoPet) { pet in
-                NavigationStack { PetBasicInfoDetailView(pet: pet) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            }
-            .sheet(item: $expandedBasicInfoHuman) { human in
-                NavigationStack { HumanBasicInfoDetailView(human: human) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            }
-            .sheet(item: $expandedQuickWeightDetailPet) { pet in
-                NavigationStack { WeightHistoryView(pet: pet) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            }
-            .sheet(item: $expandedQuickExpenseDetailPet) { pet in
-                NavigationStack { ExpenseHistoryView(pet: pet) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            }
-            .sheet(item: $expandedQuickFeedDetailPet) { pet in
-                QuickFeedDetailSheet(
-                    pet: pet,
-                    onRemove: { expandedQuickFeedDetailPet = nil },
-                    opensManualSheetOnAppear: expandedQuickFeedOpensManualSheet
-                )
-                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-                .onDisappear { expandedQuickFeedOpensManualSheet = false }
-            }
-            .sheet(item: $expandedQuickWaterDetailPet) { pet in
-                QuickWaterDetailSheet(pet: pet) {
-                    expandedQuickWaterDetailPet = nil
-                }
-                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            }
-            .sheet(item: $expandedQuickPottyDetailPet) { pet in
-                QuickPottyDetailSheet(pet: pet) { expandedQuickPottyDetailPet = nil }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            }
-            .sheet(item: $expandedQuickLitterDetailPet) { pet in
-                QuickLitterDetailSheet(pet: pet) { expandedQuickLitterDetailPet = nil }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            }
-            .sheet(item: $expandedQuickPlayDetailPet) { pet in
-                QuickPlayDetailSheet(pet: pet) { expandedQuickPlayDetailPet = nil }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            }
-            .sheet(item: $expandedQuickHygienePet) { pet in
-                NavigationStack { PetHygieneDetailView(pet: pet) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            }
-            .sheet(item: $expandedQuickWalkPet) { pet in
-                NavigationStack { WalkSummarySheet(pet: pet) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            .sheet(item: $routes.sheet) { route in
+                homeSheetDestination(for: route)
             }
             .fullScreenCover(item: $todayFocusWalkPet) { pet in
                 WalkTrackingFullScreen(pet: pet)
-            }
-            .sheet(item: $expandedQuickHealthPet, onDismiss: {
-                expandedQuickHealthInitialSection = nil
-            }) { pet in
-                NavigationStack {
-                    PetHealthDetailView(
-                        pet: pet,
-                        isModal: true,
-                        initialSection: expandedQuickHealthInitialSection
-                    )
-                }
-                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            }
-            .sheet(item: $expandedQuickPetMedicationPet) { pet in
-                NavigationStack { PetMedicationView(pet: pet) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
             }
             .overlay {
                 if let pet = expandedQuickMomentPet {
@@ -212,38 +120,6 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                     .ignoresSafeArea()
                     .zIndex(100)
                 }
-            }
-            .sheet(item: $expandedMomentHistoryPet) { pet in
-                PetMomentsHubView(pet: pet)
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            }
-            .sheet(item: $expandedQuickHumanMedication) { human in
-                NavigationStack {
-                    HumanMedicationView(
-                        human: human,
-                        showsDoneButton: true,
-                        onDoseTaken: {
-                            onHumanDoseTaken(human.id)
-                        }
-                    )
-                }
-                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            }
-            .sheet(item: $expandedHumanWeightDetail) { human in
-                NavigationStack { HumanWeightHistoryView(human: human) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            }
-            .sheet(item: $expandedHumanWorkoutDetail) { human in
-                HumanWorkoutHistoryView(human: human)
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            }
-            .sheet(item: $expandedHumanExpenseDetail) { human in
-                NavigationStack { HumanExpenseDetailView(human: human) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            }
-            .sheet(item: $expandedHumanNoteDetail) { human in
-                HumanNoteHistorySheet(human: human)
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
             }
             .fullScreenCover(isPresented: $showingOasisReward) {
                 OasisRewardView()
@@ -278,12 +154,202 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 Text("该成员已将此功能设为仅自己可见。")
             }
     }
+
+    @ViewBuilder
+    private func homeSheetDestination(for route: HomeSheetRoute) -> some View {
+        switch route {
+        case let .petAllFeatures(id):
+            if let pet = pet(id) {
+                PetAllFeaturesSheet(pet: pet)
+                    .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .humanAllFeatures(id):
+            if let human = human(id) {
+                HumanAllFeaturesSheet(human: human)
+                    .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .petBasicInfo(id):
+            if let pet = pet(id) {
+                NavigationStack { PetBasicInfoDetailView(pet: pet) }
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .humanBasicInfo(id):
+            if let human = human(id) {
+                NavigationStack { HumanBasicInfoDetailView(human: human) }
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .petWeight(id):
+            if let pet = pet(id) {
+                NavigationStack { WeightHistoryView(pet: pet) }
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .petExpense(id):
+            if let pet = pet(id) {
+                NavigationStack { ExpenseHistoryView(pet: pet) }
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .petFeed(id, opensManualSheet):
+            if let pet = pet(id) {
+                QuickFeedDetailSheet(
+                    pet: pet,
+                    onRemove: { routes.dismissSheet() },
+                    opensManualSheetOnAppear: opensManualSheet
+                )
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .petWater(id):
+            if let pet = pet(id) {
+                QuickWaterDetailSheet(pet: pet) {
+                    routes.dismissSheet()
+                }
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .petPotty(id):
+            if let pet = pet(id) {
+                QuickPottyDetailSheet(pet: pet) { routes.dismissSheet() }
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .petLitter(id):
+            if let pet = pet(id) {
+                QuickLitterDetailSheet(pet: pet) { routes.dismissSheet() }
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .petPlay(id):
+            if let pet = pet(id) {
+                QuickPlayDetailSheet(pet: pet) { routes.dismissSheet() }
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .petHygiene(id):
+            if let pet = pet(id) {
+                NavigationStack { PetHygieneDetailView(pet: pet) }
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .petWalkSummary(id):
+            if let pet = pet(id) {
+                NavigationStack { WalkSummarySheet(pet: pet) }
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .petHealth(id, initialSection):
+            if let pet = pet(id) {
+                NavigationStack {
+                    PetHealthDetailView(
+                        pet: pet,
+                        isModal: true,
+                        initialSection: initialSection
+                    )
+                }
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .petMedication(id):
+            if let pet = pet(id) {
+                NavigationStack { PetMedicationView(pet: pet) }
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .petMomentHistory(id):
+            if let pet = pet(id) {
+                PetMomentsHubView(pet: pet)
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .humanMedication(id):
+            if let human = human(id) {
+                NavigationStack {
+                    HumanMedicationView(
+                        human: human,
+                        showsDoneButton: true,
+                        onDoseTaken: {
+                            onHumanDoseTaken(human.id)
+                        }
+                    )
+                }
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .humanWeight(id):
+            if let human = human(id) {
+                NavigationStack { HumanWeightHistoryView(human: human) }
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .humanWorkout(id):
+            if let human = human(id) {
+                HumanWorkoutHistoryView(human: human)
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .humanExpense(id):
+            if let human = human(id) {
+                NavigationStack { HumanExpenseDetailView(human: human) }
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .humanNote(id):
+            if let human = human(id) {
+                HumanNoteHistorySheet(human: human)
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        }
+    }
+
+    private func pet(_ id: UUID) -> Pet? {
+        pets.first { $0.id == id }
+    }
+
+    private func human(_ id: UUID) -> Human? {
+        humans.first { $0.id == id }
+    }
+
+    private func missingRouteDismissView() -> some View {
+        Color.clear
+            .onAppear {
+                routes.dismissSheet()
+            }
+    }
 }
 
 extension View {
     func focusHomeRouteSheets(
         pets: [Pet],
+        humans: [Human],
         l: L10n,
+        routes: HomeRouteCoordinator,
         functionMenuPresentation: Binding<FunctionMenuPresentation?>,
         showStreakDetail: Binding<Bool>,
         showingSettings: Binding<Bool>,
@@ -294,31 +360,8 @@ extension View {
         showingCalendar: Binding<Bool>,
         calendarEntityFilterId: Binding<String?>,
         calendarHumanFilterId: Binding<String?>,
-        expandedAllFeaturesPet: Binding<Pet?>,
-        expandedAllFeaturesHuman: Binding<Human?>,
-        expandedBasicInfoPet: Binding<Pet?>,
-        expandedBasicInfoHuman: Binding<Human?>,
-        expandedQuickWeightDetailPet: Binding<Pet?>,
-        expandedQuickExpenseDetailPet: Binding<Pet?>,
-        expandedQuickFeedDetailPet: Binding<Pet?>,
-        expandedQuickFeedOpensManualSheet: Binding<Bool>,
-        expandedQuickWaterDetailPet: Binding<Pet?>,
-        expandedQuickPottyDetailPet: Binding<Pet?>,
-        expandedQuickLitterDetailPet: Binding<Pet?>,
-        expandedQuickPlayDetailPet: Binding<Pet?>,
-        expandedQuickHygienePet: Binding<Pet?>,
-        expandedQuickWalkPet: Binding<Pet?>,
         todayFocusWalkPet: Binding<Pet?>,
-        expandedQuickHealthPet: Binding<Pet?>,
-        expandedQuickHealthInitialSection: Binding<PetHealthInitialSection?>,
-        expandedQuickPetMedicationPet: Binding<Pet?>,
         expandedQuickMomentPet: Binding<Pet?>,
-        expandedMomentHistoryPet: Binding<Pet?>,
-        expandedQuickHumanMedication: Binding<Human?>,
-        expandedHumanWeightDetail: Binding<Human?>,
-        expandedHumanWorkoutDetail: Binding<Human?>,
-        expandedHumanExpenseDetail: Binding<Human?>,
-        expandedHumanNoteDetail: Binding<Human?>,
         showingOasisReward: Binding<Bool>,
         activeCoconutLogSubject: Binding<CoconutLogSubject?>,
         showingAntiRepeatAlert: Binding<Bool>,
@@ -339,7 +382,9 @@ extension View {
     ) -> some View {
         modifier(FocusHomeRouteSheetModifier(
             pets: pets,
+            humans: humans,
             l: l,
+            routes: routes,
             functionMenuPresentation: functionMenuPresentation,
             showStreakDetail: showStreakDetail,
             showingSettings: showingSettings,
@@ -350,31 +395,8 @@ extension View {
             showingCalendar: showingCalendar,
             calendarEntityFilterId: calendarEntityFilterId,
             calendarHumanFilterId: calendarHumanFilterId,
-            expandedAllFeaturesPet: expandedAllFeaturesPet,
-            expandedAllFeaturesHuman: expandedAllFeaturesHuman,
-            expandedBasicInfoPet: expandedBasicInfoPet,
-            expandedBasicInfoHuman: expandedBasicInfoHuman,
-            expandedQuickWeightDetailPet: expandedQuickWeightDetailPet,
-            expandedQuickExpenseDetailPet: expandedQuickExpenseDetailPet,
-            expandedQuickFeedDetailPet: expandedQuickFeedDetailPet,
-            expandedQuickFeedOpensManualSheet: expandedQuickFeedOpensManualSheet,
-            expandedQuickWaterDetailPet: expandedQuickWaterDetailPet,
-            expandedQuickPottyDetailPet: expandedQuickPottyDetailPet,
-            expandedQuickLitterDetailPet: expandedQuickLitterDetailPet,
-            expandedQuickPlayDetailPet: expandedQuickPlayDetailPet,
-            expandedQuickHygienePet: expandedQuickHygienePet,
-            expandedQuickWalkPet: expandedQuickWalkPet,
             todayFocusWalkPet: todayFocusWalkPet,
-            expandedQuickHealthPet: expandedQuickHealthPet,
-            expandedQuickHealthInitialSection: expandedQuickHealthInitialSection,
-            expandedQuickPetMedicationPet: expandedQuickPetMedicationPet,
             expandedQuickMomentPet: expandedQuickMomentPet,
-            expandedMomentHistoryPet: expandedMomentHistoryPet,
-            expandedQuickHumanMedication: expandedQuickHumanMedication,
-            expandedHumanWeightDetail: expandedHumanWeightDetail,
-            expandedHumanWorkoutDetail: expandedHumanWorkoutDetail,
-            expandedHumanExpenseDetail: expandedHumanExpenseDetail,
-            expandedHumanNoteDetail: expandedHumanNoteDetail,
             showingOasisReward: showingOasisReward,
             activeCoconutLogSubject: activeCoconutLogSubject,
             showingAntiRepeatAlert: showingAntiRepeatAlert,

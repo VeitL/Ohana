@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Treat / 零食" class="ohana-duotone-icon">
+  <title>Treat / 零食</title>
+  <g>
+
+      <rect style="fill:#ff755f" x="8.2" y="11" width="15.6" height="10" rx="5" transform="rotate(-24 16 16)"/>
+      <circle style="fill:#7be4d4" cx="8.8" cy="20.7" r="3"/>
+      <circle style="fill:#7be4d4;opacity:.28" cx="23.2" cy="11.3" r="2.5"/>
+      <rect style="fill:#7be4d4" x="13.4" y="13.9" width="5.2" height="2.7" rx="1.35" transform="rotate(-24 16 15.25)"/>
+  </g>
+</svg>

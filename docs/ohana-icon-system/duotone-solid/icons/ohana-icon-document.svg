@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Document / 文档" class="ohana-duotone-icon">
+  <title>Document / 文档</title>
+  <g>
+
+      <path style="fill:#3f74d8" d="M9 5.5h10.4l4.1 4.2v16.8H9V5.5Z"/>
+      <path style="fill:#ffb36b;opacity:.28" d="M19.1 5.6v5h4.5l-4.5-5Z"/>
+      <rect style="fill:#ffb36b" x="12" y="15.1" width="8" height="2.4" rx="1.2"/>
+      <rect style="fill:#ffb36b;opacity:.28" x="12" y="19.6" width="6.2" height="2.4" rx="1.2"/>
+  </g>
+</svg>

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Wet food / 湿粮" class="ohana-duotone-icon" style="--ohana-icon-primary: #d86a76; --ohana-icon-accent: #ffd36c;">
+  <style>
+  .primary { fill: var(--ohana-icon-primary, #1f8a8a); }
+  .primary-soft { fill: var(--ohana-icon-primary, #1f8a8a); opacity: .22; }
+  .accent { fill: var(--ohana-icon-accent, #ff755f); }
+  .accent-soft { fill: var(--ohana-icon-accent, #ff755f); opacity: .28; }
+  .primary-line {
+    fill: none;
+    stroke: var(--ohana-icon-primary, #1f8a8a);
+    stroke-width: 4.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .accent-line {
+    fill: none;
+    stroke: var(--ohana-icon-accent, #ff755f);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .primary-thin-line {
+    fill: none;
+    stroke: var(--ohana-icon-primary, #1f8a8a);
+    stroke-width: 2.1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .accent-thin-line {
+    fill: none;
+    stroke: var(--ohana-icon-accent, #ff755f);
+    stroke-width: 2.1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  </style>
+  <title>Wet food / 湿粮</title>
+  <g>
+
+      <ellipse class="primary-soft" cx="16" cy="8.8" rx="8.3" ry="3.2"/>
+      <path class="primary" d="M7.7 8.8h16.6v14.3c0 2-3.7 3.6-8.3 3.6s-8.3-1.6-8.3-3.6V8.8Z"/>
+      <ellipse class="primary" cx="16" cy="8.8" rx="8.3" ry="3.2"/>
+      <rect class="accent" x="10.1" y="14.4" width="11.8" height="5.4" rx="2.7"/>
+      <ellipse class="primary-soft" cx="16" cy="23.2" rx="7.8" ry="2.6"/>
+  </g>
+</svg>

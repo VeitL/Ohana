@@ -45,10 +45,34 @@ private final class CalendarVisibleDateCoordinator: ObservableObject {
     }
 }
 
-/// 日历宠物筛选条（与 `CalendarView` 共享 `calendar_filterPetId`，空字符串表示「全部」）
-struct CalendarPetChipFilterBar: View {
-    @AppStorage("calendar_filterPetId") private var calendarFilterPetId: String = ""
-    @AppStorage("calendar_filterHumanId") private var calendarFilterHumanId: String = ""
+private struct CalendarFilterSelection: Equatable {
+    var petId: String
+    var humanId: String
+
+    static let all = CalendarFilterSelection(petId: "", humanId: "")
+
+    var selectedPetId: String? { petId.isEmpty ? nil : petId }
+    var selectedHumanId: String? { humanId.isEmpty ? nil : humanId }
+
+    static func pet(_ id: String) -> CalendarFilterSelection {
+        CalendarFilterSelection(petId: id, humanId: "")
+    }
+
+    static func human(_ id: String) -> CalendarFilterSelection {
+        CalendarFilterSelection(petId: "", humanId: id)
+    }
+}
+
+private struct CalendarContentHandoffState: Equatable {
+    var viewModeRaw: String
+    var filter: CalendarFilterSelection
+}
+
+/// 日历宠物筛选条：点击时只回传本地视觉选择，持久化由 `CalendarView` 下一帧处理。
+private struct CalendarPetChipFilterBar: View {
+    let selection: CalendarFilterSelection
+    let onSelect: (CalendarFilterSelection) -> Void
+
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @Environment(\.colorScheme) private var colorScheme
@@ -57,26 +81,23 @@ struct CalendarPetChipFilterBar: View {
     private var chipAccent: Color { Color.goPrimary }
     private var chipSelFg: Color { Color.arkInk }
     private var matSurface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
-    private var selectedPetId: String? { calendarFilterPetId.isEmpty ? nil : calendarFilterPetId }
-    private var selectedHumanId: String? { calendarFilterHumanId.isEmpty ? nil : calendarFilterHumanId }
+    private var selectedPetId: String? { selection.selectedPetId }
+    private var selectedHumanId: String? { selection.selectedHumanId }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 chipButton(label: "全部", systemImage: "square.grid.2x2.fill", isSelected: selectedPetId == nil && selectedHumanId == nil) {
-                    calendarFilterPetId = ""
-                    calendarFilterHumanId = ""
+                    onSelect(.all)
                 }
                 ForEach(pets) { pet in
                     chipButton(label: pet.name, systemImage: pet.speciesSilhouetteSymbol, isSelected: selectedPetId == pet.id.uuidString) {
-                        calendarFilterPetId = pet.id.uuidString
-                        calendarFilterHumanId = ""
+                        onSelect(.pet(pet.id.uuidString))
                     }
                 }
                 ForEach(humans) { human in
                     chipButton(label: human.name, systemImage: "person.fill", isSelected: selectedHumanId == human.id.uuidString) {
-                        calendarFilterHumanId = human.id.uuidString
-                        calendarFilterPetId = ""
+                        onSelect(.human(human.id.uuidString))
                     }
                 }
             }
@@ -99,6 +120,8 @@ struct CalendarPetChipFilterBar: View {
             .background(chipBackground(isSelected: isSelected), in: Capsule())
             .shadow(color: isSelected && isMaterial ? chipAccent.opacity(0.25) : .clear, radius: 6, x: 0, y: 2) // ui-v4: allow legacy material calendar chip depth
         }
+        .buttonStyle(ScaleButtonStyle())
+        .ohanaSelectionMotion(isSelected: isSelected, scale: 1.018)
     }
 
     private func chipForeground(isSelected: Bool) -> Color {
@@ -120,6 +143,9 @@ struct CalendarView: View {
     var hideToolbar: Bool = false
     var showsEmbeddedControls: Bool = false
     var addEventTrigger: Int = 0
+    var isEmbeddedPrepared: Bool = true
+    var isEmbeddedVisible: Bool = true
+    var isEmbeddedActive: Bool = true
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -138,15 +164,25 @@ struct CalendarView: View {
     @State private var showingCoconutLog = false
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @AppStorage("calendar_viewMode") private var viewModeRaw: String = CalendarViewMode.list.rawValue
-    private var viewMode: CalendarViewMode { CalendarViewMode(rawValue: viewModeRaw) ?? .list }
+    @State private var displayedViewModeRaw: String?
+    private var viewMode: CalendarViewMode { CalendarViewMode(rawValue: displayedViewModeRaw ?? viewModeRaw) ?? .list }
+    @State private var visualFilterSelection = CalendarFilterSelection.all
+    @State private var appliedFilterSelection = CalendarFilterSelection.all
+    @State private var didSyncCalendarFilter = false
     @State private var deletingEvent: Event? = nil
     @State private var showDeleteSeriesAlert = false
     @Environment(\.colorScheme) private var colorScheme
     @StateObject private var visibleDateCoordinator = CalendarVisibleDateCoordinator()
     @State private var listVisibleTopDate = Calendar.current.startOfDay(for: Date())
-    @State private var visibleTimelineDateID: String?
+    @State private var visibleTimelineDateID: String? = CalendarView.todayTimelineDateID
     @State private var didScrollListToToday = false
     @State private var monthSlideDirection = 1
+    @State private var viewModeCommitTask: Task<Void, Never>?
+    @State private var filterApplyTask: Task<Void, Never>?
+    @State private var filterStorageCommitTask: Task<Void, Never>?
+    @State private var calendarMaintenanceTask: Task<Void, Never>?
+    @State private var listInitialPositionTask: Task<Void, Never>?
+    @State private var didScheduleCalendarMaintenance = false
 
     private var isMaterial: Bool { false }
     private var matBg:      Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
@@ -163,6 +199,33 @@ struct CalendarView: View {
         viewMode == .list ? listVisibleTopDate : selectedDate
     }
 
+    private static var todayTimelineDateID: String {
+        String(Int(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970))
+    }
+
+    private var isCalendarPrepared: Bool {
+        isEmbeddedPrepared || isEmbeddedVisible || isEmbeddedActive
+    }
+
+    private var storedFilterSelection: CalendarFilterSelection {
+        CalendarFilterSelection(petId: calendarFilterPetId, humanId: calendarFilterHumanId)
+    }
+
+    private var displayedFilterSelection: CalendarFilterSelection {
+        didSyncCalendarFilter ? visualFilterSelection : storedFilterSelection
+    }
+
+    private var activeFilterSelection: CalendarFilterSelection {
+        didSyncCalendarFilter ? appliedFilterSelection : storedFilterSelection
+    }
+
+    private var contentHandoffState: CalendarContentHandoffState {
+        CalendarContentHandoffState(
+            viewModeRaw: displayedViewModeRaw ?? viewModeRaw,
+            filter: activeFilterSelection
+        )
+    }
+
     private var activeHuman: Human? {
         if let id = UUID(uuidString: activeHumanIdStr), let human = humans.first(where: { $0.id == id }) {
             return human
@@ -177,14 +240,14 @@ struct CalendarView: View {
     /// 从宠物详情进入时固定为该宠物；否则使用 AppStorage 筛选
     private var effectivePetFilterId: String? {
         if let p = preselectedPetId { return p }
-        if preselectedHumanId != nil || !calendarFilterHumanId.isEmpty { return nil }
-        return calendarFilterPetId.isEmpty ? nil : calendarFilterPetId
+        if preselectedHumanId != nil || !activeFilterSelection.humanId.isEmpty { return nil }
+        return activeFilterSelection.selectedPetId
     }
 
     /// 从人类卡片进入时固定为该成员；首页默认不筛选，继续显示全部日历项目。
     private var effectiveHumanFilterId: String? {
         if let preselectedHumanId { return preselectedHumanId }
-        return calendarFilterHumanId.isEmpty ? nil : calendarFilterHumanId
+        return activeFilterSelection.selectedHumanId
     }
 
     private var filteredEvents: [Event] {
@@ -204,6 +267,8 @@ struct CalendarView: View {
             return entityType == EntityKind.pet.rawValue.lowercased()
                 || entityType == "pet"
                 || entityType == "pet_food_stock"
+                || entityType == FeedRuleMetadata.autoFeederEntityType.lowercased()
+                || entityType == WaterPlanWriter.entityType.lowercased()
         }
         if entityType == "pet_insurance" {
             return insurances.first { $0.id.uuidString == event.relatedEntityId }?.pet?.id.uuidString == petId
@@ -273,16 +338,18 @@ struct CalendarView: View {
                 }
                 var safety = 0
                 while cursor <= hardCap && safety < 200 {
-                    result.append(EventOccurrence(
-                        id: "\(event.id.uuidString)-\(cursor.timeIntervalSince1970)",
-                        event: event,
-                        occurrenceDate: cursor
-                    ))
+                    if shouldShowEventOccurrence(event, occurrenceDate: cursor) {
+                        result.append(EventOccurrence(
+                            id: "\(event.id.uuidString)-\(cursor.timeIntervalSince1970)",
+                            event: event,
+                            occurrenceDate: cursor
+                        ))
+                    }
                     cursor = cal.date(byAdding: .day, value: event.recurrenceDays, to: cursor) ?? cursor
                     safety += 1
                 }
             } else {
-                if eStart >= cutoff && eStart <= future {
+                if eStart >= cutoff && eStart <= future && shouldShowEventOccurrence(event, occurrenceDate: eStart) {
                     result.append(EventOccurrence(
                         id: event.id.uuidString,
                         event: event,
@@ -316,9 +383,29 @@ struct CalendarView: View {
     private var timelineDates: [Date] {
         timelineSections.map(\.date)
     }
+
+    private var timelineDateSignature: String {
+        timelineDates.map(timelineDateID).joined(separator: "|")
+    }
+
+    private var timelineDateIDs: Set<String> {
+        Set(timelineDates.map(timelineDateID))
+    }
     
     private var eventsForSelectedDate: [Event] {
-        filteredEvents.filter { eventOccursOnDate($0, date: selectedDate) }
+        filteredEvents.filter {
+            eventOccursOnDate($0, date: selectedDate) &&
+                shouldShowEventOccurrence($0, occurrenceDate: selectedDate)
+        }
+    }
+
+    private func shouldShowEventOccurrence(_ event: Event, occurrenceDate: Date) -> Bool {
+        CarePlanCalendarSync.shouldShowModeScopedPlanOccurrence(
+            event,
+            occurrenceDate: occurrenceDate,
+            allEvents: events,
+            pets: pets
+        )
     }
 
     /// 判断事件是否出现在指定日期（支持多日事件 + 重复事件展开）
@@ -357,28 +444,43 @@ struct CalendarView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ZStack(alignment: .top) {
-                OhanaAppBackground()
-                
-                VStack(spacing: 0) {
-                    if isMaterial {
-                        // Material 模式：为 sticky header 留空间
-                        Spacer().frame(height: 68)
-                    } else if !hideToolbar {
-                        // 独立页面时显示顶栏；嵌入首页时由外层 header 负责。
-                        classicCalendarHeader
-                    } else if showsEmbeddedControls {
-                        embeddedCalendarHeader
-                    } else {
-                        // 首页嵌入：为全局顶栏 + 外层宠物筛选条留出空间
-                        Spacer().frame(height: overviewCalendarEmbedTopInset)
-                    }
+        Group {
+            if hideToolbar {
+                calendarContent
+            } else {
+                NavigationStack {
+                    calendarContent
+                }
+            }
+        }
+    }
 
-                    if shouldShowInlinePetChips {
-                        CalendarPetChipFilterBar()
-                    }
-                    
+    private var calendarContent: some View {
+        ZStack(alignment: .top) {
+            OhanaAppBackground()
+
+            VStack(spacing: 0) {
+                if isMaterial {
+                    // Material 模式：为 sticky header 留空间
+                    Spacer().frame(height: 68)
+                } else if !hideToolbar {
+                    // 独立页面时显示顶栏；嵌入首页时由外层 header 负责。
+                    classicCalendarHeader
+                } else if showsEmbeddedControls {
+                    embeddedCalendarHeader
+                } else {
+                    // 首页嵌入：为全局顶栏 + 外层宠物筛选条留出空间
+                    Spacer().frame(height: overviewCalendarEmbedTopInset)
+                }
+
+                if shouldShowInlinePetChips {
+                    CalendarPetChipFilterBar(
+                        selection: displayedFilterSelection,
+                        onSelect: selectCalendarFilter
+                    )
+                }
+
+                Group {
                     switch viewMode {
                     case .month:
                         goMonthView
@@ -386,30 +488,89 @@ struct CalendarView: View {
                         goListView
                     }
                 }
+                .ohanaContextHandoff(
+                    contentHandoffState,
+                    direction: viewMode == .list ? .fromTrailing : .neutral,
+                    isVisible: isEmbeddedVisible || !hideToolbar
+                )
+            }
 
-                // Material 模式 Sticky Header
-                if isMaterial {
-                    calStickyHeader
+            // Material 模式 Sticky Header
+            if isMaterial {
+                calStickyHeader
+            }
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $showingAddEvent) {
+            AddEventView()
+                .ohanaSheetPagePresentation() // ui-v4: allow calendar editor as long sheet
+        }
+        .sheet(isPresented: $showingCoconutLog) {
+            CoconutLogView()
+                .ohanaSheetPagePresentation() // ui-v4: allow coconut history as long sheet
+        }
+        .onChange(of: addEventTrigger) { _, _ in showingAddEvent = true }
+        .onChange(of: viewModeRaw) { _, newValue in
+            syncCalendarViewModeFromStorage(newValue)
+        }
+        .onChange(of: calendarFilterPetId) { _, _ in
+            syncCalendarFilterFromStorage(animated: true)
+        }
+        .onChange(of: calendarFilterHumanId) { _, _ in
+            syncCalendarFilterFromStorage(animated: true)
+        }
+        .onAppear {
+            syncCalendarViewModeFromStorage(viewModeRaw)
+            syncCalendarFilterFromStorage(animated: false)
+            if isCalendarPrepared, viewMode == .list {
+                scheduleInitialListPositionIfNeeded()
+            }
+            if isCalendarPrepared {
+                scheduleCalendarMaintenance()
+            }
+        }
+        .onDisappear {
+            cancelPendingCalendarMaintenance()
+            filterApplyTask?.cancel()
+            filterStorageCommitTask?.cancel()
+            listInitialPositionTask?.cancel()
+            listInitialPositionTask = nil
+        }
+        .onChange(of: isEmbeddedActive) { _, isActive in
+            if isActive {
+                scheduleCalendarMaintenance()
+                if viewMode == .list {
+                    scheduleInitialListPositionIfNeeded()
                 }
+            } else if !isCalendarPrepared {
+                cancelPendingCalendarMaintenance()
+                listInitialPositionTask?.cancel()
+                listInitialPositionTask = nil
             }
-            .toolbar(.hidden, for: .navigationBar)
-            .sheet(isPresented: $showingAddEvent) {
-                AddEventView()
-                    .ohanaSheetPagePresentation() // ui-v4: allow calendar editor as long sheet
-            }
-            .sheet(isPresented: $showingCoconutLog) {
-                CoconutLogView()
-                    .ohanaSheetPagePresentation() // ui-v4: allow coconut history as long sheet
-            }
-            .onChange(of: addEventTrigger) { _, _ in showingAddEvent = true }
-            .onChange(of: viewModeRaw) { _, newValue in
-                if CalendarViewMode(rawValue: newValue) == .list {
-                    didScrollListToToday = false
-                    listVisibleTopDate = Calendar.current.startOfDay(for: Date())
+        }
+        .onChange(of: isEmbeddedPrepared) { _, isPrepared in
+            if isPrepared {
+                scheduleCalendarMaintenance()
+                if viewMode == .list {
+                    scheduleInitialListPositionIfNeeded()
                 }
+            } else if !isEmbeddedVisible && !isEmbeddedActive {
+                cancelPendingCalendarMaintenance()
+                listInitialPositionTask?.cancel()
+                listInitialPositionTask = nil
             }
-            .onAppear {
-                reconcileDefaultPlanOverrides()
+        }
+        .onChange(of: isEmbeddedVisible) { _, isVisible in
+            if isVisible {
+                syncCalendarViewModeFromStorage(viewModeRaw)
+                scheduleCalendarMaintenance()
+                if viewMode == .list {
+                    scheduleInitialListPositionIfNeeded()
+                }
+            } else if !isEmbeddedPrepared && !isEmbeddedActive {
+                cancelPendingCalendarMaintenance()
+                listInitialPositionTask?.cancel()
+                listInitialPositionTask = nil
             }
         }
     }
@@ -418,6 +579,140 @@ struct CalendarView: View {
         for pet in pets {
             CarePlanCalendarSync.reconcileDefaultPlanOverrides(for: pet, context: modelContext)
         }
+    }
+
+    private func scheduleCalendarMaintenance() {
+        guard isCalendarPrepared else { return }
+        guard !didScheduleCalendarMaintenance else { return }
+        didScheduleCalendarMaintenance = true
+        calendarMaintenanceTask?.cancel()
+        let delayMilliseconds: UInt64 = isEmbeddedActive ? (hideToolbar ? 220 : 90) : (hideToolbar ? 60 : 30)
+        calendarMaintenanceTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
+            reconcileDefaultPlanOverrides()
+            calendarMaintenanceTask = nil
+        }
+    }
+
+    private func cancelPendingCalendarMaintenance() {
+        if calendarMaintenanceTask != nil {
+            didScheduleCalendarMaintenance = false
+        }
+        calendarMaintenanceTask?.cancel()
+        calendarMaintenanceTask = nil
+    }
+
+    private func selectCalendarViewMode(_ mode: CalendarViewMode) {
+        guard viewMode != mode else { return }
+        withAnimation(GoMotion.selection) {
+            displayedViewModeRaw = mode.rawValue
+        }
+        if mode == .list {
+            resetCalendarListPositionForModeSwitch()
+        }
+        scheduleCalendarViewModeStorageCommit(mode)
+    }
+
+    private func syncCalendarViewModeFromStorage(_ rawValue: String) {
+        guard let newMode = CalendarViewMode(rawValue: rawValue) else { return }
+        guard displayedViewModeRaw != rawValue else { return }
+        let previousMode = CalendarViewMode(rawValue: displayedViewModeRaw ?? viewModeRaw)
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            displayedViewModeRaw = rawValue
+        }
+        if previousMode != .list, newMode == .list {
+            resetCalendarListPositionForModeSwitch()
+        }
+    }
+
+    private func scheduleCalendarViewModeStorageCommit(_ mode: CalendarViewMode) {
+        viewModeCommitTask?.cancel()
+        viewModeCommitTask = OhanaFrameScheduler.runAfterNextFrame {
+            guard viewModeRaw != mode.rawValue else {
+                viewModeCommitTask = nil
+                return
+            }
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                viewModeRaw = mode.rawValue
+            }
+            viewModeCommitTask = nil
+        }
+    }
+
+    private func selectCalendarFilter(_ selection: CalendarFilterSelection) {
+        guard displayedFilterSelection != selection else { return }
+        withAnimation(GoMotion.selection) {
+            visualFilterSelection = selection
+            didSyncCalendarFilter = true
+        }
+        scheduleCalendarFilterApply(selection)
+    }
+
+    private func syncCalendarFilterFromStorage(animated: Bool) {
+        let selection = storedFilterSelection
+        guard displayedFilterSelection != selection || activeFilterSelection != selection || !didSyncCalendarFilter else { return }
+        filterApplyTask?.cancel()
+        filterStorageCommitTask?.cancel()
+        didSyncCalendarFilter = true
+        if animated {
+            withAnimation(GoMotion.selection) {
+                visualFilterSelection = selection
+            }
+            withAnimation(GoMotion.stateChange) {
+                appliedFilterSelection = selection
+            }
+        } else {
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                visualFilterSelection = selection
+                appliedFilterSelection = selection
+            }
+        }
+    }
+
+    private func scheduleCalendarFilterApply(_ selection: CalendarFilterSelection) {
+        filterApplyTask?.cancel()
+        filterApplyTask = OhanaFrameScheduler.runAfterNextFrame {
+            guard visualFilterSelection == selection else {
+                filterApplyTask = nil
+                return
+            }
+            withAnimation(GoMotion.stateChange) {
+                appliedFilterSelection = selection
+            }
+            filterApplyTask = nil
+            scheduleCalendarFilterStorageCommit(selection)
+        }
+    }
+
+    private func scheduleCalendarFilterStorageCommit(_ selection: CalendarFilterSelection) {
+        filterStorageCommitTask?.cancel()
+        filterStorageCommitTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 90) {
+            guard appliedFilterSelection == selection else {
+                filterStorageCommitTask = nil
+                return
+            }
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                calendarFilterPetId = selection.petId
+                calendarFilterHumanId = selection.humanId
+            }
+            filterStorageCommitTask = nil
+        }
+    }
+
+    private func resetCalendarListPositionForModeSwitch() {
+        listInitialPositionTask?.cancel()
+        listInitialPositionTask = nil
+        let today = Calendar.current.startOfDay(for: Date())
+        didScrollListToToday = false
+        visibleTimelineDateID = timelineDateID(today)
+        listVisibleTopDate = today
     }
 
     // MARK: - Classic Calendar Header
@@ -527,7 +822,11 @@ struct CalendarView: View {
                 ForEach(thisWeekDays, id: \.self) { day in
                     let isToday = Calendar.current.isDateInToday(day)
                     let isSelected = Calendar.current.isDate(day, inSameDayAs: selectedDate)
-                    let dayEvents = filteredEvents.filter { eventOccursOnDate($0, date: day) }
+                    let dayNumber = Calendar.current.component(.day, from: day)
+                    let dayEvents = filteredEvents.filter {
+                        eventOccursOnDate($0, date: day) &&
+                            shouldShowEventOccurrence($0, occurrenceDate: day)
+                    }
                     let hasEvents = !dayEvents.isEmpty
                     // 每个事件对应的宠物主题色（去重，最多3种）
                     let dotColors: [Color] = {
@@ -563,9 +862,10 @@ struct CalendarView: View {
                                 .font(.system(size: 10, weight: .bold, design: .rounded))
                                 .foregroundStyle(isSelected ? chipSelFg : (isMaterial ? Color(hex: "8E8E93") : classicSoftText))
                             
-                            Text("\(Calendar.current.component(.day, from: day))")
+                            Text("\(dayNumber)")
                                 .font(.system(size: 17, weight: .black, design: .rounded))
                                 .foregroundStyle(isSelected ? chipSelFg : (isToday ? chipAccent : (isMaterial ? .primary : classicPrimaryText)))
+                                .ohanaNumericMotion(dayNumber)
                             
                             // 事件点（宠物主题色，多宠物时最多3个彩点）
                             ZStack {
@@ -624,7 +924,7 @@ struct CalendarView: View {
             return Color.ohanaSecondaryText
         }()
         return Button {
-            withAnimation(GoMotion.selection) { viewModeRaw = mode.rawValue }
+            selectCalendarViewMode(mode)
         } label: {
             Image(systemName: systemName)
                 .font(.system(size: 14, weight: .bold))
@@ -633,6 +933,8 @@ struct CalendarView: View {
                 .frame(width: 36, height: 30)
                 .background { if viewMode == mode { Capsule().fill(chipAccent) } }
         }
+        .buttonStyle(ScaleButtonStyle())
+        .ohanaSelectionMotion(isSelected: viewMode == mode, scale: 1.018)
     }
     
     // MARK: - Go Month View
@@ -691,7 +993,11 @@ struct CalendarView: View {
                     if let date {
                         let isToday = Calendar.current.isDateInToday(date)
                         let isSelected = Calendar.current.isDate(date, inSameDayAs: selectedDate)
-                        let hasEvents = filteredEvents.contains { eventOccursOnDate($0, date: date) }
+                        let dayNumber = Calendar.current.component(.day, from: date)
+                        let hasEvents = filteredEvents.contains {
+                            eventOccursOnDate($0, date: date) &&
+                                shouldShowEventOccurrence($0, occurrenceDate: date)
+                        }
                         
                         Button {
                             withAnimation(GoMotion.feedback) {
@@ -699,9 +1005,10 @@ struct CalendarView: View {
                             }
                         } label: {
                             VStack(spacing: 3) {
-                                Text("\(Calendar.current.component(.day, from: date))")
+                                Text("\(dayNumber)")
                                     .font(.system(size: 16, weight: isSelected || isToday ? .bold : .medium, design: .rounded))
                                     .foregroundStyle(isSelected ? chipSelFg : (isToday ? chipAccent : (isMaterial ? .primary : classicPrimaryText)))
+                                    .ohanaNumericMotion(dayNumber)
                                 
                                 Circle()
                                     .fill(hasEvents ? (isSelected ? chipSelFg.opacity(0.7) : chipAccent) : .clear)
@@ -774,17 +1081,26 @@ struct CalendarView: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 20)
                 }
-                .scrollPosition(id: $visibleTimelineDateID, anchor: .top)
                 .onAppear {
-                    scrollListToTodayIfNeeded(proxy)
+                    scheduleInitialTimelineScrollIfNeeded(proxy: proxy)
                 }
-                .onChange(of: timelineDates) { _, _ in
-                    scrollListToTodayIfNeeded(proxy)
+                .onChange(of: isEmbeddedPrepared) { _, isPrepared in
+                    if isPrepared {
+                        scheduleInitialTimelineScrollIfNeeded(proxy: proxy)
+                    }
                 }
-                .task(id: visibleTimelineDateID) {
-                    let dateID = visibleTimelineDateID
-                    await Task.yield()
-                    guard !Task.isCancelled else { return }
+                .onChange(of: isEmbeddedVisible) { _, isVisible in
+                    if isVisible {
+                        scheduleInitialTimelineScrollIfNeeded(proxy: proxy)
+                    }
+                }
+                .onChange(of: timelineDateSignature) { _, _ in
+                    scheduleInitialTimelineScrollIfNeeded(proxy: proxy)
+                }
+                .onChange(of: visibleTimelineDateID) { _, dateID in
+                    guard isCalendarPrepared else { return }
+                    guard let dateID else { return }
+                    scrollTimeline(proxy, to: dateID, animated: false)
                     scheduleVisibleCalendarMonthUpdate(from: dateID)
                 }
             }
@@ -844,6 +1160,7 @@ struct CalendarView: View {
                     Text("·  \(occurrences.count)")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
+                        .ohanaNumericMotion(occurrences.count)
 
                     Spacer()
                 }
@@ -893,6 +1210,7 @@ struct CalendarView: View {
                     Text(count == 0 ? "暂无事件" : "\(count) 项")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(classicPrimaryText.opacity(0.55))
+                        .ohanaNumericMotion(count)
                     Spacer()
                 }
 
@@ -906,15 +1224,17 @@ struct CalendarView: View {
     }
 
     private func timelineDateBadge(_ date: Date, isToday: Bool) -> some View {
-        VStack(spacing: 3) {
+        let dayNumber = Calendar.current.component(.day, from: date)
+        return VStack(spacing: 3) {
             Text(weekdayShort(date))
                 .font(.system(size: 10, weight: .black, design: .rounded))
                 .foregroundStyle(isToday ? chipAccent : classicSoftText)
                 .textCase(.uppercase)
 
-            Text("\(Calendar.current.component(.day, from: date))")
+            Text("\(dayNumber)")
                 .font(.system(size: isToday ? 18 : 17, weight: .black, design: .rounded))
                 .foregroundStyle(isToday ? chipSelFg : classicPrimaryText)
+                .ohanaNumericMotion(dayNumber)
                 .frame(width: 34, height: 34)
                 .background(isToday ? chipAccent : classicSubtleFill, in: Circle())
         }
@@ -947,22 +1267,53 @@ struct CalendarView: View {
         String(Int(Calendar.current.startOfDay(for: date).timeIntervalSince1970))
     }
 
-    private func scrollListToTodayIfNeeded(_ proxy: ScrollViewProxy) {
+    private func scheduleInitialListPositionIfNeeded() {
+        guard isCalendarPrepared else { return }
         guard !didScrollListToToday, timelineDates.contains(where: { Calendar.current.isDateInToday($0) }) else { return }
-        didScrollListToToday = true
         let today = Calendar.current.startOfDay(for: Date())
-        visibleTimelineDateID = timelineDateID(today)
-        listVisibleTopDate = today
-        DispatchQueue.main.async {
-            proxy.scrollTo(timelineDateID(today), anchor: .top)
+        let todayID = timelineDateID(today)
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            listVisibleTopDate = today
+            visibleTimelineDateID = todayID
+        }
+    }
+
+    private func scheduleInitialTimelineScrollIfNeeded(proxy: ScrollViewProxy) {
+        guard isCalendarPrepared, !didScrollListToToday else { return }
+        scheduleInitialListPositionIfNeeded()
+        guard let targetID = visibleTimelineDateID, timelineDateIDs.contains(targetID) else { return }
+        listInitialPositionTask?.cancel()
+        listInitialPositionTask = OhanaFrameScheduler.runAfterNextFrame {
+            guard isCalendarPrepared, timelineDateIDs.contains(targetID) else {
+                listInitialPositionTask = nil
+                return
+            }
+            scrollTimeline(proxy, to: targetID, animated: false)
+            didScrollListToToday = true
+            listInitialPositionTask = nil
+        }
+    }
+
+    private func scrollTimeline(_ proxy: ScrollViewProxy, to dateID: String, animated: Bool) {
+        guard timelineDateIDs.contains(dateID) else { return }
+        if animated {
+            withAnimation(GoMotion.selection) {
+                proxy.scrollTo(dateID, anchor: .top)
+            }
+        } else {
+            proxy.scrollTo(dateID, anchor: .top)
         }
     }
 
     private func scheduleVisibleCalendarMonthUpdate(from dateID: String?) {
+        guard isCalendarPrepared else { return }
         guard let dateID,
               let timestamp = TimeInterval(dateID) else { return }
         let date = Date(timeIntervalSince1970: timestamp)
         visibleDateCoordinator.scheduleUpdate(to: date) { normalized in
+            guard isCalendarPrepared else { return }
             updateVisibleCalendarMonth(to: normalized)
         }
     }

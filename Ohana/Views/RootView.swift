@@ -91,8 +91,7 @@ struct RootView: View {
         didQueueStartupMaintenance = true
 
         Task { @MainActor in
-            await Task.yield()
-            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 700)
             guard !Task.isCancelled else { return }
             InputLatencyWarmupService.warmUpOnce()
 
@@ -186,35 +185,71 @@ private enum InputLatencyWarmupService {
         guard !didWarmUp else { return }
         didWarmUp = true
 
+        let startedAt = CFAbsoluteTimeGetCurrent()
         OhanaFeedback.prepareInteraction()
+        warmUpTextInputSystem(startedAt: startedAt)
+    }
 
+    private static func warmUpTextInputSystem(startedAt: CFAbsoluteTime) {
         guard UIApplication.shared.applicationState == .active,
+              currentFirstResponder() == nil,
               let scene = UIApplication.shared.connectedScenes
                 .compactMap({ $0 as? UIWindowScene })
                 .first(where: { $0.activationState == .foregroundActive }),
               let window = scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first
-        else { return }
+        else {
+            AppPerformanceMonitor.shared.record("输入反馈预热", startedAt: startedAt, note: "text input skipped")
+            return
+        }
 
-        let startedAt = CFAbsoluteTimeGetCurrent()
         let textField = UITextField(frame: CGRect(x: -240, y: -240, width: 1, height: 1))
         textField.alpha = 0.01
         textField.tintColor = .clear
         textField.textColor = .clear
         textField.backgroundColor = .clear
-        textField.keyboardType = .decimalPad
+        textField.keyboardType = .default
         textField.autocorrectionType = .no
         textField.spellCheckingType = .no
+        textField.smartDashesType = .no
+        textField.smartQuotesType = .no
+        textField.isAccessibilityElement = false
         textField.accessibilityElementsHidden = true
         textField.inputAssistantItem.leadingBarButtonGroups = []
         textField.inputAssistantItem.trailingBarButtonGroups = []
         window.addSubview(textField)
 
-        textField.becomeFirstResponder()
+        guard textField.becomeFirstResponder() else {
+            textField.removeFromSuperview()
+            AppPerformanceMonitor.shared.record("输入反馈预热", startedAt: startedAt, note: "first responder unavailable")
+            return
+        }
+
         DispatchQueue.main.async {
             textField.resignFirstResponder()
             textField.removeFromSuperview()
-            AppPerformanceMonitor.shared.record("键盘冷启动预热", startedAt: startedAt)
+            AppPerformanceMonitor.shared.record("输入反馈预热", startedAt: startedAt, note: "text input warm")
         }
+    }
+
+    private static func currentFirstResponder() -> UIResponder? {
+        let box = InputWarmupResponderBox()
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.ohanaCaptureInputWarmupFirstResponder(_:)),
+            to: nil,
+            from: box,
+            for: nil
+        )
+        return box.responder
+    }
+}
+
+private final class InputWarmupResponderBox {
+    weak var responder: UIResponder?
+}
+
+private extension UIResponder {
+    @objc func ohanaCaptureInputWarmupFirstResponder(_ sender: Any) {
+        (sender as? InputWarmupResponderBox)?.responder = self
     }
 }
 

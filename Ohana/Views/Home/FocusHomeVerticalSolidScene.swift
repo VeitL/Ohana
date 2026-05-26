@@ -74,12 +74,16 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
             }
             .onAppear {
                 syncFrozenAvatarSource(for: selectedCardId)
+                primeFloatingMotionIfVisible()
             }
             .onChange(of: selectedCardId) { _, newValue in
                 syncFrozenAvatarSource(for: newValue)
             }
             .onChange(of: progress) { _, _ in
                 clearFrozenAvatarSourcesIfIdle()
+            }
+            .onChange(of: isVisible) { _, _ in
+                primeFloatingMotionIfVisible()
             }
         }
     }
@@ -169,6 +173,21 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
             && workloadPolicy.ambientMotionBudget(isVisible: isVisible) == .full
     }
 
+    private func primeFloatingMotionIfVisible() {
+        guard isVisible, selectedCardId == nil, progress <= 0.001 else { return }
+        frozenAvatarClearGeneration += 1
+        if frozenAvatarSources.isEmpty {
+            floatingResumeStartTime = nil
+        } else {
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                frozenAvatarSources.removeAll()
+                floatingResumeStartTime = nil
+            }
+        }
+    }
+
     private func syncFrozenAvatarSource(for selectedId: UUID?) {
         frozenAvatarClearGeneration += 1
         guard let selectedId,
@@ -242,7 +261,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
             isReady: isExpandedInteractionReady
         )
         .padding(.horizontal, 11)
-        .padding(.bottom, 18)
+        .padding(.bottom, 8)
         .offset(y: (1 - reveal) * 18)
         .zIndex(12)
     }
@@ -538,6 +557,9 @@ private struct FocusHomeVerticalSolidCardSurface: View {
                 backgroundHeadlineLayer(width: w, progress: p)
                     .zIndex(1)
 
+                bottomQuickActionGradient(height: h, progress: p)
+                    .zIndex(2)
+
                 VStack(alignment: .leading, spacing: 0) {
                     header(progress: p)
                         .padding(.top, lerp(16, 24, p))
@@ -581,7 +603,7 @@ private struct FocusHomeVerticalSolidCardSurface: View {
             .scaleEffect(lerp(0.24, 1, reveal), anchor: .top)
             .opacity(Double(smooth(p, 0.02, 0.16)))
             .padding(.horizontal, 8)
-            .padding(.top, 8)
+            .padding(.top, lerp(8, 34, p))
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .allowsHitTesting(false)
     }
@@ -613,6 +635,7 @@ private struct FocusHomeVerticalSolidCardSurface: View {
     @ViewBuilder
     private func header(progress p: CGFloat) -> some View {
         let reveal = expandedContentProgress(p)
+        let compactHeaderOpacity = Double(1 - reveal)
         HStack(alignment: .top, spacing: 10) {
             VStack(alignment: .leading, spacing: lerp(3, 4, p)) {
                 Text(card.name)
@@ -622,19 +645,15 @@ private struct FocusHomeVerticalSolidCardSurface: View {
                     .minimumScaleFactor(0.70)
                     .shadow(color: Color.arkInk.opacity(0.58), radius: 5, x: 0, y: 2) // ui-v4: allow requested legibility shadow on card text
 
-                ZStack(alignment: .leading) {
-                    Text(card.kind)
-                        .opacity(Double(1 - reveal))
-                    Text(expandedSubtitle)
-                        .opacity(Double(reveal))
-                }
-                .font(.system(size: lerp(9, 12, p), weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.70)
-                .shadow(color: Color.arkInk.opacity(0.46), radius: 4, x: 0, y: 1) // ui-v4: allow requested legibility shadow on card text
+                Text(card.kind)
+                    .font(.system(size: lerp(9, 12, p), weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.70)
+                    .shadow(color: Color.arkInk.opacity(0.46), radius: 4, x: 0, y: 1) // ui-v4: allow requested legibility shadow on card text
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .opacity(compactHeaderOpacity)
 
             Spacer(minLength: 0)
 
@@ -655,11 +674,11 @@ private struct FocusHomeVerticalSolidCardSurface: View {
                 .resizable()
                 .scaledToFit()
                 .frame(
-                    width: width * (card.isHuman ? lerp(0.50, 0.60, visualProgress) : lerp(0.62, 0.72, visualProgress)),
-                    height: height * (card.isHuman ? lerp(0.40, 0.42, visualProgress) : lerp(0.42, 0.44, visualProgress)),
+                    width: width * (card.isHuman ? lerp(0.50, 0.60, visualProgress) : lerp(0.62, 0.80, visualProgress)),
+                    height: height * (card.isHuman ? lerp(0.40, 0.42, visualProgress) : lerp(0.42, 0.49, visualProgress)),
                     alignment: .bottom
                 )
-                .offset(y: card.isHuman ? lerp(0, -18, visualProgress) : lerp(0, -24, visualProgress))
+                .offset(y: card.isHuman ? lerp(0, -18, visualProgress) : lerp(0, -28, visualProgress))
                 .shadow(color: Color.arkInk.opacity(transparent ? 0.26 : 0.16), radius: 16, y: 10) // ui-v4: allow intentional avatar depth
         } else {
             Image(systemName: avatarSymbol)
@@ -673,7 +692,9 @@ private struct FocusHomeVerticalSolidCardSurface: View {
     private func avatarHorizontalOffset(width: CGFloat, progress p: CGFloat) -> CGFloat {
         let leadingPadding = lerp(CGFloat(10), CGFloat(18), p)
         let trailingPadding = lerp(CGFloat(10), CGFloat(18), p)
-        return (trailingPadding - leadingPadding) / 2
+        let baseCenterOffset = (trailingPadding - leadingPadding) / 2
+        let expandedShift = card.isHuman ? CGFloat(0) : -width * (card.isElectronicPet ? 0.045 : 0.085)
+        return baseCenterOffset + lerp(0, expandedShift, p)
     }
 
     private func rightInfoColumn(width: CGFloat, height: CGFloat, progress p: CGFloat) -> some View {
@@ -723,10 +744,12 @@ private struct FocusHomeVerticalSolidCardSurface: View {
     }
 
     private func petInfoStack(progress p: CGFloat) -> some View {
-        let meta = [card.ageText, card.humanEquivalentAgeText, card.zodiacText]
+        let meta = [card.humanEquivalentAgeText, card.zodiacText]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty && $0 != "未知" }
-        return VStack(alignment: .trailing, spacing: lerp(3, 5, p)) {
+        return VStack(alignment: .trailing, spacing: lerp(4, 7, p)) {
+            petAgeMetric(progress: p)
+
             Text(petTogetherHeadline)
                 .font(.system(size: lerp(15, 20, p), weight: .black, design: .rounded))
                 .foregroundStyle(cardPrimaryText)
@@ -755,6 +778,47 @@ private struct FocusHomeVerticalSolidCardSurface: View {
                     .shadow(color: Color.arkInk.opacity(0.42), radius: 4, x: 0, y: 1) // ui-v4: allow readability shadow on image card text
             }
         }
+    }
+
+    @ViewBuilder
+    private func petAgeMetric(progress p: CGFloat) -> some View {
+        if let age = expandedAgeParts {
+            HStack(alignment: .firstTextBaseline, spacing: lerp(3, 5, p)) {
+                Text(age.number)
+                    .font(.system(size: lerp(26, 52, p), weight: .black, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .contentTransition(.numericText())
+
+                Text(age.unit)
+                    .font(.system(size: lerp(10, 16, p), weight: .black, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            .foregroundStyle(cardPrimaryText)
+            .shadow(color: Color.arkInk.opacity(0.55), radius: 5, x: 0, y: 2) // ui-v4: allow readability shadow on image card text
+        }
+    }
+
+    private var expandedAgeParts: (number: String, unit: String)? {
+        guard let rawAge = card.ageText?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !rawAge.isEmpty else {
+            return nil
+        }
+        let numberPrefix = rawAge.prefix { character in
+            character.isNumber || character == "." || character == ","
+        }
+        guard !numberPrefix.isEmpty else {
+            return nil
+        }
+        let unit = rawAge
+            .dropFirst(numberPrefix.count)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let l = L10n(AppLanguage.code)
+        return (
+            number: String(numberPrefix),
+            unit: unit.isEmpty ? l.tr(zh: "岁", en: "year", de: "Jahr") : unit
+        )
     }
 
     private func electronicPetInfoStack(progress p: CGFloat) -> some View {
@@ -789,23 +853,8 @@ private struct FocusHomeVerticalSolidCardSurface: View {
     @ViewBuilder
     private func bottomInfo(progress p: CGFloat) -> some View {
         let reveal = expandedContentProgress(p)
-        ZStack(alignment: .bottomLeading) {
-            compactFooter(progress: p)
-                .opacity(Double(1 - reveal))
-            expandedMetrics
-                .opacity(Double(reveal))
-                .scaleEffect(lerp(0.98, 1, reveal), anchor: .bottom)
-        }
-    }
-
-    private var expandedMetrics: some View {
-        let values = expandedInfoValues
-        return HStack(spacing: 8) {
-            metricPill(primaryMetric, metricUnit)
-            if let secondary = values.first {
-                metricPill(secondary, card.kind)
-            }
-        }
+        compactFooter(progress: p)
+            .opacity(Double(1 - reveal))
     }
 
     private func compactFooter(progress p: CGFloat) -> some View {
@@ -827,28 +876,24 @@ private struct FocusHomeVerticalSolidCardSurface: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func metricPill(_ value: String, _ label: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(value)
-                .font(.system(size: 18, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.70)
-                .contentTransition(.numericText())
-            Text(label)
-                .font(.system(size: 9, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
     private func expandedContentProgress(_ progress: CGFloat) -> CGFloat {
         smooth(progress, 0.18, 0.58)
+    }
+
+    private func bottomQuickActionGradient(height: CGFloat, progress p: CGFloat) -> some View {
+        let reveal = smooth(p, 0.36, 0.72)
+        return LinearGradient(
+            colors: [
+                Color.arkInk.opacity(0),
+                Color.arkInk.opacity(0.36 * Double(reveal)),
+                Color.arkInk.opacity(0.78 * Double(reveal))
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(height: height * lerp(0.34, 0.48, reveal))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .allowsHitTesting(false)
     }
 
     private var petTogetherHeadline: String {
@@ -871,29 +916,6 @@ private struct FocusHomeVerticalSolidCardSurface: View {
         cardPrimaryText.opacity(opacity)
     }
 
-    private var expandedSubtitle: String {
-        card.ageText ?? card.daysTogetherText ?? card.kind
-    }
-
-    private var expandedInfoValues: [String] {
-        var values: [String] = []
-        if let ageText = card.ageText, !ageText.isEmpty {
-            values.append(ageText)
-        }
-        if let daysTogetherText = card.daysTogetherText,
-           !daysTogetherText.isEmpty,
-           daysTogetherText != card.ageText {
-            values.append(daysTogetherText)
-        }
-        if card.isHuman {
-            values.append("\(card.coconutBalance)🥥")
-        }
-        if values.isEmpty {
-            values.append(card.kind)
-        }
-        return values
-    }
-
     private var statusBadge: String {
         if let statusBadgeText = card.statusBadgeText {
             return statusBadgeText
@@ -908,17 +930,11 @@ private struct FocusHomeVerticalSolidCardSurface: View {
     }
 
     private var primaryMetric: String {
-        if card.isHuman { return "\(card.coconutBalance)" }
-        if card.isElectronicPet { return "\(card.critterAppearanceStage)" }
-        if card.daysTogether > 0 { return "\(card.daysTogether)" }
-        return "\(max(0, card.streak))"
+        card.homePrimaryMetricValue
     }
 
     private var metricUnit: String {
-        if card.isHuman { return "c" }
-        if card.isElectronicPet { return "Lv" }
-        if card.daysTogether > 0 { return "d" }
-        return "streak"
+        card.homePrimaryMetricUnit
     }
 
     private var avatarSymbol: String {

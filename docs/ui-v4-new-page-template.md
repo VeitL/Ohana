@@ -2,6 +2,23 @@
 
 Use this when creating or heavily refactoring an app view. The machine source of truth is always `ui规范.selection.json`; this template is only a practical starting point.
 
+## Before Creating Local UI
+
+Before adding a page-local button, card, row, popup, metric, chart, avatar treatment, close control, or motion helper, check whether an existing shared component or V4 pattern already exists.
+
+Create local UI only when:
+
+- The behavior is truly feature-specific.
+- No shared component matches the role.
+- The local variant does not weaken accessibility, hit testing, density, motion, or token semantics.
+- The code is unlikely to be copied elsewhere.
+
+Promote local UI to a shared component when it appears in two features, encodes a V4 rule, or affects navigation chrome, sheet chrome, privacy placeholders, forms, charts, accessibility, or motion.
+
+## Template Scope
+
+This template is a construction starter, not a route-ownership rule. Do not copy the sample `NavigationStack` into leaf views already hosted by an app route host. Route hosts own navigation containers; pages own content, local chrome, local interaction state, and typed intents.
+
 ## Default Page Shape
 
 Use `ZStack` as the visual root. For static content it is simply the background/content layering tool. For key motion interactions, use a stable motion scene: keep layers mounted, freeze the UI snapshot before animation, and drive transforms/masks from one progress value.
@@ -202,6 +219,8 @@ Rules:
 - Keep compact density, but preserve a 44pt hit target for buttons, toggles, rows, chips, and icon actions.
 - Use `ScaleButtonStyle()` for tappable controls unless there is a specific reason not to.
 - Use `GoMotion.page`, `GoMotion.feedback`, `GoMotion.fab`, `GoMotion.quick`, or `GoMotion.reduced`; do not invent one-off spring values.
+- Apply Ohana premium micro-motion by default: visible numbers use `.ohanaNumericMotion(value)` or `contentTransition(.numericText())`; member/filter/segmented/calendar-owner switches use selected-state-first snapshot handoff with `GoMotion.selection` or `GoMotion.stateChange`; related visible changes begin in the same interaction frame.
+- Keep micro scale restrained: roughly 1.01-1.05 for selection/context feedback and up to about 1.08-1.12 only for reward or success pulses. Avoid hard content replacement, delayed two-step transitions, large bounce, repeated wobble, and fake delta animations during context switches.
 - For key animated interactions, use `OhanaMotionScene` or an equivalent stable `ZStack + single progress` scene; avoid independent delayed animations for the same action.
 - Settings rows must follow `settingIcon`; non-sheet pages must follow `pageBackButton` and `pageCloseButton`; sheet close controls must follow `sheetChrome`.
 - New sheets must follow independent sheet tokens from `ui规范.selection.json`: compact layout, nativeRegular background, flat card/input, pill button, iconOnly chrome, and an adaptive content-height detent for short record/confirm sheets.

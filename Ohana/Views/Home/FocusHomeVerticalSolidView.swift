@@ -2,8 +2,7 @@
 //  FocusHomeVerticalSolidView.swift
 //  Ohana
 //
-//  Real-data portrait solid home style. It reuses the Home V3 data and routing
-//  shell, and swaps only the visual card scene.
+//  Real-data portrait solid home style.
 //
 
 import SwiftUI
@@ -16,13 +15,12 @@ struct FocusHomeVerticalSolidView: View {
     let heroNS: Namespace.ID
 
     var body: some View {
-        FocusHomeV3View(
+        HomeDataContainer(
             selectedPet: $selectedPet,
             selectedHuman: $selectedHuman,
             selectedPlant: $selectedPlant,
             selectedPetTab: $selectedPetTab,
-            heroNS: heroNS,
-            sceneStyle: .verticalSolid
+            heroNS: heroNS
         )
     }
 }

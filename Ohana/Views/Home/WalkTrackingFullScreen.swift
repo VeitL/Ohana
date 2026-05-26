@@ -11,7 +11,6 @@
 //
 
 import SwiftUI
-import SwiftData
 
 struct WalkTrackingFullScreen: View {
     let pet: Pet
@@ -22,7 +21,7 @@ struct WalkTrackingFullScreen: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             // 内部卡片本体（地图 + 控制面板）铺满整个屏幕
-            WalkTrackingCard(pet: pet)
+            WalkTrackingCardHost(pet: pet)
                 .ignoresSafeArea()
 
             // 顶部最小化按钮 — 用户可收起卡片回到首页，巡岛继续进行
@@ -30,7 +29,7 @@ struct WalkTrackingFullScreen: View {
                 .padding(.top, 12)
                 .padding(.leading, 16)
         }
-        .background(Color.black.ignoresSafeArea())
+        .background(Color.arkInk.ignoresSafeArea())
         .statusBarHidden(false)
     }
 
@@ -46,12 +45,12 @@ struct WalkTrackingFullScreen: View {
                 Text("收起")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(Color.goCardWhite)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .background(Color.ohanaCardSurface, in: Capsule())
             .overlay(
-                Capsule().strokeBorder(.white.opacity(0.2), lineWidth: 1)
+                Capsule().strokeBorder(Color.goCardWhite.opacity(0.2), lineWidth: 1)
             )
         }
         .buttonStyle(ScaleButtonStyle())

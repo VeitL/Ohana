@@ -92,6 +92,449 @@ struct QuickActionItem: Identifiable, Codable, Hashable {
     }
 }
 
+enum OhanaQuickActionGlyphKind {
+    case feed
+    case calendar
+    case walk
+    case water
+    case waterChange
+    case potty
+    case litter
+    case groom
+    case health
+    case medicine
+    case weight
+    case expense
+    case play
+    case photo
+    case cleanup
+    case training
+    case plantFertilize
+    case document
+
+    static func resolve(actionType: String, fallbackSystemName: String) -> OhanaQuickActionGlyphKind? {
+        let action = actionType.lowercased()
+        let symbol = fallbackSystemName.lowercased()
+
+        if action == "water", symbol.contains("water.waves") {
+            return .waterChange
+        }
+
+        switch action {
+        case "feed":
+            return .feed
+        case "calendar":
+            return .calendar
+        case "walk":
+            return .walk
+        case "water":
+            return .water
+        case "waterchange", "filterclean":
+            return .waterChange
+        case "potty":
+            return .potty
+        case "litter":
+            return .litter
+        case "groom":
+            return .groom
+        case "health":
+            return .health
+        case "medication", "humanmedication":
+            return .medicine
+        case "weight", "humanweight":
+            return .weight
+        case "expense", "humanexpense":
+            return .expense
+        case "play":
+            return .play
+        case "moment":
+            return .photo
+        case "cagecleaning":
+            return .cleanup
+        case "freeflight", "humanworkout":
+            return .training
+        case "misting":
+            return .water
+        case "substratechange", "fertilizeplant":
+            return .plantFertilize
+        case "humannote", "note":
+            return .document
+        default:
+            break
+        }
+
+        if symbol.contains("fork") { return .feed }
+        if symbol.contains("calendar") { return .calendar }
+        if symbol.contains("figure.walk") { return .walk }
+        if symbol.contains("drop") { return .water }
+        if symbol.contains("water.waves") { return .waterChange }
+        if symbol.contains("allergens") { return .potty }
+        if symbol.contains("trash") { return .litter }
+        if symbol.contains("scissors") || symbol.contains("comb") { return .groom }
+        if symbol.contains("heart") || symbol.contains("stethoscope") { return .health }
+        if symbol.contains("pill") { return .medicine }
+        if symbol.contains("scale") { return .weight }
+        if symbol.contains("credit") || symbol.contains("banknote") || symbol.contains("yensign") { return .expense }
+        if symbol.contains("tennisball") { return .play }
+        if symbol.contains("camera") { return .photo }
+        if symbol.contains("basket") { return .cleanup }
+        if symbol.contains("cloud.drizzle") { return .water }
+        if symbol.contains("leaf") { return .plantFertilize }
+        if symbol.contains("note") { return .document }
+        return nil
+    }
+}
+
+struct OhanaQuickActionIcon: View {
+    let actionType: String
+    let fallbackSystemName: String
+    var size: CGFloat = 32
+    var color: Color = Color.ohanaFunctionalIcon
+    var isCompleted: Bool = false
+    var showsCompletionBadge: Bool = false
+
+    private var glyphKind: OhanaQuickActionGlyphKind? {
+        OhanaQuickActionGlyphKind.resolve(actionType: actionType, fallbackSystemName: fallbackSystemName)
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            if let glyphKind {
+                OhanaQuickActionGlyph(kind: glyphKind, color: color)
+                    .frame(width: size, height: size)
+            } else {
+                Image(systemName: fallbackSystemName)
+                    .font(.system(size: size * 0.62, weight: .semibold))
+                    .symbolRenderingMode(.monochrome)
+                    .foregroundStyle(color)
+                    .frame(width: size, height: size)
+            }
+
+            if showsCompletionBadge && isCompleted {
+                completionBadge
+                    .offset(x: size * 0.08, y: size * 0.08)
+                    .transition(.scale(scale: 0.82).combined(with: .opacity))
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+
+    private var completionBadge: some View {
+        let badgeSize = max(12, size * 0.36)
+        return ZStack {
+            Circle()
+                .fill(Color.goPrimary)
+            Image(systemName: "checkmark")
+                .font(.system(size: badgeSize * 0.52, weight: .black))
+                .foregroundStyle(Color.ohanaPrimaryActionText)
+        }
+        .frame(width: badgeSize, height: badgeSize)
+        .overlay {
+            Circle()
+                .strokeBorder(Color.ohanaCardSurface.opacity(0.85), lineWidth: max(1, size * 0.035))
+        }
+    }
+}
+
+private struct OhanaQuickActionGlyph: View {
+    let kind: OhanaQuickActionGlyphKind
+    let color: Color
+
+    var body: some View {
+        Canvas { context, size in
+            let side = min(size.width, size.height)
+            var iconContext = context
+            iconContext.translateBy(
+                x: (size.width - side) / 2,
+                y: (size.height - side) / 2
+            )
+            iconContext.scaleBy(x: side / 32, y: side / 32)
+            draw(kind, in: &iconContext)
+        }
+    }
+
+    private func draw(_ kind: OhanaQuickActionGlyphKind, in context: inout GraphicsContext) {
+        switch kind {
+        case .feed:
+            fill(ellipse(x: 6.6, y: 9.8, width: 18.8, height: 8.8), in: &context, opacity: 0.2)
+            fill(bowlPath(x: 5.5, y: 14.7, width: 21, height: 11.3), in: &context)
+            fill(circle(cx: 12.2, cy: 12.1, r: 2.2), in: &context, opacity: 0.82)
+            fill(circle(cx: 16.4, cy: 11.1, r: 2.6), in: &context, opacity: 0.82)
+            fill(circle(cx: 20.4, cy: 12.6, r: 2.1), in: &context, opacity: 0.82)
+
+        case .calendar:
+            fill(roundedRect(x: 5.5, y: 6.5, width: 21, height: 20, radius: 5.5), in: &context)
+            fill(capsule(x: 9, y: 10, width: 14, height: 3), in: &context, opacity: 0.42)
+            fill(circle(cx: 11.3, cy: 17.3, r: 1.55), in: &context, opacity: 0.42)
+            fill(circle(cx: 16, cy: 17.3, r: 1.55), in: &context, opacity: 0.24)
+            fill(circle(cx: 20.7, cy: 17.3, r: 1.55), in: &context, opacity: 0.24)
+            fill(capsule(x: 14.1, y: 20.2, width: 7.9, height: 3.2), in: &context, opacity: 0.42)
+
+        case .walk:
+            var path = Path()
+            path.move(to: CGPoint(x: 9, y: 22.1))
+            path.addCurve(to: CGPoint(x: 16.8, y: 10.3), control1: CGPoint(x: 6.8, y: 15.5), control2: CGPoint(x: 11, y: 9.5))
+            path.addCurve(to: CGPoint(x: 23.1, y: 18.4), control1: CGPoint(x: 21.2, y: 10.9), control2: CGPoint(x: 24, y: 14.2))
+            path.addCurve(to: CGPoint(x: 13.6, y: 21), control1: CGPoint(x: 22.2, y: 22.6), control2: CGPoint(x: 17.1, y: 24.4))
+            path.addCurve(to: CGPoint(x: 15.7, y: 14.3), control1: CGPoint(x: 10.8, y: 18.3), control2: CGPoint(x: 12.1, y: 14.5))
+            stroke(path, in: &context, width: 4.2)
+            fill(circle(cx: 8.8, cy: 22.2, r: 3.15), in: &context)
+            fill(rotated(roundedRect(x: 20.1, y: 7.5, width: 5.6, height: 3.4, radius: 1.7), degrees: 32, center: CGPoint(x: 22.9, y: 9.2)), in: &context, opacity: 0.48)
+
+        case .water:
+            fill(dropPath(), in: &context)
+            fill(bowlPath(x: 7.2, y: 20.2, width: 17.6, height: 5.8), in: &context, opacity: 0.38)
+            fill(ellipse(x: 7.2, y: 17.3, width: 17.6, height: 6), in: &context, opacity: 0.18)
+
+        case .waterChange:
+            fill(bowlPath(x: 7.2, y: 20.8, width: 17.6, height: 6.2), in: &context)
+            var wave = Path()
+            wave.move(to: CGPoint(x: 8.8, y: 18.4))
+            wave.addCurve(to: CGPoint(x: 15, y: 18.4), control1: CGPoint(x: 10.8, y: 16), control2: CGPoint(x: 13, y: 16))
+            wave.addCurve(to: CGPoint(x: 21.2, y: 18.4), control1: CGPoint(x: 17, y: 20.8), control2: CGPoint(x: 19.2, y: 20.8))
+            stroke(wave, in: &context, width: 2.2, opacity: 0.48)
+            stroke(arcArrowPath(clockwise: true), in: &context, width: 2.5, opacity: 0.84)
+            stroke(arcArrowPath(clockwise: false), in: &context, width: 2.5, opacity: 0.84)
+
+        case .potty:
+            fill(bowlPath(x: 7.2, y: 16.2, width: 17.6, height: 9.8), in: &context)
+            fill(capsule(x: 10, y: 11.2, width: 12, height: 5.2), in: &context, opacity: 0.2)
+            fill(capsule(x: 11.6, y: 12.8, width: 8.8, height: 2.4), in: &context, opacity: 0.5)
+            fill(circle(cx: 23.1, cy: 9.7, r: 2.15), in: &context, opacity: 0.66)
+            fill(circle(cx: 26.2, cy: 13, r: 1.35), in: &context, opacity: 0.24)
+
+        case .litter:
+            fill(bowlPath(x: 6.7, y: 17, width: 18.6, height: 9), in: &context)
+            fill(ellipse(x: 6.7, y: 13.2, width: 18.6, height: 7.4), in: &context, opacity: 0.18)
+            fill(rotated(capsule(x: 17.2, y: 7.1, width: 3.6, height: 11.2), degrees: 28, center: CGPoint(x: 19, y: 12.7)), in: &context, opacity: 0.74)
+            fill(rotated(capsule(x: 19.6, y: 6.5, width: 5.6, height: 3.4), degrees: 28, center: CGPoint(x: 22.4, y: 8.2)), in: &context, opacity: 0.28)
+
+        case .groom:
+            fill(roundedRect(x: 8, y: 7, width: 16, height: 9.5, radius: 4.4), in: &context)
+            fill(roundedRect(x: 12.4, y: 15.3, width: 7.2, height: 10.7, radius: 3.6), in: &context)
+            for x in [10, 14.7, 19.4] {
+                fill(capsule(x: x, y: 18.2, width: 2.6, height: 5.8), in: &context, opacity: 0.42)
+            }
+
+        case .health:
+            fill(roundedRect(x: 7, y: 6, width: 18, height: 21, radius: 5.2), in: &context)
+            fill(capsule(x: 11, y: 9.7, width: 10, height: 2.8), in: &context, opacity: 0.18)
+            fill(heartPath(), in: &context, opacity: 0.54)
+
+        case .medicine:
+            let outer = rotated(capsule(x: 5.4, y: 12, width: 21.2, height: 8), degrees: -35, center: CGPoint(x: 16, y: 16))
+            let inner = rotated(capsule(x: 16, y: 12.4, width: 10.1, height: 7.2), degrees: -35, center: CGPoint(x: 16, y: 16))
+            fill(outer, in: &context)
+            fill(inner, in: &context, opacity: 0.42)
+            fill(rotated(circle(cx: 11.8, cy: 16, r: 2.1), degrees: -35, center: CGPoint(x: 16, y: 16)), in: &context, opacity: 0.18)
+
+        case .weight:
+            fill(roundedRect(x: 5.5, y: 8, width: 21, height: 18.5, radius: 6), in: &context)
+            fill(capsule(x: 10, y: 11, width: 12, height: 3), in: &context, opacity: 0.18)
+            var needle = Path()
+            needle.move(to: CGPoint(x: 16, y: 17.3))
+            needle.addLine(to: CGPoint(x: 20, y: 13.5))
+            stroke(needle, in: &context, width: 2.4, opacity: 0.48)
+            fill(circle(cx: 16, cy: 17.3, r: 2.45), in: &context, opacity: 0.48)
+
+        case .expense:
+            fill(roundedRect(x: 6, y: 9, width: 20, height: 15.8, radius: 5), in: &context)
+            fill(capsule(x: 8.6, y: 12, width: 14.8, height: 3), in: &context, opacity: 0.4)
+            fill(circle(cx: 19.8, cy: 20.1, r: 2.5), in: &context, opacity: 0.22)
+            fill(circle(cx: 13.1, cy: 20.1, r: 2.1), in: &context, opacity: 0.42)
+
+        case .play:
+            var triangle = Path()
+            triangle.move(to: CGPoint(x: 11, y: 9.1))
+            triangle.addCurve(to: CGPoint(x: 14.9, y: 7), control1: CGPoint(x: 11, y: 7.1), control2: CGPoint(x: 13.2, y: 5.9))
+            triangle.addLine(to: CGPoint(x: 24.9, y: 13.8))
+            triangle.addCurve(to: CGPoint(x: 24.9, y: 18.2), control1: CGPoint(x: 26.4, y: 14.8), control2: CGPoint(x: 26.4, y: 17.2))
+            triangle.addLine(to: CGPoint(x: 14.9, y: 25))
+            triangle.addCurve(to: CGPoint(x: 11, y: 22.9), control1: CGPoint(x: 13.2, y: 26.1), control2: CGPoint(x: 11, y: 24.9))
+            triangle.closeSubpath()
+            fill(triangle, in: &context)
+            fill(circle(cx: 8.6, cy: 23.3, r: 3.1), in: &context, opacity: 0.42)
+
+        case .photo:
+            fill(roundedRect(x: 6, y: 8, width: 20, height: 16, radius: 5), in: &context)
+            fill(circle(cx: 20.8, cy: 12.6, r: 2.1), in: &context, opacity: 0.48)
+            var mountain = Path()
+            mountain.move(to: CGPoint(x: 9.4, y: 22.2))
+            mountain.addLine(to: CGPoint(x: 14, y: 16.8))
+            mountain.addLine(to: CGPoint(x: 17.4, y: 20.6))
+            mountain.addLine(to: CGPoint(x: 19.5, y: 18.3))
+            mountain.addLine(to: CGPoint(x: 23, y: 22.2))
+            mountain.closeSubpath()
+            fill(mountain, in: &context, opacity: 0.32)
+
+        case .cleanup:
+            fill(rotated(capsule(x: 8.4, y: 17.4, width: 15.8, height: 6.2), degrees: -18, center: CGPoint(x: 16.3, y: 20.5)), in: &context)
+            fill(rotated(capsule(x: 13.5, y: 7, width: 4, height: 13.5), degrees: -18, center: CGPoint(x: 15.5, y: 13.8)), in: &context)
+            fill(circle(cx: 22.7, cy: 8.5, r: 2.2), in: &context, opacity: 0.42)
+            fill(circle(cx: 25.4, cy: 13, r: 1.35), in: &context, opacity: 0.22)
+            fill(circle(cx: 8.2, cy: 24.5, r: 1.5), in: &context, opacity: 0.22)
+
+        case .training:
+            fill(circle(cx: 16, cy: 16, r: 10.4), in: &context)
+            fill(circle(cx: 16, cy: 16, r: 6.2), in: &context, opacity: 0.22)
+            fill(circle(cx: 16, cy: 16, r: 2.7), in: &context, opacity: 0.54)
+            fill(rotated(capsule(x: 22.2, y: 5.5, width: 5.4, height: 3.2), degrees: 35, center: CGPoint(x: 24.9, y: 7.1)), in: &context, opacity: 0.54)
+
+        case .plantFertilize:
+            fill(bowlPath(x: 9.1, y: 18, width: 13.8, height: 8), in: &context)
+            fill(leafPath(start: CGPoint(x: 15.5, y: 17.8), left: true), in: &context)
+            fill(leafPath(start: CGPoint(x: 16.7, y: 17.2), left: false), in: &context)
+            fill(circle(cx: 23.8, cy: 20.5, r: 2), in: &context, opacity: 0.44)
+            fill(circle(cx: 25.8, cy: 15.6, r: 1.4), in: &context, opacity: 0.22)
+
+        case .document:
+            fill(documentPath(), in: &context)
+            fill(foldPath(), in: &context, opacity: 0.24)
+            fill(capsule(x: 12, y: 15.1, width: 8, height: 2.4), in: &context, opacity: 0.42)
+            fill(capsule(x: 12, y: 19.6, width: 6.2, height: 2.4), in: &context, opacity: 0.24)
+        }
+    }
+
+    private func fill(_ path: Path, in context: inout GraphicsContext, opacity: Double = 1) {
+        context.fill(path, with: .color(color.opacity(opacity)))
+    }
+
+    private func stroke(_ path: Path, in context: inout GraphicsContext, width: CGFloat, opacity: Double = 1) {
+        context.stroke(
+            path,
+            with: .color(color.opacity(opacity)),
+            style: StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round)
+        )
+    }
+
+    private func circle(cx: CGFloat, cy: CGFloat, r: CGFloat) -> Path {
+        ellipse(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+    }
+
+    private func ellipse(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat) -> Path {
+        var path = Path()
+        path.addEllipse(in: CGRect(x: x, y: y, width: width, height: height))
+        return path
+    }
+
+    private func roundedRect(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat, radius: CGFloat) -> Path {
+        var path = Path()
+        path.addRoundedRect(
+            in: CGRect(x: x, y: y, width: width, height: height),
+            cornerSize: CGSize(width: radius, height: radius),
+            style: .continuous
+        )
+        return path
+    }
+
+    private func capsule(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat) -> Path {
+        roundedRect(x: x, y: y, width: width, height: height, radius: min(width, height) / 2)
+    }
+
+    private func rotated(_ path: Path, degrees: CGFloat, center: CGPoint) -> Path {
+        var transform = CGAffineTransform(translationX: center.x, y: center.y)
+        transform = transform.rotated(by: degrees * .pi / 180)
+        transform = transform.translatedBy(x: -center.x, y: -center.y)
+        return path.applying(transform)
+    }
+
+    private func bowlPath(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat) -> Path {
+        let bottom = y + height
+        var path = Path()
+        path.move(to: CGPoint(x: x, y: y))
+        path.addLine(to: CGPoint(x: x + width, y: y))
+        path.addLine(to: CGPoint(x: x + width - width * 0.08, y: bottom - height * 0.28))
+        path.addQuadCurve(
+            to: CGPoint(x: x + width * 0.72, y: bottom),
+            control: CGPoint(x: x + width * 0.92, y: bottom)
+        )
+        path.addLine(to: CGPoint(x: x + width * 0.28, y: bottom))
+        path.addQuadCurve(
+            to: CGPoint(x: x + width * 0.08, y: bottom - height * 0.28),
+            control: CGPoint(x: x + width * 0.08, y: bottom)
+        )
+        path.closeSubpath()
+        return path
+    }
+
+    private func dropPath() -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: 16, y: 4.8))
+        path.addCurve(to: CGPoint(x: 23.1, y: 17.9), control1: CGPoint(x: 20.8, y: 10.5), control2: CGPoint(x: 23.1, y: 14.3))
+        path.addCurve(to: CGPoint(x: 16, y: 25), control1: CGPoint(x: 23.1, y: 22), control2: CGPoint(x: 20, y: 25))
+        path.addCurve(to: CGPoint(x: 8.9, y: 17.9), control1: CGPoint(x: 12, y: 25), control2: CGPoint(x: 8.9, y: 22))
+        path.addCurve(to: CGPoint(x: 16, y: 4.8), control1: CGPoint(x: 8.9, y: 14.3), control2: CGPoint(x: 11.2, y: 10.5))
+        path.closeSubpath()
+        return path
+    }
+
+    private func heartPath() -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: 16, y: 23.1))
+        path.addCurve(to: CGPoint(x: 10.6, y: 16.3), control1: CGPoint(x: 13.9, y: 21.8), control2: CGPoint(x: 10.6, y: 19.4))
+        path.addCurve(to: CGPoint(x: 13.7, y: 12.9), control1: CGPoint(x: 10.6, y: 14.3), control2: CGPoint(x: 11.9, y: 12.9))
+        path.addCurve(to: CGPoint(x: 16, y: 14.2), control1: CGPoint(x: 14.8, y: 12.9), control2: CGPoint(x: 15.6, y: 13.4))
+        path.addCurve(to: CGPoint(x: 18.3, y: 12.9), control1: CGPoint(x: 16.4, y: 13.4), control2: CGPoint(x: 17.2, y: 12.9))
+        path.addCurve(to: CGPoint(x: 21.4, y: 16.3), control1: CGPoint(x: 20.1, y: 12.9), control2: CGPoint(x: 21.4, y: 14.3))
+        path.addCurve(to: CGPoint(x: 16, y: 23.1), control1: CGPoint(x: 21.4, y: 19.4), control2: CGPoint(x: 18.1, y: 21.8))
+        path.closeSubpath()
+        return path
+    }
+
+    private func arcArrowPath(clockwise: Bool) -> Path {
+        var path = Path()
+        if clockwise {
+            path.addArc(center: CGPoint(x: 19, y: 12), radius: 6, startAngle: .degrees(-45), endAngle: .degrees(74), clockwise: false)
+            path.move(to: CGPoint(x: 22.3, y: 17.1))
+            path.addLine(to: CGPoint(x: 26.4, y: 16.6))
+            path.move(to: CGPoint(x: 22.3, y: 17.1))
+            path.addLine(to: CGPoint(x: 25.6, y: 13.1))
+        } else {
+            path.addArc(center: CGPoint(x: 13, y: 12), radius: 6, startAngle: .degrees(135), endAngle: .degrees(255), clockwise: false)
+            path.move(to: CGPoint(x: 9.6, y: 6.9))
+            path.addLine(to: CGPoint(x: 5.6, y: 7.4))
+            path.move(to: CGPoint(x: 9.6, y: 6.9))
+            path.addLine(to: CGPoint(x: 6.4, y: 10.9))
+        }
+        return path
+    }
+
+    private func leafPath(start: CGPoint, left: Bool) -> Path {
+        var path = Path()
+        path.move(to: start)
+        if left {
+            path.addCurve(to: CGPoint(x: 7.2, y: 11.3), control1: CGPoint(x: 14.3, y: 13.4), control2: CGPoint(x: 11.2, y: 11.2))
+            path.addCurve(to: start, control1: CGPoint(x: 8.2, y: 15.4), control2: CGPoint(x: 11.2, y: 17.6))
+        } else {
+            path.addCurve(to: CGPoint(x: 24.5, y: 9.2), control1: CGPoint(x: 17.5, y: 12.4), control2: CGPoint(x: 20.3, y: 9.7))
+            path.addCurve(to: start, control1: CGPoint(x: 24.1, y: 13.9), control2: CGPoint(x: 21.2, y: 16.8))
+        }
+        path.closeSubpath()
+        return path
+    }
+
+    private func documentPath() -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: 9, y: 5.5))
+        path.addLine(to: CGPoint(x: 19.4, y: 5.5))
+        path.addLine(to: CGPoint(x: 23.5, y: 9.7))
+        path.addLine(to: CGPoint(x: 23.5, y: 26.5))
+        path.addLine(to: CGPoint(x: 9, y: 26.5))
+        path.closeSubpath()
+        return path
+    }
+
+    private func foldPath() -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: 19.1, y: 5.6))
+        path.addLine(to: CGPoint(x: 23.6, y: 10.6))
+        path.addLine(to: CGPoint(x: 19.1, y: 10.6))
+        path.closeSubpath()
+        return path
+    }
+}
+
 enum QuickActionLimit {
     static let maxItemsPerEntity = 8
     static let title = "快捷操作已达上限"
@@ -343,20 +786,18 @@ struct GoQuickActionCard: View {
 
     private var cardContent: some View {
         VStack(spacing: 6) {
-            // Icon — 喂水已打卡：水浪仅在水滴形下半部；喂食与其它项共用 SF Symbol（无动画）
+            // Icon — keep the function glyph visible; completion is an additive badge/state.
             ZStack {
-                if isWaterAction && isCompletedToday {
-                    QuickActionWaterDropWithWaves(
-                        accent: checkInAccentColor,
-                        isPressed: isPressed
-                    )
-                } else {
-                    Image(systemName: resolvedIcon)
-                        .font(.system(size: 26, weight: .semibold))
-                        .foregroundStyle(quickActionIconForeground)
-                        .scaleEffect(isPressed ? 0.90 : 1.0)
-                        .ohanaSymbolPulse(trigger: isCompletedToday)
-                }
+                OhanaQuickActionIcon(
+                    actionType: item.actionType,
+                    fallbackSystemName: resolvedIcon,
+                    size: 34,
+                    color: quickActionIconForeground,
+                    isCompleted: isCompletedToday,
+                    showsCompletionBadge: isCompletedToday
+                )
+                .scaleEffect(isPressed ? 0.90 : 1.0)
+                .ohanaSymbolPulse(trigger: isCompletedToday)
 
                 if pendingReminder != nil || showsAttentionDot {
                     Circle()
@@ -636,10 +1077,13 @@ struct QAManageSheet: View {
             List {
                 ForEach(savedItems, id: \.id) { item in
                     HStack(spacing: 12) {
-                        Image(systemName: item.icon)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(Color.ohanaFunctionalIcon)
-                            .frame(width: 36, height: 36)
+                        OhanaQuickActionIcon(
+                            actionType: item.actionType,
+                            fallbackSystemName: item.icon,
+                            size: 28,
+                            color: Color.ohanaFunctionalIcon
+                        )
+                        .frame(width: 36, height: 36)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.label)
                                 .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -892,10 +1336,13 @@ struct AddQuickActionSheet: View {
                                 dismiss()
                             } label: {
                                 VStack(spacing: 8) {
-                                    Image(systemName: action.icon)
-                                        .font(.system(size: 28, weight: .semibold))
-                                        .foregroundStyle(Color.ohanaFunctionalIcon)
-                                        .frame(width: 44, height: 44)
+                                    OhanaQuickActionIcon(
+                                        actionType: action.id,
+                                        fallbackSystemName: action.icon,
+                                        size: 34,
+                                        color: Color.ohanaFunctionalIcon
+                                    )
+                                    .frame(width: 44, height: 44)
                                     Text(action.label)
                                         .font(.system(size: 11, weight: .bold, design: .rounded))
                                         .foregroundStyle(Color.ohanaPrimaryText)
@@ -1266,9 +1713,12 @@ struct QAQuickAddPopoverContent: View {
                                             .overlay(
                                                 Circle().strokeBorder(accent.opacity(0.4), lineWidth: 1)
                                             )
-                                        Image(systemName: opt.icon)
-                                            .font(.system(size: 26, weight: .semibold))
-                                            .foregroundStyle(pickerIconForeground(actionType: opt.id))
+                                        OhanaQuickActionIcon(
+                                            actionType: opt.id,
+                                            fallbackSystemName: opt.icon,
+                                            size: 34,
+                                            color: pickerIconForeground(actionType: opt.id)
+                                        )
                                     }
                                     Text(opt.label)
                                         .font(OhanaFont.caption2(.bold))
@@ -1299,10 +1749,13 @@ struct QuickActionReorderDragPreview: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Image(systemName: item.icon)
-                .font(.system(size: 26, weight: .semibold))
-                .foregroundStyle(Color.ohanaFunctionalIcon)
-                .frame(width: 44, height: 44)
+            OhanaQuickActionIcon(
+                actionType: item.actionType,
+                fallbackSystemName: item.icon,
+                size: 34,
+                color: Color.ohanaFunctionalIcon
+            )
+            .frame(width: 44, height: 44)
             Text(item.label)
                 .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)

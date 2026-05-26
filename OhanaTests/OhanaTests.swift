@@ -816,6 +816,44 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func waterPlanManualModeKeepsPlanButHidesCalendarAndCancelsFutureReminders() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = dateForTest(year: 2026, month: 5, day: 10, hour: 6)
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+        try context.save()
+
+        _ = WaterPlanWriter.replacePlan(
+            pet: pet,
+            times: WaterPlanWriter.suggestedTimes(count: 2, now: now, calendar: calendar),
+            allEvents: [],
+            context: context,
+            now: now,
+            calendar: calendar
+        )
+        var events = try context.fetch(FetchDescriptor<Event>())
+        #expect(WaterPlanWriter.planEvents(pet: pet, allEvents: events).count == 2)
+        var reminders = try context.fetch(FetchDescriptor<Reminder>())
+        #expect(reminders.contains { $0.scheduledAt > now && $0.isPending })
+
+        WaterOperatingMode.set(pet.id, mode: .manual)
+        WaterPlanWriter.deactivateReminderOperations(pet: pet, allEvents: events, context: context, now: now)
+        events = try context.fetch(FetchDescriptor<Event>())
+        reminders = try context.fetch(FetchDescriptor<Reminder>())
+        let planEvent = try #require(WaterPlanWriter.planEvents(pet: pet, allEvents: events).first)
+
+        #expect(WaterPlanWriter.planEvents(pet: pet, allEvents: events).count == 2)
+        #expect(!reminders.contains { $0.scheduledAt > now && $0.isPending })
+        #expect(!CarePlanCalendarSync.shouldShowModeScopedPlanOccurrence(planEvent, occurrenceDate: now, allEvents: events, pets: [pet], now: now, calendar: calendar))
+
+        WaterOperatingMode.set(pet.id, mode: .reminder)
+        #expect(CarePlanCalendarSync.shouldShowModeScopedPlanOccurrence(planEvent, occurrenceDate: now, allEvents: events, pets: [pet], now: now, calendar: calendar))
+    }
+
+    @MainActor
     @Test func completePlannedWaterWritesWaterLogAndCompletesReminder() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -1190,7 +1228,7 @@ struct OhanaTests {
     }
 
     @MainActor
-    @Test func feedingPlanWriterKeepsManualAndAutoModesMutuallyExclusive() async throws {
+    @Test func feedingPlanWriterKeepsManualAndAutoPlansWhileCalendarShowsActiveMode() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         var calendar = Calendar(identifier: .gregorian)
@@ -1222,8 +1260,27 @@ struct OhanaTests {
         )
         _ = FeedingPlanWriter.replacePlan(pet: pet, draft: manualDraft, allEvents: events, context: context, now: now, calendar: calendar)
         events = try context.fetch(FetchDescriptor<Event>())
-        #expect(events.filter { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }.isEmpty)
+        #expect(events.filter { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }.count == 1)
         #expect(events.filter { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }.count == 2)
+
+        let manualEvent = try #require(events.first { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) })
+        let autoEvent = try #require(events.first { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) })
+
+        FeedOperatingMode.set(pet.id, mode: .manualReminder)
+        #expect(CarePlanCalendarSync.shouldShowModeScopedPlanOccurrence(manualEvent, occurrenceDate: now, allEvents: events, pets: [pet], now: now, calendar: calendar))
+        #expect(!CarePlanCalendarSync.shouldShowModeScopedPlanOccurrence(autoEvent, occurrenceDate: now, allEvents: events, pets: [pet], now: now, calendar: calendar))
+
+        FeedOperatingMode.set(pet.id, mode: .autoFeeder)
+        #expect(!CarePlanCalendarSync.shouldShowModeScopedPlanOccurrence(manualEvent, occurrenceDate: now, allEvents: events, pets: [pet], now: now, calendar: calendar))
+        #expect(CarePlanCalendarSync.shouldShowModeScopedPlanOccurrence(autoEvent, occurrenceDate: now, allEvents: events, pets: [pet], now: now, calendar: calendar))
+
+        FeedOperatingMode.set(pet.id, mode: .manual)
+        #expect(!CarePlanCalendarSync.shouldShowModeScopedPlanOccurrence(manualEvent, occurrenceDate: now, allEvents: events, pets: [pet], now: now, calendar: calendar))
+        #expect(!CarePlanCalendarSync.shouldShowModeScopedPlanOccurrence(autoEvent, occurrenceDate: now, allEvents: events, pets: [pet], now: now, calendar: calendar))
+        #expect(FeedMaintenanceCommand.ensureUpcomingPlanReminders(pet: pet, allEvents: events, context: context, now: now, calendar: calendar).isEmpty)
+        events = try context.fetch(FetchDescriptor<Event>())
+        let remainingFeedReminders = try context.fetch(FetchDescriptor<Reminder>())
+        #expect(!remainingFeedReminders.contains { $0.scheduledAt > now && $0.isPending })
 
         let autoAgainDraft = FeedPlanDraft(
             kind: .autoFeeder,
@@ -1235,7 +1292,7 @@ struct OhanaTests {
         )
         _ = FeedingPlanWriter.replacePlan(pet: pet, draft: autoAgainDraft, allEvents: events, context: context, now: now, calendar: calendar)
         events = try context.fetch(FetchDescriptor<Event>())
-        #expect(events.filter { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }.isEmpty)
+        #expect(events.filter { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }.count == 2)
         #expect(events.filter { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }.count == 1)
     }
 

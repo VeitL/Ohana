@@ -9,29 +9,82 @@ This repository contains the Ohana iOS app. Main SwiftUI app code lives in `Ohan
 ## Build, Test, and Development Commands
 
 - `open Ohana.xcodeproj` opens the app in Xcode for local development.
-- `xcodebuild -project Ohana.xcodeproj -scheme Ohana -configuration Debug build` builds the app from the command line.
-- `scripts/build-debug-fast.sh` is the default quick Debug build. It intentionally uses `platform=iOS Simulator,name=iPhone 17` without an `OS=` pin so Xcode uses the installed default iOS 26.5 simulator runtime and does not try to download or resolve an older runtime.
-- `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -destination 'platform=iOS Simulator,name=iPhone 16'` runs unit and UI tests on a simulator; adjust the device name to one installed locally.
+- `scripts/build-debug-fast.sh` is the default quick Debug build. It intentionally uses `-sdk iphonesimulator` and the fixed destination `platform=iOS Simulator,name=iPhone 17` without an `OS=` pin so Xcode uses the installed default iOS 26.5 simulator runtime and does not try to download or resolve an older runtime.
+- `xcodebuild -project Ohana.xcodeproj -scheme Ohana -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' build` builds the app directly when the script is not appropriate.
+- `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17'` runs unit and UI tests on the fixed simulator.
 - `xcodebuild -list -project Ohana.xcodeproj` lists available targets, schemes, and configurations.
+
+### Fixed Simulator Build Rule
+
+All command-line builds and tests must target the fixed simulator `platform=iOS Simulator,name=iPhone 17` with `-sdk iphonesimulator`. Do not build against a connected physical iPhone, `generic/platform=iOS`, `Any iOS Device`, or an auto-selected device. Do not switch simulator model or pin an older `OS=` unless the user explicitly asks for that validation. If Xcode prints passcode-protected physical-device discovery warnings while the command is still using `-sdk iphonesimulator` and the fixed iPhone 17 simulator destination, treat those warnings as environment noise; do not change the destination to a physical device to "fix" them.
+
+## Parallel Agent & Build Isolation
+
+Do not run multiple active Codex conversations against the same worktree for large refactors. Each parallel task should get its own git worktree and branch, for example `git worktree add ../Ohana-feeding -b codex/feeding`, `git worktree add ../Ohana-water -b codex/water`, or `git worktree add ../Ohana-potty -b codex/potty`.
+
+Do not create a new worktree or branch by default. Stay in the current worktree unless the user explicitly asks for an isolated worktree/branch, or unless you first explain a concrete parallel-work blocker and get approval.
+
+Each conversation owns only its current worktree. Before editing, run `git status --short` and keep changes inside the requested task scope. If a file is already being changed for an unrelated task, do not patch it to satisfy the current build unless the user explicitly asks you to take over that blocker.
+
+Use `scripts/build-debug-fast.sh` for local Debug builds. The script uses `-sdk iphonesimulator`, the fixed iPhone 17 simulator destination, a per-worktree/per-branch DerivedData path under `.build/DerivedData/`, and a matching lock under `.build/locks/`, which avoids the common Xcode `build.db` lock failure when two conversations build at once. If you must call `xcodebuild` directly while other work is active, pass `-sdk iphonesimulator`, `-destination 'platform=iOS Simulator,name=iPhone 17'`, and a unique `-derivedDataPath` for the current worktree/task.
+
+When validation fails in files outside the current task scope or outside the files changed by this conversation, report it as an external blocker. Do not “fix forward” into another conversation's feature area just to make the build green unless the user explicitly authorizes that cross-task repair.
 
 ## iOS Agent Workflow
 
 Treat this repository as an existing SwiftUI Xcode project, not a greenfield scaffold. Reuse `Ohana.xcodeproj`, the `Ohana` scheme, existing models, navigation patterns, assets, and shared utilities before adding new structure.
 
+### Default Fast-Change Mode
+
+Default to fast-change mode unless the user explicitly asks for exhaustive validation or the change is medium/high risk by the classification below.
+
+- Start with one `git status --short` to understand the local change boundary.
+- Read only task-relevant files and avoid broad repository archaeology.
+- Make focused edits and avoid checkpoint builds after every small step.
+- Prefer cheap validation first: `rg`, path-specific audits, targeted tests, or a focused compiler check.
+- For pure UI changes, default to no compile/build. Pure UI means copy, spacing, padding, color/token usage, view composition, static layout, icon choice, simple animation parameters, and visual-only SwiftUI modifier changes that do not change data flow, route state, public APIs, model/service calls, generated assets, or shared component contracts. Validate with `rg`, visual reasoning, and `scripts/audit-ui-v4.sh --changed` or a path-specific UI audit instead.
+- Escalate a UI change to compile validation only when it introduces or renames Swift types/properties/functions, changes generic/component APIs, touches shared design-system helpers, changes navigation/sheet/route behavior, changes runtime policy/timers/maps/Canvas/TimelineView, changes localization plumbing, or the user explicitly asks for a build.
+- For documentation-only changes, do not run app builds or audits unless the user asks.
+- For single-file logic changes, run the narrowest relevant test or one quick build only when the compiler surface changed.
+- For new types, changed public APIs, SwiftData, routing, reminders, notifications, rewards, runtime policy, startup, or cross-feature behavior, upgrade validation to targeted tests plus `scripts/build-debug-fast.sh`.
+- If validation fails in unrelated files, report it as an external blocker instead of fixing outside the task scope.
+
 Keep the development loop CLI-first. Start with the narrowest trustworthy check for the code touched, then expand only when needed:
 - Use `xcodebuild -list -project Ohana.xcodeproj` when schemes or targets are unclear.
-- Use `xcodebuild -project Ohana.xcodeproj -scheme Ohana -configuration Debug build` for a general app build.
-- Use `scripts/build-debug-fast.sh` for day-to-day validation; do not hardcode older simulator OS versions such as `OS=26.4.1`. Let Xcode select the installed default iOS 26.5 runtime unless a task explicitly requires another destination.
-- Use `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -destination 'platform=iOS Simulator,name=iPhone 16'` for test validation when behavior or persistence changes.
-- For UI changes, prefer a simulator build/run and screenshots after the code compiles; if deeper simulator control is available through XcodeBuildMCP or similar tooling, use it to launch, inspect logs, and capture screenshots.
+- Use `scripts/build-debug-fast.sh` for day-to-day validation; do not hardcode older simulator OS versions such as `OS=26.4.1`. Let Xcode select the installed default iOS 26.5 runtime for the fixed iPhone 17 simulator unless a task explicitly requires another destination.
+- Use `xcodebuild -project Ohana.xcodeproj -scheme Ohana -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' build` only when a direct app build is necessary.
+- Use `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17'` for test validation when behavior or persistence changes.
+- For pure UI changes, do not build by default. If a UI change has already been escalated to compile validation or the user asks for visual verification, prefer the fixed iPhone 17 simulator build/run and screenshots; if deeper simulator control is available through XcodeBuildMCP or similar tooling, use it to launch, inspect logs, and capture screenshots.
 
 For iPhone and iPad work, keep the implementation focused on those platforms unless the task explicitly asks for broader Apple-platform support. When reporting completion, include the scheme, simulator destination, and validation commands that were actually used.
 
 For simulator-only UI bugs, keep one failure mode per run and own the reproduce-fix-verify loop. Build and launch the app, confirm the starting screen with a screenshot or UI snapshot, drive the reported path with taps, typing, scrolling, or swipes, capture relevant screenshots/logs, make the smallest fix, then rerun the same path. Prefer accessibility labels and identifiers over raw coordinates; if a control can only be reached by coordinates, call that out as a testability gap.
 
-When adding App Intents, start from Ohana's highest-value external actions rather than mirroring the whole app. Good first candidates are quick pet-care logging, openingep high-frequency UI paths lightweight. Taps, hero transitions, sha specific pet or human profile, viewing today's care focus, and creating or jumping to reminders. Keep `AppEntity` surfaces smaller than the SwiftData model layer, add `AppShortcutsProvider` entries only for discoverable user-facing actions, and route intent-driven app openings into the existing navigation/state model cleanly.
+When adding App Intents, start from Ohana's highest-value external actions rather than mirroring the whole app. Good first candidates are quick pet-care logging, opening a specific pet or human profile, viewing today's care focus, and creating or jumping to reminders. Keep `AppEntity` surfaces smaller than the SwiftData model layer, add `AppShortcutsProvider` entries only for discoverable user-facing actions, and route intent-driven app openings into the existing navigation/state model cleanly.
 
 Only adopt iOS 26 Liquid Glass APIs when a task explicitly asks for that migration. Audit one high-traffic flow at a time, preserve older-iOS fallbacks with availability checks, and prefer native glass APIs over custom blur stacks once the deployment target and Xcode toolchain support them.
+
+### Mature App Change Classification
+
+Before implementing, classify the change:
+
+- UI-only: token/component/page layout or visual interaction.
+- Feature-local: one feature route, screen, read model, or service command.
+- Cross-feature: affects two or more features, dashboards, reminders, tasks, rewards, widgets, App Intents, or notifications.
+- Persistence: SwiftData schema, migration, write command, delete behavior, or recovery path.
+- Runtime: timer, map, location, background refresh, repeating animation, startup, prefetch, or cache warmup.
+- Design-system: token, shared component, page template, motion helper, navigation chrome, sheet/popup pattern.
+- Release-risk: privacy, account, PIN, memorial mode, background permission, data loss, startup regression, or large refactor.
+
+Use the narrowest safe validation for low-risk changes. Use `docs/release-quality-gates.md` for medium/high-risk changes. Do not treat a successful build as sufficient validation for cross-feature, persistence, runtime, privacy, or startup changes.
+
+### Startup Path and Lazy Feature Loading
+
+Keep app startup skinny. The startup path may initialize only the app shell, root route host, model container, localization, design tokens, runtime policy, and required migration checks.
+
+Do not add feature-specific SwiftData scans, image decoding, dashboard aggregation, notification reconciliation, reward synchronization, route tree construction, map warmup, timer startup, media preload, or broad service registration to app launch unless `docs/startup-and-lazy-loading-policy.md` explicitly allows it.
+
+Feature code should activate from typed routes, visible tabs, explicit user actions, App Intents, widgets, notifications, or narrowly scoped refresh tasks. Startup work must be measured before and after any change that touches app launch.
 
 ### Route Contract
 
@@ -50,6 +103,20 @@ Use Swift and SwiftUI conventions already present in the project: four-space ind
 Avoid oversized Swift files, especially giant SwiftUI view files. When a view grows into a compile/runtime hot spot, split it by responsibility before adding more behavior: pure visual surfaces, state/coordinator objects, route hosts, business executors, data snapshot builders, and reusable subviews should live in separate files. Card stacks, hero animations, Today Focus, FAB menus, sheets, charts, and quick actions should not all be owned by one massive view. This protects incremental build time, SwiftUI diffing cost, first-frame responsiveness, animation smoothness, and energy usage.
 
 Keep high-frequency UI paths lightweight and two-phase. Phase 1 is visual: update only local interaction state, typed route state, frozen render snapshots, and token-driven animation state needed to start the visible response. Phase 2 is business/data: after the first frame, route presentation, or animation handoff, run cancellable service or snapshot refresh work. Do not decode images, scan large SwiftData collections, build complex route trees, start timers, synchronize tasks/reminders/rewards, or recompute unrelated dashboards in the same frame as a tap, drag, sheet presentation, hero transition, or quick check-in.
+
+### Mature App Smoothness Laws
+
+These laws apply to every page, sheet, card, dashboard, and route. A mature Ohana feature may be functionally complex, but the frame touched by the user's finger must stay simple.
+
+- Finger-first frame law: the frame triggered by the user's finger must always do only the smallest visual state change needed for immediate feedback. Complexity may still exist, but it must be moved to places the user cannot see, and it must be cancellable, cacheable, batchable, or deferred until after the visual handoff. In practice, tap/drag/selection frame 0 may update only local render state, frozen snapshots, animation progress, route value, pressed/focused/selected state, or hit-testing state.
+- Keep the interaction path ultra-light. A button tap, Tab switch, card expansion, drag, or sheet presentation may mutate only local UI state such as selected, pressed, focused, route value, frozen snapshot, or animation progress. It must not also query SwiftData, rebuild destination trees, decode images, synchronize reminders/tasks/rewards, refresh dashboards, or fan out to unrelated services.
+- Separate visuals from business state. The user sees a render snapshot, not raw persistence objects. Complex data must be shaped first by a snapshot builder, read model, or route-scoped store into small, stable, preferably `Equatable` values. SwiftUI `body` should compose those values; it should not be the aggregation engine.
+- Prepare pages before the switch is visible. Do not make a route feel like "tap, blank, then load." When a target page is likely or explicitly requested, mount or preflight it off the visible path, prepare layout, decode critical images, and capture its first-screen snapshot before the transition presents it. The visible transition should slide or reveal a ready page.
+- Freeze the world during hero and spatial animations. A hero transition should not animate while SwiftData, image decoding, dashboard refresh, or service state changes are mutating the same surface. Freeze the visual inputs, drive one stable ZStack or motion scene through transform, opacity, mask, zIndex, and hit testing, then thaw after completion.
+- Defer heavy work and make it cancellable. After a page enters, it may load more data, reconcile services, or refresh snapshots, but that work must be route-scoped and cancelled when the page disappears. A single Tab tap must not refresh home, calendar, Oasis, plants, reminders, rewards, and dashboards together.
+- Treat caching as experience infrastructure. Home cards, Today Focus, calendar agenda, avatars, Oasis tree state, and other high-traffic surfaces should use lightweight caches, render snapshots, or prepared read models. Data sources may be complex; repeated rendering must not re-derive everything from scratch.
+- Enforce runtime budgets. Animations, timers, maps, particles, Canvas, TimelineView, and repeatForever loops must be visible, intentional, and governed by `AppWorkloadPolicy`. Run them while visible, downgrade or pause them when hidden, and be stricter in Low Power Mode, Reduce Motion, background, or app power-saving mode.
+- Keep the architecture split explicit. Finger path: `tap -> local visual state -> route/snapshot handoff -> first frame`. Background path: `data load -> service sync -> snapshot refresh -> next idle frame`.
 
 ## Interaction Architecture & Isolation
 
@@ -78,7 +145,7 @@ Keep ownership strict:
 
 ## Architecture, Compliance & Energy Guardrails
 
-Use `docs/app-architecture-governance.md` as the engineering source of truth for app architecture boundaries, App Store-sensitive background behavior, privacy, energy, runtime observability, and long-term maintainability. UI-specific rules still come from `ui规范.selection.json`.
+Use `docs/app-architecture-governance.md` as the engineering source of truth for app architecture boundaries, App Store-sensitive background behavior, privacy, energy, runtime observability, and long-term maintainability. Use `docs/feature-module-contract.md`, `docs/startup-and-lazy-loading-policy.md`, `docs/performance-and-observability.md`, `docs/data-cache-sync-policy.md`, `docs/release-quality-gates.md`, and `docs/design-system-governance.md` for mature-app quality gates. UI-specific rules still come from `ui规范.selection.json`.
 
 Cross-page runtime policy belongs in `Ohana/Utilities/AppRuntimePolicy.swift`. Do not create parallel low-power, Reduce Motion, scene phase, performance monitor, or background-work policies inside individual views. Views should consume `AppWorkloadPolicy` and keep foreground visible interactions visually unchanged. Interaction motion and ambient work are separate budgets. Visible taps, selections, card expansion, FAB reveal, and popup presentation use `interactionMotionBudget`; decorative loops, particles, breathing glows, Canvas, and repeating effects use `ambientMotionBudget`; timers, maps, countdowns, polling, and refresh use `refreshBudget`. Do not substitute one budget for another.
 
@@ -102,6 +169,7 @@ Before reporting runtime, energy, background-location, or animation-loop work co
 
 Before reporting an interaction-heavy change complete, verify:
 
+- The user-triggered first frame contains only the minimum visual state mutation; any complex data, route, persistence, service, or refresh work is invisible, cancellable, cacheable, batchable, or deferred.
 - The tap/drag/selection handler mutates only the minimal state required for immediate feedback.
 - No reusable visual component owns `ModelContext`, broad `@Query`, timers, location, analytics fan-out, or cross-page services.
 - Heavy data refresh is deferred until after first frame, route presentation, or animation handoff.
@@ -146,6 +214,18 @@ Use `docs/open-swiftui-animations-memory.md` and `docs/pow-animation-memory.md` 
 
 When adding motion, prefer the shared helpers in `Ohana/Views/Components/OhanaMotionEffects.swift`, `Ohana/Views/Components/OhanaZStackMotionScene.swift`, and existing `GoMotion` tokens. Reuse `PhaseAnimator`, `contentTransition(.numericText())`, `symbolEffect`, `dashPhase`, staged spring entrances, ping, shine, shake, and pop-style transitions where they add clear meaning: rewards, attention states, counters, FAB/menu reveal, chart/progress entry, validation errors, pending task review, and success feedback. Respect Reduce Motion and avoid decorative loops on high-frequency screens.
 
+### Premium Micro-Motion Law
+
+Ohana's default motion taste is restrained, elastic, and legible: never stiff, never cartoony. The preferred feel is the light spring used by `CoconutBalanceCapsule`, `ohanaNumericMotion`, and the Ohana wealth/island coconut counters: tiny scale response, numeric text interpolation, and a crisp one-shot feedback pulse.
+
+- Animate numbers as numbers. Any visible count, currency, coconut balance, streak, progress total, badge, calendar agenda count, or dashboard metric should use `.ohanaNumericMotion(value)` or `contentTransition(.numericText())` with an existing `GoMotion` token. Real positive/negative deltas may use the `CoconutBalanceCapsule` style floating delta; context switches must not pretend to be earned/spent deltas.
+- Animate context changes with snapshot handoff. Switching family members, pets, calendar owners, dashboard filters, or segmented modes should first update only the selected local UI state, then transition the already-built render snapshot with `GoMotion.selection` or `GoMotion.stateChange`. Use a subtle opacity/offset/scale handoff, such as 0.985 to 1.0 or 1.0 to 0.985, not a hard reload, spinner, or abrupt content replacement.
+- Keep scale tiny and meaningful. Selection/context feedback should stay around 1.01-1.05; reward or success pulses may reach about 1.08-1.12. Avoid large bounce, rubber-band effects, repeated wobble, or unrelated decorative motion on work-focused screens.
+- Make related changes start together. For a tap that changes a selected chip, visible number, chart, card, and detail content, the first visible feedback must begin in the same interaction frame. Heavy data refresh or persistence still runs later through cancellable snapshot builders or command executors.
+- Avoid two-step page motion. A route/tab/content switch should not animate horizontally and then resize/reflow vertically. Keep the page frame stable, prepare the destination snapshot, and animate one coherent transition.
+- Respect runtime budgets. Premium micro-motion is interaction motion, not ambient motion. It must respect Reduce Motion and `AppWorkloadPolicy.interactionMotionBudget`; background loops, breathing effects, particles, and timers remain governed by ambient/refresh budgets.
+- Before reporting UI work complete, do a motion pass: counters use numeric motion, selected/filter/member changes use snapshot handoff, content does not pop in abruptly, related animated elements start together, and no animation masks slow data work.
+
 ## Localization Source of Truth
 
 Ohana must support Chinese, English, and German across user-facing pages. Use `Ohana/Models/Localization.swift` (`L10n`, `AppLanguage`, and `AppLocalizedText`) as the code source of truth for dynamic strings, interpolated text, formatter labels, alerts, sheet titles, button labels, and any text built outside a static SwiftUI `Text("...")` key.
@@ -156,15 +236,33 @@ Do not add new direct language ternaries such as `appLanguage == "zh" ? ... : ..
 
 When adding or refactoring pages, include Chinese, English, and German copy at the same time. For dates, numbers, currency, units, and relative labels, use `AppLanguage.effectiveLocale`, `AppLanguage.compactMonthDayFormat`, `AppLanguage.fullMonthYearFormat`, or a localized helper instead of hardcoded Chinese date formats.
 
+## Performance & Observability Gates
 
+For high-traffic flows, do not report "feels fast" as validation. Report the user flow, the measurement method, and whether the change affects launch, first render, tap response, route transition, scrolling, memory, SwiftData reads, image decoding, timers, or background work.
+
+Use `docs/performance-and-observability.md` for flow budgets. Add privacy-safe signposts or diagnostics for critical flows when measurement would otherwise be guesswork.
 
 ## Testing Guidelines
 
 Tests use Swift Testing (`import Testing`) with `@Test` functions and `#expect` assertions. Add unit coverage in `OhanaTests/` for service, model, and persistence behavior; add UI flows in `OhanaUITests/` only when validating user-facing navigation or launch behavior. Name tests after the behavior under test, for example `reminderSchedulingServiceDeduplicatesEventAndScheduledMinute`. Use in-memory SwiftData containers for persistence tests to avoid touching real app data.
 
+### Test Pyramid and Scenario Matrix
+
+Use the smallest reliable test that catches the failure:
+
+- Domain service tests: business facts, invariants, task/reminder/reward synchronization, privacy filters, delete/memorial behavior.
+- Snapshot/read-model tests: aggregation, sorting, filtering, empty states, dense data, privacy placeholders.
+- Route tests: typed route creation, deep link/App Intent/notification route mapping, route cancellation.
+- Runtime policy tests: Low Power, Reduce Motion, scene phase, visible/invisible state, timer/animation/map gating.
+- UI tests: only for high-value flows where layout, navigation, keyboard, or route behavior cannot be trusted through unit tests.
+
+For high-frequency user flows, test at least the relevant subset: empty data, dense data, missing images, long German text, private/locked state, failed write, reopen after background, Low Power Mode behavior if runtime work exists, Reduce Motion behavior if animated, and in-memory SwiftData migration or compatibility when schema changes.
+
 ## Commit & Pull Request Guidelines
 
 Recent history uses concise imperative commits, often Conventional Commit style such as `feat(home): ...` and `fix(theme): ...`. Prefer `feat(scope):`, `fix(scope):`, `chore(scope):`, or a short imperative sentence when no scope fits. Pull requests should include a summary of changes, test results or simulator used, linked issues when applicable, and screenshots or recordings for visible UI changes.
+
+For medium/high-risk changes, include a release quality note using `docs/release-quality-gates.md`. Do not ship high-risk persistence, privacy, startup, background, or cross-feature changes with only a successful build.
 
 ## Security & Configuration Tips
 

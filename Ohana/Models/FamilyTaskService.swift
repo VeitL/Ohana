@@ -36,42 +36,89 @@ enum FamilyTaskService {
 
     @MainActor
     static func migrateLegacyBountiesIfNeeded(context: ModelContext) {
-        let migratedKey = "familyCollaborationTask.legacyBountiesMigrated.v1"
-        guard !UserDefaults.standard.bool(forKey: migratedKey) else { return }
-        defer { UserDefaults.standard.set(true, forKey: migratedKey) }
+        syncLegacyBounties(context: context)
+    }
 
+    @MainActor
+    static func syncLegacyBounties(context: ModelContext) {
         guard let raw = UserDefaults.standard.string(forKey: "bountyTasks"),
               let data = raw.data(using: .utf8),
               let legacy = try? JSONDecoder().decode([LegacyBountyTask].self, from: data),
               !legacy.isEmpty else { return }
 
         let existing = (try? context.fetch(FetchDescriptor<FamilyCollaborationTask>())) ?? []
-        let existingIds = Set(existing.map(\.id))
-
-        for item in legacy where !existingIds.contains(item.id) {
-            let task = FamilyCollaborationTask(
-                id: item.id,
-                title: item.title,
-                note: item.description,
-                kind: .bounty,
-                status: item.isCompleted ? .completed : .active,
-                createdById: item.creatorId,
-                createdByName: item.creatorName,
-                assignedToId: item.assignedToId,
-                assignedToName: item.assignedToName,
-                rewardCoconuts: cappedReward(item.reward),
-                dueAt: nil,
-                emoji: item.emoji,
-                createdAt: item.createdAt
-            )
-            task.claimedById = item.assigneeId
-            task.claimedByName = item.assigneeName
-            task.completedById = item.assigneeId
-            task.completedByName = item.assigneeName
-            task.completedAt = item.completedAt
-            context.insert(task)
+        var existingById: [UUID: FamilyCollaborationTask] = [:]
+        for task in existing {
+            existingById[task.id] = task
         }
-        context.safeSave()
+        var changed = false
+
+        for item in legacy {
+            if let task = existingById[item.id] {
+                changed = syncLegacyBounty(item, into: task) || changed
+                continue
+            }
+            let task = makeTask(from: item)
+            context.insert(task)
+            changed = true
+        }
+        if changed {
+            context.safeSave()
+        }
+    }
+
+    private static func makeTask(from item: LegacyBountyTask) -> FamilyCollaborationTask {
+        let task = FamilyCollaborationTask(
+            id: item.id,
+            title: item.title,
+            note: item.description,
+            kind: .bounty,
+            status: item.isCompleted ? .completed : .active,
+            createdById: item.creatorId,
+            createdByName: item.creatorName,
+            assignedToId: item.assignedToId,
+            assignedToName: item.assignedToName,
+            rewardCoconuts: cappedReward(item.reward),
+            dueAt: nil,
+            emoji: item.emoji,
+            createdAt: item.createdAt
+        )
+        task.claimedById = item.assigneeId
+        task.claimedByName = item.assigneeName
+        task.completedById = item.assigneeId
+        task.completedByName = item.assigneeName
+        task.completedAt = item.completedAt
+        return task
+    }
+
+    private static func syncLegacyBounty(_ item: LegacyBountyTask, into task: FamilyCollaborationTask) -> Bool {
+        var changed = false
+        func set<Value: Equatable>(_ keyPath: ReferenceWritableKeyPath<FamilyCollaborationTask, Value>, _ value: Value) {
+            if task[keyPath: keyPath] != value {
+                task[keyPath: keyPath] = value
+                changed = true
+            }
+        }
+
+        set(\.title, item.title)
+        set(\.note, item.description)
+        set(\.kindRaw, FamilyCollaborationTaskKind.bounty.rawValue)
+        set(\.assignedToId, item.assignedToId)
+        set(\.assignedToName, item.assignedToName)
+        set(\.claimedById, item.assigneeId)
+        set(\.claimedByName, item.assigneeName)
+        set(\.rewardCoconuts, cappedReward(item.reward))
+        set(\.emoji, item.emoji)
+
+        let legacyStatus: FamilyCollaborationTaskStatus = item.isCompleted ? .completed : .active
+        set(\.statusRaw, legacyStatus.rawValue)
+        set(\.completedById, item.isCompleted ? item.assigneeId : nil)
+        set(\.completedByName, item.isCompleted ? item.assigneeName : nil)
+        set(\.completedAt, item.isCompleted ? item.completedAt : nil)
+        if changed {
+            task.touch()
+        }
+        return changed
     }
 
     @MainActor

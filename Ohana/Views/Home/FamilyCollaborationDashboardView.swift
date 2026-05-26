@@ -3,13 +3,79 @@
 //  Ohana
 //
 //  Ohana member-page collaboration dashboard. Keeps collaboration and bounty in
-//  one place while preserving the existing UserDefaults bounty data source.
+//  one unified SwiftData task layer, with legacy bounty data imported lazily.
 //
 
 import SwiftUI
 import SwiftData
 
-struct FamilyCollaborationDashboardView: View {
+@MainActor
+struct FamilyCollaborationCommandExecutor {
+    let modelContext: ModelContext
+
+    func migrateLegacyBountiesIfNeeded() {
+        FamilyTaskService.migrateLegacyBountiesIfNeeded(context: modelContext)
+    }
+
+    func assignReminder(_ reminder: Reminder, to human: Human, by creator: Human?, rewardCoconuts: Int, note: String) {
+        _ = FamilyTaskService.assignReminder(
+            reminder,
+            to: human,
+            by: creator,
+            rewardCoconuts: rewardCoconuts,
+            note: note,
+            context: modelContext
+        )
+    }
+
+    func createTask(title: String, note: String, assignedTo human: Human?, by creator: Human?, rewardCoconuts: Int, dueAt: Date?, emoji: String) {
+        _ = FamilyTaskService.createHouseholdTask(
+            title: title,
+            note: note,
+            assignedTo: human,
+            by: creator,
+            rewardCoconuts: rewardCoconuts,
+            dueAt: dueAt,
+            emoji: emoji,
+            context: modelContext
+        )
+    }
+
+    func updateTask(_ task: FamilyCollaborationTask, title: String, note: String, assignedTo human: Human?, rewardCoconuts: Int, dueAt: Date?, emoji: String) {
+        FamilyTaskService.updateTask(
+            task,
+            title: title,
+            note: note,
+            assignedTo: human,
+            rewardCoconuts: rewardCoconuts,
+            dueAt: dueAt,
+            emoji: emoji,
+            context: modelContext
+        )
+    }
+
+    func deleteTask(_ task: FamilyCollaborationTask) {
+        FamilyTaskService.delete(task, context: modelContext)
+    }
+
+    func rejectCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?) {
+        FamilyTaskService.rejectCompletion(task, by: reviewer, context: modelContext)
+    }
+
+    func confirmCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?) {
+        FamilyTaskService.confirmCompletion(task, by: reviewer, context: modelContext)
+    }
+
+    func complete(_ task: FamilyCollaborationTask, by human: Human?) {
+        FamilyTaskService.complete(task, by: human, context: modelContext)
+    }
+
+    func claim(_ task: FamilyCollaborationTask, by human: Human) {
+        FamilyTaskService.claim(task, by: human, context: modelContext)
+    }
+}
+
+struct FamilyCollaborationDashboardHost: View {
     let pets: [Pet]
     let humans: [Human]
     let pendingReminders: [Reminder]
@@ -19,12 +85,40 @@ struct FamilyCollaborationDashboardView: View {
     var onOpenWeeklyReport: () -> Void
 
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.colorScheme) private var colorScheme
     @Query(sort: \FamilyCollaborationTask.updatedAt, order: .reverse) private var familyTasks: [FamilyCollaborationTask]
+    @AppStorage("bountyTasks") private var legacyBountyTasksRaw = ""
+
+    var body: some View {
+        FamilyCollaborationDashboardView(
+            pets: pets,
+            humans: humans,
+            pendingReminders: pendingReminders,
+            familyTasks: familyTasks,
+            legacyBountySyncToken: legacyBountyTasksRaw,
+            commandExecutor: FamilyCollaborationCommandExecutor(modelContext: modelContext),
+            createTaskTrigger: createTaskTrigger,
+            onEditorVisibilityChanged: onEditorVisibilityChanged,
+            onOpenPetActivity: onOpenPetActivity,
+            onOpenWeeklyReport: onOpenWeeklyReport
+        )
+    }
+}
+
+struct FamilyCollaborationDashboardView: View {
+    let pets: [Pet]
+    let humans: [Human]
+    let pendingReminders: [Reminder]
+    let familyTasks: [FamilyCollaborationTask]
+    let legacyBountySyncToken: String
+    let commandExecutor: FamilyCollaborationCommandExecutor
+    var createTaskTrigger: Int = 0
+    var onEditorVisibilityChanged: (Bool) -> Void = { _ in }
+    var onOpenPetActivity: (Pet) -> Void
+    var onOpenWeeklyReport: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage("currentActiveHumanId") private var activeHumanId = ""
-    @AppStorage("bountyTasks") private var bountyTasksRaw = ""
-    @State private var showingAddBounty = false
     @State private var showingMoreCollaboration = false
     @State private var selectedPetId: UUID?
     @State private var selectedTaskScope: TaskScope = .mine
@@ -33,6 +127,7 @@ struct FamilyCollaborationDashboardView: View {
     @State private var inlineEditorDragOffset: CGFloat = 0
     @State private var isVisible = false
     @State private var memberRailFloating = false
+    @State private var legacyBountySyncTask: Task<Void, Never>?
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     private enum TaskScope: String {
@@ -61,17 +156,6 @@ struct FamilyCollaborationDashboardView: View {
     }
     private var currentHuman: Human? {
         humans.first { $0.id.uuidString == activeHumanId } ?? humans.first
-    }
-
-    private var bountyTasks: [BountyTask] {
-        guard let data = bountyTasksRaw.data(using: .utf8),
-              let decoded = try? JSONDecoder().decode([BountyTask].self, from: data)
-        else { return [] }
-        return decoded.sorted { $0.createdAt > $1.createdAt }
-    }
-
-    private var activeBounties: [BountyTask] {
-        bountyTasks.filter { !$0.isCompleted }
     }
 
     private var activeFamilyTasks: [FamilyCollaborationTask] {
@@ -200,7 +284,7 @@ struct FamilyCollaborationDashboardView: View {
             }
         }
         .onAppear {
-            FamilyTaskService.migrateLegacyBountiesIfNeeded(context: modelContext)
+            scheduleLegacyBountySync()
             if selectedPetId == nil {
                 selectedPetId = pets.first { !$0.hasPassedAway }?.id
             }
@@ -209,7 +293,11 @@ struct FamilyCollaborationDashboardView: View {
             }
         }
         .onDisappear {
+            legacyBountySyncTask?.cancel()
             onEditorVisibilityChanged(false)
+        }
+        .onChange(of: legacyBountySyncToken) { _, _ in
+            scheduleLegacyBountySync()
         }
         .onChange(of: createTaskTrigger) { _, newValue in
             guard newValue != 0 else { return }
@@ -461,6 +549,13 @@ struct FamilyCollaborationDashboardView: View {
         .animation(GoMotion.feedback, value: selected)
     }
 
+    private func scheduleLegacyBountySync() {
+        legacyBountySyncTask?.cancel()
+        legacyBountySyncTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 90) {
+            commandExecutor.migrateLegacyBountiesIfNeeded()
+        }
+    }
+
     private func presentEditor(_ route: TaskEditorRoute) {
         inlineEditorVisible = false
         inlineEditorDragOffset = 0
@@ -503,41 +598,38 @@ struct FamilyCollaborationDashboardView: View {
                             pets: pets,
                             onClose: dismissEditor,
                             onAssignReminder: { reminder, human, reward, note in
-                                _ = FamilyTaskService.assignReminder(
+                                commandExecutor.assignReminder(
                                     reminder,
                                     to: human,
                                     by: currentHuman,
                                     rewardCoconuts: reward,
-                                    note: note,
-                                    context: modelContext
+                                    note: note
                                 )
                             },
                             onCreateTask: { title, note, human, reward, dueAt, emoji in
-                                _ = FamilyTaskService.createHouseholdTask(
+                                commandExecutor.createTask(
                                     title: title,
                                     note: note,
                                     assignedTo: human,
                                     by: currentHuman,
                                     rewardCoconuts: reward,
                                     dueAt: dueAt,
-                                    emoji: emoji,
-                                    context: modelContext
+                                    emoji: emoji
                                 )
                             },
                             onUpdateTask: { task, title, note, human, reward, dueAt, emoji in
-                                FamilyTaskService.updateTask(
+                                commandExecutor.updateTask(
                                     task,
                                     title: title,
                                     note: note,
                                     assignedTo: human,
                                     rewardCoconuts: reward,
                                     dueAt: dueAt,
-                                    emoji: emoji,
-                                    context: modelContext
+                                    emoji: emoji
                                 )
                             },
                             onDeleteTask: { task in
-                                FamilyTaskService.delete(task, context: modelContext)
+                                commandExecutor.deleteTask(task)
                             }
                         )
                         .padding(.top, 32)
@@ -824,10 +916,14 @@ struct FamilyCollaborationDashboardView: View {
         if task.status == .pendingReview, task.createdById == activeHumanId {
             HStack(spacing: 6) {
                 smallAction(title: l.tr(zh: "退回", en: "Redo", de: "Zurück"), color: Color.goRed) {
-                    FamilyTaskService.rejectCompletion(task, by: currentHuman, context: modelContext)
+                    runFamilyTaskCommand {
+                        commandExecutor.rejectCompletion(task, by: currentHuman)
+                    }
                 }
                 smallAction(title: l.tr(zh: "确认", en: "Confirm", de: "Bestätigen"), color: Color.goPrimary) {
-                    FamilyTaskService.confirmCompletion(task, by: currentHuman, context: modelContext)
+                    runFamilyTaskCommand {
+                        commandExecutor.confirmCompletion(task, by: currentHuman)
+                    }
                 }
             }
         } else if task.status == .pendingReview {
@@ -836,11 +932,15 @@ struct FamilyCollaborationDashboardView: View {
                 .foregroundStyle(Color.goYellow)
         } else if task.assignedToId == activeHumanId || task.claimedById == activeHumanId {
             smallAction(title: l.tr(zh: "完成", en: "Done", de: "Fertig"), color: Color.goPrimary) {
-                FamilyTaskService.complete(task, by: currentHuman, context: modelContext)
+                runFamilyTaskCommand {
+                    commandExecutor.complete(task, by: currentHuman)
+                }
             }
         } else if task.isOpen, let human = currentHuman {
             smallAction(title: l.tr(zh: "接手", en: "Take", de: "Nehmen"), color: Color.goTeal) {
-                FamilyTaskService.claim(task, by: human, context: modelContext)
+                runFamilyTaskCommand {
+                    commandExecutor.claim(task, by: human)
+                }
             }
         } else if task.createdById == activeHumanId {
             Text(l.tr(zh: "编辑", en: "Edit", de: "Bearb."))
@@ -868,6 +968,13 @@ struct FamilyCollaborationDashboardView: View {
         let target = task.assignedToName ?? task.claimedByName ?? l.tr(zh: "全家可接", en: "open", de: "offen")
         let due = task.dueAt.map { " · \($0.formatted(date: .omitted, time: .shortened))" } ?? ""
         return "\(task.createdByName) → \(target)\(due)"
+    }
+
+    private func runFamilyTaskCommand(_ command: @escaping @MainActor () -> Void) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        OhanaFrameScheduler.runAfterNextFrame {
+            command()
+        }
     }
 
     private func familyTasks(for pet: Pet) -> [FamilyCollaborationTask] {
@@ -959,7 +1066,7 @@ struct FamilyCollaborationDashboardView: View {
             taskSlot(
                 icon: "target",
                 title: l.tr(zh: "悬赏", en: "Bounty", de: "Prämie"),
-                count: activeBounties.count,
+                count: bountyFamilyTasks.count,
                 subtitle: bountySlotSubtitle,
                 tint: Color.goTeal,
                 actionTitle: bountySlotActionTitle,
@@ -983,23 +1090,31 @@ struct FamilyCollaborationDashboardView: View {
     }
 
     private var bountySlotSubtitle: String {
-        guard let task = activeBounties.first else {
+        guard let task = bountyFamilyTasks.first else {
             return l.tr(zh: "发布一个奖励任务", en: "Post a reward task", de: "Prämienaufgabe erstellen")
         }
-        return "\(task.emoji) \(task.title) · +\(task.reward)🥥"
+        return task.rewardCoconuts > 0
+            ? "\(task.emoji) \(task.title) · +\(task.rewardCoconuts)🥥"
+            : "\(task.emoji) \(task.title)"
     }
 
     private var bountySlotActionTitle: String {
-        guard let task = activeBounties.first else {
+        guard let task = bountyFamilyTasks.first else {
             return l.tr(zh: "发布", en: "Post", de: "Erstellen")
         }
-        if task.creatorId == activeHumanId {
+        if task.status == .pendingReview, task.createdById == activeHumanId {
+            return l.tr(zh: "确认", en: "Confirm", de: "Bestätigen")
+        }
+        if task.createdById == activeHumanId {
             return l.tr(zh: "管理", en: "Manage", de: "Verwalten")
         }
-        if task.assignedToId == activeHumanId {
+        if task.status == .pendingReview {
+            return l.tr(zh: "待确认", en: "Review", de: "Prüfung")
+        }
+        if task.assignedToId == activeHumanId || task.claimedById == activeHumanId {
             return l.tr(zh: "完成", en: "Done", de: "Fertig")
         }
-        if task.assignedToId == nil {
+        if task.isOpen {
             return l.tr(zh: "接手", en: "Take", de: "Übernehmen")
         }
         return l.tr(zh: "查看", en: "View", de: "Ansehen")
@@ -1052,16 +1167,26 @@ struct FamilyCollaborationDashboardView: View {
     }
 
     private func performPrimaryBountyAction() {
-        guard let task = activeBounties.first else {
-            showingAddBounty = true
+        guard let task = bountyFamilyTasks.first else {
+            presentEditor(.create)
             return
         }
-        if task.creatorId == activeHumanId {
+        if task.status == .pendingReview, task.createdById == activeHumanId {
+            runFamilyTaskCommand {
+                commandExecutor.confirmCompletion(task, by: currentHuman)
+            }
+        } else if task.createdById == activeHumanId {
             showingMoreCollaboration = true
-        } else if task.assignedToId == activeHumanId {
-            completeBounty(task)
-        } else if task.assignedToId == nil {
-            claimBounty(task)
+        } else if task.status == .pendingReview {
+            showingMoreCollaboration = true
+        } else if task.assignedToId == activeHumanId || task.claimedById == activeHumanId {
+            runFamilyTaskCommand {
+                commandExecutor.complete(task, by: currentHuman)
+            }
+        } else if task.isOpen, let human = currentHuman {
+            runFamilyTaskCommand {
+                commandExecutor.claim(task, by: human)
+            }
         } else {
             showingMoreCollaboration = true
         }
@@ -1113,10 +1238,10 @@ struct FamilyCollaborationDashboardView: View {
         collaborationSection(
             title: l.tr(zh: "奖励悬赏", en: "Reward bounties", de: "Prämienaufgaben"),
             icon: "target",
-            count: activeBounties.count,
+            count: bountyFamilyTasks.count,
             trailing: {
                 Button {
-                    showingAddBounty = true
+                    presentEditor(.create)
                 } label: {
                     Label(l.tr(zh: "发布", en: "Post", de: "Erstellen"), systemImage: "plus")
                         .font(OhanaFont.caption(.black))
@@ -1128,15 +1253,15 @@ struct FamilyCollaborationDashboardView: View {
                 .buttonStyle(ScaleButtonStyle())
             }
         ) {
-            if activeBounties.isEmpty {
+            if bountyFamilyTasks.isEmpty {
                 compactEmpty(
                     icon: "sparkles",
                     text: l.tr(zh: "发布一个带椰子奖励的任务。", en: "Post a task with coconut rewards.", de: "Erstelle eine Aufgabe mit Kokosnuss-Belohnung.")
                 )
             } else {
                 VStack(spacing: 10) {
-                    ForEach(activeBounties.prefix(3)) { task in
-                        bountyTaskRow(task, compact: false)
+                    ForEach(bountyFamilyTasks.prefix(3)) { task in
+                        familyTaskRow(task)
                     }
                 }
             }
@@ -1322,54 +1447,6 @@ struct FamilyCollaborationDashboardView: View {
         collaborationSection(title: title, icon: icon, count: count, trailing: { EmptyView() }, content: content)
     }
 
-    private func bountyTaskRow(_ task: BountyTask, compact: Bool) -> some View {
-        let isCreator = task.creatorId == activeHumanId
-        let assignedToMe = task.assignedToId == activeHumanId
-        let isOpen = task.assignedToId == nil
-
-        return HStack(spacing: 12) {
-            Text(task.emoji)
-                .font(OhanaFont.title3(.black))
-                .frame(width: compact ? 38 : 44, height: compact ? 38 : 44)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(task.title)
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                Text(bountySubtitle(task))
-                    .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(compact ? 1 : 2)
-            }
-
-            Spacer(minLength: 4)
-
-            Text("+\(task.reward)🥥")
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.arkInk)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 5)
-                .background(Color.goYellow, in: Capsule())
-
-            if isCreator {
-                smallAction(title: l.tr(zh: "撤销", en: "Cancel", de: "Zurück"), color: Color.goRed) {
-                    removeBounty(task)
-                }
-            } else if assignedToMe {
-                smallAction(title: l.tr(zh: "完成", en: "Done", de: "Fertig"), color: Color.goPrimary) {
-                    completeBounty(task)
-                }
-            } else if isOpen {
-                smallAction(title: l.tr(zh: "接手", en: "Take", de: "Übernehmen"), color: Color.goTeal) {
-                    claimBounty(task)
-                }
-            }
-        }
-        .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
     private func reminderTaskRow(_ reminder: Reminder, role: ReminderRole) -> some View {
         let event = reminder.event
         return HStack(spacing: 12) {
@@ -1525,59 +1602,6 @@ struct FamilyCollaborationDashboardView: View {
         .buttonStyle(ScaleButtonStyle())
     }
 
-    private func saveBountyTasks(_ tasks: [BountyTask]) {
-        if let data = try? JSONEncoder().encode(tasks),
-           let string = String(data: data, encoding: .utf8) {
-            bountyTasksRaw = string
-        }
-    }
-
-    private func claimBounty(_ task: BountyTask) {
-        guard let human = currentHuman else { return }
-        var tasks = bountyTasks
-        guard let index = tasks.firstIndex(where: { $0.id == task.id }) else { return }
-        tasks[index].assignedToId = human.id.uuidString
-        tasks[index].assignedToName = human.name
-        tasks[index].assignedToEmoji = human.avatarEmoji
-        saveBountyTasks(tasks)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-    }
-
-    private func completeBounty(_ task: BountyTask) {
-        guard let human = currentHuman else { return }
-        var tasks = bountyTasks
-        guard let index = tasks.firstIndex(where: { $0.id == task.id }) else { return }
-        tasks[index].isCompleted = true
-        tasks[index].completedAt = Date()
-        tasks[index].assigneeId = human.id.uuidString
-        tasks[index].assigneeName = human.name
-        saveBountyTasks(tasks)
-
-        human.coconutBalance += task.reward
-        QuestManager.shared.addCoconuts(
-            task.reward,
-            emoji: "🎯",
-            title: l.tr(zh: "完成家庭悬赏", en: "Completed family bounty", de: "Familienprämie erledigt"),
-            actorId: human.id.uuidString,
-            actorName: human.name
-        )
-        CareLedgerService.recordCoconut(
-            delta: task.reward,
-            title: l.tr(zh: "完成家庭悬赏", en: "Completed family bounty", de: "Familienprämie erledigt"),
-            actorId: human.id.uuidString,
-            actorName: human.name,
-            source: .service,
-            context: modelContext
-        )
-        modelContext.safeSave()
-        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-    }
-
-    private func removeBounty(_ task: BountyTask) {
-        saveBountyTasks(bountyTasks.filter { $0.id != task.id })
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-    }
-
     private func isActivePetEvent(_ event: Event) -> Bool {
         let type = event.relatedEntityType.lowercased()
         guard type == "pet" || type == EntityKind.pet.rawValue.lowercased() else { return false }
@@ -1589,13 +1613,6 @@ struct FamilyCollaborationDashboardView: View {
             pets.first { $0.id.uuidString == event.relatedEntityId }?.name
         } ?? l.tr(zh: "家庭", en: "Family", de: "Familie")
         return "\(petName) · \(relativeTime(from: reminder.scheduledAt))"
-    }
-
-    private func bountySubtitle(_ task: BountyTask) -> String {
-        if let assigned = task.assignedToName, !assigned.isEmpty {
-            return l.tr(zh: "\(task.creatorName) 指派给 \(assigned)", en: "\(task.creatorName) assigned to \(assigned)", de: "\(task.creatorName) an \(assigned)")
-        }
-        return l.tr(zh: "\(task.creatorName) 发布 · 全家可接", en: "\(task.creatorName) posted · open", de: "\(task.creatorName) erstellt · offen")
     }
 
     private func openReminders(for pet: Pet) -> [Reminder] {

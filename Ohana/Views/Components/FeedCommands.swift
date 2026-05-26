@@ -255,7 +255,8 @@ enum SaveFoodStockCommand {
             executorId: executorId,
             allEvents: allEvents,
             context: context,
-            recordToUpdate: recordToUpdate
+            recordToUpdate: recordToUpdate,
+            rebuildReminder: false
         )
         syncExpenseIfNeeded(
             pet: pet,
@@ -405,7 +406,8 @@ enum CorrectStockCommand {
             record: record,
             remainingGrams: remainingGrams,
             allEvents: allEvents,
-            context: context
+            context: context,
+            rebuildReminder: false
         )
         return FeedStockCommandResult(
             stockReminders: FeedingPlanWriter.rebuildFoodStockReminders(
@@ -550,13 +552,25 @@ enum FeedMaintenanceCommand {
     static func ensureUpcomingPlanReminders(
         pet: Pet,
         allEvents: [Event],
-        context: ModelContext
+        context: ModelContext,
+        now: Date = Date(),
+        calendar: Calendar = .current
     ) -> [Reminder] {
-        guard FeedOperatingMode.resolved(pet: pet, allEvents: allEvents) == .manualReminder else { return [] }
+        guard FeedOperatingMode.resolved(pet: pet, allEvents: allEvents) == .manualReminder else {
+            FeedingPlanWriter.deactivateManualReminderOperations(
+                pet: pet,
+                allEvents: allEvents,
+                context: context,
+                now: now
+            )
+            return []
+        }
         return FeedingPlanWriter.ensureUpcomingManualReminders(
             pet: pet,
             allEvents: allEvents,
-            context: context
+            context: context,
+            now: now,
+            calendar: calendar
         )
     }
 
@@ -624,7 +638,6 @@ enum SwitchFeedModeCommand {
             return .switched(remindersToSchedule: [])
         }
     }
-
 }
 
 enum SetFeedModeCommand {

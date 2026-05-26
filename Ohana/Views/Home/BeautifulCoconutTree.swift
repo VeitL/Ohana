@@ -321,7 +321,7 @@ struct BeautifulCoconutTree: View {
         .onAppear {
             isSwaying = true
             if level >= 5 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                OhanaFrameScheduler.runAfterNextFrame(milliseconds: 300) {
                     vineProgress = 1.0
                 }
             }
@@ -335,7 +335,7 @@ struct BeautifulCoconutTree: View {
             // 新等级达到 5+ 时重新生长藤蔓
             if newVal >= 5 && oldVal < 5 {
                 vineProgress = 0
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                OhanaFrameScheduler.runAfterNextFrame(milliseconds: 500) {
                     vineProgress = 1.0
                 }
             }
@@ -529,11 +529,16 @@ private struct InteractiveCoconut: View {
 
     @State private var breatheScale: CGFloat = 0.8
     @State private var breatheOpacity: Double = 0
+    @State private var isLocallyHarvested = false
+
+    private var visuallyHarvested: Bool {
+        isHarvested || isLocallyHarvested
+    }
 
     var body: some View {
         ZStack {
             // 呼吸发光
-            if !isHarvested {
+            if !visuallyHarvested {
                 Circle()
                     .fill(Color.goPrimary)
                     .frame(width: 32, height: 32)
@@ -549,14 +554,21 @@ private struct InteractiveCoconut: View {
 
             // 椰子本体
             CoconutView(isMax: isMax)
-                .scaleEffect(isHarvested ? 0.001 : 1.0)
-                .opacity(isHarvested ? 0 : 1)
+                .scaleEffect(visuallyHarvested ? 0.72 : 1.0)
+                .offset(y: visuallyHarvested ? -28 : 0)
+                .opacity(visuallyHarvested ? 0 : 1)
                 .animation(
                     GoMotion.feedback,
-                    value: isHarvested
+                    value: visuallyHarvested
                 )
         }
-        .onTapGesture { if !isHarvested { onTap() } }
+        .onTapGesture {
+            guard !visuallyHarvested else { return }
+            withAnimation(GoMotion.feedback) {
+                isLocallyHarvested = true
+            }
+            onTap()
+        }
     }
 
     private func updateBreathing() {
@@ -909,7 +921,7 @@ struct StardustView: View {
 
                         Button("注入能量") {
                             isInjecting = true
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            OhanaFrameScheduler.runAfterNextFrame(milliseconds: 500) {
                                 isInjecting = false
                             }
                         }

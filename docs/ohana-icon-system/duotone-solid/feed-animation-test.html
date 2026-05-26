@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ohana Feed Icon Motion Test</title>
+  <style>
+    :root {
+      --ohana-icon-primary: #1f8a8a;
+      --ohana-icon-accent: #ff755f;
+      --page-bg: #f4f8f6;
+      --surface: #ffffff;
+      --surface-strong: #243033;
+      --ink: #172024;
+      --muted: #65747a;
+      --line: rgba(23, 32, 36, .1);
+      --shadow: 0 24px 70px rgba(21, 43, 40, .12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--page-bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
+      letter-spacing: 0;
+    }
+
+    main {
+      width: min(980px, calc(100vw - 32px));
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 40px 0;
+      display: grid;
+      grid-template-columns: minmax(280px, 430px) minmax(280px, 1fr);
+      gap: 20px;
+      align-items: center;
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: clamp(26px, 4vw, 42px);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      font-size: 15px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    p {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .preview-panel,
+    .info-panel {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .preview-panel {
+      min-height: 540px;
+      border-radius: 30px;
+      padding: 28px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+    }
+
+    .icon-button {
+      width: min(280px, 70vw);
+      aspect-ratio: 1;
+      border: 0;
+      border-radius: 34px;
+      padding: 0;
+      display: grid;
+      place-items: center;
+      color: var(--ohana-icon-primary);
+      background: #eaf3ef;
+      box-shadow:
+        inset 0 0 0 1px rgba(31, 138, 138, .11),
+        0 18px 38px rgba(25, 68, 64, .13);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition:
+        transform 180ms ease,
+        box-shadow 180ms ease,
+        background-color 180ms ease;
+    }
+
+    .icon-button:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        inset 0 0 0 1px rgba(31, 138, 138, .14),
+        0 24px 48px rgba(25, 68, 64, .16);
+    }
+
+    .icon-button:active {
+      transform: scale(.97);
+    }
+
+    .icon-button:focus-visible {
+      outline: 3px solid rgba(255, 117, 95, .7);
+      outline-offset: 6px;
+    }
+
+    .feed-icon {
+      width: 72%;
+      height: 72%;
+      display: block;
+      overflow: visible;
+    }
+
+    .primary {
+      fill: var(--ohana-icon-primary);
+    }
+
+    .primary-soft {
+      fill: var(--ohana-icon-primary);
+      opacity: .18;
+    }
+
+    .accent {
+      fill: var(--ohana-icon-accent);
+    }
+
+    .bowl,
+    .food-shadow,
+    .grain,
+    .badge {
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+
+    .bowl {
+      filter: drop-shadow(0 3px 2px rgba(31, 138, 138, .12));
+      transition: filter 180ms ease;
+    }
+
+    .food-shadow {
+      opacity: 0;
+      transform: translateY(2px) scale(.72);
+      transition: opacity 260ms ease, transform 260ms ease;
+    }
+
+    .grain {
+      opacity: .08;
+      transform: translateY(2.6px) scale(.68);
+    }
+
+    .grain-a {
+      --delay: 40ms;
+      --out-delay: 0ms;
+    }
+
+    .grain-b {
+      --delay: 120ms;
+      --out-delay: 70ms;
+    }
+
+    .grain-c {
+      --delay: 200ms;
+      --out-delay: 35ms;
+    }
+
+    .badge {
+      opacity: 0;
+      transform: scale(.6);
+      transition: opacity 180ms ease, transform 180ms ease;
+    }
+
+    body[data-state="feeding"] .icon-button {
+      background: #edf6f2;
+    }
+
+    body[data-state="feeding"] .bowl {
+      animation: bowl-ready 680ms cubic-bezier(.2, .9, .24, 1);
+    }
+
+    body[data-state="feeding"] .food-shadow {
+      animation: food-shadow-in 620ms ease forwards;
+    }
+
+    body[data-state="feeding"] .grain {
+      animation: grain-drop 720ms cubic-bezier(.18, .95, .24, 1) forwards;
+      animation-delay: var(--delay);
+    }
+
+    body[data-state="fed"] .food-shadow {
+      opacity: .22;
+      transform: translateY(0) scale(1);
+    }
+
+    body[data-state="fed"] .grain {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    body[data-state="fed"] .badge {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    body[data-state="clearing"] .food-shadow {
+      animation: food-shadow-out 420ms ease forwards;
+    }
+
+    body[data-state="clearing"] .grain {
+      animation: grain-clear 480ms ease-in forwards;
+      animation-delay: var(--out-delay);
+    }
+
+    body[data-state="clearing"] .badge {
+      opacity: 0;
+      transform: scale(.72);
+    }
+
+    @keyframes grain-drop {
+      0% {
+        opacity: 0;
+        transform: translateY(-11px) scale(.56);
+      }
+      58% {
+        opacity: 1;
+        transform: translateY(1.5px) scale(1.12);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes grain-clear {
+      0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+      100% {
+        opacity: .08;
+        transform: translateY(2.8px) scale(.66);
+      }
+    }
+
+    @keyframes bowl-ready {
+      0%,
+      100% {
+        transform: scale(1);
+      }
+      44% {
+        transform: scale(1.045);
+      }
+    }
+
+    @keyframes food-shadow-in {
+      0% {
+        opacity: 0;
+        transform: translateY(2px) scale(.72);
+      }
+      100% {
+        opacity: .22;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes food-shadow-out {
+      0% {
+        opacity: .22;
+        transform: translateY(0) scale(1);
+      }
+      100% {
+        opacity: 0;
+        transform: translateY(2px) scale(.72);
+      }
+    }
+
+    .status {
+      margin-top: 28px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .status-label {
+      justify-self: center;
+      min-width: 112px;
+      min-height: 32px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      display: inline-grid;
+      place-items: center;
+      color: var(--ohana-icon-primary);
+      background: rgba(31, 138, 138, .1);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .hint {
+      max-width: 270px;
+      margin: 0 auto;
+    }
+
+    .info-panel {
+      border-radius: 26px;
+      padding: 26px;
+      display: grid;
+      gap: 22px;
+    }
+
+    .intro {
+      display: grid;
+      gap: 10px;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border-radius: 18px;
+      background: #f8fbf9;
+      border: 1px solid var(--line);
+    }
+
+    label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    input[type="color"] {
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .step-list {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .step {
+      min-height: 74px;
+      padding: 13px 14px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: #fbfdfc;
+      display: grid;
+      gap: 5px;
+      transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
+    }
+
+    .step strong {
+      font-size: 13px;
+      line-height: 1.25;
+    }
+
+    .step span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    body[data-state="empty"] .step[data-step="empty"],
+    body[data-state="feeding"] .step[data-step="feeding"],
+    body[data-state="fed"] .step[data-step="fed"],
+    body[data-state="clearing"] .step[data-step="clearing"] {
+      border-color: color-mix(in srgb, var(--ohana-icon-primary) 42%, transparent);
+      background: color-mix(in srgb, var(--ohana-icon-primary) 10%, #ffffff);
+      transform: translateX(2px);
+    }
+
+    .motion-note {
+      padding: 16px;
+      border-radius: 18px;
+      color: #edf7f4;
+      background: var(--surface-strong);
+    }
+
+    .motion-note p {
+      color: rgba(237, 247, 244, .78);
+      margin-top: 7px;
+    }
+
+    @media (max-width: 760px) {
+      main {
+        grid-template-columns: 1fr;
+        padding: 20px 0 32px;
+      }
+
+      .preview-panel {
+        min-height: 420px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 1ms !important;
+      }
+    }
+  </style>
+</head>
+<body data-state="empty">
+  <main>
+    <section class="preview-panel" aria-label="喂食图标动画测试">
+      <div>
+        <button class="icon-button" type="button" aria-pressed="false" aria-label="播放喂食图标动画">
+          <svg class="feed-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-labelledby="feedIconTitle feedIconDesc">
+            <title id="feedIconTitle">喂食图标</title>
+            <desc id="feedIconDesc">点击后，饭碗里的粮食圆点从透明变为实色，再次点击会淡出回到空碗。</desc>
+            <ellipse class="food-shadow primary-soft" cx="16" cy="13.3" rx="10.2" ry="4.8"/>
+            <path class="bowl primary" d="M5.6 13.7h20.8l-1.5 7.5A5.8 5.8 0 0 1 19.2 26h-6.4a5.8 5.8 0 0 1-5.7-4.8l-1.5-7.5Z"/>
+            <rect class="bowl primary" x="9.3" y="23.6" width="13.4" height="2.7" rx="1.35"/>
+            <path class="accent" d="M16 21.7c-1.8-1-3-2.3-3-3.6 0-1 .7-1.7 1.5-1.7.6 0 1.1.3 1.5.9.4-.6.9-.9 1.5-.9.8 0 1.5.7 1.5 1.7 0 1.3-1.2 2.6-3 3.6Z"/>
+            <circle class="grain grain-a accent" cx="11.3" cy="11.8" r="2.05"/>
+            <circle class="grain grain-b accent" cx="15.8" cy="10.6" r="2.45"/>
+            <circle class="grain grain-c accent" cx="20.2" cy="12" r="2"/>
+            <g class="badge" aria-hidden="true">
+              <circle fill="#fff" cx="23.9" cy="23.7" r="4.15"/>
+              <circle class="accent" cx="23.9" cy="23.7" r="3.25"/>
+              <path d="M22.35 23.55l1.05 1.1 2.2-2.35" fill="none" stroke="#fff" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
+            </g>
+          </svg>
+        </button>
+
+        <div class="status" aria-live="polite">
+          <div class="status-label" data-status-title>空碗</div>
+          <p class="hint" data-status-copy>粮食圆点保持低透明度，表示还没有完成今天的喂食。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="info-panel">
+      <div class="intro">
+        <h1>喂食图标动画</h1>
+        <p>点击左侧图标测试状态切换。动效只作用在碗里的粮食圆点和完成角标，主体饭碗保持稳定。</p>
+      </div>
+
+      <section class="controls" aria-label="图标颜色">
+        <label>饭碗色 <input id="primaryColor" type="color" value="#1f8a8a"></label>
+        <label>粮食色 <input id="accentColor" type="color" value="#ff755f"></label>
+      </section>
+
+      <ul class="step-list" aria-label="动画说明">
+        <li class="step" data-step="empty">
+          <strong>空碗 / 未打卡</strong>
+          <span>粮食圆点低透明度并略微缩小，保留“这里会出现粮食”的暗示。</span>
+        </li>
+        <li class="step" data-step="feeding">
+          <strong>投喂中 / 点击后的过渡</strong>
+          <span>三个圆点按 40ms、120ms、200ms 依次落入碗里，从透明变成实色。</span>
+        </li>
+        <li class="step" data-step="fed">
+          <strong>已经喂食 / 已打卡</strong>
+          <span>粮食圆点保持实色，碗内阴影出现，右下角显示完成角标。</span>
+        </li>
+        <li class="step" data-step="clearing">
+          <strong>回到空碗 / 撤销打卡</strong>
+          <span>粮食圆点淡出并缩回，完成角标消失，状态回到未打卡。</span>
+        </li>
+      </ul>
+
+      <section class="motion-note">
+        <h2>接入 SwiftUI 时的建议</h2>
+        <p>用一次性状态动画触发，不做循环。完成态作为稳定状态保留；重新变成未完成时，再播放淡出。</p>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const body = document.body;
+    const button = document.querySelector(".icon-button");
+    const statusTitle = document.querySelector("[data-status-title]");
+    const statusCopy = document.querySelector("[data-status-copy]");
+    const primaryInput = document.querySelector("#primaryColor");
+    const accentInput = document.querySelector("#accentColor");
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+    const stateCopy = {
+      empty: {
+        title: "空碗",
+        copy: "粮食圆点保持低透明度，表示还没有完成今天的喂食。",
+        pressed: "false",
+        label: "播放喂食图标动画"
+      },
+      feeding: {
+        title: "投喂中",
+        copy: "粮食圆点依次从上方出现，落入饭碗并变成实色。",
+        pressed: "true",
+        label: "喂食动画播放中"
+      },
+      fed: {
+        title: "已经喂食",
+        copy: "粮食圆点保持实色，完成角标出现，表示今天已经喂食。",
+        pressed: "true",
+        label: "回到空碗状态"
+      },
+      clearing: {
+        title: "回到空碗",
+        copy: "粮食圆点淡出并缩回，完成角标消失。",
+        pressed: "false",
+        label: "清空动画播放中"
+      }
+    };
+
+    let state = "empty";
+    let timer = null;
+
+    function applyState(nextState) {
+      state = nextState;
+      body.dataset.state = nextState;
+      statusTitle.textContent = stateCopy[nextState].title;
+      statusCopy.textContent = stateCopy[nextState].copy;
+      button.setAttribute("aria-pressed", stateCopy[nextState].pressed);
+      button.setAttribute("aria-label", stateCopy[nextState].label);
+    }
+
+    function schedule(nextState, delay) {
+      clearTimeout(timer);
+      timer = window.setTimeout(() => applyState(nextState), reducedMotion.matches ? 1 : delay);
+    }
+
+    button.addEventListener("click", () => {
+      if (state === "feeding" || state === "clearing") return;
+
+      if (state === "empty") {
+        applyState("feeding");
+        schedule("fed", 920);
+        return;
+      }
+
+      applyState("clearing");
+      schedule("empty", 560);
+    });
+
+    primaryInput.addEventListener("input", (event) => {
+      document.documentElement.style.setProperty("--ohana-icon-primary", event.target.value);
+    });
+
+    accentInput.addEventListener("input", (event) => {
+      document.documentElement.style.setProperty("--ohana-icon-accent", event.target.value);
+    });
+  </script>
+</body>
+</html>

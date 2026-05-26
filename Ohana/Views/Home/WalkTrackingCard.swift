@@ -9,11 +9,110 @@ import SwiftUI
 import SwiftData
 import MapKit
 
-struct WalkTrackingCard: View {
+struct WalkTrackingSnapshot {
+    let latestWalk: PetWalkLog?
+    let latestWalkMapImage: UIImage?
+    let latestRouteCoordinates: [CLLocationCoordinate2D]
+    let latestPoopMarkers: [WalkPoopMarker]
+    let thisWeekDistanceKm: Double
+
+    @MainActor
+    static func make(pet: Pet, manager: PetWalkingManager) -> WalkTrackingSnapshot {
+        let latestWalk: PetWalkLog?
+        if manager.lastCompletedPetId == pet.id, let completed = manager.lastCompletedWalk {
+            latestWalk = completed
+        } else {
+            latestWalk = pet.walkLogs.max { $0.startDate < $1.startDate }
+        }
+        let routeCoordinates: [CLLocationCoordinate2D]
+        if manager.lastCompletedPetId == pet.id, !manager.lastCompletedRouteCoordinates.isEmpty {
+            routeCoordinates = manager.lastCompletedRouteCoordinates
+        } else {
+            routeCoordinates = Self.routeCoordinates(from: latestWalk?.routeLocationsData)
+        }
+        let poopMarkers: [WalkPoopMarker]
+        if manager.lastCompletedPetId == pet.id, !manager.lastCompletedPoopMarkers.isEmpty {
+            poopMarkers = manager.lastCompletedPoopMarkers
+        } else if let walkId = latestWalk?.id.uuidString {
+            poopMarkers = pet.pottyLogs
+                .filter { $0.walkLogId == walkId }
+                .sorted { $0.date < $1.date }
+                .map(WalkPoopMarker.init(log:))
+        } else {
+            poopMarkers = []
+        }
+        let weekDistanceKm = pet.walkLogs
+            .filter { $0.startDate >= Self.weekStartDate() }
+            .reduce(0) { $0 + $1.distanceMeters } / 1000.0
+        return WalkTrackingSnapshot(
+            latestWalk: latestWalk,
+            latestWalkMapImage: latestWalk?.mapSnapshotData.flatMap(UIImage.init(data:)),
+            latestRouteCoordinates: routeCoordinates,
+            latestPoopMarkers: poopMarkers,
+            thisWeekDistanceKm: weekDistanceKm
+        )
+    }
+
+    private static func routeCoordinates(from data: Data?) -> [CLLocationCoordinate2D] {
+        guard let data,
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Double]]
+        else { return [] }
+        return arr.compactMap { dict in
+            guard let lat = dict["lat"], let lon = dict["lon"] else { return nil }
+            return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+        }
+    }
+
+    private static func weekStartDate() -> Date {
+        var cal = Calendar.current
+        cal.firstWeekday = 2
+        return cal.dateComponents([.calendar, .yearForWeekOfYear, .weekOfYear], from: Date()).date ?? Date()
+    }
+}
+
+@MainActor
+struct WalkTrackingCommandExecutor {
+    let modelContext: ModelContext
+
+    func stopWalk(manager: PetWalkingManager, household: Household?) {
+        manager.stop(modelContext: modelContext, household: household)
+    }
+
+    func saveWeeklyGoal(_ goal: Double, for pet: Pet) {
+        pet.weeklyWalkGoalKm = goal
+        modelContext.safeSave()
+    }
+}
+
+struct WalkTrackingCardHost: View {
     let pet: Pet
     var onCloseSummaryToPetCard: (() -> Void)? = nil
+
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Household.createdAt) private var households: [Household]
+
+    var body: some View {
+        let commandExecutor = WalkTrackingCommandExecutor(modelContext: modelContext)
+        WalkTrackingCard(
+            pet: pet,
+            snapshot: WalkTrackingSnapshot.make(pet: pet, manager: PetWalkingManager.shared),
+            onCloseSummaryToPetCard: onCloseSummaryToPetCard,
+            onStopWalk: {
+                commandExecutor.stopWalk(manager: PetWalkingManager.shared, household: households.first)
+            },
+            onSaveWeeklyGoal: { goal in
+                commandExecutor.saveWeeklyGoal(goal, for: pet)
+            }
+        )
+    }
+}
+
+struct WalkTrackingCard: View {
+    let pet: Pet
+    let snapshot: WalkTrackingSnapshot
+    var onCloseSummaryToPetCard: (() -> Void)? = nil
+    var onStopWalk: () -> Void
+    var onSaveWeeklyGoal: (Double) -> Void
 
     private var mgr: PetWalkingManager { PetWalkingManager.shared }
     private var locationMgr: LocationManager { LocationManager.shared }
@@ -206,10 +305,9 @@ struct WalkTrackingCard: View {
             }
         } else {
             // 待出发：显示上次遛狗地图快照
-            let lastWalk = pet.walkLogs.sorted { $0.startDate > $1.startDate }.first
-            if let data = lastWalk?.mapSnapshotData, let ui = UIImage(data: data) {
+            if let lastWalk = snapshot.latestWalk, let ui = snapshot.latestWalkMapImage {
                 Button {
-                    if let walk = lastWalk { showWalkDetail = walk }
+                    showWalkDetail = lastWalk
                 } label: {
                     Image(uiImage: ui)
                         .resizable()
@@ -511,10 +609,10 @@ struct WalkTrackingCard: View {
 
     @ViewBuilder
     private func summaryRouteMap(walk: PetWalkLog?) -> some View {
-        let coords = routeCoordinates(for: walk)
-        let poopMarkers = summaryPoopMarkers(for: walk)
+        let coords = snapshot.latestRouteCoordinates
+        let poopMarkers = snapshot.latestPoopMarkers
         let visibleCoords = coords + poopMarkers.compactMap(\.coordinate)
-        if let walk, let data = walk.mapSnapshotData, let ui = UIImage(data: data), !(equipFxRainbowRoute || equipFxRainbowPoop) {
+        if walk != nil, let ui = snapshot.latestWalkMapImage, !(equipFxRainbowRoute || equipFxRainbowPoop) {
             GeometryReader { geo in
                 Image(uiImage: ui)
                     .resizable()
@@ -747,8 +845,7 @@ struct WalkTrackingCard: View {
             }
 
             Button {
-                pet.weeklyWalkGoalKm = goalDraft
-                modelContext.safeSave()
+                onSaveWeeklyGoal(goalDraft)
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 showingGoalSetter = false
             } label: {
@@ -783,10 +880,7 @@ struct WalkTrackingCard: View {
     }
 
     private var latestWalk: PetWalkLog? {
-        if mgr.lastCompletedPetId == pet.id, let completed = mgr.lastCompletedWalk {
-            return completed
-        }
-        return pet.walkLogs.sorted { $0.startDate > $1.startDate }.first
+        snapshot.latestWalk
     }
 
     private var finishedElapsed: TimeInterval {
@@ -810,48 +904,13 @@ struct WalkTrackingCard: View {
         return locationMgr.totalDistance
     }
 
-    private var weekStartDate: Date {
-        var cal = Calendar.current
-        cal.firstWeekday = 2
-        return cal.dateComponents([.calendar, .yearForWeekOfYear, .weekOfYear], from: Date()).date ?? Date()
-    }
-
     private var thisWeekDistanceKm: Double {
-        pet.walkLogs
-            .filter { $0.startDate >= weekStartDate }
-            .reduce(0) { $0 + $1.distanceMeters } / 1000.0
+        snapshot.thisWeekDistanceKm
     }
 
     private var weeklyProgress: Double {
         guard pet.weeklyWalkGoalKm > 0 else { return 0 }
         return min(thisWeekDistanceKm / pet.weeklyWalkGoalKm, 1.0)
-    }
-
-    private func routeCoordinates(for walk: PetWalkLog?) -> [CLLocationCoordinate2D] {
-        if mgr.lastCompletedPetId == pet.id,
-           !mgr.lastCompletedRouteCoordinates.isEmpty {
-            return mgr.lastCompletedRouteCoordinates
-        }
-
-        guard let data = walk?.routeLocationsData,
-              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Double]]
-        else { return [] }
-        return arr.compactMap { dict in
-            guard let lat = dict["lat"], let lon = dict["lon"] else { return nil }
-            return CLLocationCoordinate2D(latitude: lat, longitude: lon)
-        }
-    }
-
-    @MainActor
-    private func summaryPoopMarkers(for walk: PetWalkLog?) -> [WalkPoopMarker] {
-        if mgr.lastCompletedPetId == pet.id, !mgr.lastCompletedPoopMarkers.isEmpty {
-            return mgr.lastCompletedPoopMarkers
-        }
-        guard let walkId = walk?.id.uuidString else { return [] }
-        return pet.pottyLogs
-            .filter { $0.walkLogId == walkId }
-            .sorted { $0.date < $1.date }
-            .map(WalkPoopMarker.init(log:))
     }
 
     private func routeCoordinates(from locations: [CLLocation], maxCount: Int) -> [CLLocationCoordinate2D] {
@@ -1020,7 +1079,7 @@ struct WalkTrackingCard: View {
 
     private func finishWalkAndFlip() {
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-        mgr.stop(modelContext: modelContext, household: households.first)
+        onStopWalk()
         presentSummaryBack()
     }
 

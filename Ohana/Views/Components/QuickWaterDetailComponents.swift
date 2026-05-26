@@ -38,14 +38,120 @@ struct WaterChartPoint: Identifiable {
     var id: Date { date }
 }
 
+struct QuickWaterRuleSnapshot {
+    let planEvents: [Event]
+    let todayPlanReminders: [Reminder]
+    let pendingTodayPlanReminders: [Reminder]
+    let missedPlanReminders: [Reminder]
+    let completedTodayPlanReminders: [Reminder]
+    let nextPendingReminder: Reminder?
+
+    static let empty = QuickWaterRuleSnapshot(
+        planEvents: [],
+        todayPlanReminders: [],
+        pendingTodayPlanReminders: [],
+        missedPlanReminders: [],
+        completedTodayPlanReminders: [],
+        nextPendingReminder: nil
+    )
+
+    var missedCount: Int {
+        missedPlanReminders.count
+    }
+
+    var completionText: String {
+        "\(completedTodayPlanReminders.count)/\(max(todayPlanReminders.count, planEvents.count, 1))"
+    }
+
+    static func build(
+        pet: Pet,
+        allEvents: [Event],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> QuickWaterRuleSnapshot {
+        let planEvents = WaterPlanWriter.planEvents(pet: pet, allEvents: allEvents)
+        let todayPlanReminders = planEvents
+            .flatMap(\.reminders)
+            .filter { calendar.isDate($0.scheduledAt, inSameDayAs: now) }
+            .sorted { $0.scheduledAt < $1.scheduledAt }
+        let pendingTodayPlanReminders = todayPlanReminders.filter { $0.isPending || $0.isFailed }
+        let missedPlanReminders = planEvents
+            .flatMap(\.reminders)
+            .filter { ($0.isPending || $0.isFailed) && $0.scheduledAt <= now }
+            .sorted { $0.scheduledAt < $1.scheduledAt }
+        let completedTodayPlanReminders = todayPlanReminders.filter(\.isCompleted)
+
+        return QuickWaterRuleSnapshot(
+            planEvents: planEvents,
+            todayPlanReminders: todayPlanReminders,
+            pendingTodayPlanReminders: pendingTodayPlanReminders,
+            missedPlanReminders: missedPlanReminders,
+            completedTodayPlanReminders: completedTodayPlanReminders,
+            nextPendingReminder: missedPlanReminders.first ?? pendingTodayPlanReminders.first
+        )
+    }
+}
+
+struct QuickWaterRenderSnapshot {
+    let todayWaterLogs: [PetCareLog]
+    let waterLogs: [PetCareLog]
+    let waterChangeLogs: [PetCareLog]
+    let filterCleanLogs: [PetCareLog]
+    let allWaterLogs: [PetCareLog]
+    let rule: QuickWaterRuleSnapshot
+
+    static let empty = QuickWaterRenderSnapshot(
+        todayWaterLogs: [],
+        waterLogs: [],
+        waterChangeLogs: [],
+        filterCleanLogs: [],
+        allWaterLogs: [],
+        rule: .empty
+    )
+
+    var lastWaterLog: PetCareLog? {
+        todayWaterLogs.first ?? waterLogs.first
+    }
+
+    var lastWaterChange: PetCareLog? {
+        waterChangeLogs.first
+    }
+
+    var lastFilterClean: PetCareLog? {
+        filterCleanLogs.first
+    }
+
+    static func build(
+        pet: Pet,
+        allEvents: [Event],
+        waterCareLogs: [PetCareLog],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> QuickWaterRenderSnapshot {
+        let todayWaterLogs = waterCareLogs.filter {
+            $0.type == CareType.watering.rawValue &&
+                calendar.isDate($0.date, inSameDayAs: now)
+        }
+        let waterLogs = waterCareLogs.filter { $0.type == CareType.watering.rawValue }
+        let waterChangeLogs = waterCareLogs.filter { $0.type == CareType.waterChange.rawValue }
+        let filterCleanLogs = waterCareLogs.filter { $0.type == CareType.filterClean.rawValue }
+
+        return QuickWaterRenderSnapshot(
+            todayWaterLogs: todayWaterLogs,
+            waterLogs: waterLogs,
+            waterChangeLogs: waterChangeLogs,
+            filterCleanLogs: filterCleanLogs,
+            allWaterLogs: waterCareLogs,
+            rule: QuickWaterRuleSnapshot.build(pet: pet, allEvents: allEvents, now: now, calendar: calendar)
+        )
+    }
+}
+
 struct WaterNativeSheetGlassSurface: View {
     let cornerRadius: CGFloat
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        shape
-            .fill(.clear)
-            .glassEffect(.regular.interactive(false), in: shape)
+        OhanaPopupGlassSurface(cornerRadius: cornerRadius)
     }
 }
 
@@ -53,10 +159,7 @@ struct WaterInlineSheetGlassSurface: View {
     let cornerRadius: CGFloat
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        shape
-            .fill(.clear)
-            .glassEffect(.regular.interactive(false), in: shape)
+        OhanaPopupGlassSurface(cornerRadius: cornerRadius)
     }
 }
 

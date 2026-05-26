@@ -31,11 +31,14 @@ struct IslandMoodWeatherView: View {
     
     @State private var particles: [WeatherParticle] = []
     @State private var timer: Timer?
+    @State private var isVisible = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
+    @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
 
-    private var shouldReduceWork: Bool {
-        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
+    private var shouldRunParticles: Bool {
+        mood != .calm &&
+        !reduceMotion &&
+        workloadPolicy.ambientMotionBudget(isVisible: isVisible).allowsMotion
     }
     
     var body: some View {
@@ -50,27 +53,38 @@ struct IslandMoodWeatherView: View {
                 }
             }
             .onAppear {
-                startParticles(in: geo.size)
+                isVisible = true
+                updateParticles(in: geo.size)
             }
             .onDisappear {
-                stopParticles()
-            }
-            .onChange(of: mood) { _, newMood in
+                isVisible = false
                 stopParticles()
                 particles.removeAll()
-                if newMood != .calm, !shouldReduceWork {
-                    startParticles(in: geo.size)
-                }
+            }
+            .onChange(of: mood) { _, _ in
+                updateParticles(in: geo.size, reset: true)
+            }
+            .onChange(of: shouldRunParticles) { _, _ in
+                updateParticles(in: geo.size, reset: true)
             }
         }
         .allowsHitTesting(false)
     }
+
+    private func updateParticles(in size: CGSize, reset: Bool = false) {
+        stopParticles()
+        if reset {
+            particles.removeAll()
+        }
+        guard shouldRunParticles else { return }
+        startParticles(in: size)
+    }
     
     private func startParticles(in size: CGSize) {
-        guard mood != .calm, !shouldReduceWork else { return }
+        guard shouldRunParticles, timer == nil else { return }
         
         timer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { _ in
-            withAnimation(.linear(duration: 3)) {
+            withAnimation(.linear(duration: 3)) { // ui-v4: allow AppWorkloadPolicy-gated particle drift uses constant falling motion.
                 addParticle(in: size)
                 removeOldParticles()
             }

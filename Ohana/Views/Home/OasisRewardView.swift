@@ -8,11 +8,161 @@
 import SwiftUI
 import SwiftData
 
+private struct OasisRewardPresentationModifier: ViewModifier {
+    @Binding var showingCoconutLog: Bool
+    @Binding var showCoconutRules: Bool
+    @Binding var showAchievements: Bool
+    @Binding var showInventory: Bool
+    @Binding var showCoconutShop: Bool
+    @Binding var showGacha: Bool
+    @Binding var showCheckInSheet: Bool
+    @Binding var showCritterCodex: Bool
+    let pets: [Pet]
+    let coconutShopInitialCategory: ShopItem.ShopCategory
+
+    func body(content: Content) -> some View {
+        content
+            .fullScreenCover(isPresented: $showingCoconutLog) { CoconutLogView() }
+            .sheet(isPresented: $showCoconutRules) {
+                CoconutRulesSheet()
+                    .ohanaSheetPagePresentation() // ui-v4: allow rules reference sheet
+            }
+            .sheet(isPresented: $showAchievements) {
+                if let pet = pets.first {
+                    AchievementWallView(pet: pet, allPets: pets)
+                        .ohanaSheetPagePresentation() // ui-v4: allow long achievement overview
+                }
+            }
+            .sheet(isPresented: $showInventory) {
+                InventoryView()
+                    .ohanaSheetPagePresentation() // ui-v4: allow long inventory overview
+            }
+            .sheet(isPresented: $showCoconutShop) {
+                CoconutShopView(initialCategory: coconutShopInitialCategory)
+                    .ohanaSheetPagePresentation() // ui-v4: allow long shop overview
+            }
+            .sheet(isPresented: $showGacha) {
+                GachaView()
+                    .ohanaSheetPagePresentation() // ui-v4: allow long blind-box overview
+            }
+            .sheet(isPresented: $showCheckInSheet) {
+                DailyStreakDetailView(pets: pets, onClose: { showCheckInSheet = false })
+                    .ohanaSheetPagePresentation() // ui-v4: allow long streak overview
+            }
+            .sheet(isPresented: $showCritterCodex) {
+                OasisCritterCodexView(mode: .codex)
+                    .ohanaSheetPagePresentation() // ui-v4: allow long critter codex overview
+            }
+    }
+}
+
+private struct OasisRewardRuntimeModifier: ViewModifier {
+    let shouldRunAmbientMotion: Bool
+    let currentActiveHumanId: String
+    let petsCount: Int
+    let humansCount: Int
+    let plantsCount: Int
+    let electronicPetsCount: Int
+    let critterFragmentsCount: Int
+    let activeHumanCoconutBalance: Int
+    let rulesTrigger: Bool
+    let inventoryTrigger: Bool
+    let injectEnergyTrigger: Int
+    let isEmbeddedPrepared: Bool
+    let isEmbeddedVisible: Bool
+    let isEmbeddedActive: Bool
+    let makeupConfirmationTitle: String
+    let makeupConfirmationBinding: Binding<Bool>
+    @Binding var showMakeupConfirm: String?
+    @Binding var showCoconutRules: Bool
+    @Binding var showInventory: Bool
+    let onAppearAction: () -> Void
+    let onDisappearAction: () -> Void
+    let onAmbientMotionChanged: (Bool) -> Void
+    let onActiveHumanChanged: () -> Void
+    let onRefreshOasisEnergy: () -> Void
+    let onRefreshFeaturedCritterLifecycle: () -> Void
+    let onRefreshRenderSnapshots: () -> Void
+    let onInjectTreeEnergy: () -> Void
+    let onEmbeddedPreparedChanged: (Bool) -> Void
+    let onEmbeddedVisibleChanged: (Bool) -> Void
+    let onEmbeddedActiveChanged: (Bool) -> Void
+    let onApplyMakeup: (String) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear(perform: onAppearAction)
+            .onDisappear(perform: onDisappearAction)
+            .onChange(of: shouldRunAmbientMotion) { _, shouldAnimate in
+                onAmbientMotionChanged(shouldAnimate)
+            }
+            .onChange(of: currentActiveHumanId) { _, _ in
+                onActiveHumanChanged()
+            }
+            .modifier(makeupConfirmationModifier)
+            .onChange(of: petsCount) { onRefreshOasisEnergy() }
+            .onChange(of: humansCount) { onRefreshOasisEnergy() }
+            .onChange(of: plantsCount) { onRefreshOasisEnergy() }
+            .onChange(of: electronicPetsCount) { _, _ in onRefreshFeaturedCritterLifecycle() }
+            .onChange(of: critterFragmentsCount) { _, _ in onRefreshRenderSnapshots() }
+            .onChange(of: activeHumanCoconutBalance) { _, _ in onRefreshRenderSnapshots() }
+            .onChange(of: rulesTrigger) { _, _ in showCoconutRules = true }
+            .onChange(of: inventoryTrigger) { _, _ in showInventory = true }
+            .onChange(of: injectEnergyTrigger) { _, _ in onInjectTreeEnergy() }
+            .onChange(of: isEmbeddedPrepared) { _, isPrepared in onEmbeddedPreparedChanged(isPrepared) }
+            .onChange(of: isEmbeddedVisible) { _, isVisible in onEmbeddedVisibleChanged(isVisible) }
+            .onChange(of: isEmbeddedActive) { _, isActive in onEmbeddedActiveChanged(isActive) }
+    }
+
+    private var makeupConfirmationModifier: some ViewModifier {
+        OasisRewardMakeupConfirmationModifier(
+            makeupConfirmationTitle: makeupConfirmationTitle,
+            makeupConfirmationBinding: makeupConfirmationBinding,
+            showMakeupConfirm: $showMakeupConfirm,
+            onApplyMakeup: onApplyMakeup
+        )
+    }
+}
+
+private struct OasisRewardMakeupConfirmationModifier: ViewModifier {
+    let makeupConfirmationTitle: String
+    let makeupConfirmationBinding: Binding<Bool>
+    @Binding var showMakeupConfirm: String?
+    let onApplyMakeup: (String) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .confirmationDialog(
+                makeupConfirmationTitle,
+                isPresented: makeupConfirmationBinding,
+                titleVisibility: .visible
+            ) {
+                Button("消耗1个补签包确认补签") {
+                    if let date = showMakeupConfirm {
+                        onApplyMakeup(date)
+                    }
+                    showMakeupConfirm = nil
+                }
+                Button("取消", role: .cancel) {
+                    showMakeupConfirm = nil
+                }
+            }
+    }
+}
+
+private final class OasisTreeHarvestBuffer {
+    var pendingCount = 0
+    var commitTask: Task<Void, Never>?
+}
+
 struct OasisRewardView: View {
     var hideToolbar: Bool = false
     var rulesTrigger: Bool = false
     var inventoryTrigger: Bool = false
     var injectEnergyTrigger: Int = 0
+    var isEmbeddedPrepared: Bool = true
+    var isEmbeddedVisible: Bool = true
+    var isEmbeddedActive: Bool = true
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -69,11 +219,54 @@ struct OasisRewardView: View {
     @State private var flyCoconut: Bool     = false
     @State private var flyOpacity: Double   = 0
     @State private var harvestedCoconutIndices: Set<Int> = []
+    @State private var treeVisualEnergyOverride: Int?
+    @State private var coconutBalanceVisualOverride: Int?
     @State private var isVisible = false
+    @State private var isVisibleStatePrepared = false
+    @State private var actionSnapshot = OasisRewardActionSnapshot()
+    @State private var bentoSnapshot = OasisBentoSnapshot()
+    @State private var critterRenderSnapshots: [UUID: OasisCritterRenderSnapshot] = [:]
+    @State private var canHarvestTreeToday = false
+    @State private var treePassiveIncomeAmount = 0
+    @State private var preparedWorkTask: Task<Void, Never>?
+    @State private var visibleWorkTask: Task<Void, Never>?
+    @State private var renderSnapshotTask: Task<Void, Never>?
+    @State private var treeCommandTask: Task<Void, Never>?
+    @State private var upgradeRewardTask: Task<Void, Never>?
+    @State private var critterCommandTask: Task<Void, Never>?
+    @State private var checkInCommandTask: Task<Void, Never>?
+    @State private var critterNestOpenTask: Task<Void, Never>?
+    @State private var critterNestCloseTask: Task<Void, Never>?
+    @State private var injectionResetTask: Task<Void, Never>?
+    @State private var levelUpFeedbackTask: Task<Void, Never>?
+    @State private var particleCleanupTask: Task<Void, Never>?
+    @State private var critterPulseCleanupTask: Task<Void, Never>?
+    @State private var critterOutcomeCleanupTask: Task<Void, Never>?
+    @State private var rescueBusyCleanupTask: Task<Void, Never>?
+    @State private var treeHarvestBuffer = OasisTreeHarvestBuffer()
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     private let treeMgr = OasisTreeManager.shared
     private var l: L10n { L10n(appLanguage) }
+    private var commandExecutor: OasisRewardCommandExecutor {
+        OasisRewardCommandExecutor(context: modelContext)
+    }
+
+    private var treeVisualTotalEnergy: Int {
+        treeVisualEnergyOverride ?? treeMgr.totalEnergy
+    }
+
+    private var treeVisualLevel: TreeLevel {
+        OasisTreeManager.treeLevel(forTotalEnergy: treeVisualTotalEnergy)
+    }
+
+    private var treeVisualProgressToNextLevel: Double {
+        OasisTreeManager.progressToNextLevel(forTotalEnergy: treeVisualTotalEnergy)
+    }
+
+    private var treeVisualNextLevelThreshold: Int {
+        OasisTreeManager.nextLevelThreshold(forTotalEnergy: treeVisualTotalEnergy)
+    }
 
     private var pendingUpgradeCoconuts: [OasisUpgradeCoconut] {
         upgradeCoconuts
@@ -86,7 +279,16 @@ struct OasisRewardView: View {
     }
 
     private var activeHumanCoconutBalance: Int {
-        activeHuman?.coconutBalance ?? QuestManager.shared.coconutCount
+        if let coconutBalanceVisualOverride {
+            return coconutBalanceVisualOverride
+        }
+        return actionSnapshot.activeCoconutBalance > 0
+            ? actionSnapshot.activeCoconutBalance
+            : (activeHuman?.coconutBalance ?? QuestManager.shared.coconutCount)
+    }
+
+    private var canInjectTreeEnergy: Bool {
+        actionSnapshot.canInjectCoconuts ?? (activeHumanCoconutBalance >= 10)
     }
 
     private var contentTopInset: CGFloat {
@@ -98,7 +300,15 @@ struct OasisRewardView: View {
     }
 
     private var shouldRunAmbientMotion: Bool {
-        workloadPolicy.shouldAnimate(isVisible: isVisible)
+        workloadPolicy.shouldAnimate(isVisible: isVisible && isVisibleStatePrepared)
+    }
+
+    private var isOasisPrepared: Bool {
+        isEmbeddedPrepared || isEmbeddedVisible || isEmbeddedActive
+    }
+
+    private var shouldTreatEmbeddedAsVisible: Bool {
+        isEmbeddedVisible || isEmbeddedActive
     }
 
     private var makeupConfirmationTitle: String {
@@ -132,7 +342,7 @@ struct OasisRewardView: View {
 
     private func oasisToolbarButton(systemName: String, action: @escaping () -> Void) -> some View {
         Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            OhanaFeedback.light()
             action()
         } label: {
             Image(systemName: systemName)
@@ -150,124 +360,357 @@ struct OasisRewardView: View {
     }
 
     var body: some View {
+        oasisRuntimeContent
+    }
+
+    private var oasisRuntimeContent: AnyView {
+        AnyView(
+            oasisPresentedContent
+                .modifier(
+                    OasisRewardRuntimeModifier(
+                        shouldRunAmbientMotion: shouldRunAmbientMotion,
+                        currentActiveHumanId: currentActiveHumanId,
+                        petsCount: pets.count,
+                        humansCount: humans.count,
+                        plantsCount: plants.count,
+                        electronicPetsCount: electronicPets.count,
+                        critterFragmentsCount: critterFragments.count,
+                        activeHumanCoconutBalance: activeHumanCoconutBalance,
+                        rulesTrigger: rulesTrigger,
+                        inventoryTrigger: inventoryTrigger,
+                        injectEnergyTrigger: injectEnergyTrigger,
+                        isEmbeddedPrepared: isEmbeddedPrepared,
+                        isEmbeddedVisible: isEmbeddedVisible,
+                        isEmbeddedActive: isEmbeddedActive,
+                        makeupConfirmationTitle: makeupConfirmationTitle,
+                        makeupConfirmationBinding: makeupConfirmationBinding,
+                        showMakeupConfirm: $showMakeupConfirm,
+                        showCoconutRules: $showCoconutRules,
+                        showInventory: $showInventory,
+                        onAppearAction: handleOasisAppear,
+                        onDisappearAction: deactivateVisibleWork,
+                        onAmbientMotionChanged: handleAmbientMotionChanged,
+                        onActiveHumanChanged: handleActiveHumanChanged,
+                        onRefreshOasisEnergy: refreshOasisEnergyIfActive,
+                        onRefreshFeaturedCritterLifecycle: refreshFeaturedCritterLifecycleIfActive,
+                        onRefreshRenderSnapshots: { scheduleOasisRenderSnapshotRefresh() },
+                        onInjectTreeEnergy: injectTreeEnergyIfActive,
+                        onEmbeddedPreparedChanged: handleEmbeddedPreparedChanged,
+                        onEmbeddedVisibleChanged: handleEmbeddedVisibleChanged,
+                        onEmbeddedActiveChanged: handleEmbeddedActiveChanged,
+                        onApplyMakeup: applyMakeup
+                    )
+                )
+        )
+    }
+
+    private var oasisPresentedContent: AnyView {
+        AnyView(
+            oasisRootContent
+                .modifier(
+                    OasisRewardPresentationModifier(
+                        showingCoconutLog: $showingCoconutLog,
+                        showCoconutRules: $showCoconutRules,
+                        showAchievements: $showAchievements,
+                        showInventory: $showInventory,
+                        showCoconutShop: $showCoconutShop,
+                        showGacha: $showGacha,
+                        showCheckInSheet: $showCheckInSheet,
+                        showCritterCodex: $showCritterCodex,
+                        pets: pets,
+                        coconutShopInitialCategory: coconutShopInitialCategory
+                    )
+                )
+        )
+    }
+
+    private var oasisRootContent: some View {
         ZStack {
-            OhanaAppBackground()
-                .ignoresSafeArea()
+            oasisBackgroundLayer
 
-            // task21: 粒子特效放在最外层 ZStack，不被 ScrollView 裁剪
-            ForEach(energyParticles) { p in
-                Text("✨")
-                    .font(.system(size: 22))
-                    .offset(x: p.offsetX, y: p.offsetY)
-                    .opacity(p.opacity)
-                    .allowsHitTesting(false)
-            }
-            .zIndex(99)
+            energyParticleLayer
+                .zIndex(99)
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 0) {
-                    Spacer().frame(height: contentTopInset)
+            oasisScrollContent
 
-                    // ── 生命之树核心卡片（夜空风格）
-                    treeSceneCard
-                        .padding(.horizontal, 16)
-                        .padding(.top, treeSceneTopPadding)
+            oasisToolbarLayer
 
-                    // ── Bento 功能区（紧凑小卡）
-                    oasisBentoGrid
-                        .padding(.horizontal, 16)
-                        .padding(.top, 14)
-                        .padding(.bottom, 140)
-                }
-            }
-
-            if !hideToolbar {
-                oasisFixedToolbar
-                    .padding(.horizontal, 24)
-                    .padding(.top, 8)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .zIndex(120)
-            }
-
-            if showCritterNest || critterNestPopupProgress > 0.001 {
-                critterNestPopupOverlay
-                    .zIndex(180)
-            }
+            critterNestLayer
         }
-        .fullScreenCover(isPresented: $showingCoconutLog) { CoconutLogView() }
-        .sheet(isPresented: $showCoconutRules) {
-            CoconutRulesSheet()
-                .ohanaSheetPagePresentation() // ui-v4: allow rules reference sheet
+    }
+
+    private var oasisBackgroundLayer: some View {
+        OhanaAppBackground()
+            .ignoresSafeArea()
+    }
+
+    private var energyParticleLayer: some View {
+        ForEach(energyParticles) { p in
+            Text("✨")
+                .font(.system(size: 22))
+                .offset(x: p.offsetX, y: p.offsetY)
+                .opacity(p.opacity)
+                .allowsHitTesting(false)
         }
-        .sheet(isPresented: $showAchievements) {
-            if let pet = pets.first {
-                AchievementWallView(pet: pet, allPets: pets)
-                    .ohanaSheetPagePresentation() // ui-v4: allow long achievement overview
+    }
+
+    private var oasisScrollContent: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 0) {
+                Spacer().frame(height: contentTopInset)
+
+                treeSceneCard
+                    .padding(.horizontal, 16)
+                    .padding(.top, treeSceneTopPadding)
+
+                oasisBentoGrid
+                    .padding(.horizontal, 16)
+                    .padding(.top, 14)
+                    .padding(.bottom, 140)
             }
         }
-        .sheet(isPresented: $showInventory) {
-            InventoryView()
-                .ohanaSheetPagePresentation() // ui-v4: allow long inventory overview
+    }
+
+    @ViewBuilder
+    private var oasisToolbarLayer: some View {
+        if !hideToolbar {
+            oasisFixedToolbar
+                .padding(.horizontal, 24)
+                .padding(.top, 8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .zIndex(120)
         }
-        .sheet(isPresented: $showCoconutShop) {
-            CoconutShopView(initialCategory: coconutShopInitialCategory)
-                .ohanaSheetPagePresentation() // ui-v4: allow long shop overview
+    }
+
+    @ViewBuilder
+    private var critterNestLayer: some View {
+        if showCritterNest || critterNestPopupProgress > 0.001 {
+            critterNestPopupOverlay
+                .zIndex(180)
         }
-        .sheet(isPresented: $showGacha) {
-            GachaView()
-                .ohanaSheetPagePresentation() // ui-v4: allow long blind-box overview
+    }
+
+    private func handleOasisAppear() {
+        if isOasisPrepared {
+            prepareVisibleShell()
         }
-        .sheet(isPresented: $showCheckInSheet) {
-            DailyStreakDetailView(pets: pets, onClose: { showCheckInSheet = false })
-                .ohanaSheetPagePresentation() // ui-v4: allow long streak overview
+        if shouldTreatEmbeddedAsVisible {
+            activateVisiblePresentation()
         }
-        .sheet(isPresented: $showCritterCodex) {
-            OasisCritterCodexView(mode: .codex)
-                .ohanaSheetPagePresentation() // ui-v4: allow long critter codex overview
+        if isEmbeddedActive {
+            activateVisibleWork()
         }
-        .onAppear {
-            isVisible = true
-            treeMgr.refreshEnergy(modelContext: modelContext, pets: pets, humans: humans, plants: plants)
-            refreshFeaturedCritterLifecycle()
-            lastLevel = treeMgr.treeLevel
+    }
+
+    private func handleEmbeddedPreparedChanged(_ isPrepared: Bool) {
+        if isPrepared {
+            prepareVisibleShell()
+        } else if !shouldTreatEmbeddedAsVisible {
+            deactivateVisibleWork()
+        }
+    }
+
+    private func handleEmbeddedVisibleChanged(_ isVisible: Bool) {
+        if isVisible {
+            activateVisiblePresentation()
+        } else if !isEmbeddedActive {
+            deactivateVisiblePresentation()
+        }
+    }
+
+    private func handleEmbeddedActiveChanged(_ isActive: Bool) {
+        if isActive {
+            activateVisibleWork()
+        } else if !isOasisPrepared {
+            deactivateVisibleWork()
+        } else {
+            visibleWorkTask?.cancel()
+            visibleWorkTask = nil
+            if !isEmbeddedVisible {
+                deactivateVisiblePresentation()
+            }
+        }
+    }
+
+    private func handleActiveHumanChanged() {
+        guard isOasisPrepared else { return }
+        scheduleOasisRenderSnapshotRefresh(milliseconds: 40)
+        loadCheckInData()
+        if isEmbeddedActive {
+            scheduleTodayCheckIn()
+        }
+    }
+
+    private func handleAmbientMotionChanged(_ shouldAnimate: Bool) {
+        if shouldAnimate {
             startAmbientMotionIfNeeded()
-            loadCheckInData()
-            triggerTodayCheckIn()
-        }
-        .onDisappear {
-            isVisible = false
+        } else {
             stopAmbientMotion()
         }
-        .onChange(of: shouldRunAmbientMotion) { _, shouldAnimate in
-            if shouldAnimate {
-                startAmbientMotionIfNeeded()
-            } else {
-                stopAmbientMotion()
+    }
+
+    private func activateVisibleWork() {
+        prepareVisibleShell()
+        activateVisiblePresentation()
+        scheduleVisibleWork(delayMilliseconds: hideToolbar ? 120 : 60)
+    }
+
+    private func activateVisiblePresentation() {
+        prepareVisibleShell()
+        isVisible = true
+        startAmbientMotionIfNeeded()
+    }
+
+    private func prepareVisibleShell() {
+        guard isOasisPrepared else { return }
+        isVisible = shouldTreatEmbeddedAsVisible
+        lastLevel = treeMgr.treeLevel
+        refreshTreeHarvestSnapshot()
+        justHarvested = !canHarvestTreeToday
+        markVisibleStatePrepared()
+        schedulePreparedVisualWork()
+    }
+
+    private func deactivateVisiblePresentation() {
+        isVisible = false
+        stopAmbientMotion()
+    }
+
+    private func deactivateVisibleWork() {
+        isVisible = false
+        isVisibleStatePrepared = false
+        treeVisualEnergyOverride = nil
+        coconutBalanceVisualOverride = nil
+        preparedWorkTask?.cancel()
+        preparedWorkTask = nil
+        visibleWorkTask?.cancel()
+        visibleWorkTask = nil
+        treeCommandTask?.cancel()
+        treeCommandTask = nil
+        treeHarvestBuffer.commitTask?.cancel()
+        treeHarvestBuffer.commitTask = nil
+        treeHarvestBuffer.pendingCount = 0
+        renderSnapshotTask?.cancel()
+        renderSnapshotTask = nil
+        critterNestCloseTask?.cancel()
+        critterNestCloseTask = nil
+        critterNestOpenTask?.cancel()
+        critterNestOpenTask = nil
+        injectionResetTask?.cancel()
+        injectionResetTask = nil
+        levelUpFeedbackTask?.cancel()
+        levelUpFeedbackTask = nil
+        particleCleanupTask?.cancel()
+        particleCleanupTask = nil
+        critterPulseCleanupTask?.cancel()
+        critterPulseCleanupTask = nil
+        critterOutcomeCleanupTask?.cancel()
+        critterOutcomeCleanupTask = nil
+        rescueBusyCleanupTask?.cancel()
+        rescueBusyCleanupTask = nil
+        stopAmbientMotion()
+    }
+
+    private func refreshOasisEnergyIfActive() {
+        guard isEmbeddedActive, isVisibleStatePrepared else { return }
+        scheduleVisibleWork(delayMilliseconds: 90)
+        scheduleOasisRenderSnapshotRefresh(milliseconds: 120)
+    }
+
+    private func refreshFeaturedCritterLifecycleIfActive() {
+        guard isEmbeddedActive else { return }
+        scheduleVisibleWork(delayMilliseconds: 120)
+    }
+
+    private func injectTreeEnergyIfActive() {
+        guard isEmbeddedActive else { return }
+        injectTreeEnergy()
+    }
+
+    private func scheduleVisibleWork(delayMilliseconds: UInt64? = nil) {
+        guard isEmbeddedActive else { return }
+        visibleWorkTask?.cancel()
+        let delay = delayMilliseconds ?? (hideToolbar ? 120 : 80)
+        visibleWorkTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delay) {
+            guard isEmbeddedActive, isVisible else {
+                visibleWorkTask = nil
+                return
             }
+            refreshVisibleState()
+            visibleWorkTask = nil
         }
-        .onChange(of: currentActiveHumanId) { _, _ in
+    }
+
+    private func schedulePreparedVisualWork() {
+        guard isOasisPrepared else { return }
+        preparedWorkTask?.cancel()
+        preparedWorkTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: hideToolbar ? 24 : 0) {
+            guard isOasisPrepared else {
+                preparedWorkTask = nil
+                return
+            }
+            commandExecutor.refreshPreviewEnergy(treeManager: treeMgr, pets: pets, humans: humans, plants: plants)
+            lastLevel = treeMgr.treeLevel
             loadCheckInData()
-            triggerTodayCheckIn()
+            rebuildOasisRenderSnapshots()
+            markVisibleStatePrepared()
+            preparedWorkTask = nil
         }
-        // 补签确认弹窗
-        .confirmationDialog(
-            makeupConfirmationTitle,
-            isPresented: makeupConfirmationBinding,
-            titleVisibility: .visible
-        ) {
-            Button("消耗1个补签包确认补签") {
-                if let d = showMakeupConfirm { applyMakeup(date: d) }
-                showMakeupConfirm = nil
+    }
+
+    private func refreshVisibleState() {
+        commandExecutor.refreshEnergy(treeManager: treeMgr, pets: pets, humans: humans, plants: plants)
+        commandExecutor.refreshFeaturedCritterLifecycle(electronicPets)
+        lastLevel = treeMgr.treeLevel
+        loadCheckInData()
+        scheduleTodayCheckIn()
+        rebuildOasisRenderSnapshots()
+        markVisibleStatePrepared()
+    }
+
+    private func markVisibleStatePrepared() {
+        let wasPrepared = isVisibleStatePrepared
+        isVisibleStatePrepared = true
+        if wasPrepared {
+            updateGlowMotion()
+            updateHarvestBubbleMotion()
+        } else {
+            startAmbientMotionIfNeeded()
+        }
+    }
+
+    private func scheduleOasisRenderSnapshotRefresh(milliseconds: UInt64 = 80) {
+        guard isOasisPrepared else { return }
+        renderSnapshotTask?.cancel()
+        renderSnapshotTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: milliseconds) {
+            guard isOasisPrepared else {
+                renderSnapshotTask = nil
+                return
             }
-            Button("取消", role: .cancel) { showMakeupConfirm = nil }
+            rebuildOasisRenderSnapshots()
+            renderSnapshotTask = nil
         }
-        .onChange(of: pets.count)   { treeMgr.refreshEnergy(modelContext: modelContext, pets: pets, humans: humans, plants: plants) }
-        .onChange(of: humans.count) { treeMgr.refreshEnergy(modelContext: modelContext, pets: pets, humans: humans, plants: plants) }
-        .onChange(of: plants.count) { treeMgr.refreshEnergy(modelContext: modelContext, pets: pets, humans: humans, plants: plants) }
-        .onChange(of: electronicPets.count) { _, _ in refreshFeaturedCritterLifecycle() }
-        .onChange(of: rulesTrigger) { _, _ in showCoconutRules = true }
-        .onChange(of: inventoryTrigger) { _, _ in showInventory = true }
-        .onChange(of: injectEnergyTrigger) { _, _ in injectTreeEnergy() }
+    }
+
+    private func rebuildOasisRenderSnapshots() {
+        refreshTreeHarvestSnapshot()
+        let nextActionSnapshot = commandExecutor.makeActionSnapshot(
+            humans: humans,
+            currentActiveHumanId: currentActiveHumanId,
+            critterFragments: critterFragments
+        )
+        actionSnapshot = nextActionSnapshot
+        bentoSnapshot = commandExecutor.makeBentoSnapshot(
+            pets: pets,
+            electronicPets: electronicPets,
+            activeCoconutBalance: nextActionSnapshot.activeCoconutBalance
+        )
+        critterRenderSnapshots = commandExecutor.makeCritterSnapshots(electronicPets: electronicPets)
+    }
+
+    private func refreshTreeHarvestSnapshot() {
+        canHarvestTreeToday = treeMgr.canHarvestToday
+        treePassiveIncomeAmount = treeMgr.passiveIncomeAmount
     }
 
     // MARK: - Navy Background
@@ -342,7 +785,11 @@ struct OasisRewardView: View {
     }
 
     private var headerCoconutBalanceButton: some View {
-        CoconutBalanceCapsule(balance: activeHumanCoconutBalance, showsDeltaAnimation: true) {
+        CoconutBalanceCapsule(
+            balance: activeHumanCoconutBalance,
+            showsDeltaAnimation: true,
+            deltaAnimationContext: "oasis-\(currentActiveHumanId.isEmpty ? "global" : currentActiveHumanId)"
+        ) {
             showingCoconutLog = true
         }
         .accessibilityLabel("椰子资产 \(activeHumanCoconutBalance)")
@@ -381,9 +828,9 @@ struct OasisRewardView: View {
 
                 ZStack(alignment: .bottom) {
                     BeautifulCoconutTree(
-                        level: treeMgr.treeLevel.rawValue,
+                        level: treeVisualLevel.rawValue,
                         isInjecting: isInjecting,
-                        growthProgress: treeMgr.progressToNextLevel,
+                        growthProgress: treeVisualProgressToNextLevel,
                         injectionPulseToken: injectionPulseToken,
                         pendingUpgradeCoconutCount: pendingUpgradeCoconuts.count,
                         allowsAmbientMotion: shouldRunAmbientMotion,
@@ -397,7 +844,7 @@ struct OasisRewardView: View {
                     .frame(height: 300)
                     .padding(.bottom, 16)
 
-                    if treeMgr.canHarvestToday && !justHarvested {
+                    if canHarvestTreeToday && !justHarvested {
                         stageHarvestButton
                             .padding(.bottom, 2)
                             .transition(.scale(scale: 0.94).combined(with: .opacity))
@@ -446,11 +893,13 @@ struct OasisRewardView: View {
         .overlay(stageShape.strokeBorder(Color.goPrimary.opacity(0.22), lineWidth: 1))
         .contentShape(stageShape)
         .onAppear {
-            justHarvested = !treeMgr.canHarvestToday
+            refreshTreeHarvestSnapshot()
+            justHarvested = !canHarvestTreeToday
             updateGlowMotion()
         }
-        .onChange(of: treeMgr.treeLevel) { oldLevel, newLevel in
-            justHarvested = !treeMgr.canHarvestToday
+        .onChange(of: treeVisualLevel) { oldLevel, newLevel in
+            refreshTreeHarvestSnapshot()
+            justHarvested = !canHarvestTreeToday
             if newLevel.rawValue > oldLevel.rawValue {
                 triggerLevelUpFeedback()
             }
@@ -472,7 +921,7 @@ struct OasisRewardView: View {
                 shape
                     .fill(
                         RadialGradient(
-                            colors: [treeMgr.treeLevel.glowColor.opacity(colorScheme == .light ? 0.22 : 0.32), .clear],
+                            colors: [treeVisualLevel.glowColor.opacity(colorScheme == .light ? 0.22 : 0.32), .clear],
                             center: .center,
                             startRadius: 40,
                             endRadius: 300
@@ -524,7 +973,7 @@ struct OasisRewardView: View {
             Circle()
                 .fill(
                     RadialGradient(
-                        colors: [treeMgr.treeLevel.glowColor.opacity(glowBreathing ? 0.30 : 0.10), .clear],
+                        colors: [treeVisualLevel.glowColor.opacity(glowBreathing ? 0.30 : 0.10), .clear],
                         center: .center,
                         startRadius: 20,
                         endRadius: 190
@@ -577,12 +1026,12 @@ struct OasisRewardView: View {
     private var stageTopHUD: some View {
         HStack(alignment: .top, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Lv.\(treeMgr.treeLevel.rawValue)")
+                Text("Lv.\(treeVisualLevel.rawValue)")
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .monospacedDigit()
                     .contentTransition(.numericText())
-                Text(treeMgr.treeLevel.displayName)
+                Text(treeVisualLevel.displayName)
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
                     .lineLimit(1)
@@ -598,7 +1047,7 @@ struct OasisRewardView: View {
     private var treeCritterEntryButton: some View {
         let critter = featuredCritter
         let catalogId = critter?.catalogId ?? nextCritterTargetCatalogId
-        let snapshot = critter.map { OasisUpgradeRewardService.lifecycleSnapshot(for: $0, context: modelContext) }
+        let snapshot = critter.map { critterRenderSnapshot(for: $0).lifecycle }
         let tint = snapshot.map { critterLifecycleTint(for: $0.state) } ?? Color.goPrimary
         let statusIcon = snapshot.map { critterLifecycleIcon(for: $0.state) } ?? "lock.fill"
         let isLocked = critter == nil
@@ -699,10 +1148,12 @@ struct OasisRewardView: View {
         withAnimation(critterNestPopupCloseAnimation) {
             critterNestPopupProgress = 0
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + critterNestPopupCloseDelay) {
+        critterNestCloseTask?.cancel()
+        critterNestCloseTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: UInt64(critterNestPopupCloseDelay * 1000)) {
             if critterNestPopupProgress <= 0.001 {
                 showCritterNest = false
             }
+            critterNestCloseTask = nil
         }
     }
 
@@ -774,13 +1225,13 @@ struct OasisRewardView: View {
     private var stageEnergyRail: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 8) {
-                Text(treeMgr.treeLevel == .lv10 ? l.tr(zh: "满级", en: "Max", de: "Max") : "\(treeMgr.totalEnergy)/\(treeMgr.nextLevelThreshold)")
+                Text(treeVisualLevel == .lv10 ? l.tr(zh: "满级", en: "Max", de: "Max") : "\(treeVisualTotalEnergy)/\(treeVisualNextLevelThreshold)")
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .monospacedDigit()
                     .contentTransition(.numericText())
                 Spacer()
-                Text(treeMgr.passiveIncomeAmount > 0 ? "+\(treeMgr.passiveIncomeAmount)🥥/d" : "Lv.5 🥥")
+                Text(treePassiveIncomeAmount > 0 ? "+\(treePassiveIncomeAmount)🥥/d" : "Lv.5 🥥")
                     .font(OhanaFont.caption2(.black))
                     .foregroundStyle(Color.goPrimary)
             }
@@ -790,18 +1241,18 @@ struct OasisRewardView: View {
                     Capsule().fill(Color.ohanaControlFill)
                     Capsule()
                         .fill(LinearGradient(colors: [Color.goPrimary, Color.goTeal], startPoint: .leading, endPoint: .trailing))
-                        .frame(width: max(8, geo.size.width * treeMgr.progressToNextLevel))
+                        .frame(width: max(8, geo.size.width * treeVisualProgressToNextLevel))
                         .contentTransition(.numericText())
                 }
                 .frame(height: 8)
-                .animation(GoMotion.page, value: treeMgr.progressToNextLevel)
+                .animation(GoMotion.page, value: treeVisualProgressToNextLevel)
             }
             .frame(height: 8)
         }
     }
 
     private var stageInjectButton: some View {
-        let canInject = OasisCritterEconomyService.canSpendCurrentHumanCoconuts(10, context: modelContext)
+        let canInject = canInjectTreeEnergy
         return Button {
             injectTreeEnergy()
         } label: {
@@ -831,7 +1282,7 @@ struct OasisRewardView: View {
             HStack(spacing: 6) {
                 Text("🥥")
                     .font(.system(size: 17))
-                Text("+\(treeMgr.passiveIncomeAmount)")
+                Text("+\(treePassiveIncomeAmount)")
                     .font(OhanaFont.caption(.black))
                     .monospacedDigit()
             }
@@ -914,7 +1365,7 @@ struct OasisRewardView: View {
         HStack(spacing: 6) {
             Image(systemName: "sparkles")
                 .font(.system(size: 12, weight: .black))
-            Text("Lv.\(treeMgr.treeLevel.rawValue)")
+            Text("Lv.\(treeVisualLevel.rawValue)")
                 .font(OhanaFont.caption(.black))
                 .monospacedDigit()
         }
@@ -930,7 +1381,7 @@ struct OasisRewardView: View {
     }
 
     private var nextStageHint: String {
-        if treeMgr.treeLevel == .lv10 {
+        if treeVisualLevel == .lv10 {
             return l.tr(zh: "树冠已觉醒", en: "Tree awakened", de: "Baum erwacht")
         }
         return l.tr(zh: "下一颗升级椰子在树上成长", en: "Next upgrade coconut is growing", de: "Nächste Upgrade-Kokosnuss wächst")
@@ -946,29 +1397,27 @@ struct OasisRewardView: View {
 
     private func harvestTreeCoconut(_ idx: Int) {
         guard !harvestedCoconutIndices.contains(idx) else { return }
-        harvestedCoconutIndices.insert(idx)
-        OasisCritterEconomyService.awardCurrentHumanCoconuts(1, emoji: "🥥", title: "摘下椰子 +1🥥", context: modelContext)
-        modelContext.safeSave()
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        flyCoconut = false
-        flyOpacity = 1
-        withAnimation(GoMotion.fab.delay(0.05)) {
-            flyCoconut = true
-        }
-        withAnimation(GoMotion.quick.delay(0.6)) {
-            flyOpacity = 0
+        OhanaFeedback.medium()
+        treeHarvestBuffer.pendingCount += 1
+        treeHarvestBuffer.commitTask?.cancel()
+        treeHarvestBuffer.commitTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 760) {
+            let amount = treeHarvestBuffer.pendingCount
+            treeHarvestBuffer.pendingCount = 0
+            commandExecutor.awardHarvestedTreeCoconuts(amount)
+            rebuildOasisRenderSnapshots()
+            treeHarvestBuffer.commitTask = nil
         }
     }
 
     private func harvestDailyTreeCoconuts() {
-        guard treeMgr.canHarvestToday else { return }
-        let amount = treeMgr.passiveIncomeAmount
+        guard canHarvestTreeToday else { return }
+        let amount = treePassiveIncomeAmount
         guard amount > 0 else { return }
-        UserDefaults.standard.set(Date(), forKey: OasisTreeManager.passiveIncomeKey)
-        OasisCritterEconomyService.awardCurrentHumanCoconuts(amount, emoji: "🌳", title: "生命之树的馈赠 +\(amount)🥥", context: modelContext)
-        modelContext.safeSave()
-        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-        withAnimation(GoMotion.feedback) { justHarvested = true }
+        OhanaFeedback.strong()
+        withAnimation(GoMotion.feedback) {
+            justHarvested = true
+            canHarvestTreeToday = false
+        }
         spawnEnergyParticles(count: 10)
         flyCoconut = false
         flyOpacity = 1
@@ -978,47 +1427,98 @@ struct OasisRewardView: View {
         withAnimation(GoMotion.quick.delay(0.6)) {
             flyOpacity = 0
         }
+        treeCommandTask?.cancel()
+        treeCommandTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 80) {
+            if commandExecutor.harvestDailyTreeCoconuts(treeManager: treeMgr) {
+                rebuildOasisRenderSnapshots()
+            }
+            treeCommandTask = nil
+        }
     }
 
     private func openCritterEntry() {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        showCritterNest = true
-        critterNestPopupProgress = max(critterNestPopupProgress, 0.001)
-        withAnimation(critterNestPopupOpenAnimation) {
-            critterNestPopupProgress = 1
+        guard !showCritterNest, critterNestPopupProgress <= 0.001 else { return }
+        OhanaFeedback.light()
+        critterNestCloseTask?.cancel()
+        critterNestCloseTask = nil
+        critterNestOpenTask?.cancel()
+        critterNestOpenTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 40) {
+            showCritterNest = true
+            critterNestPopupProgress = max(critterNestPopupProgress, 0.001)
+            withAnimation(critterNestPopupOpenAnimation) {
+                critterNestPopupProgress = 1
+            }
+            critterNestOpenTask = nil
         }
     }
 
     private func injectTreeEnergy() {
-        guard OasisCritterEconomyService.canSpendCurrentHumanCoconuts(10, context: modelContext) else {
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
+        guard canInjectTreeEnergy else {
+            OhanaFeedback.error()
             return
         }
+        guard !isInjecting else { return }
 
-        let beforeLevel = treeMgr.treeLevel
+        let beforeLevel = treeVisualLevel
+        let beforeBalance = activeHumanCoconutBalance
+        let targetBalance = max(0, beforeBalance - 10)
+        let targetEnergy = treeMgr.totalEnergy + 10
+        let targetLevel = OasisTreeManager.treeLevel(forTotalEnergy: targetEnergy)
+        injectionPulseToken += 1
+        let pulseToken = injectionPulseToken
+        OhanaFeedback.light()
+        withAnimation(GoMotion.feedback) {
+            coconutBalanceVisualOverride = targetBalance
+            actionSnapshot.activeCoconutBalance = targetBalance
+            actionSnapshot.canInjectCoconuts = targetBalance >= 10
+            bentoSnapshot.shopMetric = "🥥 \(targetBalance)"
+        }
+        withAnimation(GoMotion.hero) {
+            treeVisualEnergyOverride = targetEnergy
+        }
+        withAnimation(GoMotion.tap) {
+            isInjecting = true
+        }
+        spawnEnergyParticles(count: 8)
 
-        if treeMgr.injectEnergy(cost: 10, modelContext: modelContext) {
-            injectionPulseToken += 1
-            let pulseToken = injectionPulseToken
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            withAnimation(GoMotion.quick) {
-                isInjecting = true
-            }
-            spawnEnergyParticles(count: 8)
-            if treeMgr.treeLevel != beforeLevel {
-                triggerLevelUpFeedback()
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
-                guard injectionPulseToken == pulseToken else { return }
-                withAnimation(GoMotion.quick) {
+        treeCommandTask?.cancel()
+        treeCommandTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 80) {
+            let didInject = commandExecutor.injectTreeEnergy(treeManager: treeMgr)
+            if didInject {
+                if targetLevel != beforeLevel, treeVisualLevel == beforeLevel {
+                    triggerLevelUpFeedback()
+                }
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    rebuildOasisRenderSnapshots()
+                    treeVisualEnergyOverride = nil
+                    coconutBalanceVisualOverride = nil
+                }
+            } else {
+                withAnimation(GoMotion.hero) {
+                    treeVisualEnergyOverride = nil
+                    coconutBalanceVisualOverride = nil
+                    rebuildOasisRenderSnapshots()
+                }
+                withAnimation(GoMotion.tap) {
                     isInjecting = false
                 }
+                OhanaFeedback.error()
             }
-        } else {
-            withAnimation(GoMotion.quick) {
+            treeCommandTask = nil
+        }
+
+        injectionResetTask?.cancel()
+        injectionResetTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 220) {
+            guard injectionPulseToken == pulseToken else {
+                injectionResetTask = nil
+                return
+            }
+            withAnimation(GoMotion.tap) {
                 isInjecting = false
             }
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            injectionResetTask = nil
         }
     }
 
@@ -1081,15 +1581,16 @@ struct OasisRewardView: View {
                         critterMilestonePill(level: 20, catalogId: OasisUpgradeRewardCatalog.legendaryCritterId)
                     }
                 } else if let critter = featuredCritter {
-                    let snapshot = OasisUpgradeRewardService.lifecycleSnapshot(for: critter, context: modelContext)
-                    let wish = OasisUpgradeRewardService.displayDailyWish(for: critter, snapshot: snapshot)
-                    let wishCompleted = OasisUpgradeRewardService.isDailyWishCompleted(for: critter, wish: wish, context: modelContext)
-                    critterLifeStrip(critter, snapshot: snapshot)
-                    critterWishStrip(wish, critter: critter, isCompleted: wishCompleted)
+                    let snapshot = critterRenderSnapshot(for: critter)
+                    let wish = snapshot.dailyWish
+                    critterLifeStrip(critter, snapshot: snapshot.lifecycle)
+                    if let wish {
+                        critterWishStrip(wish, critter: critter, isCompleted: snapshot.isDailyWishCompleted)
+                    }
                     if let lastCritterInteractionOutcome, lastCritterInteractionOutcome.success {
                         critterOutcomeStrip(lastCritterInteractionOutcome)
                     }
-                    if snapshot.isRescuable {
+                    if snapshot.lifecycle.isRescuable {
                         HStack(spacing: 8) {
                             critterNestAction(
                                 icon: "cross.case.fill",
@@ -1106,27 +1607,27 @@ struct OasisRewardView: View {
                         critterNestAction(
                             icon: "fork.knife",
                             title: l.tr(zh: "喂养", en: "Feed", de: "Füttern"),
-                            cost: critterInteractionCostText(critter, action: .feed),
-                            enabled: OasisUpgradeRewardService.canInteract(with: critter, action: .feed, context: modelContext),
-                            highlighted: !wishCompleted && wish.action == .feed
+                            cost: critterInteractionCostText(snapshot.feedCost),
+                            enabled: snapshot.canFeed,
+                            highlighted: !snapshot.isDailyWishCompleted && wish?.action == .feed
                         ) {
                             interact(with: critter, action: .feed)
                         }
                         critterNestAction(
                             icon: "sparkles",
                             title: l.tr(zh: "玩耍", en: "Play", de: "Spielen"),
-                            cost: critterInteractionCostText(critter, action: .play),
-                            enabled: OasisUpgradeRewardService.canInteract(with: critter, action: .play, context: modelContext),
-                            highlighted: !wishCompleted && wish.action == .play
+                            cost: critterInteractionCostText(snapshot.playCost),
+                            enabled: snapshot.canPlay,
+                            highlighted: !snapshot.isDailyWishCompleted && wish?.action == .play
                         ) {
                             interact(with: critter, action: .play)
                         }
                         critterNestAction(
                             icon: "moon.fill",
                             title: l.tr(zh: "休息", en: "Rest", de: "Ruhen"),
-                            cost: "3/d",
-                            enabled: OasisUpgradeRewardService.canInteract(with: critter, action: .rest, context: modelContext),
-                            highlighted: !wishCompleted && wish.action == .rest
+                            cost: critterInteractionCostText(snapshot.restCost),
+                            enabled: snapshot.canRest,
+                            highlighted: !snapshot.isDailyWishCompleted && wish?.action == .rest
                         ) {
                             interact(with: critter, action: .rest)
                         }
@@ -1141,7 +1642,7 @@ struct OasisRewardView: View {
             )
         .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .onTapGesture {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            OhanaFeedback.light()
             showCritterCodex = true
         }
         .accessibilityLabel(l.tr(zh: "电子宠物图鉴", en: "Critter Codex", de: "Critter-Album"))
@@ -1161,6 +1662,10 @@ struct OasisRewardView: View {
             .first
     }
 
+    private func critterRenderSnapshot(for critter: OasisElectronicPet) -> OasisCritterRenderSnapshot {
+        critterRenderSnapshots[critter.id] ?? OasisCritterRenderSnapshot.lightweight(for: critter)
+    }
+
     private var nextCritterMilestoneLevel: Int {
         OasisUpgradeRewardCatalog.critter(id: nextCritterTargetCatalogId)?.sourceLevel ?? 10
     }
@@ -1169,7 +1674,7 @@ struct OasisRewardView: View {
         guard let entry = OasisUpgradeRewardCatalog.critter(id: nextCritterTargetCatalogId) else {
             return l.tr(zh: "Lv.10 保底 Lumo", en: "Lv.10 guarantees Lumo", de: "Lv.10 garantiert Lumo")
         }
-        if treeMgr.treeLevel.rawValue < entry.sourceLevel {
+        if treeVisualLevel.rawValue < entry.sourceLevel {
             return l.tr(
                 zh: "Lv.\(entry.sourceLevel) 保底 \(entry.nameZh)",
                 en: "Lv.\(entry.sourceLevel) guarantees \(entry.nameEn)",
@@ -1195,12 +1700,12 @@ struct OasisRewardView: View {
     private var nextCritterProgress: CGFloat {
         let targetEnergy = nextCritterMilestoneLevel == 5 ? 500 : 3600
         guard targetEnergy > 0 else { return 1 }
-        return min(1, max(0, CGFloat(treeMgr.totalEnergy) / CGFloat(targetEnergy)))
+        return min(1, max(0, CGFloat(treeVisualTotalEnergy) / CGFloat(targetEnergy)))
     }
 
     private func critterMilestonePill(level: Int, catalogId: String) -> some View {
         let entry = OasisUpgradeRewardCatalog.critter(id: catalogId)
-        let isReached = treeMgr.treeLevel.rawValue >= level
+        let isReached = treeVisualLevel.rawValue >= level
         return HStack(spacing: 8) {
             OasisCritterIllustration(catalogId: catalogId, locked: !isReached, size: 38)
             VStack(alignment: .leading, spacing: 1) {
@@ -1331,8 +1836,7 @@ struct OasisRewardView: View {
         .disabled(!enabled)
     }
 
-    private func critterInteractionCostText(_ critter: OasisElectronicPet, action: OasisCritterAction) -> String {
-        let cost = OasisUpgradeRewardService.interactionCost(for: critter, action: action, context: modelContext)
+    private func critterInteractionCostText(_ cost: Int) -> String {
         return cost == 0 ? l.tr(zh: "免费", en: "Free", de: "Gratis") : "\(cost)🥥"
     }
 
@@ -1523,19 +2027,19 @@ struct OasisRewardView: View {
     }
 
     private var fragmentSummary: some View {
-        let total = critterFragments.reduce(0) { $0 + $1.amount }
         return HStack(spacing: 4) {
             Text("◇")
                 .font(.system(size: 12, weight: .black))
-            Text("\(total)")
+            Text("\(actionSnapshot.critterFragmentTotal)")
                 .font(.system(size: 12, weight: .black, design: .rounded))
         }
         .foregroundStyle(Color.goPrimary)
     }
 
     private func critterCompanionCard(_ critter: OasisElectronicPet) -> some View {
-        let snapshot = OasisUpgradeRewardService.lifecycleSnapshot(for: critter, context: modelContext)
-        let isDead = snapshot.state == .dead
+        let snapshot = critterRenderSnapshot(for: critter)
+        let lifecycle = snapshot.lifecycle
+        let isDead = lifecycle.state == .dead
         return HStack(spacing: 12) {
             OasisCritterIllustration(catalogId: critter.catalogId, locked: false, size: 58, critter: critter)
                 .scaleEffect(critterActionPulseId == critter.id ? 1.08 : 1)
@@ -1559,7 +2063,7 @@ struct OasisRewardView: View {
                     critterMeter(value: critter.health, icon: "cross.case.fill")
                     critterMeter(value: OasisUpgradeRewardService.bondProgress(for: critter), icon: "heart.fill")
                 }
-                Text(snapshot.state.name(l))
+                Text(lifecycle.state.name(l))
                     .font(.system(size: 10, weight: .black, design: .rounded))
                     .foregroundStyle(isDead ? Color.ohanaTertiaryText : Color.goPrimary)
                     .lineLimit(1)
@@ -1568,30 +2072,29 @@ struct OasisRewardView: View {
             Spacer()
 
             HStack(spacing: 7) {
-                if snapshot.isRescuable {
+                if lifecycle.isRescuable {
                     critterActionButton(icon: "cross.case.fill", cost: l.tr(zh: "免费", en: "Free", de: "Gratis"), enabled: rescuingCritterId != critter.id) {
                         rescue(with: critter)
                     }
                 } else {
                     critterActionButton(
                         icon: "carrot.fill",
-                        cost: critterInteractionCostText(critter, action: .feed),
-                        enabled: OasisUpgradeRewardService.canInteract(with: critter, action: .feed, context: modelContext)
+                        cost: critterInteractionCostText(snapshot.feedCost),
+                        enabled: snapshot.canFeed
                     ) {
                         interact(with: critter, action: .feed)
                     }
                     critterActionButton(
                         icon: "sparkles",
-                        cost: critterInteractionCostText(critter, action: .play),
-                        enabled: OasisUpgradeRewardService.canInteract(with: critter, action: .play, context: modelContext)
+                        cost: critterInteractionCostText(snapshot.playCost),
+                        enabled: snapshot.canPlay
                     ) {
                         interact(with: critter, action: .play)
                     }
-                    let starCost = OasisUpgradeRewardService.starUpgradeCost(for: critter)
                     critterActionButton(
                         icon: "star.fill",
-                        cost: "\(starCost.fragments)◇",
-                        enabled: !isDead && OasisCritterEconomyService.canSpendCurrentHumanCoconuts(starCost.coconuts, context: modelContext)
+                        cost: "\(snapshot.starFragmentsCost)◇",
+                        enabled: snapshot.canUpgradeStar
                     ) {
                         upgradeCritterStar(critter)
                     }
@@ -1633,14 +2136,15 @@ struct OasisRewardView: View {
     private func openUpgradeCoconut(_ coconut: OasisUpgradeCoconut) {
         guard openingUpgradeCoconutId == nil else { return }
         openingUpgradeCoconutId = coconut.id
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        OhanaFeedback.medium()
         withAnimation(GoMotion.feedback) {
             openedUpgradeReward = nil
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+        upgradeRewardTask?.cancel()
+        upgradeRewardTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 220) {
             do {
-                let result = try OasisUpgradeRewardService.open(coconut, context: modelContext)
-                UINotificationFeedbackGenerator().notificationOccurred(result.isMilestoneCritter ? .success : .warning)
+                let result = try commandExecutor.openUpgradeCoconut(coconut)
+                result.isMilestoneCritter ? OhanaFeedback.success() : OhanaFeedback.warning()
                 withAnimation(GoMotion.fab) {
                     openedUpgradeReward = result
                     openingUpgradeCoconutId = nil
@@ -1648,104 +2152,144 @@ struct OasisRewardView: View {
                 if result.isMilestoneCritter {
                     spawnEnergyParticles(count: 16)
                 }
+                rebuildOasisRenderSnapshots()
             } catch {
-                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                OhanaFeedback.error()
                 withAnimation(GoMotion.feedback) {
                     openingUpgradeCoconutId = nil
                 }
             }
+            upgradeRewardTask = nil
         }
     }
 
     private func interact(with critter: OasisElectronicPet, action: OasisCritterAction) {
-        do {
-            let outcome = try OasisUpgradeRewardService.interactWithOutcome(with: critter, action: action, context: modelContext)
-            if outcome.success {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        guard critterActionPulseId == nil else { return }
+        OhanaFeedback.light()
+        withAnimation(GoMotion.feedback) {
+            critterActionPulseId = critter.id
+        }
+        critterCommandTask?.cancel()
+        critterCommandTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 70) {
+            do {
+                let outcome = try commandExecutor.interact(with: critter, action: action)
+                applyCritterInteractionOutcome(outcome, critter: critter)
+            } catch {
+                OhanaFeedback.error()
                 withAnimation(GoMotion.feedback) {
-                    critterActionPulseId = critter.id
-                    lastCritterInteractionOutcome = outcome
+                    critterActionPulseId = nil
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    withAnimation(GoMotion.feedback) {
-                        critterActionPulseId = nil
-                    }
-                }
-                clearCritterInteractionOutcomeLater(outcome)
-            } else {
-                UINotificationFeedbackGenerator().notificationOccurred(.warning)
             }
-        } catch {
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            critterCommandTask = nil
+        }
+    }
+
+    private func applyCritterInteractionOutcome(_ outcome: OasisCritterInteractionOutcome, critter: OasisElectronicPet) {
+        if outcome.success {
+            OhanaFeedback.light()
+            withAnimation(GoMotion.feedback) {
+                critterActionPulseId = critter.id
+                lastCritterInteractionOutcome = outcome
+            }
+            critterPulseCleanupTask?.cancel()
+            critterPulseCleanupTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 350) {
+                withAnimation(GoMotion.feedback) {
+                    critterActionPulseId = nil
+                }
+                critterPulseCleanupTask = nil
+            }
+            clearCritterInteractionOutcomeLater(outcome)
+            rebuildOasisRenderSnapshots()
+        } else {
+            OhanaFeedback.warning()
+            withAnimation(GoMotion.feedback) {
+                critterActionPulseId = nil
+            }
         }
     }
 
     private func rescue(with critter: OasisElectronicPet) {
         guard rescuingCritterId == nil else { return }
         rescuingCritterId = critter.id
-        defer { clearRescueBusyState(for: critter.id) }
+        OhanaFeedback.light()
+        withAnimation(GoMotion.feedback) {
+            critterActionPulseId = critter.id
+        }
+        clearRescueBusyState(for: critter.id)
 
-        do {
-            let outcome = try OasisUpgradeRewardService.rescueIfNeeded(for: critter, context: modelContext)
-            if outcome.success {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        critterCommandTask?.cancel()
+        critterCommandTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 70) {
+            do {
+                let outcome = try commandExecutor.rescue(critter)
+                applyCritterInteractionOutcome(outcome, critter: critter)
+            } catch {
+                OhanaFeedback.error()
                 withAnimation(GoMotion.feedback) {
-                    critterActionPulseId = critter.id
-                    lastCritterInteractionOutcome = outcome
+                    critterActionPulseId = nil
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    withAnimation(GoMotion.feedback) {
-                        critterActionPulseId = nil
-                    }
-                }
-                clearCritterInteractionOutcomeLater(outcome)
-            } else {
-                UINotificationFeedbackGenerator().notificationOccurred(.warning)
             }
-        } catch {
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            critterCommandTask = nil
         }
     }
 
     private func clearRescueBusyState(for critterId: UUID) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-            guard rescuingCritterId == critterId else { return }
+        rescueBusyCleanupTask?.cancel()
+        rescueBusyCleanupTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 450) {
+            guard rescuingCritterId == critterId else {
+                rescueBusyCleanupTask = nil
+                return
+            }
             rescuingCritterId = nil
-        }
-    }
-
-    private func refreshFeaturedCritterLifecycle() {
-        for critter in electronicPets where !critter.isArchived {
-            OasisUpgradeRewardService.normalizeLifecycle(for: critter, context: modelContext)
+            rescueBusyCleanupTask = nil
         }
     }
 
     private func clearCritterInteractionOutcomeLater(_ outcome: OasisCritterInteractionOutcome) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.4) {
-            guard lastCritterInteractionOutcome == outcome else { return }
+        critterOutcomeCleanupTask?.cancel()
+        critterOutcomeCleanupTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 3_400) {
+            guard lastCritterInteractionOutcome == outcome else {
+                critterOutcomeCleanupTask = nil
+                return
+            }
             withAnimation(GoMotion.reduced) {
                 lastCritterInteractionOutcome = nil
             }
+            critterOutcomeCleanupTask = nil
         }
     }
 
     private func upgradeCritterStar(_ critter: OasisElectronicPet) {
-        do {
-            if try OasisUpgradeRewardService.upgradeStar(for: critter, context: modelContext) {
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-                withAnimation(GoMotion.fab) {
-                    critterActionPulseId = critter.id
+        guard critterActionPulseId == nil else { return }
+        OhanaFeedback.light()
+        withAnimation(GoMotion.fab) {
+            critterActionPulseId = critter.id
+        }
+        critterCommandTask?.cancel()
+        critterCommandTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 70) {
+            do {
+                if try commandExecutor.upgradeStar(critter) {
+                    OhanaFeedback.success()
+                    withAnimation(GoMotion.feedback) {
+                        critterActionPulseId = critter.id
+                    }
+                    rebuildOasisRenderSnapshots()
+                } else {
+                    OhanaFeedback.warning()
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                critterPulseCleanupTask?.cancel()
+                critterPulseCleanupTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 400) {
                     withAnimation(GoMotion.feedback) {
                         critterActionPulseId = nil
                     }
+                    critterPulseCleanupTask = nil
                 }
-            } else {
-                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            } catch {
+                OhanaFeedback.error()
+                withAnimation(GoMotion.feedback) {
+                    critterActionPulseId = nil
+                }
             }
-        } catch {
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            critterCommandTask = nil
         }
     }
 
@@ -1759,7 +2303,7 @@ struct OasisRewardView: View {
                     .font(.system(size: 16, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
-                Text("能量 \(treeMgr.totalEnergy) · 下一级 \(treeMgr.nextLevelThreshold)")
+                Text("能量 \(treeVisualTotalEnergy) · 下一级 \(treeVisualNextLevelThreshold)")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -1775,9 +2319,9 @@ struct OasisRewardView: View {
                             colors: [Color.goPrimary, Color.goTeal],
                             startPoint: .leading, endPoint: .trailing
                         ))
-                        .frame(width: geo.size.width * treeMgr.progressToNextLevel, height: 8)
+                        .frame(width: geo.size.width * treeVisualProgressToNextLevel, height: 8)
                         .shadow(color: Color.goPrimary.opacity(0.5), radius: 6, x: 0, y: 0) // ui-v4: allow Oasis progress shine
-                        .animation(GoMotion.page, value: treeMgr.progressToNextLevel)
+                        .animation(GoMotion.page, value: treeVisualProgressToNextLevel)
                 }
             }
             .frame(height: 8)
@@ -1785,11 +2329,11 @@ struct OasisRewardView: View {
             // Stats row
             HStack(spacing: 0) {
                 progressStatCell(
-                    value: treeMgr.passiveIncomeAmount > 0
-                        ? "+\(treeMgr.passiveIncomeAmount)🥥/日"
+                    value: treePassiveIncomeAmount > 0
+                        ? "+\(treePassiveIncomeAmount)🥥/日"
                         : "Lv.5 解锁",
                     label: "被动收入",
-                    color: treeMgr.passiveIncomeAmount > 0
+                    color: treePassiveIncomeAmount > 0
                         ? Color.goPrimary
                         : Color.ohanaSecondaryText.opacity(0.6)
                 )
@@ -1799,7 +2343,7 @@ struct OasisRewardView: View {
                     color: Color(hex: "5B6AFF")
                 )
                 progressStatCell(
-                    value: "\(treeMgr.totalEnergy)",
+                    value: "\(treeVisualTotalEnergy)",
                     label: "岛屿能量",
                     color: Color(hex: "A855F7")
                 )
@@ -1828,21 +2372,9 @@ struct OasisRewardView: View {
     // MARK: - Inject Energy Button
 
     private var injectEnergyButton: some View {
-        let canInject = OasisCritterEconomyService.canSpendCurrentHumanCoconuts(10, context: modelContext)
+        let canInject = canInjectTreeEnergy
         return Button {
-            let beforeLevel = treeMgr.treeLevel
-            withAnimation { isInjecting = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                withAnimation { isInjecting = false }
-            }
-            if treeMgr.injectEnergy(cost: 10, modelContext: modelContext) {
-                spawnEnergyParticles(count: 10)
-                if treeMgr.treeLevel != beforeLevel {
-                    triggerLevelUpFeedback()
-                }
-            } else {
-                UINotificationFeedbackGenerator().notificationOccurred(.error)
-            }
+            injectTreeEnergy()
         } label: {
             HStack(spacing: 8) {
                 Text("⚡")
@@ -1887,7 +2419,7 @@ struct OasisRewardView: View {
     }
 
     private var milestoneCard: some View {
-        let currentLv = treeMgr.treeLevel.rawValue
+        let currentLv = treeVisualLevel.rawValue
         let isMaxLevel = currentLv >= 10
         let nextLv = min(currentLv + 1, 10)
         let nextLevel = TreeLevel(rawValue: nextLv) ?? .lv10
@@ -2249,10 +2781,6 @@ struct OasisRewardView: View {
 
     // MARK: - 打卡工具函数
 
-    private func todayStr() -> String {
-        CheckInStreakStore.dateString()
-    }
-
     private var currentStreak: Int {
         CheckInStreakStore.currentStreak(for: currentActiveHumanId)
     }
@@ -2279,136 +2807,90 @@ struct OasisRewardView: View {
     }
 
     private func loadCheckInData() {
-        checkedInDates = CheckInStreakStore.checkedInDates(for: currentActiveHumanId)
-        makeupDates = CheckInStreakStore.makeupDates(for: currentActiveHumanId)
-        makeupPackCount = UserDefaults.standard.integer(forKey: CheckInStreakStore.makeupPackKey)
-        lastClaimedMilestone = CheckInStreakStore.lastClaimedMilestone(for: currentActiveHumanId)
+        applyCheckInSnapshot(commandExecutor.loadCheckInData(currentActiveHumanId: currentActiveHumanId))
     }
 
     private func triggerTodayCheckIn() {
-        let today = todayStr()
-        guard !checkedInDates.contains(today) else { return }
-        checkedInDates.insert(today)
-        CheckInStreakStore.setCheckedInDates(checkedInDates, for: currentActiveHumanId)
-        OasisCritterEconomyService.awardCurrentHumanCoconuts(1, emoji: "📅", title: "每日打卡奖励", context: modelContext)
-        modelContext.safeSave()
+        if let updatedDates = commandExecutor.triggerTodayCheckIn(
+            currentActiveHumanId: currentActiveHumanId,
+            checkedInDates: checkedInDates
+        ) {
+            checkedInDates = updatedDates
+            rebuildOasisRenderSnapshots()
+        }
+    }
+
+    private func scheduleTodayCheckIn() {
+        checkInCommandTask?.cancel()
+        checkInCommandTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 140) {
+            guard isEmbeddedActive else {
+                checkInCommandTask = nil
+                return
+            }
+            triggerTodayCheckIn()
+            checkInCommandTask = nil
+        }
     }
 
     private func applyMakeup(date: String) {
-        guard makeupPackCount > 0, !checkedInDates.contains(date) else { return }
-        makeupPackCount -= 1
-        UserDefaults.standard.set(makeupPackCount, forKey: CheckInStreakStore.makeupPackKey)
-        checkedInDates.insert(date)
-        makeupDates.insert(date)
-        CheckInStreakStore.setCheckedInDates(checkedInDates, for: currentActiveHumanId)
-        CheckInStreakStore.setMakeupDates(makeupDates, for: currentActiveHumanId)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        let snapshot = OasisCheckInSnapshot(
+            checkedInDates: checkedInDates,
+            makeupDates: makeupDates,
+            makeupPackCount: makeupPackCount,
+            lastClaimedMilestone: lastClaimedMilestone
+        )
+        guard let updated = commandExecutor.applyMakeup(
+            date: date,
+            currentActiveHumanId: currentActiveHumanId,
+            snapshot: snapshot
+        ) else { return }
+        applyCheckInSnapshot(updated)
+        OhanaFeedback.medium()
     }
 
     private func claimMilestone(_ days: Int, reward: Int, emoji: String) {
-        OasisCritterEconomyService.awardCurrentHumanCoconuts(reward, emoji: emoji, title: "\(days)天连胜奖励", context: modelContext)
-        modelContext.safeSave()
         lastClaimedMilestone = days
-        CheckInStreakStore.setLastClaimedMilestone(days, for: currentActiveHumanId)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        OhanaFeedback.success()
+        checkInCommandTask?.cancel()
+        checkInCommandTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 70) {
+            commandExecutor.claimMilestone(
+                days: days,
+                reward: reward,
+                emoji: emoji,
+                currentActiveHumanId: currentActiveHumanId
+            )
+            rebuildOasisRenderSnapshots()
+            checkInCommandTask = nil
+        }
     }
 
-    // MARK: - Bento Dynamic Subtitles
-
-    private var shopSubtitle: String {
-        let canAfford = activeHumanCoconutBalance >= 25
-        return canAfford ? "13件道具 · 最低25🥥" : "攒够椰子再来"
-    }
-
-    private var gachaSubtitle: String {
-        "80🥥/次 · 不限次数"
-    }
-
-    private var bountySubtitle: String {
-        let all = BountyTask.loadAll()
-        let active = all.filter { !$0.isCompleted }.count
-        let mine = BountyTask.pendingAssignedCount(
-            for: UserDefaults.standard.string(forKey: "currentActiveHumanId") ?? ""
-        )
-        if mine > 0 { return "@我 \(mine) 个待完成" }
-        return active == 0 ? "发布任务 / 接单" : "\(active)个进行中 · 去看看"
-    }
-
-    private var bountyAssignedBadge: Int {
-        BountyTask.pendingAssignedCount(
-            for: UserDefaults.standard.string(forKey: "currentActiveHumanId") ?? ""
-        )
+    private func applyCheckInSnapshot(_ snapshot: OasisCheckInSnapshot) {
+        checkedInDates = snapshot.checkedInDates
+        makeupDates = snapshot.makeupDates
+        makeupPackCount = snapshot.makeupPackCount
+        lastClaimedMilestone = snapshot.lastClaimedMilestone
     }
 
     // MARK: - Bento Grid
 
     private var oasisBentoGrid: some View {
-        let allAchievements = pets.flatMap { AchievementManager.compute(for: $0) }
-        let unlockedCount   = allAchievements.filter { $0.isUnlocked }.count
-        let totalCount      = allAchievements.count
-        let noPet           = pets.isEmpty  // 无宠物锁定判断
-
-        return VStack(spacing: 8) {
-            // 行一：椰子商店 + 成就解锁
-            HStack(spacing: 8) {
-                bentoMiniCard(emoji: "🛒", title: l.tr(zh: "商店", en: "Shop", de: "Shop"),
-                    metric: "🥥 \(activeHumanCoconutBalance)", accent: Color.goYellow,
-                    action: {
-                        coconutShopInitialCategory = .effect
-                        showCoconutShop = true
-                    })
-                bentoMiniCard(emoji: "🏆", title: l.tr(zh: "成就", en: "Awards", de: "Erfolge"),
-                    metric: noPet ? "—" : "\(unlockedCount)/\(totalCount)",
-                    accent: noPet ? Color.ohanaSecondaryText : Color.goTeal,
-                    action: { if !noPet { showAchievements = true } })
-                    .opacity(noPet ? 0.55 : 1)
+        OasisBentoGridView(
+            snapshot: bentoSnapshot,
+            localization: l,
+            onOpenShop: {
+                coconutShopInitialCategory = .effect
+                showCoconutShop = true
+            },
+            onOpenAchievements: {
+                showAchievements = true
+            },
+            onOpenCritters: {
+                showCritterCodex = true
+            },
+            onOpenGacha: {
+                showGacha = true
             }
-            // 行二：伙伴图鉴 + 盲盒
-            HStack(spacing: 8) {
-                bentoMiniCard(emoji: "🐾", title: l.tr(zh: "伙伴", en: "Critters", de: "Critter"),
-                    metric: electronicPets.isEmpty ? "Lv.10" : "\(electronicPets.filter { !$0.isArchived }.count)/\(OasisUpgradeRewardCatalog.critters.count)",
-                    accent: Color.goTeal,
-                    action: { showCritterCodex = true })
-                bentoMiniCard(emoji: "🎁", title: l.tr(zh: "盲盒", en: "Blind Box", de: "Blind Box"),
-                    metric: "80🥥", accent: Color.goPrimary,
-                    action: {
-                        showGacha = true
-                    })
-            }
-        }
-    }
-
-    private func bentoMiniCard(emoji: String, title: String, metric: String, accent: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                Text(emoji).font(.system(size: 24))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(metric)
-                        .font(.system(size: 16, weight: .black, design: .rounded))
-                        .foregroundStyle(accent)
-                        .monospacedDigit()
-                        .lineLimit(1)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
-            .padding(.horizontal, 14).padding(.vertical, 11)
-            .frame(maxWidth: .infinity)
-            .background(
-                Color.ohanaCardSurface,
-                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
-            )
-        }
-        .buttonStyle(ScaleButtonStyle())
+        )
     }
 
     // MARK: - Animations
@@ -2448,20 +2930,22 @@ struct OasisRewardView: View {
 
     private func triggerLevelUpFeedback() {
         guard !levelUpPulse else { return }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        OhanaFeedback.success()
         spawnEnergyParticles(count: 22)
         withAnimation(GoMotion.fab) {
             levelUpPulse = true
             levelUpBadgeVisible = true
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+        levelUpFeedbackTask?.cancel()
+        levelUpFeedbackTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 700) {
             withAnimation(GoMotion.hero) {
                 levelUpPulse = false
             }
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.35) {
-            withAnimation(GoMotion.quick) {
-                levelUpBadgeVisible = false
+            levelUpFeedbackTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 650) {
+                withAnimation(GoMotion.quick) {
+                    levelUpBadgeVisible = false
+                }
+                levelUpFeedbackTask = nil
             }
         }
     }
@@ -2474,8 +2958,10 @@ struct OasisRewardView: View {
                 energyParticles[i].opacity  = 0
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.75) {
+        particleCleanupTask?.cancel()
+        particleCleanupTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 1_750) {
             energyParticles.removeAll()
+            particleCleanupTask = nil
         }
     }
 }

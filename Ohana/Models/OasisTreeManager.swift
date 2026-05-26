@@ -97,10 +97,7 @@ final class OasisTreeManager {
     var totalEnergy: Int { islandEnergy + injectedEnergy }
 
     var treeLevel: TreeLevel {
-        for lv in TreeLevel.allCases.reversed() {
-            if totalEnergy >= energyThresholds[lv.rawValue - 1] { return lv }
-        }
-        return .lv1
+        Self.treeLevel(forTotalEnergy: totalEnergy)
     }
 
     /// 当前级别起始能量
@@ -109,10 +106,29 @@ final class OasisTreeManager {
     var nextLevelThreshold: Int { energyThresholds[min(treeLevel.rawValue, 9)] }
 
     var progressToNextLevel: Double {
-        guard treeLevel < .lv10 else { return 1.0 }
-        let span = nextLevelThreshold - currentLevelStart
+        Self.progressToNextLevel(forTotalEnergy: totalEnergy)
+    }
+
+    static func treeLevel(forTotalEnergy totalEnergy: Int) -> TreeLevel {
+        for lv in TreeLevel.allCases.reversed() {
+            if totalEnergy >= energyThresholds[lv.rawValue - 1] { return lv }
+        }
+        return .lv1
+    }
+
+    static func nextLevelThreshold(forTotalEnergy totalEnergy: Int) -> Int {
+        let level = treeLevel(forTotalEnergy: totalEnergy)
+        return energyThresholds[min(level.rawValue, 9)]
+    }
+
+    static func progressToNextLevel(forTotalEnergy totalEnergy: Int) -> Double {
+        let level = treeLevel(forTotalEnergy: totalEnergy)
+        guard level < .lv10 else { return 1.0 }
+        let currentStart = energyThresholds[level.rawValue - 1]
+        let nextThreshold = energyThresholds[min(level.rawValue, 9)]
+        let span = nextThreshold - currentStart
         guard span > 0 else { return 1.0 }
-        return min(1.0, Double(totalEnergy - currentLevelStart) / Double(span))
+        return min(1.0, Double(totalEnergy - currentStart) / Double(span))
     }
 
     // MARK: - 升级追踪（防止重复奖励）
@@ -175,7 +191,30 @@ final class OasisTreeManager {
 
     // MARK: - Load Energy from ModelContext
 
+    func refreshPreviewEnergy(modelContext: ModelContext, pets: [Pet], humans: [Human], plants: [Plant] = []) {
+        _ = plants
+        islandEnergy = Self.calculatedIslandEnergy(
+            modelContext: modelContext,
+            pets: pets,
+            humans: humans
+        )
+    }
+
     func refreshEnergy(modelContext: ModelContext, pets: [Pet], humans: [Human], plants: [Plant] = []) {
+        _ = plants
+        islandEnergy = Self.calculatedIslandEnergy(
+            modelContext: modelContext,
+            pets: pets,
+            humans: humans
+        )
+        checkAndRewardLevelUp(modelContext: modelContext)
+    }
+
+    private static func calculatedIslandEnergy(
+        modelContext: ModelContext,
+        pets: [Pet],
+        humans: [Human]
+    ) -> Int {
         var total = 0
         for pet in pets {
             total += pet.careLogs.count
@@ -190,8 +229,7 @@ final class OasisTreeManager {
             FetchDescriptor<Event>(predicate: #Predicate { $0.relatedEntityType == "Plant" })
         )) ?? 0
         total += plantEventCount
-        islandEnergy = total
-        checkAndRewardLevelUp(modelContext: modelContext)
+        return total
     }
 
     // MARK: - Inject Energy（消耗椰子，增加树经验）

@@ -6,8 +6,10 @@
 //
 
 import SwiftUI
+import Combine
+import UniformTypeIdentifiers
 
-enum VerticalHomeTab: String, CaseIterable, Identifiable {
+enum VerticalHomeTab: String, CaseIterable, Identifiable, Hashable {
     case home
     case calendar
     case oasis
@@ -34,119 +36,413 @@ enum VerticalHomeTab: String, CaseIterable, Identifiable {
     }
 }
 
+@MainActor
+final class VerticalHomeTabVisualState: ObservableObject {
+    @Published private(set) var selectedTab: VerticalHomeTab
+    private var commitTask: Task<Void, Never>?
+
+    init(selectedTab: VerticalHomeTab = .home) {
+        self.selectedTab = selectedTab
+    }
+
+    deinit {
+        commitTask?.cancel()
+    }
+
+    func select(_ tab: VerticalHomeTab) {
+        guard selectedTab != tab else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            selectedTab = tab
+        }
+    }
+
+    func sync(_ tab: VerticalHomeTab) {
+        select(tab)
+    }
+
+    func scheduleCommit(
+        for tab: VerticalHomeTab,
+        milliseconds: UInt64,
+        commit: @escaping @MainActor () -> Void
+    ) {
+        commitTask?.cancel()
+        commitTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: milliseconds) { [weak self] in
+            guard let self, self.selectedTab == tab else { return }
+            commit()
+            self.commitTask = nil
+        }
+    }
+
+    func cancelCommit() {
+        commitTask?.cancel()
+        commitTask = nil
+    }
+}
+
+enum VerticalHomeTabMountPolicy {
+    static func mountedTabs(
+        active: VerticalHomeTab,
+        outgoing: VerticalHomeTab?,
+        prepared: Set<VerticalHomeTab> = []
+    ) -> Set<VerticalHomeTab> {
+        var tabs: Set<VerticalHomeTab> = prepared
+        tabs.insert(active)
+        if let outgoing {
+            tabs.insert(outgoing)
+        }
+        return tabs
+    }
+
+    static func lifecycle(
+        for tab: VerticalHomeTab,
+        active: VerticalHomeTab,
+        outgoing: VerticalHomeTab?,
+        selected: VerticalHomeTab,
+        preparing: VerticalHomeTab? = nil,
+        prepared: Set<VerticalHomeTab> = []
+    ) -> VerticalHomePageLifecycle {
+        let isActivePage = tab == active
+        let isVisiblePage = isActivePage || tab == outgoing
+        let isPreparingPage = tab == preparing
+        return VerticalHomePageLifecycle(
+            isPrepared: isPreparingPage || prepared.contains(tab) || (isActivePage && selected == tab),
+            isPreparingForDisplay: isPreparingPage,
+            isVisible: isVisiblePage,
+            isLive: isActivePage && outgoing == nil && selected == tab
+        )
+    }
+}
+
+struct VerticalHomePageLifecycle: Equatable {
+    let isPrepared: Bool
+    let isPreparingForDisplay: Bool
+    let isVisible: Bool
+    let isLive: Bool
+}
+
 struct VerticalHomePagedContent<Home: View, Calendar: View, Oasis: View, Plants: View>: View {
-    let selectedTab: VerticalHomeTab
-    @ViewBuilder var home: () -> Home
-    @ViewBuilder var calendar: () -> Calendar
-    @ViewBuilder var oasis: () -> Oasis
-    @ViewBuilder var plants: () -> Plants
+    @ObservedObject var tabState: VerticalHomeTabVisualState
+    @ViewBuilder var home: (_ lifecycle: VerticalHomePageLifecycle) -> Home
+    @ViewBuilder var calendar: (_ lifecycle: VerticalHomePageLifecycle) -> Calendar
+    @ViewBuilder var oasis: (_ lifecycle: VerticalHomePageLifecycle) -> Oasis
+    @ViewBuilder var plants: (_ lifecycle: VerticalHomePageLifecycle) -> Plants
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
-    @State private var pagePosition: CGFloat = 0
-    @State private var didSyncInitialPosition = false
+    @State private var activeTab: VerticalHomeTab = .home
+    @State private var outgoingTab: VerticalHomeTab?
+    @State private var preparingTab: VerticalHomeTab?
+    @State private var mountedTabs: Set<VerticalHomeTab> = [.home]
+    @State private var preparedTabs: Set<VerticalHomeTab> = []
+    @State private var transitionProgress: CGFloat = 1
+    @State private var transitionDirection: CGFloat = 1
+    @State private var preflightTask: Task<Void, Never>?
+    @State private var animationTask: Task<Void, Never>?
+    @State private var cleanupTask: Task<Void, Never>?
+    @State private var prepareTask: Task<Void, Never>?
 
     var body: some View {
         GeometryReader { geo in
-            let position = didSyncInitialPosition ? pagePosition : CGFloat(selectedIndex)
-            HStack(spacing: 0) {
-                page(home(), tab: .home, size: geo.size, pagePosition: position)
-                page(calendar(), tab: .calendar, size: geo.size, pagePosition: position)
-                page(oasis(), tab: .oasis, size: geo.size, pagePosition: position)
-                page(plants(), tab: .plants, size: geo.size, pagePosition: position)
+            ZStack {
+                ForEach(mountedTabsInDisplayOrder, id: \.self) { tab in
+                    let isVisiblePage = tab == activeTab || tab == outgoingTab
+                    let isActivePage = tab == activeTab
+                    let lifecycle = VerticalHomeTabMountPolicy.lifecycle(
+                        for: tab,
+                        active: activeTab,
+                        outgoing: outgoingTab,
+                        selected: tabState.selectedTab,
+                        preparing: preparingTab,
+                        prepared: preparedTabs
+                    )
+                    page(
+                        for: tab,
+                        size: geo.size,
+                        relative: pageRelative(for: tab),
+                        isActive: isActivePage,
+                        lifecycle: lifecycle,
+                        isVisiblePage: isVisiblePage
+                    )
+                    .zIndex(pageZIndex(for: tab))
+                    .allowsHitTesting(lifecycle.isLive)
+                    .accessibilityHidden(!lifecycle.isLive)
+                }
             }
-            .frame(width: geo.size.width * CGFloat(VerticalHomeTab.allCases.count), alignment: .leading)
-            .offset(x: -geo.size.width * position)
-            .onAppear {
-                syncPagePosition(animated: false)
-            }
-            .onChange(of: selectedTab) { _, _ in
-                syncPagePosition(animated: true)
-            }
+            .frame(width: geo.size.width, height: geo.size.height)
         }
         .clipped()
+        .onAppear {
+            syncActiveTabIfNeeded()
+            schedulePreparedTabsWarmup()
+        }
+        .onDisappear {
+            cleanupTask?.cancel()
+            cleanupTask = nil
+            preflightTask?.cancel()
+            preflightTask = nil
+            animationTask?.cancel()
+            animationTask = nil
+            prepareTask?.cancel()
+            prepareTask = nil
+        }
+        .onChange(of: tabState.selectedTab) { _, newValue in
+            beginPageTransition(to: newValue)
+        }
     }
 
-    private var selectedIndex: Int {
-        VerticalHomeTab.allCases.firstIndex(of: selectedTab) ?? 0
+    private var mountedTabsInDisplayOrder: [VerticalHomeTab] {
+        VerticalHomeTab.allCases.filter { mountedTabs.contains($0) }
+    }
+
+    private var warmupTabs: Set<VerticalHomeTab> {
+        Set(warmupOrder)
+    }
+
+    private var warmupOrder: [VerticalHomeTab] {
+        [.calendar, .oasis, .plants]
+    }
+
+    private var hasActivePageTransition: Bool {
+        outgoingTab != nil
+    }
+
+    private var incomingRelative: CGFloat {
+        guard outgoingTab != nil else { return 0 }
+        return transitionDirection * (1 - transitionProgress)
+    }
+
+    private var outgoingRelative: CGFloat {
+        guard outgoingTab != nil else { return 0 }
+        return -transitionDirection * transitionProgress
     }
 
     private var pageSwitchAnimation: Animation {
-        .interactiveSpring(response: 0.48, dampingFraction: 0.88, blendDuration: 0.16)
+        GoMotion.page
     }
 
     private var canAnimatePages: Bool {
         !reduceMotion && workloadPolicy.shouldRunInteractionAnimation(isVisible: true)
     }
 
-    private func syncPagePosition(animated: Bool) {
-        let target = CGFloat(selectedIndex)
-        guard didSyncInitialPosition else {
-            didSyncInitialPosition = true
-            pagePosition = target
-            return
+    private var cleanupDelayMilliseconds: UInt64 {
+        canAnimatePages ? 520 : 130
+    }
+
+    private func preflightDelayMilliseconds(for tab: VerticalHomeTab) -> UInt64 {
+        if tab == .oasis {
+            return 0
         }
-        guard abs(pagePosition - target) > 0.001 else { return }
-        let animation = canAnimatePages ? pageSwitchAnimation : GoMotion.reduced
-        if animated {
-            withAnimation(animation) {
-                pagePosition = target
-            }
-        } else {
-            pagePosition = target
-        }
+        return preparedTabs.contains(tab) ? 8 : 32
     }
 
     @ViewBuilder
-    private func page(_ content: some View, tab: VerticalHomeTab, size: CGSize, pagePosition: CGFloat) -> some View {
-        let relative = relativePosition(for: tab, pagePosition: pagePosition)
-        let pageContent = content
-            .frame(width: size.width, height: size.height)
-            .scaleEffect(pageScale(relative), anchor: .center)
-            .rotation3DEffect(
-                .degrees(pageRotation(relative)),
-                axis: (x: 0, y: 1, z: 0),
-                anchor: relative < 0 ? .trailing : .leading,
-                perspective: 0.72
-            )
-            .offset(y: pageLift(relative))
-            .opacity(pageOpacity(relative))
-            .zIndex(Double(3 - min(abs(relative), 2)))
-            .allowsHitTesting(abs(relative) < 0.5)
+    private func page(
+        for tab: VerticalHomeTab,
+        size: CGSize,
+        relative: CGFloat,
+        isActive: Bool,
+        lifecycle: VerticalHomePageLifecycle,
+        isVisiblePage: Bool
+    ) -> some View {
+        ZStack {
+            pageContent(for: tab, lifecycle: lifecycle)
+                .transaction { transaction in
+                    if outgoingTab != nil {
+                        transaction.animation = nil
+                        transaction.disablesAnimations = true
+                    }
+                }
+        }
+        .frame(width: size.width, height: size.height)
+        .offset(x: pageOffset(relative, width: size.width))
+        .animation(hasActivePageTransition && canAnimatePages ? pageSwitchAnimation : nil, value: transitionProgress)
+        .opacity(isVisiblePage ? 1 : 0)
+    }
 
-        if abs(relative) < 0.001 {
-            pageContent
-        } else {
-            pageContent.compositingGroup()
+    @ViewBuilder
+    private func pageContent(for tab: VerticalHomeTab, lifecycle: VerticalHomePageLifecycle) -> some View {
+        switch tab {
+        case .home:
+            home(lifecycle)
+        case .calendar:
+            calendar(lifecycle)
+        case .oasis:
+            oasis(lifecycle)
+        case .plants:
+            plants(lifecycle)
         }
     }
 
-    private func relativePosition(for tab: VerticalHomeTab, pagePosition: CGFloat) -> CGFloat {
-        let index = VerticalHomeTab.allCases.firstIndex(of: tab) ?? 0
-        return CGFloat(index) - pagePosition
+    private func syncActiveTabIfNeeded() {
+        guard activeTab != tabState.selectedTab else { return }
+        cleanupTask?.cancel()
+        cleanupTask = nil
+        preflightTask?.cancel()
+        preflightTask = nil
+        animationTask?.cancel()
+        animationTask = nil
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            mountedTabs = mountedTabsFor(active: tabState.selectedTab, outgoing: nil)
+            activeTab = tabState.selectedTab
+            outgoingTab = nil
+            preparingTab = nil
+            transitionProgress = 1
+        }
     }
 
-    private func pageScale(_ relative: CGFloat) -> CGFloat {
-        1 - min(abs(relative), 1) * 0.10
+    private func schedulePreparedTabsWarmup() {
+        guard !warmupTabs.isSubset(of: preparedTabs) else { return }
+        prepareTask?.cancel()
+        prepareTask = Task { @MainActor in
+            for (index, tab) in warmupOrder.enumerated() where !preparedTabs.contains(tab) {
+                await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: index == 0 ? 360 : 180)
+                guard !Task.isCancelled else { return }
+                guard !preparedTabs.contains(tab) else { continue }
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    preparedTabs.insert(tab)
+                    mountedTabs = mountedTabsFor(active: activeTab, outgoing: outgoingTab)
+                }
+            }
+            prepareTask = nil
+        }
     }
 
-    private func pageRotation(_ relative: CGFloat) -> Double {
-        Double(-min(max(relative, -1), 1) * 10)
+    private func beginPageTransition(to tab: VerticalHomeTab) {
+        guard tab != activeTab else {
+            cleanupOutgoingPage()
+            return
+        }
+
+        cleanupTask?.cancel()
+        preflightTask?.cancel()
+        animationTask?.cancel()
+        prepareTask?.cancel()
+        prepareTask = nil
+        let previousTab = activeTab
+        let direction = transitionDirection(from: previousTab, to: tab)
+        let preflightDelay = preflightDelayMilliseconds(for: tab)
+
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            preparingTab = tab
+            preparedTabs.insert(tab)
+            mountedTabs = mountedTabsFor(active: activeTab, outgoing: outgoingTab)
+            transitionDirection = direction
+            transitionProgress = 1
+        }
+
+        preflightTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: preflightDelay) {
+            guard preparingTab == tab, activeTab == previousTab else {
+                preflightTask = nil
+                return
+            }
+            startPreparedPageTransition(to: tab, from: previousTab, direction: direction)
+            preflightTask = nil
+        }
     }
 
-    private func pageLift(_ relative: CGFloat) -> CGFloat {
-        min(abs(relative), 1) * 14
+    private func startPreparedPageTransition(to tab: VerticalHomeTab, from previousTab: VerticalHomeTab, direction: CGFloat) {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            preparingTab = nil
+            outgoingTab = previousTab
+            activeTab = tab
+            preparedTabs.insert(tab)
+            mountedTabs = mountedTabsFor(active: tab, outgoing: previousTab)
+            transitionDirection = direction
+            transitionProgress = 0
+        }
+
+        let shouldAnimate = canAnimatePages
+        let cleanupDelay = cleanupDelayMilliseconds
+        let animation = pageSwitchAnimation
+        if shouldAnimate {
+            animationTask = OhanaFrameScheduler.runAfterNextFrame {
+                guard activeTab == tab, outgoingTab == previousTab else { return }
+                withAnimation(animation) {
+                    transitionProgress = 1
+                }
+                animationTask = nil
+            }
+        } else {
+            var reducedTransaction = Transaction(animation: nil)
+            reducedTransaction.disablesAnimations = true
+            withTransaction(reducedTransaction) {
+                transitionProgress = 1
+            }
+        }
+
+        cleanupTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: cleanupDelay) {
+            guard activeTab == tab else { return }
+            cleanupOutgoingPage()
+        }
     }
 
-    private func pageOpacity(_ relative: CGFloat) -> Double {
-        let distance = abs(relative)
-        guard distance > 1 else { return 1 }
-        return max(0.18, 1 - Double(min(distance - 1, 1)) * 0.82)
+    private func cleanupOutgoingPage() {
+        cleanupTask?.cancel()
+        cleanupTask = nil
+        preflightTask?.cancel()
+        preflightTask = nil
+        animationTask?.cancel()
+        animationTask = nil
+        guard outgoingTab != nil || preparingTab != nil || transitionProgress != 1 else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            outgoingTab = nil
+            preparingTab = nil
+            transitionProgress = 1
+            mountedTabs = mountedTabsFor(active: activeTab, outgoing: nil)
+        }
+        schedulePreparedTabsWarmup()
+    }
+
+    private func mountedTabsFor(active: VerticalHomeTab, outgoing: VerticalHomeTab?) -> Set<VerticalHomeTab> {
+        VerticalHomeTabMountPolicy.mountedTabs(active: active, outgoing: outgoing, prepared: preparedTabs)
+    }
+
+    private func pageRelative(for tab: VerticalHomeTab) -> CGFloat {
+        if tab == activeTab {
+            return incomingRelative
+        }
+        if tab == outgoingTab {
+            return outgoingRelative
+        }
+        if tab == preparingTab {
+            return transitionDirection
+        }
+        return 0
+    }
+
+    private func pageZIndex(for tab: VerticalHomeTab) -> Double {
+        if tab == activeTab { return 3 }
+        if tab == outgoingTab { return 2 }
+        return 0
+    }
+
+    private func transitionDirection(from oldTab: VerticalHomeTab, to newTab: VerticalHomeTab) -> CGFloat {
+        let oldIndex = VerticalHomeTab.allCases.firstIndex(of: oldTab) ?? 0
+        let newIndex = VerticalHomeTab.allCases.firstIndex(of: newTab) ?? oldIndex
+        return newIndex >= oldIndex ? 1 : -1
+    }
+
+    private func pageOffset(_ relative: CGFloat, width: CGFloat) -> CGFloat {
+        min(max(relative, -1), 1) * width
     }
 }
 
 struct VerticalHomeTaskDeck: View {
     @Binding var isCollapsed: Bool
+    let isVisible: Bool
+    let isLive: Bool
     let pendingCount: Int
     let height: CGFloat
     let activePets: [Pet]
@@ -162,6 +458,7 @@ struct VerticalHomeTaskDeck: View {
     let onTapNegativeSignal: (IslandNegativeSignal) -> Void
     let onTapOasis: () -> Void
     let onTapFamilyTask: (FamilyCollaborationTask) -> Void
+    let onConfirmExchange: (CoconutExchangeRequest) -> Void
     let onFirstSuccessFeed: (Pet) -> Void
     let onFirstSuccessPlay: (Pet) -> Void
     let onFirstSuccessMoment: (Pet) -> Void
@@ -171,7 +468,16 @@ struct VerticalHomeTaskDeck: View {
 
     var body: some View {
         expandedDeck
-        .frame(height: height, alignment: .top)
+            .opacity(isVisible ? 1 : 0)
+            .allowsHitTesting(isLive)
+            .accessibilityHidden(!isVisible)
+            .transaction { transaction in
+                if !isVisible {
+                    transaction.animation = nil
+                    transaction.disablesAnimations = true
+                }
+            }
+            .frame(height: height, alignment: .top)
     }
 
     private var expandedDeck: some View {
@@ -183,12 +489,14 @@ struct VerticalHomeTaskDeck: View {
                 humans: humans,
                 events: events,
                 activePet: activePet,
+                isLive: isLive,
                 presentation: .compactStack,
                 onOpenQuest: onOpenQuest,
                 onCompleteQuest: onCompleteQuest,
                 onTapNegativeSignal: onTapNegativeSignal,
                 onTapOasis: onTapOasis,
-                onTapFamilyTask: onTapFamilyTask
+                onTapFamilyTask: onTapFamilyTask,
+                onConfirmExchange: onConfirmExchange
             )
         }
     }
@@ -201,7 +509,7 @@ struct VerticalHomeTaskDeck: View {
 }
 
 struct VerticalHomeBottomBar: View {
-    @Binding var selectedTab: VerticalHomeTab
+    @ObservedObject var tabState: VerticalHomeTabVisualState
     @Binding var isFabExpanded: Bool
     @Binding var itemsVisible: Bool
     let activeCard: FocusCard?
@@ -219,6 +527,7 @@ struct VerticalHomeBottomBar: View {
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     private var l: L10n { L10n(appLanguage) }
+    private var selectedTab: VerticalHomeTab { tabState.selectedTab }
     private var canAnimate: Bool {
         !reduceMotion && workloadPolicy.shouldRunInteractionAnimation(isVisible: true)
     }
@@ -439,11 +748,13 @@ private struct VerticalFabShortcutButton: View {
                     Circle()
                         .fill(Color.goPrimary.opacity(item.isAvailable ? 1 : 0.36))
                         .frame(width: 42, height: 42)
-                    Image(systemName: item.icon)
-                        .font(.system(size: 15, weight: .black))
-                        .symbolRenderingMode(.monochrome)
-                        .foregroundStyle(Color.ohanaPrimaryActionText.opacity(item.isAvailable ? 1 : 0.54))
-                        .frame(width: 42, height: 42)
+                    OhanaQuickActionIcon(
+                        actionType: item.id,
+                        fallbackSystemName: item.icon,
+                        size: 24,
+                        color: Color.ohanaPrimaryActionText.opacity(item.isAvailable ? 1 : 0.54)
+                    )
+                    .frame(width: 42, height: 42)
 
                     if let badge = item.badge {
                         Text(badge)
@@ -532,48 +843,71 @@ struct VerticalHomeEmbeddedAction: Identifiable {
 struct VerticalHomeEmbeddedQuickActions: View {
     let title: String
     let items: [VerticalHomeEmbeddedAction]
-    let onAll: () -> Void
+    var isEditMode: Bool = false
+    var jiggle: Bool = false
+    var shouldReduceWork: Bool = false
+    var forcesSubmenusBelow: Bool = false
+    var draggingItemId: Binding<String?>?
+    var onToggleEdit: (() -> Void)?
+    var onMove: (_ fromId: String, _ toId: String) -> Void = { _, _ in }
+    var onRemove: (_ id: String) -> Void = { _ in }
+    @AppStorage("appLanguage") private var appLanguage = "zh"
     @State private var openActionId: String? = nil
+    @State private var lastDropTargetId: String? = nil
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(title)
                     .font(.system(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.goCardWhite.opacity(0.78))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.92))
                 Spacer()
-                Button {
-                    OhanaFeedback.light()
-                    onAll()
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 13, weight: .black))
-                        .symbolRenderingMode(.monochrome)
-                        .foregroundStyle(Color.goCardWhite)
-                        .frame(width: 32, height: 28)
-                        .background(Color.goCardWhite.opacity(0.14), in: Capsule())
+                if let onToggleEdit {
+                    Button {
+                        OhanaFeedback.light()
+                        withAnimation(GoMotion.feedback) {
+                            openActionId = nil
+                        }
+                        onToggleEdit()
+                    } label: {
+                        Image(systemName: isEditMode ? "checkmark" : "pencil")
+                            .font(.system(size: 13, weight: .black))
+                            .symbolRenderingMode(.monochrome)
+                            .foregroundStyle(isEditMode ? Color.goPrimary : Color.goCardWhite)
+                            .frame(width: 44, height: 32)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .accessibilityLabel(isEditMode
+                                        ? l.tr(zh: "完成编辑快捷操作", en: "Done editing quick actions", de: "Schnellaktionen fertig bearbeiten")
+                                        : l.tr(zh: "编辑快捷操作", en: "Edit quick actions", de: "Schnellaktionen bearbeiten"))
                 }
-                .buttonStyle(ScaleButtonStyle())
             }
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 9), count: 3), spacing: 10) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 4), spacing: 8) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     actionCell(item, index: index)
                         .zIndex(openActionId == item.id ? 40 : Double(items.count - index))
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .background(Color.arkInk.opacity(0.18), in: RoundedRectangle(cornerRadius: 24, style: .continuous)) // ui-v4: allow embedded card action dock contrast
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
         .onChange(of: items.map(\.id).joined(separator: "|")) { _, _ in
             openActionId = nil
+        }
+        .onChange(of: isEditMode) { _, _ in
+            openActionId = nil
+            lastDropTargetId = nil
         }
     }
 
     private func actionCell(_ item: VerticalHomeEmbeddedAction, index: Int) -> some View {
         ZStack {
             Button {
+                guard !isEditMode else { return }
                 OhanaFeedback.light()
                 if item.detailAction == nil {
                     item.action()
@@ -583,21 +917,28 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     }
                 }
             } label: {
+                let showsCompleted = item.isCompleted && !isEditMode
                 VStack(spacing: 5) {
-                    Image(systemName: item.isCompleted ? "checkmark" : item.icon)
-                        .font(.system(size: 16, weight: .black))
-                        .symbolRenderingMode(.monochrome)
+                    OhanaQuickActionIcon(
+                        actionType: item.id,
+                        fallbackSystemName: item.icon,
+                        size: 25,
+                        color: showsCompleted ? Color.goPrimary : Color.goCardWhite,
+                        isCompleted: showsCompleted,
+                        showsCompletionBadge: showsCompleted
+                    )
                     Text(item.title)
-                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .font(.system(size: 9.5, weight: .black, design: .rounded))
+                        .foregroundStyle(showsCompleted ? Color.goPrimary : Color.goCardWhite)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.64)
+                        .minimumScaleFactor(0.55)
                 }
-                .foregroundStyle(Color.goCardWhite)
                 .frame(maxWidth: .infinity)
-                .frame(height: 56)
-                .background(Color.goCardWhite.opacity(item.isCompleted ? 0.22 : 0.13), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+                .frame(height: 54)
+                .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(ScaleButtonStyle())
+            .allowsHitTesting(!isEditMode)
 
             if openActionId == item.id, let detailAction = item.detailAction {
                 verticalEmbeddedInlineMenu(
@@ -608,7 +949,31 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .center)))
                 .zIndex(80)
             }
+
+            if isEditMode {
+                editDragLayer(for: item)
+            }
         }
+        .scaleEffect(isDragging(item) ? 1.035 : 1)
+        .opacity(isDragging(item) ? 0.72 : 1)
+        .rotationEffect(.degrees(editJiggleAngle(for: item)))
+        .animation(editJiggleAnimation, value: jiggle)
+        .animation(GoMotion.selection, value: draggingItemId?.wrappedValue)
+        .overlay(alignment: .topLeading) {
+            if isEditMode {
+                removeButton(for: item)
+            }
+        }
+        .onDrop(
+            of: [.plainText, .utf8PlainText],
+            delegate: VerticalHomeEmbeddedActionDropDelegate(
+                isEnabled: isEditMode,
+                targetId: item.id,
+                draggingItemId: draggingItemId,
+                lastDropTargetId: $lastDropTargetId,
+                onMove: onMove
+            )
+        )
     }
 
     private func verticalEmbeddedInlineMenu(
@@ -629,7 +994,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
             )
         }
         .padding(6)
-        .background(Color.ohanaCardSurfaceElevated, in: Capsule())
+        .background(Color.arkInk.opacity(0.34), in: Capsule()) // ui-v4: allow embedded quick action submenu contrast on dark card gradient
         .shadow(color: Color.arkInk.opacity(0.24), radius: 14, x: 0, y: 8) // ui-v4: allow embedded quick action submenu lift
         .offset(x: menuOffsetX(index: index), y: menuOffsetY(index: index))
     }
@@ -645,23 +1010,137 @@ struct VerticalHomeEmbeddedQuickActions: View {
             Image(systemName: icon)
                 .font(.system(size: 14, weight: .black))
                 .symbolRenderingMode(.monochrome)
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .frame(width: 38, height: 34)
-                .background(Color.ohanaControlFill, in: Capsule())
+                .foregroundStyle(Color.goCardWhite)
+                .frame(width: 44, height: 38)
+                .contentShape(Rectangle())
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(accessibility)
     }
 
+    private func editDragLayer(for item: VerticalHomeEmbeddedAction) -> some View {
+        Color.clear
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .onDrag {
+                OhanaFeedback.light()
+                withAnimation(GoMotion.selection) {
+                    draggingItemId?.wrappedValue = item.id
+                }
+                return NSItemProvider(object: item.id as NSString)
+            } preview: {
+                VStack(spacing: 6) {
+                    OhanaQuickActionIcon(
+                        actionType: item.id,
+                        fallbackSystemName: item.icon,
+                        size: 34,
+                        color: Color.goPrimary
+                    )
+                    .frame(width: 44, height: 44)
+                    Text(item.title)
+                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                }
+                .fixedSize()
+            }
+    }
+
+    private func removeButton(for item: VerticalHomeEmbeddedAction) -> some View {
+        Button {
+            OhanaFeedback.strong()
+            onRemove(item.id)
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(Color.goRed)
+                    .frame(width: 20, height: 20)
+                Image(systemName: "minus")
+                    .font(.system(size: 9, weight: .black))
+                    .symbolRenderingMode(.monochrome)
+                    .foregroundStyle(Color.arkInk)
+            }
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .offset(x: -14, y: -14)
+        .accessibilityLabel(l.tr(zh: "移除快捷操作", en: "Remove quick action", de: "Schnellaktion entfernen"))
+    }
+
+    private func isDragging(_ item: VerticalHomeEmbeddedAction) -> Bool {
+        draggingItemId?.wrappedValue == item.id
+    }
+
+    private func editJiggleAngle(for item: VerticalHomeEmbeddedAction) -> Double {
+        guard isEditMode, !isDragging(item) else { return 0 }
+        return jiggle ? -1.05 : 1.05
+    }
+
+    private var editJiggleAnimation: Animation? {
+        guard isEditMode, !shouldReduceWork else { return nil }
+        return GoMotion.quick.repeatForever(autoreverses: true)
+    }
+
     private func menuOffsetY(index: Int) -> CGFloat {
-        index >= 3 ? -54 : 54
+        if forcesSubmenusBelow {
+            return 66
+        }
+        return index >= 4 ? -52 : 52
     }
 
     private func menuOffsetX(index: Int) -> CGFloat {
-        switch index % 3 {
-        case 0: return 16
-        case 2: return -16
+        switch index % 4 {
+        case 0: return 18
+        case 3: return -18
         default: return 0
         }
+    }
+}
+
+private struct VerticalHomeEmbeddedActionDropDelegate: DropDelegate {
+    let isEnabled: Bool
+    let targetId: String
+    let draggingItemId: Binding<String?>?
+    @Binding var lastDropTargetId: String?
+    let onMove: (_ fromId: String, _ toId: String) -> Void
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggingItemId?.wrappedValue = nil
+        lastDropTargetId = nil
+        return isEnabled
+    }
+
+    func dropEntered(info: DropInfo) {
+        guard isEnabled, lastDropTargetId != targetId else { return }
+        if let fromId = draggingItemId?.wrappedValue {
+            move(fromId)
+            return
+        }
+
+        let types: [UTType] = [.plainText, .utf8PlainText]
+        guard let provider = info.itemProviders(for: types).first else { return }
+        provider.loadObject(ofClass: NSString.self) { obj, _ in
+            guard let ns = obj as? NSString else { return }
+            let fromId = ns as String
+            DispatchQueue.main.async {
+                move(fromId)
+            }
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        isEnabled ? DropProposal(operation: .move) : nil
+    }
+
+    func dropExited(info: DropInfo) {
+        if lastDropTargetId == targetId {
+            lastDropTargetId = nil
+        }
+    }
+
+    private func move(_ fromId: String) {
+        guard fromId != targetId else { return }
+        lastDropTargetId = targetId
+        OhanaFeedback.light()
+        onMove(fromId, targetId)
     }
 }

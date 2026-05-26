@@ -30,7 +30,7 @@ struct VerticalSolidHomeRenderSnapshot {
 final class VerticalSolidHomeMotionCoordinator: ObservableObject {
     @Published private(set) var renderSnapshot: VerticalSolidHomeRenderSnapshot?
     @Published private(set) var isHeroMotionActive = false
-    @Published private(set) var isTabMotionLocked = false
+    private(set) var isTabMotionLocked = false
 
     private var generation = 0
 

@@ -37,7 +37,7 @@ struct FocusHomeWalkCardFlip<Front: View>: View {
                 .allowsHitTesting(currentWalkPet == nil && rotation < 90)
 
             if let pet = currentWalkPet {
-                WalkTrackingCard(
+                WalkTrackingCardHost(
                     pet: pet,
                     onCloseSummaryToPetCard: closeWalkSummaryToPetCard
                 )

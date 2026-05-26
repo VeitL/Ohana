@@ -889,11 +889,13 @@ struct EditableProfileAvatarPicker: View {
     let cropSpecies: String
     let silhouetteSystemName: String?
 
+    @State private var showingPhotoPicker = false
     @State private var photosPickerItem: PhotosPickerItem? = nil
     @State private var showingCamera = false
     @State private var showCameraPermissionAlert = false
     @State private var pendingCapturedAvatarImage: UIImage? = nil
     @State private var cropImageItem: IdentifiableCropImage? = nil
+    @State private var cropPresentationTask: Task<Void, Never>? = nil
     @State private var isPasting = false
 
     var body: some View {
@@ -903,7 +905,9 @@ struct EditableProfileAvatarPicker: View {
                     pastePasteboardImage()
                 }
 
-                PhotosPicker(selection: $photosPickerItem, matching: .images) {
+                Button {
+                    presentPhotoLibrary()
+                } label: {
                     avatarActionLabel(icon: "photo.on.rectangle.angled", title: "相册")
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -928,6 +932,16 @@ struct EditableProfileAvatarPicker: View {
         .onChange(of: photosPickerItem) { _, item in
             handlePhotosPickerItemChanged(item)
         }
+        .onChange(of: cropImageItem) { _, new in
+            guard new == nil else { return }
+            cropPresentationTask?.cancel()
+            cropPresentationTask = nil
+        }
+        .onDisappear {
+            cropPresentationTask?.cancel()
+            cropPresentationTask = nil
+        }
+        .photosPicker(isPresented: $showingPhotoPicker, selection: $photosPickerItem, matching: .images)
         .fullScreenCover(isPresented: $showingCamera, onDismiss: {
             if let img = pendingCapturedAvatarImage {
                 pendingCapturedAvatarImage = nil
@@ -1007,16 +1021,29 @@ struct EditableProfileAvatarPicker: View {
                     AddPetWizardView.cropReadyImage(from: data, maxPixel: 1_600)
                 }.value
                 await MainActor.run {
+                    photosPickerItem = nil
                     if let resized {
-                        cropImageItem = IdentifiableCropImage(image: resized)
-                        AppPerformanceMonitor.shared.record("相册到裁剪页", startedAt: startedAt, note: cropSpecies)
+                        presentAvatarCropAfterMediaDismissal(resized, delayMilliseconds: 360) {
+                            AppPerformanceMonitor.shared.record("相册到裁剪页", startedAt: startedAt, note: cropSpecies)
+                        }
                     }
+                }
+            } else {
+                await MainActor.run {
+                    photosPickerItem = nil
                 }
             }
         }
     }
 
+    private func presentPhotoLibrary() {
+        GoKeyboard.dismiss()
+        cropPresentationTask?.cancel()
+        showingPhotoPicker = true
+    }
+
     private func presentCamera() {
+        cropPresentationTask?.cancel()
         requestOhanaCameraAccess {
             showingCamera = true
         } onDenied: {
@@ -1047,9 +1074,28 @@ struct EditableProfileAvatarPicker: View {
             let prepared = await Task.detached(priority: .userInitiated) {
                 AddPetWizardView.preparedCropImage(image, maxPixel: 1_600)
             }.value
-            try? await Task.sleep(nanoseconds: 120_000_000)
-            cropImageItem = IdentifiableCropImage(image: prepared)
-            AppPerformanceMonitor.shared.markEnd("avatar.camera.to.crop", name: "拍照到裁剪页", note: cropSpecies)
+            await MainActor.run {
+                presentAvatarCropAfterMediaDismissal(prepared, delayMilliseconds: 320) {
+                    AppPerformanceMonitor.shared.markEnd("avatar.camera.to.crop", name: "拍照到裁剪页", note: cropSpecies)
+                }
+            }
+        }
+    }
+
+    private func presentAvatarCropAfterMediaDismissal(
+        _ image: UIImage,
+        delayMilliseconds: UInt64,
+        onPresented: @escaping @MainActor () -> Void
+    ) {
+        cropPresentationTask?.cancel()
+        cropPresentationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
+            guard !showingPhotoPicker, !showingCamera else {
+                presentAvatarCropAfterMediaDismissal(image, delayMilliseconds: 140, onPresented: onPresented)
+                return
+            }
+            cropImageItem = IdentifiableCropImage(image: image)
+            cropPresentationTask = nil
+            onPresented()
         }
     }
 }

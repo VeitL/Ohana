@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Family / 家庭" class="ohana-duotone-icon">
+  <title>Family / 家庭</title>
+  <g>
+
+      <circle style="fill:#298b9b" cx="12.3" cy="10.6" r="4.2"/>
+      <circle style="fill:#ff9a6a" cx="20.1" cy="11.9" r="3.4"/>
+      <path style="fill:#298b9b" d="M5.8 24.6c.6-5 3.4-8 7-8s6.3 3 7 8H5.8Z"/>
+      <path style="fill:#ff9a6a;opacity:.28" d="M15.4 24.6c.5-4 2.8-6.4 5.7-6.4 2.7 0 4.9 2.4 5.4 6.4H15.4Z"/>
+  </g>
+</svg>

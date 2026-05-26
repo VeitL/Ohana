@@ -80,36 +80,36 @@ enum PetFoodBrandCatalog {
     private static let brandMap: [String: [FeedFoodKind: [String]]] = [
         "CN": [
             .dry: ["皇家", "冠能", "渴望", "爱肯拿", "纽顿", "素力高", "网易严选", "鲜朗", "伯纳天纯", "麦富迪", "高爷家", "蓝氏", "比瑞吉", "耐威克", "海洋之星"],
-            .wet: ["巅峰", "K9 Natural", "希宝", "珍致", "麦富迪", "高爷家", "鲜朗", "尾巴生活", "网易严选", "小佩", "蓝氏", "喵达", "红狗"]
+            .wet: ["巅峰", "K9 Natural", "希宝", "珍致", "麦富迪", "高爷家", "鲜朗", "尾巴生活", "网易严选", "小佩", "蓝氏", "喵达", "红狗"],
         ],
         "US": [
             .dry: ["Royal Canin", "Purina Pro Plan", "Hill's Science Diet", "Blue Buffalo", "Wellness", "Orijen", "Acana", "Taste of the Wild", "Instinct", "Iams", "Merrick", "Nutro", "Natural Balance"],
-            .wet: ["Fancy Feast", "Friskies", "Sheba", "Weruva", "Tiki Cat", "Wellness", "Hill's Science Diet", "Royal Canin", "Blue Buffalo", "Purina Pro Plan", "Instinct", "Merrick"]
+            .wet: ["Fancy Feast", "Friskies", "Sheba", "Weruva", "Tiki Cat", "Wellness", "Hill's Science Diet", "Royal Canin", "Blue Buffalo", "Purina Pro Plan", "Instinct", "Merrick"],
         ],
         "DE": [
             .dry: ["Royal Canin", "Purina Pro Plan", "Hill's Science Plan", "Josera", "Animonda", "Mera", "Wild Freedom", "Happy Cat", "Sanabelle", "Concept for Life", "Leonardo", "Bosch"],
-            .wet: ["Animonda", "Mjamjam", "Feringa", "Wild Freedom", "Catz Finefood", "Leonardo", "Royal Canin", "Purina Gourmet", "Sheba", "Whiskas", "MAC's"]
+            .wet: ["Animonda", "Mjamjam", "Feringa", "Wild Freedom", "Catz Finefood", "Leonardo", "Royal Canin", "Purina Gourmet", "Sheba", "Whiskas", "MAC's"],
         ],
         "GB": [
             .dry: ["Royal Canin", "Purina Pro Plan", "Hill's Science Plan", "James Wellbeloved", "Iams", "Lily's Kitchen", "Applaws", "Wellness CORE", "Scrumbles", "Harringtons", "Burns"],
-            .wet: ["Felix", "Sheba", "Gourmet", "Whiskas", "Lily's Kitchen", "Applaws", "Encore", "Blink!", "Untamed", "Royal Canin", "Hill's Science Plan"]
+            .wet: ["Felix", "Sheba", "Gourmet", "Whiskas", "Lily's Kitchen", "Applaws", "Encore", "Blink!", "Untamed", "Royal Canin", "Hill's Science Plan"],
         ],
         "JP": [
             .dry: ["Royal Canin", "Purina ONE", "Hill's Science Diet", "Unicharm", "Iams", "Medyfas", "Nisshin Petfood", "Aixia", "Kanematsu", "Orijen", "Acana"],
-            .wet: ["CIAO", "Aixia", "MonPetit", "Sheba", "Kal Kan", "Royal Canin", "Hill's Science Diet", "Unicharm", "Medyfas", "Neko Genki"]
+            .wet: ["CIAO", "Aixia", "MonPetit", "Sheba", "Kal Kan", "Royal Canin", "Hill's Science Diet", "Unicharm", "Medyfas", "Neko Genki"],
         ],
         "HK": [
             .dry: ["Royal Canin", "Hill's Science Diet", "Purina Pro Plan", "Orijen", "Acana", "Ziwi Peak", "Farmina", "Wellness", "Instinct", "Taste of the Wild"],
-            .wet: ["Ziwi Peak", "Kakato", "Applaws", "Tiki Cat", "Weruva", "Sheba", "Fancy Feast", "Royal Canin", "Hill's Science Diet", "CIAO"]
+            .wet: ["Ziwi Peak", "Kakato", "Applaws", "Tiki Cat", "Weruva", "Sheba", "Fancy Feast", "Royal Canin", "Hill's Science Diet", "CIAO"],
         ],
         "TW": [
             .dry: ["皇家", "希爾思", "冠能", "渴望", "愛肯拿", "紐頓", "汪喵星球", "怪獸部落", "法米納", "耐吉斯", "莫比"],
-            .wet: ["汪喵星球", "怪獸部落", "凱特鮮廚", "巔峰", "CIAO", "Sheba", "Fancy Feast", "皇家", "希爾思", "陪心寵糧"]
+            .wet: ["汪喵星球", "怪獸部落", "凱特鮮廚", "巔峰", "CIAO", "Sheba", "Fancy Feast", "皇家", "希爾思", "陪心寵糧"],
         ],
         "GLOBAL": [
             .dry: ["Royal Canin", "Purina Pro Plan", "Hill's Science Diet", "Orijen", "Acana", "Farmina", "Ziwi Peak", "Wellness"],
-            .wet: ["Royal Canin", "Hill's Science Diet", "Sheba", "Fancy Feast", "Ziwi Peak", "Tiki Cat", "Weruva", "Applaws"]
-        ]
+            .wet: ["Royal Canin", "Hill's Science Diet", "Sheba", "Fancy Feast", "Ziwi Peak", "Tiki Cat", "Weruva", "Applaws"],
+        ],
     ]
 }
 
@@ -214,14 +214,14 @@ enum FeedRuleMetadata {
 
     static func isManualReminderEvent(_ event: Event, pet: Pet) -> Bool {
         (event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet") &&
-        event.relatedEntityId == pet.id.uuidString &&
-        event.eventType == EventType.foodChange.rawValue
+            event.relatedEntityId == pet.id.uuidString &&
+            event.eventType == EventType.foodChange.rawValue
     }
 
     static func isAutoFeederEvent(_ event: Event, pet: Pet) -> Bool {
         event.relatedEntityType == autoFeederEntityType &&
-        event.relatedEntityId == pet.id.uuidString &&
-        event.eventType == EventType.foodChange.rawValue
+            event.relatedEntityId == pet.id.uuidString &&
+            event.eventType == EventType.foodChange.rawValue
     }
 
     static func amountGrams(from event: Event, fallback: Double = 0) -> Double {
@@ -230,9 +230,10 @@ enum FeedRuleMetadata {
         }
         let pattern = #"(\d+(?:[\.,]\d+)?)\s*g"#
         if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
-            let range = NSRange(event.title.startIndex..<event.title.endIndex, in: event.title)
+            let range = NSRange(event.title.startIndex ..< event.title.endIndex, in: event.title)
             if let match = regex.firstMatch(in: event.title, options: [], range: range),
-               let capture = Range(match.range(at: 1), in: event.title) {
+               let capture = Range(match.range(at: 1), in: event.title)
+            {
                 let raw = String(event.title[capture]).replacingOccurrences(of: ",", with: ".")
                 if let value = Double(raw) { return value }
             }
@@ -255,10 +256,10 @@ enum FeedRuleMetadata {
     static func mealName(for date: Date, calendar: Calendar = .current) -> String {
         let hour = calendar.component(.hour, from: date)
         switch hour {
-        case 5..<10: return "早餐"
-        case 10..<14: return "午餐"
-        case 14..<17: return "下午餐"
-        case 17..<21: return "晚餐"
+        case 5 ..< 10: return "早餐"
+        case 10 ..< 14: return "午餐"
+        case 14 ..< 17: return "下午餐"
+        case 17 ..< 21: return "晚餐"
         default: return "夜宵"
         }
     }
@@ -286,7 +287,7 @@ enum FeedRuleMetadata {
 
         var dates: [Date] = []
         var guardCount = 0
-        while cursor <= end && guardCount < 500 {
+        while cursor <= end, guardCount < 500 {
             dates.append(cursor)
             guard let next = calendar.date(byAdding: .day, value: intervalDays, to: cursor) else { break }
             cursor = next
@@ -323,10 +324,10 @@ enum FeedStockCalculator {
         let source = careLogs ?? pet.careLogs
         return source.filter { log in
             (careLogs == nil || log.pet?.id == pet.id) &&
-            log.careType == .feeding &&
-            FeedLogMetadata.isMainFoodLog(log) &&
-            (foodKind.map { log.foodKind == $0 } ?? true) &&
-            (startDate.map { log.date >= $0 } ?? true)
+                log.careType == .feeding &&
+                FeedLogMetadata.isMainFoodLog(log) &&
+                (foodKind.map { log.foodKind == $0 } ?? true) &&
+                (startDate.map { log.date >= $0 } ?? true)
         }
     }
 
@@ -334,9 +335,9 @@ enum FeedStockCalculator {
         let source = careLogs ?? pet.careLogs
         return source.filter { log in
             (careLogs == nil || log.pet?.id == pet.id) &&
-            log.careType == .feeding &&
-            FeedLogMetadata.isTreatLog(log) &&
-            (startDate.map { log.date >= $0 } ?? true)
+                log.careType == .feeding &&
+                FeedLogMetadata.isTreatLog(log) &&
+                (startDate.map { log.date >= $0 } ?? true)
         }
     }
 
@@ -375,7 +376,8 @@ enum FeedStockCalculator {
             return max(0, sharedStockTotal)
         }
         if !log.sharedSessionId.isEmpty,
-           log.note.hasPrefix(SharedCareMetadata.sharedFeedNotePrefix) {
+           log.note.hasPrefix(SharedCareMetadata.sharedFeedNotePrefix)
+        {
             return 0
         }
         return effectiveMainFoodAmount(for: log, pet: pet)
@@ -420,7 +422,7 @@ enum FeedStockCalculator {
         events
             .filter {
                 FeedRuleMetadata.isManualReminderEvent($0, pet: pet) ||
-                FeedRuleMetadata.isAutoFeederEvent($0, pet: pet)
+                    FeedRuleMetadata.isAutoFeederEvent($0, pet: pet)
             }
             .filter { event in foodKind.map { $0 == event.foodKind } ?? true }
             .reduce(0) { total, event in
@@ -470,14 +472,15 @@ enum FeedStockCalculator {
         let sourceRecords = foodRecords ?? pet.foodRecords
         let hasModernRecord = sourceRecords.contains { record in
             (foodRecords == nil || record.pet?.id == pet.id) &&
-            record.foodKind == foodKind
+                record.foodKind == foodKind
         }
         let total = stockRecord == nil && hasModernRecord ? 0 : activeStockTotalGrams(for: pet, record: stockRecord, foodKind: foodKind)
         let consumed: Double
         let remaining: Double
         if let stockRecord,
            let correctionGrams = stockRecord.remainingCorrectionGrams,
-           let correctionDate = stockRecord.remainingCorrectionDate {
+           let correctionDate = stockRecord.remainingCorrectionDate
+        {
             consumed = mainFoodLogs(for: pet, foodKind: foodKind, since: correctionDate, careLogs: careLogs)
                 .filter { $0.date <= now }
                 .reduce(0) { $0 + stockDeductionAmount(for: $1, pet: pet) }
@@ -516,8 +519,8 @@ enum FeedStockCalculator {
         return source
             .filter { record in
                 (foodRecords == nil || record.pet?.id == pet.id) &&
-                record.foodKind == foodKind &&
-                stockOpenDay(for: record) <= today
+                    record.foodKind == foodKind &&
+                    stockOpenDay(for: record) <= today
             }
             .sorted {
                 if $0.startDate != $1.startDate { return $0.startDate > $1.startDate }
@@ -711,19 +714,24 @@ struct FeedingDashboardState {
     var todayAutoFeedLogs: [PetCareLog] {
         today.mainFoodTodayLogs.filter { FeedLogMetadata.source(for: $0) == .autoMain }
     }
+
     var todayAutoFeedCount: Int { todayAutoFeedLogs.count }
     var todayManualPlanTotalCount: Int {
         max(today.todayPlanReminders.count, manualPlanEvents.count, 1)
     }
+
     var todayManualPlanCompletedCount: Int {
         min(today.completedTodayPlanReminders.count, todayManualPlanTotalCount)
     }
+
     var todayManualPlanMissedCount: Int {
         today.missedTodayPlanReminders.count
     }
+
     var hasMissedManualPlan: Bool {
         todayManualPlanMissedCount > 0
     }
+
     var todayManualPlanCompletionText: String {
         "\(todayManualPlanCompletedCount)/\(todayManualPlanTotalCount)"
     }
@@ -761,7 +769,7 @@ struct FeedPlanDraft: Equatable {
         self.kind = kind
         self.dailyCount = min(max(dailyCount, 1), 6)
         self.times = Self.normalizedTimes(times, count: self.dailyCount, now: now, calendar: calendar)
-        self.meals = self.times.map {
+        meals = self.times.map {
             FeedPlanMealDraft(time: $0, foodKind: .dry, grams: max(0, gramsPerMeal))
         }
     }
@@ -773,9 +781,9 @@ struct FeedPlanDraft: Equatable {
         calendar: Calendar = .current
     ) {
         self.kind = kind
-        self.dailyCount = min(max(meals.count, 1), 6)
-        self.meals = Self.normalizedMeals(meals, count: self.dailyCount, now: now, calendar: calendar)
-        self.times = self.meals.map(\.time)
+        dailyCount = min(max(meals.count, 1), 6)
+        self.meals = Self.normalizedMeals(meals, count: dailyCount, now: now, calendar: calendar)
+        times = self.meals.map(\.time)
     }
 
     static func suggestedTimes(for count: Int, on date: Date = Date(), calendar: Calendar = .current) -> [Date] {
@@ -899,7 +907,8 @@ enum FeedingPlanWriter {
     ) {
         var didChange = false
         for event in planEvents(pet: pet, kind: .manualReminder, allEvents: allEvents) {
-            for reminder in event.reminders where reminder.isPending {
+            let pendingReminders = event.reminders.filter(\.isPending)
+            for reminder in pendingReminders {
                 NotificationManager.shared.cancel(notificationId: reminder.notificationId)
                 if reminder.scheduledAt > now {
                     context.delete(reminder)
@@ -972,7 +981,8 @@ enum FeedingPlanWriter {
         context: ModelContext,
         recordToUpdate: PetFoodRecord? = nil,
         now: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        rebuildReminder: Bool = true
     ) -> PetFoodRecord {
         let sanitizedTotal = max(0, totalGrams)
         let sanitizedDaily = max(0, dailyGrams ?? pet.dailyPortionGrams)
@@ -1011,13 +1021,15 @@ enum FeedingPlanWriter {
         }
         context.safeSave()
 
-        _ = rebuildFoodStockReminder(
-            pet: pet,
-            allEvents: allEvents,
-            context: context,
-            now: now,
-            calendar: calendar
-        )
+        if rebuildReminder {
+            _ = rebuildFoodStockReminder(
+                pet: pet,
+                allEvents: allEvents,
+                context: context,
+                now: now,
+                calendar: calendar
+            )
+        }
         return record
     }
 
@@ -1029,12 +1041,14 @@ enum FeedingPlanWriter {
         allEvents: [Event],
         context: ModelContext,
         now: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        rebuildReminder: Bool = true
     ) -> Reminder? {
         record.remainingCorrectionGrams = max(0, remainingGrams)
         record.remainingCorrectionDate = now
         context.safeSave()
         guard let pet = record.pet else { return nil }
+        guard rebuildReminder else { return nil }
         return rebuildFoodStockReminder(pet: pet, allEvents: allEvents, context: context, now: now, calendar: calendar)
     }
 
@@ -1095,7 +1109,7 @@ enum FeedingPlanWriter {
     static func stockReminderEvents(pet: Pet, allEvents: [Event]) -> [Event] {
         allEvents.filter {
             $0.relatedEntityType == stockReminderEntityType &&
-            ($0.relatedEntityId == pet.id.uuidString || $0.relatedEntityId.hasPrefix("\(pet.id.uuidString):"))
+                ($0.relatedEntityId == pet.id.uuidString || $0.relatedEntityId.hasPrefix("\(pet.id.uuidString):"))
         }
     }
 
@@ -1149,18 +1163,18 @@ enum FeedingPlanWriter {
         calendar: Calendar
     ) -> [Date] {
         let intervalDays = max(event.recurrenceDays, 1)
-        let end = calendar.date(byAdding: .day, value: daysAhead, to: now) ?? now.addingTimeInterval(Double(daysAhead) * 86_400)
+        let end = calendar.date(byAdding: .day, value: daysAhead, to: now) ?? now.addingTimeInterval(Double(daysAhead) * 86400)
         var cursor = event.startDate
         var guardCount = 0
 
-        while cursor < now && guardCount < 500 {
+        while cursor < now, guardCount < 500 {
             guard let next = calendar.date(byAdding: .day, value: intervalDays, to: cursor) else { break }
             cursor = next
             guardCount += 1
         }
 
         var occurrences: [Date] = []
-        while cursor <= end && guardCount < 1_000 {
+        while cursor <= end, guardCount < 1000 {
             occurrences.append(cursor)
             guard let next = calendar.date(byAdding: .day, value: intervalDays, to: cursor) else { break }
             cursor = next
@@ -1178,7 +1192,7 @@ enum FeedingPlanWriter {
             of: now
         ) ?? now
         if candidate <= now {
-            candidate = calendar.date(byAdding: .day, value: 1, to: candidate) ?? candidate.addingTimeInterval(86_400)
+            candidate = calendar.date(byAdding: .day, value: 1, to: candidate) ?? candidate.addingTimeInterval(86400)
         }
         return candidate
     }
@@ -1290,7 +1304,7 @@ enum WaterPlanWriter {
     static func normalizedTimes(_ times: [Date], count: Int, now: Date = Date(), calendar: Calendar = .current) -> [Date] {
         let clamped = min(max(count, 1), 6)
         let fallback = suggestedTimes(count: clamped, now: now, calendar: calendar)
-        return (0..<clamped).map { index in
+        return (0 ..< clamped).map { index in
             index < times.count ? times[index] : fallback[index]
         }
     }
@@ -1337,6 +1351,29 @@ enum WaterPlanWriter {
     }
 
     @MainActor
+    static func deactivateReminderOperations(
+        pet: Pet,
+        allEvents: [Event],
+        context: ModelContext,
+        now: Date = Date()
+    ) {
+        var didChange = false
+        for event in planEvents(pet: pet, allEvents: allEvents) {
+            let pendingReminders = event.reminders.filter(\.isPending)
+            for reminder in pendingReminders {
+                NotificationManager.shared.cancel(notificationId: reminder.notificationId)
+                if reminder.scheduledAt > now {
+                    context.delete(reminder)
+                    didChange = true
+                }
+            }
+        }
+        if didChange {
+            context.safeSave()
+        }
+    }
+
+    @MainActor
     @discardableResult
     static func ensureUpcomingReminders(
         pet: Pet,
@@ -1357,12 +1394,14 @@ enum WaterPlanWriter {
 
     static func planEvents(pet: Pet, allEvents: [Event]) -> [Event] {
         allEvents
-            .filter {
-                $0.relatedEntityType == entityType &&
-                $0.relatedEntityId == pet.id.uuidString &&
-                $0.eventType == EventType.daily.rawValue
-            }
+            .filter { isPlanEvent($0, pet: pet) }
             .sorted { $0.startDate < $1.startDate }
+    }
+
+    static func isPlanEvent(_ event: Event, pet: Pet) -> Bool {
+        event.relatedEntityType == entityType &&
+            event.relatedEntityId == pet.id.uuidString &&
+            event.eventType == EventType.daily.rawValue
     }
 
     @MainActor
@@ -1399,17 +1438,17 @@ enum WaterPlanWriter {
         daysAhead: Int,
         calendar: Calendar
     ) -> [Date] {
-        let end = calendar.date(byAdding: .day, value: daysAhead, to: now) ?? now.addingTimeInterval(Double(daysAhead) * 86_400)
+        let end = calendar.date(byAdding: .day, value: daysAhead, to: now) ?? now.addingTimeInterval(Double(daysAhead) * 86400)
         var cursor = event.startDate
         var guardCount = 0
-        while cursor < now && guardCount < 500 {
+        while cursor < now, guardCount < 500 {
             guard let next = calendar.date(byAdding: .day, value: max(event.recurrenceDays, 1), to: cursor) else { break }
             cursor = next
             guardCount += 1
         }
 
         var occurrences: [Date] = []
-        while cursor <= end && guardCount < 1_000 {
+        while cursor <= end, guardCount < 1000 {
             occurrences.append(cursor)
             guard let next = calendar.date(byAdding: .day, value: max(event.recurrenceDays, 1), to: cursor) else { break }
             cursor = next
@@ -1427,7 +1466,7 @@ enum WaterPlanWriter {
             of: now
         ) ?? now
         if candidate <= now {
-            candidate = calendar.date(byAdding: .day, value: 1, to: candidate) ?? candidate.addingTimeInterval(86_400)
+            candidate = calendar.date(byAdding: .day, value: 1, to: candidate) ?? candidate.addingTimeInterval(86400)
         }
         return candidate
     }

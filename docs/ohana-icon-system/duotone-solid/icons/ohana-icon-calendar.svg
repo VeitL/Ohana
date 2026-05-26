@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Calendar / 日历" class="ohana-duotone-icon">
+  <title>Calendar / 日历</title>
+  <g>
+
+      <rect style="fill:#3f74d8" x="5.5" y="6.5" width="21" height="20" rx="5.5"/>
+      <rect style="fill:#9bdc4a" x="9" y="10" width="14" height="3" rx="1.5"/>
+      <circle style="fill:#9bdc4a" cx="11.3" cy="17.3" r="1.55"/>
+      <circle style="fill:#9bdc4a;opacity:.28" cx="16" cy="17.3" r="1.55"/>
+      <circle style="fill:#9bdc4a;opacity:.28" cx="20.7" cy="17.3" r="1.55"/>
+      <rect style="fill:#9bdc4a" x="14.1" y="20.2" width="7.9" height="3.2" rx="1.6"/>
+  </g>
+</svg>

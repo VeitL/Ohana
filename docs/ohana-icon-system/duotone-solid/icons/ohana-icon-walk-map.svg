@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Walk map / 散步地图" class="ohana-duotone-icon">
+  <title>Walk map / 散步地图</title>
+  <g>
+
+      <path style="fill:#2b8f78" d="M16 5.2a6.2 6.2 0 0 1 6.2 6.2c0 4.7-6.2 10.4-6.2 10.4S9.8 16.1 9.8 11.4A6.2 6.2 0 0 1 16 5.2Z"/>
+      <circle style="fill:#c8ff3d" cx="16" cy="11.5" r="2.4"/>
+      <path style="fill:none;stroke:#2b8f78;stroke-width:4.2;stroke-linecap:round;stroke-linejoin:round" d="M7.5 24.8c3.3-2.2 6.7-2.3 10.3 0 2.3 1.5 4.7 1.5 6.8-.1"/>
+  </g>
+</svg>

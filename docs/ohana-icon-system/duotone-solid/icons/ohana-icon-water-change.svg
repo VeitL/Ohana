@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Water change / 换水" class="ohana-duotone-icon">
+  <title>Water change / 换水</title>
+  <g>
+
+      <path style="fill:#1c9ec2" d="M14.1 5.2c4.4 5.1 6.5 8.4 6.5 11.7a6.5 6.5 0 0 1-13 0c0-3.3 2.1-6.6 6.5-11.7Z"/>
+      <path style="fill:none;stroke:#c8ff3d;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" d="M23.6 11a5.6 5.6 0 0 1 .8 7.7"/>
+      <path style="fill:none;stroke:#c8ff3d;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" d="m24.4 18.8 3.2-.6-.8-3.1"/>
+      <path style="fill:none;stroke:#c8ff3d;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" d="M21.6 24a5.6 5.6 0 0 1-.8-7.7"/>
+      <path style="fill:none;stroke:#c8ff3d;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" d="m20.8 16.2-3.2.6.8 3.1"/>
+  </g>
+</svg>

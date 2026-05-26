@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Plant fertilize / 植物施肥" class="ohana-duotone-icon">
+  <title>Plant fertilize / 植物施肥</title>
+  <g>
+
+      <path style="fill:#2f8e62" d="M9.1 18h13.8l-1.1 5A4.2 4.2 0 0 1 17.7 26h-3.4a4.2 4.2 0 0 1-4.1-3L9.1 18Z"/>
+      <path style="fill:#2f8e62" d="M15.5 17.8c-1.2-4.4-4.3-6.6-8.3-6.5 1 4.1 4 6.3 8.3 6.5Z"/>
+      <path style="fill:#2f8e62" d="M16.7 17.2c.8-4.8 3.6-7.5 7.8-8c-.4 4.7-3.3 7.6-7.8 8Z"/>
+      <circle style="fill:#ffb36b" cx="23.8" cy="20.5" r="2"/>
+      <circle style="fill:#ffb36b;opacity:.28" cx="25.8" cy="15.6" r="1.4"/>
+  </g>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Mood / 心情" class="ohana-duotone-icon">
+  <title>Mood / 心情</title>
+  <g>
+
+      <circle style="fill:#5f6fd8" cx="16" cy="16" r="10.2"/>
+      <circle style="fill:#ffd36c" cx="20.2" cy="12.2" r="2.1"/>
+      <path style="fill:none;stroke:#ffd36c;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" d="M11.2 17.8c2.4 2.6 7.2 2.6 9.6 0"/>
+  </g>
+</svg>

@@ -9,6 +9,8 @@ import SwiftUI
 
 struct FocusHomeHeaderView: View {
     let safeTop: CGFloat
+    let topGap: CGFloat
+    let contentHeight: CGFloat
     let streak: Int
     let coconutBalance: Int
     let coconutDeltaContext: String?
@@ -25,6 +27,8 @@ struct FocusHomeHeaderView: View {
 
     init(
         safeTop: CGFloat,
+        topGap: CGFloat = 12,
+        contentHeight: CGFloat = 44,
         streak: Int,
         coconutBalance: Int,
         coconutDeltaContext: String? = nil,
@@ -39,6 +43,8 @@ struct FocusHomeHeaderView: View {
         onSettings: @escaping () -> Void
     ) {
         self.safeTop = safeTop
+        self.topGap = topGap
+        self.contentHeight = contentHeight
         self.streak = streak
         self.coconutBalance = coconutBalance
         self.coconutDeltaContext = coconutDeltaContext
@@ -110,8 +116,8 @@ struct FocusHomeHeaderView: View {
             }
         }
         .padding(.horizontal, K.hPad)
-        .padding(.top, safeTop + 12)
-        .frame(height: safeTop + 56)
+        .padding(.top, safeTop + topGap)
+        .frame(height: safeTop + topGap + contentHeight, alignment: .top)
     }
 
     private var settingsPill: some View {

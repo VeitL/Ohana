@@ -8,12 +8,10 @@
 //
 //  优先级：异常趋势/医疗风险 > 未完成委托 > 记忆碎片 > 全部完成庆祝 > 岛屿探访
 //
-//  v2 实时响应：内部 @Query 监听 PetCareLog / PetWalkLog / PetPottyLog，
-//  用户在对应打卡/记录页保存后无需父视图手动刷新。
+//  v3 render snapshot：父级 Host/Store 准备首屏数据，卡片只负责绘制。
 //
 
 import SwiftUI
-import SwiftData
 
 enum TodayFocusCardPresentation {
     case board
@@ -23,11 +21,7 @@ enum TodayFocusCardPresentation {
 // MARK: - TodayFocusCard
 
 struct TodayFocusCard: View {
-    let pets: [Pet]
-    let plants: [Plant]
-    let quests: [IslandQuest]        // passed from parent; isCompleted may be stale
-    let humans: [Human]
-    let activePet: Pet?
+    let snapshot: TodayFocusSnapshot
     let presentation: TodayFocusCardPresentation
     var onOpenQuest: (IslandQuest) -> Void = { _ in }
     var onCompleteQuest: (IslandQuest) -> Void = { _ in }
@@ -35,52 +29,37 @@ struct TodayFocusCard: View {
     var onTapMemory: () -> Void = {}
     var onTapOasis: () -> Void = {}
     var onTapFamilyTask: (FamilyCollaborationTask) -> Void = { _ in }
-
-    // Live @Query arrays — scoped to today so the home card does not hydrate
-    // the full care history on every launch.
-    @Query(sort: \PetCareLog.date, order: .reverse) private var liveCare: [PetCareLog]
-    @Query(sort: \PetWalkLog.startDate, order: .reverse) private var liveWalks: [PetWalkLog]
-    @Query(sort: \PetPottyLog.date, order: .reverse) private var livePotty: [PetPottyLog]
-    @Query(sort: \HumanWeightLog.date, order: .reverse) private var liveHumanWeights: [HumanWeightLog]
-    @Query(sort: \FamilyCollaborationTask.updatedAt, order: .reverse) private var familyTasks: [FamilyCollaborationTask]
-    @Query(sort: \CoconutExchangeRequest.createdAt, order: .reverse) private var exchangeRequests: [CoconutExchangeRequest]
+    var onConfirmExchange: (CoconutExchangeRequest) -> Void = { _ in }
+    var freezesToFrontCard: Bool = false
 
     @State private var bounceEmoji = false
     @State private var pulse: CGFloat = 0
     @State private var selectedFocusIndex = 0
     @State private var skippedFocusKeys: Set<String> = TodayFocusCard.loadSkippedFocusKeys()
     @State private var closedNegativeKeys: Set<String> = TodayFocusCard.loadClosedNegativeKeys()
-    @GestureState private var focusDragY: CGFloat = 0
+    @State private var frozenFrontContent: TodayFocusService.Content?
+    @GestureState private var focusDragX: CGFloat = 0
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.modelContext) private var modelContext
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
-    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
-    @AppStorage("currentActiveHumanId") private var activeHumanId = ""
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     private var l: L10n { L10n(appLanguage) }
 
     init(
-        pets: [Pet],
-        plants: [Plant],
-        quests: [IslandQuest],
-        humans: [Human],
-        activePet: Pet?,
+        snapshot: TodayFocusSnapshot,
         presentation: TodayFocusCardPresentation = .board,
         onOpenQuest: @escaping (IslandQuest) -> Void = { _ in },
         onCompleteQuest: @escaping (IslandQuest) -> Void = { _ in },
         onTapNegativeSignal: @escaping (IslandNegativeSignal) -> Void = { _ in },
         onTapMemory: @escaping () -> Void = {},
         onTapOasis: @escaping () -> Void = {},
-        onTapFamilyTask: @escaping (FamilyCollaborationTask) -> Void = { _ in }
+        onTapFamilyTask: @escaping (FamilyCollaborationTask) -> Void = { _ in },
+        onConfirmExchange: @escaping (CoconutExchangeRequest) -> Void = { _ in },
+        freezesToFrontCard: Bool = false
     ) {
-        self.pets = pets
-        self.plants = plants
-        self.quests = quests
-        self.humans = humans
-        self.activePet = activePet
+        self.snapshot = snapshot
         self.presentation = presentation
         self.onOpenQuest = onOpenQuest
         self.onCompleteQuest = onCompleteQuest
@@ -88,28 +67,8 @@ struct TodayFocusCard: View {
         self.onTapMemory = onTapMemory
         self.onTapOasis = onTapOasis
         self.onTapFamilyTask = onTapFamilyTask
-
-        let todayStart = Calendar.current.startOfDay(for: Date())
-        _liveCare = Query(
-            filter: #Predicate<PetCareLog> { $0.date >= todayStart },
-            sort: \.date,
-            order: .reverse
-        )
-        _liveWalks = Query(
-            filter: #Predicate<PetWalkLog> { $0.startDate >= todayStart },
-            sort: \.startDate,
-            order: .reverse
-        )
-        _livePotty = Query(
-            filter: #Predicate<PetPottyLog> { $0.date >= todayStart },
-            sort: \.date,
-            order: .reverse
-        )
-        _liveHumanWeights = Query(
-            filter: #Predicate<HumanWeightLog> { $0.date >= todayStart },
-            sort: \.date,
-            order: .reverse
-        )
+        self.onConfirmExchange = onConfirmExchange
+        self.freezesToFrontCard = freezesToFrontCard
     }
 
     private var shouldReduceWork: Bool {
@@ -117,15 +76,7 @@ struct TodayFocusCard: View {
     }
 
     private var refreshedQuests: [IslandQuest] {
-        TodayFocusService.refreshedQuests(
-            quests,
-            pets: pets,
-            humans: humans,
-            careLogs: liveCare,
-            walkLogs: liveWalks,
-            pottyLogs: livePotty,
-            humanWeightLogs: liveHumanWeights
-        )
+        snapshot.refreshedQuests
     }
 
     private var pendingQuests: [IslandQuest] {
@@ -133,31 +84,15 @@ struct TodayFocusCard: View {
     }
 
     private var assignedFamilyTasks: [FamilyCollaborationTask] {
-        guard !activeHumanId.isEmpty else { return [] }
-        return familyTasks
-            .filter {
-                !$0.isFinished &&
-                (($0.status == .pendingReview && $0.createdById == activeHumanId) ||
-                 ($0.status != .pendingReview && ($0.assignedToId == activeHumanId || $0.claimedById == activeHumanId))) &&
-                !skippedFocusKeys.contains(familyTaskSkipKey($0))
-            }
-            .sorted { ($0.dueAt ?? $0.createdAt) < ($1.dueAt ?? $1.createdAt) }
+        snapshot.assignedFamilyTasks.filter { !skippedFocusKeys.contains(familyTaskSkipKey($0)) }
     }
 
     private var pendingExchangeRequests: [CoconutExchangeRequest] {
-        guard !activeHumanId.isEmpty else { return [] }
-        return exchangeRequests
-            .filter {
-                $0.status == .pending &&
-                $0.receiverId == activeHumanId &&
-                !skippedFocusKeys.contains(exchangeSkipKey($0))
-            }
-            .sorted { $0.createdAt < $1.createdAt }
+        snapshot.pendingExchangeRequests.filter { !skippedFocusKeys.contains(exchangeSkipKey($0)) }
     }
 
     private var negativeSignals: [IslandNegativeSignal] {
-        IslandNegativeFeedback.signals(pets: pets, plants: plants)
-            .filter { !closedNegativeKeys.contains(negativeSkipKey($0)) }
+        snapshot.negativeSignals.filter { !closedNegativeKeys.contains(negativeSkipKey($0)) }
     }
 
     private var focusCards: [TodayFocusService.Content] {
@@ -178,8 +113,8 @@ struct TodayFocusCard: View {
         if !pendingQuests.isEmpty {
             return pendingQuests.map { .quest($0) }
         }
-        if !refreshedQuests.isEmpty || !pets.isEmpty || !plants.isEmpty || !humans.isEmpty {
-            return [.celebrate(pets: pets)]
+        if !refreshedQuests.isEmpty || !snapshot.pets.isEmpty || !snapshot.plants.isEmpty || !snapshot.humans.isEmpty {
+            return [.celebrate(pets: snapshot.pets)]
         }
         return [.welcome]
     }
@@ -233,7 +168,21 @@ struct TodayFocusCard: View {
             }
         }
         .onAppear {
-            startAmbientPulseIfNeeded()
+            if freezesToFrontCard {
+                frozenFrontContent = content
+            } else {
+                startAmbientPulseIfNeeded()
+            }
+        }
+        .onChange(of: freezesToFrontCard) { _, isFrozen in
+            if isFrozen {
+                frozenFrontContent = content
+                pulse = 0
+                bounceEmoji = false
+            } else {
+                frozenFrontContent = nil
+                startAmbientPulseIfNeeded()
+            }
         }
         .onChange(of: shouldReduceWork) { _, reduced in
             if reduced {
@@ -243,12 +192,13 @@ struct TodayFocusCard: View {
                 startAmbientPulseIfNeeded()
             }
         }
-        .onChange(of: focusCards.count) { _, count in
+        .onChange(of: focusCardCountChangeKey) { _, count in
+            guard count >= 0 else { return }
             if selectedFocusIndex >= count {
                 selectedFocusIndex = max(0, count - 1)
             }
         }
-        .animation(GoMotion.hero, value: contentIdentity)
+        .animation(freezesToFrontCard ? nil : GoMotion.hero, value: animationIdentity)
     }
 
     private var boardBody: some View {
@@ -305,7 +255,7 @@ struct TodayFocusCard: View {
     }
 
     private func startAmbientPulseIfNeeded() {
-        guard !shouldReduceWork else { return }
+        guard !shouldReduceWork, !freezesToFrontCard else { return }
         withAnimation(.easeInOut(duration: 2.6).repeatForever(autoreverses: true)) { pulse = 1 } // ui-v4: allow Today Focus ambient pulse micro-motion
         withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { bounceEmoji = true } // ui-v4: allow Today Focus celebration bounce micro-motion
     }
@@ -317,19 +267,23 @@ struct TodayFocusCard: View {
         let content: TodayFocusService.Content
     }
 
-    private var focusDeckCards: [FocusDeckCard] {
-        focusCards.map { FocusDeckCard(id: contentKey($0), content: $0) }
-    }
-
     @ViewBuilder
     private func card(showsPageIndicator: Bool) -> some View {
-        let cards = focusCards
-        if presentation == .compactStack {
-            physicalStackCard(cards: focusDeckCards)
-        } else if cards.count > 1 {
-            legacySwitchingCard(cards: cards, showsPageIndicator: showsPageIndicator)
+        if freezesToFrontCard {
+            cardContent(frozenFrontContent ?? content)
+                .transaction { transaction in
+                    transaction.animation = nil
+                    transaction.disablesAnimations = true
+                }
         } else {
-            cardContent(cards.first ?? .welcome)
+            let cards = focusCards
+            if presentation == .compactStack {
+                physicalStackCard(cards: cards.map { FocusDeckCard(id: contentKey($0), content: $0) })
+            } else if cards.count > 1 {
+                legacySwitchingCard(cards: cards, showsPageIndicator: showsPageIndicator)
+            } else {
+                cardContent(cards.first ?? .welcome)
+            }
         }
     }
 
@@ -373,7 +327,7 @@ struct TodayFocusCard: View {
                         let relative = focusRelativeIndex(for: index, count: cards.count)
                         cardContent(item)
                             .padding(.horizontal, 2)
-                            .offset(y: focusItemOffset(relative: relative))
+                            .offset(x: focusItemOffset(relative: relative))
                             .scaleEffect(focusItemScale(relative: relative))
                             .opacity(focusItemOpacity(relative: relative))
                             .allowsHitTesting(relative == 0)
@@ -396,16 +350,16 @@ struct TodayFocusCard: View {
 
     private func focusSwipeGesture(count: Int) -> some Gesture {
         DragGesture(minimumDistance: 8, coordinateSpace: .local)
-            .updating($focusDragY) { value, state, _ in
-                guard abs(value.translation.height) > abs(value.translation.width) else { return }
-                state = max(-76, min(76, value.translation.height))
+            .updating($focusDragX) { value, state, _ in
+                guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                state = max(-92, min(92, value.translation.width))
             }
             .onEnded { value in
-                let vertical = value.translation.height
-                guard abs(vertical) > abs(value.translation.width) else { return }
-                let predicted = value.predictedEndTranslation.height
-                guard abs(vertical) > 44 || abs(predicted) > 92 else { return }
-                shiftFocus(vertical < 0 ? 1 : -1, count: count)
+                let horizontal = value.translation.width
+                guard abs(horizontal) > abs(value.translation.height) else { return }
+                let predicted = value.predictedEndTranslation.width
+                guard abs(horizontal) > 44 || abs(predicted) > 92 else { return }
+                shiftFocus(horizontal < 0 ? 1 : -1, count: count)
             }
     }
 
@@ -417,20 +371,20 @@ struct TodayFocusCard: View {
     }
 
     private func focusItemOffset(relative: Int) -> CGFloat {
-        CGFloat(relative) * 58 + focusDragY
+        CGFloat(relative) * 76 + focusDragX
     }
 
     private func focusItemScale(relative: Int) -> CGFloat {
-        let dragProgress = min(1, abs(focusDragY) / 76)
+        let dragProgress = min(1, abs(focusDragX) / 92)
         return relative == 0 ? (1 - dragProgress * 0.025) : (0.96 + dragProgress * 0.04)
     }
 
     private func focusItemOpacity(relative: Int) -> Double {
-        let dragProgress = min(1, abs(focusDragY) / 76)
+        let dragProgress = min(1, abs(focusDragX) / 92)
         if relative == 0 {
             return Double(1 - dragProgress * 0.34)
         }
-        let isIncoming = (focusDragY < 0 && relative == 1) || (focusDragY > 0 && relative == -1)
+        let isIncoming = (focusDragX < 0 && relative == 1) || (focusDragX > 0 && relative == -1)
         return isIncoming ? Double(dragProgress) : 0
     }
 
@@ -655,15 +609,15 @@ struct TodayFocusCard: View {
 
     private func questTargetName(_ quest: IslandQuest) -> String? {
         if let petId = quest.targetPetId,
-           let pet = pets.first(where: { $0.id == petId }) {
+           let pet = snapshot.pets.first(where: { $0.id == petId }) {
             return pet.name
         }
         if let plantId = quest.targetPlantId,
-           let plant = plants.first(where: { $0.id == plantId }) {
+           let plant = snapshot.plants.first(where: { $0.id == plantId }) {
             return plant.name
         }
         if let humanId = IslandQuestEngine.humanWeightId(fromQuestId: quest.id),
-           let human = humans.first(where: { $0.id == humanId }) {
+           let human = snapshot.humans.first(where: { $0.id == humanId }) {
             return human.name
         }
         return nil
@@ -915,14 +869,20 @@ struct TodayFocusCard: View {
         ].joined(separator: "|")
     }
 
-    private func confirmExchange(_ request: CoconutExchangeRequest) {
-        guard let receiver = humans.first(where: { $0.id.uuidString == activeHumanId }) else { return }
-        do {
-            try CoconutExchangeService.confirm(request, by: receiver, context: modelContext)
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        } catch {
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
+    private var animationIdentity: String {
+        if freezesToFrontCard {
+            guard let frozenFrontContent else { return "frozen:pending" }
+            return "frozen:\(contentKey(frozenFrontContent))"
         }
+        return contentIdentity
+    }
+
+    private var focusCardCountChangeKey: Int {
+        freezesToFrontCard ? -1 : focusCards.count
+    }
+
+    private func confirmExchange(_ request: CoconutExchangeRequest) {
+        onConfirmExchange(request)
     }
 
     private func contentKey(_ content: TodayFocusService.Content) -> String {

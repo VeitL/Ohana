@@ -30,8 +30,8 @@ struct FocusCard: Identifiable {
     var cardPopoutSourceRaw: String = ""
     var humanGender: String? = nil
     var petSpecies: String?
-    var coatColor: Color = Color(hex: "E8C49A")
-    var eyeColor: Color = Color(hex: "6B3A2A")
+    var coatColor: Color = .init(hex: "E8C49A")
+    var eyeColor: Color = .init(hex: "6B3A2A")
     var patternName: String?
     var themeColorHex: String = ""
     var daysTogether: Int = 0
@@ -49,6 +49,7 @@ struct FocusCard: Identifiable {
     var critterLifeStateRaw: String = ""
     var isDummy: Bool = false
     var isReal: Bool = false
+    var homeWalkDistanceMeters: Double = 0
     var actions: [Action]
 
     struct Action: Identifiable {
@@ -56,6 +57,73 @@ struct FocusCard: Identifiable {
         let label: String
         let icon: String
         let colorHex: String
+    }
+}
+
+extension FocusCard {
+    var homePrimaryMetricValue: String {
+        if isElectronicPet {
+            return electronicPetLevelMetricValue
+        }
+        if isRegularPetCard {
+            if daysTogether > 0 {
+                return "\(daysTogether)"
+            }
+            if isDogCard, homeWalkDistanceMeters > 0 {
+                return homeWalkDistanceMetric.value
+            }
+        }
+        return "\(coconutBalance)"
+    }
+
+    var homePrimaryMetricUnit: String {
+        if isElectronicPet {
+            return "Lv"
+        }
+        if isRegularPetCard {
+            if daysTogether > 0 {
+                return "d"
+            }
+            if isDogCard, homeWalkDistanceMeters > 0 {
+                return homeWalkDistanceMetric.unit
+            }
+        }
+        return "c"
+    }
+
+    static func weeklyWalkDistanceMeters(for pet: Pet, now: Date = Date()) -> Double {
+        let start = Calendar.current.date(byAdding: .day, value: -6, to: now) ?? now
+        return pet.walkLogs
+            .filter { $0.startDate >= start }
+            .reduce(0.0) { $0 + $1.distanceMeters }
+    }
+
+    private var isRegularPetCard: Bool {
+        !isHuman && !isElectronicPet
+    }
+
+    private var isDogCard: Bool {
+        let species = (petSpecies ?? kind).lowercased()
+        return species.contains("dog") || species.contains("狗")
+    }
+
+    private var homeWalkDistanceMetric: (value: String, unit: String) {
+        let formatted = AppMeasurementSystem.formatDistanceMeters(homeWalkDistanceMeters)
+        let parts = formatted.split(separator: " ", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else {
+            return (formatted, "")
+        }
+        return (parts[0], parts[1])
+    }
+
+    private var electronicPetLevelMetricValue: String {
+        let trimmed = (ageText ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if let firstNumber = trimmed.split(whereSeparator: { !$0.isNumber }).first,
+           !firstNumber.isEmpty
+        {
+            return String(firstNumber)
+        }
+        return "\(max(1, critterAppearanceStage))"
     }
 }
 
@@ -93,7 +161,11 @@ struct FunctionMenuPresentation: Identifiable {
 }
 
 extension FocusCard {
-    static func from(_ pet: Pet, includeAvatarData: Bool = true) -> FocusCard {
+    static func from(
+        _ pet: Pet,
+        includeAvatarData: Bool = true,
+        includeWalkDistance: Bool = true
+    ) -> FocusCard {
         let isDog = pet.species.contains("狗") || pet.species.lowercased().contains("dog")
         let isCat = pet.species.contains("猫") || pet.species.lowercased().contains("cat")
         let isFish = pet.species.contains("鱼") || pet.species.lowercased().contains("fish")
@@ -136,6 +208,7 @@ extension FocusCard {
         let usesEnglishFallback = AppLanguage.normalize(language) != "zh"
         let hour = Calendar.current.component(.hour, from: Date())
         let togetherDays = pet.hasPassedAway ? pet.daysTogetherAtPassing : pet.daysTogether
+        let walkDistanceMeters = includeWalkDistance ? weeklyWalkDistanceMeters(for: pet) : 0
         return FocusCard(
             id: pet.id,
             name: pet.name.isEmpty ? l.tr(zh: "未命名", en: "Unnamed", de: "Unbenannt") : pet.name,
@@ -170,6 +243,7 @@ extension FocusCard {
             passedAwayDate: pet.passedAwayDate,
             daysTogetherAtPassing: pet.daysTogetherAtPassing,
             isReal: true,
+            homeWalkDistanceMeters: walkDistanceMeters,
             actions: Array(acts.prefix(4))
         )
     }
@@ -256,7 +330,7 @@ extension FocusCard {
             actions: [
                 .init(label: l.tr(zh: "照顾", en: "CARE", de: "PFLEGE"), icon: "cross.case.fill", colorHex: "9EF06A"),
                 .init(label: l.tr(zh: "喂", en: "FEED", de: "FUTTER"), icon: "fork.knife", colorHex: "FFDD44"),
-                .init(label: l.tr(zh: "玩", en: "PLAY", de: "SPIEL"), icon: "sparkles", colorHex: "80FFEA")
+                .init(label: l.tr(zh: "玩", en: "PLAY", de: "SPIEL"), icon: "sparkles", colorHex: "80FFEA"),
             ]
         )
     }
@@ -267,32 +341,32 @@ extension FocusCard {
                   petSpecies: "狗", coatColor: Color(hex: "D7A76D"), eyeColor: Color(hex: "57341E"),
                   isDummy: true,
                   actions: [.init(label: "FEED", icon: "fork.knife", colorHex: "FFDD44"),
-                             .init(label: "WALK", icon: "figure.walk", colorHex: "14B8A6"),
-                             .init(label: "WATER", icon: "drop", colorHex: "00D4AA"),
-                             .init(label: "POTTY", icon: "allergens", colorHex: "A78BFA")]),
+                            .init(label: "WALK", icon: "figure.walk", colorHex: "14B8A6"),
+                            .init(label: "WATER", icon: "drop", colorHex: "00D4AA"),
+                            .init(label: "POTTY", icon: "allergens", colorHex: "A78BFA")]),
 
         FocusCard(id: UUID(), name: "Luna", kind: "CAT", emoji: "🐱",
                   color: Color(hex: "C9B6E4"), streak: 12, coconutBalance: 66,
                   petSpecies: "猫", coatColor: Color(hex: "9CA7B2"), eyeColor: Color(hex: "7A4E20"),
                   isDummy: true,
                   actions: [.init(label: "FEED", icon: "fork.knife", colorHex: "FFDD44"),
-                             .init(label: "WATER", icon: "drop", colorHex: "00D4AA"),
-                             .init(label: "LITTER", icon: "trash", colorHex: "5B6AFF"),
-                             .init(label: "PLAY", icon: "sparkles", colorHex: "F472B6")]),
+                            .init(label: "WATER", icon: "drop", colorHex: "00D4AA"),
+                            .init(label: "LITTER", icon: "trash", colorHex: "5B6AFF"),
+                            .init(label: "PLAY", icon: "sparkles", colorHex: "F472B6")]),
 
         FocusCard(id: UUID(), name: "Alex", kind: "HUMAN", emoji: "🧑‍💻",
                   color: Color(hex: "B9E8D2"), streak: 3, coconutBalance: 18,
                   isHuman: true, isDummy: true,
                   actions: [.init(label: "WEIGHT", icon: "scalemass", colorHex: "80FFEA"),
-                             .init(label: "WORKOUT", icon: "figure.run", colorHex: "F97316"),
-                             .init(label: "NOTE", icon: "note.text", colorHex: "5B6AFF")]),
+                            .init(label: "WORKOUT", icon: "figure.run", colorHex: "F97316"),
+                            .init(label: "NOTE", icon: "note.text", colorHex: "5B6AFF")]),
 
         FocusCard(id: UUID(), name: "Nemo", kind: "FISH", emoji: "🐟",
                   color: Color(hex: "C7E7F1"), streak: 4, coconutBalance: 24,
                   petSpecies: "鱼", isDummy: true,
                   actions: [.init(label: "FEED", icon: "fork.knife", colorHex: "FFDD44"),
-                             .init(label: "WATER", icon: "drop.circle", colorHex: "00D4AA"),
-                             .init(label: "FILTER", icon: "wrench.and.screwdriver", colorHex: "A78BFA")]),
+                            .init(label: "WATER", icon: "drop.circle", colorHex: "00D4AA"),
+                            .init(label: "FILTER", icon: "wrench.and.screwdriver", colorHex: "A78BFA")]),
     ]
 }
 

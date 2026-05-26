@@ -335,6 +335,102 @@ private struct OhanaStateMotionModifier<Value: Equatable>: ViewModifier {
     }
 }
 
+private struct OhanaNumericMotionModifier<Value: Equatable>: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    let value: Value
+
+    private var animation: Animation {
+        guard !reduceMotion,
+              workloadPolicy.shouldRunInteractionAnimation(isVisible: true) else {
+            return GoMotion.reduced
+        }
+        return GoMotion.feedback
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .contentTransition(.numericText())
+            .animation(animation, value: value)
+    }
+}
+
+enum OhanaContextHandoffDirection {
+    case neutral
+    case fromLeading
+    case fromTrailing
+    case fromTop
+    case fromBottom
+
+    var offset: CGSize {
+        switch self {
+        case .neutral:
+            return .zero
+        case .fromLeading:
+            return CGSize(width: -12, height: 0)
+        case .fromTrailing:
+            return CGSize(width: 12, height: 0)
+        case .fromTop:
+            return CGSize(width: 0, height: -10)
+        case .fromBottom:
+            return CGSize(width: 0, height: 10)
+        }
+    }
+}
+
+private struct OhanaContextHandoffModifier<Value: Equatable>: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @State private var progress: CGFloat = 1
+    @State private var handoffToken = 0
+
+    let value: Value
+    let direction: OhanaContextHandoffDirection
+    let isVisible: Bool
+    let initialScale: CGFloat
+
+    private var canAnimate: Bool {
+        !reduceMotion && workloadPolicy.shouldRunInteractionAnimation(isVisible: isVisible)
+    }
+
+    func body(content: Content) -> some View {
+        let clampedProgress = min(max(progress, 0), 1)
+        let offset = direction.offset
+        content
+            .opacity(canAnimate ? Double(0.90 + 0.10 * clampedProgress) : 1)
+            .scaleEffect(canAnimate ? initialScale + (1 - initialScale) * clampedProgress : 1)
+            .offset(
+                x: canAnimate ? offset.width * (1 - clampedProgress) : 0,
+                y: canAnimate ? offset.height * (1 - clampedProgress) : 0
+            )
+            .animation(canAnimate ? GoMotion.stateChange : GoMotion.reduced, value: progress)
+            .onChange(of: value) { _, _ in
+                runHandoff()
+            }
+    }
+
+    private func runHandoff() {
+        guard canAnimate else {
+            progress = 1
+            return
+        }
+
+        handoffToken += 1
+        let token = handoffToken
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            progress = 0
+        }
+        OhanaFrameScheduler.runAfterNextFrame {
+            guard token == handoffToken else { return }
+            withAnimation(GoMotion.stateChange) {
+                progress = 1
+            }
+        }
+    }
+}
+
 private struct OhanaStaggeredMenuItemModifier: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
@@ -422,8 +518,7 @@ extension View {
     }
 
     func ohanaNumericMotion<Value: Equatable>(_ value: Value) -> some View {
-        contentTransition(.numericText())
-            .animation(GoMotion.feedback, value: value)
+        modifier(OhanaNumericMotionModifier(value: value))
     }
 
     func ohanaSelectionMotion(isSelected: Bool, scale: CGFloat = 1.012) -> some View {
@@ -432,6 +527,22 @@ extension View {
 
     func ohanaStateMotion<Value: Equatable>(_ value: Value) -> some View {
         modifier(OhanaStateMotionModifier(value: value))
+    }
+
+    func ohanaContextHandoff<Value: Equatable>(
+        _ value: Value,
+        direction: OhanaContextHandoffDirection = .neutral,
+        isVisible: Bool = true,
+        initialScale: CGFloat = 0.988
+    ) -> some View {
+        modifier(
+            OhanaContextHandoffModifier(
+                value: value,
+                direction: direction,
+                isVisible: isVisible,
+                initialScale: initialScale
+            )
+        )
     }
 
     func ohanaStaggeredMenuItem(isVisible: Bool, index: Int, total: Int, anchor: UnitPoint = .bottomTrailing) -> some View {

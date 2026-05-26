@@ -17,8 +17,6 @@ struct ContentView: View {
     @State private var selectedPetTab: PetDetailTab = .overview
     @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
-    @AppStorage(OhanaHomeStyle.storageKey) private var homeStyleRaw = OhanaHomeStyle.defaultStyle.rawValue
-    @AppStorage(OhanaHomeStyle.verticalDefaultMigrationKey) private var didMigrateVerticalHomeDefault = false
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @State private var showingRequiredHumanProfile = false
     @State private var showingRequiredAccountSwitch = false
@@ -67,7 +65,6 @@ struct ContentView: View {
                 .zIndex(120)
         }
         .onAppear {
-            migrateVerticalHomeDefaultIfNeeded()
             allowSystemAutoLock()
             AppWorkloadPolicy.shared.updateScenePhase(scenePhase)
             AppWorkloadPolicy.shared.refresh(reason: "contentAppear")
@@ -129,39 +126,12 @@ struct ContentView: View {
 
     @ViewBuilder
     private var selectedHomeView: some View {
-        switch effectiveHomeStyle {
-        case .walletV3:
-            FocusHomeV3View(
-                selectedPet: $selectedPet,
-                selectedHuman: $selectedHuman,
-                selectedPlant: $selectedPlant,
-                selectedPetTab: $selectedPetTab,
-                heroNS: heroNS
-            )
-        case .walletV2:
-            FocusHomeV2View(
-                selectedPet: $selectedPet,
-                selectedHuman: $selectedHuman,
-                selectedPlant: $selectedPlant,
-                selectedPetTab: $selectedPetTab,
-                heroNS: heroNS
-            )
-        case .verticalSolid:
-            FocusHomeVerticalSolidView(
-                selectedPet: $selectedPet,
-                selectedHuman: $selectedHuman,
-                selectedPlant: $selectedPlant,
-                selectedPetTab: $selectedPetTab,
-                heroNS: heroNS
-            )
-        }
-    }
-
-    private var effectiveHomeStyle: OhanaHomeStyle {
-        if !didMigrateVerticalHomeDefault && homeStyleRaw == OhanaHomeStyle.walletV3.rawValue {
-            return .verticalSolid
-        }
-        return OhanaHomeStyle(rawValue: homeStyleRaw) ?? OhanaHomeStyle.defaultStyle
+        HomeV2DataContainer(
+            selectedPet: $selectedPet,
+            selectedHuman: $selectedHuman,
+            selectedPlant: $selectedPlant,
+            selectedPetTab: $selectedPetTab
+        )
     }
 
     @ViewBuilder
@@ -221,14 +191,6 @@ struct ContentView: View {
         @unknown default:
             PetWalkingManager.shared.handleAppInactiveTransition()
         }
-    }
-
-    private func migrateVerticalHomeDefaultIfNeeded() {
-        guard !didMigrateVerticalHomeDefault else { return }
-        if homeStyleRaw == OhanaHomeStyle.walletV3.rawValue {
-            homeStyleRaw = OhanaHomeStyle.verticalSolid.rawValue
-        }
-        didMigrateVerticalHomeDefault = true
     }
 
     private func allowSystemAutoLock() {

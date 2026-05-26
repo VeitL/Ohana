@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Distance / 距离" class="ohana-duotone-icon">
+  <title>Distance / 距离</title>
+  <g>
+
+      <path style="fill:none;stroke:#6370c8;stroke-width:4.2;stroke-linecap:round;stroke-linejoin:round" d="M7.8 22.4C11.6 15 20.4 18.6 23.8 10"/>
+      <circle style="fill:#7be4d4" cx="7.8" cy="22.4" r="3"/>
+      <circle style="fill:#6370c8" cx="23.8" cy="10" r="3"/>
+      <rect style="fill:#7be4d4;opacity:.28" x="21.4" y="5.2" width="5.6" height="3.2" rx="1.6"/>
+  </g>
+</svg>

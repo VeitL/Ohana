@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Temperature / 温湿度" class="ohana-duotone-icon">
+  <title>Temperature / 温湿度</title>
+  <g>
+
+      <rect style="fill:#20a0b8" x="13" y="5.2" width="6" height="15" rx="3"/>
+      <circle style="fill:#20a0b8" cx="16" cy="22" r="5.2"/>
+      <rect style="fill:#ff755f" x="15" y="9.2" width="2" height="11.8" rx="1"/>
+      <circle style="fill:#ff755f" cx="16" cy="22" r="2.4"/>
+      <circle style="fill:#ff755f;opacity:.28" cx="23.7" cy="9.4" r="2.2"/>
+  </g>
+</svg>

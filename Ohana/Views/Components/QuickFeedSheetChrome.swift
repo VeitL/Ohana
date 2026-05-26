@@ -256,9 +256,7 @@ struct FeedNativeSheetGlassSurface: View {
         Group {
             switch glassMode {
             case .regular:
-                shape
-                    .fill(.clear)
-                    .glassEffect(.regular.interactive(false), in: shape) // ui-v4: allow single-layer native sheet background
+                OhanaPopupGlassSurface(cornerRadius: cornerRadius) // ui-v4: allow single-layer native sheet background
             case .clear:
                 shape
                     .fill(.clear)
@@ -277,9 +275,7 @@ struct FeedInlineSheetGlassSurface: View {
         Group {
             switch glassMode {
             case .regular:
-                shape
-                    .fill(.clear)
-                    .glassEffect(.regular.interactive(false), in: shape) // ui-v4: allow single-layer inline sheet glass
+                OhanaPopupGlassSurface(cornerRadius: cornerRadius) // ui-v4: allow single-layer inline sheet glass
             case .clear:
                 shape
                     .fill(.clear)

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Potty cleanup / 如厕" class="ohana-duotone-icon">
+  <title>Potty cleanup / 如厕</title>
+  <g>
+
+      <rect style="fill:#7b6ac8" x="5.8" y="7" width="20.4" height="18.5" rx="5.8"/>
+      <rect style="fill:#7b6ac8;opacity:.22" x="9.2" y="10.8" width="13.6" height="10.7" rx="3.6"/>
+      <text style="fill:#ffb36b" x="16" y="18.7" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="8.1" font-weight="900">WC</text>
+      <rect style="fill:#ffb36b;opacity:.28" x="10.2" y="22.5" width="11.6" height="2.1" rx="1.05"/>
+  </g>
+</svg>

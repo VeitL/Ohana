@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Vaccination and vet visit / 疫苗/就诊" class="ohana-duotone-icon">
+  <title>Vaccination and vet visit / 疫苗/就诊</title>
+  <g>
+
+      <path style="fill:#298b9b" d="M16 4.8 24.4 8v6.8c0 5.5-3.1 9.8-8.4 12.4-5.3-2.6-8.4-6.9-8.4-12.4V8L16 4.8Z"/>
+      <rect style="fill:#c8ff3d" x="14.2" y="10.6" width="3.6" height="11" rx="1.8"/>
+      <rect style="fill:#c8ff3d" x="10.5" y="14.3" width="11" height="3.6" rx="1.8"/>
+  </g>
+</svg>

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Document / 文档" class="ohana-duotone-icon" style="--ohana-icon-primary: #3f74d8; --ohana-icon-accent: #ffb36b;">
+  <style>
+  .primary { fill: var(--ohana-icon-primary, #1f8a8a); }
+  .primary-soft { fill: var(--ohana-icon-primary, #1f8a8a); opacity: .22; }
+  .accent { fill: var(--ohana-icon-accent, #ff755f); }
+  .accent-soft { fill: var(--ohana-icon-accent, #ff755f); opacity: .28; }
+  .primary-line {
+    fill: none;
+    stroke: var(--ohana-icon-primary, #1f8a8a);
+    stroke-width: 4.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .accent-line {
+    fill: none;
+    stroke: var(--ohana-icon-accent, #ff755f);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .primary-thin-line {
+    fill: none;
+    stroke: var(--ohana-icon-primary, #1f8a8a);
+    stroke-width: 2.1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .accent-thin-line {
+    fill: none;
+    stroke: var(--ohana-icon-accent, #ff755f);
+    stroke-width: 2.1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  </style>
+  <title>Document / 文档</title>
+  <g>
+
+      <path class="primary" d="M9 5.5h10.4l4.1 4.2v16.8H9V5.5Z"/>
+      <path class="accent-soft" d="M19.1 5.6v5h4.5l-4.5-5Z"/>
+      <rect class="accent" x="12" y="15.1" width="8" height="2.4" rx="1.2"/>
+      <rect class="accent-soft" x="12" y="19.6" width="6.2" height="2.4" rx="1.2"/>
+  </g>
+</svg>

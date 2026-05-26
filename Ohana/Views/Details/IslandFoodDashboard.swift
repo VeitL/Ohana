@@ -5,39 +5,8 @@
 //  Cross-pet food overview used by the GO home FAB and feature groups.
 //
 
-import SwiftUI
 import SwiftData
-
-private struct FoodDayPoint: Identifiable {
-    let id = UUID()
-    let date: Date
-    let grams: Double
-    let count: Int
-}
-
-private struct FoodPetSummary: Identifiable {
-    let id: UUID
-    let pet: Pet
-    let todayCount: Int
-    let todayGrams: Double
-    let weekCount: Int
-    let weekGrams: Double
-}
-
-private struct FoodStockOverview {
-    let remainingGrams: Double
-    let totalGrams: Double
-    let estimatedDailyGrams: Double
-
-    var hasStock: Bool { totalGrams > 0 }
-    var remainingDays: Int? {
-        estimatedDailyGrams > 0 ? Int(remainingGrams / estimatedDailyGrams) : nil
-    }
-    var progress: Double {
-        guard totalGrams > 0 else { return 0.04 }
-        return max(0.04, min(1, remainingGrams / totalGrams))
-    }
-}
+import SwiftUI
 
 struct IslandFoodDashboard: View {
     var standalone: Bool = true
@@ -52,96 +21,30 @@ struct IslandFoodDashboard: View {
     @State private var selectedPetId: UUID? = nil
     @State private var sheetPet: Pet? = nil
     @State private var chartRevealProgress: CGFloat = 0
+    @StateObject private var snapshotStore = IslandFoodDashboardSnapshotStore()
 
     private var activePets: [Pet] {
-        pets.filter { !$0.hasPassedAway }
+        snapshot.activePets
     }
 
     private var selectedPets: [Pet] {
-        guard let selectedPetId else { return activePets }
-        return activePets.filter { $0.id == selectedPetId }
-    }
-
-    private var filteredFeedLogs: [PetCareLog] {
-        let selectedIds = Set(selectedPets.map(\.id))
-        let queried = allCareLogs.filter { log in
-            guard let pet = log.pet else { return false }
-            return selectedIds.contains(pet.id) && log.careType == .feeding
-        }
-        if !queried.isEmpty || !selectedPets.isEmpty {
-            return queried
-        }
-        return selectedPets
-            .flatMap(\.careLogs)
-            .filter { $0.careType == .feeding }
-    }
-
-    private var todayFeedLogs: [PetCareLog] {
-        filteredFeedLogs.filter { Calendar.current.isDateInToday($0.date) }
-    }
-
-    private var weekFeedLogs: [PetCareLog] {
-        let cal = Calendar.current
-        let today = cal.startOfDay(for: Date())
-        let cutoff = cal.date(byAdding: .day, value: -6, to: today) ?? today
-        return filteredFeedLogs.filter { $0.date >= cutoff }
-    }
-
-    private var todayGrams: Double {
-        todayFeedLogs.reduce(0) { $0 + amountGrams(for: $1) }
-    }
-
-    private var weekGrams: Double {
-        weekFeedLogs.reduce(0) { $0 + amountGrams(for: $1) }
+        snapshot.selectedPets
     }
 
     private var dailyPoints: [FoodDayPoint] {
-        let cal = Calendar.current
-        let selected = selectedPets
-        return (0..<7).reversed().map { offset in
-            let day = cal.date(byAdding: .day, value: -offset, to: cal.startOfDay(for: Date())) ?? Date()
-            let selectedIds = Set(selected.map(\.id))
-            let queried = allCareLogs.filter { log in
-                guard let pet = log.pet else { return false }
-                return selectedIds.contains(pet.id) &&
-                    log.careType == .feeding &&
-                    cal.isDate(log.date, inSameDayAs: day)
-            }
-            let logs = queried.isEmpty
-                ? selected.flatMap(\.careLogs).filter { $0.careType == .feeding && cal.isDate($0.date, inSameDayAs: day) }
-                : queried
-            return FoodDayPoint(
-                date: day,
-                grams: logs.reduce(0) { $0 + amountGrams(for: $1) },
-                count: logs.count
-            )
-        }
+        snapshot.dailyPoints
     }
 
     private var petSummaries: [FoodPetSummary] {
-        let cal = Calendar.current
-        let today = cal.startOfDay(for: Date())
-        let cutoff = cal.date(byAdding: .day, value: -6, to: today) ?? today
-        return selectedPets.map { pet in
-            let petLogs = allCareLogs.filter { $0.pet?.id == pet.id && $0.careType == .feeding }
-            let sourceLogs = petLogs.isEmpty ? pet.careLogs.filter { $0.careType == .feeding } : petLogs
-            let todayLogs = sourceLogs.filter { cal.isDateInToday($0.date) }
-            let weekLogs = sourceLogs.filter { $0.date >= cutoff }
-            return FoodPetSummary(
-                id: pet.id,
-                pet: pet,
-                todayCount: todayLogs.count,
-                todayGrams: todayLogs.reduce(0) { $0 + amountGrams(for: $1) },
-                weekCount: weekLogs.count,
-                weekGrams: weekLogs.reduce(0) { $0 + amountGrams(for: $1) }
-            )
-        }
+        snapshot.petSummaries
     }
 
     private var lowestFoodDaysPet: Pet? {
-        selectedPets
-            .filter { foodRemainingDays(for: $0) != nil }
-            .min { (foodRemainingDays(for: $0) ?? Int.max) < (foodRemainingDays(for: $1) ?? Int.max) }
+        snapshot.lowestFoodDaysPet
+    }
+
+    private var snapshot: IslandFoodDashboardSnapshot {
+        snapshotStore.snapshot
     }
 
     var body: some View {
@@ -149,9 +52,21 @@ struct IslandFoodDashboard: View {
             .sheet(item: $sheetPet) { pet in
                 PetFoodManagementView(pet: pet)
             }
-            .onAppear { playChartReveal() }
-            .onChange(of: selectedPetId) { _, _ in playChartReveal() }
-            .onChange(of: filteredFeedLogs.count) { _, _ in playChartReveal() }
+            .onAppear {
+                rebuildSnapshot(force: true)
+                playChartReveal()
+            }
+            .onChange(of: selectedPetId) { _, _ in
+                rebuildSnapshot(force: true)
+                playChartReveal()
+            }
+            .onChange(of: pets.count) { _, _ in rebuildSnapshot(force: true) }
+            .onChange(of: allEvents.count) { _, _ in rebuildSnapshot(force: true) }
+            .onChange(of: allCareLogs.count) { _, _ in
+                rebuildSnapshot(force: true)
+                playChartReveal()
+            }
+            .onChange(of: allFoodRecords.count) { _, _ in rebuildSnapshot(force: true) }
     }
 
     @ViewBuilder
@@ -264,9 +179,9 @@ struct IslandFoodDashboard: View {
 
     private var overviewCards: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-            metricCard(title: "今日喂食", value: "\(todayFeedLogs.count)", unit: "次", icon: "fork.knife", accent: Color.foodDry)
-            metricCard(title: "今日总量", value: compactFoodWeight(todayGrams), unit: "", icon: "scalemass.fill", accent: Color.goPrimary)
-            metricCard(title: "7 天总量", value: compactFoodWeight(weekGrams), unit: "", icon: "chart.bar.fill", accent: Color.goTeal)
+            metricCard(title: "今日喂食", value: "\(snapshot.todayFeedCount)", unit: "次", icon: "fork.knife", accent: Color.foodDry)
+            metricCard(title: "今日总量", value: compactFoodWeight(snapshot.todayGrams), unit: "", icon: "scalemass.fill", accent: Color.goPrimary)
+            metricCard(title: "7 天总量", value: compactFoodWeight(snapshot.weekGrams), unit: "", icon: "chart.bar.fill", accent: Color.goTeal)
             metricCard(title: "余粮风险", value: foodRiskValue, unit: foodRiskUnit, icon: "shippingbox.fill", accent: foodRiskAccent)
         }
     }
@@ -279,7 +194,7 @@ struct IslandFoodDashboard: View {
                     .foregroundStyle(Color.foodDry.opacity(0.22))
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(Color.foodDry.gradient)
-                    .frame(width: 82, height: max(10, 68 * CGFloat(min(1, weekGrams / max(1, Double(selectedPets.count) * 700))) * chartRevealProgress))
+                    .frame(width: 82, height: max(10, 68 * CGFloat(min(1, snapshot.weekGrams / max(1, Double(selectedPets.count) * 700))) * chartRevealProgress))
                     .mask {
                         Image(systemName: "takeoutbag.and.cup.and.straw.fill")
                             .font(.system(size: 82, weight: .black))
@@ -291,10 +206,10 @@ struct IslandFoodDashboard: View {
                 Text("喂食节奏")
                     .font(.system(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                Text(todayFeedLogs.isEmpty ? "今天还没开饭" : "今天 \(todayFeedLogs.count) 次")
+                Text(snapshot.todayFeedCount == 0 ? "今天还没开饭" : "今天 \(snapshot.todayFeedCount) 次")
                     .font(.system(size: 24, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("7 天 \(weekFeedLogs.count) 次 · \(compactFoodWeight(weekGrams))")
+                Text("7 天 \(snapshot.weekFeedCount) 次 · \(compactFoodWeight(snapshot.weekGrams))")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -452,11 +367,6 @@ struct IslandFoodDashboard: View {
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
-    private func amountGrams(for log: PetCareLog) -> Double {
-        if log.amountGrams > 0 { return log.amountGrams }
-        return log.pet?.dailyPortionGrams ?? 0
-    }
-
     private func compactFoodWeight(_ value: Double) -> String {
         AppMeasurementSystem.formatFoodGrams(value)
     }
@@ -477,55 +387,12 @@ struct IslandFoodDashboard: View {
         return Color.goPrimary
     }
 
-    private func foodStockOverview(for pet: Pet) -> FoodStockOverview? {
-        let dry = FeedStockCalculator.snapshot(
-            for: pet,
-            foodKind: .dry,
-            events: allEvents,
-            careLogs: allCareLogs,
-            foodRecords: allFoodRecords
-        )
-        let wet = FeedStockCalculator.snapshot(
-            for: pet,
-            foodKind: .wet,
-            events: allEvents,
-            careLogs: allCareLogs,
-            foodRecords: allFoodRecords
-        )
-        let modernTotal = dry.totalGrams + wet.totalGrams
-        if modernTotal > 0 {
-            return FoodStockOverview(
-                remainingGrams: dry.remainingGrams + wet.remainingGrams,
-                totalGrams: modernTotal,
-                estimatedDailyGrams: dry.estimatedDailyGrams + wet.estimatedDailyGrams
-            )
-        }
-
-        switch pet.foodTrackingMode {
-        case .precise:
-            guard pet.restockWeight > 0 else { return nil }
-            return FoodStockOverview(
-                remainingGrams: pet.remainingFoodGrams,
-                totalGrams: pet.restockWeight,
-                estimatedDailyGrams: pet.dailyPortionGrams
-            )
-        case .casual:
-            guard let days = pet.casualRemainingDays, pet.casualDurationDays > 0 else { return nil }
-            let progress = max(0.04, min(1, Double(days) / Double(pet.casualDurationDays)))
-            return FoodStockOverview(
-                remainingGrams: Double(days),
-                totalGrams: Double(pet.casualDurationDays),
-                estimatedDailyGrams: progress > 0 ? 1 : 0
-            )
-        }
-    }
-
     private func foodRemainingDays(for pet: Pet) -> Int? {
-        foodStockOverview(for: pet)?.remainingDays
+        snapshot.stock(for: pet)?.remainingDays
     }
 
     private func foodProgress(for pet: Pet) -> Double {
-        foodStockOverview(for: pet)?.progress ?? 0.04
+        snapshot.stock(for: pet)?.progress ?? 0.04
     }
 
     private func foodAccent(for pet: Pet) -> Color {
@@ -536,13 +403,24 @@ struct IslandFoodDashboard: View {
     }
 
     private func foodStatusText(for pet: Pet) -> String {
-        guard let stock = foodStockOverview(for: pet), stock.hasStock else {
+        guard let stock = snapshot.stock(for: pet), stock.hasStock else {
             return "未设置粮仓"
         }
         if let days = stock.remainingDays {
             return "余粮 \(compactFoodWeight(stock.remainingGrams)) · 可用 \(days) 天"
         }
         return "余粮 \(compactFoodWeight(stock.remainingGrams)) · 未估算"
+    }
+
+    private func rebuildSnapshot(force: Bool = false) {
+        snapshotStore.rebuild(
+            pets: pets,
+            selectedPetId: selectedPetId,
+            allEvents: allEvents,
+            allCareLogs: allCareLogs,
+            allFoodRecords: allFoodRecords,
+            force: force
+        )
     }
 
     private func playChartReveal() {

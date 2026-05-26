@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Check-in / 打卡" class="ohana-duotone-icon">
+  <title>Check-in / 打卡</title>
+  <g>
+
+      <rect style="fill:#2b8f78" x="6.5" y="6.5" width="19" height="19" rx="9.5"/>
+      <path style="fill:none;stroke:#c8ff3d;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" d="m10.8 16.2 3.6 3.6 7-8"/>
+      <circle style="fill:#c8ff3d;opacity:.28" cx="23.1" cy="22.6" r="2.2"/>
+  </g>
+</svg>

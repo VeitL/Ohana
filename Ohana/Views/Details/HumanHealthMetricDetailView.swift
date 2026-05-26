@@ -75,8 +75,8 @@ struct HumanHealthMetricDetailView: View {
                     LazyVStack(alignment: .leading, spacing: 14) {
                         pageHeader
                         heroMetric
-                        unitSelector
                         chartSection
+                        unitSelector
                         referenceSection
                         historySection
                     }

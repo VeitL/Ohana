@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Litter / 猫砂" class="ohana-duotone-icon">
+  <title>Litter / 猫砂</title>
+  <g>
+
+      <path style="fill:#7b6ac8" d="M6.7 17h18.6l-1.5 6.1A4.1 4.1 0 0 1 19.8 26h-7.6a4.1 4.1 0 0 1-4-2.9L6.7 17Z"/>
+      <ellipse style="fill:#7b6ac8;opacity:.22" cx="16" cy="16.9" rx="9.3" ry="3.7"/>
+      <circle style="fill:#ffb36b" cx="9.7" cy="16.5" r=".78"/>
+      <circle style="fill:#ffb36b" cx="12.1" cy="15.2" r=".68"/>
+      <circle style="fill:#ffb36b" cx="14.5" cy="16.8" r=".76"/>
+      <circle style="fill:#ffb36b" cx="17.1" cy="15.5" r=".7"/>
+      <circle style="fill:#ffb36b" cx="19.5" cy="17.1" r=".8"/>
+      <circle style="fill:#ffb36b" cx="22" cy="15.8" r=".66"/>
+      <circle style="fill:#ffb36b;opacity:.28" cx="10.9" cy="19.1" r=".66"/>
+      <circle style="fill:#ffb36b;opacity:.28" cx="13.8" cy="18.5" r=".74"/>
+      <circle style="fill:#ffb36b;opacity:.28" cx="16.5" cy="19.5" r=".68"/>
+      <circle style="fill:#ffb36b;opacity:.28" cx="19.2" cy="18.8" r=".72"/>
+      <circle style="fill:#ffb36b;opacity:.28" cx="21.8" cy="19.5" r=".62"/>
+  </g>
+</svg>

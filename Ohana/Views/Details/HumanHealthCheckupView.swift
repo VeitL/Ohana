@@ -17,6 +17,7 @@ struct HumanHealthCheckupView: View {
 
     @State private var recordingMetric: HealthMetric?
     @State private var detailMetric: HealthMetric?
+    @State private var metricToOpenAfterEntry: HealthMetric?
 
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isViewingOwnProfile: Bool { activeHumanId == human.id }
@@ -43,6 +44,14 @@ struct HumanHealthCheckupView: View {
         }.count
     }
 
+    private var trackedMetrics: [HealthMetric] {
+        var seen = Set<String>()
+        return sortedLogs.compactMap { log in
+            guard seen.insert(log.metricKey).inserted else { return nil }
+            return HealthMetricCatalog.metric(forKey: log.metricKey)
+        }
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             OhanaAppBackground()
@@ -54,6 +63,7 @@ struct HumanHealthCheckupView: View {
                     LazyVStack(alignment: .leading, spacing: 16) {
                         pageHeader
                         summaryStrip
+                        trackedChartSection
                         recentSection
                         catalogSection
                     }
@@ -69,10 +79,18 @@ struct HumanHealthCheckupView: View {
                     human: human,
                     metric: recordingMetric,
                     initialUnitCode: preferredUnit(for: recordingMetric).code,
-                    onSaved: { _ in },
+                    onSaved: { _ in
+                        metricToOpenAfterEntry = recordingMetric
+                    },
                     onDismiss: {
                         withAnimation(GoMotion.feedback) {
                             self.recordingMetric = nil
+                        }
+                        if let metric = metricToOpenAfterEntry {
+                            metricToOpenAfterEntry = nil
+                            DispatchQueue.main.async {
+                                detailMetric = metric
+                            }
                         }
                     }
                 )
@@ -104,6 +122,129 @@ struct HumanHealthCheckupView: View {
                 HumanPrivacyToggleButton(human: human, field: .weight)
             }
         }
+    }
+
+    @ViewBuilder
+    private var trackedChartSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                sectionTitle(l.tr(zh: "已追踪图表", en: "Tracked Charts", de: "Getrackte Diagramme"))
+                Spacer()
+                Text(l.tr(zh: "\(trackedMetrics.count) 项", en: "\(trackedMetrics.count) tracked", de: "\(trackedMetrics.count) getrackt"))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+
+            if trackedMetrics.isEmpty {
+                trackedChartEmptyState
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(trackedMetrics.prefix(12)) { metric in
+                            trackedMetricChartCard(metric)
+                        }
+                    }
+                    .padding(.vertical, 1)
+                }
+            }
+        }
+    }
+
+    private var trackedChartEmptyState: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "chart.line.uptrend.xyaxis")
+                .font(.system(size: 18, weight: .black))
+                .foregroundStyle(Color.goOrange)
+                .frame(width: 42, height: 42)
+                .background(Color.goOrange.opacity(0.14), in: Circle())
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(l.tr(zh: "录入任意指标后会生成追踪图", en: "Charts appear after you log a metric.", de: "Diagramme erscheinen nach dem ersten Wert."))
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text(l.tr(zh: "从下方分类选择指标开始。", en: "Pick a metric from the catalog below.", de: "Wähle unten einen Wert aus dem Katalog."))
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func trackedMetricChartCard(_ metric: HealthMetric) -> some View {
+        let logs = logs(for: metric)
+        let latest = logs.first
+        let unit = latest.flatMap { metric.unit(for: $0.unitCode) } ?? metric.defaultUnit(for: appCountry)
+        let unitLogs = logs.filter { $0.unitCode == unit.code }.sorted { $0.date < $1.date }
+        let points = unitLogs.suffix(12).map {
+            OhanaMinimalChartPoint(date: $0.date, value: $0.value, id: $0.id.uuidString)
+        }
+        var yValues = unitLogs.map(\.value)
+        if let low = unit.normalLow { yValues.append(low) }
+        if let high = unit.normalHigh { yValues.append(high) }
+
+        return Button {
+            detailMetric = metric
+            UISelectionFeedbackGenerator().selectionChanged()
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: metric.category.systemImage)
+                        .font(.system(size: 12, weight: .black))
+                        .foregroundStyle(Color.arkInk)
+                        .frame(width: 28, height: 28)
+                        .background(metric.category.color, in: Circle())
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(metric.displayName(l))
+                            .font(OhanaFont.subheadline(.black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+                        Text(unit.label)
+                            .font(OhanaFont.caption2(.black))
+                            .foregroundStyle(metric.category.color)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .black))
+                        .foregroundStyle(Color.ohanaTertiaryText)
+                }
+
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(latest.map { unit.formattedValue($0.value, includeUnit: false) } ?? "—")
+                        .font(OhanaFont.metric(size: 27, .black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.62)
+                        .contentTransition(.numericText())
+                    Text(unit.label)
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(metric.category.color)
+                    Spacer(minLength: 0)
+                }
+
+                OhanaMinimalTrendChart(
+                    points: Array(points),
+                    yDomain: OhanaChartStyle.yDomain(values: yValues, includeZero: false),
+                    tint: metric.category.color,
+                    showsLatestPoint: true
+                )
+                .frame(height: 58)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
+            .padding(14)
+            .frame(width: 226, height: 156, alignment: .topLeading)
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(l.tr(
+            zh: "查看 \(metric.displayName(l)) 追踪图",
+            en: "View \(metric.displayName(l)) tracking chart",
+            de: "Tracking-Diagramm für \(metric.displayName(l)) anzeigen"
+        ))
     }
 
     private var countryTitle: String {
@@ -385,6 +526,10 @@ struct HumanHealthCheckupView: View {
 
     private func latestLog(for metric: HealthMetric) -> HumanHealthMetricLog? {
         sortedLogs.first { $0.metricKey == metric.key }
+    }
+
+    private func logs(for metric: HealthMetric) -> [HumanHealthMetricLog] {
+        sortedLogs.filter { $0.metricKey == metric.key }
     }
 
     private func preferredUnit(for metric: HealthMetric) -> HealthMetricUnit {

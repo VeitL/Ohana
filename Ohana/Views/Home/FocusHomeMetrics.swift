@@ -111,21 +111,6 @@ private struct HomeHeroTopRevealShape: Shape {
     }
 }
 
-struct ExpandedQuickPetRecordRoute: Identifiable {
-    let id = UUID()
-    let pet: Pet
-}
-
-struct ExpandedQuickHumanRecordRoute: Identifiable {
-    let id = UUID()
-    let human: Human
-    let actionType: String
-
-    var actionKey: String {
-        "\(human.id.uuidString):\(actionType)"
-    }
-}
-
 enum ExpandedQuickActionMenuTarget: Identifiable {
     case pet(QuickActionItem, Pet)
     case human(QuickActionItem, Human)

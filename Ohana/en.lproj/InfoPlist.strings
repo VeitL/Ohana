@@ -1,5 +1,6 @@
 /* Localized Info.plist strings (English) */
-"NSCameraUsageDescription" = "Used to take photos in “Moments” and save them to your library.";
+"NSCameraUsageDescription" = "Used to take member or pet avatar photos and photos in Moments.";
+"NSPhotoLibraryUsageDescription" = "Used to choose member or pet avatars and image attachments from your photo library.";
 "NSLocationWhenInUseUsageDescription" = "Used to attach your current location in “Moments” and record a route after you start a dog walk.";
 "NSLocationAlwaysAndWhenInUseUsageDescription" = "Used only during an active dog walk so Ohana can keep recording the route when the app is in the background or the screen is locked.";
 "NSLocationAlwaysUsageDescription" = "Used only during an active dog walk to keep recording the route in the background or while the screen is locked.";

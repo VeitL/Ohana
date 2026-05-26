@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Vaccination and vet visit / 疫苗/就诊" class="ohana-duotone-icon" style="--ohana-icon-primary: #298b9b; --ohana-icon-accent: #c8ff3d;">
+  <style>
+  .primary { fill: var(--ohana-icon-primary, #1f8a8a); }
+  .primary-soft { fill: var(--ohana-icon-primary, #1f8a8a); opacity: .22; }
+  .accent { fill: var(--ohana-icon-accent, #ff755f); }
+  .accent-soft { fill: var(--ohana-icon-accent, #ff755f); opacity: .28; }
+  .primary-line {
+    fill: none;
+    stroke: var(--ohana-icon-primary, #1f8a8a);
+    stroke-width: 4.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .accent-line {
+    fill: none;
+    stroke: var(--ohana-icon-accent, #ff755f);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .primary-thin-line {
+    fill: none;
+    stroke: var(--ohana-icon-primary, #1f8a8a);
+    stroke-width: 2.1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .accent-thin-line {
+    fill: none;
+    stroke: var(--ohana-icon-accent, #ff755f);
+    stroke-width: 2.1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  </style>
+  <title>Vaccination and vet visit / 疫苗/就诊</title>
+  <g>
+
+      <path class="primary" d="M16 4.8 24.4 8v6.8c0 5.5-3.1 9.8-8.4 12.4-5.3-2.6-8.4-6.9-8.4-12.4V8L16 4.8Z"/>
+      <rect class="accent" x="14.2" y="10.6" width="3.6" height="11" rx="1.8"/>
+      <rect class="accent" x="10.5" y="14.3" width="11" height="3.6" rx="1.8"/>
+  </g>
+</svg>

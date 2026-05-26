@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Dog walking / 遛狗" class="ohana-duotone-icon">
+  <title>Dog walking / 遛狗</title>
+  <g>
+
+      <path style="fill:none;stroke:#c8ff3d;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round" d="M7.2 9.2c3.4.3 6.1 2.2 8.8 5.1"/>
+      <circle style="fill:#c8ff3d;opacity:.28" cx="6.8" cy="9" r="2.1"/>
+      <rect style="fill:#2b8f78" x="12.2" y="16.2" width="9.2" height="5.4" rx="2.7"/>
+      <circle style="fill:#2b8f78" cx="22.3" cy="15.2" r="3.05"/>
+      <ellipse style="fill:#2b8f78" cx="25" cy="16.3" rx="2.1" ry="1.45"/>
+      <path style="fill:#2b8f78" d="M24.3 13 27 11.8l-.4 3.4-2.3-2.2Z"/>
+      <path style="fill:none;stroke:#2b8f78;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round" d="M12.6 17.4 9.5 15.5"/>
+      <rect style="fill:#2b8f78" x="13.4" y="20.7" width="2" height="4.4" rx="1"/>
+      <rect style="fill:#2b8f78" x="18.1" y="20.7" width="2" height="4.4" rx="1"/>
+      <circle style="fill:#c8ff3d" cx="23.2" cy="14.8" r=".75"/>
+      <rect style="fill:#c8ff3d" x="17.7" y="13.2" width="4.1" height="1.8" rx=".9"/>
+  </g>
+</svg>

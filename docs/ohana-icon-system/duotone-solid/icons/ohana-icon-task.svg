@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Task / 任务" class="ohana-duotone-icon">
+  <title>Task / 任务</title>
+  <g>
+
+      <rect style="fill:#2b8f78" x="6.5" y="6.5" width="19" height="19" rx="6"/>
+      <path style="fill:none;stroke:#c8ff3d;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" d="m11.5 16.4 3 3.1 6.4-7"/>
+      <circle style="fill:#c8ff3d;opacity:.28" cx="22.7" cy="22.7" r="2.2"/>
+  </g>
+</svg>

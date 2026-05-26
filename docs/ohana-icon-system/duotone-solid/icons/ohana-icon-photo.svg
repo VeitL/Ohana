@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Photo / 照片" class="ohana-duotone-icon">
+  <title>Photo / 照片</title>
+  <g>
+
+      <rect style="fill:#298b9b" x="6" y="8" width="20" height="16" rx="5"/>
+      <circle style="fill:#ffd36c" cx="20.8" cy="12.6" r="2.1"/>
+      <path style="fill:#ffd36c;opacity:.28" d="M9.4 22.2 14 16.8l3.4 3.8 2.1-2.3 3.5 3.9H9.4Z"/>
+  </g>
+</svg>

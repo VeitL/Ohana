@@ -1,5 +1,6 @@
 /* Localized Info.plist strings (German) */
-"NSCameraUsageDescription" = "Wird verwendet, um Fotos in Moments aufzunehmen und in deiner Mediathek zu speichern.";
+"NSCameraUsageDescription" = "Wird verwendet, um Mitglieder- oder Haustier-Avatare und Fotos in Moments aufzunehmen.";
+"NSPhotoLibraryUsageDescription" = "Wird verwendet, um Mitglieder- oder Haustier-Avatare und Bildanhänge aus deiner Fotomediathek auszuwählen.";
 "NSLocationWhenInUseUsageDescription" = "Wird verwendet, um deinen aktuellen Standort in Moments hinzuzufügen und nach dem Start eines Spaziergangs eine Route aufzuzeichnen.";
 "NSLocationAlwaysAndWhenInUseUsageDescription" = "Wird nur während eines aktiven Spaziergangs verwendet, damit Ohana die Route im Hintergrund oder bei gesperrtem Bildschirm weiter aufzeichnen kann.";
 "NSLocationAlwaysUsageDescription" = "Wird nur während eines aktiven Spaziergangs verwendet, um die Route im Hintergrund oder bei gesperrtem Bildschirm weiter aufzuzeichnen.";

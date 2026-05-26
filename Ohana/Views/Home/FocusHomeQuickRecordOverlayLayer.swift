@@ -9,7 +9,7 @@ import SwiftUI
 
 enum FocusHomeOverlayState {
     static func hasInlineRecordOverlay(
-        router: FocusHomeQuickRecordRouter,
+        router: HomeRouteCoordinator,
         quickActionMenu: ExpandedQuickActionMenuTarget?
     ) -> Bool {
         router.hasActiveOverlay || quickActionMenu != nil
@@ -17,7 +17,9 @@ enum FocusHomeOverlayState {
 }
 
 struct FocusHomeQuickRecordOverlayLayer: View {
-    @ObservedObject var router: FocusHomeQuickRecordRouter
+    @ObservedObject var router: HomeRouteCoordinator
+    let pets: [Pet]
+    let humans: [Human]
     let preselectedPayerId: String?
 
     let onPetWeightRewarded: (UUID, Int) -> Void
@@ -28,125 +30,95 @@ struct FocusHomeQuickRecordOverlayLayer: View {
 
     var body: some View {
         OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: router.hasActiveOverlay) {
-            if let route = router.petWeight {
-                let pet = route.pet
+            if let route = router.popup {
+                popupContent(for: route)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func popupContent(for route: HomePopupRoute) -> some View {
+        switch route {
+        case .petWeight(_, let petID):
+            if let pet = pets.first(where: { $0.id == petID }) {
                 GenericWeightEntrySheet(
                     target: .pet(pet),
-                    onRewarded: { delta in
-                        onPetWeightRewarded(pet.id, delta)
-                    },
-                    onDismiss: {
-                        router.dismissPetWeight(routeID: route.id)
-                    }
+                    onRewarded: { delta in onPetWeightRewarded(pet.id, delta) },
+                    onDismiss: { router.dismissPopup(routeID: route.id) }
                 )
                 .id(route.id)
                 .zIndex(1)
             }
-
-            if let route = router.petExpense {
-                let pet = route.pet
+        case .petExpense(_, let petID):
+            if let pet = pets.first(where: { $0.id == petID }) {
                 AddExpenseSheet(
                     pet: pet,
                     preselectedPayerId: preselectedPayerId,
-                    onRewarded: { delta in
-                        onPetExpenseRewarded(pet.id, delta)
-                    },
-                    onDismiss: {
-                        router.dismissPetExpense(routeID: route.id)
-                    }
+                    onRewarded: { delta in onPetExpenseRewarded(pet.id, delta) },
+                    onDismiss: { router.dismissPopup(routeID: route.id) }
                 )
                 .id(route.id)
                 .zIndex(2)
             }
-
-            if let route = router.humanWeight {
-                let human = route.human
+        case .humanWeight(_, let humanID, let actionType):
+            if let human = humans.first(where: { $0.id == humanID }) {
                 GenericWeightEntrySheet(
                     target: .human(human),
-                    onSaved: {
-                        onHumanSaved(human.id, route.actionKey)
-                    },
-                    onDismiss: {
-                        router.dismissHumanWeight(routeID: route.id)
-                    }
+                    onSaved: { onHumanSaved(human.id, "\(human.id.uuidString):\(actionType)") },
+                    onDismiss: { router.dismissPopup(routeID: route.id) }
                 )
                 .id(route.id)
                 .zIndex(3)
             }
-
-            if let route = router.humanExpense {
-                let human = route.human
+        case .humanExpense(_, let humanID, let actionType):
+            if let human = humans.first(where: { $0.id == humanID }) {
                 QuickHumanExpenseSheet(
                     human: human,
-                    onSaved: {
-                        onHumanSaved(human.id, route.actionKey)
-                    },
-                    onDismiss: {
-                        router.dismissHumanExpense(routeID: route.id)
-                    }
+                    onSaved: { onHumanSaved(human.id, "\(human.id.uuidString):\(actionType)") },
+                    onDismiss: { router.dismissPopup(routeID: route.id) }
                 )
                 .id(route.id)
                 .zIndex(4)
             }
-
-            if let route = router.humanNote {
-                let human = route.human
+        case .humanNote(_, let humanID, let actionType):
+            if let human = humans.first(where: { $0.id == humanID }) {
                 QuickHumanNoteSheet(
                     human: human,
-                    onSaved: {
-                        onHumanSaved(human.id, route.actionKey)
-                    },
-                    onDismiss: {
-                        router.dismissHumanNote(routeID: route.id)
-                    }
+                    onSaved: { onHumanSaved(human.id, "\(human.id.uuidString):\(actionType)") },
+                    onDismiss: { router.dismissPopup(routeID: route.id) }
                 )
                 .id(route.id)
                 .zIndex(5)
             }
-
-            if let route = router.humanWorkout {
-                let human = route.human
+        case .humanWorkout(_, let humanID, let actionType):
+            if let human = humans.first(where: { $0.id == humanID }) {
                 QuickHumanWorkoutSheet(
                     human: human,
-                    onSaved: {
-                        onHumanSaved(human.id, route.actionKey)
-                    },
-                    onDismiss: {
-                        router.dismissHumanWorkout(routeID: route.id)
-                    }
+                    onSaved: { onHumanSaved(human.id, "\(human.id.uuidString):\(actionType)") },
+                    onDismiss: { router.dismissPopup(routeID: route.id) }
                 )
                 .id(route.id)
                 .zIndex(6)
             }
-
-            if let route = router.humanMedication {
-                let human = route.human
+        case .humanMedication(_, let humanID, let actionType):
+            if let human = humans.first(where: { $0.id == humanID }) {
                 QuickHumanMedicationSheet(
                     human: human,
-                    onSaved: {
-                        onHumanSaved(human.id, route.actionKey)
-                    },
-                    onManage: {
-                        onManageHumanMedication(human)
-                    },
-                    onDismiss: {
-                        router.dismissHumanMedication(routeID: route.id)
-                    }
+                    onSaved: { onHumanSaved(human.id, "\(human.id.uuidString):\(actionType)") },
+                    onManage: { onManageHumanMedication(human) },
+                    onDismiss: { router.dismissPopup(routeID: route.id) }
                 )
                 .id(route.id)
                 .zIndex(7)
             }
-
-            if let route = router.petMedication {
-                let pet = route.pet
+        case .petMedication(_, let petID):
+            if let pet = pets.first(where: { $0.id == petID }) {
                 PetMedicationQuickRecordPopupLayer(
                     pet: pet,
-                    onClose: {
-                        router.dismissPetMedication(routeID: route.id)
-                    },
+                    onClose: { router.dismissPopup(routeID: route.id) },
                     onSaved: {
                         onPetMedicationSaved(pet)
-                        router.dismissPetMedication(routeID: route.id)
+                        router.dismissPopup(routeID: route.id)
                     }
                 )
                 .id(route.id)

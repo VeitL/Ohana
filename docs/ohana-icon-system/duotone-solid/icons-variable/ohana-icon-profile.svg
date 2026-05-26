@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Profile / 档案" class="ohana-duotone-icon" style="--ohana-icon-primary: #3f74d8; --ohana-icon-accent: #7be4d4;">
+  <style>
+  .primary { fill: var(--ohana-icon-primary, #1f8a8a); }
+  .primary-soft { fill: var(--ohana-icon-primary, #1f8a8a); opacity: .22; }
+  .accent { fill: var(--ohana-icon-accent, #ff755f); }
+  .accent-soft { fill: var(--ohana-icon-accent, #ff755f); opacity: .28; }
+  .primary-line {
+    fill: none;
+    stroke: var(--ohana-icon-primary, #1f8a8a);
+    stroke-width: 4.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .accent-line {
+    fill: none;
+    stroke: var(--ohana-icon-accent, #ff755f);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .primary-thin-line {
+    fill: none;
+    stroke: var(--ohana-icon-primary, #1f8a8a);
+    stroke-width: 2.1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .accent-thin-line {
+    fill: none;
+    stroke: var(--ohana-icon-accent, #ff755f);
+    stroke-width: 2.1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  </style>
+  <title>Profile / 档案</title>
+  <g>
+
+      <rect class="primary" x="6.5" y="5.8" width="19" height="21" rx="5.5"/>
+      <circle class="accent" cx="16" cy="13" r="3.4"/>
+      <path class="accent-soft" d="M10.8 22.5c.6-3.6 2.6-5.5 5.2-5.5s4.6 1.9 5.2 5.5H10.8Z"/>
+  </g>
+</svg>

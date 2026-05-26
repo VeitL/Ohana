@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Dog walking / 遛狗" class="ohana-duotone-icon" style="--ohana-icon-primary: #2b8f78; --ohana-icon-accent: #c8ff3d;">
+  <style>
+  .primary { fill: var(--ohana-icon-primary, #1f8a8a); }
+  .primary-soft { fill: var(--ohana-icon-primary, #1f8a8a); opacity: .22; }
+  .accent { fill: var(--ohana-icon-accent, #ff755f); }
+  .accent-soft { fill: var(--ohana-icon-accent, #ff755f); opacity: .28; }
+  .primary-line {
+    fill: none;
+    stroke: var(--ohana-icon-primary, #1f8a8a);
+    stroke-width: 4.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .accent-line {
+    fill: none;
+    stroke: var(--ohana-icon-accent, #ff755f);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .primary-thin-line {
+    fill: none;
+    stroke: var(--ohana-icon-primary, #1f8a8a);
+    stroke-width: 2.1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .accent-thin-line {
+    fill: none;
+    stroke: var(--ohana-icon-accent, #ff755f);
+    stroke-width: 2.1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  </style>
+  <title>Dog walking / 遛狗</title>
+  <g>
+
+      <path class="accent-thin-line" d="M7.2 9.2c3.4.3 6.1 2.2 8.8 5.1"/>
+      <circle class="accent-soft" cx="6.8" cy="9" r="2.1"/>
+      <rect class="primary" x="12.2" y="16.2" width="9.2" height="5.4" rx="2.7"/>
+      <circle class="primary" cx="22.3" cy="15.2" r="3.05"/>
+      <ellipse class="primary" cx="25" cy="16.3" rx="2.1" ry="1.45"/>
+      <path class="primary" d="M24.3 13 27 11.8l-.4 3.4-2.3-2.2Z"/>
+      <path class="primary-thin-line" d="M12.6 17.4 9.5 15.5"/>
+      <rect class="primary" x="13.4" y="20.7" width="2" height="4.4" rx="1"/>
+      <rect class="primary" x="18.1" y="20.7" width="2" height="4.4" rx="1"/>
+      <circle class="accent" cx="23.2" cy="14.8" r=".75"/>
+      <rect class="accent" x="17.7" y="13.2" width="4.1" height="1.8" rx=".9"/>
+  </g>
+</svg>

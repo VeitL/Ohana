@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Bath / 洗澡" class="ohana-duotone-icon">
+  <title>Bath / 洗澡</title>
+  <g>
+
+      <path style="fill:#20a0b8" d="M6.5 17.2h19l-1.1 5.2A4.8 4.8 0 0 1 19.7 26h-7.4a4.8 4.8 0 0 1-4.7-3.6l-1.1-5.2Z"/>
+      <path style="fill:none;stroke:#20a0b8;stroke-width:4.2;stroke-linecap:round;stroke-linejoin:round" d="M9 16.5c1.8-2.2 3.9-2.2 5.7 0 1.8 2.2 3.9 2.2 5.7 0"/>
+      <circle style="fill:#ffd36c" cx="22.6" cy="8.3" r="2.3"/>
+      <circle style="fill:#ffd36c;opacity:.28" cx="18.6" cy="11.2" r="1.6"/>
+  </g>
+</svg>

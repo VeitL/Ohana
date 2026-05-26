@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Birthday / 生日" class="ohana-duotone-icon">
+  <title>Birthday / 生日</title>
+  <g>
+
+      <rect style="fill:#ff755f" x="7" y="15.2" width="18" height="10.3" rx="4"/>
+      <rect style="fill:#ffd36c;opacity:.28" x="9" y="12.2" width="14" height="4.8" rx="2.4"/>
+      <rect style="fill:#ff755f" x="14.6" y="6.6" width="2.8" height="6.8" rx="1.4"/>
+      <path style="fill:#ffd36c" d="M16 4.3c1.5 1.8 2.2 2.8 2.2 3.8a2.2 2.2 0 0 1-4.4 0c0-1 .7-2 2.2-3.8Z"/>
+  </g>
+</svg>

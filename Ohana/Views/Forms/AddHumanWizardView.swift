@@ -32,11 +32,15 @@ struct AddHumanWizardView: View {
     @State private var name            = ""
     @State private var avatarImageData: Data? = nil
     @State private var usesAutomaticAvatarAsset = true
+    @State private var showingPhotoPicker = false
     @State private var photosPickerItem: PhotosPickerItem? = nil
     @State private var showingCamera   = false
     @State private var showCameraPermissionAlert = false
     @State private var pendingCapturedAvatarImage: UIImage? = nil
     @State private var cropImageItem: IdentifiableCropImage? = nil
+    @State private var cropPresentationTask: Task<Void, Never>? = nil
+    @State private var isAvatarMediaTransitioning = false
+    @State private var avatarMediaReturnPageIndex: Int? = nil
 
     // ── Profile
     @State private var gender      = ""
@@ -69,7 +73,6 @@ struct AddHumanWizardView: View {
     // ── Wizard navigation
     @State private var wizardPageIndex      = 0
     @State private var wizardPageDirection  = 1
-    @State private var wizardTabViewRemountID = 0
     @Namespace private var themeSelectionNamespace
 
     // ── Alerts
@@ -231,6 +234,15 @@ struct AddHumanWizardView: View {
                 refreshAutomaticAvatarAssetDataAsync()
                 scheduleAvatarDecode()
             }
+            .onDisappear {
+                if !isAvatarMediaTransitioning {
+                    avatarAssetLoadTask?.cancel()
+                    cropPresentationTask?.cancel()
+                    cropPresentationTask = nil
+                    isAvatarMediaTransitioning = false
+                    avatarMediaReturnPageIndex = nil
+                }
+            }
             .onChange(of: avatarImageData)    { _, _ in scheduleAvatarDecode() }
             .onChange(of: photosPickerItem)   { _, item in handlePhotosPicker(item) }
             .onChange(of: gender)             { _, _ in refreshAutomaticAvatarAssetDataAsync() }
@@ -238,7 +250,20 @@ struct AddHumanWizardView: View {
             .onChange(of: hasBirthday)        { _, _ in refreshAutomaticAvatarAssetDataAsync() }
             .onChange(of: cropImageItem)      { _, new in
                 guard new == nil else { return }
-                DispatchQueue.main.async { wizardTabViewRemountID += 1 }
+                cropPresentationTask?.cancel()
+                cropPresentationTask = nil
+                finishAvatarMediaPresentation()
+            }
+            .onChange(of: showingPhotoPicker) { _, isShowing in
+                guard !isShowing else { return }
+                OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
+                    guard !showingPhotoPicker,
+                          photosPickerItem == nil,
+                          cropImageItem == nil,
+                          cropPresentationTask == nil,
+                          !showingCamera else { return }
+                    finishAvatarMediaPresentation()
+                }
             }
             .onChange(of: wizardPageIndex) { _, new in
                 let clamped = min(max(new, 0), totalCards - 1)
@@ -251,10 +276,13 @@ struct AddHumanWizardView: View {
                     isCustomResidenceCity = false
                 }
             }
+            .photosPicker(isPresented: $showingPhotoPicker, selection: $photosPickerItem, matching: .images)
             .fullScreenCover(isPresented: $showingCamera, onDismiss: {
                 if let img = pendingCapturedAvatarImage {
                     pendingCapturedAvatarImage = nil
                     prepareCapturedAvatarForCrop(img)
+                } else {
+                    finishAvatarMediaPresentation()
                 }
             }) {
                 PetCameraPickerView(maxPixel: 1_600) { img in
@@ -413,7 +441,6 @@ struct AddHumanWizardView: View {
                 wizardCard(for: index)
             })
         }
-        .id(wizardTabViewRemountID)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -661,12 +688,18 @@ struct AddHumanWizardView: View {
                 VStack(spacing: 8) {
                     cardSectionLabel(l.humanWizAvatarPhoto)
                     HStack(spacing: 10) {
-                        PhotosPicker(selection: $photosPickerItem, matching: .images) {
+                        Button {
+                            presentPhotoLibrary()
+                        } label: {
                             avatarActionButton(icon: "photo.on.rectangle", label: l.humanWizPhotoLibrary)
                         }
+                        .buttonStyle(ScaleButtonStyle())
+                        .disabled(isAvatarMediaTransitioning)
                         Button { presentCamera() } label: {
                             avatarActionButton(icon: "camera.fill", label: l.humanWizCamera)
                         }
+                        .buttonStyle(ScaleButtonStyle())
+                        .disabled(isAvatarMediaTransitioning)
                     }
                     if isShowingAutomatic2DAvatar {
                         HStack {
@@ -1530,28 +1563,72 @@ struct AddHumanWizardView: View {
 
     // MARK: - Photo handling
 
+    private func beginAvatarMediaPresentation() {
+        guard !isAvatarMediaTransitioning else { return }
+        GoKeyboard.dismiss()
+        avatarMediaReturnPageIndex = wizardPageIndex
+        isAvatarMediaTransitioning = true
+    }
+
+    private func finishAvatarMediaPresentation() {
+        isAvatarMediaTransitioning = false
+        restoreAvatarMediaReturnPage()
+        avatarMediaReturnPageIndex = nil
+    }
+
+    private func restoreAvatarMediaReturnPage() {
+        guard let index = avatarMediaReturnPageIndex else { return }
+        let clamped = min(max(index, 0), totalCards - 1)
+        guard clamped != wizardPageIndex else { return }
+        var tx = Transaction()
+        tx.disablesAnimations = true
+        withTransaction(tx) {
+            wizardPageDirection = clamped > wizardPageIndex ? 1 : -1
+            wizardPageIndex = clamped
+        }
+    }
+
+    private func presentPhotoLibrary() {
+        beginAvatarMediaPresentation()
+        showingPhotoPicker = true
+    }
+
     private func handlePhotosPicker(_ item: PhotosPickerItem?) {
         Task {
             guard let item else { return }
             let startedAt = CFAbsoluteTimeGetCurrent()
-            if let data = try? await item.loadTransferable(type: Data.self) {
-                let ui = await Task.detached(priority: .userInitiated) {
-                    AddPetWizardView.cropReadyImage(from: data, maxPixel: 1_600)
-                }.value
+            await MainActor.run {
+                beginAvatarMediaPresentation()
+            }
+            guard let data = try? await item.loadTransferable(type: Data.self) else {
                 await MainActor.run {
-                    if let ui {
-                        cropImageItem = IdentifiableCropImage(image: ui)
-                        AppPerformanceMonitor.shared.record("相册到裁剪页", startedAt: startedAt, note: "人类头像")
-                    }
+                    photosPickerItem = nil
+                    finishAvatarMediaPresentation()
+                }
+                return
+            }
+            let ui = await Task.detached(priority: .userInitiated) {
+                AddPetWizardView.cropReadyImage(from: data, maxPixel: 1_600)
+            }.value
+            await MainActor.run {
+                photosPickerItem = nil
+                guard let ui else {
+                    finishAvatarMediaPresentation()
+                    return
+                }
+                presentAvatarCropAfterMediaDismissal(ui, delayMilliseconds: 360) {
+                    AppPerformanceMonitor.shared.record("相册到裁剪页", startedAt: startedAt, note: "人类头像")
                 }
             }
         }
     }
 
     private func presentCamera() {
+        beginAvatarMediaPresentation()
         requestOhanaCameraAccess {
             showingCamera = true
         } onDenied: {
+            finishAvatarMediaPresentation()
             showCameraPermissionAlert = true
         }
     }
@@ -1577,9 +1654,35 @@ struct AddHumanWizardView: View {
             let prepared = await Task.detached(priority: .userInitiated) {
                 AddPetWizardView.preparedCropImage(image, maxPixel: 1_600)
             }.value
-            try? await Task.sleep(nanoseconds: 120_000_000)
-            cropImageItem = IdentifiableCropImage(image: prepared)
-            AppPerformanceMonitor.shared.markEnd("avatar.camera.to.crop", name: "拍照到裁剪页", note: "人类头像")
+            await MainActor.run {
+                presentAvatarCropAfterMediaDismissal(prepared, delayMilliseconds: 320) {
+                    AppPerformanceMonitor.shared.markEnd("avatar.camera.to.crop", name: "拍照到裁剪页", note: "人类头像")
+                }
+            }
+        }
+    }
+
+    private func presentAvatarCropAfterMediaDismissal(
+        _ image: UIImage,
+        delayMilliseconds: UInt64,
+        onPresented: @escaping @MainActor () -> Void
+    ) {
+        cropPresentationTask?.cancel()
+        cropPresentationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
+            guard !showingPhotoPicker, !showingCamera else {
+                presentAvatarCropAfterMediaDismissal(image, delayMilliseconds: 140, onPresented: onPresented)
+                return
+            }
+            restoreAvatarMediaReturnPage()
+            cropPresentationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 50) {
+                guard !showingPhotoPicker, !showingCamera else {
+                    presentAvatarCropAfterMediaDismissal(image, delayMilliseconds: 140, onPresented: onPresented)
+                    return
+                }
+                cropImageItem = IdentifiableCropImage(image: image)
+                cropPresentationTask = nil
+                onPresented()
+            }
         }
     }
 

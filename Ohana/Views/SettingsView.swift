@@ -21,7 +21,6 @@ struct SettingsView: View {
     @AppStorage(AppCurrency.storageKey) private var appCurrency = AppCurrency.fallbackCode
     @AppStorage("appThemePreference") private var appThemePreference: String = "dark"
     @AppStorage("appBackgroundStyle") private var appBackgroundStyle: String = AppBackgroundStyle.goIsland.rawValue
-    @AppStorage(OhanaHomeStyle.storageKey) private var homeStyleRaw = OhanaHomeStyle.defaultStyle.rawValue
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
     @State private var showingClearDataAlert = false
@@ -80,10 +79,6 @@ struct SettingsView: View {
     private var selectedCurrency: AppCurrency.Option {
         AppCurrency.supported.first { $0.code == AppCurrency.normalize(appCurrency) } ?? AppCurrency.supported[0]
     }
-    private var selectedHomeStyle: OhanaHomeStyle {
-        OhanaHomeStyle(rawValue: homeStyleRaw) ?? OhanaHomeStyle.defaultStyle
-    }
-
     var body: some View {
         NavigationStack {
             ZStack {
@@ -238,9 +233,6 @@ struct SettingsView: View {
 
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
 
-                            homeStylePickerRow
-
-                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
                             performanceToggleRow
 
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
@@ -958,41 +950,6 @@ struct SettingsView: View {
             .frame(minHeight: 44)
         }
         .buttonStyle(ScaleButtonStyle())
-    }
-
-    private var homeStylePickerRow: some View {
-        HStack(spacing: 12) {
-            settingsIcon("rectangle.stack.fill", color: Color.goPrimary)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(l.tr(zh: "首页样式", en: "Home style", de: "Startseitenstil"))
-                    .font(OhanaFont.body(.semibold))
-                    .foregroundStyle(primaryText)
-                Text(selectedHomeStyle.subtitle(l))
-                    .font(OhanaFont.caption2(.semibold))
-                    .foregroundStyle(tertiaryText)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 8)
-            Menu {
-                ForEach(OhanaHomeStyle.allCases) { style in
-                    Button {
-                        homeStyleRaw = style.rawValue
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    } label: {
-                        Label(
-                            style.title(l),
-                            systemImage: style == selectedHomeStyle ? "checkmark" : "rectangle.stack"
-                        )
-                    }
-                }
-            } label: {
-                menuValueLabel(selectedHomeStyle.title(l))
-            }
-        }
-        .foregroundStyle(primaryText)
-        .frame(minHeight: 52)
-        .animation(GoMotion.feedback, value: homeStyleRaw)
     }
 
     private var performanceToggleRow: some View {

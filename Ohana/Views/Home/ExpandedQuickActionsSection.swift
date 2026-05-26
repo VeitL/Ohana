@@ -491,10 +491,13 @@ struct LegacyExpandedQuickModulesView: View {
                     onAction(action)
                 } label: {
                     VStack(alignment: .leading, spacing: 9) {
-                        Image(systemName: action.icon)
-                            .font(.system(size: 22, weight: .black))
-                            .foregroundStyle(Color.ohanaFunctionalIcon)
-                            .frame(width: 34, height: 34)
+                        OhanaQuickActionIcon(
+                            actionType: action.label,
+                            fallbackSystemName: action.icon,
+                            size: 30,
+                            color: Color.ohanaFunctionalIcon
+                        )
+                        .frame(width: 34, height: 34)
 
                         VStack(alignment: .leading, spacing: 1) {
                             Text(titleForAction(action.label))
@@ -526,9 +529,9 @@ private struct ExpandedFirstSuccessPrompt: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            button(title: "喂食", icon: "fork.knife", action: onFeed)
-            button(title: "陪玩", icon: "tennisball.fill", action: onPlay)
-            button(title: "记录", icon: "camera.fill", action: onMoment)
+            button(title: "喂食", actionType: "feed", icon: "fork.knife", action: onFeed)
+            button(title: "陪玩", actionType: "play", icon: "tennisball.fill", action: onPlay)
+            button(title: "记录", actionType: "moment", icon: "camera.fill", action: onMoment)
         }
         .padding(8)
         .background(Color.ohanaCardSurface.opacity(0.52), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -538,16 +541,18 @@ private struct ExpandedFirstSuccessPrompt: View {
         )
     }
 
-    private func button(title: String, icon: String, action: @escaping () -> Void) -> some View {
+    private func button(title: String, actionType: String, icon: String, action: @escaping () -> Void) -> some View {
         Button {
             OhanaFeedback.medium()
             action()
         } label: {
             VStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.goPrimary)
-                    .frame(width: 28, height: 28)
+                OhanaQuickActionIcon(
+                    actionType: actionType,
+                    fallbackSystemName: icon,
+                    size: 28,
+                    color: Color.goPrimary
+                )
                 Text(title)
                     .font(OhanaFont.caption2(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
@@ -1079,11 +1084,14 @@ private struct ExpandedQuickAddInlinePanel: View {
                             onAdd(item)
                         } label: {
                             VStack(spacing: 5) {
-                                Image(systemName: item.icon)
-                                    .font(.system(size: 15, weight: .black))
-                                    .foregroundStyle(Color.ohanaFunctionalIcon)
-                                    .frame(width: 30, height: 30)
-                                    .background(Color.ohanaControlFill, in: Circle())
+                                OhanaQuickActionIcon(
+                                    actionType: item.actionType,
+                                    fallbackSystemName: item.icon,
+                                    size: 22,
+                                    color: Color.ohanaFunctionalIcon
+                                )
+                                .frame(width: 30, height: 30)
+                                .background(Color.ohanaControlFill, in: Circle())
                                 Text(item.label)
                                     .font(OhanaFont.caption2(.bold))
                                     .foregroundStyle(Color.ohanaPrimaryText)

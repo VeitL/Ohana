@@ -23,6 +23,7 @@ struct VerticalSolidHomePage<QuickActions: View, ContextMenuContent: View>: View
     let heroDirection: Int
     let reduceMotion: Bool
     let isVisible: Bool
+    let isLive: Bool
     let showFirstSuccessCard: Bool
     let firstQuickCheckInCompleted: Bool
     @Binding var isTodayFocusCollapsed: Bool
@@ -38,6 +39,7 @@ struct VerticalSolidHomePage<QuickActions: View, ContextMenuContent: View>: View
     let onTapNegativeSignal: (IslandNegativeSignal) -> Void
     let onTapOasis: () -> Void
     let onTapFamilyTask: (FamilyCollaborationTask) -> Void
+    let onConfirmExchange: (CoconutExchangeRequest) -> Void
     let onFirstSuccessFeed: (Pet) -> Void
     let onFirstSuccessPlay: (Pet) -> Void
     let onFirstSuccessMoment: (Pet) -> Void
@@ -81,6 +83,8 @@ struct VerticalSolidHomePage<QuickActions: View, ContextMenuContent: View>: View
 
             VerticalHomeTaskDeck(
                 isCollapsed: $isTodayFocusCollapsed,
+                isVisible: isVisible,
+                isLive: selectedCardId == nil && isVisible,
                 pendingCount: reminders.count,
                 height: focusHeight,
                 activePets: activePets,
@@ -96,6 +100,7 @@ struct VerticalSolidHomePage<QuickActions: View, ContextMenuContent: View>: View
                 onTapNegativeSignal: onTapNegativeSignal,
                 onTapOasis: onTapOasis,
                 onTapFamilyTask: onTapFamilyTask,
+                onConfirmExchange: onConfirmExchange,
                 onFirstSuccessFeed: onFirstSuccessFeed,
                 onFirstSuccessPlay: onFirstSuccessPlay,
                 onFirstSuccessMoment: onFirstSuccessMoment

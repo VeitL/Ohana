@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Sleep / 休息" class="ohana-duotone-icon">
+  <title>Sleep / 休息</title>
+  <g>
+
+      <path style="fill:#5f6fd8" d="M5.7 25.5 16 8.4l10.3 17.1H5.7Z"/>
+      <path style="fill:#5f6fd8;opacity:.22" d="M16 8.4v17.1H5.7L16 8.4Z"/>
+      <path style="fill:#ffd36c" d="M16 16.7 21 25.5H11l5-8.8Z"/>
+      <rect style="fill:#5f6fd8" x="6.2" y="24.2" width="19.6" height="2.4" rx="1.2"/>
+      <text style="fill:#ffd36c" x="23.5" y="8.6" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="5.5" font-weight="900">Z</text>
+      <text style="fill:#ffd36c" x="26.6" y="13" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="4.5" font-weight="900">Z</text>
+      <text style="fill:#ffd36c;opacity:.28" x="20" y="5.9" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="4" font-weight="900">Z</text>
+  </g>
+</svg>

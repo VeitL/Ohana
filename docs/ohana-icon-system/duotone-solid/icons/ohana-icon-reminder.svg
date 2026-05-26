@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Reminder / 提醒" class="ohana-duotone-icon">
+  <title>Reminder / 提醒</title>
+  <g>
+
+      <path style="fill:#3f74d8" d="M10 20.7v-5.9a6 6 0 1 1 12 0v5.9l2 2.5H8l2-2.5Z"/>
+      <path style="fill:#3f74d8" d="M13.1 24.2h5.8a3 3 0 0 1-5.8 0Z"/>
+      <circle style="fill:#ff755f" cx="23.3" cy="8.7" r="3.2"/>
+  </g>
+</svg>

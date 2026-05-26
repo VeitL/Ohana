@@ -43,6 +43,7 @@ enum FocusHomeCardDataSource {
                 "\(pet.currentStreak)",
                 "\(pet.coconutBalance)",
                 "\(pet.daysTogether)",
+                "\(Int(FocusCard.weeklyWalkDistanceMeters(for: pet).rounded()))",
                 homeWaterWarningSignature(for: pet)
             ].joined(separator: "|")
         }.joined(separator: ";")
@@ -112,7 +113,7 @@ enum FocusHomeCardDataSource {
         let real = (
             pets
                 .filter { !$0.hasPassedAway && HomeCardVisibility.isPetVisible($0, raw: hiddenPetIDsRaw) }
-                .map { FocusCard.from($0, includeAvatarData: false) }
+                .map { FocusCard.from($0, includeAvatarData: false, includeWalkDistance: false) }
             + humans
                 .filter { $0.shouldShowOnHome }
                 .map { FocusCard.from($0, includeAvatarData: false) }

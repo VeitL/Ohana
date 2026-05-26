@@ -80,6 +80,32 @@ enum CarePlanCalendarSync {
         return generatedTitles.contains(event.title)
     }
 
+    static func shouldShowModeScopedPlanOccurrence(
+        _ event: Event,
+        occurrenceDate: Date,
+        allEvents: [Event],
+        pets: [Pet],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Bool {
+        guard calendar.startOfDay(for: occurrenceDate) >= calendar.startOfDay(for: now),
+              let pet = pets.first(where: { $0.id.uuidString == event.relatedEntityId }) else {
+            return true
+        }
+
+        if FeedRuleMetadata.isManualReminderEvent(event, pet: pet) {
+            return FeedOperatingMode.resolved(pet: pet, allEvents: allEvents, now: now, calendar: calendar) == .manualReminder
+        }
+        if FeedRuleMetadata.isAutoFeederEvent(event, pet: pet) {
+            return FeedOperatingMode.resolved(pet: pet, allEvents: allEvents, now: now, calendar: calendar) == .autoFeeder
+        }
+        if WaterPlanWriter.isPlanEvent(event, pet: pet) {
+            return WaterRuleState(pet: pet, allEvents: allEvents, now: now, calendar: calendar).operatingMode == .reminder
+        }
+
+        return true
+    }
+
     private static func shouldSkipDefaultPlan(kind: String, petKey: String, context: ModelContext) -> Bool {
         if UserDefaults.standard.bool(forKey: defaultSuppressionKey(kind: kind, petKey: petKey)) {
             return true

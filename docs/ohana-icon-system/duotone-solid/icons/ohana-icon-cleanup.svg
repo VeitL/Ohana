@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Cleanup / 清洁" class="ohana-duotone-icon">
+  <title>Cleanup / 清洁</title>
+  <g>
+
+      <rect style="fill:#2d88c8" x="8.4" y="17.4" width="15.8" height="6.2" rx="3.1" transform="rotate(-18 16.3 20.5)"/>
+      <rect style="fill:#2d88c8" x="13.5" y="7" width="4" height="13.5" rx="2" transform="rotate(-18 15.5 13.8)"/>
+      <circle style="fill:#ffd36c" cx="22.7" cy="8.5" r="2.2"/>
+      <circle style="fill:#ffd36c;opacity:.28" cx="25.4" cy="13" r="1.35"/>
+      <circle style="fill:#ffd36c;opacity:.28" cx="8.2" cy="24.5" r="1.5"/>
+  </g>
+</svg>

@@ -2,9 +2,10 @@
 //  FocusHomeAuxiliaryViews.swift
 //  Ohana
 //
-//  Small rendering-only helpers used by FocusStackHomeTestView.
+//  Small rendering-only helpers used by the home flow.
 //
 
+import SwiftData
 import SwiftUI
 
 struct ExpandedQuickMenuOption: Identifiable {
@@ -14,6 +15,87 @@ struct ExpandedQuickMenuOption: Identifiable {
     let tint: Color
 }
 
+struct TodayFocusSnapshot {
+    let pets: [Pet]
+    let plants: [Plant]
+    let humans: [Human]
+    let refreshedQuests: [IslandQuest]
+    let assignedFamilyTasks: [FamilyCollaborationTask]
+    let pendingExchangeRequests: [CoconutExchangeRequest]
+    let negativeSignals: [IslandNegativeSignal]
+
+    static let empty = TodayFocusSnapshot(
+        pets: [],
+        plants: [],
+        humans: [],
+        refreshedQuests: [],
+        assignedFamilyTasks: [],
+        pendingExchangeRequests: [],
+        negativeSignals: []
+    )
+
+    static func make(
+        pets: [Pet],
+        plants: [Plant],
+        reminders: [Reminder],
+        events: [Event],
+        humans: [Human],
+        activeHumanId: String,
+        careLogs: [PetCareLog],
+        walkLogs: [PetWalkLog],
+        pottyLogs: [PetPottyLog],
+        humanWeightLogs: [HumanWeightLog],
+        familyTasks: [FamilyCollaborationTask],
+        exchangeRequests: [CoconutExchangeRequest]
+    ) -> TodayFocusSnapshot {
+        let quests = IslandQuestEngine.todayQuests(
+            pets: pets,
+            reminders: reminders,
+            plants: plants,
+            events: events,
+            humans: humans
+        )
+        let refreshedQuests = TodayFocusService.refreshedQuests(
+            quests,
+            pets: pets,
+            humans: humans,
+            careLogs: careLogs,
+            walkLogs: walkLogs,
+            pottyLogs: pottyLogs,
+            humanWeightLogs: humanWeightLogs
+        )
+        let assignedTasks: [FamilyCollaborationTask]
+        if activeHumanId.isEmpty {
+            assignedTasks = []
+        } else {
+            assignedTasks = familyTasks
+                .filter {
+                    !$0.isFinished &&
+                    (($0.status == .pendingReview && $0.createdById == activeHumanId) ||
+                     ($0.status != .pendingReview && ($0.assignedToId == activeHumanId || $0.claimedById == activeHumanId)))
+                }
+                .sorted { ($0.dueAt ?? $0.createdAt) < ($1.dueAt ?? $1.createdAt) }
+        }
+        let pendingExchanges: [CoconutExchangeRequest]
+        if activeHumanId.isEmpty {
+            pendingExchanges = []
+        } else {
+            pendingExchanges = exchangeRequests
+                .filter { $0.status == .pending && $0.receiverId == activeHumanId }
+                .sorted { $0.createdAt < $1.createdAt }
+        }
+        return TodayFocusSnapshot(
+            pets: pets,
+            plants: plants,
+            humans: humans,
+            refreshedQuests: refreshedQuests,
+            assignedFamilyTasks: assignedTasks,
+            pendingExchangeRequests: pendingExchanges,
+            negativeSignals: IslandNegativeFeedback.signals(pets: pets, plants: plants)
+        )
+    }
+}
+
 struct TodayFocusQuestCardHost: View {
     let pets: [Pet]
     let plants: [Plant]
@@ -21,14 +103,94 @@ struct TodayFocusQuestCardHost: View {
     let humans: [Human]
     let events: [Event]
     let activePet: Pet?
+    let isLive: Bool
     var presentation: TodayFocusCardPresentation = .board
     var onOpenQuest: (IslandQuest) -> Void
     var onCompleteQuest: (IslandQuest) -> Void
     var onTapNegativeSignal: (IslandNegativeSignal) -> Void
     var onTapOasis: () -> Void
     var onTapFamilyTask: (FamilyCollaborationTask) -> Void
+    var onConfirmExchange: (CoconutExchangeRequest) -> Void = { _ in }
 
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @Query(sort: \PetCareLog.date, order: .reverse) private var liveCare: [PetCareLog]
+    @Query(sort: \PetWalkLog.startDate, order: .reverse) private var liveWalks: [PetWalkLog]
+    @Query(sort: \PetPottyLog.date, order: .reverse) private var livePotty: [PetPottyLog]
+    @Query(sort: \HumanWeightLog.date, order: .reverse) private var liveHumanWeights: [HumanWeightLog]
+    @Query(sort: \FamilyCollaborationTask.updatedAt, order: .reverse) private var familyTasks: [FamilyCollaborationTask]
+    @Query(sort: \CoconutExchangeRequest.createdAt, order: .reverse) private var exchangeRequests: [CoconutExchangeRequest]
+    @State private var renderSnapshot = TodayFocusSnapshot.empty
+    @State private var renderSnapshotSignature = ""
+
+    init(
+        pets: [Pet],
+        plants: [Plant],
+        reminders: [Reminder],
+        humans: [Human],
+        events: [Event],
+        activePet: Pet?,
+        isLive: Bool = true,
+        presentation: TodayFocusCardPresentation = .board,
+        onOpenQuest: @escaping (IslandQuest) -> Void,
+        onCompleteQuest: @escaping (IslandQuest) -> Void,
+        onTapNegativeSignal: @escaping (IslandNegativeSignal) -> Void,
+        onTapOasis: @escaping () -> Void,
+        onTapFamilyTask: @escaping (FamilyCollaborationTask) -> Void,
+        onConfirmExchange: @escaping (CoconutExchangeRequest) -> Void = { _ in }
+    ) {
+        self.pets = pets
+        self.plants = plants
+        self.reminders = reminders
+        self.humans = humans
+        self.events = events
+        self.activePet = activePet
+        self.isLive = isLive
+        self.presentation = presentation
+        self.onOpenQuest = onOpenQuest
+        self.onCompleteQuest = onCompleteQuest
+        self.onTapNegativeSignal = onTapNegativeSignal
+        self.onTapOasis = onTapOasis
+        self.onTapFamilyTask = onTapFamilyTask
+        self.onConfirmExchange = onConfirmExchange
+
+        let todayStart = Calendar.current.startOfDay(for: Date())
+        let activeStatus = FamilyCollaborationTaskStatus.active.rawValue
+        let claimedStatus = FamilyCollaborationTaskStatus.claimed.rawValue
+        let pendingReviewStatus = FamilyCollaborationTaskStatus.pendingReview.rawValue
+        let pendingExchangeStatus = CoconutExchangeRequestStatus.pending.rawValue
+        _liveCare = Query(
+            filter: #Predicate<PetCareLog> { $0.date >= todayStart },
+            sort: \.date,
+            order: .reverse
+        )
+        _liveWalks = Query(
+            filter: #Predicate<PetWalkLog> { $0.startDate >= todayStart },
+            sort: \.startDate,
+            order: .reverse
+        )
+        _livePotty = Query(
+            filter: #Predicate<PetPottyLog> { $0.date >= todayStart },
+            sort: \.date,
+            order: .reverse
+        )
+        _liveHumanWeights = Query(
+            filter: #Predicate<HumanWeightLog> { $0.date >= todayStart },
+            sort: \.date,
+            order: .reverse
+        )
+        _familyTasks = Query(
+            filter: #Predicate<FamilyCollaborationTask> {
+                $0.statusRaw == activeStatus || $0.statusRaw == claimedStatus || $0.statusRaw == pendingReviewStatus
+            },
+            sort: \.updatedAt,
+            order: .reverse
+        )
+        _exchangeRequests = Query(
+            filter: #Predicate<CoconutExchangeRequest> { $0.statusRaw == pendingExchangeStatus },
+            sort: \.createdAt,
+            order: .reverse
+        )
+    }
 
     private var activeHumanId: UUID? {
         UUID(uuidString: activeHumanIdStr)
@@ -40,24 +202,184 @@ struct TodayFocusQuestCardHost: View {
 
     var body: some View {
         TodayFocusCard(
-            pets: pets,
-            plants: plants,
-            quests: IslandQuestEngine.todayQuests(
-                pets: pets,
-                reminders: reminders,
-                plants: plants,
-                events: events,
-                humans: privacyVisibleHumans
-            ),
-            humans: privacyVisibleHumans,
-            activePet: activePet,
+            snapshot: renderSnapshot,
             presentation: presentation,
             onOpenQuest: onOpenQuest,
             onCompleteQuest: onCompleteQuest,
             onTapNegativeSignal: onTapNegativeSignal,
             onTapOasis: onTapOasis,
-            onTapFamilyTask: onTapFamilyTask
+            onTapFamilyTask: onTapFamilyTask,
+            onConfirmExchange: onConfirmExchange,
+            freezesToFrontCard: !isLive
         )
+        .task(id: snapshotTaskKey) {
+            guard isLive else { return }
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 96)
+            guard !Task.isCancelled else { return }
+            refreshSnapshotIfNeeded()
+        }
+    }
+
+    private var snapshotTaskKey: String {
+        isLive ? "live|\(snapshotDependencyKey)" : "frozen"
+    }
+
+    private var snapshotDependencyKey: String {
+        [
+            AppLanguage.code,
+            activeHumanIdStr,
+            petSignature,
+            plantSignature,
+            reminderSignature,
+            eventSignature,
+            liveCareSignature,
+            liveWalkSignature,
+            livePottySignature,
+            liveHumanWeightSignature,
+            familyTaskSignature,
+            exchangeRequestSignature
+        ].joined(separator: "||")
+    }
+
+    private var petSignature: String {
+        pets.map(petDependencyKey).joined(separator: "|")
+    }
+
+    private var plantSignature: String {
+        plants.map(plantDependencyKey).joined(separator: "|")
+    }
+
+    private var reminderSignature: String {
+        reminders.prefix(8).map(reminderDependencyKey).joined(separator: "|")
+    }
+
+    private var eventSignature: String {
+        events.prefix(16).map(eventDependencyKey).joined(separator: "|")
+    }
+
+    private var liveCareSignature: String {
+        liveCare.prefix(16).map(careDependencyKey).joined(separator: "|")
+    }
+
+    private var liveWalkSignature: String {
+        liveWalks.prefix(16).map(walkDependencyKey).joined(separator: "|")
+    }
+
+    private var livePottySignature: String {
+        livePotty.prefix(16).map(pottyDependencyKey).joined(separator: "|")
+    }
+
+    private var liveHumanWeightSignature: String {
+        liveHumanWeights.prefix(16).map(humanWeightDependencyKey).joined(separator: "|")
+    }
+
+    private var familyTaskSignature: String {
+        familyTasks.prefix(12).map(familyTaskDependencyKey).joined(separator: "|")
+    }
+
+    private var exchangeRequestSignature: String {
+        exchangeRequests.prefix(12).map(exchangeRequestDependencyKey).joined(separator: "|")
+    }
+
+    private func petDependencyKey(_ pet: Pet) -> String {
+        [
+            pet.id.uuidString,
+            pet.name,
+            String(pet.currentStreak),
+            String(pet.coconutBalance)
+        ].joined(separator: ":")
+    }
+
+    private func plantDependencyKey(_ plant: Plant) -> String {
+        [
+            plant.id.uuidString,
+            plant.name,
+            timestamp(plant.lastWateredDate),
+            timestamp(plant.lastFertilizedDate)
+        ].joined(separator: ":")
+    }
+
+    private func reminderDependencyKey(_ reminder: Reminder) -> String {
+        [
+            reminder.id.uuidString,
+            timestamp(reminder.scheduledAt),
+            reminder.status
+        ].joined(separator: ":")
+    }
+
+    private func eventDependencyKey(_ event: Event) -> String {
+        [
+            event.id.uuidString,
+            timestamp(event.startDate),
+            String(event.isCompleted)
+        ].joined(separator: ":")
+    }
+
+    private func careDependencyKey(_ log: PetCareLog) -> String {
+        [log.id.uuidString, timestamp(log.date)].joined(separator: ":")
+    }
+
+    private func walkDependencyKey(_ log: PetWalkLog) -> String {
+        [log.id.uuidString, timestamp(log.startDate)].joined(separator: ":")
+    }
+
+    private func pottyDependencyKey(_ log: PetPottyLog) -> String {
+        [log.id.uuidString, timestamp(log.date)].joined(separator: ":")
+    }
+
+    private func humanWeightDependencyKey(_ log: HumanWeightLog) -> String {
+        [log.id.uuidString, timestamp(log.date)].joined(separator: ":")
+    }
+
+    private func familyTaskDependencyKey(_ task: FamilyCollaborationTask) -> String {
+        [
+            task.id.uuidString,
+            task.statusRaw,
+            task.assignedToId ?? "",
+            task.claimedById ?? ""
+        ].joined(separator: ":")
+    }
+
+    private func exchangeRequestDependencyKey(_ request: CoconutExchangeRequest) -> String {
+        [
+            request.id.uuidString,
+            request.statusRaw,
+            request.receiverId
+        ].joined(separator: ":")
+    }
+
+    private func timestamp(_ date: Date) -> String {
+        String(Int(date.timeIntervalSince1970))
+    }
+
+    private func timestamp(_ date: Date?) -> String {
+        guard let date else { return "0" }
+        return timestamp(date)
+    }
+
+    private func refreshSnapshotIfNeeded() {
+        let signature = snapshotDependencyKey
+        guard signature != renderSnapshotSignature else { return }
+        let next = TodayFocusSnapshot.make(
+            pets: pets,
+            plants: plants,
+            reminders: reminders,
+            events: events,
+            humans: privacyVisibleHumans,
+            activeHumanId: activeHumanIdStr,
+            careLogs: liveCare,
+            walkLogs: liveWalks,
+            pottyLogs: livePotty,
+            humanWeightLogs: liveHumanWeights,
+            familyTasks: familyTasks,
+            exchangeRequests: exchangeRequests
+        )
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            renderSnapshot = next
+            renderSnapshotSignature = signature
+        }
     }
 }
 

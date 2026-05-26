@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Privacy / 隐私" class="ohana-duotone-icon">
+  <title>Privacy / 隐私</title>
+  <g>
+
+      <rect style="fill:#27313a" x="7.8" y="14" width="16.4" height="12" rx="4.2"/>
+      <path style="fill:none;stroke:#27313a;stroke-width:4.2;stroke-linecap:round;stroke-linejoin:round" d="M11.5 14v-2.2a4.5 4.5 0 0 1 9 0V14"/>
+      <circle style="fill:#c8ff3d" cx="16" cy="20.1" r="2.3"/>
+  </g>
+</svg>

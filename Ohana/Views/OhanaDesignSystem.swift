@@ -42,9 +42,11 @@ struct CoconutBalanceCapsule: View {
     @State private var questManager = QuestManager.shared
     @State private var previousCount: Int
     @State private var pulse = false
+    @State private var contextHandoffPulse = false
     @State private var floatingDelta: Int? = nil
     @State private var floatingDeltaProgress: CGFloat = 1
     @State private var floatingDeltaToken = 0
+    @State private var contextHandoffToken = 0
     private let balanceOverride: Int?
     private let showsDeltaAnimation: Bool
     private let deltaAnimationContext: String
@@ -83,7 +85,7 @@ struct CoconutBalanceCapsule: View {
         .frame(height: 26)
         .fixedSize(horizontal: true, vertical: false)
         .background(Color.goPrimary, in: Capsule())
-        .scaleEffect(pulse ? 1.12 : 1.0)
+        .scaleEffect(pulse ? 1.12 : (contextHandoffPulse ? 1.045 : 1.0))
         .overlay(alignment: .bottom) {
             if let delta = floatingDelta, delta != 0 {
                 floatingDeltaLabel(delta)
@@ -94,6 +96,7 @@ struct CoconutBalanceCapsule: View {
             }
         }
         .animation(GoMotion.feedback, value: pulse)
+        .animation(GoMotion.feedback, value: contextHandoffPulse)
     }
 
     private var floatingDeltaOffsetY: CGFloat {
@@ -131,10 +134,15 @@ struct CoconutBalanceCapsule: View {
         .onChange(of: deltaState) { oldValue, newValue in
             let delta = newValue.count - oldValue.count
             previousCount = newValue.count
-            guard showsDeltaAnimation, oldValue.context == newValue.context, delta != 0 else {
+            guard showsDeltaAnimation else {
                 resetFloatingDelta()
                 return
             }
+            guard oldValue.context == newValue.context else {
+                showContextHandoff()
+                return
+            }
+            guard delta != 0 else { return }
             showFloatingDelta(delta)
         }
     }
@@ -170,12 +178,28 @@ struct CoconutBalanceCapsule: View {
         }
     }
 
+    private func showContextHandoff() {
+        resetFloatingDelta()
+        contextHandoffToken += 1
+        let token = contextHandoffToken
+        withAnimation(GoMotion.feedback) {
+            contextHandoffPulse = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+            guard token == contextHandoffToken else { return }
+            withAnimation(GoMotion.feedback) {
+                contextHandoffPulse = false
+            }
+        }
+    }
+
     private func resetFloatingDelta() {
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             floatingDelta = nil
             pulse = false
+            contextHandoffPulse = false
             floatingDeltaProgress = 1
         }
     }
@@ -1081,9 +1105,9 @@ public struct OhanaPopupGlassSurface: View {
 
             LinearGradient(
                 colors: [
-                    Color.white.opacity(colorScheme == .dark ? 0.12 : 0.20), // ui-v4: allow native glass sheen
+                    Color.white.opacity(colorScheme == .dark ? 0.08 : 0.20), // ui-v4: allow native glass sheen
                     Color.clear,
-                    Color.black.opacity(colorScheme == .dark ? 0.08 : 0.03) // ui-v4: allow native glass depth tint
+                    Color.black.opacity(colorScheme == .dark ? 0.26 : 0.03) // ui-v4: allow native glass depth tint
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -1092,7 +1116,7 @@ public struct OhanaPopupGlassSurface: View {
             .allowsHitTesting(false)
 
             shape
-                .strokeBorder(Color.ohanaPopupSurfaceStroke, lineWidth: colorScheme == .dark ? 1.15 : 0.8)
+                .strokeBorder(Color.ohanaPopupSurfaceStroke, lineWidth: colorScheme == .dark ? 1.0 : 0.8)
                 .allowsHitTesting(false)
 
             shape

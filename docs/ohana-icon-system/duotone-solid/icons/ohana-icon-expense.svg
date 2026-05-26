@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Expense / 花费" class="ohana-duotone-icon">
+  <title>Expense / 花费</title>
+  <g>
+
+      <rect style="fill:#2f8e62" x="6" y="9" width="20" height="15.8" rx="5"/>
+      <rect style="fill:#ffd36c;opacity:.28" x="8.6" y="12" width="14.8" height="3" rx="1.5"/>
+      <text style="fill:#ffd36c" x="16" y="21.4" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="10.6" font-weight="900">$</text>
+  </g>
+</svg>
